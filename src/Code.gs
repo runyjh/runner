@@ -438,6 +438,11 @@ function randomBytes_(n) {
   return out.slice(0, n);
 }
 function hmac_(bytes, key) { return arr_(Utilities.computeHmacSha256Signature(bytes, key)); }
+/** 세션 토큰 해시: 't'+16진수. 시트가 수식(+, =)이나 숫자로 해석할 수 없는 모양 */
+function tokenHash_(token) {
+  return 't' + arr_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(token)))
+    .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
 function sha256b64_(s) { return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s))); }
 
 /** HMAC-SHA256 카운터 모드 키스트림 */
@@ -600,7 +605,7 @@ function api_login(loginId, password, auto) {
 
 function createSession_(driverId, auto) {
   const token = newToken_();
-  const th = sha256b64_(token);
+  const th = tokenHash_(token);
   const now = Date.now();
   const exp = now + (auto ? CFG.SESSION_AUTO_DAYS * 864e5 : CFG.SESSION_HOURS * 36e5);
   const c = cols_(SH.SESSIONS);
@@ -615,7 +620,7 @@ function sessTtl_(exp) { return Math.max(1, Math.min(CFG.SESS_CACHE, Math.floor(
 
 function getSession_(token) {
   if (!token || String(token).length > 200) return null;
-  const th = sha256b64_(token);
+  const th = tokenHash_(token);
   let s = cache_().get('ss:' + th);
   if (s) s = JSON.parse(s);
   else {
@@ -646,7 +651,7 @@ function api_checkSession(token) {
 function api_logout(token) {
   return run_(function () {
     if (!token) return { ok: true };
-    const th = sha256b64_(token);
+    const th = tokenHash_(token);
     cache_().remove('ss:' + th);
     const row = findRow_(SH.SESSIONS, 'tokenHash', th);
     if (row) writeFields_(SH.SESSIONS, row, { expiresAt: nowText_() });
@@ -932,6 +937,8 @@ function fixDriverRow_(sh, c, o) {
 }
 
 // ───────────────────────── 관리자 : 계정 / 로그인 ─────────────────────────
+// 관리자 로그인 기록은 sessions 시트의 기사ID 칸에 "admin:관리자ID" 로 남는다 (기사 로그인과 구분)
+const ADMIN_SESSION = 'admin:';
 function newAdminId_() {
   return 'A' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10);
 }
@@ -966,8 +973,9 @@ function adminInfo_(id) {
 /** 모든 관리자 API 의 첫 줄: 로그인 확인 */
 function requireAdmin_(token) {
   const s = getSession_(token);
-  if (!s || String(s.d).charAt(0) !== 'A') expired_();
-  const a = adminInfo_(s.d);
+  const d = s ? String(s.d) : '';
+  if (d.indexOf(ADMIN_SESSION) !== 0) expired_();
+  const a = adminInfo_(d.slice(ADMIN_SESSION.length));
   if (!a || a.status !== AST.ACTIVE || !sessionAfterPw_(s.c, a.pwChangedAt)) expired_();
   return a;
 }
@@ -992,7 +1000,8 @@ function adm_login(loginId, password, auto) {
     }
     cache_().remove(fk);
     if (o.status !== AST.ACTIVE) fail_('사용이 중지된 관리자 계정입니다.');
-    const s = createSession_(o.id, auto === true);
+    if (!o.id) fail_('관리자ID가 비어 있습니다. admins 시트의 관리자ID 칸을 채워 주세요.');
+    const s = createSession_(ADMIN_SESSION + o.id, auto === true);
     writeFields_(SH.ADMINS, o._row, { lastLoginAt: nowText_() });
     return { ok: true, token: s.token, admin: { name: o.name, loginId: o.loginId.toLowerCase() } };
   });
