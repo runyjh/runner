@@ -188,8 +188,9 @@ const CAD_NOTES = {
 };
 const CAD_MAX = 10;
 // route_prices 시트: 구분별 단가. 노선코드 앞자리부터의 경로(110-A, 110-A-B …) 하나에 한 줄
+// route_prices 시트: 구분별 단가. 숫자(구분1) + 구분(2~5) + 글자 하나에 한 줄. 예: 110 / 구분3 / B
 const RP = {
-  id: '단가ID', campId: '캠프ID', campName: '캠프명', level: '구분', path: '구분경로',
+  id: '단가ID', campId: '캠프ID', campName: '캠프명', num: '숫자(구분1)', level: '구분', value: '글자',
   p1: '원청단가', p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가',
   tmp: '일시단가', tmpStart: '일시단가 시작일', tmpEnd: '일시단가 종료일',
   createdAt: '등록일시', updatedAt: '수정일시'
@@ -197,8 +198,9 @@ const RP = {
 const RP_PRICE_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5', 'tmp'];
 const RP_NOTES = {
   campName: '캠프명을 입력하면 캠프ID가 자동으로 채워집니다.',
-  path: '노선코드 앞자리부터 구분을 - 로 이어 씀. 예: 110-A (구분2), 110-A-B (구분3), 110-A-B-C (구분4), 110-A-B-C-D (구분5). 110AB 처럼 써도 자동으로 나뉩니다.',
-  level: '구분경로에서 자동 (구분2~구분5)',
+  num: '노선코드 앞 숫자. 예: 110ABCD 이면 110',
+  level: '구분2 / 구분3 / 구분4 / 구분5 (2 처럼 숫자만 써도 됨)',
+  value: '그 구분 자리의 글자. 예: 110ABCD 의 구분3 은 B',
   p1: '숫자만 (원). 1,200 처럼 써도 됩니다.',
   tmp: '정해진 기간에만 쓰는 단가. 시작일·종료일을 같이 입력하세요.',
   tmpStart: '2026-11-01 형식'
@@ -402,8 +404,8 @@ function cols_(name, fresh) {
     const i = head.indexOf(def[k]);
     if (i < 0) missing.push(def[k]); else c[k] = i;
   });
-  const autoable = name === SH.DRIVERS && missing.length &&
-    missing.every(function (label) { return D_AUTO_ADD.some(function (k) { return D[k] === label; }); });
+  const autoable = missing.length && (AUTO_SHEETS.indexOf(name) >= 0 || (name === SH.DRIVERS &&
+    missing.every(function (label) { return D_AUTO_ADD.some(function (k) { return D[k] === label; }); })));
   if (autoable) {
     addHeaders_(name, missing);
     return cols_(name, true);
@@ -2371,7 +2373,7 @@ function master_() {
     routes: readAll_(SH.ROUTES).filter(function (o) { return o.id && o.code; }).map(routeView_),
     images: readAll_(SH.CIMG).filter(function (o) { return o.id; }).map(imageView_),
     addresses: readAll_(SH.CADDR).filter(function (o) { return o.id && o.address; }).map(addrView_),
-    prices: readAll_(SH.PRICES).filter(function (o) { return o.id && o.path; }).map(priceView_)
+    prices: readAll_(SH.PRICES).filter(function (o) { return o.id && o.num; }).map(priceView_)
   };
   const json = JSON.stringify(data);
   if (json.length <= MST_CHUNK * 60) {
@@ -2963,18 +2965,13 @@ function fixCampAddrRow_(sh, c, o) {
   putNote_(sh, c, o._row, 'address', o.address ? '' : '주소를 입력해 주세요.');
 }
 
-// ── 구분별 단가 (구분2~5) ──
-/** 구분경로 정리: '110-a-b' / '110AB' → '110-A-B'. 구분이 2~5개가 아니면 '' */
-function normPath_(v) {
-  const s = normCode_(v);
-  if (!s) return '';
-  let parts;
-  if (s.indexOf('-') >= 0) parts = s.split('-').filter(function (x) { return x; });
-  else { const g = splitCode_(s); parts = [g.g1, g.g2, g.g3, g.g4, g.g5].filter(function (x) { return x; }); }
-  if (parts.length < 2 || parts.length > 5) return '';
-  return parts.join('-');
+// ── 구분별 단가 (숫자별 구분2~5 글자마다) ──
+/** 구분 글자 정리: '구분3' / '3' → 3. 2~5 가 아니면 0 */
+function normLevel_(v) {
+  const m = str_(v).match(/^(?:구분)?\s*([2-5])$/);
+  return m ? Number(m[1]) : 0;
 }
-function pathLevel_(path) { return path ? path.split('-').length : 0; }
+function priceKey_(num, level, value) { return num + '|' + level + '|' + value; }
 /** 금액 글자 정리: '1,200원' → '1200'. 비었으면 '', 잘못되면 null */
 function normMoney_(v) {
   const s = str_(v).replace(/[,\s원₩]/g, '');
@@ -2982,15 +2979,17 @@ function normMoney_(v) {
   return /^\d{1,9}$/.test(s) ? String(Number(s)) : null;
 }
 function priceView_(o) {
-  const path = normPath_(o.path) || o.path;
-  const v = { id: o.id, campId: o.campId, path: path, level: pathLevel_(path), tmpStart: o.tmpStart, tmpEnd: o.tmpEnd, updatedAt: o.updatedAt };
+  const v = {
+    id: o.id, campId: o.campId, num: normCode_(o.num), level: normLevel_(o.level), value: normCode_(o.value),
+    tmpStart: o.tmpStart, tmpEnd: o.tmpEnd, updatedAt: o.updatedAt
+  };
   RP_PRICE_KEYS.forEach(function (k) { const m = normMoney_(o[k]); v[k] = m === null ? o[k] : m; });
   return v;
 }
 
 /**
  * 캠프의 구분별 단가를 한 번에 저장.
- * rows = [{ path, p1..p5, tmp, tmpStart, tmpEnd, seen }] — 보낸 경로만 바뀐다. 단가를 모두 비우면 그 줄은 지운다.
+ * rows = [{ num, level, value, p1..p5, tmp, tmpStart, tmpEnd, seen }] — 보낸 줄만 바뀐다. 단가를 모두 비우면 그 줄은 지운다.
  */
 function adm_priceSave(token, campId, rows) {
   return run_(function () {
@@ -3000,20 +2999,21 @@ function adm_priceSave(token, campId, rows) {
     if (rows.length > 2000) fail_('한 번에 2000줄까지 저장할 수 있습니다.');
     // 1) 값 검사 (잠금 밖)
     const clean = rows.map(function (r) {
-      const path = normPath_(r.path);
-      if (!path) fail_('구분경로가 올바르지 않습니다: ' + r.path);
-      const x = { path: path, seen: r.seen };
+      const num = normCode_(r.num), level = normLevel_(r.level), value = normCode_(r.value);
+      if (!num || !level || !value || num.length > 10 || value.length > 10) fail_('구분 정보가 올바르지 않습니다: ' + [r.num, r.level, r.value].join(' '));
+      const name = num + ' 구분' + level + ' ' + value;
+      const x = { num: num, level: level, value: value, key: priceKey_(num, level, value), name: name, seen: r.seen };
       RP_PRICE_KEYS.forEach(function (k) {
         const m = normMoney_(r[k]);
-        if (m === null) fail_(path + ' ' + RP[k] + ': 숫자만 입력해 주세요.');
+        if (m === null) fail_(name + ' ' + RP[k] + ': 숫자만 입력해 주세요.');
         x[k] = m;
       });
       x.tmpStart = r.tmpStart ? normDate_(r.tmpStart) : '';
       x.tmpEnd = r.tmpEnd ? normDate_(r.tmpEnd) : '';
-      if ((r.tmpStart && !x.tmpStart) || (r.tmpEnd && !x.tmpEnd)) fail_(path + ' 일시단가 기간의 날짜 형식을 확인해 주세요.');
-      if (x.tmp && (!x.tmpStart || !x.tmpEnd)) fail_(path + ' 일시단가는 시작일과 종료일을 같이 입력해 주세요.');
-      if (x.tmpStart && x.tmpEnd && x.tmpStart > x.tmpEnd) fail_(path + ' 일시단가 종료일이 시작일보다 빠릅니다.');
-      if (!x.tmp && (x.tmpStart || x.tmpEnd)) fail_(path + ' 일시단가 금액을 입력하거나 기간을 지워 주세요.');
+      if ((r.tmpStart && !x.tmpStart) || (r.tmpEnd && !x.tmpEnd)) fail_(name + ' 일시단가 기간의 날짜 형식을 확인해 주세요.');
+      if (x.tmp && (!x.tmpStart || !x.tmpEnd)) fail_(name + ' 일시단가는 시작일과 종료일을 같이 입력해 주세요.');
+      if (x.tmpStart && x.tmpEnd && x.tmpStart > x.tmpEnd) fail_(name + ' 일시단가 종료일이 시작일보다 빠릅니다.');
+      if (!x.tmp && (x.tmpStart || x.tmpEnd)) fail_(name + ' 일시단가 금액을 입력하거나 기간을 지워 주세요.');
       x.empty = RP_PRICE_KEYS.every(function (k) { return !x[k]; });
       return x;
     });
@@ -3025,21 +3025,23 @@ function adm_priceSave(token, campId, rows) {
       if (!camp) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
       const have = {};
       readAll_(SH.PRICES).forEach(function (o) {
-        if (o.campId === camp.id) { const p = normPath_(o.path) || o.path; if (!have[p]) have[p] = o; }
+        if (o.campId !== camp.id) return;
+        const k = priceKey_(normCode_(o.num), normLevel_(o.level), normCode_(o.value));
+        if (!have[k]) have[k] = o;
       });
       clean.forEach(function (x) {
-        const o = have[x.path];
+        const o = have[x.key];
         if (o && x.seen !== undefined && x.seen !== null && String(x.seen) !== String(o.updatedAt || '')) {
-          fail_(x.path + ' 단가가 다른 곳(다른 관리자 또는 시트)에서 먼저 수정되었습니다. 새로고침한 뒤 다시 해 주세요.');
+          fail_(x.name + ' 단가가 다른 곳(다른 관리자 또는 시트)에서 먼저 수정되었습니다. 새로고침한 뒤 다시 해 주세요.');
         }
-        if (!o && x.seen) fail_(x.path + ' 단가가 다른 곳에서 지워졌습니다. 새로고침한 뒤 다시 해 주세요.');
+        if (!o && x.seen) fail_(x.name + ' 단가가 다른 곳에서 지워졌습니다. 새로고침한 뒤 다시 해 주세요.');
       });
       const now = nowText_(), add = [], del = [];
       let changed = 0;
       clean.forEach(function (x) {
-        const o = have[x.path];
+        const o = have[x.key];
         if (x.empty) { if (o) { del.push(o._row); changed++; } return; }
-        const f = { level: '구분' + pathLevel_(x.path), path: x.path, tmpStart: x.tmpStart, tmpEnd: x.tmpEnd };
+        const f = { num: x.num, level: '구분' + x.level, value: x.value, tmpStart: x.tmpStart, tmpEnd: x.tmpEnd };
         RP_PRICE_KEYS.forEach(function (k) { f[k] = x[k]; });
         if (!o) {
           add.push(Object.assign({ id: newRid_('P'), campId: camp.id, campName: camp.name, createdAt: now, updatedAt: now }, f));
@@ -3054,11 +3056,11 @@ function adm_priceSave(token, campId, rows) {
       del.sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.PRICES).deleteRow(r); });
       if (changed) {
         logAdmin_(a, '단가 저장', camp.name, clean.slice(0, 20).map(function (x) {
-          return x.path + (x.empty ? ' 삭제' : ' ' + RP_PRICE_KEYS.map(function (k) { return x[k] || '-'; }).join('/'));
+          return x.name + (x.empty ? ' 삭제' : ' ' + RP_PRICE_KEYS.map(function (k) { return x[k] || '-'; }).join('/'));
         }).join(', ') + (clean.length > 20 ? ' 외 ' + (clean.length - 20) + '건' : ''));
       }
       bumpMaster_();
-      const prices = readAll_(SH.PRICES).filter(function (o) { return o.campId === camp.id && o.path; }).map(priceView_);
+      const prices = readAll_(SH.PRICES).filter(function (o) { return o.campId === camp.id && o.num; }).map(priceView_);
       return { ok: true, changed: changed, prices: prices };
     } finally {
       lock.releaseLock();
@@ -3068,7 +3070,7 @@ function adm_priceSave(token, campId, rows) {
 
 /** route_prices 시트를 직접 고쳤을 때 */
 function fixPriceRow_(sh, c, o) {
-  if (!o.id && !o.path && !o.campName && !o.campId) return;
+  if (!o.id && !o.num && !o.value && !o.campName && !o.campId) return;
   const upd = {}, now = nowText_(), notes = {};
   if (!o.id) { upd.id = newRid_('P'); if (!o.createdAt) upd.createdAt = now; }
   const camp = resolveCamp_(o);
@@ -3076,12 +3078,10 @@ function fixPriceRow_(sh, c, o) {
     if (camp.campId !== o.campId) upd.campId = camp.campId;
     if (camp.campName !== o.campName) upd.campName = camp.campName;
   }
-  const path = normPath_(o.path);
-  if (path) {
-    if (path !== o.path) upd.path = path;
-    const lv = '구분' + pathLevel_(path);
-    if (lv !== o.level) upd.level = lv;
-  } else notes.path = '구분경로를 110-A (구분2) ~ 110-A-B-C-D (구분5) 형식으로 입력해 주세요.';
+  const num = normCode_(o.num), value = normCode_(o.value), level = normLevel_(o.level);
+  if (num) { if (num !== o.num) upd.num = num; } else notes.num = '노선코드 앞 숫자를 입력해 주세요. (예: 110)';
+  if (level) { if ('구분' + level !== o.level) upd.level = '구분' + level; } else notes.level = '구분2 ~ 구분5 중 하나로 입력해 주세요.';
+  if (value) { if (value !== o.value) upd.value = value; } else notes.value = '그 구분 자리의 글자를 입력해 주세요. (예: A)';
   RP_PRICE_KEYS.forEach(function (k) {
     const m = normMoney_(o[k]);
     if (m === null) notes[k] = '숫자만 입력해 주세요.';
@@ -3096,5 +3096,5 @@ function fixPriceRow_(sh, c, o) {
   upd.updatedAt = now;
   putCells_(sh, c, o._row, upd);
   putNote_(sh, c, o._row, 'campName', camp.err || '');
-  ['path', 'tmpStart', 'tmpEnd'].concat(RP_PRICE_KEYS).forEach(function (k) { putNote_(sh, c, o._row, k, notes[k] || ''); });
+  ['num', 'level', 'value', 'tmpStart', 'tmpEnd'].concat(RP_PRICE_KEYS).forEach(function (k) { putNote_(sh, c, o._row, k, notes[k] || ''); });
 }
