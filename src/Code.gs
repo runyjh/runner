@@ -38,7 +38,7 @@ const CFG = {
 };
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
-const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log' };
+const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -92,11 +92,24 @@ const A_NOTES = {
 // admin_log 시트 (관리자 작업 기록: 개인정보 열람·수정 등). 자동으로 쌓이며 지우지 않는 것을 권장
 const L = { at: '시각', admin: '관리자', action: '작업', target: '대상', detail: '내용' };
 
+// work_memo 시트 (업무스케줄: 관리자 전용 날짜별 메모). 시트에서 직접 줄을 추가해도 된다.
+const M = {
+  id: '메모ID', date: '날짜', time: '시간', content: '내용', done: '완료',
+  author: '작성자', createdAt: '작성일시', updatedAt: '수정일시'
+};
+const M_NOTES = {
+  date: '2026-11-03 형식. 2026.11.3, 2026/11/3 처럼 입력해도 자동으로 맞춰집니다.',
+  time: '선택. 09:30 형식 (24시간)',
+  done: '완료하면 Y',
+  content: '새 줄에 날짜와 내용을 입력하면 메모ID와 작성일시가 자동으로 채워집니다.'
+};
+
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
 SCHEMA[SH.SESSIONS] = S;
 SCHEMA[SH.ADMINS] = A;
 SCHEMA[SH.ALOG] = L;
+SCHEMA[SH.MEMO] = M;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -190,6 +203,10 @@ function ensureColumns() {
       sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
       Object.keys(A_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(A_NOTES[k]); });
       sh.getRange(1, c.pwReset + 1).setBackground('#fff4e5');
+    } else if (name === SH.MEMO) {
+      const rule = SpreadsheetApp.newDataValidation().requireValueInList(['Y'], true).setAllowInvalid(true).build();
+      sh.getRange(2, c.done + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
+      Object.keys(M_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(M_NOTES[k]); });
     } else if (name === SH.SESSIONS) {
       sh.getRange(1, c.expiresAt + 1).setNote('지금보다 이전 시각으로 고치면 해당 기기는 로그아웃됩니다.');
     }
@@ -345,17 +362,24 @@ function readObj_(name, row) {
   return o;
 }
 /** 지정한 칸들만 고쳐 쓴다 (다른 칸·사람이 넣은 수식은 건드리지 않음) */
+/**
+ * 시트가 수식으로 읽지 않도록: = 나 + 로 시작하는 글자는 앞에 공백을 붙여 저장한다.
+ * (읽을 때 str_ 가 앞뒤 공백을 지우므로 원래 글자로 돌아온다)
+ */
+function safeText_(v) {
+  return typeof v === 'string' && /^[=+]/.test(v) ? ' ' + v : v;
+}
 function writeFields_(name, row, fields) {
   const c = cols_(name, true), sh = sheet_(name);
   Object.keys(fields).forEach(function (k) {
-    sh.getRange(row, c[k] + 1).setNumberFormat('@').setValue(fields[k]);
+    sh.getRange(row, c[k] + 1).setNumberFormat('@').setValue(safeText_(fields[k]));
   });
 }
 /** 잠금 안에서만 호출: 마지막 행 다음 줄에 객체를 한 번에 쓴다 */
 function appendObj_(name, obj) {
   const c = cols_(name, true), sh = sheet_(name);
   const arr = new Array(c.__w).fill('');
-  Object.keys(obj).forEach(function (k) { arr[c[k]] = obj[k]; });
+  Object.keys(obj).forEach(function (k) { arr[c[k]] = safeText_(obj[k]); });
   const r = sh.getLastRow() + 1;
   if (r > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 500);
   sh.getRange(r, 1, 1, arr.length).setNumberFormat('@').setValues([arr]);
@@ -864,6 +888,7 @@ function onSheetEdit(e) {
       Object.keys(SCHEMA[name]).forEach(function (k) { o[k] = str_(v[c[k]]); });
       if (name === SH.DRIVERS) fixDriverRow_(sh, c, o);
       else if (name === SH.ADMINS) fixAdminRow_(sh, c, o);
+      else if (name === SH.MEMO) fixMemoRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
     });
   } finally {
@@ -1255,6 +1280,174 @@ function adm_getDoc(token, id, kind) {
     const blob = file.getBlob();
     logAdmin_(a, '서류 열람', o.name + ' (' + o.id + ')', DOCS[kind].label);
     return { ok: true, mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()), name: file.getName(), url: url };
+  });
+}
+
+// ───────────────────────── 관리자 : 업무스케줄 (날짜별 메모) ─────────────────────────
+function newMemoId_() {
+  return 'M' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
+}
+/** 날짜 글자 → yyyy-MM-dd. 2026.11.3 / 2026/11/3 / 2026-11-03 / 시트의 날짜값 모두 허용. 잘못되면 '' */
+function normDate_(v) {
+  const s = str_(v);
+  const m = s.match(/^(\d{4})[-.\/\s]+(\d{1,2})[-.\/\s]+(\d{1,2})\.?$/);
+  if (!m) return '';
+  const y = +m[1], mo = +m[2], d = +m[3], dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return '';
+  return y + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2);
+}
+/** 시간 글자 → HH:mm. 9:30 / 0930 / 09:30:00 허용. 비었으면 '', 잘못되면 null */
+function normTime_(v) {
+  const s = str_(v);
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2}):?(\d{2})(?::\d{2})?$/);
+  if (!m || +m[1] > 23 || +m[2] > 59) return null;
+  return ('0' + (+m[1])).slice(-2) + ':' + m[2];
+}
+function memoView_(o) {
+  return {
+    id: o.id, date: o.date, time: o.time, content: o.content, done: String(o.done).toUpperCase() === 'Y',
+    author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt
+  };
+}
+function memoSort_(a, b) {
+  return a.date !== b.date ? (a.date < b.date ? -1 : 1)
+    : a.time !== b.time ? (!a.time ? 1 : !b.time ? -1 : a.time < b.time ? -1 : 1)
+    : a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+}
+
+/** 한 달치 메모 (시트를 한 번에 읽는다). ym = 'yyyy-MM' */
+function adm_memoMonth(token, ym) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!/^\d{4}-\d{2}$/.test(String(ym || ''))) fail_('월 형식이 올바르지 않습니다.');
+    const sh = sheet_(SH.MEMO), c = cols_(SH.MEMO), last = sh.getLastRow();
+    const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
+    const list = [];
+    let pastUndone = 0;
+    const today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
+    rows.forEach(function (v) {
+      const o = {};
+      Object.keys(M).forEach(function (k) { o[k] = str_(v[c[k]]); });
+      o.date = normDate_(o.date) || o.date;
+      if (!o.id || !o.date) return;
+      const m = memoView_(o);
+      if (o.date.indexOf(ym) === 0) list.push(m);
+      if (!m.done && o.date < today) pastUndone++;
+    });
+    list.sort(memoSort_);
+    return { ok: true, memos: list, pastUndone: pastUndone, today: today };
+  });
+}
+
+/** 지난 날짜의 완료 안 된 메모 목록 */
+function adm_memoPastUndone(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const sh = sheet_(SH.MEMO), c = cols_(SH.MEMO), last = sh.getLastRow();
+    const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
+    const today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
+    const list = [];
+    rows.forEach(function (v) {
+      const o = {};
+      Object.keys(M).forEach(function (k) { o[k] = str_(v[c[k]]); });
+      o.date = normDate_(o.date) || o.date;
+      if (!o.id || !o.date) return;
+      const m = memoView_(o);
+      if (!m.done && o.date < today) list.push(m);
+    });
+    list.sort(memoSort_);
+    return { ok: true, memos: list };
+  });
+}
+
+/** 메모 추가(id 없음) 또는 수정(id 있음). 바꿀 항목만 보내도 된다. */
+function adm_memoSave(token, memo) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    memo = memo || {};
+    const f = {};
+    if (memo.date !== undefined) {
+      f.date = normDate_(memo.date);
+      if (!f.date) fail_('날짜를 확인해 주세요.');
+    }
+    if (memo.time !== undefined) {
+      f.time = normTime_(memo.time);
+      if (f.time === null) fail_('시간은 09:30 형식으로 입력해 주세요.');
+    }
+    if (memo.content !== undefined) {
+      f.content = String(memo.content || '').trim();
+      if (!f.content) fail_('내용을 입력해 주세요.');
+      if (f.content.length > 2000) fail_('내용이 너무 깁니다. (2000자 이내)');
+    }
+    if (memo.done !== undefined) f.done = memo.done ? 'Y' : '';
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const now = nowText_();
+      if (!memo.id) {
+        if (!f.date || !f.content) fail_('날짜와 내용을 입력해 주세요.');
+        const id = newMemoId_();
+        const row = appendObj_(SH.MEMO, {
+          id: id, date: f.date, time: f.time || '', content: f.content, done: f.done || '',
+          author: a.name, createdAt: now, updatedAt: now
+        });
+        return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
+      }
+      const row = findRow_(SH.MEMO, 'id', String(memo.id));
+      if (!row) fail_('메모를 찾을 수 없습니다. 시트에서 지워졌을 수 있습니다. 새로고침해 주세요.');
+      if (!Object.keys(f).length) return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
+      f.updatedAt = now;
+      writeFields_(SH.MEMO, row, f);
+      return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+function adm_memoDelete(token, id) {
+  return run_(function () {
+    requireAdmin_(token);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.MEMO, 'id', String(id || ''));
+      if (!row) return { ok: true }; // 이미 지워짐
+      sheet_(SH.MEMO).deleteRow(row);
+      return { ok: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** work_memo 시트를 직접 고쳤을 때: 메모ID·작성일시 자동, 날짜·시간·완료 형식 정리 */
+function fixMemoRow_(sh, c, o) {
+  if (!o.id && !o.date && !o.content) return;
+  const upd = {}, notes = {};
+  const set = function (k, v) { if (o[k] !== v) upd[k] = v; };
+  if (!o.id && (o.date || o.content)) { set('id', newMemoId_()); if (!o.createdAt) set('createdAt', nowText_()); }
+  if (o.date) {
+    const d = normDate_(o.date);
+    if (d) set('date', d); else notes.date = '날짜 형식을 확인해 주세요. (예: 2026-11-03)';
+  }
+  if (o.time) {
+    const t = normTime_(o.time);
+    if (t) set('time', t); else notes.time = '시간 형식을 확인해 주세요. (예: 09:30)';
+  }
+  if (o.done) {
+    const yes = /^(y|yes|o|ok|v|완료|true|1)$/i.test(o.done);
+    set('done', yes ? 'Y' : '');
+  }
+  if (Object.keys(upd).length) {
+    upd.updatedAt = nowText_();
+    Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(safeText_(upd[k])); });
+  }
+  ['date', 'time'].forEach(function (k) {
+    const cell = sh.getRange(o._row, c[k] + 1);
+    if (notes[k]) cell.setNote(notes[k]); else if (o[k]) cell.clearNote();
   });
 }
 

@@ -129,6 +129,61 @@
   .spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--brand-weak); border-top-color: var(--brand); animation: sp .8s linear infinite; margin: 0 auto; }
   @keyframes sp { to { transform: rotate(360deg); } }
 
+  /* 업무스케줄 */
+  .nav a[data-view] { cursor: pointer; }
+  .memo-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+  .cal { background: #fff; border-radius: var(--radius); padding: 12px; }
+  .cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .cal-head b { font-size: 16px; min-width: 120px; text-align: center; }
+  .cal-head .navb { width: 32px; height: 32px; border: 1px solid var(--line); background: #fff; border-radius: 8px; font-size: 16px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .cal-dow { text-align: center; font-size: 12px; color: var(--sub); padding: 4px 0; }
+  .cal-dow.sun, .cal-day.sun .num { color: var(--danger); }
+  .cal-dow.sat, .cal-day.sat .num { color: var(--brand); }
+  .cal-day { min-height: 92px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; cursor: pointer; background: #fff; overflow: hidden; text-align: left; }
+  .cal-day.blank { background: transparent; border-color: transparent; cursor: default; }
+  .cal-day:hover:not(.blank) { border-color: #c9d1da; }
+  .cal-day.sel { border: 2px solid var(--brand); padding: 5px; background: #f7faff; }
+  .cal-day .num { font-size: 12px; font-weight: 700; }
+  .cal-day.today .num { background: var(--brand); color: #fff !important; border-radius: 999px; padding: 1px 7px; }
+  .cal-day .mi { font-size: 11px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; color: var(--ink); }
+  .cal-day .mi.done { color: var(--faint); text-decoration: line-through; }
+  .cal-day .mi.late { color: var(--danger); }
+  .cal-day .more { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .cal-day .mcount { display: none; }
+  .day-panel { background: #fff; border-radius: var(--radius); padding: 16px; position: sticky; top: 16px; }
+  .day-panel h3 { margin: 0 0 12px; font-size: 16px; }
+  .add-row { display: grid; grid-template-columns: 104px 1fr; gap: 6px; }
+  .add-row textarea { grid-column: 1 / -1; height: 64px; }
+  .add-row .btn { grid-column: 1 / -1; }
+  .memos { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .memo { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: start; }
+  .memo input[type=checkbox] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--ok); cursor: pointer; }
+  .memo .txt { white-space: pre-wrap; word-break: break-word; }
+  .memo .txt b { color: var(--brand); margin-right: 6px; font-weight: 700; }
+  .memo.done .txt { color: var(--faint); text-decoration: line-through; }
+  .memo .by { grid-column: 2 / -1; font-size: 11px; color: var(--faint); }
+  .memo .acts { display: flex; gap: 4px; }
+  .memo .acts button { border: 0; background: none; color: var(--sub); font-size: 12px; padding: 2px 4px; }
+  .memo .acts button:hover { color: var(--ink); text-decoration: underline; }
+  .memo .edit { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 104px; gap: 6px; }
+  .memo .edit textarea { grid-column: 1 / -1; height: 72px; }
+  .memo .edit .row-btns { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 6px; }
+  .late-bar { background: var(--danger-weak); color: var(--danger); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .late-bar button { border: 0; background: none; color: var(--danger); font-weight: 700; text-decoration: underline; }
+  .no-memo { color: var(--sub); text-align: center; padding: 16px 0; font-size: 13px; }
+
+  @media (max-width: 1100px) {
+    .memo-wrap { grid-template-columns: 1fr; }
+    .day-panel { position: static; }
+  }
+  @media (max-width: 820px) {
+    .cal-day { min-height: 54px; padding: 4px; }
+    .cal-day .mi { display: none; }
+    .cal-day .more { display: none; }
+    .cal-day .mcount { display: block; font-size: 10px; color: var(--brand); font-weight: 700; }
+  }
+
   @media (max-width: 820px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
     .side { position: static; height: auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px; overflow-x: auto; }
@@ -163,11 +218,11 @@
   <aside class="side">
     <div class="logo">러너 <span>올인원</span></div>
     <nav class="nav">
-      <a class="on">기사 정보관리</a>
+      <a class="on" data-view="drivers">기사 정보관리</a>
       <a class="off">스케줄관리 <small>준비 중</small></a>
       <a class="off">노선관리 <small>준비 중</small></a>
       <a class="off">정산관리 <small>준비 중</small></a>
-      <a class="off">업무스케줄 <small>준비 중</small></a>
+      <a data-view="memo">업무스케줄</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a class="off">배번호 관리 <small>준비 중</small></a>
     </nav>
@@ -175,6 +230,7 @@
   </aside>
 
   <main>
+   <section id="view-drivers">
     <div class="head">
       <h2>기사 정보관리</h2>
       <div class="tools">
@@ -190,6 +246,36 @@
       </table>
       <div class="empty hidden" id="empty"></div>
     </div>
+   </section>
+
+   <section id="view-memo" class="hidden">
+    <div class="head">
+      <h2>업무스케줄</h2>
+      <div class="tools"><button class="btn ghost" id="memoReload" title="시트의 최신 내용 불러오기">새로고침</button></div>
+    </div>
+    <div class="late-bar hidden" id="lateBar"><span id="lateText"></span><button type="button" id="lateShow">보기</button></div>
+    <div class="memo-wrap">
+      <div class="cal">
+        <div class="cal-head">
+          <button class="navb" id="calPrev" aria-label="이전 달">‹</button>
+          <b id="calTitle"></b>
+          <button class="navb" id="calNext" aria-label="다음 달">›</button>
+          <button class="btn sm ghost" id="calToday">오늘</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+      <div class="day-panel">
+        <h3 id="dayTitle"></h3>
+        <form class="add-row" id="memoAdd" novalidate>
+          <input class="inp" type="time" id="memoTime" title="시간 (선택)">
+          <input class="inp" id="memoDate" type="date" title="날짜">
+          <textarea class="inp" id="memoText" placeholder="할 일, 메모를 입력하세요. (Ctrl+Enter 로 추가)"></textarea>
+          <button class="btn" id="memoAddBtn">추가</button>
+        </form>
+        <div class="memos" id="memoList"></div>
+      </div>
+    </div>
+   </section>
   </main>
 </div>
 
@@ -267,7 +353,8 @@
   function showApp(admin) {
     $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
-    loadList();
+    driversLoaded = false;
+    switchView(currentView);
   }
   $('#loginForm').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -495,6 +582,170 @@
     }).catch(() => { $('#docView').innerHTML = ''; });
   }
   $('#docClose').addEventListener('click', () => { $('#docModal').classList.add('hidden'); $('#docView').innerHTML = ''; if (docUrl) { URL.revokeObjectURL(docUrl); docUrl = null; } });
+
+  // ───── 화면 전환 (기사 정보관리 / 업무스케줄) ─────
+  let currentView = 'drivers';
+  let driversLoaded = false;
+  function switchView(v) {
+    currentView = v;
+    $$('.nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === v));
+    $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
+    $('#view-memo').classList.toggle('hidden', v !== 'memo');
+    if (v === 'drivers' && !driversLoaded) { driversLoaded = true; loadList(); }
+    if (v === 'memo') openMonth(memoMonth || null);
+  }
+  $$('.nav a[data-view]').forEach((a) => a.addEventListener('click', () => {
+    if (a.dataset.view === currentView) return;
+    if (currentView === 'drivers' && !$('#drawer').classList.contains('hidden')) closeDrawer();
+    if (!$('#drawer').classList.contains('hidden')) return; // 저장 안 한 변경이 있어 닫지 않음
+    switchView(a.dataset.view);
+  }));
+
+  // ───── 업무스케줄 ─────
+  const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+  let memoMonth = '', memoToday = '', memos = [], selDate = '';
+  const pad2 = (n) => ('0' + n).slice(-2);
+  const ymOf = (d) => d.slice(0, 7);
+  function localToday() { const n = new Date(); return n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate()); }
+  function shiftMonth(ym, k) { const y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + k; const d = new Date(y, m, 1); return d.getFullYear() + '-' + pad2(d.getMonth() + 1); }
+  function dateLabel(d) { const dt = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)); return (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 (' + DOW[dt.getDay()] + ')'; }
+
+  function openMonth(ym, pickDate) {
+    memoToday = memoToday || localToday();
+    memoMonth = ym || ymOf(memoToday);
+    selDate = pickDate || (selDate && ymOf(selDate) === memoMonth ? selDate : (ymOf(memoToday) === memoMonth ? memoToday : memoMonth + '-01'));
+    $('#calTitle').textContent = memoMonth.slice(0, 4) + '년 ' + (+memoMonth.slice(5, 7)) + '월';
+    $('#calGrid').innerHTML = '<div style="grid-column:1/-1;padding:40px"><div class="spin"></div></div>';
+    const asked = memoMonth;
+    api('adm_memoMonth', memoMonth).then((r) => {
+      if (asked !== memoMonth) return; // 그 사이 다른 달로 이동함
+      if (!r.ok) return toast(r.msg);
+      memos = r.memos.slice().sort(memoSort); memoToday = r.today || memoToday;
+      $('#lateBar').classList.toggle('hidden', !r.pastUndone);
+      $('#lateText').textContent = '지난 날짜에 완료 안 된 메모가 ' + r.pastUndone + '건 있습니다.';
+      renderCal(); renderDay();
+    }).catch(() => {});
+  }
+  $('#calPrev').addEventListener('click', () => openMonth(shiftMonth(memoMonth, -1)));
+  $('#calNext').addEventListener('click', () => openMonth(shiftMonth(memoMonth, 1)));
+  $('#calToday').addEventListener('click', () => openMonth(ymOf(memoToday || localToday()), memoToday || localToday()));
+  $('#memoReload').addEventListener('click', () => openMonth(memoMonth, selDate));
+
+  function renderCal() {
+    const y = +memoMonth.slice(0, 4), m = +memoMonth.slice(5, 7) - 1;
+    const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+    const byDate = {};
+    memos.forEach((x) => { (byDate[x.date] = byDate[x.date] || []).push(x); });
+    let html = DOW.map((d, i) => '<div class="cal-dow' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + d + '</div>').join('');
+    for (let i = 0; i < first; i++) html += '<div class="cal-day blank"></div>';
+    for (let d = 1; d <= days; d++) {
+      const ds = memoMonth + '-' + pad2(d), dow = (first + d - 1) % 7, list = byDate[ds] || [];
+      const items = list.slice(0, 3).map((x) => '<div class="mi' + (x.done ? ' done' : (ds < memoToday ? ' late' : '')) + '">' +
+        (x.time ? x.time + ' ' : '') + esc(x.content.split('\n')[0]) + '</div>').join('');
+      const more = list.length > 3 ? '<div class="more">+' + (list.length - 3) + '건</div>' : '';
+      html += '<div class="cal-day' + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '') + (ds === memoToday ? ' today' : '') + (ds === selDate ? ' sel' : '') +
+        '" data-date="' + ds + '"><span class="num">' + d + '</span>' + items + more +
+        (list.length ? '<div class="more mcount">' + list.length + '건</div>' : '') + '</div>';
+    }
+    $('#calGrid').innerHTML = html;
+  }
+  $('#calGrid').addEventListener('click', (e) => {
+    const c = e.target.closest('.cal-day[data-date]'); if (!c) return;
+    selDate = c.dataset.date;
+    $$('.cal-day', $('#calGrid')).forEach((x) => x.classList.toggle('sel', x === c));
+    renderDay();
+  });
+
+  function renderDay() {
+    $('#dayTitle').textContent = dateLabel(selDate) + (selDate === memoToday ? ' · 오늘' : '');
+    $('#memoDate').value = selDate;
+    const list = memos.filter((x) => x.date === selDate);
+    $('#memoList').innerHTML = list.length ? list.map(memoHtml).join('') : '<div class="no-memo">이 날짜의 메모가 없습니다.</div>';
+  }
+  function memoHtml(x) {
+    return '<div class="memo' + (x.done ? ' done' : '') + '" data-id="' + esc(x.id) + '">' +
+      '<input type="checkbox" data-act="done"' + (x.done ? ' checked' : '') + ' title="완료">' +
+      '<div class="txt">' + (x.time ? '<b>' + esc(x.time) + '</b>' : '') + esc(x.content) + '</div>' +
+      '<div class="acts"><button type="button" data-act="edit">수정</button><button type="button" data-act="del">삭제</button></div>' +
+      '<div class="by">' + esc(x.author || '') + (x.updatedAt ? ' · ' + esc(String(x.updatedAt).slice(5, 16)) : '') + '</div></div>';
+  }
+
+  // 추가
+  $('#memoText').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#memoAdd').requestSubmit(); });
+  $('#memoAdd').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const content = $('#memoText').value.trim(), date = $('#memoDate').value || selDate, time = $('#memoTime').value;
+    if (!content) return toast('내용을 입력해 주세요.');
+    const b = $('#memoAddBtn'); b.disabled = true;
+    api('adm_memoSave', { date: date, time: time, content: content }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      $('#memoText').value = ''; $('#memoTime').value = '';
+      upsertMemo(r.memo);
+      if (r.memo.date !== selDate) toast(dateLabel(r.memo.date) + '에 추가했습니다.');
+    }).catch(() => {}).finally(() => { b.disabled = false; });
+  });
+
+  const memoSort = (a, b) => a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.time !== b.time ? (!a.time ? 1 : !b.time ? -1 : a.time < b.time ? -1 : 1) : (a.createdAt < b.createdAt ? -1 : 1);
+  function upsertMemo(m) {
+    memos = memos.filter((x) => x.id !== m.id);
+    if (ymOf(m.date) === memoMonth) memos.push(m);
+    memos.sort(memoSort);
+    renderCal(); renderDay();
+  }
+
+  // 완료 / 수정 / 삭제
+  $('#memoList').addEventListener('click', (e) => {
+    const box = e.target.closest('.memo'); if (!box) return;
+    const id = box.dataset.id, m = memos.find((x) => x.id === id); if (!m) return;
+    const act = e.target.dataset.act;
+    if (act === 'done') {
+      const want = e.target.checked;
+      box.classList.toggle('done', want);
+      api('adm_memoSave', { id: id, done: want }).then((r) => {
+        if (!r.ok) { toast(r.msg); e.target.checked = !want; box.classList.toggle('done', !want); return; }
+        upsertMemo(r.memo); refreshLate();
+      }).catch(() => { e.target.checked = !want; box.classList.toggle('done', !want); });
+    } else if (act === 'del') {
+      if (!confirm('이 메모를 삭제할까요?\n\n' + m.content.slice(0, 80))) return;
+      api('adm_memoDelete', id).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        memos = memos.filter((x) => x.id !== id); renderCal(); renderDay(); refreshLate();
+      }).catch(() => {});
+    } else if (act === 'edit') {
+      box.innerHTML = '<div class="edit">' +
+        '<input class="inp" type="date" data-f="date" value="' + esc(m.date) + '">' +
+        '<input class="inp" type="time" data-f="time" value="' + esc(m.time) + '">' +
+        '<textarea class="inp" data-f="content">' + esc(m.content) + '</textarea>' +
+        '<div class="row-btns"><button type="button" class="btn sm ghost" data-act="cancel">취소</button><button type="button" class="btn sm" data-act="save">저장</button></div></div>';
+      $('textarea', box).focus();
+    } else if (act === 'cancel') {
+      renderDay();
+    } else if (act === 'save') {
+      const date = $('[data-f="date"]', box).value, time = $('[data-f="time"]', box).value, content = $('[data-f="content"]', box).value.trim();
+      if (!content) return toast('내용을 입력해 주세요.');
+      e.target.disabled = true;
+      api('adm_memoSave', { id: id, date: date, time: time, content: content }).then((r) => {
+        if (!r.ok) { toast(r.msg); e.target.disabled = false; return; }
+        if (r.memo.date !== m.date) toast(dateLabel(r.memo.date) + '(으)로 옮겼습니다.');
+        upsertMemo(r.memo); refreshLate();
+      }).catch(() => { e.target.disabled = false; });
+    }
+  });
+
+  // 지난 미완료 메모
+  function refreshLate() {
+    const lateHere = memos.filter((x) => !x.done && x.date < memoToday).length;
+    if (lateHere === 0 && ymOf(memoToday) === memoMonth) $('#lateBar').classList.add('hidden');
+  }
+  $('#lateShow').addEventListener('click', () => {
+    api('adm_memoPastUndone').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      if (!r.memos.length) { $('#lateBar').classList.add('hidden'); return toast('지난 미완료 메모가 없습니다.'); }
+      const first = r.memos[0];
+      openMonth(ymOf(first.date), first.date);
+      toast('가장 오래된 미완료 메모: ' + dateLabel(first.date) + ' (모두 ' + r.memos.length + '건)');
+    }).catch(() => {});
+  });
 
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
   (function boot() {
