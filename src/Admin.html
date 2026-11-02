@@ -96,6 +96,16 @@
   .rchips button.sp { font-family: inherit; }
   .rchips button.sp.on { background: #6b46c1; border-color: #6b46c1; }
   .rchips button.off { opacity: .55; }
+  .ugrid { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 300px; overflow: auto; }
+  .urow { display: flex; align-items: center; gap: 8px; }
+  .urow > b { width: 52px; flex: none; font-size: 14px; }
+  .urow .ul { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+  .urow button.lt { width: 38px; height: 34px; border: 1px solid var(--line); background: #fff; border-radius: 8px; font-weight: 800; font-size: 14px; color: var(--ink); cursor: pointer; }
+  .urow button.lt.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .urow button.lt.off { opacity: .45; }
+  .urow .ul button.lt:not([style]) { min-width: 38px; width: auto; padding: 0 8px; }
+  .urow .uall { border: 1px solid var(--line); background: var(--gray-weak); border-radius: 8px; height: 30px; padding: 0 10px; font-size: 12px; font-weight: 700; color: var(--sub); cursor: pointer; }
+  .urow .uall.on { background: var(--brand-weak); color: var(--brand); border-color: #c9dbf8; }
   .rchips .grp { width: 100%; font-size: 11px; color: var(--sub); font-weight: 700; margin-top: 4px; }
   .brprev { margin-top: 10px; font-size: 13px; background: var(--gray-weak); border-radius: 8px; padding: 8px 10px; }
   .brprev b { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -712,8 +722,9 @@
   <form class="m-box" id="sdForm" novalidate style="width:min(520px,100%)">
     <h3 id="sdTitle">스케줄 설정</h3>
     <div class="grid2">
-      <div class="field"><label class="lb" for="sdCamp">소속 캠프</label><select class="inp" id="sdCamp"></select></div>
-      <div class="field"><label class="lb" for="sdRoute">기본노선 (백업 기사는 "백업")</label><input class="inp code-inp" id="sdRoute" list="sdRoutes" autocomplete="off" placeholder="예: 527B, 530AB (F3)"><datalist id="sdRoutes"></datalist></div>
+      <div class="field full"><label class="lb" for="sdCamp">소속 캠프 (노선관리)</label><select class="inp" id="sdCamp"></select></div>
+      <div class="field full"><span class="lb">라우트 (노선관리) — 여러 개 고를 수 있습니다</span><div class="rchips" id="sdChips"></div>
+        <div class="radios" id="sdRots"></div><div class="brprev">저장될 기본노선: <b id="sdBr"></b></div><input type="hidden" id="sdRoute"></div>
       <div class="field full"><span class="lb">고정휴무일</span><div class="offbtns" id="sdOffBtns">
         <button type="button" data-off="0">일</button><button type="button" data-off="1">월</button><button type="button" data-off="2">화</button><button type="button" data-off="3">수</button><button type="button" data-off="4">목</button><button type="button" data-off="5">금</button><button type="button" data-off="6">토</button></div>
         <input class="inp" id="sdOff" placeholder="예: 목,금 (요일로 적으면 빈칸 자동 채우기에 쓰임)"></div>
@@ -985,59 +996,113 @@
     if (CR && !force) return Promise.resolve(CR);
     return api('adm_campRoutes').then((r) => { if (r.ok) CR = r; return CR; });
   }
+  // 라우트는 구분1(숫자) 아래 A·B·C·D 한 글자씩 고른다. 예: 110ABCD → 110A, 110B, 110C, 110D
+  // 저장할 때는 운영 표기대로 묶는다: 404D + 405A + 405B → '404D,405AB'
+  const unitRe = /^(\d+)([A-Z])$/;
+  /** '404D,405AB (D1,D2)' → { special, units: ['404D','405A','405B'], rots: ['D1','D2'] } */
   function parseBR(s) {
     s = String(s || '').trim();
-    if (/^(백업|예비)/.test(s)) return { special: '백업', codes: [], rots: [] };
-    if (/^용차/.test(s)) return { special: '용차', codes: [], rots: [] };
+    if (/^(백업|예비)/.test(s)) return { special: '백업', units: [], rots: [] };
+    if (/^용차/.test(s)) return { special: '용차', units: [], rots: [] };
     const m = s.match(/\(([^)]*)\)/);
     const rots = m ? m[1].split(/[\s,]+/).map((x) => x.toUpperCase()).filter((x) => ['D1', 'D2', 'F3'].includes(x)) : [];
-    const codes = s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean);
-    return { special: '', codes, rots };
+    const units = [];
+    let lastNum = '';
+    s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean).forEach((t) => {
+      const mm = t.match(/^(\d+)([A-Z]+)$/), aa = t.match(/^([A-Z]+)$/);
+      if (mm) { lastNum = mm[1]; mm[2].split('').forEach((ch) => units.push(mm[1] + ch)); }
+      else if (aa && lastNum) aa[1].split('').forEach((ch) => units.push(lastNum + ch));
+      else units.push(t); // 나눌 수 없는 코드는 통째로
+    });
+    return { special: '', units: [...new Set(units)], rots };
   }
+  /** 고른 단위 → 저장 글자 */
+  function composeUnits(units, special, rots, allRots) {
+    if (special) return special;
+    if (!units.length) return '';
+    const byNum = new Map(), whole = [];
+    units.forEach((u) => { const m = u.match(unitRe); if (m) { if (!byNum.has(m[1])) byNum.set(m[1], new Set()); byNum.get(m[1]).add(m[2]); } else whole.push(u); });
+    const parts = [...byNum.keys()].sort((a, b) => Number(a) - Number(b) || koSort(a, b)).map((n) => n + [...byNum.get(n)].sort().join('')).concat(whole.sort(koSort));
+    const use = allRots.filter((r) => rots.includes(r));
+    return parts.join(',') + (use.length && use.length < allRots.length ? ' (' + use.join(',') + ')' : '');
+  }
+  /** 캠프의 노선관리 라우트 → 숫자별 글자 목록. list = [{code, stopped}] */
+  function unitGroups(list) {
+    const groups = new Map(), whole = new Map();
+    list.forEach((r) => {
+      const m = String(r.code).match(/^(\d+)([A-Z]+)$/);
+      if (!m) { whole.set(r.code, (whole.get(r.code) !== false) && !!r.stopped); return; }
+      if (!groups.has(m[1])) groups.set(m[1], new Map());
+      const g = groups.get(m[1]);
+      m[2].split('').forEach((ch) => g.set(ch, (g.has(ch) ? g.get(ch) : true) && !!r.stopped)); // 모든 노선이 중지일 때만 중지
+    });
+    return { groups, whole };
+  }
+  /** 고르기 칸 HTML. p = data 속성 앞글자 (a: 기사 상세, sd: 스케줄 설정) */
+  function unitPickerHtml(p, list, sel, special, q) {
+    const { groups, whole } = unitGroups(list);
+    const known = new Set();
+    groups.forEach((g, n) => g.forEach((st, ch) => known.add(n + ch)));
+    whole.forEach((st, c) => known.add(c));
+    const extra = sel.filter((u) => !known.has(u));
+    const Q = String(q || '').trim().toUpperCase();
+    const nums = [...groups.keys()].sort((a, b) => Number(a) - Number(b) || koSort(a, b)).filter((n) => !Q || n.includes(Q) || [...groups.get(n).keys()].some((ch) => (n + ch).includes(Q)));
+    const btn = (u, label, stopped, title) => '<button type="button" data-' + p + 'u="' + esc(u) + '" class="lt' + (sel.includes(u) ? ' on' : '') + (stopped ? ' off' : '') + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(label) + '</button>';
+    return '<div class="rchips">' +
+      '<button type="button" class="sp' + (special === '백업' ? ' on' : '') + '" data-' + p + 'sp="백업">백업 (고정 라우트 없음)</button>' +
+      '<button type="button" class="sp' + (special === '용차' ? ' on' : '') + '" data-' + p + 'sp="용차">용차</button></div>' +
+      (list.length ? '<div class="ugrid">' + nums.map((n) => {
+        const g = groups.get(n), letters = [...g.keys()].sort(), allOn = letters.every((ch) => sel.includes(n + ch));
+        return '<div class="urow"><b class="code">' + esc(n) + '</b><div class="ul">' + letters.map((ch) => btn(n + ch, ch, g.get(ch), g.get(ch) ? n + ch + ' 중지된 노선' : n + ch)).join('') + '</div>' +
+          '<button type="button" class="uall' + (allOn ? ' on' : '') + '" data-' + p + 'all="' + esc(n) + '">전체</button></div>';
+      }).join('') +
+      ([...whole.keys()].length ? '<div class="urow"><b class="sub" style="font-size:12px">기타</b><div class="ul">' + [...whole.keys()].sort(koSort).map((c) => btn(c, c, whole.get(c))).join('') + '</div></div>' : '') +
+      '</div>' : '') +
+      (extra.length ? '<div class="urow"><b class="sub" style="font-size:12px" title="노선관리에 없는 라우트">노선관리에 없음</b><div class="ul">' + extra.map((u) => btn(u, u, false, '노선관리에 없는 라우트')).join('') + '</div></div>' : '');
+  }
+  /** 클릭 처리 (공용): 단위 하나 / 숫자 전체 / 백업·용차 */
+  function unitClick(e, p, st, list) {
+    const u = e.target.closest('[data-' + p + 'u]'), al = e.target.closest('[data-' + p + 'all]'), sp = e.target.closest('[data-' + p + 'sp]');
+    if (u) { const v = u.dataset[p + 'u']; st.special = ''; st.units = st.units.includes(v) ? st.units.filter((x) => x !== v) : st.units.concat([v]); return true; }
+    if (al) {
+      const n = al.dataset[p + 'all'], g = unitGroups(list).groups.get(n);
+      const letters = g ? [...g.keys()].map((ch) => n + ch) : [];
+      const allOn = letters.every((x) => st.units.includes(x));
+      st.special = '';
+      st.units = allOn ? st.units.filter((x) => !letters.includes(x)) : [...new Set(st.units.concat(letters))];
+      return true;
+    }
+    if (sp) { const v = sp.dataset[p + 'sp']; st.special = st.special === v ? '' : v; if (st.special) st.units = []; return true; }
+    return false;
+  }
+
   const campRots = (id) => { const c = CR && CR.camps.find((x) => x.id === id); return String((c && c.rot) || 'D1,D2,F3').split(',').filter(Boolean); };
-  function composeBR() {
-    if (!aSel) return '';
-    if (aSel.special) return aSel.special;
-    if (!aSel.codes.length) return '';
-    const all = campRots(aSel.campId), rots = all.filter((r) => aSel.rots.includes(r));
-    return aSel.codes.join(',') + (rots.length && rots.length < all.length ? ' (' + rots.join(',') + ')' : '');
-  }
+  const campList = (id) => (CR ? CR.routes.filter((r) => r.campId === id).map((r) => ({ code: r.code, stopped: r.status === '중지' })) : []);
+  function composeBR() { return aSel ? composeUnits(aSel.units, aSel.special, aSel.rots, campRots(aSel.campId)) : ''; }
   function assignSec() {
     return '<div class="sec" id="aSec"><h4>배정 캠프 · 라우트</h4><div id="aBody"><div class="spin" style="width:20px;height:20px"></div></div>' +
       '<input type="hidden" data-k="schCampId" id="aCampVal"><input type="hidden" data-k="baseRoute" id="aRouteVal"></div>';
   }
   function initAssign(d) {
     const p = parseBR(d.baseRoute);
-    aSel = { campId: d.schCampId || '', codes: p.codes, special: p.special, rots: p.rots, q: '' };
+    aSel = { campId: d.schCampId || '', units: p.units, special: p.special, rots: p.rots, q: '' };
     $('#aCampVal').value = d.schCampId || ''; $('#aRouteVal').value = d.baseRoute || '';
     loadCR(true).then(() => { if ($('#aBody')) { if (!aSel.rots.length) aSel.rots = campRots(aSel.campId); paintAssign(); } }).catch(() => {});
   }
   function paintAssign() {
     if (!CR || !$('#aBody')) return;
     const camps = CR.camps.slice().sort((a, b) => koSort(a.name, b.name));
-    const list = CR.routes.filter((r) => r.campId === aSel.campId).sort((a, b) => (a.status === '중지') - (b.status === '중지') || koSort(a.code, b.code));
-    const known = new Set(list.map((r) => r.code));
-    const extra = aSel.codes.filter((c) => !known.has(c));
-    const q = aSel.q.trim().toUpperCase();
-    const shown = list.filter((r) => !q || r.code.includes(q));
-    let lastG = null;
-    const chips = shown.map((r) => {
-      const head = list.length > 12 && r.g1 !== lastG ? '<span class="grp">' + esc(r.g1 || '') + '</span>' : '';
-      lastG = r.g1;
-      return head + '<button type="button" data-rc="' + esc(r.code) + '" class="' + (aSel.codes.includes(r.code) ? 'on' : '') + (r.status === '중지' ? ' off' : '') + '">' + esc(r.code) + (r.status === '중지' ? '<small>중지</small>' : '') + '</button>';
-    }).join('') + extra.map((c) => '<button type="button" data-rc="' + esc(c) + '" class="on" title="노선관리에 없는 라우트입니다">' + esc(c) + '<small>노선관리에 없음</small></button>').join('');
+    const list = campList(aSel.campId);
     const rots = campRots(aSel.campId);
     $('#aBody').innerHTML =
       '<div class="field"><label class="lb" for="aCamp">캠프 (노선관리)</label><select class="inp" id="aCamp"><option value="">(배정 안 함)</option>' +
         camps.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === aSel.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') +
         (aSel.campId && !camps.some((c) => c.id === aSel.campId) ? '<option value="' + esc(aSel.campId) + '" selected>(지워진 캠프)</option>' : '') + '</select></div>' +
-      '<div class="field"><span class="lb">라우트 — 여러 개 고를 수 있습니다' + (aSel.campId ? '' : ' (캠프를 먼저 고르세요)') + '</span>' +
-        (list.length > 12 ? '<input class="inp" id="aQ" placeholder="라우트 검색" value="' + esc(aSel.q) + '" style="height:34px;margin-bottom:6px">' : '') +
-        '<div class="rchips" id="aChips">' +
-        '<button type="button" class="sp' + (aSel.special === '백업' ? ' on' : '') + '" data-sp="백업">백업 (고정 라우트 없음)</button>' +
-        '<button type="button" class="sp' + (aSel.special === '용차' ? ' on' : '') + '" data-sp="용차">용차</button>' +
-        (aSel.campId ? (chips || '<span class="sub" style="font-size:13px;padding:6px 0">이 캠프에 등록된 라우트가 없습니다. 노선관리에서 추가해 주세요.</span>') : '') + '</div></div>' +
-      (aSel.campId && !aSel.special ? '<div class="field" style="margin:0"><span class="lb">회전 (일부만 맡을 때만 해제)</span><div class="radios">' +
+      '<div class="field"><span class="lb">라우트 — 숫자(구분1)마다 A·B·C·D 를 골라 주세요' + (aSel.campId ? '' : ' (캠프를 먼저 고르세요)') + '</span>' +
+        (list.length > 24 ? '<input class="inp" id="aQ" placeholder="숫자 검색 (예: 110)" value="' + esc(aSel.q) + '" style="height:34px;margin-bottom:6px">' : '') +
+        '<div id="aChips">' + unitPickerHtml('a', aSel.campId ? list : [], aSel.units, aSel.special, aSel.q) +
+        (aSel.campId && !list.length ? '<span class="sub" style="font-size:13px;padding:6px 0;display:block">이 캠프에 등록된 라우트가 없습니다. 노선관리에서 추가해 주세요.</span>' : '') + '</div></div>' +
+      (aSel.campId && !aSel.special && aSel.units.length ? '<div class="field" style="margin:0"><span class="lb">회전 (일부만 맡을 때만 해제)</span><div class="radios">' +
         rots.map((r) => '<label><input type="checkbox" data-rot="' + r + '"' + (aSel.rots.includes(r) ? ' checked' : '') + '> ' + r + '</label>').join('') + '</div></div>' : '') +
       '<div class="brprev">저장될 기본노선: <b>' + (esc(composeBR()) || '<span style="color:var(--faint)">없음</span>') + '</b></div>';
     if (aSel.q && $('#aQ')) { const i = $('#aQ'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
@@ -1050,7 +1115,7 @@
     paintAssign();
   }
   $('#dBody').addEventListener('change', (e) => {
-    if (e.target.id === 'aCamp') { aSel.campId = e.target.value; aSel.codes = []; aSel.rots = campRots(aSel.campId); aSel.q = ''; syncAssign(); }
+    if (e.target.id === 'aCamp') { aSel.campId = e.target.value; aSel.units = []; aSel.rots = campRots(aSel.campId); aSel.q = ''; syncAssign(); }
     else if (e.target.dataset && e.target.dataset.rot) {
       const r = e.target.dataset.rot;
       aSel.rots = e.target.checked ? aSel.rots.concat([r]) : aSel.rots.filter((x) => x !== r);
@@ -1058,11 +1123,7 @@
       syncAssign();
     }
   });
-  $('#dBody').addEventListener('click', (e) => {
-    const rc = e.target.closest('[data-rc]'), sp = e.target.closest('[data-sp]');
-    if (rc) { const c = rc.dataset.rc; aSel.special = ''; aSel.codes = aSel.codes.includes(c) ? aSel.codes.filter((x) => x !== c) : aSel.codes.concat([c]); syncAssign(); }
-    else if (sp) { aSel.special = aSel.special === sp.dataset.sp ? '' : sp.dataset.sp; if (aSel.special) aSel.codes = []; syncAssign(); }
-  });
+  $('#dBody').addEventListener('click', (e) => { if (aSel && e.target.closest('#aChips') && unitClick(e, 'a', aSel, campList(aSel.campId))) syncAssign(); });
   $('#dBody').addEventListener('input', (e) => { if (e.target.id === 'aQ') { aSel.q = e.target.value; paintAssign(); } });
 
   /** 기사구분 버튼 + 기사코드 (상세·등록 공용) */
@@ -3372,9 +3433,11 @@
     $('#sdTitle').textContent = d.name + ' · 스케줄 설정';
     $('#sdCamp').innerHTML = '<option value="">(소속 캠프 없음)</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
       .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === d.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
-    $('#sdRoute').value = d.baseRoute || ''; $('#sdOff').value = d.fixedOff || ''; $('#sdExtra').value = d.extraOff || '';
+    const pb = parseBR(d.baseRoute);
+    sdSel = { units: pb.units, special: pb.special, rots: pb.rots.length ? pb.rots : sdCampRots(d.campId) };
+    paintSdRoutes();
+    $('#sdOff').value = d.fixedOff || ''; $('#sdExtra').value = d.extraOff || '';
     $('#sdPat').value = d.workPattern || ''; $('#sdMemo').value = d.memo || ''; $('#sdOrder').value = d.order || '';
-    $('#sdRoutes').innerHTML = (SD.routes[d.campId] || []).map((c) => '<option value="' + esc(c) + '">').join('') + '<option value="백업"><option value="용차">';
     paintOffBtns();
     $('#sdModal').classList.remove('hidden');
   }
@@ -3390,9 +3453,31 @@
     paintOffBtns();
   });
   $('#sdOff').addEventListener('input', paintOffBtns);
-  $('#sdCamp').addEventListener('change', () => {
-    $('#sdRoutes').innerHTML = (SD.routes[$('#sdCamp').value] || []).map((c) => '<option value="' + esc(c) + '">').join('') + '<option value="백업"><option value="용차">';
+  // 라우트 고르기 (노선관리 데이터)
+  let sdSel = { units: [], special: '', rots: [] };
+  const sdCampRots = (id) => { const c = SD.camps.find((x) => x.id === id); return String((c && c.rot) || 'D1,D2,F3').split(',').filter(Boolean); };
+  const sdList = () => (SD.routes[$('#sdCamp').value] || []).map((c) => ({ code: c, stopped: false }));
+  function sdCompose() { return composeUnits(sdSel.units, sdSel.special, sdSel.rots, sdCampRots($('#sdCamp').value)); }
+  function paintSdRoutes() {
+    const campId = $('#sdCamp').value, list = sdList();
+    $('#sdChips').innerHTML = unitPickerHtml('sd', campId ? list : [], sdSel.units, sdSel.special, '') +
+      (!campId ? '<span class="sub" style="font-size:13px;padding:6px 0;display:block">캠프를 먼저 고르세요.</span>'
+        : !list.length ? '<span class="sub" style="font-size:13px;padding:6px 0;display:block">이 캠프에 등록된 라우트가 없습니다. 노선관리에서 추가해 주세요.</span>' : '');
+    const rots = sdCampRots(campId);
+    $('#sdRots').innerHTML = campId && !sdSel.special && sdSel.units.length ? '<span class="lb" style="margin:0 6px 0 0">회전</span>' +
+      rots.map((r) => '<label><input type="checkbox" data-sdrot="' + r + '"' + (sdSel.rots.includes(r) ? ' checked' : '') + '> ' + r + '</label>').join('') : '';
+    const br = sdCompose();
+    $('#sdRoute').value = br;
+    $('#sdBr').innerHTML = br ? esc(br) : '<span style="color:var(--faint)">없음</span>';
+  }
+  $('#sdChips').addEventListener('click', (e) => { if (unitClick(e, 'sd', sdSel, sdList())) paintSdRoutes(); });
+  $('#sdRots').addEventListener('change', (e) => {
+    const r = e.target.dataset && e.target.dataset.sdrot; if (!r) return;
+    sdSel.rots = e.target.checked ? sdSel.rots.concat([r]) : sdSel.rots.filter((x) => x !== r);
+    if (!sdSel.rots.length) { sdSel.rots = [r]; toast('회전은 하나 이상 골라야 합니다.'); }
+    paintSdRoutes();
   });
+  $('#sdCamp').addEventListener('change', () => { sdSel = { units: [], special: sdSel.special, rots: sdCampRots($('#sdCamp').value) }; paintSdRoutes(); });
   $('#sdCancel').addEventListener('click', () => $('#sdModal').classList.add('hidden'));
   $('#sdOpen').addEventListener('click', () => {
     const id = sdEdit && sdEdit.id; $('#sdModal').classList.add('hidden');

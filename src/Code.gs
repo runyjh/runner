@@ -1028,7 +1028,7 @@ function onSheetEdit(e) {
   if (!e || !e.range) return;
   const sh = e.range.getSheet(), name = sh.getName();
   if (name === TOOLS.SHEET) { onToolsEdit_(e, sh); return; }
-  if (name === SCH.SHEET) { if (e.range.getRow() === 1) cache_().remove('sch:h'); return; }
+  if (name === SCH.SHEET) { onSchEdit_(e, sh); return; }
   if (!SCHEMA[name] || name === SH.ALOG) return;
   _sheets[name] = sh;
   _ss = sh.getParent();
@@ -3513,7 +3513,15 @@ function schRead_(sun, end) {
   const m = master_();
   const routes = {};
   m.routes.forEach(function (r) { if (r.status !== RST.OFF) (routes[r.campId] = routes[r.campId] || []).push(r.code); });
-  const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(schDriver_);
+  // 캠프 이름은 노선관리(camps)에서, 이름·노선은 기사 정보에서 바로 가져온다
+  const campName = {};
+  m.camps.forEach(function (c) { campName[c.id] = c.name; });
+  const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(function (o) {
+    const d = schDriver_(o);
+    if (d.campId && !campName[d.campId]) { d.campId = ''; d.camp = ''; } // 노선관리에서 지워진 캠프
+    else if (d.campId) d.camp = campName[d.campId];
+    return d;
+  });
   if (last >= 2) schSyncCopies_(sh, h, drivers);
   const holidays = {};
   dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
@@ -3788,4 +3796,77 @@ function adm_campRoutes(token) {
       routes: m.routes.map(function (r) { return { campId: r.campId, code: r.code, status: r.status, g1: r.g1 }; })
     };
   });
+}
+
+/**
+ * 스케줄 DB 시트를 직접 고쳤을 때 (설치형 편집 트리거)
+ * - 1행(날짜) 수정 → 머리글 캐시 삭제
+ * - 새 줄에 이름(필요하면 캠프도)만 쓰면 기사 정보에서 같은 이름을 찾아 행ID(기사ID)·구분·캠프·기본노선을 자동으로 채운다
+ *   캠프는 노선관리의 캠프명, 이름·기본노선은 기사 정보 그대로. 못 찾거나 여러 명이면 칸 메모로 알려 준다.
+ */
+function onSchEdit_(e, sh) {
+  const r0 = e.range.getRow(), n = e.range.getNumRows();
+  if (r0 === 1) { cache_().remove('sch:h'); if (n === 1) return; }
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return;
+  try {
+    const h = schHeader_(true);
+    const start = Math.max(2, r0), end = Math.min(r0 + n - 1, start + 199);
+    if (end < start) return;
+    const F = h.fixed, last = sh.getLastRow();
+    const all = sh.getRange(2, 1, Math.max(last - 1, 1), 5).getValues();
+    const rowOfId = {};
+    all.forEach(function (v, i) { const id = str_(v[F['행ID']]); if (id && !rowOfId[id]) rowOfId[id] = i + 2; });
+    const camps = master_().camps, campById = {};
+    camps.forEach(function (c) { campById[c.id] = c; });
+    const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; });
+    const byId = {};
+    drivers.forEach(function (o) { byId[o.id] = o; });
+    const key = function (v) { return str_(v).replace(/\s+/g, '').toUpperCase(); };
+    const campMatch = function (txt, c) { return c && (key(c.name) === key(txt) || key(c.name).replace(/캠프$/, '') === key(txt).replace(/캠프$/, '')); };
+    const cell = function (r, k) { return sh.getRange(r, F[k] + 1); };
+    for (let r = start; r <= end; r++) {
+      const v = all[r - 2] || [];
+      const id = str_(v[F['행ID']]), kind = str_(v[F['구분']]), camp = str_(v[F['캠프']]), name = str_(v[F['이름']]);
+      if (/^NOTE/.test(id)) { if (kind !== SCH.KIND_NOTE) cell(r, '구분').setValue(SCH.KIND_NOTE); continue; }
+      if (id) {
+        const o = byId[id];
+        if (o) {
+          if (kind !== SCH.KIND_DRIVER) cell(r, '구분').setValue(SCH.KIND_DRIVER);
+          cell(r, '행ID').clearNote();
+        } else cell(r, '행ID').setNote('기사 정보에 없는 기사ID 입니다. 기사 정보관리에서 확인해 주세요.');
+        continue;
+      }
+      if (!name) continue;
+      if (kind === SCH.KIND_NOTE) { // 이름만 쓴 새 비고 줄
+        let k = 1; while (rowOfId['NOTE' + k]) k++;
+        cell(r, '행ID').setNumberFormat('@').setValue('NOTE' + k); rowOfId['NOTE' + k] = r;
+        continue;
+      }
+      let cand = drivers.filter(function (o) { return key(o.name) === key(name); });
+      let campNote = '';
+      if (camp) {
+        const c = camps.filter(function (x) { return campMatch(camp, x); })[0];
+        if (!c) campNote = '노선관리에 없는 캠프명입니다.';
+        else if (cand.length > 1) cand = cand.filter(function (o) { return o.schCampId === c.id; });
+      }
+      if (campNote) cell(r, '캠프').setNote(campNote); else cell(r, '캠프').clearNote();
+      if (cand.length !== 1) {
+        cell(r, '이름').setNote(cand.length ? '같은 이름의 기사가 여러 명입니다. 캠프를 적거나 행ID(기사ID)를 직접 입력해 주세요.'
+          : '기사 정보에 없는 이름입니다. 기사 정보관리에서 먼저 등록해 주세요.');
+        continue;
+      }
+      const o = cand[0];
+      if (rowOfId[o.id] && rowOfId[o.id] !== r) { cell(r, '이름').setNote('이 기사의 줄이 이미 ' + rowOfId[o.id] + '행에 있습니다. 그 줄에 입력해 주세요.'); continue; }
+      const c = campById[o.schCampId];
+      const line = new Array(5);
+      line[F['행ID']] = o.id; line[F['구분']] = SCH.KIND_DRIVER; line[F['캠프']] = c ? c.name : '';
+      line[F['이름']] = o.name; line[F['기본노선']] = o.baseRoute;
+      sh.getRange(r, 1, 1, 5).setNumberFormat('@').setValues([line.map(function (x) { return safeText_(x || ''); })]);
+      cell(r, '이름').clearNote();
+      rowOfId[o.id] = r;
+    }
+  } finally {
+    lock.releaseLock();
+  }
 }
