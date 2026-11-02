@@ -121,6 +121,7 @@ function setup() {
     _props = null;
   }
   ensureColumns();
+  ensureTools_();
   installTriggers_();
   Logger.log('설정 완료. DB: ' + ss_().getUrl());
 }
@@ -782,6 +783,7 @@ function api_changePassword(token, currentPassword, newPassword) {
 function onSheetEdit(e) {
   if (!e || !e.range) return;
   const sh = e.range.getSheet(), name = sh.getName();
+  if (name === TOOLS.SHEET) { onToolsEdit_(e, sh); return; }
   if (!SCHEMA[name]) return;
   _sheets[name] = sh;
   _ss = sh.getParent();
@@ -871,6 +873,195 @@ function fixDriverRow_(sh, c, o) {
 
   forgetDriver_(o);
   if (upd.loginId) forgetDriver_({ loginId: upd.loginId });
+}
+
+// ───────────────────────── 서류 일괄 연결 ─────────────────────────
+/**
+ * 사용법
+ *  1) 구글 드라이브 "러너 올인원 데이터/서류 올리기" 폴더에 서류 파일을 한꺼번에 올린다.
+ *     파일 이름 = "기사구분_서류종류.확장자"
+ *       기사구분 : 쿠팡플렉스 아이디, 연락처, 기사ID, 이름(동명이인 없을 때) 중 하나
+ *       서류종류 : 자격증 / 면허증 / 사업자 / 자동차 (예: kim@flex.com_면허증.jpg, 01012345678_자격증.png)
+ *  2) DB 시트의 "서류 연결" 탭에서 실행 체크박스를 누른다. (또는 편집기에서 linkUploadedDocs 실행)
+ *  3) 파일이 기사별 서류 폴더로 옮겨지고 drivers 시트의 서류 칸에 링크가 채워진다.
+ *     연결하지 못한 파일은 올리기 폴더에 그대로 남고, 이유가 "서류 연결" 탭에 기록된다.
+ */
+const TOOLS = { SHEET: '서류 연결', RUN_CELL: 'B4', RESULT_CELL: 'B7', LAST_CELL: 'B6', LOG_ROW: 9 };
+// 순서 중요: "자동차운전면허증"이 자동차보다 면허로, "사업자등록증"이 등록증보다 사업자로 먼저 판별되도록
+const DOC_KINDS = [
+  { key: 'biz', words: ['사업자'] },
+  { key: 'qual', words: ['자격', '화물운송', '종사'] },
+  { key: 'license', words: ['면허', '운전'] },
+  { key: 'car', words: ['자동차', '차량', '차등록', '등록증'] }
+];
+const DOC_TIME_LIMIT_MS = 270000; // 4분 30초 넘으면 멈추고 다음 실행에서 이어서
+
+/** 서류 올리기 폴더 (없으면 만든다) */
+function uploadFolder_() {
+  const p = props_();
+  if (p.UPLOAD_FOLDER_ID) {
+    try {
+      const f = DriveApp.getFolderById(p.UPLOAD_FOLDER_ID);
+      if (!f.isTrashed()) return f;
+    } catch (e) { /* 지워졌으면 새로 만든다 */ }
+  }
+  const f = DriveApp.getFolderById(p.ROOT_FOLDER_ID).createFolder('서류 올리기');
+  PropertiesService.getScriptProperties().setProperty('UPLOAD_FOLDER_ID', f.getId());
+  _props = null;
+  return f;
+}
+
+/** DB 시트에 "서류 연결" 탭을 만든다 (setup 에서 호출, 이미 있으면 그대로) */
+function ensureTools_() {
+  const ss = ss_();
+  let sh = ss.getSheetByName(TOOLS.SHEET);
+  const folder = uploadFolder_();
+  if (!sh) {
+    sh = ss.insertSheet(TOOLS.SHEET);
+    sh.getRange('A1').setValue('서류 일괄 연결').setFontSize(14).setFontWeight('bold');
+    sh.getRange('A2').setValue('① "서류 올리기" 폴더에 서류 파일을 한꺼번에 올립니다. 파일 이름: 기사구분_서류종류  (예: kim@flex.com_면허증.jpg)');
+    sh.getRange('A3').setValue('   기사구분 = 쿠팡플렉스 아이디 / 연락처 / 기사ID / 이름(동명이인 없을 때),  서류종류 = 자격증 / 면허증 / 사업자 / 자동차');
+    sh.getRange('A4').setValue('② 실행').setFontWeight('bold');
+    sh.getRange('C4').setValue('← 체크하면 바로 연결을 시작합니다. 끝나면 체크가 자동으로 풀립니다.');
+    sh.getRange('A5').setValue('올리기 폴더').setFontWeight('bold');
+    sh.getRange('A6').setValue('마지막 실행').setFontWeight('bold');
+    sh.getRange('A7').setValue('결과').setFontWeight('bold');
+    sh.getRange(TOOLS.LOG_ROW, 1, 1, 5).setValues([['시각', '파일 이름', '결과', '기사', '내용']])
+      .setFontWeight('bold').setBackground('#f1f3f4');
+    sh.setFrozenRows(TOOLS.LOG_ROW);
+    sh.setColumnWidth(1, 150); sh.setColumnWidth(2, 260); sh.setColumnWidth(3, 60);
+    sh.setColumnWidth(4, 220); sh.setColumnWidth(5, 380);
+  }
+  sh.getRange(TOOLS.RUN_CELL).insertCheckboxes().setValue(false);
+  sh.getRange('B5').setFormula('=HYPERLINK("' + folder.getUrl() + '","서류 올리기 폴더 열기")');
+}
+
+/** "서류 연결" 탭 편집: 실행 체크박스를 누르면 연결 실행 */
+function onToolsEdit_(e, sh) {
+  if (e.range.getA1Notation() !== TOOLS.RUN_CELL || e.range.getValue() !== true) return;
+  _ss = sh.getParent();
+  try {
+    sh.getRange(TOOLS.RESULT_CELL).setValue('연결 중… 파일이 많으면 몇 분 걸립니다.');
+    SpreadsheetApp.flush();
+    linkUploadedDocs_();
+  } finally {
+    sh.getRange(TOOLS.RUN_CELL).setValue(false);
+  }
+}
+
+/** 편집기에서 직접 실행할 때 */
+function linkUploadedDocs() {
+  Logger.log(JSON.stringify(linkUploadedDocs_()));
+}
+
+function docKind_(text) {
+  const t = String(text || '').replace(/\s/g, '');
+  for (let i = 0; i < DOC_KINDS.length; i++) {
+    if (DOC_KINDS[i].words.some(function (w) { return t.indexOf(w) >= 0; })) return DOC_KINDS[i].key;
+  }
+  return '';
+}
+
+/** 파일 이름 앞부분으로 기사 찾기: 아이디 → 기사ID → 연락처 → 이름 순 */
+function findDriverForDoc_(idx, who) {
+  const w = String(who || '').trim();
+  if (!w) return null;
+  if (idx.login[w.toLowerCase()]) return idx.login[w.toLowerCase()];
+  if (idx.id[w]) return idx.id[w];
+  const d = phoneDigits_(w);
+  if (/^01\d{8,9}$/.test(d) && d.length === w.replace(/[\s-]/g, '').length && idx.phone[d]) return idx.phone[d];
+  return idx.name[w] || null;
+}
+
+function folderFromUrl_(url) {
+  const m = String(url || '').match(/folders\/([A-Za-z0-9_-]{10,})/);
+  if (!m) return null;
+  try {
+    const f = DriveApp.getFolderById(m[1]);
+    return f.isTrashed() ? null : f;
+  } catch (e) { return null; }
+}
+
+function linkUploadedDocs_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    writeDocResult_([], '다른 작업이 진행 중입니다. 잠시 후 다시 체크해 주세요.');
+    return { busy: true };
+  }
+  const started = Date.now(), logs = [];
+  let done = 0, failed = 0, remaining = false;
+  try {
+    // 기사 목록을 한 번에 읽어 찾기표를 만든다 (파일마다 시트를 읽지 않음)
+    const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS, true), last = sh.getLastRow();
+    const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
+    const idx = { login: {}, id: {}, phone: {}, name: {} };
+    rows.forEach(function (v, i) {
+      const r = {
+        row: i + 2, id: str_(v[c.id]), loginId: str_(v[c.loginId]).toLowerCase(),
+        name: str_(v[c.name]), phone: phoneDigits_(v[c.phone]), docFolder: str_(v[c.docFolder])
+      };
+      if (!r.id && !r.loginId) return;
+      if (r.loginId) idx.login[r.loginId] = r;
+      if (r.id) idx.id[r.id] = r;
+      if (r.phone) idx.phone[r.phone] = r;
+      if (r.name) idx.name[r.name] = idx.name[r.name] ? 'DUP' : r;
+    });
+
+    const docsParent = DriveApp.getFolderById(props_().DOCS_FOLDER_ID);
+    const stamp = Utilities.formatDate(new Date(), CFG.TZ, 'yyyyMMdd');
+    const it = uploadFolder_().getFiles();
+    while (it.hasNext()) {
+      if (Date.now() - started > DOC_TIME_LIMIT_MS) { remaining = true; break; }
+      const file = it.next(), fname = file.getName();
+      const fail = function (msg) { failed++; logs.push([nowText_(), fname, '실패', '', msg]); };
+
+      const mime = file.getMimeType();
+      if (!/^image\//.test(mime) && mime !== 'application/pdf') { fail('이미지나 PDF 파일만 연결할 수 있습니다.'); continue; }
+      const base = fname.replace(/\.[^.]+$/, ''), cut = base.lastIndexOf('_');
+      if (cut < 1) { fail('파일 이름이 "기사구분_서류종류" 형식이 아닙니다. (예: kim@flex.com_면허증.jpg)'); continue; }
+      const kind = docKind_(base.slice(cut + 1));
+      if (!kind) { fail('서류 종류를 알 수 없습니다. _ 뒤에 자격증/면허증/사업자/자동차 중 하나를 써 주세요.'); continue; }
+      const r = findDriverForDoc_(idx, base.slice(0, cut));
+      if (r === 'DUP') { fail('같은 이름의 기사가 여러 명입니다. 이름 대신 아이디나 연락처로 바꿔 주세요.'); continue; }
+      if (!r) { fail('drivers 시트에서 "' + base.slice(0, cut) + '" 기사를 찾을 수 없습니다.'); continue; }
+
+      let folder = folderFromUrl_(r.docFolder);
+      if (!folder) {
+        folder = docsParent.createFolder((r.name || '기사') + '_' + (r.loginId || r.id) + '_' + (r.id || ''));
+        r.docFolder = folder.getUrl();
+        sh.getRange(r.row, c.docFolder + 1).setValue(r.docFolder);
+      }
+      const ext = ((fname.match(/\.([^.]+)$/) || [])[1] || (mime === 'application/pdf' ? 'pdf' : 'jpg')).toLowerCase();
+      file.moveTo(folder);
+      file.setName((r.name || r.loginId) + '_' + DOCS[kind].label + '_' + stamp + '.' + ext);
+      const cell = sh.getRange(r.row, c[DOCS[kind].col] + 1);
+      const had = str_(cell.getValue());
+      cell.setValue(file.getUrl());
+      done++;
+      logs.push([nowText_(), fname, '연결', (r.name || '') + ' (' + (r.loginId || r.id) + ')',
+        DOCS[kind].label + (had ? ' · 기존 링크를 새 파일로 교체 (예전 파일은 폴더에 남아 있음)' : '')]);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  let summary = '연결 ' + done + '건, 실패 ' + failed + '건';
+  if (!done && !failed && !remaining) summary = '올리기 폴더에 파일이 없습니다.';
+  if (remaining) summary += ' · 파일이 많아 일부만 처리했습니다. 실행을 한 번 더 체크해 주세요.';
+  else if (failed) summary += ' · 실패한 파일은 이름을 고친 뒤 다시 체크하면 됩니다.';
+  writeDocResult_(logs, summary);
+  return { done: done, failed: failed, remaining: remaining };
+}
+
+/** 결과를 "서류 연결" 탭에 기록 (최근 결과가 위로) */
+function writeDocResult_(logs, summary) {
+  const sh = ss_().getSheetByName(TOOLS.SHEET);
+  if (!sh) return;
+  sh.getRange(TOOLS.LAST_CELL).setValue(nowText_());
+  sh.getRange(TOOLS.RESULT_CELL).setValue(summary);
+  if (logs.length) {
+    sh.insertRowsAfter(TOOLS.LOG_ROW, logs.length);
+    sh.getRange(TOOLS.LOG_ROW + 1, 1, logs.length, 5).setNumberFormat('@').setValues(logs);
+  }
 }
 
 /** 열 추가·삭제·이동 같은 구조 변경 시 머리글 위치 캐시를 지운다 */
