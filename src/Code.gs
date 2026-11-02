@@ -281,6 +281,7 @@ function setup() {
   ensureCompany_();
   ensureTools_();
   installTriggers_();
+  schSS_(); // 스케줄 DB 파일 (없으면 만들고 트리거 설치)
   Logger.log('설정 완료. DB: ' + ss_().getUrl());
 }
 
@@ -362,10 +363,17 @@ function ensureColumns(only) {
 /** 시트 편집·구조 변경·세션 정리 트리거 (중복 없이 설치) */
 function installTriggers_() {
   const have = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
-  const ss = ss_();
-  if (have.indexOf('onSheetEdit') < 0) ScriptApp.newTrigger('onSheetEdit').forSpreadsheet(ss).onEdit().create();
-  if (have.indexOf('onSheetChange') < 0) ScriptApp.newTrigger('onSheetChange').forSpreadsheet(ss).onChange().create();
+  installSheetTriggers_(ss_());
   if (have.indexOf('cleanupSessions') < 0) ScriptApp.newTrigger('cleanupSessions').timeBased().everyDays(1).atHour(4).create();
+}
+/** 스프레드시트 하나에 편집·구조변경 트리거 (그 파일에 이미 있으면 건너뜀) */
+function installSheetTriggers_(book) {
+  const id = book.getId();
+  const have = ScriptApp.getProjectTriggers()
+    .filter(function (t) { try { return t.getTriggerSourceId() === id; } catch (e) { return false; } })
+    .map(function (t) { return t.getHandlerFunction(); });
+  if (have.indexOf('onSheetEdit') < 0) ScriptApp.newTrigger('onSheetEdit').forSpreadsheet(book).onEdit().create();
+  if (have.indexOf('onSheetChange') < 0) ScriptApp.newTrigger('onSheetChange').forSpreadsheet(book).onChange().create();
 }
 
 // ───────────────────────── 공용 핸들 (실행당 1회) ─────────────────────────
@@ -3243,16 +3251,59 @@ function parseYmd_(s) { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2}
 function addDays_(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
 function sundayOf_(d) { return addDays_(d, -d.getDay()); }
 
+/**
+ * 스케줄 DB = 별도 구글시트 파일 "러너 올인원 스케줄 DB" (러너 올인원 데이터 폴더).
+ * 날짜 칸이 많아 무거우므로 기사·노선 DB 와 나눠서 관리한다. 파일 ID 는 설정값 SCH_DB_ID.
+ * 예전처럼 메인 DB 안에 schedule 탭이 있으면 처음 한 번 새 파일로 옮기고, 메인 DB 의 탭은 "schedule(이전됨)" 으로 이름만 바꿔 둔다.
+ */
+let _schSS = null;
+function schSS_() {
+  if (_schSS) return _schSS;
+  const id = props_().SCH_DB_ID;
+  if (id) {
+    try { return (_schSS = SpreadsheetApp.openById(id)); }
+    catch (e) { fail_('스케줄 DB 파일을 열 수 없습니다. 드라이브 휴지통에 있는지 확인하거나, 스크립트 속성 SCH_DB_ID 를 비우면 새로 만듭니다.'); }
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const p = PropertiesService.getScriptProperties();
+    const again = p.getProperty('SCH_DB_ID');
+    if (again) { _props = null; return (_schSS = SpreadsheetApp.openById(again)); }
+    const book = SpreadsheetApp.create('러너 올인원 스케줄 DB');
+    try { DriveApp.getFileById(book.getId()).moveTo(DriveApp.getFolderById(props_().ROOT_FOLDER_ID)); } catch (e) { /* 폴더 이동 실패해도 사용 가능 */ }
+    try { book.setSpreadsheetTimeZone(CFG.TZ); } catch (e) { /* 무시 */ }
+    const old = ss_().getSheetByName(SCH.SHEET);
+    if (old) {
+      const copy = old.copyTo(book);
+      copy.setName(SCH.SHEET);
+      old.setName(SCH.SHEET + '(이전됨)');
+      try { old.getRange(1, 1).setNote('스케줄은 "러너 올인원 스케줄 DB" 파일로 옮겼습니다. 이 탭은 확인 후 지워도 됩니다.'); } catch (e) { /* 무시 */ }
+      book.getSheets().forEach(function (sh) { if (sh.getName() !== SCH.SHEET) book.deleteSheet(sh); });
+    }
+    p.setProperty('SCH_DB_ID', book.getId());
+    _props = null;
+    try { installSheetTriggers_(book); } catch (e) { console.error('스케줄 DB 트리거 설치 실패: ' + e); }
+    cache_().remove('sch:h');
+    return (_schSS = book);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /** schedule 시트 (없으면 만든다: 올해 1월 1일 ~ 내년 12월 31일 날짜 칸, 비고 3줄) */
 function schSheet_() {
-  let sh = ss_().getSheetByName(SCH.SHEET);
+  const book = schSS_();
+  let sh = book.getSheetByName(SCH.SHEET);
   if (sh) return sh;
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    sh = ss_().getSheetByName(SCH.SHEET);
+    sh = book.getSheetByName(SCH.SHEET);
     if (sh) return sh;
-    sh = ss_().insertSheet(SCH.SHEET);
+    const blank = book.getSheets().filter(function (x) { return x.getLastRow() === 0 && x.getLastColumn() === 0; });
+    sh = book.insertSheet(SCH.SHEET);
+    blank.forEach(function (x) { book.deleteSheet(x); }); // 새 파일의 빈 "시트1" 정리
     const y = new Date().getFullYear();
     const dates = schDateRange_(new Date(y, 0, 1), new Date(y + 1, 11, 31));
     const head = SCH.FIXED.concat(dates);
@@ -3537,7 +3588,7 @@ function api_mySchedule(token) {
     const dates = schDateRange_(sun, end);
     const out = { ok: true, today: todayText_(), dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
-    if (!ss_().getSheetByName(SCH.SHEET)) return out;
+    if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
     const h = schHeader_();
     const row = (function () {
       const sh = schSheet_(), last = sh.getLastRow();
