@@ -3855,6 +3855,344 @@ function schMyCampBackup_(myId, dates, h, c0, c1) {
   return res;
 }
 
+// ───────────────────────── 스케줄 : 어드민 업로드 테이블 ─────────────────────────
+/*
+ * 운영시트 스크립트 '어드민: 업로드 테이블 생성'(generateUploadTable, 2026-10-25판)을 그대로 옮김.
+ * - 2주(그 주 일요일부터 14일) 중 내일(PDD)부터의 날짜만 대상.
+ * - 칸 글자를 해석해 [업무일, 사업자등록번호, 캠프명, 웨이브, 아이디, 업무상태, 회전, 업무라우트, 비고, (빈칸), 명단] 줄을 만든다.
+ * - 미입차 줄(캠프·회전별로 노선 묶음), 중복 줄(같은 날 같은 캠프·노선·회전에 2명 이상)도 만든다.
+ * - 결과는 스케줄 DB 파일의 '어드민 업로드' 탭에 운영시트와 같은 모양으로 써 두고(직접 고치기·복사 가능), 화면에도 돌려준다.
+ */
+const UPLOAD = {
+  SHEET: '어드민 업로드',
+  HEAD: ['업무일', '사업자등록번호', '캠프명', '웨이브', '아이디', '업무상태', '회전', '업무라우트', '비고', '', '명단'],
+  COLOR: { KEY: '#E3F2FD', MI: '#FFEBEE', DUP: '#FFF8E1', SEP: '#000000' },
+  LEFT_COL: 2, RIGHT_COL: 14, START_ROW: 3, GAP: 5
+};
+function adm_schUploadTable(token, start) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const base = parseYmd_(start) || new Date();
+    const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
+    const data = schRead_(sun, addDays_(sun, SCH_DAYS - 1));
+    const co = companyInfo_();
+    const res = schBuildUpload_(data, {
+      bizNo: co.branchBizNo || '654-37-01141', // company 탭 '영업점 사업자번호'
+      wave: 'WAVE1',
+      target: ymd_(addDays_(new Date(), 1))
+    });
+    let url = '';
+    try { url = schWriteUpload_(res); } catch (e) { res.sheetError = String(e && e.message || e); }
+    res.url = url;
+    res.ok = true;
+    logAdmin_(a, '어드민 업로드 테이블 생성', data.dates[0] + ' ~ ' + data.dates[data.dates.length - 1],
+      '출근 ' + (res.weeks[0].length + res.weeks[1].length) + '건 · 미입차 ' + res.missing.length + '건 · 중복 ' + res.dups.length + '건');
+    return res;
+  });
+}
+
+/** 계산만 (시트·화면 공용). data = schRead_ 결과 */
+function schBuildUpload_(data, opt) {
+  const SCHED_WORK_WORD = '업무', KEYWORDS = ['업무', '선탑', '신규'];
+  const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
+  const ALL = ['D1', 'D2', 'F3'];
+  const short = function (n) { return str_(n).replace(/\s*캠프\s*$/, '').trim(); };
+  const campRot = {};
+  data.camps.forEach(function (c) {
+    const r = str_(c.rot || '').split(',').map(function (x) { return x.trim().toUpperCase(); }).filter(function (x) { return ALL.indexOf(x) >= 0; });
+    campRot[short(c.name)] = r.length ? r : ALL;
+  });
+  const defRotArr = function (camp) { return campRot[camp] || ALL; };
+  const hasWork = function (s) { return String(s || '').indexOf(SCHED_WORK_WORD) > -1; };
+  const hasKeyword = function (s) { return KEYWORDS.some(function (k) { return String(s || '').indexOf(k) > -1; }); };
+  const isValidRouteList = function (s) {
+    const p = String(s || '').split(',').map(function (v) { return v.trim(); }).filter(Boolean);
+    return !!p.length && p.every(function (x) { return /^\d+[A-Za-z]$/.test(x); });
+  };
+  const normRot = function (s) { return String(s || '').split(',').map(function (v) { return v.trim().toUpperCase(); }).filter(function (v) { return ALL.indexOf(v) >= 0; }); };
+  const routeExpand = function (csv) {
+    let lastNum = '';
+    const out = [];
+    String(csv || '').split(',').forEach(function (cp) {
+      const t = cp.trim();
+      if (!t) return;
+      let m = t.match(/^(\d+)([A-Za-z]+)$/);
+      if (m) { lastNum = m[1]; m[2].toUpperCase().split('').forEach(function (ch) { out.push(lastNum + ch); }); return; }
+      m = t.match(/^([A-Za-z]+)$/);
+      if (m && lastNum) m[1].toUpperCase().split('').forEach(function (ch) { out.push(lastNum + ch); });
+    });
+    return out;
+  };
+  const splitBase = function (v) {
+    const s = str_(v), m = s.match(/\(([^)]*)\)/);
+    return { routes: s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '' };
+  };
+
+  // 아이디 → 이름 (운영시트 nameMap: 스케쥴 시트 D·E열)
+  const nameMap = {}, campById = {};
+  data.camps.forEach(function (c) { campById[c.id] = short(c.name); });
+  data.drivers.forEach(function (d) { if (d.loginId) nameMap[d.loginId.toLowerCase()] = d.name; });
+  const nm = function (id) { return nameMap[String(id || '').toLowerCase()] || ''; };
+
+  // 운영시트 C~F열에 해당하는 줄: 캠프, 이름, 아이디, 기본노선
+  const info = data.drivers.filter(function (d) {
+    return d.status === ST.ACTIVE || Object.keys(data.cells[d.id] || {}).some(function (k) { return data.dates.indexOf(k) >= 0; });
+  }).map(function (d) {
+    const camp = campById[d.campId] || ((d.type === '백업' || d.type === '외부용차') ? '백업' : '');
+    return { key: d.id, camp: camp, name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: data.cells[d.id] || {} };
+  });
+
+  const weeks = [data.dates.slice(0, 7), data.dates.slice(7, 14)];
+  const res = { bizNo: opt.bizNo, wave: opt.wave, target: opt.target, dates: data.dates, weeks: [[], []], keys: [[], []], missing: [], dups: [] };
+
+  weeks.forEach(function (dates, widx) {
+    const baseRouteSet = {}, entries = [], present = {}, dupe = {}, explicitMi = [];
+    const addPresent = function (date, camp, routes, rots, effId, effNm) {
+      routes.forEach(function (rt) {
+        rots.forEach(function (rot) {
+          const k = [date, camp, rt, rot].join('|');
+          present[k] = 1;
+          const dd = dupe[k] || (dupe[k] = { ids: [], names: [] });
+          if (effId && dd.ids.indexOf(String(effId)) < 0) dd.ids.push(String(effId));
+          if (effNm && dd.names.indexOf(String(effNm)) < 0) dd.names.push(String(effNm));
+        });
+      });
+    };
+    const pushEntry = function (date, camp, effId, effNm, rots, routes, missJ, priority, mark) {
+      entries.push({ row: [date, opt.bizNo, camp, opt.wave, effId, '출근', rots.join(','), routes.join(','), missJ || '', '', effNm], priority: priority, mark: mark });
+    };
+
+    info.forEach(function (r) {
+      const campStr = r.camp, id = r.id;
+      if (!campStr || !id || campStr.indexOf('비고') >= 0 || campStr.indexOf('퇴사') >= 0) return;
+      const baseCamp = campStr;
+      const base = splitBase(r.defRt);
+      dates.forEach(function (date) {
+        if (date < opt.target) return;
+        if (r.defRt) routeExpand(base.routes).forEach(function (rt) { baseRouteSet[[date, baseCamp, rt].join('|')] = 1; });
+        const lines = String(r.cells[date] || '').replace(/<br\s*\/?>/gi, '\n').split(/\r?\n|\r/).map(function (v) { return v.trim(); }).filter(Boolean);
+        const flat = lines.join(' ').trim();
+        if (!flat || flat.indexOf('비고') >= 0) return;
+        const pm = flat.match(/\(([A-Za-z][A-Za-z0-9_]{2,})\)/);
+        const idFromParen = pm ? pm[1] : '';
+        if (/미입차/.test(flat)) { explicitMi.push({ date: date, baseCamp: baseCamp, defRt: base.routes }); return; }
+
+        let m = flat.match(/^([0-9A-Za-z,]+)\s+업무등록$/);
+        if (m) {
+          const rl = routeExpand(m[1]);
+          if (rl.length) {
+            const effId = idFromParen || id, effNm = nm(effId) || nm(id), rots = defRotArr(baseCamp);
+            addPresent(date, baseCamp, rl, rots, effId, effNm); pushEntry(date, baseCamp, effId, effNm, rots, rl, '', 1, true);
+            return;
+          }
+        }
+        if (flat.indexOf('추가업무등록') >= 0) {
+          const tokens = flat.replace(/추가업무등록/g, '').trim().split(/\s+/).filter(Boolean);
+          const rots = defRotArr(baseCamp);
+          for (let t = 0; t < tokens.length;) {
+            const mi = tokens[t].match(/^([A-Za-z][A-Za-z0-9_]{2,})$/);
+            if (!mi) { t++; continue; }
+            const cid = mi[1];
+            t++;
+            if (t >= tokens.length) break;
+            const rtTok = tokens[t];
+            if (!/^\d+[A-Za-z,]+$/.test(rtTok)) { t++; continue; }
+            t++;
+            const rl = routeExpand(rtTok);
+            if (!rl.length) continue;
+            addPresent(date, baseCamp, rl, rots, cid, nm(cid)); pushEntry(date, baseCamp, cid, nm(cid), rots, rl, '', 1, true);
+          }
+          return;
+        }
+        m = flat.match(/^([0-9A-Za-z,]+)\s+([A-Za-z][A-Za-z0-9_]{2,})\s+업무등록$/);
+        if (m) {
+          const rl = routeExpand(m[1]);
+          if (rl.length) {
+            const rots = defRotArr(baseCamp);
+            addPresent(date, baseCamp, rl, rots, m[2], nm(m[2])); pushEntry(date, baseCamp, m[2], nm(m[2]), rots, rl, '', 1, true);
+            return;
+          }
+        }
+        if (lines.length >= 3 && lines[2].indexOf('업무등록') > -1) {
+          const mi = lines[1].match(/([A-Za-z][A-Za-z0-9_]{2,})/);
+          if (mi) {
+            const rl = routeExpand(lines[0]);
+            if (rl.length) {
+              const rots = defRotArr(baseCamp);
+              addPresent(date, baseCamp, rl, rots, mi[1], nm(mi[1])); pushEntry(date, baseCamp, mi[1], nm(mi[1]), rots, rl, '', 1, true);
+              return;
+            }
+          }
+        }
+        if (EXCL_WORDS.some(function (w) { return flat.indexOf(w) > -1; })) return;
+
+        let cell = flat;
+        const mDyn = cell.match(/^([가-힣]+[0-9])\s*/);
+        const dynCamp = mDyn ? mDyn[1] : '';
+        const priority = dynCamp ? 1 : 0;
+        let finalCamp = dynCamp || baseCamp;
+        if (dynCamp) cell = cell.slice(mDyn[0].length).trim();
+        cell = cell.replace(/\(\s*([A-Za-z][A-Za-z0-9_]{2,})\s*\)/g, '').replace(/\[[^\]]*]/g, '').trim();
+        let rotation = '';
+        const mR = cell.match(/\(\s*([^)]+?)\s*\)/);
+        if (mR) { rotation = mR[1].replace(/\s+/g, ''); cell = cell.replace(/\([^)]*\)/g, '').trim(); }
+        cell = cell.replace(/업무등록/g, '').trim();
+        let code;
+        if (cell === '출근' || (/업무등록/.test(flat) && !/\d+[A-Za-z]+/.test(flat))) {
+          code = base.routes;
+          if (!rotation && base.rot) rotation = base.rot;
+        } else code = cell;
+        const parts = String(code).split(/\s+/);
+        if ((campStr === '백업' || campStr === '운영자') && parts.length >= 2) { finalCamp = parts[0].substr(0, 3); code = parts[1]; }
+        else if (parts.length >= 2 && /^\d+[A-Za-z]+$/.test(parts[1])) code = parts[1];
+        let rl = routeExpand(code);
+        const fromText = cell.match(/\d+[A-Za-z]+/g) || [];
+        if (!rl.length && fromText.length) fromText.forEach(function (rc) { rl = rl.concat(routeExpand(rc)); });
+        const routeHasKey = hasKeyword(rl.join(','));
+        let rots = normRot(rotation);
+        if (!rots.length) rots = defRotArr(finalCamp);
+        const include = rl.length && (hasWork(flat) || routeHasKey || isValidRouteList(rl.join(',')));
+        let effId = id;
+        if (idFromParen) effId = idFromParen;
+        else {
+          const toks = flat.split(/\s+/).filter(Boolean);
+          const last = toks[toks.length - 1];
+          if (toks.length && /^[A-Za-z][A-Za-z0-9_]{2,}$/.test(last)) effId = last;
+        }
+        if (include) {
+          const effNm = nm(effId) || nm(id);
+          addPresent(date, finalCamp, rl, rots, effId, effNm);
+          const miss = defRotArr(finalCamp).filter(function (x) { return rots.indexOf(x) < 0; });
+          pushEntry(date, finalCamp, effId, effNm, rots, rl, miss.length ? '미입차(' + miss.join(',') + ')' : '', priority, hasWork(flat) || routeHasKey);
+        }
+      });
+    });
+
+    entries.sort(function (p, q) {
+      if (p.row[0] !== q.row[0]) return p.row[0] < q.row[0] ? -1 : 1;
+      if (p.priority !== q.priority) return q.priority - p.priority;
+      const c = String(p.row[2]).localeCompare(String(q.row[2])); if (c) return c;
+      return String(p.row[4]).localeCompare(String(q.row[4]));
+    });
+    res.weeks[widx] = entries.map(function (e) { return e.row; });
+    res.keys[widx] = entries.map(function (e) { return e.mark ? 1 : 0; });
+
+    // 미입차
+    const gm = {};
+    const addMissing = function (t, camp, rt, rot) { const k = [t, camp, rt].join('|'); (gm[k] = gm[k] || {})[rot] = 1; };
+    const byRoute = {};
+    Object.keys(present).forEach(function (p) {
+      const s = p.split('|'), k = [s[0], s[1], s[2]].join('|');
+      (byRoute[k] = byRoute[k] || {})[s[3]] = 1;
+    });
+    Object.keys(byRoute).forEach(function (k) {
+      const s = k.split('|');
+      defRotArr(s[1]).filter(function (x) { return !byRoute[k][x]; }).forEach(function (x) { addMissing(s[0], s[1], s[2], x); });
+    });
+    explicitMi.forEach(function (x) {
+      routeExpand(x.defRt).forEach(function (rt) {
+        defRotArr(x.baseCamp).forEach(function (rot) { if (!present[[x.date, x.baseCamp, rt, rot].join('|')]) addMissing(x.date, x.baseCamp, rt, rot); });
+      });
+    });
+    Object.keys(baseRouteSet).forEach(function (k) {
+      const s = k.split('|');
+      const covered = defRotArr(s[1]).some(function (rot) { return present[[s[0], s[1], s[2], rot].join('|')]; });
+      if (!covered) defRotArr(s[1]).forEach(function (rot) { addMissing(s[0], s[1], s[2], rot); });
+    });
+    const byRot = {};
+    Object.keys(gm).forEach(function (k) {
+      const s = k.split('|'), rotText = Object.keys(gm[k]).sort().join(',');
+      const g = [s[0], s[1], rotText].join('|');
+      (byRot[g] = byRot[g] || { date: s[0], camp: s[1], rotText: rotText, routes: [] }).routes.push(s[2]);
+    });
+    Object.keys(byRot).forEach(function (g) {
+      const x = byRot[g];
+      res.missing.push([x.date, opt.bizNo, x.camp, opt.wave, '미입차', '미입차', x.rotText, x.routes.sort().join(','), '', '', '']);
+    });
+
+    // 중복
+    const dupBy = {};
+    Object.keys(dupe).forEach(function (k) {
+      const d = dupe[k];
+      if (d.ids.length <= 1 && d.names.length <= 1) return;
+      const s = k.split('|'), g = [s[0], s[1], s[2]].join('|');
+      const x = dupBy[g] || (dupBy[g] = { date: s[0], camp: s[1], route: s[2], rots: {}, ids: [], names: [] });
+      x.rots[s[3]] = 1;
+      d.ids.forEach(function (v) { if (x.ids.indexOf(v) < 0) x.ids.push(v); });
+      d.names.forEach(function (v) { if (x.names.indexOf(v) < 0) x.names.push(v); });
+    });
+    Object.keys(dupBy).forEach(function (g) {
+      const x = dupBy[g], pairs = [];
+      for (let i = 0; i < Math.max(x.ids.length, x.names.length); i++) {
+        const n = x.names[i] || '', v = x.ids[i] || '';
+        pairs.push(n && v ? n + '(' + v + ')' : n || v);
+      }
+      res.dups.push([x.date, opt.bizNo, x.camp, opt.wave, '중복', '중복', Object.keys(x.rots).sort().join(','), x.route,
+        pairs.length ? '중복: ' + pairs.join(', ') : '중복', '', x.names.join(', ')]);
+    });
+  });
+  const sortRows = function (p, q) {
+    if (p[0] !== q[0]) return p[0] < q[0] ? -1 : 1;
+    const c = String(p[2]).localeCompare(String(q[2])); if (c) return c;
+    const r = String(p[7]).localeCompare(String(q[7])); if (r) return r;
+    return String(p[6]).localeCompare(String(q[6]));
+  };
+  res.missing.sort(sortRows);
+  res.dups.sort(sortRows);
+  return res;
+}
+
+/** 스케줄 DB 파일 '어드민 업로드' 탭에 운영시트와 같은 배치로 쓴다. 반환: 탭 주소 */
+function schWriteUpload_(res) {
+  const book = schSS_();
+  let up = book.getSheetByName(UPLOAD.SHEET);
+  const W = UPLOAD.HEAD.length;
+  if (!up) {
+    up = book.insertSheet(UPLOAD.SHEET);
+    if (up.getMaxColumns() < UPLOAD.RIGHT_COL + W) up.insertColumnsAfter(up.getMaxColumns(), UPLOAD.RIGHT_COL + W - up.getMaxColumns());
+    up.getRange(1, UPLOAD.LEFT_COL, 1, 2).setValues([['주차1번', '2주 스케쥴']]);
+    up.getRange(1, UPLOAD.RIGHT_COL, 1, 2).setValues([['주차2번', '확인사항']]);
+    up.getRange(2, UPLOAD.LEFT_COL, 1, W).setValues([UPLOAD.HEAD]);
+    up.getRange(2, UPLOAD.RIGHT_COL, 1, W).setValues([UPLOAD.HEAD]);
+    up.getRange(1, 1, 2, UPLOAD.RIGHT_COL + W).setFontWeight('bold');
+    up.setFrozenRows(2);
+    up.getRange(1, UPLOAD.LEFT_COL).setNote('러너 올인원 스케줄관리 > "어드민 업로드 테이블" 을 누를 때마다 3행부터 새로 만들어집니다.');
+  }
+  const need = UPLOAD.START_ROW + res.weeks[0].length + res.weeks[1].length + res.missing.length + UPLOAD.GAP * 3 + 2;
+  const needR = UPLOAD.START_ROW + res.dups.length + res.missing.length + 4;
+  const rowsNeed = Math.max(need, needR);
+  if (up.getMaxRows() < rowsNeed) up.insertRowsAfter(up.getMaxRows(), rowsNeed - up.getMaxRows());
+  if (up.getMaxColumns() < UPLOAD.RIGHT_COL + W - 1) up.insertColumnsAfter(up.getMaxColumns(), UPLOAD.RIGHT_COL + W - 1 - up.getMaxColumns());
+  const maxRows = up.getMaxRows() - 2;
+  if (maxRows > 0) {
+    const clr = up.getRange(UPLOAD.START_ROW, UPLOAD.LEFT_COL, maxRows, UPLOAD.RIGHT_COL + W - UPLOAD.LEFT_COL);
+    clr.clearContent(); clr.clearFormat();
+  }
+  const put = function (row, col, rows, bg) {
+    if (!rows.length) return;
+    const rng = up.getRange(row, col, rows.length, W);
+    rng.setNumberFormat('@').setValues(rows.map(function (r) { return r.map(safeText_); }));
+    rng.setBackgrounds(bg);
+  };
+  let rowL = UPLOAD.START_ROW;
+  [0, 1].forEach(function (w) {
+    const rows = res.weeks[w];
+    if (!rows.length) { rowL += UPLOAD.GAP; return; }
+    if (w === 1) { up.getRange(rowL, UPLOAD.LEFT_COL, 1, W).setBackground(UPLOAD.COLOR.SEP); rowL++; }
+    put(rowL, UPLOAD.LEFT_COL, rows, res.keys[w].map(function (k) { return new Array(W).fill(k ? UPLOAD.COLOR.KEY : '#FFFFFF'); }));
+    rowL += rows.length + UPLOAD.GAP;
+  });
+  put(rowL, UPLOAD.LEFT_COL, res.missing, res.missing.map(function () { return new Array(W).fill(UPLOAD.COLOR.MI); }));
+  let rowR = UPLOAD.START_ROW;
+  put(rowR, UPLOAD.RIGHT_COL, res.dups, res.dups.map(function () { return new Array(W).fill(UPLOAD.COLOR.DUP); }));
+  rowR += res.dups.length;
+  if (res.missing.length) {
+    rowR += 3;
+    put(rowR, UPLOAD.RIGHT_COL, res.missing, res.missing.map(function () { return new Array(W).fill(UPLOAD.COLOR.MI); }));
+  }
+  return book.getUrl() + '#gid=' + up.getSheetId();
+}
+
 // ───────────────────────── 데이터 초기화 (메뉴별) ─────────────────────────
 /*
  * 관리자 화면 각 메뉴의 "데이터 초기화". 확인 문구를 그대로 입력해야만 실행된다.

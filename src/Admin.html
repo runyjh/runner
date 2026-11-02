@@ -154,6 +154,15 @@
   .m-view { flex: 1; background: #2b2f33; display: flex; align-items: center; justify-content: center; overflow: auto; }
   .m-view img { max-width: 100%; max-height: 100%; object-fit: contain; }
   .m-view iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+  .up-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .up-info { color: var(--sub); font-size: 13px; margin-right: auto; }
+  .up-wrap { flex: 1; overflow: auto; background: #fff; }
+  table.up { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; min-width: 100%; }
+  table.up th { position: sticky; top: 0; background: #f1f3f4; z-index: 1; font-weight: 700; text-align: left; }
+  table.up th, table.up td { border: 1px solid #e5e8eb; padding: 5px 8px; }
+  table.up tr.key td { background: #e3f2fd; } table.up tr.mi td { background: #ffebee; } table.up tr.dup td { background: #fff8e1; }
+  table.up tr.sep td { background: #000; padding: 2px; }
+  table.up td.n { color: var(--sub); text-align: right; }
   .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(25,31,40,.92); color: #fff;
@@ -564,6 +573,7 @@
       <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
       <div class="grow">
         <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
+        <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
         <button class="btn ghost" id="sFill" title="고정·품앗이 기사의 오늘 이후 빈칸을 출근/고정휴무로">빈칸 자동 채우기</button>
         <button class="btn ghost" id="sReload">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="sched">데이터 초기화</button>
@@ -734,6 +744,23 @@
     </div>
     <div class="m-actions"><button type="button" class="btn ghost" id="sdOpen" style="margin-right:auto">기사 정보 열기</button><button type="button" class="btn ghost" id="sdCancel">닫기</button><button class="btn" id="sdSave">저장</button></div>
   </form>
+</div>
+
+<!-- ───────────── 어드민 업로드 테이블 ───────────── -->
+<div class="modal hidden" id="upModal">
+  <div class="m-box wide" style="width:min(1180px,100%)">
+    <div class="m-top"><b id="upTitle">어드민 업로드 테이블</b>
+      <a class="btn ghost" id="upSheet" target="_blank" rel="noopener">시트에서 열기</a>
+      <button type="button" class="btn ghost" id="upRegen">다시 만들기</button>
+      <button type="button" class="btn ghost" id="upClose">닫기</button></div>
+    <div class="up-bar">
+      <div class="seg" id="upTabs"></div>
+      <span class="up-info" id="upInfo"></span>
+      <label class="check"><input type="checkbox" id="upWithName"> 명단 열 포함</label>
+      <button type="button" class="btn" id="upCopy">이 표 복사</button>
+    </div>
+    <div class="up-wrap" id="upWrap"></div>
+  </div>
 </div>
 
 <!-- ───────────── 데이터 초기화 (확인 문구 입력) ───────────── -->
@@ -3413,6 +3440,75 @@
     if (!t || !/^[일월화수목금토]([,./][일월화수목금토])*$/.test(t)) return null;
     return t.split(/[,./]/).map((x) => DOW.indexOf(x));
   }
+  // ───── 어드민 업로드 테이블 (운영시트 '어드민: 업로드 테이블 생성'과 같은 결과) ─────
+  let upRes = null, upTab = 'w1';
+  const UP_HEAD = ['업무일', '사업자등록번호', '캠프명', '웨이브', '아이디', '업무상태', '회전', '업무라우트', '비고', '', '명단'];
+  function upMake() {
+    if (Object.keys(sPending).length) return toast('저장 중인 칸이 있습니다. "모두 저장됨" 이 된 뒤 다시 눌러 주세요.');
+    const start = sMode === '2w' && SD.start ? SD.start : '';
+    $('#upModal').classList.remove('hidden');
+    $('#upWrap').innerHTML = '<div class="empty">만드는 중…</div>'; $('#upInfo').textContent = ''; $('#upTabs').innerHTML = '';
+    api('adm_schUploadTable', start).then((r) => {
+      if (!r.ok) { $('#upWrap').innerHTML = ''; return toast(r.msg); }
+      upRes = r;
+      const d0 = r.dates[0], d1 = r.dates[r.dates.length - 1];
+      $('#upTitle').textContent = '어드민 업로드 테이블 · ' + d0.slice(5).replace('-', '/') + ' ~ ' + d1.slice(5).replace('-', '/') + ' (PDD ' + r.target.slice(5).replace('-', '/') + '부터)';
+      $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
+      if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
+      upTab = 'all';
+      upTabsRender(); upRender();
+    }).catch(() => { $('#upWrap').innerHTML = ''; });
+  }
+  function upRows(tab) {
+    if (!upRes) return [];
+    if (tab === 'w1') return upRes.weeks[0];
+    if (tab === 'w2') return upRes.weeks[1];
+    if (tab === 'all') return [].concat(upRes.weeks[0], upRes.weeks[1], upRes.missing);
+    if (tab === 'mi') return upRes.missing;
+    return upRes.dups;
+  }
+  function upTabsRender() {
+    const t = [['all', '전체 (출근+미입차)'], ['w1', '1주차 출근'], ['w2', '2주차 출근'], ['mi', '미입차'], ['dup', '중복']];
+    $('#upTabs').innerHTML = t.map(([k, l]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '">' + l + ' ' + upRows(k).length + '</button>').join('');
+  }
+  function upRender() {
+    const rows = upRows(upTab), keyOf = (w, i) => upRes.keys[w][i];
+    const cls = (r, i) => {
+      if (upTab === 'mi' || r[4] === '미입차') return 'mi';
+      if (upTab === 'dup') return 'dup';
+      if (upTab === 'w1') return keyOf(0, i) ? 'key' : '';
+      if (upTab === 'w2') return keyOf(1, i) ? 'key' : '';
+      const n0 = upRes.weeks[0].length, n1 = upRes.weeks[1].length;
+      return i < n0 ? (keyOf(0, i) ? 'key' : '') : i < n0 + n1 ? (keyOf(1, i - n0) ? 'key' : '') : '';
+    };
+    const sepAt = upTab === 'all' && upRes.weeks[0].length ? upRes.weeks[0].length : -1;
+    $('#upInfo').textContent = upTab === 'dup' ? '같은 날 같은 캠프·노선·회전에 2명 이상 — 업로드 전에 정리하세요.'
+      : upTab === 'mi' ? '기사가 없는 노선·회전 (캠프·회전별로 묶음)' : '파란 줄 = 업무등록·업무·선탑·신규 등 확인이 필요한 줄';
+    if (!rows.length) { $('#upWrap').innerHTML = '<div class="empty">' + (upTab === 'dup' ? '중복이 없습니다.' : upTab === 'mi' ? '미입차가 없습니다.' : '해당하는 줄이 없습니다.') + '</div>'; return; }
+    $('#upWrap').innerHTML = '<table class="up"><thead><tr><th></th>' + UP_HEAD.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map((r, i) => (i === sepAt ? '<tr class="sep"><td colspan="12"></td></tr>' : '') +
+        '<tr class="' + cls(r, i) + '"><td class="n">' + (i + 1) + '</td>' + r.map((v) => '<td>' + esc(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+  }
+  $('#sUpload').addEventListener('click', upMake);
+  $('#upRegen').addEventListener('click', upMake);
+  $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
+  $('#upTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-up]'); if (!b) return; upTab = b.dataset.up; upTabsRender(); upRender(); });
+  $('#upCopy').addEventListener('click', () => {
+    const rows = upRows(upTab);
+    if (!rows.length) return toast('복사할 줄이 없습니다.');
+    const n = $('#upWithName').checked ? 11 : 9;
+    const tsv = rows.map((r) => r.slice(0, n).map((v) => String(v).replace(/[\t\n]/g, ' ')).join('\t')).join('\n');
+    const done = () => toast(rows.length + '줄을 복사했습니다. 업로드 엑셀에 붙여넣으세요.');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done).catch(() => upCopyFallback(tsv, done));
+    else upCopyFallback(tsv, done);
+  });
+  function upCopyFallback(text, done) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast('복사하지 못했습니다. 시트에서 열어 복사해 주세요.'); }
+    ta.remove();
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#upModal').classList.contains('hidden')) $('#upModal').classList.add('hidden'); });
   $('#sFill').addEventListener('click', () => {
     const list = [], skipped = [];
     srows.filter((r) => r.kind === 'd' && (r.d.type === '고정' || r.d.type === '품앗이') && r.d.baseRoute && !/백업|용차/.test(r.d.baseRoute)).forEach((r) => {
