@@ -102,7 +102,7 @@
   .wk h3 small.est { background: #fdf3e2; color: #c27c0e; }
   .day { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
   .day:first-of-type { border-top: 0; }
-  .day .dt { width: 78px; flex: none; font-weight: 700; font-size: 15px; }
+  .day .dt { width: 84px; flex: none; font-weight: 700; font-size: 15px; }
   .day .dt small { display: block; font-size: 11px; color: var(--sub); font-weight: 500; }
   .day.sun .dt { color: var(--danger); } .day.sat .dt { color: var(--brand); }
   .day.today { background: var(--brand-weak); margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
@@ -112,6 +112,7 @@
   .day .bk { font-size: 12.5px; color: #5a3286; background: #f5eefb; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; }
   .day .bk b { font-weight: 700; margin-right: 4px; }
   .day .bk.none { color: #b0b8c1; background: transparent; padding: 0 2px; }
+  .day .dt small.peak { display: inline-block; margin-top: 3px; padding: 1px 6px; border-radius: 999px; background: #fff1e6; color: #d9480f; font-weight: 700; font-size: 10.5px; white-space: nowrap; }
   .day .dt small.pdd { color: var(--brand); font-weight: 800; }
   .day .val.none { color: #b0b8c1; font-weight: 500; background: #fafbfc; }
   .day .val.k-work { background: #bfe1f6; color: #0a53a8; }
@@ -726,8 +727,9 @@
       const week = (list, title, cls, tag) => '<div class="wk"><h3>' + title + '<small class="' + cls + '">' + tag + '</small></h3>' + list.map((d) => {
         const p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay(), v = r.cells[d] || '';
         const sub = d === pdd ? '<small class="pdd">PDD</small>' : d === r.today ? '<small>오늘</small>' : r.holidays[d] ? '<small>' + escH(r.holidays[d]) + '</small>' : '';
+        const peak = +p[2] <= 7 ? '<small class="peak">🔥 피크데이</small>' : '';
         return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
-          '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + '</div>' +
+          '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +
           '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' + bkOf(d) + '</div></div>';
       }).join('') + '</div>';
       $('#scBody').innerHTML = week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
