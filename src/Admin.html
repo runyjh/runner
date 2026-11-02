@@ -87,6 +87,18 @@
   .t-none { background: var(--gray-weak); color: var(--faint); }
   .tabs.sub2 .tab { padding: 4px 10px; font-size: 13px; }
   .code-row { display: flex; gap: 6px; }
+  .rchips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow: auto; padding: 2px; }
+  .rchips button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 10px; font-weight: 700; font-size: 13px; color: var(--ink); cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .rchips button small { font-family: Pretendard, sans-serif; font-weight: 500; color: var(--faint); margin-left: 4px; }
+  .rchips button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .rchips button.on small { color: #dce7fb; }
+  .rchips button.sp { font-family: inherit; }
+  .rchips button.sp.on { background: #6b46c1; border-color: #6b46c1; }
+  .rchips button.off { opacity: .55; }
+  .rchips .grp { width: 100%; font-size: 11px; color: var(--sub); font-weight: 700; margin-top: 4px; }
+  .brprev { margin-top: 10px; font-size: 13px; background: var(--gray-weak); border-radius: 8px; padding: 8px 10px; }
+  .brprev b { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .code-row .inp { flex: 1; }
   .req { color: var(--danger); margin-left: 2px; }
   .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--danger-weak); color: var(--danger); margin-left: 4px; }
@@ -468,7 +480,7 @@
     <div class="tabs sub2" id="ttabs"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>이름</th><th>기사구분</th><th>기사코드</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
+        <thead><tr><th>이름</th><th>기사구분</th><th>기사코드</th><th>배정 캠프 · 라우트</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -787,7 +799,7 @@
   // ───── 목록 ─────
   let all = [], counts = {}, filter = '전체', tfilter = '', selectedId = '';
   function loadList(keepSel) {
-    $('#rows').innerHTML = '<tr><td colspan="10"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
+    $('#rows').innerHTML = '<tr><td colspan="11"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
     return api('adm_listDrivers').then((r) => {
       if (!r.ok) return toast(r.msg);
       all = r.rows; counts = r.counts;
@@ -818,7 +830,7 @@
       if (filter !== '전체' && r.status !== filter) return false;
       if (tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
       if (!q) return true;
-      return [r.name, r.driverCode, r.loginId, r.carName, r.carNo].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
+      return [r.name, r.driverCode, r.loginId, r.carName, r.carNo, r.schCamp, r.baseRoute].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
         (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
     });
   }
@@ -832,7 +844,9 @@
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
         '<td><b>' + esc(r.name) + '</b></td>' +
         '<td>' + (r.driverType ? '<span class="badge t-' + esc(r.driverType) + '">' + esc(r.driverType) + '</span>' : '<span class="badge t-none">미지정</span>') + '</td>' +
-        '<td><b class="code">' + esc(r.driverCode) + '</b></td><td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
+        '<td><b class="code">' + esc(r.driverCode) + '</b></td>' +
+        '<td>' + (r.schCamp || r.baseRoute ? esc(String(r.schCamp || '').replace(/\s*캠프$/, '')) + (r.baseRoute ? ' · <b class="code">' + esc(r.baseRoute) + '</b>' : '') : '<span class="sub">미배정</span>') + '</td>' +
+        '<td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
         '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
         '<td class="sub">' + esc([r.carNo, r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
         '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
@@ -886,7 +900,7 @@
       '<div class="sec"><h4>상태</h4><div class="status-row">' +
         STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
       '</div></div>' +
-      typeSec(d) +
+      typeSec(d) + assignSec() +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디 (앱 로그인용)', d.loginId) +
         fld('phone', '연락처', d.phone) + '<div class="field"><label class="lb">생년월일 (주민번호에서 자동)</label><input class="inp" value="' + esc(d.birthDate) + '" readonly></div>' +
@@ -911,7 +925,94 @@
         '<span>비밀번호</span><span>' + (d.hasPw ? '설정됨 (변경 ' + esc(d.pwChangedAt || '-') + ')' : '없음 - 임시 비밀번호를 지정해 주세요') + '</span>' +
       '</div><div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button>' +
       '<button type="button" class="btn sm ghost danger-t" id="delDrvBtn" style="margin-left:auto">기사 삭제</button></div></div>';
+    initAssign(d);
   }
+
+  // ── 배정 캠프 · 라우트 (노선관리 데이터에서 고르기) ──
+  let CR = null, aSel = null;
+  function loadCR(force) {
+    if (CR && !force) return Promise.resolve(CR);
+    return api('adm_campRoutes').then((r) => { if (r.ok) CR = r; return CR; });
+  }
+  function parseBR(s) {
+    s = String(s || '').trim();
+    if (/^(백업|예비)/.test(s)) return { special: '백업', codes: [], rots: [] };
+    if (/^용차/.test(s)) return { special: '용차', codes: [], rots: [] };
+    const m = s.match(/\(([^)]*)\)/);
+    const rots = m ? m[1].split(/[\s,]+/).map((x) => x.toUpperCase()).filter((x) => ['D1', 'D2', 'F3'].includes(x)) : [];
+    const codes = s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean);
+    return { special: '', codes, rots };
+  }
+  const campRots = (id) => { const c = CR && CR.camps.find((x) => x.id === id); return String((c && c.rot) || 'D1,D2,F3').split(',').filter(Boolean); };
+  function composeBR() {
+    if (!aSel) return '';
+    if (aSel.special) return aSel.special;
+    if (!aSel.codes.length) return '';
+    const all = campRots(aSel.campId), rots = all.filter((r) => aSel.rots.includes(r));
+    return aSel.codes.join(',') + (rots.length && rots.length < all.length ? ' (' + rots.join(',') + ')' : '');
+  }
+  function assignSec() {
+    return '<div class="sec" id="aSec"><h4>배정 캠프 · 라우트</h4><div id="aBody"><div class="spin" style="width:20px;height:20px"></div></div>' +
+      '<input type="hidden" data-k="schCampId" id="aCampVal"><input type="hidden" data-k="baseRoute" id="aRouteVal"></div>';
+  }
+  function initAssign(d) {
+    const p = parseBR(d.baseRoute);
+    aSel = { campId: d.schCampId || '', codes: p.codes, special: p.special, rots: p.rots, q: '' };
+    $('#aCampVal').value = d.schCampId || ''; $('#aRouteVal').value = d.baseRoute || '';
+    loadCR(true).then(() => { if ($('#aBody')) { if (!aSel.rots.length) aSel.rots = campRots(aSel.campId); paintAssign(); } }).catch(() => {});
+  }
+  function paintAssign() {
+    if (!CR || !$('#aBody')) return;
+    const camps = CR.camps.slice().sort((a, b) => koSort(a.name, b.name));
+    const list = CR.routes.filter((r) => r.campId === aSel.campId).sort((a, b) => (a.status === '중지') - (b.status === '중지') || koSort(a.code, b.code));
+    const known = new Set(list.map((r) => r.code));
+    const extra = aSel.codes.filter((c) => !known.has(c));
+    const q = aSel.q.trim().toUpperCase();
+    const shown = list.filter((r) => !q || r.code.includes(q));
+    let lastG = null;
+    const chips = shown.map((r) => {
+      const head = list.length > 12 && r.g1 !== lastG ? '<span class="grp">' + esc(r.g1 || '') + '</span>' : '';
+      lastG = r.g1;
+      return head + '<button type="button" data-rc="' + esc(r.code) + '" class="' + (aSel.codes.includes(r.code) ? 'on' : '') + (r.status === '중지' ? ' off' : '') + '">' + esc(r.code) + (r.status === '중지' ? '<small>중지</small>' : '') + '</button>';
+    }).join('') + extra.map((c) => '<button type="button" data-rc="' + esc(c) + '" class="on" title="노선관리에 없는 라우트입니다">' + esc(c) + '<small>노선관리에 없음</small></button>').join('');
+    const rots = campRots(aSel.campId);
+    $('#aBody').innerHTML =
+      '<div class="field"><label class="lb" for="aCamp">캠프 (노선관리)</label><select class="inp" id="aCamp"><option value="">(배정 안 함)</option>' +
+        camps.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === aSel.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') +
+        (aSel.campId && !camps.some((c) => c.id === aSel.campId) ? '<option value="' + esc(aSel.campId) + '" selected>(지워진 캠프)</option>' : '') + '</select></div>' +
+      '<div class="field"><span class="lb">라우트 — 여러 개 고를 수 있습니다' + (aSel.campId ? '' : ' (캠프를 먼저 고르세요)') + '</span>' +
+        (list.length > 12 ? '<input class="inp" id="aQ" placeholder="라우트 검색" value="' + esc(aSel.q) + '" style="height:34px;margin-bottom:6px">' : '') +
+        '<div class="rchips" id="aChips">' +
+        '<button type="button" class="sp' + (aSel.special === '백업' ? ' on' : '') + '" data-sp="백업">백업 (고정 라우트 없음)</button>' +
+        '<button type="button" class="sp' + (aSel.special === '용차' ? ' on' : '') + '" data-sp="용차">용차</button>' +
+        (aSel.campId ? (chips || '<span class="sub" style="font-size:13px;padding:6px 0">이 캠프에 등록된 라우트가 없습니다. 노선관리에서 추가해 주세요.</span>') : '') + '</div></div>' +
+      (aSel.campId && !aSel.special ? '<div class="field" style="margin:0"><span class="lb">회전 (일부만 맡을 때만 해제)</span><div class="radios">' +
+        rots.map((r) => '<label><input type="checkbox" data-rot="' + r + '"' + (aSel.rots.includes(r) ? ' checked' : '') + '> ' + r + '</label>').join('') + '</div></div>' : '') +
+      '<div class="brprev">저장될 기본노선: <b>' + (esc(composeBR()) || '<span style="color:var(--faint)">없음</span>') + '</b></div>';
+    if (aSel.q && $('#aQ')) { const i = $('#aQ'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  }
+  function syncAssign() {
+    const cv = $('#aCampVal'), rv = $('#aRouteVal');
+    if (cv.value !== aSel.campId) { cv.value = aSel.campId; cv.dispatchEvent(new Event('input', { bubbles: true })); }
+    const br = composeBR();
+    if (rv.value !== br) { rv.value = br; rv.dispatchEvent(new Event('input', { bubbles: true })); }
+    paintAssign();
+  }
+  $('#dBody').addEventListener('change', (e) => {
+    if (e.target.id === 'aCamp') { aSel.campId = e.target.value; aSel.codes = []; aSel.rots = campRots(aSel.campId); aSel.q = ''; syncAssign(); }
+    else if (e.target.dataset && e.target.dataset.rot) {
+      const r = e.target.dataset.rot;
+      aSel.rots = e.target.checked ? aSel.rots.concat([r]) : aSel.rots.filter((x) => x !== r);
+      if (!aSel.rots.length) { aSel.rots = [r]; toast('회전은 하나 이상 골라야 합니다.'); }
+      syncAssign();
+    }
+  });
+  $('#dBody').addEventListener('click', (e) => {
+    const rc = e.target.closest('[data-rc]'), sp = e.target.closest('[data-sp]');
+    if (rc) { const c = rc.dataset.rc; aSel.special = ''; aSel.codes = aSel.codes.includes(c) ? aSel.codes.filter((x) => x !== c) : aSel.codes.concat([c]); syncAssign(); }
+    else if (sp) { aSel.special = aSel.special === sp.dataset.sp ? '' : sp.dataset.sp; if (aSel.special) aSel.codes = []; syncAssign(); }
+  });
+  $('#dBody').addEventListener('input', (e) => { if (e.target.id === 'aQ') { aSel.q = e.target.value; paintAssign(); } });
 
   /** 기사구분 버튼 + 기사코드 (상세·등록 공용) */
   function typeSec(d) {
@@ -946,7 +1047,7 @@
     const inp = (key, label, extra) => fld(key, label + (extra && extra.req ? '<span class="req">*</span>' : ''), '', extra);
     $('#dBody').innerHTML =
       '<div class="warnbox" style="background:var(--brand-weak);color:var(--brand)">관리자가 직접 등록하는 기사는 바로 승인 상태로 만들어집니다. <span class="req">*</span> 표시만 꼭 입력하면 되고, 나머지는 나중에 채워도 됩니다.</div>' +
-      typeSec(cur) +
+      typeSec(cur) + assignSec() +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         inp('name', '이름', { req: true }) + inp('phone', '연락처') +
         inp('loginId', '쿠팡플렉스 아이디 (앱 로그인용, 선택)') + inp('tempPw', '앱 임시 비밀번호 (선택, 영문+숫자 8자 이상)') +
@@ -966,6 +1067,7 @@
         STATUSES.map((st) => '<button type="button" class="st' + (st === cur.status ? ' on' : '') + '" data-st="' + st + '">' + st + '</button>').join('') + '</div></div>' +
       '<div class="sec"><h4>관리자 메모</h4>' + fld('memo', '', '', { area: true }) + '</div>';
     setDirty({});
+    initAssign(cur);
     $('#dSave').textContent = '등록';
     $('[data-k="name"]', $('#dBody')).focus();
   }
@@ -1064,7 +1166,7 @@
   function patchList(d) {
     const i = all.findIndex((x) => x.id === d.id);
     const before = i >= 0 ? all[i].status : null;
-    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, createdAt: d.createdAt, approvedAt: d.approvedAt,
+    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
       carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
     if (i >= 0) all[i] = row; else { all.unshift(row); counts.all = (counts.all || 0) + 1; }
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }

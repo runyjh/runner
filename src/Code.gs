@@ -1279,7 +1279,7 @@ function docsOf_(o) {
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
-    driverType: o.driverType, driverCode: o.driverCode,
+    driverType: o.driverType, driverCode: o.driverCode, schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
@@ -3723,5 +3723,18 @@ function adm_reset(token, section, confirm) {
     });
     if (section === 'route') files.forEach(function (id) { if (trashCampFile_(id)) trashed++; });
     return { ok: true, rows: rows, backupUrl: backupUrl, trashed: trashed };
+  });
+}
+
+/** 기사 정보관리: 캠프·라우트 고르기용 목록 (노선관리 데이터, 캐시 사용) */
+function adm_campRoutes(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const m = master_();
+    return {
+      ok: true,
+      camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
+      routes: m.routes.map(function (r) { return { campId: r.campId, code: r.code, status: r.status, g1: r.g1 }; })
+    };
   });
 }
