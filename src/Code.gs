@@ -3421,39 +3421,55 @@ function adm_schWeek(token, start) {
     requireAdmin_(token);
     const base = parseYmd_(start) || new Date();
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
-    const end = addDays_(sun, SCH_DAYS - 1);
-    const h = schEnsureDates_(sun, end);
-    const dates = schDateRange_(sun, end);
-    const sh = schSheet_(), last = sh.getLastRow();
-    const cols = dates.map(function (d) { return h.dates[d]; });
-    const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
-    const cells = {}, notes = [], rowIds = {};
-    if (last >= 2) {
-      const fixed = sh.getRange(2, 1, last - 1, 5).getValues();
-      const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
-      fixed.forEach(function (f, i) {
-        const id = str_(f[h.fixed['행ID']]);
-        if (!id) return;
-        const kind = str_(f[h.fixed['구분']]);
-        const row = {};
-        dates.forEach(function (d, j) { const v = str_(block[i][cols[j] - c0]); if (v) row[d] = v; });
-        if (kind === SCH.KIND_NOTE) notes.push({ id: id, label: str_(f[h.fixed['이름']]) || id, cells: row });
-        else if (!rowIds[id]) { rowIds[id] = 1; cells[id] = row; }
-      });
-    }
-    const m = master_();
-    const routes = {};
-    m.routes.forEach(function (r) { if (r.status !== RST.OFF) (routes[r.campId] = routes[r.campId] || []).push(r.code); });
-    const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(schDriver_);
-    if (last >= 2) schSyncCopies_(sh, h, drivers);
-    const holidays = {};
-    dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
-    return {
-      ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays,
-      camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
-      routes: routes, drivers: drivers, cells: cells, notes: notes
-    };
+    return schRead_(sun, addDays_(sun, SCH_DAYS - 1));
   });
+}
+/**
+ * 기간 스케줄 읽기 (한 달 보기 등). from·to = 'yyyy-MM-dd', 최대 62일.
+ * 반환 모양은 adm_schWeek 와 같다.
+ */
+function adm_schRange(token, from, to) {
+  return run_(function () {
+    requireAdmin_(token);
+    const a = parseYmd_(from), b = parseYmd_(to);
+    if (!a || !b || b < a) fail_('기간을 확인해 주세요.');
+    if ((b - a) / 86400000 > 61) fail_('한 번에 62일까지 볼 수 있습니다.');
+    return schRead_(a, b);
+  });
+}
+/** from~to 기간의 스케줄 + 기사·캠프·노선 (adm_schWeek / adm_schRange 공용) */
+function schRead_(sun, end) {
+  const h = schEnsureDates_(sun, end);
+  const dates = schDateRange_(sun, end);
+  const sh = schSheet_(), last = sh.getLastRow();
+  const cols = dates.map(function (d) { return h.dates[d]; });
+  const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+  const cells = {}, notes = [], rowIds = {};
+  if (last >= 2) {
+    const fixed = sh.getRange(2, 1, last - 1, 5).getValues();
+    const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+    fixed.forEach(function (f, i) {
+      const id = str_(f[h.fixed['행ID']]);
+      if (!id) return;
+      const kind = str_(f[h.fixed['구분']]);
+      const row = {};
+      dates.forEach(function (d, j) { const v = str_(block[i][cols[j] - c0]); if (v) row[d] = v; });
+      if (kind === SCH.KIND_NOTE) notes.push({ id: id, label: str_(f[h.fixed['이름']]) || id, cells: row });
+      else if (!rowIds[id]) { rowIds[id] = 1; cells[id] = row; }
+    });
+  }
+  const m = master_();
+  const routes = {};
+  m.routes.forEach(function (r) { if (r.status !== RST.OFF) (routes[r.campId] = routes[r.campId] || []).push(r.code); });
+  const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(schDriver_);
+  if (last >= 2) schSyncCopies_(sh, h, drivers);
+  const holidays = {};
+  dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
+  return {
+    ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays,
+    camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
+    routes: routes, drivers: drivers, cells: cells, notes: notes
+  };
 }
 
 /**
@@ -3603,241 +3619,5 @@ function api_mySchedule(token) {
     const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
     dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
     return out;
-  });
-}
-
-// ───────────────────────── 기존 운영시트 가져오기 (스케쥴·백업 탭) ─────────────────────────
-/*
- * 뉴버전_운영시트의
- *   스케쥴 탭: 캠프명 | 명단 | 아이디 | 라우트 | 날짜 14칸 | … | 고정휴무일 | 추가휴무일 | 기타사항 | (메모들)
- *   백업 탭  : 캠프명 | 명단 | 아이디 | 라우트 | 2026-01-01 / 1주차 | … (날짜별 기록)
- * 를 아이디(=쿠팡플렉스 아이디)로 기사와 맞춰 schedule 시트로 옮긴다.
- * 미리보기(run=false)로 무엇이 들어오는지 먼저 보여주고, run=true 일 때만 쓴다.
- */
-function opsOpen_(url) {
-  const s = str_(url);
-  const m = s.match(/\/d\/([A-Za-z0-9_-]{20,})/);
-  try { return SpreadsheetApp.openById(m ? m[1] : s); }
-  catch (e) { fail_('운영시트를 열 수 없습니다. 주소를 확인하고, 이 프로그램을 만든 구글 계정에 그 시트 보기 권한이 있는지 확인해 주세요.'); }
-}
-function opsDate_(v) {
-  if (v instanceof Date) return ymd_(v);
-  const m = str_(v).match(/(\d{4})\D{1,3}(\d{1,2})\D{1,3}(\d{1,2})/);
-  return m ? m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) : '';
-}
-const OPS_SKIP_CAMP = /^(비고|미입차|퇴사요청)/;
-/** 스케쥴·백업 탭 읽기 → { people[], notes[], dates{}, warnings[] } */
-function opsRead_(book) {
-  const sched = book.getSheetByName('스케쥴'), backup = book.getSheetByName('백업');
-  if (!sched && !backup) fail_('운영시트에서 "스케쥴" 탭과 "백업" 탭을 찾을 수 없습니다.');
-  const people = {}, notes = {}, warnings = [];
-  let order = 0, cells = 0, dashes = 0, odd = 0;
-  const person = function (camp, name, id, route) {
-    const key = id.toLowerCase();
-    if (!people[key]) people[key] = { loginId: id, camp: camp, name: name, route: route, cells: {}, order: ++order };
-    return people[key];
-  };
-  const put = function (target, date, v) {
-    const val = str_(v);
-    if (!val) return;
-    if (val === '-') { dashes++; return; }
-    if (/^\d+[A-Za-z]+(,\d*[A-Za-z]+)*\s+[가-힣]{2,4}$/.test(val)) odd++;
-    target.cells[date] = val; cells++;
-  };
-  // 1) 백업 탭 (날짜별 전체 기록)
-  if (backup) {
-    const last = backup.getLastRow(), w = backup.getLastColumn();
-    if (last >= 3 && w >= 5) {
-      const head = backup.getRange(1, 1, 1, w).getValues()[0];
-      const dcols = [];
-      head.forEach(function (h, i) { const d = i >= 4 ? opsDate_(h) : ''; if (d) dcols.push([i, d]); });
-      backup.getRange(3, 1, last - 2, w).getValues().forEach(function (r) {
-        const camp = str_(r[0]), name = str_(r[1]), id = str_(r[2]), route = str_(r[3]);
-        if (!camp && !id) return;
-        if (/^비고/.test(camp)) { const n = notes[name] || (notes[name] = { key: name, label: route || name, cells: {} }); dcols.forEach(function (x) { put(n, x[1], r[x[0]]); }); return; }
-        if (!id || id === '백업' || OPS_SKIP_CAMP.test(camp) || /백업\s*명단/.test(name)) return;
-        const p = person(camp, name, id, route);
-        dcols.forEach(function (x) { put(p, x[1], r[x[0]]); });
-      });
-    }
-  }
-  // 2) 스케쥴 탭 (지금 보이는 2주는 이쪽이 최신, 기사 속성도 여기서)
-  if (sched) {
-    const last = sched.getLastRow(), w = sched.getLastColumn();
-    const top = sched.getRange(1, 1, Math.min(20, last), w).getValues();
-    let hr = -1;
-    top.forEach(function (r, i) { if (hr < 0 && r.some(function (v) { return str_(v) === '캠프명'; }) && r.some(function (v) { return str_(v) === '아이디'; })) hr = i; });
-    if (hr < 0) warnings.push('스케쥴 탭에서 머리글(캠프명·아이디) 줄을 찾지 못해 기사 속성은 가져오지 않았습니다.');
-    else {
-      const head = top[hr].map(str_), col = function (t) { return head.indexOf(t); };
-      const cC = col('캠프명'), cN = col('명단'), cI = col('아이디'), cR = col('라우트');
-      const cOff = col('고정휴무일'), cExtra = col('추가휴무일'), cEtc = col('기타사항');
-      const dcols = [];
-      head.forEach(function (h, i) { const d = i > cR ? opsDate_(h) : ''; if (d && (cOff < 0 || i < cOff) && !/출근일수/.test(h)) dcols.push([i, d]); });
-      if (last > hr + 1) sched.getRange(hr + 2, 1, last - hr - 1, w).getValues().forEach(function (r) {
-        const camp = str_(r[cC]), name = str_(r[cN]), id = str_(r[cI]), route = str_(r[cR]);
-        if (/^비고/.test(camp)) {
-          const n = notes[name] || (notes[name] = { key: name, label: route || name, cells: {} });
-          n.label = route || n.label;
-          dcols.forEach(function (x) { delete n.cells[x[1]]; put(n, x[1], r[x[0]]); });
-          return;
-        }
-        if (!id || id === '백업' || OPS_SKIP_CAMP.test(camp) || /백업\s*명단/.test(name)) return;
-        const p = person(camp, name, id, route);
-        p.camp = camp; p.name = name; p.route = route; p.order = ++order;
-        dcols.forEach(function (x) { delete p.cells[x[1]]; put(p, x[1], r[x[0]]); });
-        if (cOff >= 0) p.fixedOff = str_(r[cOff]);
-        if (cExtra >= 0) p.extraOff = str_(r[cExtra]);
-        if (cEtc >= 0) p.pattern = str_(r[cEtc]);
-        if (cEtc >= 0) p.memo = r.slice(cEtc + 1).map(str_).filter(String).join(' / ').slice(0, 500);
-      });
-    }
-  }
-  if (dashes) warnings.push('"-" 로만 적힌 칸 ' + dashes + '개는 빈칸으로 보고 가져오지 않았습니다.');
-  if (odd) warnings.push('"408A 임정한" 처럼 노선 + 사람 이름 모양인 칸이 ' + odd + '개 있습니다. 예전 백업 탭에서 줄이 밀려 다른 사람 기록이 섞였을 수 있으니, 가져온 뒤 해당 기사 줄을 확인해 주세요.');
-  return { people: Object.keys(people).map(function (k) { return people[k]; }), notes: Object.keys(notes).map(function (k) { return notes[k]; }), warnings: warnings, cells: cells };
-}
-/** 운영시트의 캠프 표기 → 캠프명 ('강서1캠프' / '퇴사' + 이름 '(서초1)') */
-function opsCampName_(p) {
-  if (/^퇴사/.test(p.camp)) { const m = p.name.match(/\(([가-힣]+\d)\)\s*$/); return m ? m[1] + '캠프' : ''; }
-  return /캠프$/.test(p.camp) ? p.camp : '';
-}
-function opsType_(p) {
-  if (/용차/.test(p.route) || /용차/.test(p.camp)) return '외부용차';
-  if (/백업|예비/.test(p.route)) return '백업';
-  return '고정';
-}
-
-/** 미리보기(run=false) / 가져오기(run=true). opts = { createDrivers, createCamps, retired, overwrite } */
-function adm_opsImport(token, url, run, opts) {
-  return run_(function () {
-    const a = requireAdmin_(token);
-    opts = opts || {};
-    const data = opsRead_(opsOpen_(url));
-    const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
-    const byLogin = {};
-    drivers.forEach(function (o) { if (o.loginId) byLogin[o.loginId.toLowerCase()] = o; });
-    const camps = readAll_(SH.CAMPS).filter(function (o) { return o.id; });
-    const campByName = {};
-    camps.forEach(function (c) { campByName[campKey_(c.name)] = c; });
-
-    const plan = { match: [], create: [], skipRetired: [], newCamps: [], cellCount: 0, dateFrom: '', dateTo: '' };
-    data.people.forEach(function (p) {
-      const retired = /^퇴사/.test(p.camp);
-      if (retired && !opts.retired) { plan.skipRetired.push(p.name); return; }
-      const cn = opsCampName_(p);
-      if (cn && !campByName[campKey_(cn)] && plan.newCamps.indexOf(cn) < 0) plan.newCamps.push(cn);
-      const o = byLogin[p.loginId.toLowerCase()];
-      p.retired = retired; p.campName = cn;
-      if (o) { p.driver = o; plan.match.push(p); } else plan.create.push(p);
-      Object.keys(p.cells).forEach(function (d) {
-        plan.cellCount++;
-        if (!plan.dateFrom || d < plan.dateFrom) plan.dateFrom = d;
-        if (!plan.dateTo || d > plan.dateTo) plan.dateTo = d;
-      });
-    });
-    const summary = {
-      ok: true, people: data.people.length, match: plan.match.map(function (p) { return p.name; }),
-      create: plan.create.map(function (p) { return p.name + (p.retired ? ' (퇴사→정지)' : '') + ' · ' + opsType_(p); }),
-      skipRetired: plan.skipRetired, newCamps: plan.newCamps, cells: plan.cellCount, dateFrom: plan.dateFrom, dateTo: plan.dateTo,
-      notes: data.notes.map(function (n) { return n.label; }), warnings: data.warnings
-    };
-    if (!run) return summary;
-    if (!plan.dateFrom) fail_('가져올 스케줄 기록이 없습니다.');
-
-    // 1) 캠프·기사 만들기
-    const lock = LockService.getScriptLock();
-    lock.waitLock(30000);
-    let made = 0, campsMade = 0, attrs = 0;
-    try {
-      if (opts.createCamps !== false) plan.newCamps.forEach(function (cn) {
-        const now = nowText_();
-        const rot = /^서초1/.test(cn) ? 'D1,D2' : ROTS.join(',');
-        const row = appendObj_(SH.CAMPS, { id: newRid_('C'), name: cn, address: '', memo: '운영시트에서 가져옴', rot: rot, createdAt: now, updatedAt: now });
-        const c = readObj_(SH.CAMPS, row); campByName[campKey_(cn)] = c; campsMade++;
-      });
-      const attrOf = function (p) {
-        const c = p.campName ? campByName[campKey_(p.campName)] : null;
-        return {
-          schCampId: c ? c.id : '', schCamp: c ? c.name : '', baseRoute: normBaseRoute_(p.route),
-          fixedOff: p.fixedOff || '', extraOff: p.extraOff || '', workPattern: p.pattern || '', schMemo: p.memo || '', schOrder: String(p.order)
-        };
-      };
-      if (opts.createDrivers !== false) {
-        const used = {};
-        drivers.forEach(function (o) { used[o.id] = 1; });
-        const stamp = 'D' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss');
-        let seq = 0;
-        const rows = plan.create.map(function (p) {
-          const now = nowText_(), at = attrOf(p);
-          do { p.newId = stamp + ('00' + (++seq)).slice(-3); } while (used[p.newId]);
-          return Object.assign({
-            id: p.newId, loginId: p.loginId.toLowerCase(), name: p.name.replace(/\s*\([가-힣]+\d\)\s*$/, ''), status: p.retired ? ST.STOPPED : ST.ACTIVE,
-            driverType: opsType_(p), createdAt: now, updatedAt: now, approvedAt: p.retired ? '' : now, memo: '운영시트에서 가져옴'
-          }, at);
-        });
-        appendObjs_(SH.DRIVERS, rows);
-        made = rows.length;
-      }
-      // 이미 있는 기사: 비어 있는 스케줄 속성만 채운다
-      plan.match.forEach(function (p) {
-        const at = attrOf(p), o = p.driver, f = {};
-        Object.keys(at).forEach(function (k) { if (at[k] && !o[k]) f[k] = at[k]; });
-        if (Object.keys(f).length) { f.updatedAt = nowText_(); writeFields_(SH.DRIVERS, o._row, f); forgetDriver_(o); attrs++; }
-      });
-    } finally {
-      lock.releaseLock();
-    }
-    // 2) 스케줄 칸 쓰기 (기사 1줄씩 한 번에)
-    const h = schEnsureDates_(parseYmd_(plan.dateFrom), parseYmd_(plan.dateTo));
-    const sh = schSheet_();
-    const lock2 = LockService.getScriptLock();
-    lock2.waitLock(30000);
-    let written = 0, kept = 0;
-    try {
-      const freshDrivers = {};
-      readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) freshDrivers[o.id] = o; });
-      let last = sh.getLastRow();
-      const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
-      const rowOf = {};
-      ids.forEach(function (id, i) { if (id && !rowOf[id]) rowOf[id] = i + 2; });
-      const c0 = h.dates[plan.dateFrom], c1 = h.dates[plan.dateTo];
-      const writeRow = function (rowId, kind, label, cellsMap, drv) {
-        let r = rowOf[rowId];
-        if (!r) {
-          r = ++last;
-          if (r > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 200);
-          const line = new Array(5).fill('');
-          line[h.fixed['행ID']] = rowId; line[h.fixed['구분']] = kind;
-          line[h.fixed['캠프']] = drv ? drv.schCamp : ''; line[h.fixed['이름']] = drv ? drv.name : label; line[h.fixed['기본노선']] = drv ? drv.baseRoute : '';
-          sh.getRange(r, 1, 1, 5).setNumberFormat('@').setValues([line.map(safeText_)]);
-          rowOf[rowId] = r;
-        }
-        const rng = sh.getRange(r, c0 + 1, 1, c1 - c0 + 1), cur = rng.getValues()[0];
-        let changed = false;
-        Object.keys(cellsMap).forEach(function (d) {
-          const i = h.dates[d] - c0;
-          if (i < 0 || i >= cur.length) return;
-          if (str_(cur[i]) && !opts.overwrite) { if (str_(cur[i]) !== cellsMap[d]) kept++; return; }
-          if (str_(cur[i]) !== cellsMap[d]) { cur[i] = safeText_(cellsMap[d]); changed = true; written++; }
-        });
-        if (changed) rng.setNumberFormat('@').setValues([cur]);
-      };
-      plan.match.concat(opts.createDrivers !== false ? plan.create : []).forEach(function (p) {
-        const id = p.driver ? p.driver.id : p.newId;
-        if (id) writeRow(id, SCH.KIND_DRIVER, p.name, p.cells, freshDrivers[id]);
-      });
-      // 비고 줄: 비고1 → NOTE1 …
-      data.notes.forEach(function (n) {
-        const m = String(n.key).match(/(\d+)$/), id = 'NOTE' + (m ? m[1] : '1');
-        writeRow(id, SCH.KIND_NOTE, n.label, n.cells, null);
-        sh.getRange(rowOf[id], h.fixed['이름'] + 1).setNumberFormat('@').setValue(safeText_(n.label));
-      });
-    } finally {
-      lock2.releaseLock();
-    }
-    logAdmin_(a, '운영시트 가져오기', written + '칸', '기사 등록 ' + made + '명, 캠프 ' + campsMade + '개, 속성 ' + attrs + '명');
-    bumpMaster_();
-    return Object.assign(summary, { done: true, written: written, kept: kept, driversMade: made, campsMade: campsMade, attrsFilled: attrs });
   });
 }
