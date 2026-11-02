@@ -173,6 +173,33 @@
   .late-bar button { border: 0; background: none; color: var(--danger); font-weight: 700; text-decoration: underline; }
   .no-memo { color: var(--sub); text-align: center; padding: 16px 0; font-size: 13px; }
 
+  /* 배번호 관리 */
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+  .flow span { padding: 4px 10px; border-radius: 999px; background: var(--gray-weak); color: var(--faint); }
+  .flow span.done { background: var(--ok-weak); color: var(--ok); font-weight: 700; }
+  .flow span.cur { background: var(--brand); color: #fff; font-weight: 700; }
+  .flow span.bad { background: var(--danger-weak); color: var(--danger); font-weight: 700; }
+  .flow i { color: var(--line); font-style: normal; }
+  .acts-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .radios { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; min-height: 40px; }
+  .radios label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .radios label.dirty { color: var(--warn); font-weight: 700; }
+  .kv { display: grid; grid-template-columns: 118px 1fr; gap: 4px 10px; font-size: 13px; }
+  .kv span:nth-child(odd) { color: var(--sub); }
+  .kv .miss { color: var(--danger); }
+  .missbox { background: var(--danger-weak); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+  .okbox { background: var(--ok-weak); color: var(--ok); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+  .pick-list { max-height: 50vh; overflow: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .pick-list button { display: flex; justify-content: space-between; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: #fff; padding: 10px 12px; text-align: left; }
+  .pick-list button:hover { background: var(--brand-weak); }
+  .pick-list small { color: var(--sub); }
+  .b-작성 { background: var(--gray-weak); color: var(--sub); }
+  .b-출력 { background: var(--brand-weak); color: var(--brand); }
+  .b-제출 { background: var(--warn-weak); color: var(--warn); }
+  .b-허가 { background: var(--ok-weak); color: var(--ok); }
+  .co-row { display: grid; grid-template-columns: 170px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .co-row label { font-size: 12px; color: var(--sub); }
+
   @media (max-width: 1100px) {
     .memo-wrap { grid-template-columns: 1fr; }
     .day-panel { position: static; }
@@ -224,7 +251,7 @@
       <a class="off">정산관리 <small>준비 중</small></a>
       <a data-view="memo">업무스케줄</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
-      <a class="off">배번호 관리 <small>준비 중</small></a>
+      <a data-view="bib">배번호 관리</a>
     </nav>
     <div class="me"><b id="meName">관리자</b><a id="logoutBtn">로그아웃</a></div>
   </aside>
@@ -276,6 +303,26 @@
       </div>
     </div>
    </section>
+
+   <section id="view-bib" class="hidden">
+    <div class="head">
+      <h2>배번호 관리</h2>
+      <div class="tools">
+        <input class="inp search" id="bq" placeholder="이름, 차량번호 검색">
+        <button class="btn ghost" id="coBtn">회사 정보</button>
+        <button class="btn ghost" id="bibReload">새로고침</button>
+        <button class="btn" id="bibNew">새 신청서</button>
+      </div>
+    </div>
+    <div class="tabs" id="btabs"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>신청일</th><th>이름</th><th>진행상태</th><th>신청 시 차량번호</th><th>출력</th><th>제출일</th><th>허가 차량번호</th><th>비고</th></tr></thead>
+        <tbody id="brows"></tbody>
+      </table>
+      <div class="empty hidden" id="bempty"></div>
+    </div>
+   </section>
   </main>
 </div>
 
@@ -290,6 +337,47 @@
     <button class="btn" id="dSave" disabled>저장</button>
   </div>
 </aside>
+
+<!-- ───────────── 배번호 신청서 상세 ───────────── -->
+<aside class="drawer hidden" id="bdrawer">
+  <div class="d-head"><h3 id="bTitle">신청서</h3><span id="bBadge"></span><button class="x" id="bClose" aria-label="닫기">×</button></div>
+  <div class="d-body" id="bBody"></div>
+  <div class="d-foot">
+    <span class="msg" id="bMsg"></span>
+    <button class="btn ghost" id="bReset" disabled>되돌리기</button>
+    <button class="btn" id="bSave" disabled>저장</button>
+  </div>
+</aside>
+
+<!-- ───────────── 새 신청서: 기사 고르기 ───────────── -->
+<div class="modal hidden" id="pickModal">
+  <div class="m-box">
+    <h3>신청서를 만들 기사 선택</h3>
+    <input class="inp" id="pickQ" placeholder="이름, 아이디, 연락처 검색">
+    <div class="pick-list" id="pickList"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="pickCancel">닫기</button></div>
+  </div>
+</div>
+
+<!-- ───────────── 회사 정보 ───────────── -->
+<div class="modal hidden" id="coModal">
+  <form class="m-box" id="coForm" novalidate style="width:min(560px,100%)">
+    <h3>회사 정보 (서류에 들어가는 고정 항목)</h3>
+    <div id="coFields"></div>
+    <p style="margin:6px 0 0;color:var(--sub);font-size:12px">DB 시트의 company 탭에서도 고칠 수 있습니다.</p>
+    <div class="m-actions"><button type="button" class="btn ghost" id="coCancel">닫기</button><button class="btn" id="coSave">저장</button></div>
+  </form>
+</div>
+
+<!-- ───────────── 입력 창 (허가 차량번호, 반려 사유 등) ───────────── -->
+<div class="modal hidden" id="askModal">
+  <form class="m-box" id="askForm" novalidate>
+    <h3 id="askTitle"></h3>
+    <p id="askDesc" style="margin:0 0 12px;color:var(--sub);font-size:13px"></p>
+    <input class="inp" id="askInput" autocomplete="off">
+    <div class="m-actions"><button type="button" class="btn ghost" id="askCancel">취소</button><button class="btn" id="askOk">확인</button></div>
+  </form>
+</div>
 
 <!-- ───────────── 서류 보기 ───────────── -->
 <div class="modal hidden" id="docModal">
@@ -397,7 +485,7 @@
     return all.filter((r) => {
       if (filter !== '전체' && r.status !== filter) return false;
       if (!q) return true;
-      return [r.name, r.loginId, r.carName].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
+      return [r.name, r.loginId, r.carName, r.carNo].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
         (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
     });
   }
@@ -411,7 +499,7 @@
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
         '<td><b>' + esc(r.name) + '</b></td><td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
         '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
-        '<td class="sub">' + esc([r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
+        '<td class="sub">' + esc([r.carNo, r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
         '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
     }).join('');
   }
@@ -444,8 +532,12 @@
     cur = null; selectedId = ''; setDirty({}); renderRows();
   }
   $('#dClose').addEventListener('click', () => closeDrawer());
-  $('#shade').addEventListener('click', () => closeDrawer());
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#drawer').classList.contains('hidden') && $('#docModal').classList.contains('hidden') && $('#pwModal').classList.contains('hidden')) closeDrawer(); });
+  $('#shade').addEventListener('click', () => { if (!$('#bdrawer').classList.contains('hidden')) closeBib(); else closeDrawer(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || $$('.modal').some((m) => !m.classList.contains('hidden'))) return;
+    if (!$('#bdrawer').classList.contains('hidden')) closeBib();
+    else if (!$('#drawer').classList.contains('hidden')) closeDrawer();
+  });
 
   function renderDetail(d) {
     cur = d; setDirty({});
@@ -469,7 +561,7 @@
         sens('licenseNo', '운전면허번호', d) + fld('licenseType', '운전면허 종류', d.licenseType, { select: LICENSE_TYPES }) +
       '</div></div>' +
       '<div class="sec"><h4>차량</h4><div class="grid2">' +
-        fld('carName', '차명', d.carName) + fld('carYear', '연식', d.carYear) + fld('maxLoad', '최대적재량(kg)', d.maxLoad) +
+        fld('carNo', '차량번호', d.carNo) + fld('carName', '차명', d.carName) + fld('carYear', '연식', d.carYear) + fld('maxLoad', '최대적재량(kg)', d.maxLoad) +
       '</div></div>' +
       '<div class="sec"><h4>정산 계좌</h4><div class="grid2">' +
         fld('bankName', '은행명', d.bankName, { select: BANKS }) + fld('accountHolder', '예금주', d.accountHolder) + sens('account', '계좌번호', d) +
@@ -543,7 +635,7 @@
     const i = all.findIndex((x) => x.id === d.id);
     const before = i >= 0 ? all[i].status : null;
     const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, createdAt: d.createdAt, approvedAt: d.approvedAt,
-      carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
+      carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
     if (i >= 0) all[i] = row; else all.unshift(row);
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }
     renderTabs(); renderRows();
@@ -591,13 +683,17 @@
     $$('.nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === v));
     $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
     $('#view-memo').classList.toggle('hidden', v !== 'memo');
+    $('#view-bib').classList.toggle('hidden', v !== 'bib');
+    if (v === 'bib') loadBib();
     if (v === 'drivers' && !driversLoaded) { driversLoaded = true; loadList(); }
     if (v === 'memo') openMonth(memoMonth || null);
   }
   $$('.nav a[data-view]').forEach((a) => a.addEventListener('click', () => {
     if (a.dataset.view === currentView) return;
-    if (currentView === 'drivers' && !$('#drawer').classList.contains('hidden')) closeDrawer();
+    if (!$('#drawer').classList.contains('hidden')) closeDrawer();
     if (!$('#drawer').classList.contains('hidden')) return; // 저장 안 한 변경이 있어 닫지 않음
+    if (!$('#bdrawer').classList.contains('hidden')) closeBib();
+    if (!$('#bdrawer').classList.contains('hidden')) return;
     switchView(a.dataset.view);
   }));
 
@@ -745,6 +841,450 @@
       openMonth(ymOf(first.date), first.date);
       toast('가장 오래된 미완료 메모: ' + dateLabel(first.date) + ' (모두 ' + r.memos.length + '건)');
     }).catch(() => {});
+  });
+
+  // ───── 배번호 서류 4종 인쇄 양식 ─────
+  // 원본: "배번호 신규 서류(7월21일 업데이트)" — 문구를 바꿔야 하면 아래 글자만 고치면 된다.
+  const BIB_DOCS = { confirm: '허가 신청 현황 확인서', contract: '전속 운송 계약서', consent: '개인정보 활용 동의서', manage: '허가 후 관리 신청서' };
+  function bibDocsHtml(v, pages) {
+    const e = esc, co = v.company || {};
+    const ck = (on) => on ? '☑' : '□';
+    const ymd = (d) => { d = String(d || ''); return { y: d.slice(0, 4), m: d.slice(5, 7), d: d.slice(8, 10) }; };
+    const dot = (d) => { const p = ymd(d); return p.y ? p.y + '.' + p.m + '.' + p.d + '.' : ''; };
+    const ym = (s) => { s = String(s || ''); return s ? s.slice(0, 4) + '년' + (+s.slice(5, 7)) + '월' : ''; };
+    const birthTxt = (d) => { const p = ymd(d); return p.y ? p.y + '년 ' + p.m + '월 ' + p.d + '일' : ''; };
+    const dateLine = (d, sep) => { const p = ymd(d); return p.y ? p.y + ' 년 ' + p.m + '월 ' + p.d + '일' : '20&nbsp;&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;일'; };
+    const phoneParts = String(v.phone || '').split('-');
+    const lt = v.licenseType || '';
+    const ap = ymd(v.applyDate);
+    const cs = ymd(v.contractStart), ce = ymd(v.contractEnd);
+    const page = [];
+
+    // ① 허가 신청 현황 확인서 (별지1호)
+    if (pages.confirm) page.push(
+      '<section class="page"><div class="no">No.</div><div class="annex">(별지1호)</div>' +
+      '<table class="f1"><colgroup><col style="width:19%"><col style="width:44%"><col></colgroup>' +
+      '<tr><th class="title" colspan="3">택배용 화물자동차 운송사업 허가 신청 현황 확인서</th></tr>' +
+      '<tr><th rowspan="4" class="sec">① 신 청 인</th><td colspan="2">성&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;명 : ' + e(v.name) + '</td></tr>' +
+      '<tr><td colspan="2">주민등록번호 : ' + e(v.rrn) + '</td></tr>' +
+      '<tr><td colspan="2">주소(주민등록 상) : ' + e(v.address) + '</td></tr>' +
+      '<tr><td class="small">* 주민등록 상 주소지와 영업점(대리점) 주소지가<br>&nbsp;&nbsp;비인접할 경우, 접수 반려됨.</td><td>(연락처) ' + e(v.phone) + '</td></tr>' +
+      '<tr><th rowspan="8" class="sec">② 전속운송계약</th><td colspan="2">택배서비스사업자 명 : ' + e(co.courierName) + '</td></tr>' +
+      '<tr><td colspan="2">영업점(대리점) 명 : ' + e(co.branchName) + '</td></tr>' +
+      '<tr><td colspan="2">영업점(대리점) 대표자명 : ' + e(co.branchCeo) + '</td></tr>' +
+      '<tr><td colspan="2">영업점(대리점) 주소 : <span class="small">' + e(co.branchAddr) + '</span></td></tr>' +
+      '<tr><td colspan="2">영업점(대리점) 연락처 : ' + e(co.branchPhone) + '</td></tr>' +
+      '<tr><td rowspan="2">전속운송 계약기간 : <u>&nbsp;' + e(v.contractYears) + '&nbsp;</u> 년<br><span class="small">(혹은 장래 운송물량 확보 현황)</span></td><td>(계약 시작일)&nbsp;&nbsp;' + e(dot(v.contractStart)) + '</td></tr>' +
+      '<tr><td>(계약 종료일)&nbsp;&nbsp;' + e(dot(v.contractEnd)) + '</td></tr>' +
+      '<tr><td class="blue">택배서비스종사 경력기간 : <u>&nbsp;' + e(v.careerYears) + '&nbsp;</u> 년</td><td class="blue">(경력기간) ' + e(ym(v.careerStart)) + '~' + e(ym(v.careerEnd)) + '</td></tr>' +
+      '<tr><th rowspan="3" class="sec">③ 차 량 정 보</th><td colspan="2" class="blue"><b>연료 :</b> ' +
+        ['LPG', '경유', '전기', '휘발유'].map((f) => ck(v.fuel === f) + ' ' + f).join('&nbsp;&nbsp;&nbsp;&nbsp;') +
+        '&nbsp;&nbsp;&nbsp;&nbsp;' + ck(v.fuel === '기타') + ' 기타 ( ' + e(v.fuel === '기타' ? v.fuelEtc : '') + '&nbsp;&nbsp;&nbsp;&nbsp;)' +
+        '<br><span class="small">* 「대기관리권역법」 제28조 준수 필요</span></td></tr>' +
+      '<tr><td><b>차명 :</b> ' + e(v.carName) + '</td><td><b>연식 :</b> ' + e(v.carYear) + '</td></tr>' +
+      '<tr><td><b>최대적재량 :</b> (&nbsp;&nbsp;&nbsp;' + e(v.maxLoad) + '&nbsp;&nbsp;&nbsp;) kg</td><td><b>형태 :</b> ' + ck(v.bodyType === '탑형') + ' 탑형 ' + ck(v.bodyType === '밴형') + ' 밴형</td></tr>' +
+      '<tr><th rowspan="2" class="sec">④ 운 전 면 허</th><td colspan="2">면허번호 : ' + e(v.licenseNo) + '</td></tr>' +
+      '<tr><td colspan="2"><b>면허종류 :</b> ' + ck(lt === '1종 대형') + ' 1종 대형&nbsp;&nbsp;&nbsp;' + ck(lt === '1종 보통') + ' 1종 보통&nbsp;&nbsp;&nbsp;' + ck(lt === '2종 보통') + ' 2종 보통<br>' +
+        '<span style="padding-left:5.4em">' + ck(lt === '특수 대형견인') + ' 특수면허 대형견인차&nbsp;&nbsp;&nbsp;&nbsp;' + ck(lt === '특수 소형견인') + ' 특수면허 소형견인차</span></td></tr>' +
+      '<tr><th class="sec">⑤ 화 물 운 송<br>종 사 자 격</th><td>자격증번호 : ' + e(v.qualNo) + '</td><td>자격취득일 : ' + e(String(v.qualDate || '').replace(/-/g, '.')) + '</td></tr>' +
+      '<tr><td colspan="3" class="foot">' +
+        '<p>&nbsp;택배용 화물자동차 운송사업 허가를 위해 시행규칙 제6조제2항제1호·제2호에 따라 확인서를 제출합니다.</p>' +
+        '<p class="center">' + dateLine(v.applyDate) + '</p>' +
+        '<div class="sign"><div>택배서비스사업자명 :&nbsp;&nbsp;' + e(co.courierName) + '&nbsp;(인)</div><div>대표이사 :&nbsp;&nbsp;' + e(co.courierCeo) + '</div>' +
+        '<div class="mt">위 신청인 :&nbsp;&nbsp;' + e(v.name) + '&nbsp;&nbsp;&nbsp;(서명 또는 인)</div></div>' +
+        '<p class="to">특별시장 · 광역시장 · 특별자치시장 · 도지사 · 특별자치도지사 귀하</p></td></tr>' +
+      '</table>' +
+      '<p class="small">※ 위에 기입된 내용은 향후 택배용 화물자동차 운송사업 허가요령 제7조제4항에 의거 택배용 화물자동차의 운영 현황관리에 활용될 수 있음</p>' +
+      '<p class="small">첨부 : 택배용 화물자동차 전속 운송 계약서</p></section>');
+
+    // ② 전속 운송 계약서
+    if (pages.contract) page.push(
+      '<section class="page contract"><h1>택배용 화물자동차 전속 운송 계약서</h1>' +
+      '<p class="parties"><b>' + e(co.courierName) + '</b> (이하 "갑"이라 한다)와 <u>&nbsp;' + e(co.branchName) + '&nbsp;</u> (이하 "을"이라 한다) 및 <u>&nbsp;' + e(v.name) +
+        '&nbsp;</u> (이하 "병"이라 한다)는 택배용 화물자동차 운송사업 허가요령 제4조 제1항에 따라 다음과 같이 전속운송계약을 체결한다.</p>' +
+      '<div class="cols">' +
+      '<h3>제1조[목 적]</h3><p>본 계약은 화물자동차 운수사업법 시행규칙 제6조 제3항 및 택배용 화물자동차 운송사업 허가요령에 따라 "갑"과 "을"·"병"간에 전속운송계약을 체결하고, 관계법령 및 본 계약에 의하여 운송업무를 수행함으로써 택배용 화물자동차 운송사업 허가기준을 준수함을 목적으로 한다.</p>' +
+      '<h3>제2조[책임과 의무]</h3>' +
+      '<p>① "갑"은 택배사업자(화물을 집화·분류·배송하는 형태의 화물자동차 운송사업자로서 국토교통부장관으로부터 인정받은자)로서 "을"로부터 제2항에 따라 업무를 위탁받은 "병"과 관계법령에 따라 택배용 화물자동차 운송사업 허가를 위한 전속운송계약을 체결하고, 택배용 화물자동차 운송사업 허가와 관련된 사항을 전반적으로 관리 감독한다.</p>' +
+      '<p>② "을"은 "갑"과 택배 영업점 계약을 체결하고 "갑"으로부터 일정한 지역 내에서의 영업, 화물의 집화·배송·반품 및 관련 업무 등을 위탁받은 자로서 "병"과 위수탁 계약을 체결하고 이에 따라 "병"에게 택배운송 업무를 수행하게 하며, 택배 전용 번호판 사용 등에 관한 관계법령을 준수하게 할 관리책임을 진다.</p>' +
+      '<p>③ "병"은 본 계약에 따라 화물의 집화·배송만을 담당하기 위해 개별화물자동차 운송사업 또는 용달화물자동차 운송사업 허가를 받은 자로서 본 계약 및 관계 법령에 따라 택배용 화물자동차 운송사업 허가와 관련된 사항을 이행하고, 영업점과의 위수탁 계약 등에 따라 택배운송업무를 성실히 수행하며, 택배 전용 번호판 사용 등에 관하여 관계 법령을 준수할 의무를 진다.</p>' +
+      '<p>④ "갑"과 "병"간에는 별도의 계약이 없는 한, 본 계약 외에는 어떠한 권리 의무관계도 발생하지 않음을 상호 확인한다.</p>' +
+      '<h3>제3조[계약내용]</h3>' +
+      '<p>① "병"은 본 계약의 계약기간 동안 "을"이 위탁하는 집화 및 배송업무를 전속으로 담당하며, "갑" 및 "을" 외의 제3자에게 운송을 제공하여서는 아니된다.</p>' +
+      '<p>② 본 계약의 계약기간 중 "갑"과 "을"간의 택배 영업점 계약이 종료되는 경우, "갑"과 "병"은 본 계약과 동일한 조건으로 "을"의 지위를 승계·대체한 자와 전속운송계약을 체결한다.</p>' +
+      '<h3>제4조[계약기간]</h3><p>본 계약의 계약기간은 <u>' + e(cs.y || '20  ') + '</u>년 <u>' + e(cs.m || '  ') + '</u>월 <u>' + e(cs.d || '  ') + '</u>일부터 <u>' + e(ce.y || '20  ') + '</u>년 <u>' + e(ce.m || '  ') + '</u>월 <u>' + e(ce.d || '  ') +
+        '</u>일까지(<u>&nbsp;' + e(v.contractYears) + '&nbsp;</u>년간)로 하되, 기간만료일 60일 이전에 어느 일방의 계약 종료 통지가 없는 한 본 계약은 동일조건으로 1년씩 자동 연장되는 것으로 한다. 다만, 일방의 계약조건의 변경 통지가 있을 시에는 본 계약의 만료일까지 당사자 간 계약조건이 서면 합의되지 아니하면 본 계약은 종료된 것으로 한다.</p>' +
+      '<h3>제5조[택배 전용 번호판 반납]</h3><p>"병"이 질병, 사고 등의 사유로 택배운송업무가 불가능한 경우, 이후의 조치에 대하여는 "갑" 또는 "을"과 협의하여야 하며, 본 계약이 종료되거나 해지되어 택배운송업무를 계속할 수 없게 된 경우 "병"은 택배 전용 번호판을 관할관청에 반납하여야 한다.</p>' +
+      '<h3>제6조[분쟁의 해결]</h3><p>본 계약에 관하여 분쟁이 발생한 경우에는 당사자들의 상호 합의로 해결함을 원칙으로 하되, 상호 합의에 이르지 못한 경우에는 <u>&nbsp;&nbsp;' + e(co.court) + '&nbsp;&nbsp;</u> 지방법원을 관할법원으로 하는 소송절차에 의하여 해결하기로 한다.</p>' +
+      '<h3>제7조[신용정보 조회 승낙]</h3><p>"을"과 "병"은 "갑"이 \'신용정보의 이용 및 보호에 관한 법률\'이 정하는 바에 따라 "을" 및 "병"에 대한 신용조사 또는 신용정보 조회하는 것에 동의한다.</p>' +
+      '<h3>제8조[기타사항]</h3><p>본 계약 계약기간 중 본 계약내용의 변경은 당사자의 서면 합의에 의해서만 변경될 수 있으며, 기명날인된 문서를 본 계약서의 말미에 첨부하여야 한다.</p>' +
+      '<h3>제9조[특약사항]</h3><p>① 본 계약서와는 별도로 당사자 간 체결된 계약서의 내용과 본 계약서의 내용이 서로 상충되는 경우 다음의 사항은 본 계약서의 내용을 우선하여 적용한다.</p>' +
+      '<p class="ind">1. 제3조 택배 전용 번호판 사용 등에 관한 계약내용<br>2. 제4조 택배 전용 번호판 사용 등에 관한 계약기간<br>3. 제5조 택배 전용 번호판 사용 등에 관련된 번호판 반납</p>' +
+      '<p>② "병"의 택배 전용 번호 신청이 불허가 결정되면, 본 계약서는 효력이 없는 것으로 한다.</p>' +
+      '</div>' +
+      '<p class="cdate">계약일자 : <u>' + e(ap.y || '20  ') + '</u>년 <u>' + e(ap.m || '  ') + '</u>월 <u>' + e(ap.d || '  ') + '</u>일</p>' +
+      '<div class="parties2"><div><p class="who">(갑)</p><p>회 사 명 : ' + e(String(co.courierName || '').replace(/\s*유한회사$/, '')) + '</p><p>대표이사 : ' + e(co.courierCeo) + '&nbsp;&nbsp;&nbsp;(인)</p><p>주&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;소 : ' + e(co.courierAddr) + '</p>' +
+        '<p class="who mt">(을)</p><p>영업점명 : ' + e(co.branchName) + '</p><p>사업자번호 : ' + e(co.branchBizNo) + '</p><p>주&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;소 : ' + e(co.branchAddr) + '</p><p>대 표 자 : ' + e(co.branchCeo) + '&nbsp;&nbsp;&nbsp;(인)</p></div>' +
+        '<div><p class="who">(병)</p><p>성&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;명 : ' + e(v.name) + '&nbsp;&nbsp;&nbsp;(인)</p><p>주&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;소 : ' + e(v.address) + '</p><p>생년월일 : ' + e(birthTxt(v.birthDate)) + '</p><p>연 락 처 : ' + e(phoneParts.join(' - ')) + '</p></div></div>' +
+      '</section>');
+
+    // ③ 개인정보 활용 동의서 (한국통합물류협회)
+    if (pages.consent) page.push(
+      '<section class="page consent"><div class="bar"></div><h2>택배용 화물자동차 허가신청 및 이력관리를 위한</h2><h1>개인정보 활용 동의서</h1>' +
+      '<div class="org"><b>KiLA</b> 한국통합물류협회<span class="nobox">NO.</span></div>' +
+      '<div class="box"><div class="boxh">개인정보 활용 동의 및 권익 보호에 관한 사항</div>' +
+      '<p class="b">■ 정보의 수집·이용에 관한 소비자권익 보호 사항</p><p class="ind">한국통합물류협회는(이하 \'협회\') 택배용 화물자동차 운송사업 허가요령 제7조제4항에 의거하여 택배용 화물자동차의 전속운송계약(해지)현황, 운영현황을 관리하기 위해 택배용 화물자동차 및 해당 허가자에 대한 정보를 수집 및 보유합니다. 협회는 귀하의 개인정보보호를 중시하며, 개인 정보처리방침을 통해 귀하가 제공하는 개인정보가 어떠한 용도와 방식으로 사용되고, 개인정보보호를 위해 어떠한 조치가 취해지는지 알려드립니다.</p></div>' +
+      '<h3>1. 수집하는 개인정보의 항목</h3><div class="box"><p>■ 성명, 생년월일, 주소, 연락처, 차량정보(차종, 차명, 형태, 차량번호), 화물운송종사자 자격번호 등 택배용 화물자동차 운송사업 허가 신청 현황 확인서에 기입되는 모든 내용과 허가 후 정보(허가 받은 지역, 차량번호)를 수집합니다.</p></div>' +
+      '<h3>2. 개인정보 수집 및 이용목적</h3><div class="box"><p>■ 협회는 택배용 화물자동차 운송사업 허가요령 제7조 제4항에 의거, 택배용 화물자동차 이력관리 (택배업 종사여부 확인, 국토교통부 보고, 행정관청 업무 지원, 보험안내, 택배관련 복지사업 안내 등)를 위해 택배용 화물자동차 및 해당 허가자에 대한 정보를 수집 및 이용하며, 이를 제외한 목적으로 사용하지 않습니다.</p><p>■ 협회는 택배용 화물자동차 이력관리 및 <b>택배 관련 복지사업 안내 등의 정보를 전화, SMS 를 통해 관리 및 안내 할 수 있습니다.</b></p></div>' +
+      '<h3>3. 개인정보 보유 및 보유기간</h3><div class="box"><p>■ 이력관리 및 정보 안내 필요성이 상실된 경우(허가받은 자나 관할관청으로부터 허가취소, 허가받은 차량번호(\'배\'번호판) 반납 사실이 확인된 경우) 행정업무의 참고 또는 사실 증명을 위해 <b>3년간 보유</b> 후 파기합니다.</p><p>■ 종이에 출력된 개인정보는 분쇄기로 분쇄하거나 소각을 통하여 파기합니다.</p><p>■ 전자적 파일 형태로 저장된 개인정보는 기록을 재생할 수 없는 기술적 방법을 사용하여 삭제합니다.</p></div>' +
+      '<p class="right">동의(필수) ☑</p>' +
+      '<h3>4. 고유식별정보 처리 및 보관기간</h3><table class="t"><tr><th>항목</th><th>수집 목적</th><th>보유 기간</th><th>동의(필수)</th></tr>' +
+        '<tr><td><b>주민등록번호</b></td><td>택배용 화물자동차 운송사업 허가</td><td>택배용 화물자동차 운송사업 <b>허가 완료</b> 및<br>택배차량 이력관리 <b>시스템 등록시까지</b></td><td class="c">☑</td></tr>' +
+        '<tr><td><b>운전면허번호</b></td><td>택배용 화물자동차 운송사업 허가 및 차량 이력관리</td><td><b>이력관리 및 정보 안내 필요성이 상실될 경우<br>(허가 취소, 폐업 등) 3년간 보유 후 파기</b></td><td class="c">☑</td></tr></table>' +
+      '<p class="small b">※ 위와 같이 개인정보를 처리하는데 동의하지 않을 경우 택배용 화물자동차 운송사업 허가 신청 접수 대행 및 허가 후 관리에 제한이 있을 수 있습니다.</p>' +
+      '<h3>5. 개인정보 제3자 제공 내역</h3><table class="t"><tr><th>제공 받는자</th><th>제공 항목</th><th>제공 목적</th><th>보유기간</th><th>동의</th></tr>' +
+        '<tr><td><b>국토교통부, 환경부, 해양수산부, 관할관청</b></td><td>성명, 차량번호,<br>휴대폰 번호 등</td><td><b>허가 조건 위반 내용 확인,<br>택배 관련 데이터 제공 등</b></td><td class="c"><b>영구보유</b></td><td class="c">(필수) ☑</td></tr>' +
+        '<tr><td><b>현대자동차, 기아자동차, ㈜버금,<br>에이원금융판매㈜D&amp;I본부</b></td><td>성명, 휴대폰번호</td><td><b>영업용 자동차 구매 및 보험,<br>복지 사업 안내</b></td><td class="c"><b>2년</b></td><td class="c">(선택) ' + ck(v.optConsent) + '</td></tr></table>' +
+      '<p class="small b">※ 위와 같이 개인정보를 처리하는데 동의하지 않을 경우 협회에서 제공하는 복지사업 관련 서비스 제공 및 허가 후 관리에 제한이 있을 수 있습니다.</p>' +
+      '<div class="csign"><span>' + (ap.y ? e(ap.y) + '년 ' + e(ap.m) + '월 ' + e(ap.d) + '일' : '20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일') + '</span><span><b>성명</b> : ' + e(v.name) + '&nbsp;&nbsp;<span class="small">(서명 또는 인)</span></span><span class="big">한국통합물류협회 귀하</span></div>' +
+      '<div class="bar"></div></section>');
+
+    // ④ 허가 후 관리 신청서
+    const auto = v.manageMethod !== '직접 증명';
+    if (pages.manage) page.push(
+      '<section class="page manage"><h1>택배용 화물자동차(\'배\' 번호판)의 허가 후 관리 신청서</h1>' +
+      '<p><u>&nbsp;' + e(String(co.courierName || '').replace(/\s*유한회사$/, '')) + '&nbsp;</u> 및 한국통합물류협회 귀중</p>' +
+      '<p class="lead">신청자 본인은 \'배\'번호판을 택배 용도로만 사용하고 있음을 증명하기 위하여 아래와 같이 허가 후 관리 신청서를 제출합니다.</p>' +
+      '<p class="center">-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;아&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;래&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-</p>' +
+      '<h3>1. 신청 정보</h3><table class="info"><tr><td class="l">영업점명 :</td><td class="u">' + e(co.branchName) + '</td><td class="l b">신청자</td><td>성명 : <span class="u">' + e(v.name) + '</span>&nbsp;&nbsp;(인)</td></tr>' +
+        '<tr><td></td><td></td><td></td><td>생년월일 : <span class="u">' + e(birthTxt(v.birthDate)) + '</span></td></tr>' +
+        '<tr><td class="l">대표자 :</td><td class="u">' + e(co.branchCeo) + '&nbsp;&nbsp;(인)</td><td></td><td>연락처 : <span class="u">' + e(v.phone) + '</span></td></tr>' +
+        '<tr><td></td><td></td><td></td><td>차량번호 : <span class="u">' + e(v.carNo) + '</span></td></tr></table>' +
+      '<h3>2. 허가 후 관리 방법</h3><table class="t m"><tr><th style="width:7%"></th><th style="width:25%">관리방법</th><th>상세내용</th></tr>' +
+        '<tr><td class="c big">' + ck(auto) + '</td><td class="c">자동 증명<br><span class="small">(관리비 납부)</span></td><td><u>"이력관리 시스템"을 통해 전속운송계약이 체결되어 택배업에 종사하고 있음을 증명</u>하고, 신청서를 접수한 달부터 매월 집배송 수수료(월급)에서 <u>1,000원을 공제하여 한국통합물류협회에 관리비로 납부해줄 것을 요청합니다.</u></td></tr>' +
+        '<tr><td class="c big">' + ck(!auto) + '</td><td class="c">직접 증명<br><span class="small">(서류 확인비용 납부)</span></td><td><u>신청서를 접수한 달부터 매월 5일까지 한국통합물류협회에 관련 증빙</u>(택배회사 도장을 날인받은 월간 일자별 집배송 내역서 1부, 자동차등록증 사본 1부)을 <u>등기우편 또는 직접 방문하여 제출하고, 서류 확인 비용 2,000원을 지정계좌로 입금하겠습니다.</u> (지정계좌 별도 안내)<br><span class="small">★ 서류 확인비용 납부 시 차량번호로 납부해주셔야 확인이 가능합니다.</span></td></tr></table>' +
+      '<p class="note">※ 두가지 방법 중 1가지를 택하여 허가 후 관리를 신청하여야 하며, <u>신청하지 않거나, 직접 증명 선택 후 증빙 미제출 시에는 택배업 종사 확인이 불가하므로</u> 허가조건 위반 차량으로 관할관청에 통보될 수 있음</p>' +
+      '<p class="center mt">' + dateLine(v.applyDate) + '</p>' +
+      '<p class="guide">-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;&nbsp;안&nbsp;&nbsp;내&nbsp;&nbsp;사&nbsp;&nbsp;항&nbsp;&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-&nbsp;-</p>' +
+      '<ol class="g"><li>택배용 화물자동차(\'배\'번호판)는 택배용도 외로 사용할 경우 행정처분을 받습니다. (위반 시 화물자동차 운수사업법 시행규칙 제27조 별표2에 따라 사업정지 또는 허가취소 처분을 받게 됩니다.)</li>' +
+        '<li>수집하는 개인정보(성명, 생년월일, 연락처, 차량번호)에 대한 사용목적, 보유기간 등은 이력관리 등록신청 또는 허가 신규 신청시 제출하신 개인정보활용동의서를 통해 고시하였음을 알려드립니다.</li></ol>' +
+      '</section>');
+
+    return '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>배번호 신청 서류 - ' + e(v.name) + '</title><style>' +
+      '@page{size:A4;margin:11mm 13mm}*{box-sizing:border-box}' +
+      'body{margin:0;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#000;font-size:10.5pt;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      '.page{page-break-after:always;break-after:page;position:relative}.page:last-child{page-break-after:auto;break-after:auto}' +
+      '@media screen{body{background:#888}.page{background:#fff;width:210mm;min-height:297mm;margin:10px auto;padding:11mm 13mm}}' +
+      'p{margin:0 0 4px}.small{font-size:8.5pt}.center{text-align:center}.right{text-align:right}.b{font-weight:700}.mt{margin-top:10px}.blue{color:#1a3fa8}' +
+      '.no{position:absolute;right:0;top:0;border:1px solid #000;width:44mm;padding:3px 6px;font-size:10pt}.annex{margin:26px 0 4px;font-size:11pt}' +
+      'table{border-collapse:collapse;width:100%}' +
+      '.f1{border:2px solid #000}.f1 td,.f1 th{border:1px solid #000;padding:5px 7px;vertical-align:middle;text-align:left;font-weight:400}' +
+      '.f1 .title{text-align:center;font-size:15pt;font-weight:800;letter-spacing:1px;background:#f2f2f2;padding:7px}' +
+      '.f1 .sec{text-align:center;font-weight:800;font-size:11pt;white-space:nowrap;padding:5px 4px}.f1 .foot{padding:10px 12px}' +
+      '.sign{margin:8px 0 6px 46%;line-height:1.7}.to{margin-top:8px}' +
+      '.contract{font-size:8.6pt;line-height:1.42}.contract h1{text-align:center;font-size:17pt;margin:0 0 10px;letter-spacing:1px}' +
+      '.contract .parties{font-size:9.2pt;margin-bottom:8px}.cols{column-count:2;column-gap:7mm;border-top:1px solid #999;border-bottom:1px solid #999;padding:6px 0}' +
+      '.contract h3{font-size:8.8pt;margin:4px 0 1px;break-after:avoid}.contract .cols p{margin:0 0 2px;text-align:justify}.contract .ind{padding-left:1em}' +
+      '.cdate{text-align:center;font-size:12pt;font-weight:700;margin:10px 0}' +
+      '.parties2{display:grid;grid-template-columns:1fr 1fr;gap:8mm;font-size:9.4pt}.parties2 p{margin:0 0 2px}.who{font-weight:800;color:#c00}' +
+      '.consent{font-size:9pt}.consent .bar{height:9px;background:#1d3f7a;margin:0 0 6px}.consent h2{text-align:center;font-size:12pt;margin:6px 0 0;color:#1d3f7a}' +
+      '.consent h1{text-align:center;font-size:19pt;margin:0 0 6px;color:#1d3f7a}.org{display:flex;align-items:center;gap:8px;font-size:11pt;margin-bottom:6px;border-bottom:2px solid #1d3f7a;padding-bottom:4px}' +
+      '.org b{font-size:16pt;color:#1d3f7a}.nobox{margin-left:auto;border:1px solid #1d3f7a;padding:2px 60px 2px 10px;background:#1d3f7a;color:#fff}' +
+      '.box{border:1px solid #1d3f7a;padding:5px 8px;margin-bottom:4px}.boxh{background:#e8e8e8;text-align:center;font-weight:700;margin:-5px -8px 5px;padding:3px}' +
+      '.consent h3{color:#1d3f7a;font-size:10.5pt;margin:6px 0 2px}.consent .ind{padding-left:1em}' +
+      '.t td,.t th{border:1px solid #888;padding:4px 6px;font-size:8.6pt;vertical-align:middle}.t th{background:#e6ecf5}.c{text-align:center}' +
+      '.csign{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 6px;font-size:11pt}.csign .big{font-size:13pt;font-weight:800}' +
+      '.manage h1{text-align:center;font-size:15.5pt;margin:4px 0 16px}.manage .lead{margin:10px 0}.manage h3{font-size:12pt;margin:12px 0 6px}' +
+      '.info td{padding:4px 6px;font-size:10.5pt}.info .l{width:14%;text-align:right}.u{border-bottom:1px solid #000;padding:0 8px}' +
+      '.m td,.m th{font-size:9.6pt;padding:6px 8px}.m th{background:#d9d9d9}.big{font-size:15pt}' +
+      '.note{background:#eee;padding:8px 10px;margin-top:8px;font-size:9.6pt}.guide{text-align:center;margin:18px 0 6px;font-weight:700}.g{font-size:9.6pt;padding-left:18px}' +
+      '</style></head><body>' + page.join('') + '</body></html>';
+  }
+
+  /** 인쇄: 숨긴 틀 안에서 인쇄 창을 연다. 안 되는 브라우저는 미리보기 창을 쓴다. */
+  function printHtml(html) {
+    let fr = $('#printFrame');
+    if (fr) fr.remove();
+    fr = document.createElement('iframe');
+    fr.id = 'printFrame';
+    fr.setAttribute('aria-hidden', 'true');
+    fr.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
+    document.body.appendChild(fr);
+    fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (err) { openPreview(html); } };
+    fr.srcdoc = html;
+  }
+  function openPreview(html) {
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const w = window.open(url, '_blank');
+    if (!w) toast('팝업이 막혀 미리보기를 열 수 없습니다. 브라우저에서 팝업을 허용해 주세요.');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  // ───── 배번호 관리 ─────
+  const BSTATUS = ['작성', '출력', '제출', '허가', '반려'];
+  const FUELS = ['LPG', '경유', '전기', '휘발유', '기타'];
+  let bapps = [], bcounts = {}, bdrivers = [], bfilter = '전체', bcur = null, bdirty = {};
+
+  function loadBib() {
+    $('#brows').innerHTML = '<tr><td colspan="8"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
+    return api('adm_bibList').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      bapps = r.apps; bcounts = r.counts; bdrivers = r.drivers;
+      renderBTabs(); renderBRows();
+    }).catch(() => {});
+  }
+  function renderBTabs() {
+    const items = [['전체', bcounts.all || 0]].concat(BSTATUS.map((s) => [s, bcounts[s] || 0]));
+    $('#btabs').innerHTML = items.map(([k, n]) => '<button class="tab' + (k === bfilter ? ' on' : '') + '" data-f="' + k + '">' + k + '<b>' + n + '</b></button>').join('');
+  }
+  $('#btabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; bfilter = b.dataset.f; renderBTabs(); renderBRows(); });
+  $('#bq').addEventListener('input', () => renderBRows());
+  $('#bibReload').addEventListener('click', () => loadBib());
+  function renderBRows() {
+    const q = $('#bq').value.trim().toLowerCase();
+    const list = bapps.filter((a) => (bfilter === '전체' || a.status === bfilter) &&
+      (!q || [a.name, a.carNo, a.plateNo].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0)));
+    $('#bempty').classList.toggle('hidden', list.length > 0);
+    $('#bempty').textContent = bapps.length ? '조건에 맞는 신청서가 없습니다.' : '아직 신청서가 없습니다. 오른쪽 위 "새 신청서"로 만들어 주세요.';
+    $('#brows').innerHTML = list.map((a) => '<tr data-id="' + esc(a.id) + '"' + (bcur && bcur.app.id === a.id ? ' class="sel"' : '') + '>' +
+      '<td>' + esc(a.applyDate) + '</td><td><b>' + esc(a.name) + '</b></td><td><span class="badge b-' + esc(a.status) + '">' + esc(a.status) + '</span></td>' +
+      '<td>' + esc(a.carNo) + '</td><td class="sub">' + esc(String(a.printedAt || '').slice(0, 10) || '-') + '</td><td class="sub">' + esc(a.submittedAt || '-') + '</td>' +
+      '<td><b>' + esc(a.plateNo) + '</b></td><td class="sub">' + esc(a.status === '반려' ? '반려: ' + a.rejectReason : a.memo) + '</td></tr>').join('');
+  }
+  $('#brows').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) openBib(tr.dataset.id); });
+  function patchBib(app) {
+    const i = bapps.findIndex((x) => x.id === app.id);
+    const before = i >= 0 ? bapps[i].status : null;
+    if (i >= 0) bapps[i] = app; else { bapps.unshift(app); bcounts.all = (bcounts.all || 0) + 1; }
+    if (before !== app.status) { if (before && bcounts[before] != null) bcounts[before]--; if (bcounts[app.status] != null) bcounts[app.status]++; }
+    renderBTabs(); renderBRows();
+  }
+
+  // 새 신청서
+  $('#bibNew').addEventListener('click', () => { $('#pickQ').value = ''; renderPick(); $('#pickModal').classList.remove('hidden'); $('#pickQ').focus(); });
+  $('#pickCancel').addEventListener('click', () => $('#pickModal').classList.add('hidden'));
+  $('#pickQ').addEventListener('input', renderPick);
+  function renderPick() {
+    const q = $('#pickQ').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+    const list = bdrivers.filter((d) => !q || [d.name, d.loginId].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
+      (qd.length >= 3 && String(d.phone || '').replace(/\D/g, '').indexOf(qd) >= 0));
+    $('#pickList').innerHTML = list.length ? list.map((d) => {
+      const n = bapps.filter((a) => a.driverId === d.id).length;
+      return '<button type="button" data-id="' + esc(d.id) + '"><span><b>' + esc(d.name) + '</b> <small>' + esc(d.phone) + '</small></span><small>' +
+        esc(d.status) + (n ? ' · 신청서 ' + n + '건' : '') + '</small></button>';
+    }).join('') : '<div class="no-memo">기사가 없습니다.</div>';
+  }
+  $('#pickList').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-id]'); if (!b) return;
+    const d = bdrivers.find((x) => x.id === b.dataset.id);
+    const has = bapps.find((a) => a.driverId === b.dataset.id && a.status !== '허가' && a.status !== '반려');
+    if (has && !confirm(d.name + ' 기사님은 진행 중인 신청서가 이미 있습니다 (' + has.status + '). 새로 만들까요?')) return;
+    b.disabled = true;
+    api('adm_bibSave', { driverId: b.dataset.id }).then((r) => {
+      if (!r.ok) { b.disabled = false; return toast(r.msg); }
+      $('#pickModal').classList.add('hidden');
+      patchBib(r.app); showBibDrawer(); renderBib(r);
+      toast('신청서를 만들었습니다. 빈 항목을 채운 뒤 인쇄하세요.');
+    }).catch(() => { b.disabled = false; });
+  });
+
+  // 상세
+  function showBibDrawer() { $('#shade').classList.remove('hidden'); $('#bdrawer').classList.remove('hidden'); }
+  function openBib(id) {
+    showBibDrawer();
+    $('#bTitle').textContent = '불러오는 중…'; $('#bBadge').innerHTML = '';
+    $('#bBody').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
+    setBDirty({});
+    api('adm_bibGet', id).then((r) => { if (!r.ok) { toast(r.msg); return closeBib(true); } renderBib(r); }).catch(() => {});
+  }
+  function closeBib(force) {
+    if (!force && Object.keys(bdirty).length && !confirm('저장하지 않은 변경이 있습니다. 닫을까요?')) return;
+    $('#bdrawer').classList.add('hidden');
+    if ($('#drawer').classList.contains('hidden')) $('#shade').classList.add('hidden');
+    bcur = null; setBDirty({}); renderBRows();
+  }
+  $('#bClose').addEventListener('click', () => closeBib());
+
+  function setBDirty(d) {
+    bdirty = d; const n = Object.keys(d).length;
+    $('#bSave').disabled = !n; $('#bReset').disabled = !n;
+    $('#bMsg').textContent = n ? n + '개 항목이 바뀌었습니다. 저장 후 인쇄하세요.' : '';
+  }
+  const kvRow = (label, val) => '<span>' + label + '</span><span' + (val ? '' : ' class="miss"') + '>' + (val ? esc(val) : '없음') + '</span>';
+  const bInput = (key, label, val, type, ro) => '<div class="field"><label class="lb">' + label + '</label><input class="inp" data-b="' + key + '" type="' + (type || 'text') + '" value="' + esc(val) + '"' + (ro ? ' disabled' : '') + '></div>';
+  const bRadios = (key, list, val, ro) => '<div class="radios">' + list.map((x) => '<label><input type="radio" name="b-' + key + '" data-b="' + key + '" value="' + esc(x) + '"' + (x === val ? ' checked' : '') + (ro ? ' disabled' : '') + '> ' + esc(x) + '</label>').join('') + '</div>';
+
+  function renderBib(det) {
+    bcur = det; setBDirty({});
+    const a = det.app, d = det.driver || {}, locked = a.status === '허가';
+    $('#bTitle').textContent = a.name + ' · 배번호 신청';
+    $('#bBadge').innerHTML = '<span class="badge b-' + esc(a.status) + '">' + esc(a.status) + '</span>';
+    const step = (label, date, state) => '<span class="' + state + '">' + label + (date ? ' ' + esc(String(date).slice(5, 10).replace('-', '/')) : '') + '</span>';
+    const order = ['작성', '출력', '제출', '허가'];
+    const idx = order.indexOf(a.status);
+    const flow = a.status === '반려'
+      ? step('작성', a.createdAt, 'done') + '<i>›</i>' + step('출력', a.printedAt, a.printedAt ? 'done' : '') + '<i>›</i>' + step('제출', a.submittedAt, a.submittedAt ? 'done' : '') + '<i>›</i>' + step('반려', a.rejectedAt, 'bad')
+      : order.map((s, i) => step(s, [a.createdAt, a.printedAt, a.submittedAt, a.approvedAt][i], i < idx ? 'done' : i === idx ? 'cur' : '')).join('<i>›</i>');
+    const can = {
+      submit: a.status === '출력' || a.status === '작성', approve: a.status === '제출', reject: a.status === '출력' || a.status === '제출',
+      reopen: a.status === '반려' || a.status === '제출' || a.status === '출력', del: a.status === '작성' || a.status === '반려'
+    };
+    $('#bBody').innerHTML =
+      (det.missing.length ? '<div class="missbox"><b>서류에 비어 있는 항목 ' + det.missing.length + '개</b><br>' + det.missing.map(esc).join(', ') + '</div>'
+        : '<div class="okbox">서류에 필요한 항목이 모두 채워져 있습니다.</div>') +
+      '<div class="sec"><h4>진행</h4><div class="flow">' + flow + '</div>' +
+        (a.status === '허가' ? '<p style="margin:10px 0 0">허가 차량번호 <b>' + esc(a.plateNo) + '</b> (기사 정보의 차량번호도 바뀌었습니다)</p>' : '') +
+        (a.status === '반려' ? '<p style="margin:10px 0 0;color:var(--danger)">반려 사유: ' + esc(a.rejectReason) + '</p>' : '') +
+        '<div class="acts-row">' +
+          '<button type="button" class="btn sm" data-bact="print">서류 인쇄</button><button type="button" class="btn sm ghost" data-bact="preview">미리보기</button>' +
+          (can.submit ? '<button type="button" class="btn sm ghost" data-bact="submit">제출 완료</button>' : '') +
+          (can.approve ? '<button type="button" class="btn sm ok" data-bact="approve">허가 처리</button>' : '') +
+          (can.reject ? '<button type="button" class="btn sm ghost" data-bact="reject">반려 처리</button>' : '') +
+          (can.reopen ? '<button type="button" class="btn sm ghost" data-bact="reopen">다시 작성으로</button>' : '') +
+          (can.del ? '<button type="button" class="btn sm ghost" data-bact="delete" style="color:var(--danger)">삭제</button>' : '') +
+        '</div>' +
+        '<div class="radios" style="margin-top:8px;font-size:12px;min-height:0">' + Object.keys(BIB_DOCS).map((k) => '<label><input type="checkbox" data-page="' + k + '" checked> ' + BIB_DOCS[k] + '</label>').join('') + '</div>' +
+      '</div>' +
+      '<div class="sec"><h4>기사 정보 <span style="font-weight:400;color:var(--sub);font-size:12px">(기사 정보관리에서 수정)</span></h4><div class="kv">' +
+        kvRow('이름', d.name) + kvRow('연락처', d.phone) + kvRow('생년월일', d.birthDate) + kvRow('주민등록번호', d.rrn) + kvRow('주소', d.address) +
+        kvRow('운전면허번호', d.licenseNo) + kvRow('면허 종류', d.licenseType) + kvRow('자격증 번호', d.qualNo) + kvRow('자격 취득일', d.qualDate) +
+        kvRow('차명', d.carName) + kvRow('연식', d.carYear) + kvRow('최대적재량(kg)', d.maxLoad) +
+      '</div><div style="margin-top:10px"><button type="button" class="btn sm ghost" data-bact="driver">기사 정보 수정하러 가기</button></div></div>' +
+      '<div class="sec"><h4>신청 정보</h4>' + (locked ? '<p style="margin:0 0 10px;color:var(--sub);font-size:12px">허가가 끝나 고칠 수 없습니다.</p>' : '') + '<div class="grid2">' +
+        bInput('applyDate', '신청일 (서류 날짜·계약일자)', a.applyDate, 'date', locked) + bInput('carNo', '신청 시 차량번호', a.carNo, 'text', locked) +
+        bInput('contractStart', '계약 시작일', a.contractStart, 'date', locked) + bInput('contractEnd', '계약 종료일', a.contractEnd, 'date', locked) +
+        bInput('careerStart', '택배 종사 경력 시작 (년-월)', a.careerStart, 'month', locked) + bInput('careerEnd', '경력 종료 (년-월)', a.careerEnd, 'month', locked) +
+        bInput('contractYears', '계약기간(년) — 날짜로 자동 계산', a.contractYears, 'number', locked) + bInput('careerYears', '경력기간(년) — 자동 계산', a.careerYears, 'number', locked) +
+        '<div class="field full"><label class="lb">연료</label>' + bRadios('fuel', FUELS, a.fuel, locked) + '</div>' +
+        (a.fuel === '기타' ? bInput('fuelEtc', '연료 (기타)', a.fuelEtc, 'text', locked) : '') +
+        '<div class="field full"><label class="lb">차량 형태</label>' + bRadios('bodyType', ['탑형', '밴형'], a.bodyType, locked) + '</div>' +
+        '<div class="field full"><label class="lb">허가 후 관리 방법</label>' + bRadios('manageMethod', ['자동 증명', '직접 증명'], a.manageMethod, locked) +
+          '<div class="hint" style="font-size:12px;color:var(--sub)">자동 증명: 매월 수수료에서 1,000원 공제 · 직접 증명: 매월 증빙 제출 + 2,000원</div></div>' +
+        '<div class="field full"><label class="radios" style="min-height:0"><input type="checkbox" data-b="optConsent"' + (a.optConsent ? ' checked' : '') + (locked ? ' disabled' : '') +
+          '> 개인정보 제3자 제공 <b>선택</b> 동의 (자동차 회사·보험 안내)</label></div>' +
+        '<div class="field full"><label class="lb">메모</label><textarea class="inp" data-b="memo"' + (locked ? ' disabled' : '') + '>' + esc(a.memo) + '</textarea></div>' +
+      '</div></div>' +
+      '<div class="sec"><div class="meta"><span>신청ID</span><span>' + esc(a.id) + '</span><span>담당</span><span>' + esc(a.admin) + '</span>' +
+        '<span>작성일시</span><span>' + esc(a.createdAt) + '</span><span>마지막 출력</span><span>' + esc(a.printedAt || '-') + '</span></div></div>';
+    renderBRows();
+  }
+
+  // 입력 변경
+  $('#bBody').addEventListener('input', (e) => {
+    const el = e.target, key = el.dataset.b;
+    if (!key || !bcur) return;
+    const orig = bcur.app[key];
+    let val, changed;
+    if (el.type === 'checkbox') { val = el.checked; changed = val !== !!orig; }
+    else if (el.type === 'radio') { val = el.value; changed = val !== (orig || ''); $$('input[name="b-' + key + '"]', $('#bBody')).forEach((r) => r.parentNode.classList.toggle('dirty', changed && r.checked)); }
+    else { val = el.value.trim(); changed = val !== String(orig || ''); el.classList.toggle('dirty', changed); }
+    const d = Object.assign({}, bdirty);
+    if (changed) d[key] = val; else delete d[key];
+    setBDirty(d);
+    if (key === 'fuel') { // 기타를 고르면 칸을 보여준다
+      const show = val === '기타', has = !!$('[data-b="fuelEtc"]', $('#bBody'));
+      if (show && !has) el.closest('.field').insertAdjacentHTML('afterend', bInput('fuelEtc', '연료 (기타)', bcur.app.fuelEtc, 'text', false));
+    }
+  });
+  $('#bBody').addEventListener('change', (e) => { if (e.target.type === 'radio' || e.target.type === 'checkbox') e.target.dispatchEvent(new Event('input', { bubbles: true })); });
+  $('#bReset').addEventListener('click', () => { if (bcur) renderBib(bcur); });
+  $('#bSave').addEventListener('click', () => {
+    if (!bcur || !Object.keys(bdirty).length) return;
+    const b = $('#bSave'); b.disabled = true; b.textContent = '저장 중…';
+    api('adm_bibSave', Object.assign({ id: bcur.app.id }, bdirty)).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      toast('저장했습니다.'); renderBib(r); patchBib(r.app);
+    }).catch(() => {}).finally(() => { b.textContent = '저장'; b.disabled = !Object.keys(bdirty).length; });
+  });
+
+  // 진행 버튼
+  function ask(title, desc, placeholder) {
+    return new Promise((resolve) => {
+      $('#askTitle').textContent = title; $('#askDesc').textContent = desc || '';
+      $('#askInput').value = ''; $('#askInput').placeholder = placeholder || '';
+      $('#askModal').classList.remove('hidden'); $('#askInput').focus();
+      const done = (v) => { $('#askModal').classList.add('hidden'); $('#askForm').onsubmit = null; $('#askCancel').onclick = null; resolve(v); };
+      $('#askForm').onsubmit = (e) => { e.preventDefault(); const v = $('#askInput').value.trim(); if (!v) return toast('입력해 주세요.'); done(v); };
+      $('#askCancel').onclick = () => done(null);
+    });
+  }
+  function bibStatus(action, value, msg) {
+    return api('adm_bibStatus', bcur.app.id, action, value).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      toast(msg); renderBib(r); patchBib(r.app);
+    }).catch(() => {});
+  }
+  $('#bBody').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-bact]'); if (!b || !bcur) return;
+    const act = b.dataset.bact, a = bcur.app;
+    if ((act === 'print' || act === 'preview') && Object.keys(bdirty).length) return toast('바뀐 내용을 먼저 저장해 주세요.');
+    if (act === 'print' || act === 'preview') {
+      const pages = {};
+      $$('[data-page]', $('#bBody')).forEach((c) => { pages[c.dataset.page] = c.checked; });
+      if (!Object.keys(pages).some((k) => pages[k])) return toast('인쇄할 서류를 하나 이상 골라 주세요.');
+      // 미리보기 창은 클릭 순간에 열어야 팝업 차단을 피한다
+      const win = act === 'preview' ? window.open('', '_blank') : null;
+      if (win) win.document.write('<p style="font-family:sans-serif;padding:24px">서류를 만드는 중입니다…</p>');
+      const go = (allow) => api('adm_bibPrint', a.id, allow).then((r) => {
+        if (!r.ok && r.code === 'MISSING') {
+          if (confirm('비어 있는 항목이 있습니다:\n\n' + r.missing.join(', ') + '\n\n빈칸으로 두고 인쇄할까요? (나중에 손으로 써도 됩니다)')) return go(true);
+          if (win) win.close();
+          return;
+        }
+        if (!r.ok) { if (win) win.close(); return toast(r.msg); }
+        const html = bibDocsHtml(r.data, pages);
+        if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+        else if (act === 'preview') openPreview(html);
+        else printHtml(html);
+        renderBib(r.detail); patchBib(r.detail.app);
+      });
+      b.disabled = true;
+      go(false).catch(() => { if (win) win.close(); }).finally(() => { b.disabled = false; });
+    } else if (act === 'submit') {
+      if (confirm(a.name + ' 기사님 서류를 관할관청(협회)에 제출했나요?\n오늘 날짜로 제출 완료 처리합니다.')) bibStatus('submit', '', '제출 완료로 바꿨습니다.');
+    } else if (act === 'approve') {
+      ask('허가 처리', "허가받은 '배' 번호판 차량번호를 입력하세요. 기사 정보의 차량번호도 이 번호로 바뀝니다.", '예: 89배1234')
+        .then((v) => { if (v) bibStatus('approve', v, '허가 처리했습니다.'); });
+    } else if (act === 'reject') {
+      ask('반려 처리', '반려 사유를 입력하세요.', '예: 주소지 비인접').then((v) => { if (v) bibStatus('reject', v, '반려 처리했습니다.'); });
+    } else if (act === 'reopen') {
+      if (confirm('신청서를 "작성" 상태로 되돌릴까요? 내용을 고친 뒤 다시 인쇄할 수 있습니다.')) bibStatus('reopen', '', '작성 상태로 되돌렸습니다.');
+    } else if (act === 'delete') {
+      if (!confirm('이 신청서를 삭제할까요?')) return;
+      api('adm_bibDelete', a.id).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        const i = bapps.findIndex((x) => x.id === a.id);
+        if (i >= 0) { if (bcounts[bapps[i].status] != null) bcounts[bapps[i].status]--; bcounts.all--; bapps.splice(i, 1); }
+        closeBib(true); renderBTabs(); renderBRows(); toast('삭제했습니다.');
+      }).catch(() => {});
+    } else if (act === 'driver') {
+      const id = bcur.driver && bcur.driver.id;
+      if (!id) return;
+      closeBib(); if (!$('#bdrawer').classList.contains('hidden')) return;
+      switchView('drivers'); openDrawer(id);
+    }
+  });
+
+  // 회사 정보
+  $('#coBtn').addEventListener('click', () => {
+    $('#coFields').innerHTML = '<div class="spin"></div>';
+    $('#coModal').classList.remove('hidden');
+    api('adm_companyGet').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      $('#coFields').innerHTML = r.fields.map((f) => '<div class="co-row"><label>' + esc(f.label) + '</label><input class="inp" data-co="' + esc(f.key) + '" value="' + esc(f.value) + '"></div>').join('');
+    }).catch(() => {});
+  });
+  $('#coCancel').addEventListener('click', () => $('#coModal').classList.add('hidden'));
+  $('#coForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const vals = {};
+    $$('[data-co]', $('#coFields')).forEach((i) => { vals[i.dataset.co] = i.value.trim(); });
+    const b = $('#coSave'); b.disabled = true;
+    api('adm_companySave', vals).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      $('#coModal').classList.add('hidden'); toast('회사 정보를 저장했습니다.');
+      if (bcur) openBib(bcur.app.id);
+    }).catch(() => {}).finally(() => { b.disabled = false; });
   });
 
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────

@@ -38,7 +38,7 @@ const CFG = {
 };
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
-const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo' };
+const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -46,7 +46,7 @@ const D = {
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
-  carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
+  carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
   docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증',
   docFolder: '서류 폴더',
@@ -59,7 +59,7 @@ const D = {
   pwHash: '비밀번호 해시', pwSalt: '비밀번호 솔트'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
-const D_AUTO_ADD = ['pwMustChange'];
+const D_AUTO_ADD = ['pwMustChange', 'carNo'];
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
@@ -104,15 +104,55 @@ const M_NOTES = {
   content: '새 줄에 날짜와 내용을 입력하면 메모ID와 작성일시가 자동으로 채워집니다.'
 };
 
+// bib_applications 시트 (배번호 신청: '배' 번호판 허가 신청 서류 4종)
+const BST = { DRAFT: '작성', PRINTED: '출력', SUBMITTED: '제출', APPROVED: '허가', REJECTED: '반려' };
+const FUELS = ['LPG', '경유', '전기', '휘발유', '기타'];
+const BODY_TYPES = ['탑형', '밴형'];
+const MANAGE = ['자동 증명', '직접 증명'];
+const B = {
+  id: '신청ID', driverId: '기사ID', name: '이름', status: '진행상태', applyDate: '신청일',
+  contractStart: '계약 시작일', contractEnd: '계약 종료일', contractYears: '계약기간(년)',
+  careerStart: '경력 시작(년월)', careerEnd: '경력 종료(년월)', careerYears: '경력기간(년)',
+  carNo: '신청 시 차량번호', fuel: '연료', fuelEtc: '연료(기타)', bodyType: '형태',
+  manageMethod: '허가 후 관리 방법', optConsent: '제3자 제공 선택 동의',
+  printedAt: '출력일시', submittedAt: '제출일', approvedAt: '허가일', plateNo: '허가 차량번호',
+  rejectedAt: '반려일', rejectReason: '반려 사유', memo: '메모', admin: '담당 관리자',
+  createdAt: '작성일시', updatedAt: '수정일시',
+  snapshotEnc: '마지막 출력 내용(암호화)'
+};
+const B_NOTES = {
+  status: '작성 / 출력 / 제출 / 허가 / 반려',
+  careerStart: '2025-05 형식 (년-월)',
+  fuel: 'LPG / 경유 / 전기 / 휘발유 / 기타',
+  manageMethod: '자동 증명 / 직접 증명',
+  optConsent: '동의하면 Y',
+  plateNo: "허가받은 '배' 번호판 차량번호"
+};
+// company 시트 (서류에 들어가는 회사 고정 정보: 항목 | 값)
+const COMPANY = [
+  ['courierName', '택배서비스사업자명', '쿠팡로지스틱스서비스 유한회사'],
+  ['courierCeo', '택배서비스사업자 대표이사', '강현오'],
+  ['courierAddr', '택배서비스사업자 주소', '서울특별시 강남구 광평로 280 7층 (수서동, 로즈데일빌딩)'],
+  ['branchName', '영업점명', '러너'],
+  ['branchCeo', '영업점 대표자', '유정훈'],
+  ['branchAddr', '영업점 주소', '경기도 부천시 소사구 양지로237, 9층 972호(옥길동, 광양프런티어밸리 5차)'],
+  ['branchPhone', '영업점 연락처', '010-9599-0808'],
+  ['branchBizNo', '영업점 사업자번호', '654-37-01141'],
+  ['court', '관할법원 (OO지방법원의 OO)', '서울중앙']
+];
+const COMPANY_SHEET = 'company';
+
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
 SCHEMA[SH.SESSIONS] = S;
 SCHEMA[SH.ADMINS] = A;
 SCHEMA[SH.ALOG] = L;
 SCHEMA[SH.MEMO] = M;
+SCHEMA[SH.BIB] = B;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
+HIDDEN[SH.BIB] = ['snapshotEnc'];
 
 const DOCS = {
   qual: { col: 'docQual', label: '화물운송종사자격증' },
@@ -160,6 +200,7 @@ function setup() {
     _props = null;
   }
   ensureColumns();
+  ensureCompany_();
   ensureTools_();
   installTriggers_();
   Logger.log('설정 완료. DB: ' + ss_().getUrl());
@@ -203,6 +244,16 @@ function ensureColumns() {
       sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
       Object.keys(A_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(A_NOTES[k]); });
       sh.getRange(1, c.pwReset + 1).setBackground('#fff4e5');
+    } else if (name === SH.BIB) {
+      const st = SpreadsheetApp.newDataValidation().requireValueInList(Object.keys(BST).map(function (k) { return BST[k]; }), true).build();
+      sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(st);
+      const fu = SpreadsheetApp.newDataValidation().requireValueInList(FUELS, true).setAllowInvalid(true).build();
+      sh.getRange(2, c.fuel + 1, sh.getMaxRows() - 1, 1).setDataValidation(fu);
+      const bt = SpreadsheetApp.newDataValidation().requireValueInList(BODY_TYPES, true).setAllowInvalid(true).build();
+      sh.getRange(2, c.bodyType + 1, sh.getMaxRows() - 1, 1).setDataValidation(bt);
+      const mm = SpreadsheetApp.newDataValidation().requireValueInList(MANAGE, true).setAllowInvalid(true).build();
+      sh.getRange(2, c.manageMethod + 1, sh.getMaxRows() - 1, 1).setDataValidation(mm);
+      Object.keys(B_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(B_NOTES[k]); });
     } else if (name === SH.MEMO) {
       const rule = SpreadsheetApp.newDataValidation().requireValueInList(['Y'], true).setAllowInvalid(true).build();
       sh.getRange(2, c.done + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
@@ -889,6 +940,7 @@ function onSheetEdit(e) {
       if (name === SH.DRIVERS) fixDriverRow_(sh, c, o);
       else if (name === SH.ADMINS) fixAdminRow_(sh, c, o);
       else if (name === SH.MEMO) fixMemoRow_(sh, c, o);
+      else if (name === SH.BIB) fixBibRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
     });
   } finally {
@@ -1067,7 +1119,7 @@ function fixAdminRow_(sh, c, o) {
 const D_EDIT_LABEL = {
   loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', address: '주소',
   qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
-  maxLoad: '최대적재량', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
+  maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
@@ -1081,7 +1133,7 @@ function docsOf_(o) {
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
-    createdAt: o.createdAt, approvedAt: o.approvedAt, carName: o.carName, carYear: o.carYear,
+    createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
 }
@@ -1227,6 +1279,7 @@ function adm_updateDriver(token, id, changes, seenRev) {
           case 'address': f.address = opt(v, '주소', 200); break;
           case 'qualNo': f.qualNo = opt(v, '자격증 번호', 30); break;
           case 'carName': f.carName = opt(v, '차명', 40); break;
+          case 'carNo': f.carNo = opt(v, '차량번호', 20).replace(/\s/g, ''); break;
           case 'bankName': f.bankName = opt(v, '은행명', 20); break;
           case 'accountHolder': f.accountHolder = opt(v, '예금주', 30); break;
         }
@@ -1449,6 +1502,368 @@ function fixMemoRow_(sh, c, o) {
     const cell = sh.getRange(o._row, c[k] + 1);
     if (notes[k]) cell.setNote(notes[k]); else if (o[k]) cell.clearNote();
   });
+}
+
+// ───────────────────────── 관리자 : 배번호 관리 ─────────────────────────
+/** company 시트 만들기 (항목 | 값). 이미 있으면 빠진 항목만 추가 */
+function ensureCompany_() {
+  const ss = ss_();
+  let sh = ss.getSheetByName(COMPANY_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(COMPANY_SHEET);
+    sh.getRange(1, 1, 1, 2).setValues([['항목', '값']]).setFontWeight('bold').setBackground('#f1f3f4');
+    sh.setFrozenRows(1);
+    sh.setColumnWidth(1, 220); sh.setColumnWidth(2, 520);
+    sh.getRange('A1').setNote('배번호 서류에 들어가는 회사 고정 정보입니다. 값(B열)만 고치세요. 항목 이름(A열)은 바꾸지 마세요.');
+  }
+  sh.getRange(1, 1, sh.getMaxRows(), 2).setNumberFormat('@');
+  const last = sh.getLastRow();
+  const have = last >= 2 ? sh.getRange(2, 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
+  const add = COMPANY.filter(function (c) { return have.indexOf(c[1]) < 0; }).map(function (c) { return [c[1], c[2]]; });
+  if (add.length) sh.getRange(last + 1, 1, add.length, 2).setValues(add);
+}
+function companyInfo_() {
+  const sh = ss_().getSheetByName(COMPANY_SHEET);
+  const out = {};
+  COMPANY.forEach(function (c) { out[c[0]] = ''; });
+  if (!sh) return out;
+  const last = sh.getLastRow();
+  if (last < 2) return out;
+  const map = {};
+  sh.getRange(2, 1, last - 1, 2).getValues().forEach(function (r) { map[str_(r[0])] = str_(r[1]); });
+  COMPANY.forEach(function (c) { if (map[c[1]] !== undefined) out[c[0]] = map[c[1]]; });
+  return out;
+}
+
+function newBibId_() {
+  return 'B' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10);
+}
+/** 년월 글자 → yyyy-MM. 2025-05 / 2025.5 / 2025년 5월 / 202505 허용. 잘못되면 '' */
+function normYm_(v) {
+  const s = str_(v).replace(/\s/g, '');
+  const m = s.match(/^(\d{4})(?:[-.\/년]?)(\d{1,2})월?\.?$/) || s.match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!m || +m[2] < 1 || +m[2] > 12) return '';
+  return m[1] + '-' + ('0' + (+m[2])).slice(-2);
+}
+function addYearsMinusDay_(d) {
+  if (!d) return '';
+  const dt = new Date(+d.slice(0, 4) + 1, +d.slice(5, 7) - 1, +d.slice(8, 10) - 1);
+  return dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2);
+}
+function yearsBetween_(a, b) {
+  if (!a || !b) return '';
+  const days = (new Date(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10)) - new Date(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) / 864e5 + 1;
+  return days > 0 ? String(Math.max(1, Math.round(days / 365))) : '';
+}
+function careerYears_(a, b) {
+  if (!a || !b) return '';
+  const months = (+b.slice(0, 4) * 12 + +b.slice(5, 7)) - (+a.slice(0, 4) * 12 + +a.slice(5, 7)) + 1;
+  return months > 0 ? String(Math.max(1, Math.round(months / 12))) : '';
+}
+function todayText_() { return Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd'); }
+
+function bibView_(o) {
+  const v = {};
+  Object.keys(B).forEach(function (k) { if (k !== 'snapshotEnc') v[k] = o[k]; });
+  v.optConsent = String(o.optConsent).toUpperCase() === 'Y';
+  v.hasSnapshot = !!o.snapshotEnc;
+  return v;
+}
+/** 서류에 필요한데 비어 있는 항목 */
+function bibMissing_(d, app, co) {
+  const miss = [];
+  const need = function (ok, label) { if (!ok) miss.push(label); };
+  if (!d) return ['기사 정보'];
+  need(d.name, '이름'); need(d.rrnEnc, '주민등록번호'); need(d.address, '주소'); need(d.phone, '연락처');
+  need(d.licenseNoEnc, '운전면허번호'); need(d.licenseType, '운전면허 종류');
+  need(d.qualNo, '화물운송 종사자격증 번호'); need(d.qualDate, '자격 취득일');
+  need(d.carName, '차명'); need(d.carYear, '연식'); need(d.maxLoad, '최대적재량');
+  need(app.applyDate, '신청일'); need(app.contractStart, '계약 시작일'); need(app.contractEnd, '계약 종료일');
+  need(app.careerStart && app.careerEnd, '경력기간'); need(app.carNo, '차량번호');
+  need(app.fuel, '연료'); need(app.bodyType, '형태'); need(app.manageMethod, '허가 후 관리 방법');
+  COMPANY.forEach(function (c) { need(co[c[0]], '회사 정보: ' + c[1]); });
+  return miss;
+}
+function readAll_(name) {
+  const sh = sheet_(name), c = cols_(name), last = sh.getLastRow();
+  const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
+  const keys = Object.keys(SCHEMA[name]);
+  return rows.map(function (v, i) {
+    const o = { _row: i + 2 };
+    keys.forEach(function (k) { o[k] = str_(v[c[k]]); });
+    return o;
+  });
+}
+
+/** 목록 + 신청서 만들 때 고를 기사 목록 */
+function adm_bibList(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const apps = readAll_(SH.BIB).filter(function (o) { return o.id; }).map(bibView_);
+    const counts = { all: apps.length };
+    Object.keys(BST).forEach(function (k) { counts[BST[k]] = 0; });
+    apps.forEach(function (a) { if (counts[a.status] !== undefined) counts[a.status]++; });
+    apps.sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0; });
+    const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id; }).map(function (o) {
+      return { id: o.id, name: o.name, loginId: o.loginId, phone: o.phone, status: o.status, carNo: o.carNo };
+    });
+    return { ok: true, apps: apps, counts: counts, drivers: drivers };
+  });
+}
+
+function bibById_(id) {
+  const row = findRow_(SH.BIB, 'id', String(id || ''));
+  return row ? readObj_(SH.BIB, row) : null;
+}
+/** 상세: 신청서 + 기사 요약 + 빈 항목 */
+function bibDetail_(app) {
+  const d = driverById_(app.driverId);
+  const co = companyInfo_();
+  return {
+    app: bibView_(app),
+    driver: d ? {
+      id: d.id, name: d.name, phone: d.phone, address: d.address, birthDate: d.birthDate, rrn: d.rrn,
+      licenseNo: d.licenseNo, licenseType: d.licenseType, qualNo: d.qualNo, qualDate: d.qualDate,
+      carNo: d.carNo, carName: d.carName, carYear: d.carYear, maxLoad: d.maxLoad, status: d.status
+    } : null,
+    missing: bibMissing_(d, app, co)
+  };
+}
+function adm_bibGet(token, id) {
+  return run_(function () {
+    requireAdmin_(token);
+    const app = bibById_(id);
+    if (!app) fail_('신청서를 찾을 수 없습니다. 새로고침해 주세요.');
+    return Object.assign({ ok: true }, bibDetail_(app));
+  });
+}
+
+/** 신청서 새로 만들기(driverId) 또는 수정(id) */
+function adm_bibSave(token, data) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    data = data || {};
+    const f = {};
+    const date = function (k, label) {
+      if (data[k] === undefined) return;
+      const v = str_(data[k]);
+      f[k] = v ? normDate_(v) : '';
+      if (v && !f[k]) fail_(label + ' 날짜를 확인해 주세요.');
+    };
+    const ym = function (k, label) {
+      if (data[k] === undefined) return;
+      const v = str_(data[k]);
+      f[k] = v ? normYm_(v) : '';
+      if (v && !f[k]) fail_(label + '을(를) 2025-05 형식으로 입력해 주세요.');
+    };
+    const num = function (k, label) {
+      if (data[k] === undefined) return;
+      const v = str_(data[k]);
+      if (v && !/^\d{1,2}$/.test(v)) fail_(label + '은(는) 숫자로 입력해 주세요.');
+      f[k] = v;
+    };
+    const pick = function (k, list, label) {
+      if (data[k] === undefined) return;
+      const v = str_(data[k]);
+      if (v && list.indexOf(v) < 0) fail_(label + ' 값을 확인해 주세요.');
+      f[k] = v;
+    };
+    date('applyDate', '신청일'); date('contractStart', '계약 시작일'); date('contractEnd', '계약 종료일');
+    ym('careerStart', '경력 시작'); ym('careerEnd', '경력 종료');
+    num('contractYears', '계약기간'); num('careerYears', '경력기간');
+    pick('fuel', FUELS, '연료'); pick('bodyType', BODY_TYPES, '형태'); pick('manageMethod', MANAGE, '허가 후 관리 방법');
+    if (data.fuelEtc !== undefined) f.fuelEtc = str_(data.fuelEtc).slice(0, 20);
+    if (data.carNo !== undefined) f.carNo = str_(data.carNo).replace(/\s/g, '').slice(0, 20);
+    if (data.optConsent !== undefined) f.optConsent = data.optConsent ? 'Y' : '';
+    if (data.memo !== undefined) f.memo = str_(data.memo).slice(0, 1000);
+    if (f.contractStart && f.contractEnd && f.contractEnd < f.contractStart) fail_('계약 종료일이 시작일보다 빠릅니다.');
+    if (f.careerStart && f.careerEnd && f.careerEnd < f.careerStart) fail_('경력 종료가 시작보다 빠릅니다.');
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const now = nowText_();
+      if (!data.id) {
+        // 새 신청서: 기사 정보와 같은 기사의 지난 신청서로 기본값을 채운다
+        const d = driverById_(String(data.driverId || ''));
+        if (!d) fail_('기사를 찾을 수 없습니다.');
+        const prev = readAll_(SH.BIB).filter(function (o) { return o.driverId === d.id && o.id; })
+          .sort(function (x, y) { return x.createdAt < y.createdAt ? 1 : -1; })[0] || {};
+        const today = todayText_();
+        const start = f.contractStart || today;
+        const end = f.contractEnd || addYearsMinusDay_(start);
+        const cs = f.careerStart !== undefined ? f.careerStart : (prev.careerStart || '');
+        const ce = f.careerEnd !== undefined ? f.careerEnd : (prev.careerEnd || '');
+        const id = newBibId_();
+        const row = appendObj_(SH.BIB, {
+          id: id, driverId: d.id, name: d.name, status: BST.DRAFT,
+          applyDate: f.applyDate || today, contractStart: start, contractEnd: end,
+          contractYears: f.contractYears || yearsBetween_(start, end),
+          careerStart: cs, careerEnd: ce, careerYears: f.careerYears || prev.careerYears || careerYears_(cs, ce),
+          carNo: f.carNo !== undefined ? f.carNo : (d.carNo || prev.carNo || ''),
+          fuel: f.fuel || prev.fuel || '', fuelEtc: f.fuelEtc || prev.fuelEtc || '', bodyType: f.bodyType || prev.bodyType || '',
+          manageMethod: f.manageMethod || prev.manageMethod || '자동 증명', optConsent: f.optConsent || '',
+          memo: f.memo || '', admin: a.name, createdAt: now, updatedAt: now
+        });
+        return Object.assign({ ok: true }, bibDetail_(readObj_(SH.BIB, row)));
+      }
+      const app = bibById_(data.id);
+      if (!app) fail_('신청서를 찾을 수 없습니다. 새로고침해 주세요.');
+      if (app.status === BST.APPROVED) fail_('허가가 끝난 신청서는 고칠 수 없습니다. 필요하면 시트에서 직접 고쳐 주세요.');
+      // 날짜를 바꾸면 기간(년)을 다시 계산 (직접 입력한 값이 있으면 그 값을 사용)
+      const cStart = f.contractStart !== undefined ? f.contractStart : app.contractStart;
+      const cEnd = f.contractEnd !== undefined ? f.contractEnd : app.contractEnd;
+      if ((f.contractStart !== undefined || f.contractEnd !== undefined) && f.contractYears === undefined) f.contractYears = yearsBetween_(cStart, cEnd);
+      const kStart = f.careerStart !== undefined ? f.careerStart : app.careerStart;
+      const kEnd = f.careerEnd !== undefined ? f.careerEnd : app.careerEnd;
+      if (cStart && cEnd && cEnd < cStart) fail_('계약 종료일이 시작일보다 빠릅니다.');
+      if (kStart && kEnd && kEnd < kStart) fail_('경력 종료가 시작보다 빠릅니다.');
+      if ((f.careerStart !== undefined || f.careerEnd !== undefined) && f.careerYears === undefined) f.careerYears = careerYears_(kStart, kEnd);
+      if (!Object.keys(f).length) return Object.assign({ ok: true }, bibDetail_(app));
+      f.updatedAt = now;
+      writeFields_(SH.BIB, app._row, f);
+      return Object.assign({ ok: true }, bibDetail_(readObj_(SH.BIB, app._row)));
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 진행 상태 변경: submit(제출) / approve(허가, 번호판) / reject(반려, 사유) / reopen(다시 작성) */
+function adm_bibStatus(token, id, action, value) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const app = bibById_(id);
+      if (!app) fail_('신청서를 찾을 수 없습니다. 새로고침해 주세요.');
+      const f = { updatedAt: nowText_() };
+      let log = '';
+      if (action === 'submit') {
+        f.status = BST.SUBMITTED; f.submittedAt = normDate_(value) || todayText_(); log = '제출';
+      } else if (action === 'approve') {
+        const plate = str_(value).replace(/\s/g, '');
+        if (!plate) fail_("허가받은 '배' 번호판 차량번호를 입력해 주세요.");
+        if (plate.length > 20) fail_('차량번호를 확인해 주세요.');
+        f.status = BST.APPROVED; f.approvedAt = todayText_(); f.plateNo = plate; log = '허가 ' + plate;
+      } else if (action === 'reject') {
+        const reason = str_(value);
+        if (!reason) fail_('반려 사유를 입력해 주세요.');
+        f.status = BST.REJECTED; f.rejectedAt = todayText_(); f.rejectReason = reason.slice(0, 500); log = '반려';
+      } else if (action === 'reopen') {
+        f.status = BST.DRAFT; log = '다시 작성';
+      } else fail_('알 수 없는 작업입니다.');
+      writeFields_(SH.BIB, app._row, f);
+      if (action === 'approve') {
+        // 허가받은 번호판을 기사 정보의 차량번호로 (신청 전 번호는 신청서에 남아 있음)
+        const d = driverById_(app.driverId);
+        if (d) { writeFields_(SH.DRIVERS, d._row, { carNo: f.plateNo, updatedAt: f.updatedAt }); forgetDriver_(d); }
+      }
+      logAdmin_(a, '배번호 진행', app.name + ' (' + app.driverId + ')', log);
+      return Object.assign({ ok: true }, bibDetail_(readObj_(SH.BIB, app._row)));
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+function adm_bibDelete(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const app = bibById_(id);
+      if (!app) return { ok: true };
+      if (app.status !== BST.DRAFT && app.status !== BST.REJECTED) fail_('작성 또는 반려 상태의 신청서만 지울 수 있습니다.');
+      sheet_(SH.BIB).deleteRow(app._row);
+      logAdmin_(a, '배번호 신청서 삭제', app.name + ' (' + app.driverId + ')', app.id);
+      return { ok: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/**
+ * 서류 출력용 데이터 (주민번호·면허번호 포함 전체 값).
+ * 빈 항목이 있으면 allowMissing 없이는 거절. 출력하면 상태 작성→출력, 출력 내용을 암호화해 보관, 기록 남김.
+ */
+function adm_bibPrint(token, id, allowMissing) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const app = bibById_(id);
+    if (!app) fail_('신청서를 찾을 수 없습니다.');
+    const d = driverById_(app.driverId);
+    if (!d) fail_('기사 정보를 찾을 수 없습니다.');
+    const co = companyInfo_();
+    const missing = bibMissing_(d, app, co);
+    if (missing.length && !allowMissing) return { ok: false, code: 'MISSING', missing: missing, msg: '비어 있는 항목이 있습니다.' };
+    const rrn = d.rrnEnc ? decrypt_(d.rrnEnc) : '';
+    const lic = d.licenseNoEnc ? decrypt_(d.licenseNoEnc) : '';
+    const data = {
+      no: app.id, applyDate: app.applyDate,
+      name: d.name, rrn: rrn, address: d.address, phone: d.phone, birthDate: d.birthDate,
+      contractStart: app.contractStart, contractEnd: app.contractEnd, contractYears: app.contractYears,
+      careerStart: app.careerStart, careerEnd: app.careerEnd, careerYears: app.careerYears,
+      fuel: app.fuel, fuelEtc: app.fuelEtc, bodyType: app.bodyType, carNo: app.carNo,
+      carName: d.carName, carYear: d.carYear, maxLoad: d.maxLoad,
+      licenseNo: lic, licenseType: d.licenseType, qualNo: d.qualNo, qualDate: d.qualDate,
+      manageMethod: app.manageMethod, optConsent: String(app.optConsent).toUpperCase() === 'Y',
+      company: co
+    };
+    const f = { printedAt: nowText_(), snapshotEnc: encrypt_(JSON.stringify(data)), updatedAt: nowText_() };
+    if (app.status === BST.DRAFT) f.status = BST.PRINTED;
+    writeFields_(SH.BIB, app._row, f);
+    logAdmin_(a, '배번호 서류 출력', d.name + ' (' + d.id + ')', '서류 4종' + (missing.length ? ' (빈 항목 ' + missing.length + '개)' : ''));
+    return { ok: true, data: data, detail: bibDetail_(readObj_(SH.BIB, app._row)) };
+  });
+}
+
+function adm_companyGet(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const co = companyInfo_();
+    return { ok: true, fields: COMPANY.map(function (c) { return { key: c[0], label: c[1], value: co[c[0]] }; }) };
+  });
+}
+function adm_companySave(token, values) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    values = values || {};
+    ensureCompany_();
+    const sh = ss_().getSheetByName(COMPANY_SHEET);
+    const last = sh.getLastRow();
+    const labels = sh.getRange(2, 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); });
+    const changed = [];
+    COMPANY.forEach(function (c) {
+      if (values[c[0]] === undefined) return;
+      const i = labels.indexOf(c[1]);
+      if (i < 0) return;
+      sh.getRange(i + 2, 2).setNumberFormat('@').setValue(safeText_(str_(values[c[0]]).slice(0, 200)));
+      changed.push(c[1]);
+    });
+    if (changed.length) logAdmin_(a, '회사 정보 수정', '', changed.join(', '));
+    return { ok: true };
+  });
+}
+
+/** bib_applications 시트를 직접 고쳤을 때: 신청ID 자동, 날짜·년월·동의 형식 정리 */
+function fixBibRow_(sh, c, o) {
+  if (!o.id && !o.driverId && !o.name) return;
+  const upd = {};
+  const set = function (k, v) { if (o[k] !== v) upd[k] = v; };
+  if (!o.id && o.driverId) { set('id', newBibId_()); if (!o.createdAt) set('createdAt', nowText_()); if (!o.status) set('status', BST.DRAFT); }
+  ['applyDate', 'contractStart', 'contractEnd', 'submittedAt', 'approvedAt', 'rejectedAt'].forEach(function (k) {
+    if (o[k]) { const v = normDate_(o[k]); if (v) set(k, v); }
+  });
+  ['careerStart', 'careerEnd'].forEach(function (k) { if (o[k]) { const v = normYm_(o[k]); if (v) set(k, v); } });
+  if (o.optConsent) set('optConsent', /^(y|yes|o|동의|true|1)$/i.test(o.optConsent) ? 'Y' : '');
+  if (Object.keys(upd).length) {
+    upd.updatedAt = nowText_();
+    Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(safeText_(upd[k])); });
+  }
 }
 
 // ───────────────────────── 서류 일괄 연결 ─────────────────────────
