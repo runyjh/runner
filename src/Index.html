@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --ink: #191f28; --sub: #6b7684; --line: #e5e8eb;
+    --brand: #1b64da; --brand-weak: #e8f0fd; --danger: #e5484d; --ok: #12a150;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    font-size: 15px; line-height: 1.5; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 24px 16px 48px; min-height: 100vh; }
+  .view { display: none; }
+  .view.on { display: block; animation: fade .18s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .brand { text-align: center; margin: 48px 0 32px; }
+  .brand .logo { width: 56px; height: 56px; border-radius: 16px; background: var(--brand); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 24px; }
+  .brand h1 { margin: 14px 0 4px; font-size: 22px; }
+  .brand p { margin: 0; color: var(--sub); font-size: 14px; }
+
+  .topbar { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
+  .topbar h2 { margin: 0; font-size: 20px; }
+  .back { border: 0; background: none; font-size: 22px; padding: 4px 8px 4px 0; cursor: pointer; color: var(--ink); }
+
+  .card { background: var(--card); border-radius: var(--radius); padding: 20px 16px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 14px; font-size: 16px; }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  label.lb { display: block; font-size: 13px; color: var(--sub); margin-bottom: 6px; }
+  label.lb .req { color: var(--danger); margin-left: 2px; }
+  input[type=text], input[type=password], input[type=tel], input[type=date], input[type=number], select {
+    width: 100%; height: 48px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px;
+    font: inherit; color: var(--ink); background: #fff; outline: none; appearance: none; }
+  input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+  input.bad { border-color: var(--danger); }
+  select { background-image: linear-gradient(45deg, transparent 50%, var(--sub) 50%), linear-gradient(135deg, var(--sub) 50%, transparent 50%);
+    background-position: calc(100% - 20px) 21px, calc(100% - 15px) 21px; background-size: 5px 5px; background-repeat: no-repeat; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; min-width: 0; }
+  .row > .shrink { flex: 0 0 auto; }
+  .suffix { position: relative; }
+  .suffix span { position: absolute; right: 14px; top: 13px; color: var(--sub); }
+  .hint { font-size: 12px; color: var(--sub); margin-top: 6px; }
+  .hint.ok { color: var(--ok); } .hint.err { color: var(--danger); }
+
+  .btn { width: 100%; height: 52px; border: 0; border-radius: 12px; background: var(--brand); color: #fff;
+    font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn.ghost { background: var(--brand-weak); color: var(--brand); }
+  .btn.sm { width: auto; height: 48px; padding: 0 14px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .links { display: flex; justify-content: center; gap: 14px; margin-top: 18px; font-size: 14px; }
+  .links a { color: var(--sub); text-decoration: none; cursor: pointer; }
+  .links i { color: var(--line); font-style: normal; }
+
+  .check { display: flex; align-items: center; gap: 8px; margin: 4px 0 18px; font-size: 14px; color: var(--sub); cursor: pointer; user-select: none; }
+  .check input { width: 20px; height: 20px; accent-color: var(--brand); margin: 0; }
+  .pwbox { position: relative; }
+  .pwbox button { position: absolute; right: 6px; top: 6px; height: 36px; border: 0; background: none; color: var(--sub); font: inherit; font-size: 13px; cursor: pointer; padding: 0 8px; }
+
+  .docs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .doc { position: relative; aspect-ratio: 4 / 3; border: 1.5px dashed var(--line); border-radius: 12px; background: #fafbfc;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    font-size: 13px; color: var(--sub); cursor: pointer; overflow: hidden; padding: 8px; }
+  .doc b { color: var(--ink); font-size: 13px; }
+  .doc .plus { font-size: 22px; line-height: 1; margin-bottom: 4px; }
+  .doc img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .doc.done { border-style: solid; border-color: var(--brand); }
+  .doc.done::after { content: attr(data-name) ' ✓'; position: absolute; left: 0; right: 0; bottom: 0; padding: 4px;
+    background: rgba(25,31,40,.72); color: #fff; font-size: 12px; }
+  .doc input { display: none; }
+
+  .agree { font-size: 13px; color: var(--sub); }
+  .agree details { margin-top: 8px; background: #fafbfc; border-radius: 10px; padding: 10px 12px; }
+  .agree summary { cursor: pointer; color: var(--ink); }
+  .agree ul { margin: 8px 0 0; padding-left: 18px; }
+
+  .msg { text-align: center; padding: 56px 8px 24px; }
+  .msg .ic { font-size: 44px; }
+  .msg h2 { margin: 12px 0 8px; font-size: 20px; }
+  .msg p { color: var(--sub); margin: 0 0 24px; }
+
+  .hello { margin: 8px 0 20px; }
+  .hello h2 { margin: 0; font-size: 22px; }
+  .hello p { margin: 4px 0 0; color: var(--sub); }
+  .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .menu div { background: #fff; border-radius: var(--radius); padding: 18px 16px; min-height: 96px; }
+  .menu b { display: block; font-size: 16px; }
+  .menu span { font-size: 12px; color: var(--sub); }
+
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); background: rgba(25,31,40,.92);
+    color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; opacity: 0; transition: .2s; pointer-events: none;
+    max-width: calc(100% - 32px); text-align: center; z-index: 50; }
+  .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .loading { position: fixed; inset: 0; background: rgba(245,246,248,.7); display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; z-index: 40; color: var(--sub); font-size: 14px; }
+  .loading.on { display: flex; }
+  .spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--brand-weak); border-top-color: var(--brand); animation: sp .8s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+
+  .layer { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; z-index: 60; }
+  .layer.on { display: block; }
+  .layer .box { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100% - 24px));
+    height: min(560px, calc(100% - 48px)); background: #fff; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .layer .head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 700; }
+  .layer .head button { border: 0; background: none; font-size: 22px; cursor: pointer; }
+  .layer #postcodeWrap { flex: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ───────────── 로그인 ───────────── -->
+  <section id="v-login" class="view">
+    <div class="brand">
+      <div class="logo">R</div>
+      <h1>러너 올인원</h1>
+      <p>기사님 전용 업무 앱</p>
+    </div>
+    <form id="loginForm" autocomplete="on" novalidate>
+      <div class="card">
+        <div class="field">
+          <label class="lb" for="lgId">쿠팡플렉스 아이디</label>
+          <input type="text" id="lgId" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="아이디 입력">
+        </div>
+        <div class="field">
+          <label class="lb" for="lgPw">비밀번호</label>
+          <div class="pwbox">
+            <input type="password" id="lgPw" autocomplete="current-password" placeholder="비밀번호 입력">
+            <button type="button" data-toggle="lgPw">보기</button>
+          </div>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="lgAuto" checked> 자동 로그인</label>
+      <button class="btn" id="lgBtn" type="submit">로그인</button>
+    </form>
+    <div class="links">
+      <a data-go="reset">비밀번호 찾기</a><i>|</i><a data-go="signup">회원가입</a>
+    </div>
+  </section>
+
+  <!-- ───────────── 회원가입 ───────────── -->
+  <section id="v-signup" class="view">
+    <div class="topbar"><button class="back" data-go="login" aria-label="뒤로">←</button><h2>회원가입</h2></div>
+    <form id="signupForm" novalidate>
+      <div class="card">
+        <h3>계정</h3>
+        <div class="field">
+          <label class="lb" for="suId">쿠팡플렉스 아이디<span class="req">*</span></label>
+          <div class="row">
+            <input type="text" id="suId" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="로그인 아이디로 사용됩니다">
+            <button type="button" class="btn ghost sm shrink" id="suIdCheck">중복확인</button>
+          </div>
+          <div class="hint" id="suIdHint"></div>
+        </div>
+        <div class="field">
+          <label class="lb" for="suPw">비밀번호<span class="req">*</span></label>
+          <div class="pwbox"><input type="password" id="suPw" autocomplete="new-password" placeholder="영문+숫자 8자 이상"><button type="button" data-toggle="suPw">보기</button></div>
+        </div>
+        <div class="field">
+          <label class="lb" for="suPw2">비밀번호 확인<span class="req">*</span></label>
+          <input type="password" id="suPw2" autocomplete="new-password" placeholder="비밀번호 다시 입력">
+          <div class="hint" id="suPwHint"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>기본 정보</h3>
+        <div class="field">
+          <label class="lb" for="suName">이름<span class="req">*</span></label>
+          <input type="text" id="suName" autocomplete="name" placeholder="홍길동">
+        </div>
+        <div class="field">
+          <label class="lb" for="suRrn">주민등록번호<span class="req">*</span></label>
+          <input type="tel" id="suRrn" inputmode="numeric" maxlength="14" placeholder="000000-0000000" autocomplete="off">
+          <div class="hint">암호화되어 저장되며 배번호 신청 서류에만 사용됩니다.</div>
+        </div>
+        <div class="field">
+          <label class="lb" for="suAddr">주소(주민등록상)<span class="req">*</span></label>
+          <div class="row">
+            <input type="text" id="suAddr" readonly placeholder="주소 검색을 눌러 주세요">
+            <button type="button" class="btn ghost sm shrink" id="suAddrBtn">주소 검색</button>
+          </div>
+          <input type="text" id="suAddr2" placeholder="상세 주소 (동·호수)" style="margin-top:8px">
+          <div class="hint">주민등록상 주소와 다르면 허가 신청이 반려될 수 있습니다.</div>
+        </div>
+        <div class="field">
+          <label class="lb" for="suPhone">연락처<span class="req">*</span></label>
+          <input type="tel" id="suPhone" inputmode="numeric" maxlength="13" placeholder="010-0000-0000" autocomplete="tel">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>자격 · 면허</h3>
+        <div class="field">
+          <label class="lb" for="suQualDate">화물운송 종사자격 취득일<span class="req">*</span></label>
+          <input type="date" id="suQualDate">
+        </div>
+        <div class="field">
+          <label class="lb" for="suQualNo">화물운송 종사자격증 번호<span class="req">*</span></label>
+          <input type="text" id="suQualNo" placeholder="예: 1-25-000000">
+        </div>
+        <div class="field">
+          <label class="lb" for="suLicNo">자동차운전면허 번호<span class="req">*</span></label>
+          <input type="tel" id="suLicNo" inputmode="numeric" maxlength="15" placeholder="00-00-000000-00" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="lb" for="suLicType">자동차운전면허 종류<span class="req">*</span></label>
+          <select id="suLicType">
+            <option value="">선택</option>
+            <option>1종 대형</option><option>1종 보통</option><option>2종 보통</option>
+            <option>특수 대형견인</option><option>특수 소형견인</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>차량</h3>
+        <div class="field">
+          <label class="lb" for="suCar">차명<span class="req">*</span></label>
+          <input type="text" id="suCar" placeholder="예: 포터2 일렉트릭">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="lb" for="suYear">연식<span class="req">*</span></label>
+            <select id="suYear"><option value="">선택</option></select>
+          </div>
+          <div class="field">
+            <label class="lb" for="suLoad">최대적재량<span class="req">*</span></label>
+            <div class="suffix"><input type="number" id="suLoad" inputmode="numeric" min="1" max="999999" placeholder="750"><span>kg</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>정산 계좌</h3>
+        <div class="field">
+          <label class="lb" for="suBank">은행명<span class="req">*</span></label>
+          <select id="suBank"><option value="">선택</option></select>
+        </div>
+        <div class="field">
+          <label class="lb" for="suAcc">계좌번호<span class="req">*</span></label>
+          <input type="tel" id="suAcc" inputmode="numeric" placeholder="숫자만 입력" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="lb" for="suHolder">예금주<span class="req">*</span></label>
+          <input type="text" id="suHolder" placeholder="예금주 이름">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>필요 서류<span style="color:var(--danger)">*</span></h3>
+        <div class="docs">
+          <label class="doc" data-doc="qual" data-name="자격증"><input type="file" accept="image/*"><span class="plus">＋</span><b>화물운송 종사자격증</b>사진 올리기</label>
+          <label class="doc" data-doc="license" data-name="면허증"><input type="file" accept="image/*"><span class="plus">＋</span><b>자동차운전면허증</b>사진 올리기</label>
+          <label class="doc" data-doc="biz" data-name="사업자등록증"><input type="file" accept="image/*"><span class="plus">＋</span><b>사업자등록증</b>사진 올리기</label>
+          <label class="doc" data-doc="car" data-name="자동차등록증"><input type="file" accept="image/*"><span class="plus">＋</span><b>자동차등록증</b>사진 올리기</label>
+        </div>
+        <div class="hint">글자가 잘 보이게 찍어 주세요. 사진은 자동으로 용량을 줄여 올립니다.</div>
+      </div>
+
+      <div class="card agree">
+        <label class="check" style="margin:0;color:var(--ink)"><input type="checkbox" id="suAgree"> 개인정보 수집·이용에 동의합니다 (필수)</label>
+        <details>
+          <summary>자세히 보기</summary>
+          <ul>
+            <li>수집 항목: 이름, 주민등록번호, 주소, 연락처, 화물운송 종사자격 정보, 운전면허 정보, 차량 정보, 정산 계좌, 첨부 서류</li>
+            <li>이용 목적: 기사 계약·관리, 배차 및 정산, 택배용 화물자동차('배' 번호판) 허가 신청 서류 작성</li>
+            <li>보유 기간: 계약 종료 후 관련 법령이 정한 기간</li>
+            <li>동의를 거부할 수 있으나, 거부 시 가입할 수 없습니다.</li>
+          </ul>
+        </details>
+      </div>
+
+      <button class="btn" id="suBtn" type="submit">가입 신청</button>
+    </form>
+  </section>
+
+  <!-- ───────────── 비밀번호 찾기 ───────────── -->
+  <section id="v-reset" class="view">
+    <div class="topbar"><button class="back" data-go="login" aria-label="뒤로">←</button><h2>비밀번호 찾기</h2></div>
+    <form id="rsForm1" novalidate>
+      <div class="card">
+        <h3>본인 확인</h3>
+        <div class="field"><label class="lb" for="rsId">쿠팡플렉스 아이디</label><input type="text" id="rsId" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label class="lb" for="rsName">이름</label><input type="text" id="rsName"></div>
+        <div class="field"><label class="lb" for="rsPhone">연락처</label><input type="tel" id="rsPhone" inputmode="numeric" maxlength="13" placeholder="010-0000-0000"></div>
+        <div class="field"><label class="lb" for="rsBirth">생년월일 6자리</label><input type="tel" id="rsBirth" inputmode="numeric" maxlength="6" placeholder="예: 730107"></div>
+      </div>
+      <button class="btn" id="rsBtn1" type="submit">확인</button>
+    </form>
+    <form id="rsForm2" novalidate style="display:none">
+      <div class="card">
+        <h3>새 비밀번호</h3>
+        <div class="field"><label class="lb" for="rsPw">새 비밀번호</label><div class="pwbox"><input type="password" id="rsPw" autocomplete="new-password" placeholder="영문+숫자 8자 이상"><button type="button" data-toggle="rsPw">보기</button></div></div>
+        <div class="field"><label class="lb" for="rsPw2">새 비밀번호 확인</label><input type="password" id="rsPw2" autocomplete="new-password"></div>
+        <div class="hint">10분 안에 변경해 주세요. 변경하면 다른 기기의 자동 로그인도 해제됩니다.</div>
+      </div>
+      <button class="btn" id="rsBtn2" type="submit">비밀번호 변경</button>
+    </form>
+  </section>
+
+  <!-- ───────────── 가입 완료 / 승인 대기 ───────────── -->
+  <section id="v-pending" class="view">
+    <div class="msg">
+      <div class="ic">⏳</div>
+      <h2>가입 신청이 완료되었습니다</h2>
+      <p>관리자가 서류를 확인한 뒤 승인하면<br>로그인할 수 있습니다.</p>
+      <button class="btn" data-go="login">로그인 화면으로</button>
+    </div>
+  </section>
+
+  <!-- ───────────── 홈 (2단계 이후 채움) ───────────── -->
+  <section id="v-home" class="view">
+    <div class="hello"><h2 id="homeName">기사님, 안녕하세요</h2><p>오늘도 안전 운행하세요.</p></div>
+    <div class="menu">
+      <div><b>스케줄</b><span>준비 중</span></div>
+      <div><b>정산서 보기</b><span>준비 중</span></div>
+      <div><b>품앗이</b><span>준비 중</span></div>
+      <div><b>마이페이지</b><span>준비 중</span></div>
+    </div>
+    <div class="links"><a id="logoutBtn">로그아웃</a></div>
+  </section>
+
+  <!-- ───────────── 시작 화면 ───────────── -->
+  <section id="v-splash" class="view on">
+    <div class="msg"><div class="spin" style="margin:40px auto 16px"></div><p>불러오는 중…</p></div>
+  </section>
+</div>
+
+<div class="loading" id="loading"><div class="spin"></div><div id="loadingText">처리 중…</div></div>
+<div class="toast" id="toast"></div>
+<div class="layer" id="postLayer"><div class="box"><div class="head">주소 검색<button type="button" id="postClose" aria-label="닫기">×</button></div><div id="postcodeWrap"></div></div></div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+  const TOKEN = 'runner.token', USER = 'runner.user', LAST_ID = 'runner.lastId';
+
+  // ───── 서버 호출 (google.script.run → Promise) ─────
+  const api = (fn, ...args) => new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+  });
+
+  // ───── 저장소 (자동 로그인 = localStorage, 아니면 sessionStorage) ─────
+  const store = {
+    get(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v, persist) { try { (persist ? localStorage : sessionStorage).setItem(k, v); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch (e) {} }
+  };
+
+  // ───── 화면 전환 / 알림 ─────
+  function show(name) {
+    $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + name));
+    window.scrollTo(0, 0);
+  }
+  let toastTimer;
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2800);
+  }
+  function loading(on, text) { $('#loadingText').textContent = text || '처리 중…'; $('#loading').classList.toggle('on', !!on); }
+  const netErr = () => toast('연결이 원활하지 않습니다. 잠시 후 다시 시도해 주세요.');
+
+  $$('[data-go]').forEach((el) => el.addEventListener('click', () => show(el.dataset.go)));
+  $$('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
+    const i = document.getElementById(b.dataset.toggle);
+    i.type = i.type === 'password' ? 'text' : 'password';
+    b.textContent = i.type === 'password' ? '보기' : '숨기기';
+  }));
+
+  // ───── 입력 자동 서식 ─────
+  const onlyDigits = (v) => v.replace(/\D/g, '');
+  function maskPhone(v) {
+    const d = onlyDigits(v).slice(0, 11);
+    if (d.length < 4) return d;
+    if (d.length < 8) return d.slice(0, 3) + '-' + d.slice(3);
+    return d.length === 11 ? d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7) : d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+  }
+  function maskRrn(v) { const d = onlyDigits(v).slice(0, 13); return d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d; }
+  function maskLicense(v) {
+    const d = onlyDigits(v).slice(0, 12), p = [d.slice(0, 2), d.slice(2, 4), d.slice(4, 10), d.slice(10, 12)];
+    return p.filter(Boolean).join('-');
+  }
+  const bindMask = (sel, fn) => $(sel).addEventListener('input', (e) => { e.target.value = fn(e.target.value); });
+  bindMask('#suPhone', maskPhone); bindMask('#rsPhone', maskPhone);
+  bindMask('#suRrn', maskRrn); bindMask('#suLicNo', maskLicense);
+  bindMask('#suAcc', (v) => onlyDigits(v).slice(0, 16));
+  bindMask('#rsBirth', (v) => onlyDigits(v).slice(0, 6));
+
+  // 연식, 은행 목록
+  (function fillSelects() {
+    const y = new Date().getFullYear() + 1, ys = $('#suYear');
+    for (let i = y; i >= 2000; i--) ys.insertAdjacentHTML('beforeend', '<option>' + i + '</option>');
+    const banks = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크',
+      'SC제일은행', '한국씨티은행', '우체국', '새마을금고', '신협', '수협은행', 'KDB산업은행', '부산은행', 'iM뱅크(대구)', '경남은행',
+      '광주은행', '전북은행', '제주은행', '저축은행'];
+    const bs = $('#suBank');
+    banks.forEach((b) => bs.insertAdjacentHTML('beforeend', '<option>' + b + '</option>'));
+  })();
+
+  // ───── 시작: 자동 로그인 ─────
+  // 저장된 사용자 정보가 있으면 홈을 먼저 보여주고(체감 속도), 서버 확인은 뒤에서 한다.
+  function goHome(user) { $('#homeName').textContent = (user && user.name ? user.name + ' 기사님' : '기사님') + ', 안녕하세요'; show('home'); }
+  function goLogin() {
+    const last = store.get(LAST_ID);
+    if (last) $('#lgId').value = last;
+    show('login');
+  }
+  function clearSession() { store.del(TOKEN); store.del(USER); }
+
+  (function boot() {
+    const token = store.get(TOKEN);
+    if (!token) { goLogin(); api('api_ping').catch(() => {}); return; }
+    let cached = null;
+    try { cached = JSON.parse(store.get(USER) || 'null'); } catch (e) {}
+    if (cached) goHome(cached);
+    api('api_checkSession', token).then((r) => {
+      if (r && r.ok) {
+        let persist = false;
+        try { persist = !!localStorage.getItem(TOKEN); } catch (e) {}
+        store.set(USER, JSON.stringify(r.user), persist); goHome(r.user);
+      }
+      else { clearSession(); goLogin(); if (cached) toast('다시 로그인해 주세요.'); }
+    }).catch(() => { if (!cached) { goLogin(); netErr(); } });
+  })();
+
+  // ───── 로그인 ─────
+  $('#loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = $('#lgId').value.trim(), pw = $('#lgPw').value, auto = $('#lgAuto').checked;
+    if (!id) return toast('쿠팡플렉스 아이디를 입력해 주세요.');
+    if (!pw) return toast('비밀번호를 입력해 주세요.');
+    const btn = $('#lgBtn'); btn.disabled = true; btn.textContent = '로그인 중…';
+    api('api_login', id, pw, auto).then((r) => {
+      if (!r.ok) { toast(r.msg); return; }
+      store.set(TOKEN, r.token, auto);
+      store.set(USER, JSON.stringify(r.user), auto);
+      store.set(LAST_ID, id, true);
+      $('#lgPw').value = '';
+      goHome(r.user);
+    }).catch(netErr).finally(() => { btn.disabled = false; btn.textContent = '로그인'; });
+  });
+
+  $('#logoutBtn').addEventListener('click', () => {
+    const token = store.get(TOKEN);
+    clearSession(); goLogin();
+    if (token) api('api_logout', token).catch(() => {});
+  });
+
+  // ───── 회원가입 ─────
+  let idChecked = '';
+  $('#suId').addEventListener('input', () => { idChecked = ''; const h = $('#suIdHint'); h.textContent = ''; h.className = 'hint'; });
+  $('#suIdCheck').addEventListener('click', () => {
+    const id = $('#suId').value.trim(), h = $('#suIdHint');
+    if (id.length < 3) { h.textContent = '아이디를 3자 이상 입력해 주세요.'; h.className = 'hint err'; return; }
+    h.textContent = '확인 중…'; h.className = 'hint';
+    api('api_checkLoginId', id).then((r) => {
+      if (!r.ok) { h.textContent = r.msg; h.className = 'hint err'; return; }
+      if (r.available) { idChecked = id.toLowerCase(); h.textContent = '사용할 수 있는 아이디입니다.'; h.className = 'hint ok'; }
+      else { h.textContent = '이미 가입된 아이디입니다.'; h.className = 'hint err'; }
+    }).catch(() => { h.textContent = ''; netErr(); });
+  });
+
+  function pwRule(pw) { return pw.length >= 8 && pw.length <= 30 && /[A-Za-z]/.test(pw) && /\d/.test(pw); }
+  ['#suPw', '#suPw2'].forEach((s) => $(s).addEventListener('input', () => {
+    const a = $('#suPw').value, b = $('#suPw2').value, h = $('#suPwHint');
+    if (!a) { h.textContent = ''; return; }
+    if (!pwRule(a)) { h.textContent = '영문과 숫자를 포함해 8~30자로 입력해 주세요.'; h.className = 'hint err'; }
+    else if (b && a !== b) { h.textContent = '비밀번호가 서로 다릅니다.'; h.className = 'hint err'; }
+    else if (b) { h.textContent = '비밀번호가 일치합니다.'; h.className = 'hint ok'; }
+    else { h.textContent = ''; }
+  }));
+
+  // 주소 검색 (다음 우편번호 서비스, 화면 안에 띄움)
+  let postLoaded = null;
+  function loadPostcode() {
+    if (postLoaded) return postLoaded;
+    postLoaded = new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      s.onload = res; s.onerror = () => { postLoaded = null; rej(); };
+      document.head.appendChild(s);
+    });
+    return postLoaded;
+  }
+  $('#suAddrBtn').addEventListener('click', () => {
+    loadPostcode().then(() => {
+      const wrap = $('#postcodeWrap'); wrap.innerHTML = '';
+      new daum.Postcode({
+        width: '100%', height: '100%',
+        oncomplete: (d) => {
+          let addr = d.roadAddress || d.jibunAddress;
+          if (d.buildingName && d.apartment === 'Y') addr += ' (' + d.buildingName + ')';
+          $('#suAddr').value = addr; $('#postLayer').classList.remove('on'); $('#suAddr2').focus();
+        }
+      }).embed(wrap);
+      $('#postLayer').classList.add('on');
+    }).catch(() => {
+      // 주소 검색을 불러오지 못하면 직접 입력할 수 있게 한다.
+      $('#suAddr').readOnly = false; $('#suAddr').placeholder = '주소를 직접 입력해 주세요'; $('#suAddr').focus();
+      toast('주소 검색을 열 수 없어 직접 입력으로 바꿨습니다.');
+    });
+  });
+  $('#postClose').addEventListener('click', () => $('#postLayer').classList.remove('on'));
+
+  // 서류 이미지: 고르는 즉시 압축 → 제출 때는 바로 전송
+  const docs = {};
+  function compressImage(file, max = 1600, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        const dataUrl = c.toDataURL('image/jpeg', quality);
+        resolve({ data: dataUrl.split(',')[1], mime: 'image/jpeg', preview: dataUrl });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없습니다.')); };
+      img.src = url;
+    });
+  }
+  $$('.doc').forEach((box) => {
+    const input = box.querySelector('input');
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { toast('이미지 파일만 올릴 수 있습니다.'); input.value = ''; return; }
+      compressImage(file).then((r) => {
+        docs[box.dataset.doc] = { data: r.data, mime: r.mime };
+        let img = box.querySelector('img');
+        if (!img) { img = document.createElement('img'); box.appendChild(img); }
+        img.src = r.preview; box.classList.add('done');
+      }).catch((err) => toast(err.message)).finally(() => { input.value = ''; });
+    });
+  });
+
+  function collectSignup() {
+    const v = (s) => $(s).value.trim();
+    const addr = v('#suAddr') + (v('#suAddr2') ? ' ' + v('#suAddr2') : '');
+    return {
+      loginId: v('#suId'), password: $('#suPw').value, name: v('#suName'), rrn: v('#suRrn'),
+      address: addr, phone: v('#suPhone'), qualDate: v('#suQualDate'), qualNo: v('#suQualNo'),
+      licenseNo: v('#suLicNo'), licenseType: v('#suLicType'), carName: v('#suCar'), carYear: v('#suYear'),
+      maxLoad: v('#suLoad'), bankName: v('#suBank'), account: v('#suAcc'), accountHolder: v('#suHolder'),
+      agree: $('#suAgree').checked
+    };
+  }
+  function checkSignup(f) {
+    const need = [
+      ['#suId', f.loginId, '쿠팡플렉스 아이디'], ['#suName', f.name, '이름'], ['#suAddr', $('#suAddr').value.trim(), '주소'],
+      ['#suQualDate', f.qualDate, '자격 취득일'], ['#suQualNo', f.qualNo, '자격증 번호'], ['#suLicType', f.licenseType, '면허 종류'],
+      ['#suCar', f.carName, '차명'], ['#suYear', f.carYear, '연식'], ['#suLoad', f.maxLoad, '최대적재량'],
+      ['#suBank', f.bankName, '은행명'], ['#suHolder', f.accountHolder, '예금주']
+    ];
+    $$('#signupForm .bad').forEach((el) => el.classList.remove('bad'));
+    const bad = (sel, msg) => { const el = $(sel); el.classList.add('bad'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); toast(msg); return false; };
+    if (idChecked !== f.loginId.toLowerCase()) return bad('#suId', '쿠팡플렉스 아이디 중복확인을 해 주세요.');
+    if (!pwRule(f.password)) return bad('#suPw', '비밀번호는 영문과 숫자를 포함해 8~30자로 입력해 주세요.');
+    if (f.password !== $('#suPw2').value) return bad('#suPw2', '비밀번호 확인이 다릅니다.');
+    for (const [sel, val, label] of need) if (!val) return bad(sel, label + '을(를) 입력해 주세요.');
+    if (onlyDigits(f.rrn).length !== 13) return bad('#suRrn', '주민등록번호 13자리를 입력해 주세요.');
+    if (!/^01\d{8,9}$/.test(onlyDigits(f.phone))) return bad('#suPhone', '연락처를 확인해 주세요.');
+    if (onlyDigits(f.licenseNo).length !== 12) return bad('#suLicNo', '운전면허 번호 12자리를 입력해 주세요.');
+    if (f.account.length < 8) return bad('#suAcc', '계좌번호를 확인해 주세요.');
+    const names = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };
+    for (const k of Object.keys(names)) if (!docs[k]) { toast(names[k] + ' 사진을 올려 주세요.'); document.querySelector('[data-doc="' + k + '"]').scrollIntoView({ block: 'center', behavior: 'smooth' }); return false; }
+    if (!f.agree) { toast('개인정보 수집·이용에 동의해 주세요.'); return false; }
+    return true;
+  }
+
+  $('#signupForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = collectSignup();
+    if (!checkSignup(f)) return;
+    const btn = $('#suBtn'); btn.disabled = true;
+    loading(true, '서류를 올리는 중… (10초 정도 걸립니다)');
+    api('api_signup', f, docs).then((r) => {
+      if (!r.ok) { toast(r.msg); return; }
+      $('#signupForm').reset();
+      Object.keys(docs).forEach((k) => delete docs[k]);
+      $$('.doc').forEach((d) => { d.classList.remove('done'); const i = d.querySelector('img'); if (i) i.remove(); });
+      idChecked = ''; $('#suIdHint').textContent = ''; $('#suPwHint').textContent = '';
+      store.set(LAST_ID, f.loginId, true);
+      show('pending');
+    }).catch(netErr).finally(() => { btn.disabled = false; loading(false); });
+  });
+
+  // ───── 비밀번호 찾기 ─────
+  let resetToken = '';
+  $('#rsForm1').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = $('#rsId').value.trim(), name = $('#rsName').value.trim(), phone = $('#rsPhone').value, birth = $('#rsBirth').value;
+    if (!id || !name || !phone || birth.length !== 6) return toast('모든 항목을 입력해 주세요.');
+    const btn = $('#rsBtn1'); btn.disabled = true;
+    api('api_resetVerify', id, name, phone, birth).then((r) => {
+      if (!r.ok) { toast(r.msg); return; }
+      resetToken = r.resetToken;
+      $('#rsForm1').style.display = 'none'; $('#rsForm2').style.display = 'block'; $('#rsPw').focus();
+    }).catch(netErr).finally(() => { btn.disabled = false; });
+  });
+  $('#rsForm2').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const a = $('#rsPw').value, b = $('#rsPw2').value;
+    if (!pwRule(a)) return toast('영문과 숫자를 포함해 8~30자로 입력해 주세요.');
+    if (a !== b) return toast('새 비밀번호 확인이 다릅니다.');
+    const btn = $('#rsBtn2'); btn.disabled = true;
+    api('api_resetPassword', resetToken, a).then((r) => {
+      toast(r.msg);
+      if (!r.ok) { $('#rsForm2').style.display = 'none'; $('#rsForm1').style.display = 'block'; return; }
+      resetToken = ''; $('#rsForm1').reset(); $('#rsForm2').reset();
+      $('#rsForm2').style.display = 'none'; $('#rsForm1').style.display = 'block';
+      clearSession(); goLogin();
+    }).catch(netErr).finally(() => { btn.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>
