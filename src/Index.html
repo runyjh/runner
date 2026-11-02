@@ -107,6 +107,12 @@
   .day.sun .dt { color: var(--danger); } .day.sat .dt { color: var(--brand); }
   .day.today { background: var(--brand-weak); margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .day .val { flex: 1; padding: 8px 10px; border-radius: 8px; font-weight: 700; font-size: 15px; white-space: pre-wrap; word-break: break-all; background: #f2f4f6; color: var(--ink); }
+  .day .vc { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .day .vc .val { flex: none; }
+  .day .bk { font-size: 12.5px; color: #5a3286; background: #f5eefb; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; }
+  .day .bk b { font-weight: 700; margin-right: 4px; }
+  .day .bk.none { color: #b0b8c1; background: transparent; padding: 0 2px; }
+  .day .dt small.pdd { color: var(--brand); font-weight: 800; }
   .day .val.none { color: #b0b8c1; font-weight: 500; background: #fafbfc; }
   .day .val.k-work { background: #bfe1f6; color: #0a53a8; }
   .day .val.k-off { background: #f08c8c; color: #fff; }
@@ -708,11 +714,21 @@
         else if (r.code === 'MUST_CHANGE') openChangePw(true, '');
         return;
       }
+      // PDD(배송 예정일) = 오늘 기준 내일 → 파란색 강조
+      const tp = String(r.today || '').split('-');
+      const pd = tp.length === 3 ? new Date(+tp[0], +tp[1] - 1, +tp[2] + 1) : null;
+      const pdd = pd ? pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0') + '-' + String(pd.getDate()).padStart(2, '0') : '';
+      const bkOf = (d) => {
+        if (!r.camp) return '';
+        const l = (r.backup || {})[d] || [];
+        return l.length ? '<div class="bk"><b>' + escH(r.camp) + ' 백업</b>' + l.map(escH).join(', ') + '</div>' : '<div class="bk none">' + escH(r.camp) + ' 백업 없음</div>';
+      };
       const week = (list, title, cls, tag) => '<div class="wk"><h3>' + title + '<small class="' + cls + '">' + tag + '</small></h3>' + list.map((d) => {
         const p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay(), v = r.cells[d] || '';
-        return '<div class="day' + (d === r.today ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
-          '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (d === r.today ? '<small>오늘</small>' : r.holidays[d] ? '<small>' + escH(r.holidays[d]) + '</small>' : '') + '</div>' +
-          '<div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div></div>';
+        const sub = d === pdd ? '<small class="pdd">PDD</small>' : d === r.today ? '<small>오늘</small>' : r.holidays[d] ? '<small>' + escH(r.holidays[d]) + '</small>' : '';
+        return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
+          '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + '</div>' +
+          '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' + bkOf(d) + '</div></div>';
       }).join('') + '</div>';
       $('#scBody').innerHTML = week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
     }).catch(() => { $('#scBody').innerHTML = ''; netErr(); });

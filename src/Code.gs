@@ -3782,14 +3782,77 @@ function api_mySchedule(token) {
       const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(String(s.d)).matchEntireCell(true).matchCase(true).findNext();
       return cell ? cell.getRow() : 0;
     })();
-    if (!row) return out;
     const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
     if (!cols.length) return out;
     const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
-    const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
-    dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
+    if (row) {
+      const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
+      dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
+    }
+    // 내 캠프에 들어오는 백업 (스케줄관리 '백업 명단' 과 같은 규칙)
+    try {
+      const bk = schMyCampBackup_(s.d, dates, h, c0, c1);
+      out.camp = bk.camp; out.backup = bk.list;
+    } catch (e) { out.backup = {}; }
     return out;
   });
+}
+
+/**
+ * 기사 앱용: 내 캠프의 날짜별 백업 명단 { camp: '강서1', list: { 'yyyy-MM-dd': ['527B 김영환', …] } }
+ * 관리자 화면 SchedCalc 의 백업 명단 계산(운영시트 updateBackupRoster)과 같은 규칙.
+ * 백업 기사 = 기본노선에 백업·예비·용차, 또는 기사구분이 백업·외부용차.
+ * 그 기사의 칸에서 '캠프명 + 노선' 을 찾고, 캠프명이 없으면 그 기사 소속 캠프로 본다.
+ */
+function schMyCampBackup_(myId, dates, h, c0, c1) {
+  const m = master_(), campName = {};
+  m.camps.forEach(function (c) { campName[c.id] = c.name; });
+  const short = function (n) { return str_(n).replace(/\s*캠프\s*$/, '').trim(); };
+  const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
+  const me = drivers.filter(function (o) { return o.id === myId; })[0];
+  const myCamp = me && campName[me.schCampId] ? short(campName[me.schCampId]) : '';
+  const res = { camp: myCamp, list: {} };
+  if (!myCamp) return res;
+  const byId = {};
+  drivers.forEach(function (o) { byId[o.id] = o; });
+  const sh = schSheet_(), last = sh.getLastRow();
+  if (last < 2) return res;
+  const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues();
+  const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+  const campNames = m.camps.map(function (c) { return short(c.name); }).filter(Boolean).sort(function (a, b) { return b.length - a.length; });
+  const esc = function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+  const seen = {};
+  ids.forEach(function (r, i) {
+    const id = str_(r[0]), o = byId[id];
+    if (!o || seen[id]) return;
+    seen[id] = 1;
+    const ownCamp = campName[o.schCampId] ? short(campName[o.schCampId]) : '';
+    const isBackup = /백업|예비|용차/.test(o.baseRoute || '') || /용차/.test(ownCamp) || o.driverType === '백업' || o.driverType === '외부용차';
+    if (!isBackup) return;
+    dates.forEach(function (d) {
+      const c = h.dates[d];
+      if (c === undefined) return;
+      const cellText = str_(block[i][c - c0]);
+      if (!cellText || cellText === '출근' || /휴무|휴가|퇴사/.test(cellText)) return;
+      const flat = cellText.replace(/\([^)]*\)/g, '').trim();
+      const hits = [];
+      let found = false;
+      campNames.forEach(function (tc) {
+        const re = new RegExp(esc(tc) + '\\s*(\\d+[A-Za-z][A-Za-z0-9,]*)(\\s*\\[.*?\\])?', 'g');
+        let mm;
+        while ((mm = re.exec(flat)) !== null) { found = true; if (tc === myCamp) hits.push(mm[1] + ' ' + o.name + (mm[2] || '')); }
+      });
+      if (!found && ownCamp === myCamp) {
+        const re = /(\d+[A-Za-z]+)(\s*\[.*?\])?/g;
+        let mm;
+        while ((mm = re.exec(flat)) !== null) hits.push(mm[1] + ' ' + o.name + (mm[2] || ''));
+      }
+      if (!hits.length) return;
+      const l = res.list[d] || (res.list[d] = []);
+      hits.forEach(function (x) { if (l.indexOf(x) < 0) l.push(x); });
+    });
+  });
+  return res;
 }
 
 // ───────────────────────── 데이터 초기화 (메뉴별) ─────────────────────────
