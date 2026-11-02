@@ -292,6 +292,9 @@
         <div class="field"><label class="lb" for="rsName">이름</label><input type="text" id="rsName"></div>
         <div class="field"><label class="lb" for="rsPhone">연락처</label><input type="tel" id="rsPhone" inputmode="numeric" maxlength="13" placeholder="010-0000-0000"></div>
         <div class="field"><label class="lb" for="rsBirth">생년월일 6자리</label><input type="tel" id="rsBirth" inputmode="numeric" maxlength="6" placeholder="예: 730107"></div>
+        <div class="field"><label class="lb" for="rsBank">정산 계좌 은행</label><select id="rsBank"><option value="">선택</option></select></div>
+        <div class="field"><label class="lb" for="rsAcc">정산 계좌번호</label><input type="tel" id="rsAcc" inputmode="numeric" placeholder="숫자만 입력" autocomplete="off"></div>
+        <div class="hint">가입할 때 등록한 정산 계좌를 입력해 주세요.</div>
       </div>
       <button class="btn" id="rsBtn1" type="submit">확인</button>
     </form>
@@ -413,6 +416,7 @@
   bindMask('#suRrn', maskRrn); bindMask('#suLicNo', maskLicense);
   bindMask('#suAcc', (v) => onlyDigits(v).slice(0, 16));
   bindMask('#rsBirth', (v) => onlyDigits(v).slice(0, 6));
+  bindMask('#rsAcc', (v) => onlyDigits(v).slice(0, 16));
 
   // 연식, 은행 목록
   (function fillSelects() {
@@ -421,8 +425,10 @@
     const banks = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크',
       'SC제일은행', '한국씨티은행', '우체국', '새마을금고', '신협', '수협은행', 'KDB산업은행', '부산은행', 'iM뱅크(대구)', '경남은행',
       '광주은행', '전북은행', '제주은행', '저축은행'];
-    const bs = $('#suBank');
-    banks.forEach((b) => bs.insertAdjacentHTML('beforeend', '<option>' + b + '</option>'));
+    ['#suBank', '#rsBank'].forEach((sel) => {
+      const bs = $(sel);
+      banks.forEach((b) => bs.insertAdjacentHTML('beforeend', '<option>' + b + '</option>'));
+    });
   })();
 
   // ───── 시작: 자동 로그인 ─────
@@ -620,9 +626,10 @@
   $('#rsForm1').addEventListener('submit', (e) => {
     e.preventDefault();
     const id = $('#rsId').value.trim(), name = $('#rsName').value.trim(), phone = $('#rsPhone').value, birth = $('#rsBirth').value;
-    if (!id || !name || !phone || birth.length !== 6) return toast('모든 항목을 입력해 주세요.');
+    const bank = $('#rsBank').value, acc = $('#rsAcc').value;
+    if (!id || !name || !phone || birth.length !== 6 || !bank || !acc) return toast('모든 항목을 입력해 주세요.');
     const btn = $('#rsBtn1'); btn.disabled = true;
-    api('api_resetVerify', id, name, phone, birth).then((r) => {
+    api('api_resetVerify', id, name, phone, birth, bank, acc).then((r) => {
       if (!r.ok) { toast(r.msg); return; }
       resetToken = r.resetToken;
       $('#rsForm1').style.display = 'none'; $('#rsForm2').style.display = 'block'; $('#rsPw').focus();

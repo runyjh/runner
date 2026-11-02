@@ -688,8 +688,20 @@ function api_signup(form, files) {
 }
 
 // ───────────────────────── API : 비밀번호 찾기 ─────────────────────────
-/** 1단계 본인 확인: 아이디 + 이름 + 연락처 + 생년월일(6자리) */
-function api_resetVerify(loginId, name, phone, birth6) {
+/** 은행명 비교: 띄어쓰기와 끝의 "은행" 글자는 무시 (예: "신한" = "신한은행") */
+function sameBank_(a, b) {
+  const n = function (s) { return String(s || '').replace(/\s/g, '').replace(/은행$/, ''); };
+  return !!n(a) && n(a) === n(b);
+}
+/** 등록된 계좌번호(암호화)와 입력값 비교 */
+function sameAccount_(o, account) {
+  const input = digits_(account);
+  if (!input || !o.accountEnc) return false;
+  try { return digits_(decrypt_(o.accountEnc)) === input; } catch (e) { return false; }
+}
+
+/** 1단계 본인 확인: 아이디 + 이름 + 연락처 + 생년월일(6자리) + 은행명 + 계좌번호 */
+function api_resetVerify(loginId, name, phone, birth6, bankName, account) {
   return run_(function () {
     const id = normLoginId_(loginId);
     const rk = 'rf:' + id;
@@ -701,10 +713,12 @@ function api_resetVerify(loginId, name, phone, birth6) {
       o.name === String(name || '').trim() &&
       phoneDigits_(o.phone) === phoneDigits_(phone) &&
       digits_(o.birthDate).slice(2) === digits_(birth6) &&
+      sameBank_(o.bankName, bankName) &&
+      sameAccount_(o, account) &&
       o.status !== ST.STOPPED;
     if (!ok) {
       cache_().put(rk, String(tries + 1), 1800);
-      fail_('입력한 정보와 일치하는 회원이 없습니다.');
+      fail_('입력한 정보와 일치하는 회원이 없습니다. 계속 안 되면 관리자에게 문의해 주세요.');
     }
     cache_().remove(rk);
     const t = newToken_();
