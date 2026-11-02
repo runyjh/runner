@@ -762,7 +762,8 @@
         '<span>기사ID</span><span>' + esc(d.id) + '</span><span>가입일시</span><span>' + esc(d.createdAt || '-') + '</span>' +
         '<span>승인일시</span><span>' + esc(d.approvedAt || '-') + '</span><span>수정일시</span><span>' + esc(d.updatedAt || '-') + '</span>' +
         '<span>비밀번호</span><span>' + (d.hasPw ? '설정됨 (변경 ' + esc(d.pwChangedAt || '-') + ')' : '없음 - 임시 비밀번호를 지정해 주세요') + '</span>' +
-      '</div><div style="margin-top:12px"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button></div></div>';
+      '</div><div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button>' +
+      '<button type="button" class="btn sm ghost danger-t" id="delDrvBtn" style="margin-left:auto">기사 삭제</button></div></div>';
   }
 
   /** 기사구분 버튼 + 기사코드 (상세·등록 공용) */
@@ -879,6 +880,8 @@
       const rb = $('[data-reveal="' + key + '"]', $('#dBody')); if (rb) rb.remove();
     } else if (dc && cur) {
       openDoc(dc.dataset.doc);
+    } else if (e.target.id === 'delDrvBtn' && cur) {
+      deleteDriver(cur);
     } else if (e.target.id === 'tempPwBtn' && cur) {
       $('#pwNew').value = ''; $('#pwModal').classList.remove('hidden'); $('#pwNew').focus();
     }
@@ -919,6 +922,24 @@
     if (i >= 0) all[i] = row; else { all.unshift(row); counts.all = (counts.all || 0) + 1; }
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }
     renderTabs(); renderRows();
+  }
+
+  // ───── 기사 삭제 ─────
+  function deleteDriver(d) {
+    if (Object.keys(dirty).length && !confirm('저장하지 않은 변경이 있습니다. 무시하고 삭제를 진행할까요?')) return;
+    ask('기사 삭제 — 되돌릴 수 없습니다',
+      d.name + ' 기사님의 정보를 모두 지웁니다. 앱 로그인도 바로 끊기고, 가입 서류 폴더는 드라이브 휴지통으로 옮겨집니다 (30일 안에는 드라이브에서 복구 가능). ' +
+      '잠시 쉬는 기사라면 삭제 대신 상태를 "정지"로 바꾸세요. 삭제하려면 기사 이름을 그대로 입력하세요.', d.name).then((v) => {
+      if (v == null) return;
+      if (v.replace(/\s+/g, '') !== String(d.name || '').replace(/\s+/g, '')) return toast('이름이 달라 삭제하지 않았습니다.');
+      api('adm_deleteDriver', d.id, v).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        const i = all.findIndex((x) => x.id === d.id);
+        if (i >= 0) { const st = all[i].status; all.splice(i, 1); counts.all = Math.max(0, (counts.all || 1) - 1); if (counts[st] != null) counts[st] = Math.max(0, counts[st] - 1); }
+        closeDrawer(true); renderTabs(); renderRows();
+        toast(d.name + ' 기사님을 삭제했습니다.' + (r.docsTrashed ? ' 서류 폴더는 휴지통으로 옮겼습니다.' : ''));
+      }).catch(() => {});
+    });
   }
 
   // ───── 임시 비밀번호 ─────

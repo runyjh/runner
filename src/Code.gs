@@ -1489,6 +1489,48 @@ function adm_createDriver(token, fields, tempPw) {
   });
 }
 
+/**
+ * 기사 삭제 (되돌릴 수 없음). confirmName = 화면에서 다시 입력한 기사 이름 (실수 방지)
+ * - drivers 시트의 그 줄을 지우고, 그 기사의 로그인(세션)도 모두 지운다 → 앱에서 바로 로그아웃
+ * - 앱 가입 때 만들어진 서류 폴더는 드라이브 휴지통으로 옮긴다 (30일 안에는 드라이브에서 복구 가능)
+ * - 배번호 신청서 같은 기록은 지우지 않는다 (이름이 남아 있어 나중에 확인 가능)
+ */
+function adm_deleteDriver(token, id, confirmName) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    let o, folderId = '';
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      o = driverById_(String(id || ''));
+      if (!o) return { ok: true, already: true };
+      if (str_(confirmName).replace(/\s+/g, '') !== str_(o.name).replace(/\s+/g, '')) fail_('입력한 이름이 기사 이름과 다릅니다. 삭제하지 않았습니다.');
+      sheet_(SH.DRIVERS).deleteRow(o._row);
+      forgetDriver_(o);
+      // 이 기사의 로그인 기록 지우기
+      const ss = readAll_(SH.SESSIONS).filter(function (x) { return x.driverId === o.id; });
+      ss.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
+        .forEach(function (r) { sheet_(SH.SESSIONS).deleteRow(r); });
+      if (ss.length) cache_().removeAll(ss.map(function (x) { return 'ss:' + x.tokenHash; }));
+      folderId = (String(o.docFolder || '').match(/folders\/([A-Za-z0-9_-]{10,})/) || [])[1] || fileIdOf_(o.docFolder);
+      logAdmin_(a, '기사 삭제', o.name + ' (' + o.id + ')', [o.driverType, o.driverCode].filter(String).join(' ') + (ss.length ? ', 로그인 ' + ss.length + '건 해제' : ''));
+    } finally {
+      lock.releaseLock();
+    }
+    // 서류 폴더: 앱이 만든 "기사 서류" 폴더 안의 것만 휴지통으로
+    let trashed = false;
+    if (folderId) {
+      try {
+        const f = DriveApp.getFolderById(folderId), parents = f.getParents();
+        while (parents.hasNext()) {
+          if (parents.next().getId() === props_().DOCS_FOLDER_ID) { f.setTrashed(true); trashed = true; break; }
+        }
+      } catch (e) { /* 이미 없는 폴더 */ }
+    }
+    return { ok: true, docsTrashed: trashed };
+  });
+}
+
 /** 임시 비밀번호 지정 → 기사는 다음 로그인 때 직접 변경 */
 function adm_setTempPassword(token, id, password) {
   return run_(function () {
