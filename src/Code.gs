@@ -38,7 +38,8 @@ const CFG = {
 };
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
-const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications' };
+const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
+  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -142,6 +143,38 @@ const COMPANY = [
 ];
 const COMPANY_SHEET = 'company';
 
+// ── 노선관리 (2단계 기준 데이터). 캠프명 > 노선코드 ──
+// camps 시트: 캠프 기본 정보
+const CP = { id: '캠프ID', name: '캠프명', address: '주소', memo: '메모', createdAt: '등록일시', updatedAt: '수정일시' };
+const CP_NOTES = {
+  name: '새 줄에 캠프명만 입력해도 캠프ID가 자동으로 채워집니다. 캠프명을 바꾸면 routes·camp_images 탭의 캠프명도 자동으로 바뀝니다.'
+};
+// camp_images 시트: 캠프 참고 이미지 (파일은 드라이브 "캠프 참고 이미지" 폴더)
+const CI = {
+  id: '이미지ID', campId: '캠프ID', campName: '캠프명', file: '이미지 링크', desc: '설명', order: '순서',
+  createdAt: '등록일시', updatedAt: '수정일시'
+};
+const CI_NOTES = {
+  campName: '캠프명을 입력하면 캠프ID가 자동으로 채워집니다.',
+  file: '드라이브 이미지 파일 링크. 드라이브에서 "링크 복사"한 주소를 붙여 넣어도 됩니다.',
+  order: '작은 숫자가 앞에 표시됩니다.'
+};
+// routes 시트: 노선 (구분1~5는 노선코드에서 자동으로 나뉜다)
+const RST = { ON: '사용', OFF: '중지' };
+const R = {
+  id: '노선ID', campId: '캠프ID', campName: '캠프명', code: '노선코드',
+  g1: '구분1', g2: '구분2', g3: '구분3', g4: '구분4', g5: '구분5',
+  status: '사용여부', memo: '메모', createdAt: '등록일시', updatedAt: '수정일시'
+};
+const R_NOTES = {
+  campName: '캠프명을 입력하면 캠프ID가 자동으로 채워집니다. 다른 캠프명으로 바꾸면 그 캠프로 옮겨집니다.',
+  code: '예: 110ABCD → 구분1 110 / 구분2 A / 구분3 B / 구분4 C / 구분5 D (자동). 110-A-B-C-D 처럼 - 로 나눠 써도 됩니다.',
+  g1: '노선코드에서 자동으로 채워집니다. 노선코드를 고치세요.',
+  status: '사용 / 중지'
+};
+// 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
+const AUTO_SHEETS = ['camps', 'camp_images', 'routes'];
+
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
 SCHEMA[SH.SESSIONS] = S;
@@ -149,6 +182,9 @@ SCHEMA[SH.ADMINS] = A;
 SCHEMA[SH.ALOG] = L;
 SCHEMA[SH.MEMO] = M;
 SCHEMA[SH.BIB] = B;
+SCHEMA[SH.CAMPS] = CP;
+SCHEMA[SH.CIMG] = CI;
+SCHEMA[SH.ROUTES] = R;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -207,9 +243,9 @@ function setup() {
 }
 
 /** 빠진 머리글을 오른쪽 끝에 추가하고 서식·숨김·드롭다운·설명을 다시 적용한다. */
-function ensureColumns() {
-  try { ss_().setSpreadsheetTimeZone(CFG.TZ); } catch (e) { /* 권한 문제 시 무시 */ }
-  Object.keys(SCHEMA).forEach(function (name) {
+function ensureColumns(only) {
+  if (!only) { try { ss_().setSpreadsheetTimeZone(CFG.TZ); } catch (e) { /* 권한 문제 시 무시 */ } }
+  (only || Object.keys(SCHEMA)).forEach(function (name) {
     const def = SCHEMA[name];
     if (!ss_().getSheetByName(name)) ss_().insertSheet(name);
     const sh = sheet_(name);
@@ -258,6 +294,16 @@ function ensureColumns() {
       const rule = SpreadsheetApp.newDataValidation().requireValueInList(['Y'], true).setAllowInvalid(true).build();
       sh.getRange(2, c.done + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
       Object.keys(M_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(M_NOTES[k]); });
+    } else if (name === SH.CAMPS) {
+      Object.keys(CP_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(CP_NOTES[k]); });
+      sh.setFrozenColumns(Math.min(c.name + 1, 3));
+    } else if (name === SH.CIMG) {
+      Object.keys(CI_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(CI_NOTES[k]); });
+    } else if (name === SH.ROUTES) {
+      const rule = SpreadsheetApp.newDataValidation().requireValueInList([RST.ON, RST.OFF], true).build();
+      sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
+      Object.keys(R_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(R_NOTES[k]); });
+      ['g1', 'g2', 'g3', 'g4', 'g5'].forEach(function (k) { sh.getRange(1, c[k] + 1).setBackground('#eef2f6'); });
     } else if (name === SH.SESSIONS) {
       sh.getRange(1, c.expiresAt + 1).setNote('지금보다 이전 시각으로 고치면 해당 기기는 로그아웃됩니다.');
     }
@@ -285,7 +331,13 @@ function ss_() {
 }
 function sheet_(name) {
   if (_sheets[name]) return _sheets[name];
-  const sh = ss_().getSheetByName(name);
+  let sh = ss_().getSheetByName(name);
+  if (!sh && AUTO_SHEETS.indexOf(name) >= 0) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try { if (!ss_().getSheetByName(name)) ensureColumns([name]); } finally { lock.releaseLock(); }
+    sh = ss_().getSheetByName(name);
+  }
   if (!sh) fail_('DB 시트 "' + name + '"을(를) 찾을 수 없습니다. 시트 이름을 바꾸지 마세요.');
   return (_sheets[name] = sh);
 }
@@ -925,6 +977,7 @@ function onSheetEdit(e) {
   const r0 = e.range.getRow(), n = e.range.getNumRows();
   if (r0 === 1) {
     clearHeadCache_(name);
+    if (AUTO_SHEETS.indexOf(name) >= 0) bumpMaster_();
     if (n === 1) return;
   }
   const lock = LockService.getScriptLock();
@@ -934,6 +987,8 @@ function onSheetEdit(e) {
     const start = Math.max(2, r0), end = Math.min(r0 + n - 1, start + 199);
     if (end < start) return;
     const block = sh.getRange(start, 1, end - start + 1, c.__w).getValues();
+    let campRenamed = false;
+    _campIdx = null; _routeList = null;
     block.forEach(function (v, i) {
       const o = { _row: start + i };
       Object.keys(SCHEMA[name]).forEach(function (k) { o[k] = str_(v[c[k]]); });
@@ -941,9 +996,14 @@ function onSheetEdit(e) {
       else if (name === SH.ADMINS) fixAdminRow_(sh, c, o);
       else if (name === SH.MEMO) fixMemoRow_(sh, c, o);
       else if (name === SH.BIB) fixBibRow_(sh, c, o);
+      else if (name === SH.CAMPS) { fixCampRow_(sh, c, o); campRenamed = true; }
+      else if (name === SH.ROUTES) fixRouteRow_(sh, c, o);
+      else if (name === SH.CIMG) fixCampImageRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
     });
+    if (campRenamed) syncCampNames_();
   } finally {
+    if (AUTO_SHEETS.indexOf(name) >= 0) bumpMaster_();
     lock.releaseLock();
   }
 }
@@ -2058,6 +2118,7 @@ function writeDocResult_(logs, summary) {
 /** 열 추가·삭제·이동 같은 구조 변경 시 머리글 위치 캐시를 지운다 */
 function onSheetChange() {
   Object.keys(SCHEMA).forEach(clearHeadCache_);
+  bumpMaster_(); // 행 삭제·추가 등 구조 변경 → 노선 기준 데이터 캐시 버림
 }
 
 /** 매일 새벽 만료된 세션을 한 번에 정리 (setup 에서 트리거 등록) */
@@ -2086,4 +2147,621 @@ function testCrypto() {
   const enc = encrypt_('900101-1234567');
   Logger.log(enc);
   Logger.log(decrypt_(enc));
+}
+
+// ───────────────────────── 관리자 : 노선관리 (캠프 > 노선코드) ─────────────────────────
+/*
+ * 시트 3개: camps(캠프) / routes(노선) / camp_images(캠프 참고 이미지)
+ * - 화면은 세 시트를 한 번에 읽어 캐시해 두고(adm_routeAll), 저장할 때만 캐시를 버린다.
+ * - 시트에서 직접 고쳐도 같은 규칙으로 정리되고(fix*Row_), 캐시는 자동으로 버려진다.
+ * - 캠프명은 camps 탭이 기준. routes·camp_images 의 캠프명 칸은 보기 편하라고 같이 적어 두는 사본이다.
+ */
+function newRid_(prefix) {
+  return prefix + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
+}
+function campKey_(v) { return str_(v).replace(/\s+/g, '').toUpperCase(); }
+/** 노선코드 정리: 공백 제거, 영문 대문자 */
+function normCode_(v) { return str_(v).replace(/\s+/g, '').toUpperCase(); }
+/**
+ * 노선코드 → 구분1~5
+ *   110ABCD     → 110 / A / B / C / D   (앞쪽 숫자 묶음 = 구분1, 그 뒤 한 글자씩)
+ *   110-A-B-C-D → - 기준으로 나눔 (구분 하나가 두 글자 이상일 때)
+ *   남는 글자는 구분5에 붙인다.
+ */
+function splitCode_(code) {
+  code = normCode_(code);
+  let parts;
+  if (code.indexOf('-') >= 0) {
+    parts = code.split('-').filter(function (x) { return x; });
+    if (parts.length > 5) parts = parts.slice(0, 4).concat([parts.slice(4).join('-')]);
+  } else {
+    const m = code.match(/^(\d+)(.*)$/);
+    const head = m ? m[1] : code.charAt(0), rest = m ? m[2] : code.slice(1);
+    parts = head ? [head].concat(rest.split('')) : [];
+    if (parts.length > 5) parts = parts.slice(0, 4).concat([parts.slice(4).join('')]);
+  }
+  while (parts.length < 5) parts.push('');
+  return { g1: parts[0], g2: parts[1], g3: parts[2], g4: parts[3], g5: parts[4] };
+}
+function checkCode_(v) {
+  const code = normCode_(v);
+  if (!code) fail_('노선코드를 입력해 주세요.');
+  if (code.length > 20) fail_('노선코드가 너무 깁니다. (20자 이내): ' + code);
+  if (!/^[0-9A-Z가-힣_-]+$/.test(code)) fail_('노선코드에는 영문·숫자·한글·- 만 쓸 수 있습니다: ' + code);
+  return code;
+}
+function fileIdOf_(v) {
+  const s = str_(v);
+  const m = s.match(/\/d\/([A-Za-z0-9_-]{10,})/) || s.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{20,}$/.test(s) ? s : '';
+}
+function campView_(o) {
+  return { id: o.id, name: o.name, address: o.address, memo: o.memo, createdAt: o.createdAt, updatedAt: o.updatedAt };
+}
+function routeView_(o) {
+  const g = splitCode_(o.code);
+  return {
+    id: o.id, campId: o.campId, code: normCode_(o.code), g1: g.g1, g2: g.g2, g3: g.g3, g4: g.g4, g5: g.g5,
+    status: o.status === RST.OFF ? RST.OFF : RST.ON, memo: o.memo, createdAt: o.createdAt, updatedAt: o.updatedAt
+  };
+}
+function imageView_(o) {
+  return {
+    id: o.id, campId: o.campId, fileId: fileIdOf_(o.file), url: o.file, desc: o.desc,
+    order: Number(o.order) || 0, createdAt: o.createdAt, updatedAt: o.updatedAt
+  };
+}
+function conflict_(seen, o) {
+  if (seen !== undefined && seen !== null && String(seen) !== String(o.updatedAt || '')) {
+    fail_('다른 곳(다른 관리자 또는 시트)에서 먼저 수정되었습니다. 새로고침한 뒤 다시 해 주세요.');
+  }
+}
+
+// ── 기준 데이터 캐시: 버전 키가 바뀌면 이전 캐시는 쓰지 않는다 (읽는 중 저장이 끼어들어도 안전) ──
+const MST_CHUNK = 30000; // 캐시 1칸 100KB 제한 (한글 3바이트) 안쪽
+function masterVer_() {
+  let v = cache_().get('mst:v');
+  if (!v) { v = String(Date.now()); cache_().put('mst:v', v, CFG.CACHE_MAX); }
+  return v;
+}
+function bumpMaster_() {
+  try { cache_().put('mst:v', Date.now() + Math.random().toString(36).slice(2, 6), CFG.CACHE_MAX); } catch (e) { /* 캐시 오류는 무시 */ }
+}
+function master_() {
+  const ck = cache_(), v = masterVer_(), base = 'mst:' + v + ':';
+  const n = Number(ck.get(base + 'n') || 0);
+  if (n) {
+    const keys = [];
+    for (let i = 0; i < n; i++) keys.push(base + i);
+    const got = ck.getAll(keys);
+    if (keys.every(function (k) { return got[k] != null; })) {
+      try { return JSON.parse(keys.map(function (k) { return got[k]; }).join('')); } catch (e) { /* 다시 읽는다 */ }
+    }
+  }
+  const data = {
+    camps: readAll_(SH.CAMPS).filter(function (o) { return o.id; }).map(campView_),
+    routes: readAll_(SH.ROUTES).filter(function (o) { return o.id && o.code; }).map(routeView_),
+    images: readAll_(SH.CIMG).filter(function (o) { return o.id; }).map(imageView_)
+  };
+  const json = JSON.stringify(data);
+  if (json.length <= MST_CHUNK * 60) {
+    const put = {};
+    let i = 0;
+    for (let p = 0; p < json.length; p += MST_CHUNK) put[base + (i++)] = json.slice(p, p + MST_CHUNK);
+    put[base + 'n'] = String(i);
+    try { ck.putAll(put, CFG.CACHE_MAX); } catch (e) { /* 캐시 실패해도 결과는 돌려준다 */ }
+  }
+  return data;
+}
+
+/** 노선관리 화면 데이터 (캠프·노선·이미지 목록) 한 번에 */
+function adm_routeAll(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    return Object.assign({ ok: true }, master_());
+  });
+}
+
+/** camps 의 캠프명을 routes·camp_images 의 캠프명 칸에 맞춘다 (바뀐 칸이 있을 때만 쓴다) */
+function syncCampNames_() {
+  const names = {};
+  readAll_(SH.CAMPS).forEach(function (o) { if (o.id) names[o.id] = o.name; });
+  [SH.ROUTES, SH.CIMG].forEach(function (sn) {
+    const sh = sheet_(sn), c = cols_(sn, true), last = sh.getLastRow();
+    if (last < 2) return;
+    const ids = sh.getRange(2, c.campId + 1, last - 1, 1).getValues();
+    const rng = sh.getRange(2, c.campName + 1, last - 1, 1), cur = rng.getValues();
+    let changed = false;
+    const out = cur.map(function (r, i) {
+      const id = str_(ids[i][0]), now = str_(r[0]);
+      const want = id && names[id] !== undefined ? names[id] : now;
+      if (want !== now) changed = true;
+      return [safeText_(want)];
+    });
+    if (changed) rng.setNumberFormat('@').setValues(out);
+  });
+}
+
+// ── 캠프 ──
+function adm_campSave(token, f) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    f = f || {};
+    const name = str_(f.name).replace(/\s+/g, ' ');
+    if (!name) fail_('캠프명을 입력해 주세요.');
+    if (name.length > 40) fail_('캠프명은 40자 이내로 입력해 주세요.');
+    const address = str_(f.address).replace(/\s+/g, ' ');
+    if (address.length > 200) fail_('주소가 너무 깁니다.');
+    const memo = String(f.memo == null ? '' : f.memo).trim();
+    if (memo.length > 2000) fail_('메모가 너무 깁니다. (2000자 이내)');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const camps = readAll_(SH.CAMPS).filter(function (o) { return o.id || o.name; });
+      if (camps.some(function (o) { return campKey_(o.name) === campKey_(name) && o.id !== f.id; })) {
+        fail_('같은 이름의 캠프가 이미 있습니다: ' + name);
+      }
+      const now = nowText_();
+      let row;
+      if (!f.id) {
+        row = appendObj_(SH.CAMPS, { id: newRid_('C'), name: name, address: address, memo: memo, createdAt: now, updatedAt: now });
+      } else {
+        const o = camps.filter(function (x) { return x.id === f.id; })[0];
+        if (!o) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
+        conflict_(f.seen, o);
+        row = o._row;
+        writeFields_(SH.CAMPS, row, { name: name, address: address, memo: memo, updatedAt: now });
+        if (o.name !== name) syncCampNames_();
+      }
+      bumpMaster_();
+      return { ok: true, camp: campView_(readObj_(SH.CAMPS, row)) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+function adm_campDelete(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    id = String(id || '');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    let files = [];
+    try {
+      const row = findRow_(SH.CAMPS, 'id', id);
+      if (!row) return { ok: true };
+      const n = readAll_(SH.ROUTES).filter(function (r) { return r.campId === id && r.code; }).length;
+      if (n) fail_('이 캠프에 노선이 ' + n + '개 있습니다. 노선을 먼저 지우거나 다른 캠프로 옮겨 주세요.');
+      const o = readObj_(SH.CAMPS, row);
+      const imgs = readAll_(SH.CIMG).filter(function (x) { return x.campId === id; });
+      files = imgs.map(function (x) { return fileIdOf_(x.file); });
+      imgs.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
+        .forEach(function (r) { sheet_(SH.CIMG).deleteRow(r); });
+      sheet_(SH.CAMPS).deleteRow(row);
+      logAdmin_(a, '캠프 삭제', o.name + ' (' + id + ')', '이미지 ' + imgs.length + '장');
+      bumpMaster_();
+    } finally {
+      lock.releaseLock();
+    }
+    files.forEach(trashCampFile_);
+    return { ok: true };
+  });
+}
+
+// ── 캠프 참고 이미지 ──
+function campImgFolder_() {
+  const p = props_();
+  if (p.CAMP_IMG_FOLDER_ID) {
+    try {
+      const f = DriveApp.getFolderById(p.CAMP_IMG_FOLDER_ID);
+      if (!f.isTrashed()) return f;
+    } catch (e) { /* 지워졌으면 새로 만든다 */ }
+  }
+  const f = DriveApp.getFolderById(p.ROOT_FOLDER_ID).createFolder('캠프 참고 이미지');
+  PropertiesService.getScriptProperties().setProperty('CAMP_IMG_FOLDER_ID', f.getId());
+  _props = null;
+  return f;
+}
+/** 앱이 올린 파일(캠프 참고 이미지 폴더 안)만 휴지통으로. 시트에 직접 붙여 넣은 다른 파일은 건드리지 않는다. */
+function trashCampFile_(fileId) {
+  if (!fileId) return;
+  try {
+    const folderId = props_().CAMP_IMG_FOLDER_ID;
+    const file = DriveApp.getFileById(fileId), parents = file.getParents();
+    while (parents.hasNext()) {
+      if (parents.next().getId() === folderId) { file.setTrashed(true); return; }
+    }
+  } catch (e) { /* 이미 없는 파일 */ }
+}
+function cleanDesc_(v) {
+  const d = String(v == null ? '' : v).trim();
+  if (d.length > 500) fail_('설명은 500자 이내로 입력해 주세요.');
+  return d;
+}
+
+/** 이미지 1장 올리기: img = { data(base64), mime, desc } */
+function adm_campImageAdd(token, campId, img) {
+  return run_(function () {
+    requireAdmin_(token);
+    img = img || {};
+    if (!img.data || !/^image\//.test(String(img.mime))) fail_('이미지 파일만 올릴 수 있습니다.');
+    if (String(img.data).length > CFG.MAX_FILE_B64) fail_('이미지가 너무 큽니다.');
+    const desc = cleanDesc_(img.desc);
+    const row = findRow_(SH.CAMPS, 'id', String(campId || ''));
+    if (!row) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
+    const camp = readObj_(SH.CAMPS, row);
+    // 업로드는 잠금 밖에서
+    const id = newRid_('I');
+    const ext = /png/.test(img.mime) ? '.png' : /webp/.test(img.mime) ? '.webp' : '.jpg';
+    const fname = (camp.name + '_' + (desc.split('\n')[0].slice(0, 30) || '이미지') + '_' + id).replace(/[\\\/:*?"<>|]/g, ' ') + ext;
+    const file = campImgFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(img.data), img.mime, fname));
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const max = readAll_(SH.CIMG).filter(function (x) { return x.campId === camp.id; })
+        .reduce(function (m, x) { return Math.max(m, Number(x.order) || 0); }, 0);
+      const now = nowText_();
+      const r = appendObj_(SH.CIMG, {
+        id: id, campId: camp.id, campName: camp.name, file: file.getUrl(), desc: desc, order: String(max + 1),
+        createdAt: now, updatedAt: now
+      });
+      bumpMaster_();
+      return { ok: true, image: imageView_(readObj_(SH.CIMG, r)) };
+    } catch (e) {
+      try { file.setTrashed(true); } catch (x) { /* 무시 */ }
+      throw e;
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 설명 고치기 */
+function adm_campImageSave(token, id, f) {
+  return run_(function () {
+    requireAdmin_(token);
+    f = f || {};
+    const desc = cleanDesc_(f.desc);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.CIMG, 'id', String(id || ''));
+      if (!row) fail_('이미지를 찾을 수 없습니다. 새로고침해 주세요.');
+      conflict_(f.seen, readObj_(SH.CIMG, row));
+      writeFields_(SH.CIMG, row, { desc: desc, updatedAt: nowText_() });
+      bumpMaster_();
+      return { ok: true, image: imageView_(readObj_(SH.CIMG, row)) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 순서 바꾸기: ids = 보여 줄 순서대로 이미지ID 목록 */
+function adm_campImageOrder(token, campId, ids) {
+  return run_(function () {
+    requireAdmin_(token);
+    ids = (ids || []).map(String);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const rows = {};
+      readAll_(SH.CIMG).forEach(function (x) { if (x.campId === campId) rows[x.id] = x; });
+      ids.forEach(function (id, i) {
+        const x = rows[id];
+        if (x && Number(x.order) !== i + 1) writeFields_(SH.CIMG, x._row, { order: String(i + 1) });
+      });
+      bumpMaster_();
+      return { ok: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+function adm_campImageDelete(token, id) {
+  return run_(function () {
+    requireAdmin_(token);
+    let fileId = '';
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.CIMG, 'id', String(id || ''));
+      if (!row) return { ok: true };
+      fileId = fileIdOf_(readObj_(SH.CIMG, row).file);
+      sheet_(SH.CIMG).deleteRow(row);
+      bumpMaster_();
+    } finally {
+      lock.releaseLock();
+    }
+    trashCampFile_(fileId);
+    return { ok: true };
+  });
+}
+
+/** 이미지 내용. full=false 면 목록용 (큰 파일은 드라이브 썸네일, 작은 결과는 캐시) */
+function adm_campImage(token, id, full) {
+  return run_(function () {
+    requireAdmin_(token);
+    const row = findRow_(SH.CIMG, 'id', String(id || ''));
+    if (!row) fail_('이미지를 찾을 수 없습니다.');
+    const o = readObj_(SH.CIMG, row), fid = fileIdOf_(o.file);
+    if (!fid) fail_('이미지 링크가 없습니다. camp_images 탭의 이미지 링크를 확인해 주세요.');
+    const ck = 'cim:' + fid;
+    if (!full) {
+      const hit = cache_().get(ck);
+      if (hit) {
+        const p = hit.split('|', 2);
+        return { ok: true, mime: p[0], thumb: p[1] === 't', data: hit.slice(p[0].length + p[1].length + 2), url: o.file };
+      }
+    }
+    let file;
+    try { file = DriveApp.getFileById(fid); } catch (e) { fail_('이미지 파일을 열 수 없습니다. 드라이브에서 지워졌는지 확인해 주세요.'); }
+    const size = file.getSize();
+    if (size > 15 * 1024 * 1024) fail_('파일이 너무 커서 화면에 표시할 수 없습니다. 드라이브에서 열어 주세요.');
+    let blob = null, thumb = false;
+    if (!full && size > 600 * 1024) { try { blob = file.getThumbnail(); thumb = !!blob; } catch (e) { blob = null; } }
+    if (!blob) blob = file.getBlob();
+    const mime = blob.getContentType() || 'image/jpeg';
+    if (!/^image\//.test(mime)) fail_('이미지 파일이 아닙니다.');
+    const data = Utilities.base64Encode(blob.getBytes());
+    if (!full && data.length < 90000) { try { cache_().put(ck, mime + '|' + (thumb ? 't' : 'f') + '|' + data, CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
+    return { ok: true, mime: mime, thumb: thumb, data: data, url: o.file };
+  });
+}
+
+// ── 노선 ──
+function routeRowObj_(campId, campName, code, status, memo, now) {
+  const g = splitCode_(code);
+  return {
+    id: newRid_('R'), campId: campId, campName: campName, code: code,
+    g1: g.g1, g2: g.g2, g3: g.g3, g4: g.g4, g5: g.g5,
+    status: status || RST.ON, memo: memo || '', createdAt: now, updatedAt: now
+  };
+}
+/** 여러 줄을 한 번에 추가 (잠금 안에서만 호출) */
+function appendObjs_(name, objs) {
+  if (!objs.length) return 0;
+  const c = cols_(name, true), sh = sheet_(name);
+  const rows = objs.map(function (obj) {
+    const arr = new Array(c.__w).fill('');
+    Object.keys(obj).forEach(function (k) { arr[c[k]] = safeText_(obj[k]); });
+    return arr;
+  });
+  const r = sh.getLastRow() + 1;
+  if (r + rows.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), rows.length + 500);
+  sh.getRange(r, 1, rows.length, c.__w).setNumberFormat('@').setValues(rows);
+  return r;
+}
+function campMap_() {
+  const m = {};
+  readAll_(SH.CAMPS).forEach(function (o) { if (o.id) m[o.id] = o; });
+  return m;
+}
+
+/** 노선 추가(id 없음) 또는 수정. 수정은 바꿀 항목만 보내도 된다: code, campId, status, memo */
+function adm_routeSave(token, f) {
+  return run_(function () {
+    requireAdmin_(token);
+    f = f || {};
+    if (f.status !== undefined && f.status !== RST.ON && f.status !== RST.OFF) fail_('사용여부는 사용 또는 중지만 됩니다.');
+    const memo = f.memo === undefined ? undefined : String(f.memo || '').trim();
+    if (memo && memo.length > 1000) fail_('메모가 너무 깁니다. (1000자 이내)');
+    const code = f.code === undefined ? undefined : checkCode_(f.code);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const camps = campMap_(), routes = readAll_(SH.ROUTES);
+      const dup = function (campId, cd, selfId) {
+        return routes.some(function (r) { return r.id !== selfId && r.campId === campId && normCode_(r.code) === cd; });
+      };
+      const now = nowText_();
+      let row;
+      if (!f.id) {
+        const camp = camps[f.campId];
+        if (!camp) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
+        if (!code) fail_('노선코드를 입력해 주세요.');
+        if (dup(camp.id, code, '')) fail_(camp.name + '에 이미 있는 노선코드입니다: ' + code);
+        row = appendObj_(SH.ROUTES, routeRowObj_(camp.id, camp.name, code, f.status, memo, now));
+      } else {
+        const o = routes.filter(function (r) { return r.id === f.id; })[0];
+        if (!o) fail_('노선을 찾을 수 없습니다. 시트에서 지워졌을 수 있습니다. 새로고침해 주세요.');
+        conflict_(f.seen, o);
+        const upd = {};
+        let campId = o.campId, cd = normCode_(o.code);
+        if (f.campId !== undefined && f.campId !== o.campId) {
+          const camp = camps[f.campId];
+          if (!camp) fail_('옮길 캠프를 찾을 수 없습니다.');
+          campId = upd.campId = camp.id; upd.campName = camp.name;
+        }
+        if (code !== undefined) {
+          cd = upd.code = code;
+          const g = splitCode_(code);
+          Object.keys(g).forEach(function (k) { upd[k] = g[k]; });
+        }
+        if (f.status !== undefined) upd.status = f.status;
+        if (memo !== undefined) upd.memo = memo;
+        if (dup(campId, cd, o.id)) fail_((camps[campId] ? camps[campId].name : '같은 캠프') + '에 이미 있는 노선코드입니다: ' + cd);
+        upd.updatedAt = now;
+        row = o._row;
+        writeFields_(SH.ROUTES, row, upd);
+      }
+      bumpMaster_();
+      return { ok: true, route: routeView_(readObj_(SH.ROUTES, row)) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 노선 여러 개 한 번에 추가. text = 줄바꿈·쉼표·띄어쓰기로 나눈 노선코드들 */
+function adm_routeBulkAdd(token, campId, text) {
+  return run_(function () {
+    requireAdmin_(token);
+    const list = String(text || '').split(/[\s,;]+/).map(normCode_).filter(function (x) { return x; });
+    if (!list.length) fail_('노선코드를 입력해 주세요.');
+    if (list.length > 500) fail_('한 번에 500개까지 추가할 수 있습니다.');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const camp = campMap_()[campId];
+      if (!camp) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
+      const have = {};
+      readAll_(SH.ROUTES).forEach(function (r) { if (r.campId === camp.id) have[normCode_(r.code)] = 1; });
+      const now = nowText_(), add = [], skipped = [];
+      list.forEach(function (cd) {
+        let bad = '';
+        try { checkCode_(cd); } catch (e) { bad = '사용할 수 없는 글자'; }
+        if (!bad && have[cd]) bad = '이미 있음';
+        if (bad) { skipped.push({ code: cd, reason: bad }); return; }
+        have[cd] = 1;
+        add.push(routeRowObj_(camp.id, camp.name, cd, RST.ON, '', now));
+      });
+      const r0 = appendObjs_(SH.ROUTES, add);
+      bumpMaster_();
+      const routes = add.map(function (x, i) { x._row = r0 + i; return routeView_(x); });
+      return { ok: true, routes: routes, skipped: skipped };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 여러 노선 사용/중지 */
+function adm_routeStatus(token, ids, status) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (status !== RST.ON && status !== RST.OFF) fail_('사용여부는 사용 또는 중지만 됩니다.');
+    const want = {};
+    (ids || []).forEach(function (id) { want[String(id)] = 1; });
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const now = nowText_(), done = [];
+      readAll_(SH.ROUTES).forEach(function (r) {
+        if (!want[r.id]) return;
+        if (r.status !== status) writeFields_(SH.ROUTES, r._row, { status: status, updatedAt: now });
+        r.status = status; r.updatedAt = now;
+        done.push(routeView_(r));
+      });
+      bumpMaster_();
+      return { ok: true, routes: done };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 노선 삭제 (여러 개 가능) */
+function adm_routeDelete(token, ids) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const want = {};
+    (ids || []).forEach(function (id) { want[String(id)] = 1; });
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const hit = readAll_(SH.ROUTES).filter(function (r) { return want[r.id]; });
+      hit.map(function (r) { return r._row; }).sort(function (p, q) { return q - p; })
+        .forEach(function (row) { sheet_(SH.ROUTES).deleteRow(row); });
+      if (hit.length) {
+        logAdmin_(a, '노선 삭제', hit.length + '개', hit.slice(0, 30).map(function (r) { return r.campName + ' ' + r.code; }).join(', '));
+      }
+      bumpMaster_();
+      return { ok: true, deleted: hit.map(function (r) { return r.id; }) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+// ── 시트를 직접 고쳤을 때 (onSheetEdit 에서 호출) ──
+let _campIdx = null, _routeList = null;
+function campIndex_() {
+  if (_campIdx) return _campIdx;
+  const idx = { byId: {}, byName: {}, count: {} };
+  readAll_(SH.CAMPS).forEach(function (o) {
+    if (!o.name) return;
+    const k = campKey_(o.name);
+    idx.count[k] = (idx.count[k] || 0) + 1;
+    if (o.id) { idx.byId[o.id] = o.name; if (!idx.byName[k]) idx.byName[k] = o.id; }
+  });
+  return (_campIdx = idx);
+}
+/** 캠프명(우선) 또는 캠프ID로 캠프 찾기 → { campId, campName } 또는 { err } */
+function resolveCamp_(o) {
+  const idx = campIndex_();
+  if (o.campName) {
+    const id = idx.byName[campKey_(o.campName)];
+    if (id) return { campId: id, campName: idx.byId[id] };
+    return { err: '없는 캠프명입니다. camps 탭에 있는 캠프명과 똑같이 입력해 주세요.' };
+  }
+  if (o.campId && idx.byId[o.campId] !== undefined) return { campId: o.campId, campName: idx.byId[o.campId] };
+  return { err: '캠프명을 입력해 주세요.' };
+}
+function putCells_(sh, c, row, upd) {
+  Object.keys(upd).forEach(function (k) { sh.getRange(row, c[k] + 1).setNumberFormat('@').setValue(safeText_(upd[k])); });
+}
+function putNote_(sh, c, row, k, msg, had) {
+  const cell = sh.getRange(row, c[k] + 1);
+  if (msg) cell.setNote(msg); else if (had !== false) cell.clearNote();
+}
+
+function fixCampRow_(sh, c, o) {
+  if (!o.id && !o.name) return;
+  const upd = {}, now = nowText_();
+  if (!o.id) { upd.id = newRid_('C'); if (!o.createdAt) upd.createdAt = now; }
+  const name = o.name.replace(/\s+/g, ' ');
+  if (name !== o.name) upd.name = name;
+  upd.updatedAt = now;
+  putCells_(sh, c, o._row, upd);
+  const n = campIndex_().count[campKey_(name)] || 0;
+  putNote_(sh, c, o._row, 'name', !name ? '캠프명을 입력해 주세요.' : n > 1 ? '같은 캠프명이 또 있습니다. 캠프명은 겹치지 않게 해 주세요.' : '');
+}
+
+function fixRouteRow_(sh, c, o) {
+  if (!o.id && !o.code && !o.campName && !o.campId) return;
+  const upd = {}, now = nowText_();
+  if (!o.id) { upd.id = newRid_('R'); if (!o.createdAt) upd.createdAt = now; }
+  const code = normCode_(o.code);
+  if (code !== o.code) upd.code = code;
+  const g = splitCode_(code);
+  Object.keys(g).forEach(function (k) { if (o[k] !== g[k]) upd[k] = g[k]; });
+  const st = /^(중지|n|no|x|off|미사용|사용안함|0)$/i.test(o.status) ? RST.OFF : RST.ON;
+  if (st !== o.status) upd.status = st;
+  const camp = resolveCamp_(o);
+  if (!camp.err) {
+    if (camp.campId !== o.campId) upd.campId = camp.campId;
+    if (camp.campName !== o.campName) upd.campName = camp.campName;
+  }
+  upd.updatedAt = now;
+  putCells_(sh, c, o._row, upd);
+  putNote_(sh, c, o._row, 'campName', camp.err || '');
+  let codeMsg = '';
+  if (!code) codeMsg = '노선코드를 입력해 주세요.';
+  else if (!/^[0-9A-Z가-힣_-]+$/.test(code) || code.length > 20) codeMsg = '노선코드에는 영문·숫자·한글·- 만, 20자 이내로 써 주세요.';
+  else if (!camp.err) {
+    if (!_routeList) _routeList = readAll_(SH.ROUTES);
+    const same = _routeList.some(function (r) { return r._row !== o._row && r.campId === camp.campId && normCode_(r.code) === code; });
+    if (same) codeMsg = '같은 캠프에 같은 노선코드가 또 있습니다.';
+  }
+  putNote_(sh, c, o._row, 'code', codeMsg);
+}
+
+function fixCampImageRow_(sh, c, o) {
+  if (!o.id && !o.file && !o.campName && !o.campId) return;
+  const upd = {}, now = nowText_();
+  if (!o.id) { upd.id = newRid_('I'); if (!o.createdAt) upd.createdAt = now; }
+  const camp = resolveCamp_(o);
+  if (!camp.err) {
+    if (camp.campId !== o.campId) upd.campId = camp.campId;
+    if (camp.campName !== o.campName) upd.campName = camp.campName;
+  }
+  if (o.order && !/^\d+$/.test(o.order)) upd.order = String(parseInt(o.order, 10) || '');
+  upd.updatedAt = now;
+  putCells_(sh, c, o._row, upd);
+  putNote_(sh, c, o._row, 'campName', camp.err || '');
+  putNote_(sh, c, o._row, 'file', fileIdOf_(o.file) ? '' : '드라이브 이미지 링크를 붙여 넣어 주세요.');
 }

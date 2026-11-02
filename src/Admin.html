@@ -200,6 +200,78 @@
   .co-row { display: grid; grid-template-columns: 170px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
   .co-row label { font-size: 12px; color: var(--sub); }
 
+  /* 노선관리 */
+  .rt-wrap { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .camp-side { background: #fff; border-radius: var(--radius); padding: 12px; position: sticky; top: 16px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; gap: 8px; }
+  .camp-list { overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+  .camp-item { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; border: 1px solid transparent; background: none; border-radius: 8px; padding: 9px 10px; }
+  .camp-item:hover { background: #f7f8fa; }
+  .camp-item.on { background: var(--brand-weak); border-color: #c9dbf8; }
+  .camp-item b { font-size: 14px; }
+  .camp-item small { color: var(--sub); font-size: 12px; }
+  .camp-item small em { font-style: normal; color: var(--brand); font-weight: 700; }
+  .camp-item span { color: var(--faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .camp-item.orphan b { color: var(--danger); }
+  .ch-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .ch-top h3 { margin: 0 auto 0 0; font-size: 18px; }
+  .kv2 { display: grid; grid-template-columns: 48px 1fr; gap: 6px 12px; font-size: 13px; }
+  .kv2 > span:nth-child(odd) { color: var(--sub); }
+  .kv2 em, .img-tile em { color: var(--faint); font-style: normal; }
+  .pre { white-space: pre-wrap; word-break: break-word; }
+  .maplink { margin-left: 6px; font-size: 12px; color: var(--brand); white-space: nowrap; }
+  .sec-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+  .sec-h h4 { margin: 0; }
+  .sec-h small { color: var(--sub); font-weight: 600; margin-left: 4px; }
+  .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .img-tile { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 0; overflow: hidden; text-align: left; display: flex; flex-direction: column; }
+  .img-tile:hover { border-color: #b8c2cc; }
+  .img-tile .ph { aspect-ratio: 4 / 3; background: var(--gray-weak); display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 12px; }
+  .img-tile .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .img-tile .ph i { font-style: normal; }
+  .img-tile span { padding: 6px 8px; font-size: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-word; }
+  .rfilters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .rfilters .inp { height: 34px; width: auto; min-width: 0; font-size: 13px; padding: 0 8px; }
+  .rfilters input.inp { width: 180px; }
+  .rbulk { display: flex; align-items: center; gap: 6px; background: var(--brand-weak); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .rbulk b { margin-right: auto; color: var(--brand); font-size: 13px; }
+  .rt-table { border: 1px solid var(--line); max-height: 62vh; }
+  .rt-table table { min-width: 720px; }
+  .rt-table th, .rt-table td { padding: 8px 10px; }
+  .rt-table th.ck, .rt-table td.ck { width: 34px; padding-right: 0; }
+  .rt-table td.g { color: var(--sub); }
+  .code, .rt-table td.g, .gchips b, .code-inp { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .5px; }
+  .rt-table tr.off td { color: var(--faint); }
+  .rt-table .memo-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .b-ron { background: var(--ok-weak); color: var(--ok); }
+  .b-roff { background: var(--gray-weak); color: var(--sub); }
+  .danger-t { color: var(--danger) !important; }
+  .gchips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: -4px 0 12px; }
+  .gchips span { background: var(--gray-weak); border-radius: 8px; padding: 6px 4px; text-align: center; }
+  .gchips small { display: block; font-size: 11px; color: var(--sub); }
+  .gchips b { font-size: 15px; word-break: break-all; }
+  table.mini { min-width: 0; font-size: 12px; }
+  table.mini th, table.mini td { padding: 5px 8px; }
+  table.mini tr.skip td { color: var(--faint); }
+  table.mini tr.skip td:first-child b { text-decoration: line-through; }
+  .prev-wrap { max-height: 240px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .ia-list { display: flex; flex-direction: column; gap: 8px; max-height: 55vh; overflow: auto; }
+  .ia-item { display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: start; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  .ia-item img { width: 96px; height: 72px; object-fit: cover; border-radius: 6px; }
+  .ia-item textarea { height: 52px; }
+  .ia-item small { color: var(--faint); font-size: 11px; }
+  .ia-item.done { opacity: .6; }
+  .ia-item .x { border: 0; background: none; font-size: 20px; color: var(--sub); line-height: 1; }
+  .iv-desc { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: #fff; }
+  .iv-desc textarea { height: 48px; flex: 1; }
+  .iv-desc .btn { height: 48px; }
+  .m-top { flex-wrap: wrap; }
+  .code-inp { font-size: 16px; text-transform: uppercase; }
+  @media (max-width: 900px) {
+    .rt-wrap { grid-template-columns: minmax(0, 1fr); }
+    .camp-side { position: static; max-height: 300px; }
+    .rfilters input.inp { width: 100%; }
+  }
+
   @media (max-width: 1100px) {
     .memo-wrap { grid-template-columns: 1fr; }
     .day-panel { position: static; }
@@ -247,7 +319,7 @@
     <nav class="nav">
       <a class="on" data-view="drivers">기사 정보관리</a>
       <a class="off">스케줄관리 <small>준비 중</small></a>
-      <a class="off">노선관리 <small>준비 중</small></a>
+      <a data-view="route">노선관리</a>
       <a class="off">정산관리 <small>준비 중</small></a>
       <a data-view="memo">업무스케줄</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
@@ -323,6 +395,22 @@
       <div class="empty hidden" id="bempty"></div>
     </div>
    </section>
+   <section id="view-route" class="hidden">
+    <div class="head">
+      <h2>노선관리</h2>
+      <div class="tools">
+        <button class="btn ghost" id="rtReload">새로고침</button>
+        <button class="btn" id="campNew">+ 캠프 추가</button>
+      </div>
+    </div>
+    <div class="rt-wrap">
+      <div class="camp-side">
+        <input class="inp" id="campQ" placeholder="캠프명·노선코드 검색" autocomplete="off">
+        <div class="camp-list" id="campList"></div>
+      </div>
+      <div id="campMain"></div>
+    </div>
+   </section>
   </main>
 </div>
 
@@ -395,6 +483,52 @@
     <div class="field"><label class="lb" for="pwNew">임시 비밀번호 (영문+숫자 8자 이상)</label><input class="inp" id="pwNew" autocomplete="off"></div>
     <div class="m-actions"><button type="button" class="btn ghost" id="pwCancel">취소</button><button class="btn" id="pwOk">지정</button></div>
   </form>
+</div>
+
+<!-- ───────────── 노선관리: 캠프 추가·수정 ───────────── -->
+<div class="modal hidden" id="campModal">
+  <form class="m-box" id="campForm" novalidate style="width:min(520px,100%)">
+    <h3 id="cmTitle">캠프 추가</h3>
+    <div class="field"><label class="lb" for="cmName">캠프명</label><input class="inp" id="cmName" maxlength="40" autocomplete="off"></div>
+    <div class="field"><label class="lb" for="cmAddr">주소</label><input class="inp" id="cmAddr" maxlength="200" autocomplete="off"></div>
+    <div class="field"><label class="lb" for="cmMemo">메모 (선택)</label><textarea class="inp" id="cmMemo" placeholder="출입 방법, 주차, 연락처 등"></textarea></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="cmCancel">닫기</button><button class="btn" id="cmSave">저장</button></div>
+  </form>
+</div>
+
+<!-- ───────────── 노선관리: 노선 추가·수정 ───────────── -->
+<div class="modal hidden" id="routeModal">
+  <form class="m-box" id="routeForm" novalidate style="width:min(560px,100%)">
+    <h3 id="rmTitle">노선</h3>
+    <div id="rmBody"></div>
+    <div class="m-actions"><button type="button" class="btn ghost danger-t" id="rmDel" style="margin-right:auto">삭제</button><button type="button" class="btn ghost" id="rmCancel">닫기</button><button class="btn" id="rmSave">저장</button></div>
+  </form>
+</div>
+
+<!-- ───────────── 노선관리: 참고 이미지 올리기 ───────────── -->
+<div class="modal hidden" id="imgAddModal">
+  <form class="m-box" id="imgAddForm" novalidate style="width:min(640px,100%)">
+    <h3>참고 이미지 추가</h3>
+    <div class="ia-list" id="iaList"></div>
+    <p style="margin:8px 0 0;color:var(--sub);font-size:12px">사진은 올리기 전에 자동으로 줄여서(최대 1600px) 빠르게 올립니다. 설명은 나중에 고칠 수 있습니다.</p>
+    <div class="m-actions"><span id="iaMsg" style="margin-right:auto;color:var(--sub);font-size:13px;align-self:center"></span><button type="button" class="btn ghost" id="iaCancel">닫기</button><button class="btn" id="iaSave">올리기</button></div>
+  </form>
+</div>
+<input type="file" id="imgFile" accept="image/*" multiple class="hidden">
+
+<!-- ───────────── 노선관리: 이미지 보기 ───────────── -->
+<div class="modal hidden" id="imgModal">
+  <div class="m-box wide">
+    <div class="m-top">
+      <b id="ivTitle"></b>
+      <button class="btn sm ghost" id="ivPrev" title="이전 이미지">◀</button><button class="btn sm ghost" id="ivNext" title="다음 이미지">▶</button>
+      <button class="btn sm ghost" id="ivLeft" title="순서를 앞으로">앞으로</button><button class="btn sm ghost" id="ivRight" title="순서를 뒤로">뒤로</button>
+      <a class="btn sm ghost" id="ivDrive" target="_blank" rel="noopener" style="line-height:30px;text-decoration:none">드라이브</a>
+      <button class="btn sm ghost danger-t" id="ivDel">삭제</button><button class="btn sm ghost" id="ivClose">닫기</button>
+    </div>
+    <div class="m-view" id="ivView"></div>
+    <div class="iv-desc"><textarea class="inp" id="ivDesc" placeholder="이미지 설명 (예: 정문 들어와서 왼쪽 2번 도크)"></textarea><button class="btn" id="ivSave" disabled>설명 저장</button></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -684,7 +818,9 @@
     $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
     $('#view-memo').classList.toggle('hidden', v !== 'memo');
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
+    $('#view-route').classList.toggle('hidden', v !== 'route');
     if (v === 'bib') loadBib();
+    if (v === 'route') loadRoutes();
     if (v === 'drivers' && !driversLoaded) { driversLoaded = true; loadList(); }
     if (v === 'memo') openMonth(memoMonth || null);
   }
@@ -1285,6 +1421,533 @@
       $('#coModal').classList.add('hidden'); toast('회사 정보를 저장했습니다.');
       if (bcur) openBib(bcur.app.id);
     }).catch(() => {}).finally(() => { b.disabled = false; });
+  });
+
+  // ───── 노선관리 (캠프 > 노선코드) ─────
+  const RT = { camps: [], routes: [], images: [] };
+  const ORPHAN = '__none__';            // 캠프가 지정되지 않은 노선 모음
+  const GK = ['g1', 'g2', 'g3', 'g4', 'g5'];
+  const CODE_RE = /^[0-9A-Z가-힣_-]+$/;
+  let curCamp = null, rsel = new Set(), rmEdit = null;
+  const rtf = { q: '', g1: '', g2: '', g3: '', g4: '', g5: '', status: '' };
+  const koSort = (a, b) => String(a || '').localeCompare(String(b || ''), 'ko', { numeric: true });
+  const normCode = (v) => String(v || '').replace(/\s+/g, '').toUpperCase();
+  /** 서버(splitCode_)와 같은 규칙: 110ABCD → 110/A/B/C/D, 110-A-B-C-D 는 - 기준 */
+  function splitCode(code) {
+    code = normCode(code);
+    let p;
+    if (code.includes('-')) {
+      p = code.split('-').filter(Boolean);
+      if (p.length > 5) p = p.slice(0, 4).concat([p.slice(4).join('-')]);
+    } else {
+      const m = code.match(/^(\d+)(.*)$/);
+      const head = m ? m[1] : code.charAt(0), rest = m ? m[2] : code.slice(1);
+      p = head ? [head].concat(rest.split('')) : [];
+      if (p.length > 5) p = p.slice(0, 4).concat([p.slice(4).join('')]);
+    }
+    while (p.length < 5) p.push('');
+    return { g1: p[0], g2: p[1], g3: p[2], g4: p[3], g5: p[4] };
+  }
+  const resetFilters = () => { Object.keys(rtf).forEach((k) => { rtf[k] = ''; }); };
+  const campById = (id) => RT.camps.find((c) => c.id === id);
+  function routesOf(id) {
+    if (id === ORPHAN) { const ids = new Set(RT.camps.map((c) => c.id)); return RT.routes.filter((r) => !ids.has(r.campId)); }
+    return RT.routes.filter((r) => r.campId === id);
+  }
+  const imagesOf = (id) => RT.images.filter((i) => i.campId === id)
+    .sort((a, b) => (a.order || 1e9) - (b.order || 1e9) || koSort(a.createdAt, b.createdAt));
+  const sortedCamps = () => RT.camps.slice().sort((a, b) => koSort(a.name, b.name));
+
+  function loadRoutes() {
+    if (!RT.camps.length) $('#campMain').innerHTML = '<div class="sec"><div class="spin"></div></div>';
+    return api('adm_routeAll').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images;
+      if (curCamp && curCamp !== ORPHAN && !campById(curCamp)) curCamp = null;
+      if (curCamp === ORPHAN && !routesOf(ORPHAN).length) curCamp = null;
+      if (!curCamp && RT.camps.length) curCamp = sortedCamps()[0].id;
+      renderCampList(); renderCampMain();
+    }).catch(() => {});
+  }
+  $('#rtReload').addEventListener('click', () => loadRoutes().then(() => toast('새로 불러왔습니다.')));
+
+  // 왼쪽 캠프 목록
+  function renderCampList() {
+    const q = normCode($('#campQ').value);
+    const items = sortedCamps().map((c) => ({ id: c.id, name: c.name, address: c.address, routes: routesOf(c.id), imgs: imagesOf(c.id).length }));
+    const orphan = routesOf(ORPHAN);
+    if (orphan.length) items.push({ id: ORPHAN, name: '캠프 미지정', address: '시트에서 캠프명을 확인해 주세요', routes: orphan, imgs: 0, orphan: true });
+    const shown = items.filter((it) => {
+      if (!q) return true;
+      it.hit = it.routes.filter((r) => r.code.includes(q)).length;
+      return normCode(it.name).includes(q) || it.hit;
+    });
+    $('#campList').innerHTML = shown.length ? shown.map((it) =>
+      '<button class="camp-item' + (it.id === curCamp ? ' on' : '') + (it.orphan ? ' orphan' : '') + '" data-camp="' + esc(it.id) + '">' +
+      '<b>' + esc(it.name) + '</b><small>노선 ' + it.routes.length + (it.orphan ? '' : ' · 이미지 ' + it.imgs) +
+      (q && it.hit ? ' · <em>노선 ' + it.hit + '개 일치</em>' : '') + '</small>' +
+      (it.address ? '<span>' + esc(it.address) + '</span>' : '') + '</button>').join('')
+      : '<div class="empty" style="padding:24px 8px">' + (RT.camps.length ? '검색 결과가 없습니다.' : '등록된 캠프가 없습니다.<br><b>+ 캠프 추가</b>로 시작하세요.') + '</div>';
+  }
+  $('#campQ').addEventListener('input', renderCampList);
+  $('#campList').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-camp]'); if (!b) return;
+    const id = b.dataset.camp, q = normCode($('#campQ').value);
+    if (id !== curCamp) { curCamp = id; resetFilters(); rsel.clear(); }
+    if (q && !normCode((campById(id) || {}).name).includes(q) && routesOf(id).some((r) => r.code.includes(q))) rtf.q = q;
+    renderCampList(); renderCampMain();
+    if (window.innerWidth <= 900) $('#campMain').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // 오른쪽: 캠프 정보 + 참고 이미지 + 노선
+  function renderCampMain() {
+    const m = $('#campMain');
+    if (!curCamp) {
+      m.innerHTML = '<div class="sec empty">' + (RT.camps.length ? '왼쪽에서 캠프를 고르세요.' : '아직 캠프가 없습니다. 오른쪽 위 <b>+ 캠프 추가</b>를 눌러 첫 캠프를 등록하세요.') + '</div>';
+      return;
+    }
+    const orphan = curCamp === ORPHAN;
+    const c = orphan ? { name: '캠프 미지정', address: '', memo: '' } : campById(curCamp);
+    const imgs = orphan ? [] : imagesOf(curCamp);
+    m.innerHTML =
+      '<div class="sec">' +
+        '<div class="ch-top"><h3>' + esc(c.name) + '</h3>' +
+          (orphan ? '' : '<button class="btn sm ghost" data-ract="camp-edit">캠프 정보 수정</button><button class="btn sm ghost danger-t" data-ract="camp-del">캠프 삭제</button>') + '</div>' +
+        (orphan ? '<p style="margin:0;color:var(--sub);font-size:13px">시트(routes 탭)에서 캠프명이 비었거나, camps 탭에 없는 캠프명을 쓴 노선입니다. 노선을 눌러 캠프를 지정해 주세요.</p>'
+          : '<div class="kv2"><span>주소</span><span>' + (c.address ? esc(c.address) + '<a class="maplink" target="_blank" rel="noopener" href="https://map.naver.com/p/search/' + encodeURIComponent(c.address) + '">지도 ↗</a>' : '<em>없음</em>') + '</span>' +
+            '<span>메모</span><span class="pre">' + (c.memo ? esc(c.memo) : '<em>없음</em>') + '</span></div>') +
+      '</div>' +
+      (orphan ? '' :
+      '<div class="sec"><div class="sec-h"><h4>참고 이미지<small>' + imgs.length + '장</small></h4><button class="btn sm" data-ract="img-add">+ 이미지 추가</button></div>' +
+        (imgs.length ? '<div class="img-grid">' + imgs.map((im) =>
+          '<button class="img-tile" data-img="' + esc(im.id) + '"><div class="ph" data-ph="' + esc(im.id) + '"><div class="spin" style="width:20px;height:20px"></div></div>' +
+          '<span>' + (im.desc ? esc(im.desc) : '<em>설명 없음</em>') + '</span></button>').join('') + '</div>'
+          : '<div class="no-memo">참고 이미지가 없습니다. 출입구, 주차 위치, 상차 위치 사진 등을 올려 두세요.</div>') +
+      '</div>') +
+      '<div class="sec"><div class="sec-h"><h4>노선<small id="rCount"></small></h4>' + (orphan ? '' : '<button class="btn sm" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
+        '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
+        '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th>메모</th><th>수정일시</th></tr></thead>' +
+        '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div>' +
+      '</div>';
+    renderFilters(); renderRoutes(); loadThumbs();
+  }
+
+  function renderFilters() {
+    const rs = routesOf(curCamp);
+    const sel = (k, label) => {
+      const vals = [...new Set(rs.map((r) => r[k]).filter(Boolean))].sort(koSort);
+      if (rtf[k] && !vals.includes(rtf[k])) rtf[k] = '';
+      return '<select class="inp" data-rf="' + k + '" aria-label="' + label + '"><option value="">' + label + ' 전체</option>' +
+        vals.map((v) => '<option value="' + esc(v) + '"' + (v === rtf[k] ? ' selected' : '') + '>' + esc(v) + '</option>').join('') + '</select>';
+    };
+    $('#rFilters').innerHTML = '<input class="inp" data-rf="q" placeholder="노선코드·메모 검색" value="' + esc(rtf.q) + '" autocomplete="off">' +
+      GK.map((k, i) => sel(k, '구분' + (i + 1))).join('') +
+      '<select class="inp" data-rf="status" aria-label="사용여부"><option value="">사용여부 전체</option>' +
+      ['사용', '중지'].map((v) => '<option' + (rtf.status === v ? ' selected' : '') + '>' + v + '</option>').join('') + '</select>' +
+      '<button class="btn sm ghost" data-ract="rf-reset" style="height:34px">초기화</button>';
+  }
+  function filteredRoutes() {
+    const q = rtf.q.trim().toUpperCase(), qc = normCode(q);
+    return routesOf(curCamp).filter((r) =>
+      (!q || r.code.includes(qc) || String(r.memo || '').toUpperCase().includes(q)) &&
+      GK.every((k) => !rtf[k] || r[k] === rtf[k]) && (!rtf.status || r.status === rtf.status)
+    ).sort((a, b) => koSort(a.code, b.code));
+  }
+  function renderRoutes() {
+    const all = routesOf(curCamp), list = filteredRoutes();
+    $('#rCount').textContent = list.length === all.length ? all.length + '개' : list.length + ' / ' + all.length + '개';
+    $('#rRows').innerHTML = list.map((r) =>
+      '<tr data-rid="' + esc(r.id) + '"' + (r.status === '중지' ? ' class="off"' : '') + '>' +
+      '<td class="ck"><input type="checkbox" data-rck="' + esc(r.id) + '"' + (rsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
+      '<td><b class="code">' + esc(r.code) + '</b></td>' + GK.map((k) => '<td class="g">' + esc(r[k]) + '</td>').join('') +
+      '<td><span class="badge ' + (r.status === '중지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' +
+      '<td class="sub memo-cell" title="' + esc(r.memo) + '">' + esc(r.memo) + '</td><td class="sub">' + esc(String(r.updatedAt || '').slice(0, 16)) + '</td></tr>').join('');
+    const em = $('#rEmpty');
+    em.classList.toggle('hidden', !!list.length);
+    em.innerHTML = all.length ? '조건에 맞는 노선이 없습니다.' : '등록된 노선이 없습니다. <b>+ 노선 추가</b>로 노선코드를 입력하세요.';
+    $('#rAll').checked = !!list.length && list.every((r) => rsel.has(r.id));
+    renderBulk();
+  }
+  function renderBulk() {
+    const have = new Set(RT.routes.map((r) => r.id));
+    rsel = new Set([...rsel].filter((id) => have.has(id)));
+    const b = $('#rBulk'); if (!b) return;
+    b.classList.toggle('hidden', !rsel.size);
+    b.innerHTML = '<b>' + rsel.size + '개 선택</b><button class="btn sm ok" data-ract="bulk-on">사용</button><button class="btn sm ghost" data-ract="bulk-off">중지</button>' +
+      '<button class="btn sm danger" data-ract="bulk-del">삭제</button><button class="btn sm ghost" data-ract="bulk-clear">선택 해제</button>';
+  }
+
+  $('#campMain').addEventListener('input', (e) => {
+    const f = e.target.closest('[data-rf]'); if (!f) return;
+    rtf[f.dataset.rf] = f.value; renderRoutes();
+  });
+  $('#campMain').addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.id === 'rAll') { filteredRoutes().forEach((r) => (t.checked ? rsel.add(r.id) : rsel.delete(r.id))); renderRoutes(); }
+    else if (t.dataset.rck) { t.checked ? rsel.add(t.dataset.rck) : rsel.delete(t.dataset.rck); $('#rAll').checked = filteredRoutes().every((r) => rsel.has(r.id)); renderBulk(); }
+  });
+  $('#campMain').addEventListener('click', (e) => {
+    if (e.target.closest('td.ck, th.ck')) return; // 체크박스 칸은 선택만
+    const tile = e.target.closest('[data-img]');
+    if (tile) return openViewer(tile.dataset.img);
+    const tr = e.target.closest('tr[data-rid]');
+    if (tr) return openRouteEdit(tr.dataset.rid);
+    const b = e.target.closest('[data-ract]'); if (!b) return;
+    const act = b.dataset.ract, c = campById(curCamp);
+    if (act === 'camp-edit') openCampModal(c);
+    else if (act === 'camp-del') deleteCamp(c);
+    else if (act === 'img-add') { iaFiles = []; $('#imgFile').click(); }
+    else if (act === 'route-add') openRouteAdd();
+    else if (act === 'rf-reset') { resetFilters(); renderFilters(); renderRoutes(); }
+    else if (act === 'bulk-clear') { rsel.clear(); renderRoutes(); }
+    else if (act === 'bulk-on' || act === 'bulk-off') {
+      const st = act === 'bulk-on' ? '사용' : '중지';
+      api('adm_routeStatus', [...rsel], st).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        r.routes.forEach(patchRoute); rsel.clear(); renderRoutes(); toast(r.routes.length + '개 노선을 ' + st + '(으)로 바꿨습니다.');
+      }).catch(() => {});
+    } else if (act === 'bulk-del') {
+      const n = rsel.size;
+      if (!confirm('선택한 노선 ' + n + '개를 삭제할까요?\n삭제하면 되돌릴 수 없습니다. 잠시 쓰지 않는 노선이면 "중지"를 권장합니다.')) return;
+      api('adm_routeDelete', [...rsel]).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        dropRoutes(r.deleted); rsel.clear(); renderCampList(); renderCampMain(); toast(r.deleted.length + '개 노선을 삭제했습니다.');
+      }).catch(() => {});
+    }
+  });
+  function patchRoute(r) {
+    const i = RT.routes.findIndex((x) => x.id === r.id);
+    if (i >= 0) RT.routes[i] = r; else RT.routes.push(r);
+  }
+  function dropRoutes(ids) { const s = new Set(ids); RT.routes = RT.routes.filter((r) => !s.has(r.id)); }
+
+  // 캠프 추가·수정·삭제
+  let cmEdit = null;
+  function openCampModal(c) {
+    cmEdit = c || null;
+    $('#cmTitle').textContent = c ? '캠프 정보 수정' : '캠프 추가';
+    $('#cmName').value = c ? c.name : ''; $('#cmAddr').value = c ? c.address : ''; $('#cmMemo').value = c ? c.memo : '';
+    $('#campModal').classList.remove('hidden'); $('#cmName').focus();
+  }
+  $('#campNew').addEventListener('click', () => openCampModal(null));
+  $('#cmCancel').addEventListener('click', () => $('#campModal').classList.add('hidden'));
+  $('#campForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = { name: $('#cmName').value.trim(), address: $('#cmAddr').value.trim(), memo: $('#cmMemo').value.trim() };
+    if (!f.name) { $('#cmName').focus(); return toast('캠프명을 입력해 주세요.'); }
+    if (cmEdit) { f.id = cmEdit.id; f.seen = cmEdit.updatedAt; }
+    const b = $('#cmSave'); b.disabled = true;
+    api('adm_campSave', f).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      const i = RT.camps.findIndex((x) => x.id === r.camp.id);
+      if (i >= 0) RT.camps[i] = r.camp; else RT.camps.push(r.camp);
+      if (!cmEdit) { curCamp = r.camp.id; resetFilters(); rsel.clear(); }
+      $('#campModal').classList.add('hidden');
+      renderCampList(); renderCampMain();
+      toast(cmEdit ? '캠프 정보를 저장했습니다.' : '캠프를 추가했습니다. 이제 노선을 추가하세요.');
+    }).catch(() => {}).finally(() => { b.disabled = false; });
+  });
+  function deleteCamp(c) {
+    const n = routesOf(c.id).length, ni = imagesOf(c.id).length;
+    if (n) return toast('노선이 ' + n + '개 있어 삭제할 수 없습니다. 노선을 먼저 지우거나 다른 캠프로 옮겨 주세요.');
+    if (!confirm('"' + c.name + '" 캠프를 삭제할까요?' + (ni ? '\n참고 이미지 ' + ni + '장도 함께 지워집니다.' : ''))) return;
+    api('adm_campDelete', c.id).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      RT.camps = RT.camps.filter((x) => x.id !== c.id); RT.images = RT.images.filter((x) => x.campId !== c.id);
+      curCamp = RT.camps.length ? sortedCamps()[0].id : null; resetFilters(); rsel.clear();
+      renderCampList(); renderCampMain(); toast('캠프를 삭제했습니다.');
+    }).catch(() => {});
+  }
+
+  // 노선 추가 (여러 개 한 번에)
+  function openRouteAdd() {
+    rmEdit = null;
+    $('#rmTitle').textContent = (campById(curCamp) || {}).name + ' · 노선 추가';
+    $('#rmBody').innerHTML = '<div class="field"><label class="lb" for="rmCodes">노선코드 — 여러 개는 줄바꿈, 쉼표, 띄어쓰기로 구분</label>' +
+      '<textarea class="inp code-inp" id="rmCodes" style="height:110px" placeholder="110ABCD&#10;110ABCE&#10;111ABCD" spellcheck="false"></textarea></div>' +
+      '<p style="margin:-4px 0 0;color:var(--sub);font-size:12px">구분1~5는 자동으로 나뉩니다: 앞쪽 숫자 = 구분1, 그 뒤 한 글자씩 구분2~5. 한 구분이 두 글자 이상이면 110-AB-C-D-E 처럼 - 로 나눠 쓰세요.</p>' +
+      '<div id="rmPrev"></div>';
+    $('#rmDel').classList.add('hidden'); $('#rmSave').textContent = '추가'; $('#rmSave').disabled = true;
+    $('#routeModal').classList.remove('hidden'); $('#rmCodes').focus();
+  }
+  function parseCodes() {
+    const have = new Set(routesOf(curCamp).map((r) => r.code)), seen = new Set();
+    return $('#rmCodes').value.split(/[\s,;]+/).map(normCode).filter(Boolean).map((cd) => {
+      let st = '';
+      if (!CODE_RE.test(cd) || cd.length > 20) st = '사용 불가';
+      else if (have.has(cd) || seen.has(cd)) st = '이미 있음';
+      seen.add(cd);
+      return { code: cd, st: st };
+    });
+  }
+  function rmPreview() {
+    const list = parseCodes(), ok = list.filter((x) => !x.st).length;
+    const dup = list.filter((x) => x.st === '이미 있음').length, bad = list.length - ok - dup;
+    $('#rmPrev').innerHTML = list.length ? '<div style="margin:10px 0 4px;font-size:13px"><b style="color:var(--brand)">추가 ' + ok + '개</b>' +
+      (dup ? ' · 이미 있음 ' + dup : '') + (bad ? ' · <span style="color:var(--danger)">사용 불가 ' + bad + '</span>' : '') + '</div>' +
+      '<div class="prev-wrap"><table class="mini"><thead><tr><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th></th></tr></thead><tbody>' +
+      list.slice(0, 300).map((x) => { const g = splitCode(x.code); return '<tr' + (x.st ? ' class="skip"' : '') + '><td><b class="code">' + esc(x.code) + '</b></td>' +
+        GK.map((k) => '<td class="code">' + esc(g[k]) + '</td>').join('') + '<td>' + (x.st || '추가') + '</td></tr>'; }).join('') +
+      '</tbody></table></div>' : '';
+    $('#rmSave').disabled = !ok;
+  }
+
+  // 노선 수정
+  function openRouteEdit(id) {
+    const r = RT.routes.find((x) => x.id === id); if (!r) return;
+    rmEdit = r;
+    const camps = sortedCamps(), known = !!campById(r.campId);
+    $('#rmTitle').textContent = '노선 수정';
+    $('#rmBody').innerHTML =
+      '<div class="field"><label class="lb" for="rmCode">노선코드</label><input class="inp code-inp" id="rmCode" value="' + esc(r.code) + '" autocomplete="off" spellcheck="false"></div>' +
+      '<div class="gchips" id="rmSplit"></div>' +
+      '<div class="field"><label class="lb" for="rmCamp">캠프 (바꾸면 그 캠프로 옮겨집니다)</label><select class="inp" id="rmCamp">' +
+        (known ? '' : '<option value="">(캠프 미지정)</option>') +
+        camps.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === r.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><span class="lb">사용여부</span><div class="radios">' + ['사용', '중지'].map((v) =>
+        '<label><input type="radio" name="rmSt" value="' + v + '"' + (r.status === v ? ' checked' : '') + '> ' + v + '</label>').join('') +
+        '<span style="color:var(--faint);font-size:12px">당분간 안 쓰는 노선은 삭제 대신 중지</span></div></div>' +
+      '<div class="field"><label class="lb" for="rmMemo">메모</label><textarea class="inp" id="rmMemo">' + esc(r.memo) + '</textarea></div>' +
+      '<div class="meta"><span>등록</span><span>' + esc(r.createdAt || '-') + '</span><span>수정</span><span>' + esc(r.updatedAt || '-') + '</span></div>';
+    $('#rmDel').classList.remove('hidden'); $('#rmSave').textContent = '저장'; $('#rmSave').disabled = false;
+    rmSplit();
+    $('#routeModal').classList.remove('hidden');
+  }
+  function rmSplit() {
+    const g = splitCode($('#rmCode').value);
+    $('#rmSplit').innerHTML = GK.map((k, i) => '<span><small>구분' + (i + 1) + '</small><b>' + (esc(g[k]) || '-') + '</b></span>').join('');
+  }
+  $('#rmBody').addEventListener('input', (e) => {
+    if (e.target.id === 'rmCode') rmSplit();
+    if (e.target.id === 'rmCodes') rmPreview();
+  });
+  $('#rmCancel').addEventListener('click', () => $('#routeModal').classList.add('hidden'));
+  $('#routeForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const b = $('#rmSave');
+    if (!rmEdit) {
+      const camp = curCamp, text = parseCodes().filter((x) => !x.st).map((x) => x.code).join('\n');
+      if (!text) return toast('추가할 노선코드가 없습니다.');
+      b.disabled = true;
+      return api('adm_routeBulkAdd', camp, text).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        r.routes.forEach(patchRoute);
+        $('#routeModal').classList.add('hidden');
+        renderCampList(); if (curCamp === camp) renderCampMain();
+        toast(r.routes.length + '개 노선을 추가했습니다.' + (r.skipped.length ? ' (' + r.skipped.length + '개는 이미 있어 건너뜀)' : ''));
+      }).catch(() => {}).finally(() => { b.disabled = false; });
+    }
+    const r0 = rmEdit, f = { id: r0.id, seen: r0.updatedAt };
+    const code = normCode($('#rmCode').value), camp = $('#rmCamp').value;
+    const st = ($('input[name="rmSt"]:checked') || {}).value, memo = $('#rmMemo').value.trim();
+    if (!code) return toast('노선코드를 입력해 주세요.');
+    if (!CODE_RE.test(code) || code.length > 20) return toast('노선코드에는 영문·숫자·한글·- 만, 20자 이내로 써 주세요.');
+    if (code !== r0.code) f.code = code;
+    if (camp && camp !== r0.campId) f.campId = camp;
+    if (!camp && !campById(r0.campId)) return toast('캠프를 골라 주세요.');
+    if (st && st !== r0.status) f.status = st;
+    if (memo !== (r0.memo || '')) f.memo = memo;
+    if (Object.keys(f).length === 2) { $('#routeModal').classList.add('hidden'); return; }
+    b.disabled = true;
+    api('adm_routeSave', f).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      patchRoute(r.route);
+      $('#routeModal').classList.add('hidden');
+      renderCampList(); renderCampMain();
+      toast(f.campId ? '"' + campById(f.campId).name + '" 캠프로 옮겼습니다.' : '저장했습니다.');
+    }).catch(() => {}).finally(() => { b.disabled = false; });
+  });
+  $('#rmDel').addEventListener('click', () => {
+    const r0 = rmEdit; if (!r0) return;
+    if (!confirm('노선 ' + r0.code + '을(를) 삭제할까요?\n되돌릴 수 없습니다. 잠시 쓰지 않는 노선이면 "중지"를 권장합니다.')) return;
+    api('adm_routeDelete', [r0.id]).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      dropRoutes(r.deleted); $('#routeModal').classList.add('hidden');
+      renderCampList(); renderCampMain(); toast('삭제했습니다.');
+    }).catch(() => {});
+  });
+
+  // 참고 이미지: 불러오기 (동시에 3장씩, 한 번 받은 것은 다시 받지 않음)
+  const imgCache = {}, imgPending = {}, imgQueue = [];
+  let imgActive = 0;
+  function pumpImg() {
+    while (imgActive < 3 && imgQueue.length) {
+      const j = imgQueue.shift(); imgActive++;
+      j.fn().then(j.res, j.rej).finally(() => { imgActive--; pumpImg(); });
+    }
+  }
+  const queued = (fn) => new Promise((res, rej) => { imgQueue.push({ fn, res, rej }); pumpImg(); });
+  function b64Url(b64, mime) {
+    const bin = atob(b64), arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([arr], { type: mime }));
+  }
+  function getImg(im, full) {
+    const key = im.fileId || im.id, have = imgCache[key];
+    if (have && (!full || !have.thumb)) return Promise.resolve(have);
+    const pk = key + (full ? ':f' : ':t');
+    if (imgPending[pk]) return imgPending[pk];
+    return (imgPending[pk] = queued(() => api('adm_campImage', im.id, !!full)).then((r) => {
+      delete imgPending[pk];
+      if (!r.ok) throw new Error(r.msg);
+      return (imgCache[key] = { src: b64Url(r.data, r.mime), thumb: !!r.thumb });
+    }, (e) => { delete imgPending[pk]; throw e; }));
+  }
+  function loadThumbs() {
+    $$('[data-ph]', $('#campMain')).forEach((ph) => {
+      const im = RT.images.find((x) => x.id === ph.dataset.ph); if (!im) return;
+      getImg(im, false).then((v) => { if (ph.isConnected) ph.innerHTML = '<img src="' + v.src + '" alt="" loading="lazy">'; })
+        .catch(() => { if (ph.isConnected) ph.innerHTML = '<i>불러오지 못함</i>'; });
+    });
+  }
+
+  // 참고 이미지: 올리기
+  let iaFiles = [], iaBusy = false;
+  function compressImage(file, max = 1600, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        const dataUrl = c.toDataURL('image/jpeg', quality);
+        resolve({ data: dataUrl.split(',')[1], mime: 'image/jpeg', preview: dataUrl });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없습니다. (jpg·png 사진을 골라 주세요)')); };
+      img.src = url;
+    });
+  }
+  $('#imgFile').addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    if (!files.length) return;
+    $('#imgAddModal').classList.remove('hidden'); renderIa();
+    for (const f of files) {
+      try { const c = await compressImage(f); iaFiles.push(Object.assign(c, { desc: '', name: f.name })); }
+      catch (err) { toast(f.name + ': ' + err.message); }
+      renderIa();
+    }
+  });
+  function renderIa() {
+    $('#iaList').innerHTML = (iaFiles.length ? iaFiles.map((x, i) =>
+      '<div class="ia-item' + (x.done ? ' done' : '') + '"><img src="' + x.preview + '" alt="">' +
+      '<div><textarea class="inp" data-ia="' + i + '" placeholder="이 사진 설명 (예: 정문 들어와서 왼쪽 2번 도크)"' + (x.done || iaBusy ? ' disabled' : '') + '>' + esc(x.desc) + '</textarea>' +
+      '<small>' + esc(x.name) + (x.done ? ' · 올림' : '') + (x.err ? ' · <b style="color:var(--danger)">' + esc(x.err) + '</b>' : '') + '</small></div>' +
+      (iaBusy || x.done ? '<span></span>' : '<button type="button" class="x" data-iarm="' + i + '" aria-label="빼기">×</button>') + '</div>').join('')
+      : '<div class="no-memo">사진을 준비하는 중…</div>') +
+      (iaBusy ? '' : '<button type="button" class="btn ghost sm" id="iaMore" style="align-self:flex-start">+ 사진 더 고르기</button>');
+    $('#iaSave').disabled = iaBusy || !iaFiles.some((x) => !x.done);
+  }
+  $('#iaList').addEventListener('input', (e) => { const t = e.target.closest('[data-ia]'); if (t) iaFiles[+t.dataset.ia].desc = t.value; });
+  $('#iaList').addEventListener('click', (e) => {
+    if (e.target.id === 'iaMore') return $('#imgFile').click();
+    const x = e.target.closest('[data-iarm]'); if (x) { iaFiles.splice(+x.dataset.iarm, 1); renderIa(); }
+  });
+  function closeIa() { if (iaBusy) return; $('#imgAddModal').classList.add('hidden'); iaFiles = []; }
+  $('#iaCancel').addEventListener('click', closeIa);
+  $('#imgAddForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (iaBusy) return;
+    const camp = curCamp, todo = iaFiles.filter((x) => !x.done);
+    if (!todo.length) return;
+    iaBusy = true; renderIa();
+    let n = 0, okN = 0;
+    for (const x of todo) {
+      $('#iaMsg').textContent = (++n) + ' / ' + todo.length + ' 올리는 중…';
+      try {
+        const r = await api('adm_campImageAdd', camp, { data: x.data, mime: x.mime, desc: x.desc.trim() });
+        if (!r.ok) { x.err = r.msg; }
+        else { x.done = true; x.err = ''; okN++; RT.images.push(r.image); imgCache[r.image.fileId || r.image.id] = { src: x.preview, thumb: false }; }
+      } catch (err) { x.err = '연결 오류'; }
+      renderIa();
+    }
+    iaBusy = false; $('#iaMsg').textContent = '';
+    renderCampList(); if (curCamp === camp) renderCampMain();
+    const failed = iaFiles.filter((x) => !x.done).length;
+    if (!failed) { closeIa(); toast(okN + '장을 올렸습니다.'); }
+    else { renderIa(); toast(failed + '장을 올리지 못했습니다. 다시 "올리기"를 눌러 주세요.'); }
+  });
+
+  // 참고 이미지: 크게 보기 · 설명 고치기 · 순서 · 삭제
+  let ivList = [], ivIdx = 0;
+  function openViewer(id) {
+    ivList = imagesOf(curCamp); ivIdx = ivList.findIndex((x) => x.id === id);
+    if (ivIdx < 0) return;
+    $('#imgModal').classList.remove('hidden'); showIv();
+  }
+  const ivDirty = () => ivList[ivIdx] && $('#ivDesc').value.trim() !== (ivList[ivIdx].desc || '');
+  function showIv() {
+    const im = ivList[ivIdx];
+    $('#ivTitle').textContent = (ivIdx + 1) + ' / ' + ivList.length;
+    $('#ivDesc').value = im.desc || ''; $('#ivSave').disabled = true;
+    $('#ivDrive').href = im.url || '#';
+    $('#ivPrev').disabled = $('#ivLeft').disabled = ivIdx === 0;
+    $('#ivNext').disabled = $('#ivRight').disabled = ivIdx === ivList.length - 1;
+    const v = $('#ivView'); v.innerHTML = '<div class="spin"></div>';
+    getImg(im, true).then((x) => { if (ivList[ivIdx] === im) v.innerHTML = '<img src="' + x.src + '" alt="">'; })
+      .catch((e) => { if (ivList[ivIdx] === im) v.innerHTML = '<p style="color:#fff;padding:24px">' + esc(e.message && e.message !== 'EXPIRED' ? e.message : '불러오지 못했습니다.') + '</p>'; });
+  }
+  function ivGo(d) {
+    const j = ivIdx + d; if (j < 0 || j >= ivList.length) return;
+    if (ivDirty() && !confirm('설명을 저장하지 않았습니다. 넘어갈까요?')) return;
+    ivIdx = j; showIv();
+  }
+  function closeIv() {
+    if (ivDirty() && !confirm('설명을 저장하지 않았습니다. 닫을까요?')) return;
+    $('#imgModal').classList.add('hidden'); $('#ivView').innerHTML = '';
+  }
+  $('#ivPrev').addEventListener('click', () => ivGo(-1));
+  $('#ivNext').addEventListener('click', () => ivGo(1));
+  $('#ivClose').addEventListener('click', closeIv);
+  $('#ivDesc').addEventListener('input', () => { $('#ivSave').disabled = !ivDirty(); });
+  $('#ivSave').addEventListener('click', () => {
+    const im = ivList[ivIdx], b = $('#ivSave'); b.disabled = true;
+    api('adm_campImageSave', im.id, { desc: $('#ivDesc').value.trim(), seen: im.updatedAt }).then((r) => {
+      if (!r.ok) { b.disabled = false; return toast(r.msg); }
+      Object.assign(im, r.image); $('#ivDesc').value = im.desc; renderCampMain(); toast('설명을 저장했습니다.');
+    }).catch(() => { b.disabled = false; });
+  });
+  function ivMove(d) {
+    const j = ivIdx + d; if (j < 0 || j >= ivList.length) return;
+    const list = ivList.slice(), t = list[ivIdx]; list[ivIdx] = list[j]; list[j] = t;
+    api('adm_campImageOrder', curCamp, list.map((x) => x.id)).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      list.forEach((x, i) => { x.order = i + 1; });
+      ivList = list; ivIdx = j;
+      $('#ivTitle').textContent = (ivIdx + 1) + ' / ' + ivList.length;
+      $('#ivPrev').disabled = $('#ivLeft').disabled = ivIdx === 0;
+      $('#ivNext').disabled = $('#ivRight').disabled = ivIdx === ivList.length - 1;
+      renderCampMain();
+    }).catch(() => {});
+  }
+  $('#ivLeft').addEventListener('click', () => ivMove(-1));
+  $('#ivRight').addEventListener('click', () => ivMove(1));
+  $('#ivDel').addEventListener('click', () => {
+    const im = ivList[ivIdx];
+    if (!confirm('이 이미지를 삭제할까요? (드라이브 파일은 휴지통으로 옮겨집니다)')) return;
+    api('adm_campImageDelete', im.id).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      RT.images = RT.images.filter((x) => x.id !== im.id);
+      ivList.splice(ivIdx, 1);
+      renderCampList(); renderCampMain(); toast('삭제했습니다.');
+      if (!ivList.length) { $('#imgModal').classList.add('hidden'); $('#ivView').innerHTML = ''; return; }
+      ivIdx = Math.min(ivIdx, ivList.length - 1); showIv();
+    }).catch(() => {});
+  });
+
+  // 노선관리 창: Esc 로 닫기, 이미지 보기에서 ← → 로 넘기기
+  document.addEventListener('keydown', (e) => {
+    const vis = (id) => !$(id).classList.contains('hidden');
+    if (vis('#imgModal')) {
+      if (e.key === 'Escape') closeIv();
+      else if (e.target.tagName !== 'TEXTAREA' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) ivGo(e.key === 'ArrowLeft' ? -1 : 1);
+      return;
+    }
+    if (e.key !== 'Escape') return;
+    if (vis('#imgAddModal')) closeIa();
+    else if (vis('#routeModal')) $('#routeModal').classList.add('hidden');
+    else if (vis('#campModal')) $('#campModal').classList.add('hidden');
   });
 
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
