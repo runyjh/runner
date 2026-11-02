@@ -496,8 +496,41 @@ function fmtPhoneDigits_(d) {
 function maskRrn_(d) { return d.slice(0, 6) + '-' + d.charAt(6) + '******'; }
 function maskLicense_(d) { return d.slice(0, 2) + '-' + d.slice(2, 4) + '-******-' + d.slice(10, 12); }
 function maskAccount_(d) { return new Array(Math.max(0, d.length - 4) + 1).join('*') + d.slice(-4); }
+/**
+ * 겹치지 않는 아이디 만들기.
+ * 예전에는 '시각(초) + 두 자리 난수' 라서 시트에 여러 줄을 한 번에 붙여넣으면 같은 초에 같은 번호가 나올 수 있었다
+ * (실제로 두 기사가 같은 기사ID를 받아 한 명을 고르면 둘 다 선택되는 문제가 생김).
+ * 이제는 이번 실행에서 이미 쓴 번호를 기억하고, 기사ID는 시트에 이미 있는 번호와도 대조한다.
+ */
+var _usedIds = {};
+var _driverIdSet = null; // 이번 실행에서 drivers 탭 기사ID 목록 (처음 한 번만 읽음)
+function uniqId_(prefix, taken) {
+  for (let i = 0; i < 50; i++) {
+    const id = prefix + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
+    if (_usedIds[id] || (taken && taken[id])) continue;
+    _usedIds[id] = 1;
+    return id;
+  }
+  // 같은 초에 900개 가까이 만든 극단적인 경우: 순번을 붙인다
+  let n = 1, id;
+  do { id = prefix + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + 'X' + (n++); } while (_usedIds[id] || (taken && taken[id]));
+  _usedIds[id] = 1;
+  return id;
+}
+function driverIdSet_() {
+  if (_driverIdSet) return _driverIdSet;
+  const set = {};
+  try {
+    const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS), last = sh.getLastRow();
+    if (last >= 2) sh.getRange(2, c.id + 1, last - 1, 1).getValues().forEach(function (v) { const s = str_(v[0]); if (s) set[s] = 1; });
+  } catch (e) { /* 시트가 없으면 빈 목록 */ }
+  return (_driverIdSet = set);
+}
 function newDriverId_() {
-  return 'D' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10);
+  const set = driverIdSet_();
+  const id = uniqId_('D', set);
+  set[id] = 1;
+  return id;
 }
 
 // ───────────────────────── 시트 읽기·쓰기 (부분 읽기) ─────────────────────────
@@ -1302,9 +1335,17 @@ function detailOf_(o) {
 /** 기사 전체 목록: 시트를 한 번에 읽는다 (호출 1회) */
 function adm_listDrivers(token) {
   return run_(function () {
-    requireAdmin_(token);
+    const a = requireAdmin_(token);
     const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS), last = sh.getLastRow();
-    const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
+    let rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
+    // 기사ID가 겹친 줄이 있으면 먼저 고친다 (겹치면 한 명을 고를 때 다른 기사도 같이 선택됨)
+    let repaired = [];
+    const seen = {};
+    if (rows.some(function (v) { const id = str_(v[c.id]); if (!id) return false; if (seen[id]) return true; seen[id] = 1; return false; })) {
+      repaired = repairDriverIds_(a);
+      const l2 = sh.getLastRow();
+      rows = l2 >= 2 ? sh.getRange(2, 1, l2 - 1, c.__w).getValues() : [];
+    }
     const keys = Object.keys(D), list = [], counts = { all: 0 };
     [ST.PENDING, ST.ACTIVE, ST.REJECTED, ST.STOPPED].forEach(function (k) { counts[k] = 0; });
     rows.forEach(function (v) {
@@ -1315,9 +1356,78 @@ function adm_listDrivers(token) {
       counts.all++;
       if (counts[o.status] !== undefined) counts[o.status]++;
     });
-    list.sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0; });
-    return { ok: true, rows: list, counts: counts };
+    list.sort(function (p, q) { return p.createdAt < q.createdAt ? 1 : p.createdAt > q.createdAt ? -1 : 0; });
+    return { ok: true, rows: list, counts: counts, repaired: repaired };
   });
+}
+
+/**
+ * 겹친 기사ID 고치기 (잠금 안에서 다시 읽어 처리)
+ * - 같은 ID 중 위쪽(먼저 있던) 줄은 그대로 두고, 아래쪽 줄에 새 ID를 준다.
+ * - 스케줄 DB 의 행ID 가 그 ID 이고 이름이 아래쪽 기사와 같으면 새 ID로 옮긴다. 배번호 신청도 이름으로 같이 옮긴다.
+ * - 그 ID 로 열린 로그인은 누구 것인지 알 수 없으므로 해제한다 (다시 로그인하면 됨).
+ * 반환: [{ name, oldId, newId }]
+ */
+function repairDriverIds_(a) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  const out = [];
+  try {
+    _driverIdSet = null;
+    const all = readAll_(SH.DRIVERS);
+    const first = {}, moves = [];
+    all.forEach(function (o) {
+      if (!o.id) return;
+      if (!first[o.id]) { first[o.id] = o; return; }
+      moves.push(o);
+    });
+    if (!moves.length) return out;
+    const dupIds = {};
+    moves.forEach(function (o) {
+      const nid = newDriverId_();
+      writeFields_(SH.DRIVERS, o._row, { id: nid, updatedAt: nowText_() });
+      dupIds[o.id] = 1;
+      forgetDriver_(o); forgetDriver_(first[o.id]);
+      out.push({ name: o.name, loginId: o.loginId, oldId: o.id, newId: nid, keptName: first[o.id].name });
+    });
+    const byOldName = {};
+    out.forEach(function (m) { byOldName[m.oldId + '|' + m.name] = m.newId; });
+
+    // 배번호 신청 (이름 사본으로 주인을 가린다)
+    try {
+      readAll_(SH.BIB).forEach(function (b) {
+        const nid = byOldName[b.driverId + '|' + b.name];
+        if (nid) writeFields_(SH.BIB, b._row, { driverId: nid });
+      });
+    } catch (e) { /* 탭이 없으면 건너뜀 */ }
+
+    // 스케줄 DB 행ID
+    let schMoved = 0;
+    try {
+      if (props_().SCH_DB_ID) {
+        const ssh = schSheet_(), h = schHeader_(true), sl = ssh.getLastRow();
+        if (sl >= 2) {
+          ssh.getRange(2, 1, sl - 1, 5).getValues().forEach(function (f, i) {
+            const nid = byOldName[str_(f[h.fixed['행ID']]) + '|' + str_(f[h.fixed['이름']])];
+            if (nid) { ssh.getRange(i + 2, h.fixed['행ID'] + 1).setNumberFormat('@').setValue(nid); schMoved++; }
+          });
+        }
+      }
+    } catch (e) { /* 스케줄 DB 를 못 열면 건너뜀 */ }
+
+    // 겹친 ID 로 열린 로그인 해제
+    const ss = readAll_(SH.SESSIONS).filter(function (x) { return dupIds[x.driverId]; });
+    ss.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
+      .forEach(function (r) { sheet_(SH.SESSIONS).deleteRow(r); });
+    if (ss.length) cache_().removeAll(ss.map(function (x) { return 'ss:' + x.tokenHash; }));
+
+    logAdmin_(a, '기사ID 중복 정리', out.length + '명',
+      out.map(function (m) { return m.name + ' ' + m.oldId + '→' + m.newId + ' (' + m.keptName + ' 은 그대로)'; }).join(', ') +
+      (schMoved ? ' · 스케줄 ' + schMoved + '줄 이동' : '') + (ss.length ? ' · 로그인 ' + ss.length + '건 해제' : ''));
+    return out;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function adm_getDriver(token, id) {
@@ -2423,7 +2533,7 @@ function testCrypto() {
  * - 캠프명은 camps 탭이 기준. routes·camp_images 의 캠프명 칸은 보기 편하라고 같이 적어 두는 사본이다.
  */
 function newRid_(prefix) {
-  return prefix + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
+  return uniqId_(prefix);
 }
 function campKey_(v) { return str_(v).replace(/\s+/g, '').toUpperCase(); }
 /** 노선코드 정리: 공백 제거, 영문 대문자 */

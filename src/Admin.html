@@ -817,6 +817,7 @@
     return api('adm_listDrivers').then((r) => {
       if (!r.ok) return toast(r.msg);
       all = r.rows; counts = r.counts;
+      if (r.repaired && r.repaired.length) toast('겹친 기사ID를 고쳤습니다: ' + r.repaired.map((m) => m.name + '(' + m.keptName + '와 겹침)').join(', ') + ' · 새 ID를 받았습니다.');
       if (!keepSel && filter === '전체' && counts['승인대기'] > 0) filter = '승인대기';
       renderTabs(); renderRows();
     }).catch(() => {});
