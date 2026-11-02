@@ -38,7 +38,7 @@ const CFG = {
 };
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
-const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions' };
+const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -77,9 +77,29 @@ const D_NOTES = {
 // sessions 시트 열 정의 (로그인 기록). 만료일시를 지금보다 이전으로 고치면 그 기기는 로그아웃됩니다.
 const S = { tokenHash: '토큰 해시', driverId: '기사ID', createdAt: '생성일시', expiresAt: '만료일시', auto: '자동로그인' };
 
+// admins 시트 (관리자 계정). 관리자는 시트에서 직접 추가하고 비밀번호 재설정 칸으로 비밀번호를 정한다.
+const AST = { ACTIVE: '사용', STOPPED: '정지' };
+const A = {
+  id: '관리자ID', loginId: '아이디', name: '이름', status: '상태', pwReset: '비밀번호 재설정',
+  createdAt: '생성일시', pwChangedAt: '비밀번호 변경일시', lastLoginAt: '마지막 로그인', memo: '메모',
+  pwHash: '비밀번호 해시', pwSalt: '비밀번호 솔트'
+};
+const A_NOTES = {
+  loginId: '관리자 로그인 아이디. 새 줄에 아이디·이름·비밀번호 재설정을 입력하면 관리자가 추가됩니다.',
+  status: '사용 / 정지. 정지하면 바로 로그인할 수 없습니다.',
+  pwReset: '비밀번호(영문+숫자 8~30자)를 입력하면 바로 적용되고 이 칸은 비워집니다.'
+};
+// admin_log 시트 (관리자 작업 기록: 개인정보 열람·수정 등). 자동으로 쌓이며 지우지 않는 것을 권장
+const L = { at: '시각', admin: '관리자', action: '작업', target: '대상', detail: '내용' };
+
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
 SCHEMA[SH.SESSIONS] = S;
+SCHEMA[SH.ADMINS] = A;
+SCHEMA[SH.ALOG] = L;
+const HIDDEN = {};
+HIDDEN[SH.DRIVERS] = D_HIDDEN;
+HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
 
 const DOCS = {
   qual: { col: 'docQual', label: '화물운송종사자격증' },
@@ -89,8 +109,14 @@ const DOCS = {
 };
 
 // ───────────────────────── 웹앱 진입점 ─────────────────────────
-function doGet() {
+function doGet(e) {
   // 템플릿 평가 없이 파일을 그대로 내보내 첫 화면 응답을 빠르게 한다.
+  // 웹앱 주소 뒤에 ?page=admin 을 붙이면 관리자 화면
+  if (e && e.parameter && e.parameter.page === 'admin') {
+    return HtmlService.createHtmlOutputFromFile('Admin')
+      .setTitle('러너 올인원 관리자')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('러너 올인원')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
@@ -130,6 +156,7 @@ function setup() {
 function ensureColumns() {
   Object.keys(SCHEMA).forEach(function (name) {
     const def = SCHEMA[name];
+    if (!ss_().getSheetByName(name)) ss_().insertSheet(name);
     const sh = sheet_(name);
     const lastCol = Math.max(sh.getLastColumn(), 1);
     let head = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
@@ -149,15 +176,20 @@ function ensureColumns() {
     clearHeadCache_(name);
     const c = cols_(name, true);
 
+    (HIDDEN[name] || []).forEach(function (k) { sh.hideColumns(c[k] + 1); });
     if (name === SH.DRIVERS) {
       sh.setFrozenColumns(Math.max(c.loginId, c.name) + 1 <= 5 ? Math.max(c.loginId, c.name) + 1 : 0);
-      D_HIDDEN.forEach(function (k) { sh.hideColumns(c[k] + 1); });
       const rule = SpreadsheetApp.newDataValidation()
         .requireValueInList([ST.PENDING, ST.ACTIVE, ST.REJECTED, ST.STOPPED], true).build();
       sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
       Object.keys(D_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(D_NOTES[k]); });
       sh.getRange(1, c.pwReset + 1).setBackground('#fff4e5');
-    } else {
+    } else if (name === SH.ADMINS) {
+      const rule = SpreadsheetApp.newDataValidation().requireValueInList([AST.ACTIVE, AST.STOPPED], true).build();
+      sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
+      Object.keys(A_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(A_NOTES[k]); });
+      sh.getRange(1, c.pwReset + 1).setBackground('#fff4e5');
+    } else if (name === SH.SESSIONS) {
       sh.getRange(1, c.expiresAt + 1).setNote('지금보다 이전 시각으로 고치면 해당 기기는 로그아웃됩니다.');
     }
   });
@@ -245,7 +277,7 @@ function clearHeadCache_(name) { delete _cols[name]; cache_().remove('hc:' + nam
 function run_(fn) {
   try { return fn(); }
   catch (err) {
-    if (err && err.userMsg) return { ok: false, msg: err.userMsg };
+    if (err && err.userMsg) return err.code ? { ok: false, code: err.code, msg: err.userMsg } : { ok: false, msg: err.userMsg };
     console.error(err && err.stack ? err.stack : err);
     return { ok: false, msg: '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' };
   }
@@ -798,7 +830,7 @@ function onSheetEdit(e) {
   if (!e || !e.range) return;
   const sh = e.range.getSheet(), name = sh.getName();
   if (name === TOOLS.SHEET) { onToolsEdit_(e, sh); return; }
-  if (!SCHEMA[name]) return;
+  if (!SCHEMA[name] || name === SH.ALOG) return;
   _sheets[name] = sh;
   _ss = sh.getParent();
   const r0 = e.range.getRow(), n = e.range.getNumRows();
@@ -817,7 +849,8 @@ function onSheetEdit(e) {
       const o = { _row: start + i };
       Object.keys(SCHEMA[name]).forEach(function (k) { o[k] = str_(v[c[k]]); });
       if (name === SH.DRIVERS) fixDriverRow_(sh, c, o);
-      else cache_().remove('ss:' + o.tokenHash);
+      else if (name === SH.ADMINS) fixAdminRow_(sh, c, o);
+      else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
     });
   } finally {
     lock.releaseLock();
@@ -887,6 +920,324 @@ function fixDriverRow_(sh, c, o) {
 
   forgetDriver_(o);
   if (upd.loginId) forgetDriver_({ loginId: upd.loginId });
+}
+
+// ───────────────────────── 관리자 : 계정 / 로그인 ─────────────────────────
+function newAdminId_() {
+  return 'A' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10);
+}
+function expired_() {
+  const e = new Error('로그인이 만료되었습니다. 다시 로그인해 주세요.');
+  e.userMsg = e.message; e.code = 'EXPIRED';
+  throw e;
+}
+function adminByLogin_(loginId) {
+  let row = findRow_(SH.ADMINS, 'loginId', loginId);
+  if (!row) {
+    const c = cols_(SH.ADMINS), sh = sheet_(SH.ADMINS), last = sh.getLastRow();
+    if (last >= 2) {
+      const cell = sh.getRange(2, c.loginId + 1, last - 1, 1)
+        .createTextFinder(loginId).matchEntireCell(true).matchCase(false).findNext();
+      row = cell ? cell.getRow() : 0;
+    }
+  }
+  return row ? readObj_(SH.ADMINS, row) : null;
+}
+/** 관리자 요약 (10분 캐시, admins 시트를 고치면 즉시 삭제) */
+function adminInfo_(id) {
+  const key = 'av:' + id, hit = cache_().get(key);
+  if (hit) return JSON.parse(hit);
+  const row = findRow_(SH.ADMINS, 'id', id);
+  if (!row) return null;
+  const o = readObj_(SH.ADMINS, row);
+  const info = { id: o.id, name: o.name, loginId: o.loginId.toLowerCase(), status: o.status, pwChangedAt: toMs_(o.pwChangedAt) };
+  cache_().put(key, JSON.stringify(info), 600);
+  return info;
+}
+/** 모든 관리자 API 의 첫 줄: 로그인 확인 */
+function requireAdmin_(token) {
+  const s = getSession_(token);
+  if (!s || String(s.d).charAt(0) !== 'A') expired_();
+  const a = adminInfo_(s.d);
+  if (!a || a.status !== AST.ACTIVE || s.c < a.pwChangedAt) expired_();
+  return a;
+}
+/** 관리자 작업 기록 (개인정보 열람·수정 추적용) */
+function logAdmin_(a, action, target, detail) {
+  try {
+    sheet_(SH.ALOG).appendRow([nowText_(), a.name + ' (' + a.loginId + ')', action, target || '', detail || '']);
+  } catch (e) { console.error(e); }
+}
+
+function adm_login(loginId, password, auto) {
+  return run_(function () {
+    const id = normLoginId_(loginId);
+    if (!password) fail_('비밀번호를 입력해 주세요.');
+    const fk = 'alf:' + id;
+    const fails = Number(cache_().get(fk) || 0);
+    if (fails >= CFG.LOGIN_MAX_FAIL) fail_('로그인 실패가 반복되어 15분간 잠겼습니다. 잠시 후 다시 시도해 주세요.');
+    const o = adminByLogin_(id);
+    if (!o || !checkPassword_(String(password), o)) {
+      cache_().put(fk, String(fails + 1), 900);
+      fail_('아이디 또는 비밀번호가 맞지 않습니다.');
+    }
+    cache_().remove(fk);
+    if (o.status !== AST.ACTIVE) fail_('사용이 중지된 관리자 계정입니다.');
+    const s = createSession_(o.id, auto === true);
+    writeFields_(SH.ADMINS, o._row, { lastLoginAt: nowText_() });
+    return { ok: true, token: s.token, admin: { name: o.name, loginId: o.loginId.toLowerCase() } };
+  });
+}
+function adm_check(token) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    return { ok: true, admin: { name: a.name, loginId: a.loginId } };
+  });
+}
+function adm_logout(token) { return api_logout(token); }
+
+/** admins 시트를 직접 고쳤을 때: 아이디 정리, 관리자ID·생성일시 자동, 비밀번호 적용 */
+function fixAdminRow_(sh, c, o) {
+  if (!o.id && !o.loginId && !o.name) return;
+  const upd = {};
+  const set = function (k, v) { if (o[k] !== v) upd[k] = v; };
+  const lid = o.loginId.toLowerCase();
+  set('loginId', lid);
+  if (!o.id && lid) { set('id', newAdminId_()); if (!o.createdAt) set('createdAt', nowText_()); }
+  if (!o.status) set('status', AST.ACTIVE);
+  let note = '';
+  if (o.pwReset) {
+    if (pwValid_(o.pwReset)) {
+      const pf = passwordFields_(o.pwReset);
+      Object.keys(pf).forEach(function (k) { upd[k] = pf[k]; });
+    } else note = '적용 안 됨: 영문과 숫자를 포함해 8~30자로 입력해 주세요.';
+    upd.pwReset = '';
+  }
+  Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(upd[k]); });
+  const cell = sh.getRange(o._row, c.pwReset + 1);
+  if (note) cell.setNote(note); else if (o.pwReset) cell.clearNote();
+  if (o.id) cache_().remove('av:' + o.id);
+  if (upd.id) cache_().remove('av:' + upd.id);
+}
+
+// ───────────────────────── 관리자 : 기사 정보관리 ─────────────────────────
+const D_EDIT_LABEL = {
+  loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', address: '주소',
+  qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
+  maxLoad: '최대적재량', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
+  rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호'
+};
+const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
+
+function docsOf_(o) {
+  const out = {};
+  Object.keys(DOCS).forEach(function (k) { out[k] = !!o[DOCS[k].col]; });
+  return out;
+}
+/** 목록용 요약 */
+function listRow_(o) {
+  return {
+    id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
+    createdAt: o.createdAt, approvedAt: o.approvedAt, carName: o.carName, carYear: o.carYear,
+    docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
+  };
+}
+/** 행 내용 지문: 화면이 불러온 뒤 시트나 다른 관리자가 고쳤는지 확인하는 용도 */
+function rev_(o) {
+  return sha256b64_(Object.keys(D).map(function (k) { return k === 'pwReset' ? '' : o[k]; }).join('\u0001')).slice(0, 16);
+}
+/** 상세용 (민감정보는 가린 값만) */
+function detailOf_(o) {
+  const out = listRow_(o);
+  ['birthDate', 'address', 'qualDate', 'qualNo', 'licenseType', 'maxLoad', 'bankName', 'accountHolder',
+    'updatedAt', 'pwChangedAt', 'docFolder'].forEach(function (k) { out[k] = o[k]; });
+  out.rrn = o.rrn; out.licenseNo = o.licenseNo; out.account = o.account;
+  out.has = { rrn: !!o.rrnEnc, licenseNo: !!o.licenseNoEnc, account: !!o.accountEnc };
+  out.rev = rev_(o);
+  return out;
+}
+
+/** 기사 전체 목록: 시트를 한 번에 읽는다 (호출 1회) */
+function adm_listDrivers(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS), last = sh.getLastRow();
+    const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
+    const keys = Object.keys(D), list = [], counts = { all: 0 };
+    [ST.PENDING, ST.ACTIVE, ST.REJECTED, ST.STOPPED].forEach(function (k) { counts[k] = 0; });
+    rows.forEach(function (v) {
+      const o = {};
+      keys.forEach(function (k) { o[k] = str_(v[c[k]]); });
+      if (!o.id && !o.loginId) return;
+      list.push(listRow_(o));
+      counts.all++;
+      if (counts[o.status] !== undefined) counts[o.status]++;
+    });
+    list.sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0; });
+    return { ok: true, rows: list, counts: counts };
+  });
+}
+
+function adm_getDriver(token, id) {
+  return run_(function () {
+    requireAdmin_(token);
+    const o = driverById_(String(id || ''));
+    if (!o) fail_('기사를 찾을 수 없습니다. 목록을 새로고침해 주세요.');
+    return { ok: true, driver: detailOf_(o) };
+  });
+}
+
+/** 주민등록번호·운전면허번호·계좌번호 전체 보기 (기록 남김) */
+function adm_reveal(token, id, field) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!SENSITIVE[field]) fail_('알 수 없는 항목입니다.');
+    const o = driverById_(String(id || ''));
+    if (!o) fail_('기사를 찾을 수 없습니다.');
+    const v = decrypt_(o[SENSITIVE[field]]);
+    logAdmin_(a, '개인정보 열람', o.name + ' (' + o.id + ')', D_EDIT_LABEL[field]);
+    return { ok: true, value: v };
+  });
+}
+
+/**
+ * 기사 정보 수정
+ * @param changes  바뀐 항목만 { key: 값 }. 민감정보(rrn/licenseNo/account)는 새 전체 번호.
+ * @param seenRev 화면이 불러온 시점의 행 지문 (그 뒤 다른 곳에서 고쳤으면 거절)
+ */
+function adm_updateDriver(token, id, changes, seenRev) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    changes = changes || {};
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const o = driverById_(String(id || ''));
+      if (!o) fail_('기사를 찾을 수 없습니다. 목록을 새로고침해 주세요.');
+      if (seenRev && String(seenRev) !== rev_(o)) {
+        fail_('다른 곳(시트 또는 다른 관리자)에서 먼저 수정되었습니다. 새로고침 후 다시 수정해 주세요.');
+      }
+      const f = {}, changed = [];
+      const opt = function (v, label, max) {
+        const s = String(v == null ? '' : v).trim();
+        if (s.length > (max || 200)) fail_(label + '이(가) 너무 깁니다.');
+        return s;
+      };
+      Object.keys(changes).forEach(function (k) {
+        if (!D_EDIT_LABEL[k]) return;
+        const v = changes[k];
+        switch (k) {
+          case 'loginId': {
+            const lid = normLoginId_(v);
+            if (lid !== o.loginId.toLowerCase()) {
+              const other = driverByLogin_(lid);
+              if (other && other.id !== o.id) fail_('이미 다른 기사가 쓰는 쿠팡플렉스 아이디입니다.');
+            }
+            f.loginId = lid; break;
+          }
+          case 'name': f.name = req_(v, '이름', 30); break;
+          case 'phone': f.phone = fmtPhone_(v); break;
+          case 'status':
+            if ([ST.PENDING, ST.ACTIVE, ST.REJECTED, ST.STOPPED].indexOf(v) < 0) fail_('상태 값을 확인해 주세요.');
+            f.status = v;
+            if (v === ST.ACTIVE && !o.approvedAt) f.approvedAt = nowText_();
+            break;
+          case 'qualDate':
+            f.qualDate = opt(v, '자격 취득일', 10);
+            if (f.qualDate && !/^\d{4}-\d{2}-\d{2}$/.test(f.qualDate)) fail_('자격 취득일을 확인해 주세요.');
+            break;
+          case 'licenseType':
+            f.licenseType = opt(v, '면허 종류', 20);
+            if (f.licenseType && LICENSE_TYPES.indexOf(f.licenseType) < 0) fail_('운전면허 종류를 확인해 주세요.');
+            break;
+          case 'carYear':
+            f.carYear = opt(v, '연식', 4);
+            if (f.carYear && !/^(19|20)\d{2}$/.test(f.carYear)) fail_('연식을 확인해 주세요.');
+            break;
+          case 'maxLoad':
+            f.maxLoad = opt(v, '최대적재량', 6);
+            if (f.maxLoad && !/^\d{1,6}$/.test(f.maxLoad)) fail_('최대적재량은 kg 단위 숫자로 입력해 주세요.');
+            break;
+          case 'rrn': {
+            const p = parseRrn_(v);
+            const idx = blindIndex_('rrn', p.digits);
+            const dupRow = findRow_(SH.DRIVERS, 'rrnIndex', idx);
+            if (dupRow && dupRow !== o._row) fail_('같은 주민등록번호로 등록된 다른 기사가 있습니다.');
+            f.rrnEnc = encrypt_(p.digits.replace(/(\d{6})(\d{7})/, '$1-$2'));
+            f.rrnIndex = idx; f.birthDate = p.birth; f.rrn = maskRrn_(p.digits);
+            break;
+          }
+          case 'licenseNo': {
+            const d = digits_(v);
+            if (d.length !== 12) fail_('운전면허번호 12자리를 확인해 주세요.');
+            f.licenseNoEnc = encrypt_(d.replace(/(\d{2})(\d{2})(\d{6})(\d{2})/, '$1-$2-$3-$4'));
+            f.licenseNo = maskLicense_(d);
+            break;
+          }
+          case 'account': {
+            const d = digits_(v);
+            if (d.length < 8 || d.length > 16) fail_('계좌번호(숫자 8~16자리)를 확인해 주세요.');
+            f.accountEnc = encrypt_(d); f.account = maskAccount_(d);
+            break;
+          }
+          case 'memo': f.memo = opt(v, '관리자 메모', 2000); break;
+          case 'address': f.address = opt(v, '주소', 200); break;
+          case 'qualNo': f.qualNo = opt(v, '자격증 번호', 30); break;
+          case 'carName': f.carName = opt(v, '차명', 40); break;
+          case 'bankName': f.bankName = opt(v, '은행명', 20); break;
+          case 'accountHolder': f.accountHolder = opt(v, '예금주', 30); break;
+        }
+        changed.push(D_EDIT_LABEL[k]);
+      });
+      if (!changed.length) return { ok: true, driver: detailOf_(o) };
+      f.updatedAt = nowText_();
+      writeFields_(SH.DRIVERS, o._row, f);
+      forgetDriver_(o);
+      if (f.loginId) forgetDriver_({ loginId: f.loginId });
+      logAdmin_(a, '기사 정보 수정', o.name + ' (' + o.id + ')', changed.join(', ') +
+        (f.status ? ' → ' + f.status : ''));
+      const fresh = readObj_(SH.DRIVERS, o._row);
+      return { ok: true, driver: detailOf_(fresh) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 임시 비밀번호 지정 → 기사는 다음 로그인 때 직접 변경 */
+function adm_setTempPassword(token, id, password) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const pw = checkPw_(password);
+    const o = driverById_(String(id || ''));
+    if (!o) fail_('기사를 찾을 수 없습니다.');
+    const f = passwordFields_(pw);
+    f.pwMustChange = 'Y';
+    f.updatedAt = f.pwChangedAt;
+    writeFields_(SH.DRIVERS, o._row, f);
+    forgetDriver_(o);
+    logAdmin_(a, '임시 비밀번호 지정', o.name + ' (' + o.id + ')', '');
+    return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, o._row)) };
+  });
+}
+
+/** 서류 이미지·PDF 를 화면에 보여주기 위해 내려준다 (관리자가 드라이브 권한이 없어도 볼 수 있게) */
+function adm_getDoc(token, id, kind) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!DOCS[kind]) fail_('알 수 없는 서류입니다.');
+    const o = driverById_(String(id || ''));
+    if (!o) fail_('기사를 찾을 수 없습니다.');
+    const url = o[DOCS[kind].col];
+    const m = String(url || '').match(/\/d\/([A-Za-z0-9_-]{10,})/) || String(url || '').match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+    if (!m) fail_('등록된 ' + DOCS[kind].label + ' 파일이 없습니다.');
+    let file;
+    try { file = DriveApp.getFileById(m[1]); } catch (e) { fail_('파일을 열 수 없습니다. 드라이브에서 지워졌는지 확인해 주세요.'); }
+    if (file.getSize() > 15 * 1024 * 1024) fail_('파일이 너무 커서 화면에 표시할 수 없습니다. 드라이브에서 열어 주세요.');
+    const blob = file.getBlob();
+    logAdmin_(a, '서류 열람', o.name + ' (' + o.id + ')', DOCS[kind].label);
+    return { ok: true, mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()), name: file.getName(), url: url };
+  });
 }
 
 // ───────────────────────── 서류 일괄 연결 ─────────────────────────

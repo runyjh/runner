@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --ink: #191f28; --sub: #6b7684; --faint: #8b95a1; --line: #e5e8eb;
+    --brand: #1b64da; --brand-weak: #e8f0fd; --danger: #e5484d; --danger-weak: #fdecec;
+    --ok: #12a150; --ok-weak: #e7f6ee; --warn: #c27c0e; --warn-weak: #fdf3e2; --gray-weak: #f2f4f6;
+    --radius: 12px; --side: 220px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); height: 100%;
+    font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    font-size: 14px; line-height: 1.5; }
+  button { font: inherit; cursor: pointer; }
+  input, select, textarea { font: inherit; color: var(--ink); }
+  .hidden { display: none !important; }
+
+  /* 로그인 */
+  #login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .login-card { width: 100%; max-width: 380px; background: var(--card); border-radius: 16px; padding: 32px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .login-card h1 { margin: 0 0 4px; font-size: 22px; }
+  .login-card p { margin: 0 0 24px; color: var(--sub); }
+
+  .field { margin-bottom: 12px; }
+  .lb { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+  .inp { width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: #fff; outline: none; }
+  textarea.inp { height: 84px; padding: 8px 12px; resize: vertical; }
+  .inp:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+  .inp[readonly] { background: var(--gray-weak); color: var(--sub); }
+  .inp.dirty { border-color: var(--warn); background: #fffdf7; }
+  .btn { height: 40px; border: 0; border-radius: 8px; padding: 0 16px; background: var(--brand); color: #fff; font-weight: 600; white-space: nowrap; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.block { width: 100%; height: 46px; font-size: 15px; }
+  .btn.ghost { background: var(--gray-weak); color: var(--ink); }
+  .btn.sm { height: 30px; padding: 0 10px; font-size: 12px; font-weight: 600; }
+  .btn.ok { background: var(--ok); } .btn.danger { background: var(--danger); }
+  .check { display: flex; align-items: center; gap: 6px; color: var(--sub); margin: 4px 0 16px; cursor: pointer; }
+
+  /* 레이아웃 */
+  #app { display: grid; grid-template-columns: var(--side) 1fr; min-height: 100vh; }
+  .side { background: #fff; border-right: 1px solid var(--line); padding: 20px 12px; position: sticky; top: 0; height: 100vh; }
+  .side .logo { font-weight: 800; font-size: 16px; padding: 0 8px 18px; }
+  .side .logo span { color: var(--brand); }
+  .nav a { display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-radius: 8px; color: var(--sub); text-decoration: none; margin-bottom: 2px; }
+  .nav a.on { background: var(--brand-weak); color: var(--brand); font-weight: 700; }
+  .nav a.off { color: #b0b8c1; cursor: default; }
+  .nav a small { font-size: 11px; }
+  .side .me { position: absolute; left: 12px; right: 12px; bottom: 16px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
+  .side .me b { color: var(--ink); display: block; font-size: 13px; }
+  .side .me a { color: var(--sub); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px 28px; min-width: 0; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .head h2 { margin: 0; font-size: 20px; }
+  .tools { display: flex; gap: 8px; }
+  .search { width: 260px; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; color: var(--sub); }
+  .tab b { margin-left: 4px; color: var(--ink); }
+  .tab.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand); }
+  .tab.on b { color: var(--brand); }
+  .tab.alert b { color: var(--danger); }
+
+  .table-wrap { background: #fff; border-radius: var(--radius); overflow: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-size: 12px; color: var(--sub); font-weight: 600; background: #fafbfc; position: sticky; top: 0; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: #f9fafb; }
+  tbody tr.sel { background: var(--brand-weak); }
+  td.sub { color: var(--sub); }
+  .empty { padding: 48px; text-align: center; color: var(--sub); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .b-승인대기 { background: var(--warn-weak); color: var(--warn); }
+  .b-승인 { background: var(--ok-weak); color: var(--ok); }
+  .b-반려 { background: var(--danger-weak); color: var(--danger); }
+  .b-정지 { background: var(--gray-weak); color: var(--sub); }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--danger-weak); color: var(--danger); margin-left: 4px; }
+  .dots { letter-spacing: 2px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .dot.on { background: var(--ok); }
+
+  /* 상세 패널 */
+  .shade { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 20; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--bg); z-index: 21;
+    display: flex; flex-direction: column; box-shadow: -4px 0 24px rgba(0,0,0,.08); }
+  .d-head { background: #fff; padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .d-head h3 { margin: 0; font-size: 18px; }
+  .d-head .x { margin-left: auto; border: 0; background: none; font-size: 22px; color: var(--sub); }
+  .d-body { flex: 1; overflow: auto; padding: 16px 20px 24px; }
+  .d-foot { background: #fff; padding: 12px 20px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+  .d-foot .msg { color: var(--sub); font-size: 12px; margin-right: auto; }
+  .sec { background: #fff; border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .sec h4 { margin: 0 0 12px; font-size: 14px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .grid2 .full { grid-column: 1 / -1; }
+  .status-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .st { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 7px 12px; color: var(--sub); }
+  .st.on { font-weight: 700; color: var(--ink); border-color: var(--ink); }
+  .sens { display: flex; gap: 6px; }
+  .sens .inp { flex: 1; }
+  .docs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .doc { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .doc span { font-size: 13px; }
+  .doc em { font-style: normal; font-size: 12px; color: var(--faint); }
+  .meta { font-size: 12px; color: var(--sub); display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .warnbox { background: var(--warn-weak); color: #8a5a00; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+
+  /* 모달 */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .m-box { background: #fff; border-radius: 14px; width: min(420px, 100%); padding: 20px; }
+  .m-box.wide { width: min(900px, 100%); height: min(90vh, 900px); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .m-box h3 { margin: 0 0 12px; font-size: 16px; }
+  .m-top { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .m-top b { margin-right: auto; }
+  .m-view { flex: 1; background: #2b2f33; display: flex; align-items: center; justify-content: center; overflow: auto; }
+  .m-view img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .m-view iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+  .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(25,31,40,.92); color: #fff;
+    padding: 10px 16px; border-radius: 10px; z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+  .toast.on { opacity: 1; }
+  .spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--brand-weak); border-top-color: var(--brand); animation: sp .8s linear infinite; margin: 0 auto; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+
+  @media (max-width: 820px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
+    .side { position: static; height: auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px; overflow-x: auto; }
+    .side .logo { padding: 0 8px 0 0; white-space: nowrap; }
+    .nav { display: flex; gap: 4px; }
+    .nav a { white-space: nowrap; }
+    .nav a small { display: none; }
+    .side .me { position: static; border: 0; padding: 0 0 0 8px; white-space: nowrap; }
+    main { padding: 16px 12px; }
+    .search { width: 100%; }
+    .tools { width: 100%; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ───────────── 관리자 로그인 ───────────── -->
+<section id="login" class="hidden">
+  <form class="login-card" id="loginForm" novalidate>
+    <h1>러너 올인원 관리자</h1>
+    <p>관리자 계정으로 로그인하세요.</p>
+    <div class="field"><label class="lb" for="lgId">아이디</label><input class="inp" id="lgId" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+    <div class="field"><label class="lb" for="lgPw">비밀번호</label><input class="inp" id="lgPw" type="password" autocomplete="current-password"></div>
+    <label class="check"><input type="checkbox" id="lgAuto"> 이 PC에서 로그인 유지</label>
+    <button class="btn block" id="lgBtn" type="submit">로그인</button>
+  </form>
+</section>
+
+<!-- ───────────── 관리자 화면 ───────────── -->
+<div id="app" class="hidden">
+  <aside class="side">
+    <div class="logo">러너 <span>올인원</span></div>
+    <nav class="nav">
+      <a class="on">기사 정보관리</a>
+      <a class="off">스케줄관리 <small>준비 중</small></a>
+      <a class="off">노선관리 <small>준비 중</small></a>
+      <a class="off">정산관리 <small>준비 중</small></a>
+      <a class="off">업무스케줄 <small>준비 중</small></a>
+      <a class="off">러너 매출·매입 <small>준비 중</small></a>
+      <a class="off">배번호 관리 <small>준비 중</small></a>
+    </nav>
+    <div class="me"><b id="meName">관리자</b><a id="logoutBtn">로그아웃</a></div>
+  </aside>
+
+  <main>
+    <div class="head">
+      <h2>기사 정보관리</h2>
+      <div class="tools">
+        <input class="inp search" id="q" placeholder="이름, 아이디, 연락처, 차명 검색">
+        <button class="btn ghost" id="reloadBtn" title="시트의 최신 내용 불러오기">새로고침</button>
+      </div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>이름</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty hidden" id="empty"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ───────────── 기사 상세 ───────────── -->
+<div class="shade hidden" id="shade"></div>
+<aside class="drawer hidden" id="drawer">
+  <div class="d-head"><h3 id="dTitle">기사</h3><span id="dBadge"></span><button class="x" id="dClose" aria-label="닫기">×</button></div>
+  <div class="d-body" id="dBody"><div style="padding:40px"><div class="spin"></div></div></div>
+  <div class="d-foot">
+    <span class="msg" id="dMsg">바뀐 항목은 주황색으로 표시됩니다.</span>
+    <button class="btn ghost" id="dReset" disabled>되돌리기</button>
+    <button class="btn" id="dSave" disabled>저장</button>
+  </div>
+</aside>
+
+<!-- ───────────── 서류 보기 ───────────── -->
+<div class="modal hidden" id="docModal">
+  <div class="m-box wide">
+    <div class="m-top"><b id="docTitle">서류</b><a class="btn sm ghost" id="docDrive" target="_blank" rel="noopener">드라이브에서 열기</a><button class="btn sm ghost" id="docClose">닫기</button></div>
+    <div class="m-view" id="docView"></div>
+  </div>
+</div>
+
+<!-- ───────────── 임시 비밀번호 ───────────── -->
+<div class="modal hidden" id="pwModal">
+  <form class="m-box" id="pwForm" novalidate>
+    <h3>임시 비밀번호 지정</h3>
+    <p style="margin:0 0 12px;color:var(--sub);font-size:13px">기사님은 이 비밀번호로 로그인한 뒤 새 비밀번호를 직접 정하게 됩니다. 기존 로그인은 모두 해제됩니다.</p>
+    <div class="field"><label class="lb" for="pwNew">임시 비밀번호 (영문+숫자 8자 이상)</label><input class="inp" id="pwNew" autocomplete="off"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="pwCancel">취소</button><button class="btn" id="pwOk">지정</button></div>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, el) => (el || document).querySelector(s);
+  const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+  const TOKEN = 'runner.admin.token';
+  const STATUSES = ['승인대기', '승인', '반려', '정지'];
+  const DOCS = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };
+  const LICENSE_TYPES = ['1종 대형', '1종 보통', '2종 보통', '특수 대형견인', '특수 소형견인'];
+  const BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크',
+    'SC제일은행', '한국씨티은행', '우체국', '새마을금고', '신협', '수협은행', 'KDB산업은행', '부산은행', 'iM뱅크(대구)', '경남은행',
+    '광주은행', '전북은행', '제주은행', '저축은행'];
+
+  // ───── 공통 ─────
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get() { try { return localStorage.getItem(TOKEN) || sessionStorage.getItem(TOKEN); } catch (e) { return null; } },
+    set(v, persist) { try { (persist ? localStorage : sessionStorage).setItem(TOKEN, v); } catch (e) {} },
+    del() { try { localStorage.removeItem(TOKEN); sessionStorage.removeItem(TOKEN); } catch (e) {} }
+  };
+  let toastTimer;
+  function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3000); }
+  const call = (fn, ...args) => new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+  /** 관리자 API 호출: 로그인 만료면 로그인 화면으로 */
+  async function api(fn, ...args) {
+    let r;
+    try { r = await call(fn, store.get(), ...args); }
+    catch (e) { toast('연결이 원활하지 않습니다. 잠시 후 다시 시도해 주세요.'); throw e; }
+    if (r && r.code === 'EXPIRED') { store.del(); showLogin(); toast(r.msg); throw new Error('EXPIRED'); }
+    return r;
+  }
+
+  // ───── 로그인 ─────
+  function showLogin() { $('#app').classList.add('hidden'); closeDrawer(true); $('#login').classList.remove('hidden'); $('#lgId').focus(); }
+  function showApp(admin) {
+    $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+    $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
+    loadList();
+  }
+  $('#loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = $('#lgId').value.trim(), pw = $('#lgPw').value, auto = $('#lgAuto').checked;
+    if (!id || !pw) return toast('아이디와 비밀번호를 입력해 주세요.');
+    const b = $('#lgBtn'); b.disabled = true;
+    call('adm_login', id, pw, auto).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      store.set(r.token, auto); $('#lgPw').value = '';
+      showApp(r.admin);
+    }).catch(() => toast('연결이 원활하지 않습니다.')).finally(() => { b.disabled = false; });
+  });
+  $('#logoutBtn').addEventListener('click', () => {
+    const t = store.get(); store.del(); showLogin();
+    if (t) call('adm_logout', t).catch(() => {});
+  });
+
+  // ───── 목록 ─────
+  let all = [], counts = {}, filter = '전체', selectedId = '';
+  function loadList(keepSel) {
+    $('#rows').innerHTML = '<tr><td colspan="8"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
+    return api('adm_listDrivers').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      all = r.rows; counts = r.counts;
+      if (!keepSel && filter === '전체' && counts['승인대기'] > 0) filter = '승인대기';
+      renderTabs(); renderRows();
+    }).catch(() => {});
+  }
+  function renderTabs() {
+    const items = [['전체', counts.all || 0]].concat(STATUSES.map((s) => [s, counts[s] || 0]));
+    $('#tabs').innerHTML = items.map(([k, n]) =>
+      '<button class="tab' + (k === filter ? ' on' : '') + (k === '승인대기' && n ? ' alert' : '') + '" data-f="' + k + '">' + k + '<b>' + n + '</b></button>').join('');
+  }
+  $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; filter = b.dataset.f; renderTabs(); renderRows(); });
+  $('#q').addEventListener('input', () => renderRows());
+  $('#reloadBtn').addEventListener('click', () => loadList(true));
+
+  function visibleRows() {
+    const q = $('#q').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+    return all.filter((r) => {
+      if (filter !== '전체' && r.status !== filter) return false;
+      if (!q) return true;
+      return [r.name, r.loginId, r.carName].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
+        (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
+    });
+  }
+  function renderRows() {
+    const list = visibleRows();
+    $('#empty').classList.toggle('hidden', list.length > 0);
+    $('#empty').textContent = all.length ? '조건에 맞는 기사가 없습니다.' : '등록된 기사가 없습니다.';
+    $('#rows').innerHTML = list.map((r) => {
+      const dots = Object.keys(DOCS).map((k) => '<i class="dot' + (r.docs[k] ? ' on' : '') + '" title="' + DOCS[k] + '"></i>').join(' ');
+      const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw ? '<span class="tag">비밀번호 없음</span>' : '');
+      return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
+        '<td><b>' + esc(r.name) + '</b></td><td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
+        '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
+        '<td class="sub">' + esc([r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
+        '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
+    }).join('');
+  }
+  $('#rows').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr && tr.dataset.id) openDrawer(tr.dataset.id); });
+
+  // ───── 상세 ─────
+  let cur = null, dirty = {};
+  const opt = (list, v) => '<option value="">선택</option>' + list.map((x) => '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>').join('') +
+    (v && list.indexOf(v) < 0 ? '<option selected>' + esc(v) + '</option>' : '');
+  const fld = (key, label, val, extra) => '<div class="field' + (extra && extra.full ? ' full' : '') + '"><label class="lb">' + label + '</label>' +
+    (extra && extra.select ? '<select class="inp" data-k="' + key + '">' + opt(extra.select, val) + '</select>'
+      : extra && extra.area ? '<textarea class="inp" data-k="' + key + '">' + esc(val) + '</textarea>'
+      : '<input class="inp" data-k="' + key + '" value="' + esc(val) + '"' + (extra && extra.type ? ' type="' + extra.type + '"' : '') + '>') + '</div>';
+  const sens = (key, label, d) => '<div class="field' + (key === 'rrn' ? ' full' : '') + '"><label class="lb">' + label + '</label><div class="sens">' +
+    '<input class="inp" data-s="' + key + '" value="' + esc(d[key]) + '" readonly placeholder="미등록">' +
+    (d.has[key] ? '<button type="button" class="btn sm ghost" data-reveal="' + key + '">전체 보기</button>' : '') +
+    '<button type="button" class="btn sm ghost" data-edit="' + key + '">변경</button></div></div>';
+
+  function openDrawer(id) {
+    selectedId = id; renderRows();
+    $('#shade').classList.remove('hidden'); $('#drawer').classList.remove('hidden');
+    $('#dBody').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
+    $('#dTitle').textContent = '불러오는 중…'; $('#dBadge').innerHTML = '';
+    setDirty({});
+    api('adm_getDriver', id).then((r) => { if (!r.ok) { toast(r.msg); return closeDrawer(true); } renderDetail(r.driver); }).catch(() => {});
+  }
+  function closeDrawer(force) {
+    if (!force && Object.keys(dirty).length && !confirm('저장하지 않은 변경이 있습니다. 닫을까요?')) return;
+    $('#shade').classList.add('hidden'); $('#drawer').classList.add('hidden');
+    cur = null; selectedId = ''; setDirty({}); renderRows();
+  }
+  $('#dClose').addEventListener('click', () => closeDrawer());
+  $('#shade').addEventListener('click', () => closeDrawer());
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#drawer').classList.contains('hidden') && $('#docModal').classList.contains('hidden') && $('#pwModal').classList.contains('hidden')) closeDrawer(); });
+
+  function renderDetail(d) {
+    cur = d; setDirty({});
+    $('#dTitle').textContent = d.name || '(이름 없음)';
+    $('#dBadge').innerHTML = '<span class="badge b-' + esc(d.status) + '">' + esc(d.status) + '</span>';
+    const docs = Object.keys(DOCS).map((k) => '<div class="doc"><span>' + DOCS[k] + '<br><em>' + (d.docs[k] ? '등록됨' : '없음') + '</em></span>' +
+      (d.docs[k] ? '<button type="button" class="btn sm ghost" data-doc="' + k + '">보기</button>' : '') + '</div>').join('');
+    $('#dBody').innerHTML =
+      (d.status === '승인대기' ? '<div class="warnbox">가입 승인 대기 중입니다. 서류를 확인한 뒤 승인 또는 반려해 주세요.</div>' : '') +
+      (d.mustChange ? '<div class="warnbox">임시 비밀번호 상태입니다. 기사님이 다음 로그인 때 비밀번호를 바꿉니다.</div>' : '') +
+      '<div class="sec"><h4>상태</h4><div class="status-row">' +
+        STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
+      '</div></div>' +
+      '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
+        fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디', d.loginId) +
+        fld('phone', '연락처', d.phone) + '<div class="field"><label class="lb">생년월일 (주민번호에서 자동)</label><input class="inp" value="' + esc(d.birthDate) + '" readonly></div>' +
+        sens('rrn', '주민등록번호', d) + fld('address', '주소(주민등록상)', d.address, { full: true }) +
+      '</div></div>' +
+      '<div class="sec"><h4>자격 · 면허</h4><div class="grid2">' +
+        fld('qualDate', '화물운송 종사자격 취득일', d.qualDate, { type: 'date' }) + fld('qualNo', '화물운송 종사자격증 번호', d.qualNo) +
+        sens('licenseNo', '운전면허번호', d) + fld('licenseType', '운전면허 종류', d.licenseType, { select: LICENSE_TYPES }) +
+      '</div></div>' +
+      '<div class="sec"><h4>차량</h4><div class="grid2">' +
+        fld('carName', '차명', d.carName) + fld('carYear', '연식', d.carYear) + fld('maxLoad', '최대적재량(kg)', d.maxLoad) +
+      '</div></div>' +
+      '<div class="sec"><h4>정산 계좌</h4><div class="grid2">' +
+        fld('bankName', '은행명', d.bankName, { select: BANKS }) + fld('accountHolder', '예금주', d.accountHolder) + sens('account', '계좌번호', d) +
+      '</div></div>' +
+      '<div class="sec"><h4>서류</h4><div class="docs">' + docs + '</div>' +
+        (d.docFolder ? '<div style="margin-top:8px;font-size:12px"><a href="' + esc(d.docFolder) + '" target="_blank" rel="noopener">서류 폴더 열기 (드라이브)</a></div>' : '') + '</div>' +
+      '<div class="sec"><h4>관리자 메모</h4>' + fld('memo', '', d.memo, { area: true }) + '</div>' +
+      '<div class="sec"><h4>계정</h4><div class="meta">' +
+        '<span>기사ID</span><span>' + esc(d.id) + '</span><span>가입일시</span><span>' + esc(d.createdAt || '-') + '</span>' +
+        '<span>승인일시</span><span>' + esc(d.approvedAt || '-') + '</span><span>수정일시</span><span>' + esc(d.updatedAt || '-') + '</span>' +
+        '<span>비밀번호</span><span>' + (d.hasPw ? '설정됨 (변경 ' + esc(d.pwChangedAt || '-') + ')' : '없음 - 임시 비밀번호를 지정해 주세요') + '</span>' +
+      '</div><div style="margin-top:12px"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button></div></div>';
+  }
+
+  // 입력 변경 추적
+  function setDirty(d) {
+    dirty = d; const n = Object.keys(d).length;
+    $('#dSave').disabled = !n; $('#dReset').disabled = !n;
+    $('#dMsg').textContent = n ? n + '개 항목이 바뀌었습니다.' : '바뀐 항목은 주황색으로 표시됩니다.';
+  }
+  $('#dBody').addEventListener('input', (e) => {
+    const el = e.target;
+    const key = el.dataset.k || el.dataset.s;
+    if (!key || !cur) return;
+    const changed = el.dataset.s ? el.value.trim() !== '' : String(el.value).trim() !== String(cur[key] || '');
+    el.classList.toggle('dirty', changed);
+    const d = Object.assign({}, dirty);
+    if (changed) d[key] = el.value.trim(); else delete d[key];
+    setDirty(d);
+  });
+  $('#dBody').addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') e.target.dispatchEvent(new Event('input', { bubbles: true })); });
+  $('#dBody').addEventListener('click', (e) => {
+    const st = e.target.closest('[data-st]'), rv = e.target.closest('[data-reveal]'), ed = e.target.closest('[data-edit]'), dc = e.target.closest('[data-doc]');
+    if (st && cur) {
+      $$('.st', $('#dBody')).forEach((b) => b.classList.toggle('on', b === st));
+      const d = Object.assign({}, dirty);
+      if (st.dataset.st !== cur.status) d.status = st.dataset.st; else delete d.status;
+      setDirty(d);
+    } else if (rv && cur) {
+      const key = rv.dataset.reveal; rv.disabled = true;
+      api('adm_reveal', cur.id, key).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        const inp = $('[data-s="' + key + '"]', $('#dBody'));
+        inp.value = r.value; rv.textContent = '30초 후 가림';
+        setTimeout(() => { if (inp.isConnected && inp.readOnly) { inp.value = cur[key]; rv.textContent = '전체 보기'; rv.disabled = false; } }, 30000);
+      }).catch(() => { rv.disabled = false; });
+    } else if (ed && cur) {
+      const key = ed.dataset.edit, inp = $('[data-s="' + key + '"]', $('#dBody'));
+      inp.readOnly = false; inp.value = ''; inp.placeholder = '새 번호 전체 입력'; inp.focus(); ed.remove();
+      const rb = $('[data-reveal="' + key + '"]', $('#dBody')); if (rb) rb.remove();
+    } else if (dc && cur) {
+      openDoc(dc.dataset.doc);
+    } else if (e.target.id === 'tempPwBtn' && cur) {
+      $('#pwNew').value = ''; $('#pwModal').classList.remove('hidden'); $('#pwNew').focus();
+    }
+  });
+  $('#dReset').addEventListener('click', () => { if (cur) renderDetail(cur); });
+  $('#dSave').addEventListener('click', () => {
+    if (!cur || !Object.keys(dirty).length) return;
+    if (dirty.status === '반려' || dirty.status === '정지') {
+      if (!confirm(cur.name + ' 기사님을 "' + dirty.status + '" 상태로 바꿉니다. 바로 로그인할 수 없게 됩니다. 계속할까요?')) return;
+    }
+    const b = $('#dSave'); b.disabled = true; b.textContent = '저장 중…';
+    api('adm_updateDriver', cur.id, dirty, cur.rev).then((r) => {
+      if (!r.ok) { toast(r.msg); return; }
+      toast('저장했습니다.');
+      renderDetail(r.driver); patchList(r.driver);
+    }).catch(() => {}).finally(() => { b.textContent = '저장'; b.disabled = !Object.keys(dirty).length; });
+  });
+  function patchList(d) {
+    const i = all.findIndex((x) => x.id === d.id);
+    const before = i >= 0 ? all[i].status : null;
+    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, createdAt: d.createdAt, approvedAt: d.approvedAt,
+      carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
+    if (i >= 0) all[i] = row; else all.unshift(row);
+    if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }
+    renderTabs(); renderRows();
+  }
+
+  // ───── 임시 비밀번호 ─────
+  $('#pwCancel').addEventListener('click', () => $('#pwModal').classList.add('hidden'));
+  $('#pwForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const pw = $('#pwNew').value.trim();
+    if (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return toast('영문과 숫자를 포함해 8자 이상으로 입력해 주세요.');
+    const b = $('#pwOk'); b.disabled = true;
+    api('adm_setTempPassword', cur.id, pw).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      $('#pwModal').classList.add('hidden');
+      toast('임시 비밀번호를 지정했습니다. 기사님께 알려 주세요.');
+      renderDetail(r.driver); patchList(r.driver);
+    }).catch(() => {}).finally(() => { b.disabled = false; });
+  });
+
+  // ───── 서류 보기 ─────
+  let docUrl = null;
+  function openDoc(kind) {
+    $('#docTitle').textContent = cur.name + ' · ' + DOCS[kind];
+    $('#docView').innerHTML = '<div class="spin"></div>';
+    $('#docDrive').classList.add('hidden');
+    $('#docModal').classList.remove('hidden');
+    api('adm_getDoc', cur.id, kind).then((r) => {
+      if (!r.ok) { $('#docView').innerHTML = '<div style="color:#fff;padding:24px">' + esc(r.msg) + '</div>'; return; }
+      const bin = atob(r.data), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      if (docUrl) URL.revokeObjectURL(docUrl);
+      docUrl = URL.createObjectURL(new Blob([bytes], { type: r.mime }));
+      $('#docView').innerHTML = /pdf/.test(r.mime) ? '<iframe src="' + docUrl + '"></iframe>' : '<img alt="" src="' + docUrl + '">';
+      if (r.url) { $('#docDrive').href = r.url; $('#docDrive').classList.remove('hidden'); }
+    }).catch(() => { $('#docView').innerHTML = ''; });
+  }
+  $('#docClose').addEventListener('click', () => { $('#docModal').classList.add('hidden'); $('#docView').innerHTML = ''; if (docUrl) { URL.revokeObjectURL(docUrl); docUrl = null; } });
+
+  // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
+  (function boot() {
+    const t = store.get();
+    if (!t) return showLogin();
+    call('adm_check', t).then((r) => { if (r.ok) showApp(r.admin); else { store.del(); showLogin(); } })
+      .catch(() => { showLogin(); toast('연결이 원활하지 않습니다.'); });
+  })();
+})();
+</script>
+</body>
+</html>
