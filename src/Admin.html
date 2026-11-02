@@ -80,6 +80,15 @@
   .b-승인 { background: var(--ok-weak); color: var(--ok); }
   .b-반려 { background: var(--danger-weak); color: var(--danger); }
   .b-정지 { background: var(--gray-weak); color: var(--sub); }
+  .t-고정 { background: var(--brand-weak); color: var(--brand); }
+  .t-백업 { background: var(--warn-weak); color: var(--warn); }
+  .t-품앗이 { background: var(--ok-weak); color: var(--ok); }
+  .t-외부용차 { background: #f1ecfb; color: #6b46c1; }
+  .t-none { background: var(--gray-weak); color: var(--faint); }
+  .tabs.sub2 .tab { padding: 4px 10px; font-size: 13px; }
+  .code-row { display: flex; gap: 6px; }
+  .code-row .inp { flex: 1; }
+  .req { color: var(--danger); margin-left: 2px; }
   .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--danger-weak); color: var(--danger); margin-left: 4px; }
   .dots { letter-spacing: 2px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
@@ -361,14 +370,16 @@
     <div class="head">
       <h2>기사 정보관리</h2>
       <div class="tools">
-        <input class="inp search" id="q" placeholder="이름, 아이디, 연락처, 차명 검색">
+        <input class="inp search" id="q" placeholder="이름, 기사코드, 아이디, 연락처, 차량 검색">
         <button class="btn ghost" id="reloadBtn" title="시트의 최신 내용 불러오기">새로고침</button>
+        <button class="btn" id="drvNew">+ 새 기사 등록</button>
       </div>
     </div>
     <div class="tabs" id="tabs"></div>
+    <div class="tabs sub2" id="ttabs"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>이름</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
+        <thead><tr><th>이름</th><th>기사구분</th><th>기사코드</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -570,6 +581,7 @@
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const TOKEN = 'runner.admin.token';
   const STATUSES = ['승인대기', '승인', '반려', '정지'];
+  const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
   const DOCS = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };
   const LICENSE_TYPES = ['1종 대형', '1종 보통', '2종 보통', '특수 대형견인', '특수 소형견인'];
   const BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크',
@@ -625,9 +637,9 @@
   });
 
   // ───── 목록 ─────
-  let all = [], counts = {}, filter = '전체', selectedId = '';
+  let all = [], counts = {}, filter = '전체', tfilter = '', selectedId = '';
   function loadList(keepSel) {
-    $('#rows').innerHTML = '<tr><td colspan="8"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
+    $('#rows').innerHTML = '<tr><td colspan="10"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
     return api('adm_listDrivers').then((r) => {
       if (!r.ok) return toast(r.msg);
       all = r.rows; counts = r.counts;
@@ -635,7 +647,15 @@
       renderTabs(); renderRows();
     }).catch(() => {});
   }
+  function renderTTabs() {
+    const n = (t) => all.filter((r) => (t === '미지정' ? !r.driverType : r.driverType === t)).length;
+    const items = [['', '구분 전체', all.length]].concat(DTYPES.map((t) => [t, t, n(t)]));
+    const none = n('미지정'); if (none) items.push(['미지정', '구분 미지정', none]);
+    $('#ttabs').innerHTML = items.map(([k, label, c]) => '<button class="tab' + (k === tfilter ? ' on' : '') + '" data-t="' + k + '">' + label + '<b>' + c + '</b></button>').join('');
+  }
+  $('#ttabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; tfilter = b.dataset.t; renderTTabs(); renderRows(); });
   function renderTabs() {
+    renderTTabs();
     const items = [['전체', counts.all || 0]].concat(STATUSES.map((s) => [s, counts[s] || 0]));
     $('#tabs').innerHTML = items.map(([k, n]) =>
       '<button class="tab' + (k === filter ? ' on' : '') + (k === '승인대기' && n ? ' alert' : '') + '" data-f="' + k + '">' + k + '<b>' + n + '</b></button>').join('');
@@ -648,8 +668,9 @@
     const q = $('#q').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
     return all.filter((r) => {
       if (filter !== '전체' && r.status !== filter) return false;
+      if (tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
       if (!q) return true;
-      return [r.name, r.loginId, r.carName, r.carNo].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
+      return [r.name, r.driverCode, r.loginId, r.carName, r.carNo].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
         (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
     });
   }
@@ -659,9 +680,11 @@
     $('#empty').textContent = all.length ? '조건에 맞는 기사가 없습니다.' : '등록된 기사가 없습니다.';
     $('#rows').innerHTML = list.map((r) => {
       const dots = Object.keys(DOCS).map((k) => '<i class="dot' + (r.docs[k] ? ' on' : '') + '" title="' + DOCS[k] + '"></i>').join(' ');
-      const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw ? '<span class="tag">비밀번호 없음</span>' : '');
+      const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw && r.loginId ? '<span class="tag">비밀번호 없음</span>' : '') + (!r.loginId ? '<span class="tag gray">앱 미사용</span>' : '');
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
-        '<td><b>' + esc(r.name) + '</b></td><td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
+        '<td><b>' + esc(r.name) + '</b></td>' +
+        '<td>' + (r.driverType ? '<span class="badge t-' + esc(r.driverType) + '">' + esc(r.driverType) + '</span>' : '<span class="badge t-none">미지정</span>') + '</td>' +
+        '<td><b class="code">' + esc(r.driverCode) + '</b></td><td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
         '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
         '<td class="sub">' + esc([r.carNo, r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
         '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
@@ -693,7 +716,7 @@
   function closeDrawer(force) {
     if (!force && Object.keys(dirty).length && !confirm('저장하지 않은 변경이 있습니다. 닫을까요?')) return;
     $('#shade').classList.add('hidden'); $('#drawer').classList.add('hidden');
-    cur = null; selectedId = ''; setDirty({}); renderRows();
+    cur = null; selectedId = ''; setDirty({}); renderRows(); $('#dSave').textContent = '저장';
   }
   $('#dClose').addEventListener('click', () => closeDrawer());
   $('#shade').addEventListener('click', () => { if (!$('#bdrawer').classList.contains('hidden')) closeBib(); else closeDrawer(); });
@@ -715,8 +738,9 @@
       '<div class="sec"><h4>상태</h4><div class="status-row">' +
         STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
       '</div></div>' +
+      typeSec(d) +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
-        fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디', d.loginId) +
+        fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디 (앱 로그인용)', d.loginId) +
         fld('phone', '연락처', d.phone) + '<div class="field"><label class="lb">생년월일 (주민번호에서 자동)</label><input class="inp" value="' + esc(d.birthDate) + '" readonly></div>' +
         sens('rrn', '주민등록번호', d) + fld('address', '주소(주민등록상)', d.address, { full: true }) +
       '</div></div>' +
@@ -740,11 +764,70 @@
       '</div><div style="margin-top:12px"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button></div></div>';
   }
 
+  /** 기사구분 버튼 + 기사코드 (상세·등록 공용) */
+  function typeSec(d) {
+    return '<div class="sec"><h4>기사구분 · 기사코드' + (d.isNew ? '<span class="req">*</span>' : '') + '</h4><div class="status-row" style="margin-bottom:12px">' +
+      DTYPES.map((t) => '<button type="button" class="st' + (t === d.driverType ? ' on' : '') + '" data-dt="' + t + '">' + t + '</button>').join('') + '</div>' +
+      '<div class="field" style="margin:0"><label class="lb">기사코드 (기사마다 겹치지 않게)</label><div class="code-row">' +
+      '<input class="inp code-inp" data-k="driverCode" value="' + esc(d.driverCode || '') + '" maxlength="20" autocomplete="off" spellcheck="false" placeholder="직접 입력">' +
+      '<button type="button" class="btn sm ghost" data-autocode style="height:40px">자동</button></div></div></div>';
+  }
+  /** 같은 기사구분의 기존 코드 중 가장 큰 번호 다음 번호를 제안 (예: B007 → B008) */
+  function nextCode(type) {
+    const used = new Set(all.map((r) => String(r.driverCode || '').toUpperCase()));
+    let best = null;
+    all.filter((r) => r.driverType === type && r.driverCode).forEach((r) => {
+      const m = String(r.driverCode).toUpperCase().match(/^(.*?)(\d+)$/);
+      if (m && (!best || +m[2] > best.n)) best = { p: m[1], n: +m[2], w: m[2].length };
+    });
+    if (!best) return '';
+    let n = best.n + 1, code;
+    do { code = best.p + String(n++).padStart(best.w, '0'); } while (used.has(code));
+    return code;
+  }
+
+  // ───── 새 기사 등록 ─────
+  function openCreate() {
+    if (!$('#drawer').classList.contains('hidden')) { closeDrawer(); if (!$('#drawer').classList.contains('hidden')) return; }
+    if (!$('#bdrawer').classList.contains('hidden')) return;
+    selectedId = ''; renderRows();
+    cur = { isNew: true, status: '승인', driverType: tfilter && tfilter !== '미지정' ? tfilter : '', has: {} };
+    $('#shade').classList.remove('hidden'); $('#drawer').classList.remove('hidden');
+    $('#dTitle').textContent = '새 기사 등록'; $('#dBadge').innerHTML = '';
+    const inp = (key, label, extra) => fld(key, label + (extra && extra.req ? '<span class="req">*</span>' : ''), '', extra);
+    $('#dBody').innerHTML =
+      '<div class="warnbox" style="background:var(--brand-weak);color:var(--brand)">관리자가 직접 등록하는 기사는 바로 승인 상태로 만들어집니다. <span class="req">*</span> 표시만 꼭 입력하면 되고, 나머지는 나중에 채워도 됩니다.</div>' +
+      typeSec(cur) +
+      '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
+        inp('name', '이름', { req: true }) + inp('phone', '연락처') +
+        inp('loginId', '쿠팡플렉스 아이디 (앱 로그인용, 선택)') + inp('tempPw', '앱 임시 비밀번호 (선택, 영문+숫자 8자 이상)') +
+        inp('rrn', '주민등록번호', { full: true }) + inp('address', '주소(주민등록상)', { full: true }) +
+      '</div></div>' +
+      '<div class="sec"><h4>자격 · 면허</h4><div class="grid2">' +
+        inp('qualDate', '화물운송 종사자격 취득일', { type: 'date' }) + inp('qualNo', '화물운송 종사자격증 번호') +
+        inp('licenseNo', '운전면허번호 (12자리)') + fld('licenseType', '운전면허 종류', '', { select: LICENSE_TYPES }) +
+      '</div></div>' +
+      '<div class="sec"><h4>차량</h4><div class="grid2">' +
+        inp('carNo', '차량번호') + inp('carName', '차명') + inp('carYear', '연식') + inp('maxLoad', '최대적재량(kg)') +
+      '</div></div>' +
+      '<div class="sec"><h4>정산 계좌</h4><div class="grid2">' +
+        fld('bankName', '은행명', '', { select: BANKS }) + inp('accountHolder', '예금주') + inp('account', '계좌번호') +
+      '</div></div>' +
+      '<div class="sec"><h4>상태</h4><div class="status-row">' +
+        STATUSES.map((st) => '<button type="button" class="st' + (st === cur.status ? ' on' : '') + '" data-st="' + st + '">' + st + '</button>').join('') + '</div></div>' +
+      '<div class="sec"><h4>관리자 메모</h4>' + fld('memo', '', '', { area: true }) + '</div>';
+    setDirty({});
+    $('#dSave').textContent = '등록';
+    $('[data-k="name"]', $('#dBody')).focus();
+  }
+  $('#drvNew').addEventListener('click', openCreate);
+
   // 입력 변경 추적
   function setDirty(d) {
     dirty = d; const n = Object.keys(d).length;
     $('#dSave').disabled = !n; $('#dReset').disabled = !n;
-    $('#dMsg').textContent = n ? n + '개 항목이 바뀌었습니다.' : '바뀐 항목은 주황색으로 표시됩니다.';
+    $('#dMsg').textContent = cur && cur.isNew ? (n ? n + '개 항목 입력됨' : '이름과 기사구분을 입력하세요.')
+      : n ? n + '개 항목이 바뀌었습니다.' : '바뀐 항목은 주황색으로 표시됩니다.';
   }
   $('#dBody').addEventListener('input', (e) => {
     const el = e.target;
@@ -759,6 +842,23 @@
   $('#dBody').addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') e.target.dispatchEvent(new Event('input', { bubbles: true })); });
   $('#dBody').addEventListener('click', (e) => {
     const st = e.target.closest('[data-st]'), rv = e.target.closest('[data-reveal]'), ed = e.target.closest('[data-edit]'), dc = e.target.closest('[data-doc]');
+    const dt = e.target.closest('[data-dt]');
+    if (dt && cur) {
+      $$('[data-dt]', $('#dBody')).forEach((b) => b.classList.toggle('on', b === dt));
+      const d = Object.assign({}, dirty);
+      if (dt.dataset.dt !== (cur.driverType || '')) d.driverType = dt.dataset.dt; else delete d.driverType;
+      setDirty(d);
+      return;
+    }
+    if (e.target.closest('[data-autocode]') && cur) {
+      const type = dirty.driverType || cur.driverType;
+      if (!type) return toast('기사구분을 먼저 골라 주세요.');
+      const code = nextCode(type);
+      if (!code) return toast(type + ' 기사 중 번호가 붙은 기사코드가 아직 없습니다. 첫 코드는 직접 입력해 주세요.');
+      const inp = $('[data-k="driverCode"]', $('#dBody'));
+      inp.value = code; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
     if (st && cur) {
       $$('.st', $('#dBody')).forEach((b) => b.classList.toggle('on', b === st));
       const d = Object.assign({}, dirty);
@@ -782,13 +882,28 @@
       $('#pwNew').value = ''; $('#pwModal').classList.remove('hidden'); $('#pwNew').focus();
     }
   });
-  $('#dReset').addEventListener('click', () => { if (cur) renderDetail(cur); });
+  $('#dReset').addEventListener('click', () => { if (cur && cur.isNew) openCreate(); else if (cur) renderDetail(cur); });
   $('#dSave').addEventListener('click', () => {
     if (!cur || !Object.keys(dirty).length) return;
-    if (dirty.status === '반려' || dirty.status === '정지') {
+    if (!cur.isNew && (dirty.status === '반려' || dirty.status === '정지')) {
       if (!confirm(cur.name + ' 기사님을 "' + dirty.status + '" 상태로 바꿉니다. 바로 로그인할 수 없게 됩니다. 계속할까요?')) return;
     }
-    const b = $('#dSave'); b.disabled = true; b.textContent = '저장 중…';
+    const b = $('#dSave');
+    if (cur.isNew) {
+      const f = Object.assign({}, dirty), pw = f.tempPw || '';
+      delete f.tempPw;
+      if (!f.name) return toast('이름을 입력해 주세요.');
+      if (!f.driverType) return toast('기사구분(고정 / 백업 / 품앗이 / 외부용차)을 골라 주세요.');
+      if (pw && (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw))) return toast('임시 비밀번호는 영문과 숫자를 포함해 8자 이상으로 입력해 주세요.');
+      if (pw && !f.loginId) return toast('앱 임시 비밀번호를 쓰려면 쿠팡플렉스 아이디도 입력해 주세요.');
+      b.disabled = true; b.textContent = '등록 중…';
+      return api('adm_createDriver', f, pw).then((r) => {
+        if (!r.ok) { toast(r.msg); return; }
+        toast(r.driver.name + ' 기사님을 등록했습니다.' + (pw ? ' 임시 비밀번호를 알려 주세요.' : ''));
+        selectedId = r.driver.id; renderDetail(r.driver); patchList(r.driver);
+      }).catch(() => {}).finally(() => { b.textContent = cur && cur.isNew ? '등록' : '저장'; b.disabled = !Object.keys(dirty).length; });
+    }
+    b.disabled = true; b.textContent = '저장 중…';
     api('adm_updateDriver', cur.id, dirty, cur.rev).then((r) => {
       if (!r.ok) { toast(r.msg); return; }
       toast('저장했습니다.');
@@ -798,9 +913,9 @@
   function patchList(d) {
     const i = all.findIndex((x) => x.id === d.id);
     const before = i >= 0 ? all[i].status : null;
-    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, createdAt: d.createdAt, approvedAt: d.approvedAt,
+    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, createdAt: d.createdAt, approvedAt: d.approvedAt,
       carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
-    if (i >= 0) all[i] = row; else all.unshift(row);
+    if (i >= 0) all[i] = row; else { all.unshift(row); counts.all = (counts.all || 0) + 1; }
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }
     renderTabs(); renderRows();
   }

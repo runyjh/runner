@@ -44,6 +44,7 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
   id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태',
+  driverType: '기사구분', driverCode: '기사코드',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
@@ -60,9 +61,12 @@ const D = {
   pwHash: '비밀번호 해시', pwSalt: '비밀번호 솔트'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
-const D_AUTO_ADD = ['pwMustChange', 'carNo'];
+const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode'];
+const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
+  driverType: '고정 / 백업 / 품앗이 / 외부용차',
+  driverCode: '기사마다 겹치지 않는 코드 (영문은 자동 대문자)',
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
   rrn: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n생년월일도 자동 갱신됩니다.',
   licenseNo: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.',
@@ -302,6 +306,8 @@ function ensureColumns(only) {
       const rule = SpreadsheetApp.newDataValidation()
         .requireValueInList([ST.PENDING, ST.ACTIVE, ST.REJECTED, ST.STOPPED], true).build();
       sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
+      const tr = SpreadsheetApp.newDataValidation().requireValueInList(DTYPES, true).setAllowInvalid(true).build();
+      sh.getRange(2, c.driverType + 1, sh.getMaxRows() - 1, 1).setDataValidation(tr);
       Object.keys(D_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(D_NOTES[k]); });
       sh.getRange(1, c.pwReset + 1).setBackground('#fff4e5');
     } else if (name === SH.ADMINS) {
@@ -1052,7 +1058,22 @@ function fixDriverRow_(sh, c, o) {
 
   const lid = o.loginId.toLowerCase();
   set('loginId', lid);
-  if (!o.id && lid) { set('id', newDriverId_()); if (!o.createdAt) set('createdAt', nowText_()); }
+  if (!o.id && (lid || o.name)) { set('id', newDriverId_()); if (!o.createdAt) set('createdAt', nowText_()); }
+  if (o.driverType) {
+    const t = normDriverType_(o.driverType);
+    if (t) set('driverType', t); else bad('driverType', DTYPES.join(' / ') + ' 중 하나로 입력해 주세요.');
+  }
+  if (o.driverCode) {
+    const code = normDriverCode_(o.driverCode);
+    if (code === null) bad('driverCode', '영문·숫자·한글·- 만, 20자 이내로 써 주세요.');
+    else {
+      set('driverCode', code);
+      const last = sh.getLastRow();
+      const same = sh.getRange(2, c.driverCode + 1, Math.max(last - 1, 1), 1).getValues()
+        .filter(function (v, i) { return i + 2 !== o._row && normDriverCode_(v[0]) === code; }).length;
+      if (same) bad('driverCode', '같은 기사코드를 쓰는 기사가 또 있습니다.');
+    }
+  }
   if (!o.status) set('status', ST.PENDING);
   if (o.status === ST.ACTIVE && !o.approvedAt) set('approvedAt', nowText_());
 
@@ -1099,7 +1120,7 @@ function fixDriverRow_(sh, c, o) {
     upd.updatedAt = nowText_();
     Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(upd[k]); });
   }
-  ['phone', 'rrn', 'licenseNo', 'account', 'pwReset'].forEach(function (k) {
+  ['phone', 'rrn', 'licenseNo', 'account', 'pwReset', 'driverType', 'driverCode'].forEach(function (k) {
     const cell = sh.getRange(o._row, c[k] + 1);
     if (notes[k]) cell.setNote(notes[k]);
     else if (o[k] !== '' || upd[k] !== undefined) cell.clearNote();
@@ -1214,6 +1235,7 @@ function fixAdminRow_(sh, c, o) {
 // ───────────────────────── 관리자 : 기사 정보관리 ─────────────────────────
 const D_EDIT_LABEL = {
   loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', address: '주소',
+  driverType: '기사구분', driverCode: '기사코드',
   qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
   maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호'
@@ -1229,6 +1251,7 @@ function docsOf_(o) {
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
+    driverType: o.driverType, driverCode: o.driverCode,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
@@ -1259,7 +1282,7 @@ function adm_listDrivers(token) {
     rows.forEach(function (v) {
       const o = {};
       keys.forEach(function (k) { o[k] = str_(v[c[k]]); });
-      if (!o.id && !o.loginId) return;
+      if (!o.id && !o.loginId && !o.name) return;
       list.push(listRow_(o));
       counts.all++;
       if (counts[o.status] !== undefined) counts[o.status]++;
@@ -1308,79 +1331,7 @@ function adm_updateDriver(token, id, changes, seenRev) {
       if (seenRev && String(seenRev) !== rev_(o)) {
         fail_('다른 곳(시트 또는 다른 관리자)에서 먼저 수정되었습니다. 새로고침 후 다시 수정해 주세요.');
       }
-      const f = {}, changed = [];
-      const opt = function (v, label, max) {
-        const s = String(v == null ? '' : v).trim();
-        if (s.length > (max || 200)) fail_(label + '이(가) 너무 깁니다.');
-        return s;
-      };
-      Object.keys(changes).forEach(function (k) {
-        if (!D_EDIT_LABEL[k]) return;
-        const v = changes[k];
-        switch (k) {
-          case 'loginId': {
-            const lid = normLoginId_(v);
-            if (lid !== o.loginId.toLowerCase()) {
-              const other = driverByLogin_(lid);
-              if (other && other.id !== o.id) fail_('이미 다른 기사가 쓰는 쿠팡플렉스 아이디입니다.');
-            }
-            f.loginId = lid; break;
-          }
-          case 'name': f.name = req_(v, '이름', 30); break;
-          case 'phone': f.phone = fmtPhone_(v); break;
-          case 'status':
-            if ([ST.PENDING, ST.ACTIVE, ST.REJECTED, ST.STOPPED].indexOf(v) < 0) fail_('상태 값을 확인해 주세요.');
-            f.status = v;
-            if (v === ST.ACTIVE && !o.approvedAt) f.approvedAt = nowText_();
-            break;
-          case 'qualDate':
-            f.qualDate = opt(v, '자격 취득일', 10);
-            if (f.qualDate && !/^\d{4}-\d{2}-\d{2}$/.test(f.qualDate)) fail_('자격 취득일을 확인해 주세요.');
-            break;
-          case 'licenseType':
-            f.licenseType = opt(v, '면허 종류', 20);
-            if (f.licenseType && LICENSE_TYPES.indexOf(f.licenseType) < 0) fail_('운전면허 종류를 확인해 주세요.');
-            break;
-          case 'carYear':
-            f.carYear = opt(v, '연식', 4);
-            if (f.carYear && !/^(19|20)\d{2}$/.test(f.carYear)) fail_('연식을 확인해 주세요.');
-            break;
-          case 'maxLoad':
-            f.maxLoad = opt(v, '최대적재량', 6);
-            if (f.maxLoad && !/^\d{1,6}$/.test(f.maxLoad)) fail_('최대적재량은 kg 단위 숫자로 입력해 주세요.');
-            break;
-          case 'rrn': {
-            const p = parseRrn_(v);
-            const idx = blindIndex_('rrn', p.digits);
-            const dupRow = findRow_(SH.DRIVERS, 'rrnIndex', idx);
-            if (dupRow && dupRow !== o._row) fail_('같은 주민등록번호로 등록된 다른 기사가 있습니다.');
-            f.rrnEnc = encrypt_(p.digits.replace(/(\d{6})(\d{7})/, '$1-$2'));
-            f.rrnIndex = idx; f.birthDate = p.birth; f.rrn = maskRrn_(p.digits);
-            break;
-          }
-          case 'licenseNo': {
-            const d = digits_(v);
-            if (d.length !== 12) fail_('운전면허번호 12자리를 확인해 주세요.');
-            f.licenseNoEnc = encrypt_(d.replace(/(\d{2})(\d{2})(\d{6})(\d{2})/, '$1-$2-$3-$4'));
-            f.licenseNo = maskLicense_(d);
-            break;
-          }
-          case 'account': {
-            const d = digits_(v);
-            if (d.length < 8 || d.length > 16) fail_('계좌번호(숫자 8~16자리)를 확인해 주세요.');
-            f.accountEnc = encrypt_(d); f.account = maskAccount_(d);
-            break;
-          }
-          case 'memo': f.memo = opt(v, '관리자 메모', 2000); break;
-          case 'address': f.address = opt(v, '주소', 200); break;
-          case 'qualNo': f.qualNo = opt(v, '자격증 번호', 30); break;
-          case 'carName': f.carName = opt(v, '차명', 40); break;
-          case 'carNo': f.carNo = opt(v, '차량번호', 20).replace(/\s/g, ''); break;
-          case 'bankName': f.bankName = opt(v, '은행명', 20); break;
-          case 'accountHolder': f.accountHolder = opt(v, '예금주', 30); break;
-        }
-        changed.push(D_EDIT_LABEL[k]);
-      });
+      const r = driverFields_(changes, o), f = r.f, changed = r.changed;
       if (!changed.length) return { ok: true, driver: detailOf_(o) };
       f.updatedAt = nowText_();
       writeFields_(SH.DRIVERS, o._row, f);
@@ -1390,6 +1341,146 @@ function adm_updateDriver(token, id, changes, seenRev) {
         (f.status ? ' → ' + f.status : ''));
       const fresh = readObj_(SH.DRIVERS, o._row);
       return { ok: true, driver: detailOf_(fresh) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/**
+ * 관리자 화면에서 받은 기사 항목 검사·정리 (수정·등록 공용).
+ * o = 지금 저장된 기사 (새 등록이면 빈 객체). 반환: { f: 시트에 쓸 칸들, changed: 바뀐 항목 이름 }
+ */
+function driverFields_(changes, o) {
+  const f = {}, changed = [];
+  const opt = function (v, label, max) {
+    const s = String(v == null ? '' : v).trim();
+    if (s.length > (max || 200)) fail_(label + '이(가) 너무 깁니다.');
+    return s;
+  };
+  Object.keys(changes).forEach(function (k) {
+    if (!D_EDIT_LABEL[k]) return;
+    const v = changes[k];
+    switch (k) {
+      case 'loginId': {
+        if (!String(v == null ? '' : v).trim()) { f.loginId = ''; break; }
+        const lid = normLoginId_(v);
+        if (lid !== String(o.loginId || '').toLowerCase()) {
+          const other = driverByLogin_(lid);
+          if (other && other.id !== o.id) fail_('이미 다른 기사가 쓰는 쿠팡플렉스 아이디입니다.');
+        }
+        f.loginId = lid; break;
+      }
+      case 'name': f.name = req_(v, '이름', 30); break;
+      case 'phone': f.phone = fmtPhone_(v); break;
+      case 'status':
+        if ([ST.PENDING, ST.ACTIVE, ST.REJECTED, ST.STOPPED].indexOf(v) < 0) fail_('상태 값을 확인해 주세요.');
+        f.status = v;
+        if (v === ST.ACTIVE && !o.approvedAt) f.approvedAt = nowText_();
+        break;
+      case 'qualDate':
+        f.qualDate = opt(v, '자격 취득일', 10);
+        if (f.qualDate && !/^\d{4}-\d{2}-\d{2}$/.test(f.qualDate)) fail_('자격 취득일을 확인해 주세요.');
+        break;
+      case 'licenseType':
+        f.licenseType = opt(v, '면허 종류', 20);
+        if (f.licenseType && LICENSE_TYPES.indexOf(f.licenseType) < 0) fail_('운전면허 종류를 확인해 주세요.');
+        break;
+      case 'carYear':
+        f.carYear = opt(v, '연식', 4);
+        if (f.carYear && !/^(19|20)\d{2}$/.test(f.carYear)) fail_('연식을 확인해 주세요.');
+        break;
+      case 'maxLoad':
+        f.maxLoad = opt(v, '최대적재량', 6);
+        if (f.maxLoad && !/^\d{1,6}$/.test(f.maxLoad)) fail_('최대적재량은 kg 단위 숫자로 입력해 주세요.');
+        break;
+      case 'rrn': {
+        const p = parseRrn_(v);
+        const idx = blindIndex_('rrn', p.digits);
+        const dupRow = findRow_(SH.DRIVERS, 'rrnIndex', idx);
+        if (dupRow && dupRow !== o._row) fail_('같은 주민등록번호로 등록된 다른 기사가 있습니다.');
+        f.rrnEnc = encrypt_(p.digits.replace(/(\d{6})(\d{7})/, '$1-$2'));
+        f.rrnIndex = idx; f.birthDate = p.birth; f.rrn = maskRrn_(p.digits);
+        break;
+      }
+      case 'licenseNo': {
+        const d = digits_(v);
+        if (d.length !== 12) fail_('운전면허번호 12자리를 확인해 주세요.');
+        f.licenseNoEnc = encrypt_(d.replace(/(\d{2})(\d{2})(\d{6})(\d{2})/, '$1-$2-$3-$4'));
+        f.licenseNo = maskLicense_(d);
+        break;
+      }
+      case 'account': {
+        const d = digits_(v);
+        if (d.length < 8 || d.length > 16) fail_('계좌번호(숫자 8~16자리)를 확인해 주세요.');
+        f.accountEnc = encrypt_(d); f.account = maskAccount_(d);
+        break;
+      }
+      case 'driverType':
+        f.driverType = opt(v, '기사구분', 10);
+        if (f.driverType && DTYPES.indexOf(f.driverType) < 0) fail_('기사구분은 ' + DTYPES.join(' / ') + ' 중에서 골라 주세요.');
+        break;
+      case 'driverCode': {
+        const code = normDriverCode_(v);
+        if (code === null) fail_('기사코드에는 영문·숫자·한글·- 만, 20자 이내로 써 주세요.');
+        if (code) {
+          const dup = findRow_(SH.DRIVERS, 'driverCode', code);
+          if (dup && dup !== o._row) fail_('이미 다른 기사가 쓰는 기사코드입니다: ' + code);
+        }
+        f.driverCode = code;
+        break;
+      }
+      case 'memo': f.memo = opt(v, '관리자 메모', 2000); break;
+      case 'address': f.address = opt(v, '주소', 200); break;
+      case 'qualNo': f.qualNo = opt(v, '자격증 번호', 30); break;
+      case 'carName': f.carName = opt(v, '차명', 40); break;
+      case 'carNo': f.carNo = opt(v, '차량번호', 20).replace(/\s/g, ''); break;
+      case 'bankName': f.bankName = opt(v, '은행명', 20); break;
+      case 'accountHolder': f.accountHolder = opt(v, '예금주', 30); break;
+    }
+    changed.push(D_EDIT_LABEL[k]);
+  });
+  return { f: f, changed: changed };
+}
+/** 기사코드 정리: 공백 제거, 영문 대문자. 비었으면 '', 잘못되면 null */
+function normDriverCode_(v) {
+  const s = str_(v).replace(/\s+/g, '').toUpperCase();
+  if (!s) return '';
+  return /^[0-9A-Z가-힣_-]{1,20}$/.test(s) ? s : null;
+}
+/** 기사구분 글자 정리: '고정기사' → '고정', '용차' → '외부용차'. 모르는 값이면 null */
+function normDriverType_(v) {
+  const s = str_(v).replace(/\s+/g, '');
+  if (!s) return '';
+  if (/^고정/.test(s)) return '고정';
+  if (/^백업/.test(s)) return '백업';
+  if (/^품앗이/.test(s)) return '품앗이';
+  if (/^(외부|용차|외부용차)/.test(s)) return '외부용차';
+  return null;
+}
+
+/** 관리자가 기사를 직접 등록. fields = 수정과 같은 항목들, tempPw = 앱 로그인용 임시 비밀번호(선택) */
+function adm_createDriver(token, fields, tempPw) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    fields = Object.assign({}, fields || {});
+    if (!str_(fields.name)) fail_('이름을 입력해 주세요.');
+    if (!str_(fields.driverType)) fail_('기사구분(고정 / 백업 / 품앗이 / 외부용차)을 골라 주세요.');
+    if (!fields.status) fields.status = ST.ACTIVE;
+    const pw = tempPw ? checkPw_(tempPw) : '';
+    if (pw && !str_(fields.loginId)) fail_('앱 로그인용 비밀번호를 지정하려면 쿠팡플렉스 아이디를 입력해 주세요.');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const r = driverFields_(fields, { _row: -1, loginId: '', approvedAt: '' });
+      const now = nowText_();
+      const row = Object.assign({ id: newDriverId_(), createdAt: now, updatedAt: now }, r.f);
+      if (row.status === ST.ACTIVE) row.approvedAt = now;
+      if (pw) { Object.assign(row, passwordFields_(pw)); row.pwMustChange = 'Y'; }
+      const at = appendObj_(SH.DRIVERS, row);
+      if (row.loginId) forgetDriver_({ loginId: row.loginId });
+      logAdmin_(a, '기사 등록', row.name + ' (' + row.id + ')', [row.driverType, row.driverCode].filter(String).join(' ') + (pw ? ', 임시 비밀번호 지정' : ''));
+      return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, at)) };
     } finally {
       lock.releaseLock();
     }
@@ -1966,8 +2057,8 @@ function fixBibRow_(sh, c, o) {
 /**
  * 사용법
  *  1) 구글 드라이브 "러너 올인원 데이터/서류 올리기" 폴더에 서류 파일을 한꺼번에 올린다.
- *     파일 이름 = "기사구분_서류종류.확장자"
- *       기사구분 : 쿠팡플렉스 아이디, 연락처, 기사ID, 이름(동명이인 없을 때) 중 하나
+ *     파일 이름 = "기사_서류종류.확장자"
+ *       기사 : 쿠팡플렉스 아이디, 연락처, 기사ID, 이름(동명이인 없을 때) 중 하나
  *       서류종류 : 자격증 / 면허증 / 사업자 / 자동차 (예: kim@flex.com_면허증.jpg, 01012345678_자격증.png)
  *  2) DB 시트의 "서류 연결" 탭에서 실행 체크박스를 누른다. (또는 편집기에서 linkUploadedDocs 실행)
  *  3) 파일이 기사별 서류 폴더로 옮겨지고 drivers 시트의 서류 칸에 링크가 채워진다.
@@ -2006,8 +2097,8 @@ function ensureTools_() {
   if (!sh) {
     sh = ss.insertSheet(TOOLS.SHEET);
     sh.getRange('A1').setValue('서류 일괄 연결').setFontSize(14).setFontWeight('bold');
-    sh.getRange('A2').setValue('① "서류 올리기" 폴더에 서류 파일을 한꺼번에 올립니다. 파일 이름: 기사구분_서류종류  (예: kim@flex.com_면허증.jpg)');
-    sh.getRange('A3').setValue('   기사구분 = 쿠팡플렉스 아이디 / 연락처 / 기사ID / 이름(동명이인 없을 때),  서류종류 = 자격증 / 면허증 / 사업자 / 자동차');
+    sh.getRange('A2').setValue('① "서류 올리기" 폴더에 서류 파일을 한꺼번에 올립니다. 파일 이름: 기사_서류종류  (예: kim@flex.com_면허증.jpg)');
+    sh.getRange('A3').setValue('   기사 = 쿠팡플렉스 아이디 / 연락처 / 기사ID / 이름(동명이인 없을 때),  서류종류 = 자격증 / 면허증 / 사업자 / 자동차');
     sh.getRange('A4').setValue('② 실행').setFontWeight('bold');
     sh.getRange('C4').setValue('← 체크하면 바로 연결을 시작합니다. 끝나면 체크가 자동으로 풀립니다.');
     sh.getRange('A5').setValue('올리기 폴더').setFontWeight('bold');
@@ -2105,7 +2196,7 @@ function linkUploadedDocs_() {
       const mime = file.getMimeType();
       if (!/^image\//.test(mime) && mime !== 'application/pdf') { fail('이미지나 PDF 파일만 연결할 수 있습니다.'); continue; }
       const base = fname.replace(/\.[^.]+$/, ''), cut = base.lastIndexOf('_');
-      if (cut < 1) { fail('파일 이름이 "기사구분_서류종류" 형식이 아닙니다. (예: kim@flex.com_면허증.jpg)'); continue; }
+      if (cut < 1) { fail('파일 이름이 "기사_서류종류" 형식이 아닙니다. (예: kim@flex.com_면허증.jpg)'); continue; }
       const kind = docKind_(base.slice(cut + 1));
       if (!kind) { fail('서류 종류를 알 수 없습니다. _ 뒤에 자격증/면허증/사업자/자동차 중 하나를 써 주세요.'); continue; }
       const r = findDriverForDoc_(idx, base.slice(0, cut));
