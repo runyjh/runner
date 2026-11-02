@@ -862,16 +862,33 @@
       '<button class="tab' + (k === filter ? ' on' : '') + (k === '승인대기' && n ? ' alert' : '') + '" data-f="' + k + '">' + k + '<b>' + n + '</b></button>').join('');
   }
   $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; filter = b.dataset.f; renderTabs(); renderRows(); });
-  $('#q').addEventListener('input', () => renderRows());
+  /**
+   * 검색칸 공통: 한글(IME) 조합 중에는 표를 다시 그리지 않고, 글자가 완성되면 그린다.
+   * (조합 중에 화면을 고치면 환경에 따라 'ㅎㅘㅇ' 처럼 글자가 깨지거나 입력이 막힘)
+   */
+  function onSearch(el, fn) {
+    let composing = false, timer = 0;
+    const run = () => { clearTimeout(timer); timer = setTimeout(fn, 80); };
+    el.addEventListener('compositionstart', () => { composing = true; });
+    el.addEventListener('compositionend', () => { composing = false; run(); });
+    el.addEventListener('input', (e) => { if (composing || e.isComposing) return; run(); });
+  }
+  // 위임 방식 검색칸(노선 필터 등): 조합이 끝나면 input 을 한 번 더 보내 결과를 그린다
+  document.addEventListener('compositionend', (e) => {
+    if (e.target.matches && e.target.matches('[data-rf], #pfQ')) e.target.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const nfc = (v) => String(v == null ? '' : v).normalize('NFC').toLowerCase();
+  onSearch($('#q'), () => renderRows());
   $('#reloadBtn').addEventListener('click', () => loadList(true));
 
   function visibleRows() {
-    const q = $('#q').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+    const q = nfc($('#q').value.trim()), qd = q.replace(/\D/g, '');
     return all.filter((r) => {
-      if (filter !== '전체' && r.status !== filter) return false;
-      if (tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
+      // 검색할 때는 상태·구분 탭과 상관없이 전체에서 찾는다 (승인대기 탭에 있어도 승인된 기사가 나오도록)
+      if (!q && filter !== '전체' && r.status !== filter) return false;
+      if (!q && tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
       if (!q) return true;
-      return [r.name, r.driverCode, r.loginId, r.carName, r.carNo, r.schCamp, r.baseRoute].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
+      return [r.name, r.driverCode, r.loginId, r.carName, r.carNo, r.schCamp, r.baseRoute, r.phone].some((v) => nfc(v).indexOf(q) >= 0) ||
         (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
     });
   }
@@ -879,7 +896,7 @@
     setTimeout(paintDBulk, 0);
     const list = visibleRows();
     $('#empty').classList.toggle('hidden', list.length > 0);
-    $('#empty').textContent = all.length ? '조건에 맞는 기사가 없습니다.' : '등록된 기사가 없습니다.';
+    $('#empty').textContent = all.length ? ($('#q').value.trim() ? '"' + $('#q').value.trim() + '" 에 맞는 기사가 없습니다.' : '조건에 맞는 기사가 없습니다.') : '등록된 기사가 없습니다.';
     $('#rows').innerHTML = list.map((r) => {
       const dots = Object.keys(DOCS).map((k) => '<i class="dot' + (r.docs[k] ? ' on' : '') + '" title="' + DOCS[k] + '"></i>').join(' ');
       const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw && r.loginId ? '<span class="tag">비밀번호 없음</span>' : '') + (!r.loginId ? '<span class="tag gray">앱 미사용</span>' : '');
@@ -1733,12 +1750,12 @@
     $('#btabs').innerHTML = items.map(([k, n]) => '<button class="tab' + (k === bfilter ? ' on' : '') + '" data-f="' + k + '">' + k + '<b>' + n + '</b></button>').join('');
   }
   $('#btabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; bfilter = b.dataset.f; renderBTabs(); renderBRows(); });
-  $('#bq').addEventListener('input', () => renderBRows());
+  onSearch($('#bq'), () => renderBRows());
   $('#bibReload').addEventListener('click', () => loadBib());
   function renderBRows() {
-    const q = $('#bq').value.trim().toLowerCase();
+    const q = nfc($('#bq').value.trim());
     const list = bapps.filter((a) => (bfilter === '전체' || a.status === bfilter) &&
-      (!q || [a.name, a.carNo, a.plateNo].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0)));
+      (!q || [a.name, a.carNo, a.plateNo].some((v) => nfc(v).indexOf(q) >= 0)));
     $('#bempty').classList.toggle('hidden', list.length > 0);
     $('#bempty').textContent = bapps.length ? '조건에 맞는 신청서가 없습니다.' : '아직 신청서가 없습니다. 오른쪽 위 "새 신청서"로 만들어 주세요.';
     $('#brows').innerHTML = list.map((a) => '<tr data-id="' + esc(a.id) + '"' + (bcur && bcur.app.id === a.id ? ' class="sel"' : '') + '>' +
@@ -1758,10 +1775,10 @@
   // 새 신청서
   $('#bibNew').addEventListener('click', () => { $('#pickQ').value = ''; renderPick(); $('#pickModal').classList.remove('hidden'); $('#pickQ').focus(); });
   $('#pickCancel').addEventListener('click', () => $('#pickModal').classList.add('hidden'));
-  $('#pickQ').addEventListener('input', renderPick);
+  onSearch($('#pickQ'), renderPick);
   function renderPick() {
-    const q = $('#pickQ').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
-    const list = bdrivers.filter((d) => !q || [d.name, d.loginId].some((v) => String(v || '').toLowerCase().indexOf(q) >= 0) ||
+    const q = nfc($('#pickQ').value.trim()), qd = q.replace(/\D/g, '');
+    const list = bdrivers.filter((d) => !q || [d.name, d.loginId].some((v) => nfc(v).indexOf(q) >= 0) ||
       (qd.length >= 3 && String(d.phone || '').replace(/\D/g, '').indexOf(qd) >= 0));
     $('#pickList').innerHTML = list.length ? list.map((d) => {
       const n = bapps.filter((a) => a.driverId === d.id).length;
@@ -2050,7 +2067,7 @@
       (it.address ? '<span>' + esc(it.address) + '</span>' : '') + '</button>').join('')
       : '<div class="empty" style="padding:24px 8px">' + (RT.camps.length ? '검색 결과가 없습니다.' : '등록된 캠프가 없습니다.<br><b>+ 캠프 추가</b>로 시작하세요.') + '</div>';
   }
-  $('#campQ').addEventListener('input', renderCampList);
+  onSearch($('#campQ'), renderCampList);
   $('#campList').addEventListener('click', (e) => {
     const b = e.target.closest('[data-camp]'); if (!b) return;
     const id = b.dataset.camp, q = normCode($('#campQ').value);
@@ -2148,6 +2165,7 @@
   }
 
   $('#campMain').addEventListener('input', (e) => {
+    if (e.isComposing) return; // 한글 조합 중에는 기다렸다가 compositionend 에서 다시 처리
     const f = e.target.closest('[data-rf]'); if (!f) return;
     rtf[f.dataset.rf] = f.value; renderRoutes();
   });
@@ -2653,7 +2671,7 @@
   // 단가 칸 입력
   $('#campMain').addEventListener('input', (e) => {
     const t = e.target;
-    if (t.id === 'pfQ') { pf.q = t.value; return renderPriceRows(); }
+    if (t.id === 'pfQ') { if (e.isComposing) return; pf.q = t.value; return renderPriceRows(); }
     if (!t.dataset.pk) return;
     const key = t.closest('tr[data-key]').dataset.key, k = t.dataset.pk;
     const v = k === 'tmpStart' || k === 'tmpEnd' ? t.value : moneyRaw(t.value).replace(/^0+(?=\d)/, '');
@@ -3408,7 +3426,7 @@
     sMonth = monthOf(ref); schedGo();
   });
   $('#sCamp').addEventListener('change', (e) => { sf.camp = e.target.value; sAct = null; sAnchor = null; renderSched(); });
-  $('#sQ').addEventListener('input', (e) => { sf.q = e.target.value; sAct = null; sAnchor = null; renderSched(); });
+  onSearch($('#sQ'), () => { sf.q = $('#sQ').value; sAct = null; sAnchor = null; renderSched(); });
   $('#sAll').addEventListener('change', (e) => { sf.all = e.target.checked; renderSched(); });
   $('#sReload').addEventListener('click', () => schedGo(SD.start));
   $('#sNoteAdd').addEventListener('click', () => {

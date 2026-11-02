@@ -112,6 +112,30 @@
   .day .bk { font-size: 12.5px; color: #5a3286; background: #f5eefb; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; }
   .day .bk b { font-weight: 700; margin-right: 4px; }
   .day .bk.none { color: #b0b8c1; background: transparent; padding: 0 2px; }
+  .segm { margin-left: auto; display: flex; background: #e9ecef; border-radius: 10px; padding: 3px; }
+  .segm button { border: 0; background: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 14px; color: var(--sub); }
+  .segm button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .mcal { background: #fff; border-radius: var(--radius); padding: 12px 10px; margin-bottom: 12px; }
+  .mnav { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 10px; }
+  .mnav b { font-size: 17px; }
+  .mnav button { border: 0; background: #f2f4f6; width: 38px; height: 34px; border-radius: 8px; font-size: 15px; }
+  .msum { text-align: center; font-size: 13px; color: var(--sub); margin: -4px 0 10px; }
+  .mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .mgrid .wd { text-align: center; font-size: 12px; color: var(--sub); font-weight: 700; padding: 2px 0 4px; }
+  .mgrid .wd.sun { color: var(--danger); } .mgrid .wd.sat { color: var(--brand); }
+  .mc { min-height: 64px; border-radius: 8px; padding: 3px; border: 1.5px solid transparent; background: #fafbfc; display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; color: inherit; }
+  .mc.blank { background: none; }
+  .mc .n { font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .mc.sun .n { color: var(--danger); } .mc.sat .n { color: var(--brand); }
+  .mc .v { font-size: 10.5px; font-weight: 700; line-height: 1.25; border-radius: 4px; padding: 2px 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all; background: #eef0f2; }
+  .mc .v.k-work { background: #bfe1f6; color: #0a53a8; } .mc .v.k-off { background: #f08c8c; color: #fff; } .mc .v.k-sick { background: #d4edbc; color: #11734b; }
+  .mc .v.k-mi { background: #d15555; color: #ffcfc9; } .mc .v.k-yong { background: #e6cff2; color: #5a3286; } .mc .v.k-reg { background: #d9f5ef; color: #0b6b57; }
+  .mc .bkdot { font-size: 9.5px; color: #5a3286; font-weight: 700; }
+  .mc.today .n i { font-style: normal; background: var(--ink); color: #fff; border-radius: 999px; padding: 0 5px; }
+  .mc.pdd { background: var(--brand-weak); border-color: var(--brand); }
+  .mc.sel { box-shadow: 0 0 0 2px var(--ink); }
+  .mdet { margin-top: 12px; }
+  .mdet .day { border-top: 0; }
   .day .dt small.peak { display: inline-block; margin-top: 3px; padding: 1px 6px; border-radius: 999px; background: #fff1e6; color: #d9480f; font-weight: 700; font-size: 10.5px; white-space: nowrap; }
   .day .dt small.pdd { color: var(--brand); font-weight: 800; }
   .day .val.none { color: #b0b8c1; font-weight: 500; background: #fafbfc; }
@@ -361,9 +385,10 @@
 
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
-    <div class="topbar"><button class="back" id="scBack" aria-label="뒤로">←</button><h2>내 스케줄</h2></div>
+    <div class="topbar"><button class="back" id="scBack" aria-label="뒤로">←</button><h2>내 스케줄</h2>
+      <div class="segm" id="scMode"><button type="button" data-m="2w" class="on">2주</button><button type="button" data-m="month">한 달</button></div></div>
     <div id="scBody"></div>
-    <p class="hint" style="text-align:center;margin:4px 0 24px">이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.</p>
+    <p class="hint" id="scHint" style="text-align:center;margin:4px 0 24px">이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.</p>
   </section>
 
   <!-- ───────────── 비밀번호 변경 ───────────── -->
@@ -703,18 +728,38 @@
     if (/업무등록/.test(s)) return 'k-reg';
     return '';
   }
+  let scMode = '2w', scMonth = '', scSel = '';
+  const ymdOf = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const pddOf = (today) => { const p = String(today || '').split('-'); return p.length === 3 ? ymdOf(new Date(+p[0], +p[1] - 1, +p[2] + 1)) : ''; };
   function openSched() {
+    scMode = '2w'; paintScMode();
+    show('sched');
+    loadSched();
+  }
+  function paintScMode() {
+    $$('#scMode button').forEach((b) => b.classList.toggle('on', b.dataset.m === scMode));
+    $('#scHint').textContent = scMode === '2w' ? '이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.'
+      : '날짜를 누르면 그날 일정과 우리 캠프 백업이 보입니다. 다음 주 이후는 바뀔 수 있습니다.';
+  }
+  $('#scMode').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-m]'); if (!b || b.dataset.m === scMode) return;
+    scMode = b.dataset.m; scSel = '';
+    if (scMode === 'month' && !scMonth) scMonth = ymdOf(new Date()).slice(0, 7);
+    paintScMode(); loadSched();
+  });
+  function loadSched() {
     const token = store.get(TOKEN);
     if (!token) { clearSession(); goLogin(); return; }
     $('#scBody').innerHTML = '<div class="card" style="text-align:center;color:var(--sub)">불러오는 중…</div>';
-    show('sched');
-    api('api_mySchedule', token).then((r) => {
+    const args = scMode === 'month' ? [token, scMonth] : [token];
+    api('api_mySchedule', ...args).then((r) => {
       if (!r.ok) {
         toast(r.msg || '스케줄을 불러오지 못했습니다.');
         if (r.code === 'EXPIRED') { clearSession(); goLogin(); }
         else if (r.code === 'MUST_CHANGE') openChangePw(true, '');
         return;
       }
+      if (scMode === 'month') return renderMonth(r);
       // PDD(배송 예정일) = 오늘 기준 내일 → 파란색 강조
       const tp = String(r.today || '').split('-');
       const pd = tp.length === 3 ? new Date(+tp[0], +tp[1] - 1, +tp[2] + 1) : null;
@@ -735,6 +780,53 @@
       $('#scBody').innerHTML = week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
     }).catch(() => { $('#scBody').innerHTML = ''; netErr(); });
   }
+  /** 하루 상세 줄 (2주 보기와 같은 모양) */
+  function dayRow(r, d) {
+    const p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay(), v = r.cells[d] || '', pdd = pddOf(r.today);
+    const sub = d === pdd ? '<small class="pdd">PDD</small>' : d === r.today ? '<small>오늘</small>' : r.holidays[d] ? '<small>' + escH(r.holidays[d]) + '</small>' : '';
+    const peak = +p[2] <= 7 ? '<small class="peak">🔥 피크데이</small>' : '';
+    const l = (r.backup || {})[d] || [];
+    const bk = !r.camp ? '' : l.length ? '<div class="bk"><b>' + escH(r.camp) + ' 백업</b>' + l.map(escH).join(', ') + '</div>' : '<div class="bk none">' + escH(r.camp) + ' 백업 없음</div>';
+    return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
+      '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +
+      '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' + bk + '</div></div>';
+  }
+  let scLast = null;
+  function renderMonth(r) {
+    scLast = r;
+    const pdd = pddOf(r.today), [y, m] = r.month.split('-').map(Number);
+    if (!scSel || !r.dates.includes(scSel)) scSel = r.dates.includes(pdd) ? pdd : r.dates.includes(r.today) ? r.today : r.dates[0];
+    const lead = new Date(y, m - 1, 1).getDay();
+    let work = 0, off = 0;
+    r.dates.forEach((d) => { const v = String(r.cells[d] || ''); if (!v) return; if (/휴무|휴가|병가|퇴사/.test(v)) off++; else if (!/미입차/.test(v)) work++; });
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
+    r.dates.forEach((d) => {
+      const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', nb = ((r.backup || {})[d] || []).length;
+      cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === r.today ? ' today' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
+        '<span class="n">' + (d === r.today ? '<i>' + day + '</i>' : day) + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + '</span>' +
+        (v ? '<span class="v ' + schKind(v) + '">' + escH(v) + '</span>' : '') +
+        (nb ? '<span class="bkdot">백업 ' + nb + '</span>' : '') + '</button>');
+    });
+    $('#scBody').innerHTML = '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
+      '<div class="msum">근무 ' + work + '일 · 휴무 ' + off + '일' + (r.camp ? ' · ' + escH(r.camp) : '') + '</div>' +
+      '<div class="mgrid">' + DOWK.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + w + '</div>').join('') + cells.join('') + '</div></div>' +
+      '<div class="wk mdet" id="scDet">' + dayRow(r, scSel) + '</div>';
+  }
+  $('#scBody').addEventListener('click', (e) => {
+    if (scMode !== 'month') return;
+    const mv = e.target.closest('[data-mv]');
+    if (mv) {
+      const [y, m] = scMonth.split('-').map(Number), d = new Date(y, m - 1 + +mv.dataset.mv, 1);
+      scMonth = ymdOf(d).slice(0, 7); scSel = ''; return loadSched();
+    }
+    const c = e.target.closest('.mc[data-d]');
+    if (c && scLast) {
+      scSel = c.dataset.d;
+      $$('#scBody .mc.sel').forEach((x) => x.classList.remove('sel')); c.classList.add('sel');
+      $('#scDet').innerHTML = dayRow(scLast, scSel);
+    }
+  });
   $('#mSched').addEventListener('click', openSched);
   $('#scBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
 

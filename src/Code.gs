@@ -3762,17 +3762,29 @@ function adm_schNote(token, action, id, label) {
   });
 }
 
-/** 기사 앱: 내 스케줄 (이번 주 일요일부터 2주) */
-function api_mySchedule(token) {
+/**
+ * 기사 앱: 내 스케줄
+ * month 없음 → 이번 주 일요일부터 2주 / month = 'yyyy-MM' → 그 달 1일~말일 (앞뒤 12개월까지)
+ */
+function api_mySchedule(token, month) {
   return run_(function () {
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
     if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
-    const sun = sundayOf_(new Date());
-    const end = addDays_(sun, SCH_DAYS - 1);
-    const dates = schDateRange_(sun, end);
-    const out = { ok: true, today: todayText_(), dates: dates, cells: {}, holidays: {} };
+    let dates, ym = '';
+    const mm = str_(month).match(/^(\d{4})-(\d{2})$/);
+    if (mm) {
+      const first = new Date(+mm[1], +mm[2] - 1, 1), now = new Date();
+      const diff = (first.getFullYear() - now.getFullYear()) * 12 + first.getMonth() - now.getMonth();
+      if (Math.abs(diff) > 12) fail_('앞뒤 12개월까지 볼 수 있습니다.');
+      dates = schDateRange_(first, new Date(+mm[1], +mm[2], 0));
+      ym = mm[1] + '-' + mm[2];
+    } else {
+      const sun = sundayOf_(new Date());
+      dates = schDateRange_(sun, addDays_(sun, SCH_DAYS - 1));
+    }
+    const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
     if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
     const h = schHeader_();
