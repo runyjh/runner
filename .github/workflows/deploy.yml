@@ -1,0 +1,73 @@
+# main 브랜치에 코드가 올라오면 문법 검사 후 Apps Script 로 자동 배포한다.
+# 필요한 저장소 Secrets: CLASPRC_JSON, SCRIPT_ID, DEPLOYMENT_ID (README 참고)
+name: Apps Script 배포
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+
+concurrency:
+  group: apps-script-deploy
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: 문법 검사
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check.js
+
+  deploy:
+    name: Apps Script 배포
+    needs: check
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: clasp 설치
+        run: npm install -g @google/clasp@2.4.2
+
+      - name: 인증 정보와 프로젝트 연결 파일 만들기
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$SCRIPT_ID" ]; then
+            echo "::error::Secrets 에 CLASPRC_JSON, SCRIPT_ID 를 등록해 주세요 (README 참고)"
+            exit 1
+          fi
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          printf '{"scriptId":"%s","rootDir":"src"}' "$SCRIPT_ID" > .clasp.json
+
+      - name: 코드 올리기 (clasp push)
+        run: clasp push --force
+
+      - name: 웹앱 새 버전 배포 (기사용 URL 유지)
+        env:
+          DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
+        run: |
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "::warning::DEPLOYMENT_ID 가 없어 코드만 올렸습니다. 웹앱 반영은 편집기에서 배포 관리 → 새 버전으로 해 주세요."
+            exit 0
+          fi
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "${GITHUB_SHA::7} $(date -u +%Y-%m-%dT%H:%MZ)"
+
+      - name: 인증 파일 삭제
+        if: always()
+        run: rm -f ~/.clasprc.json .clasp.json
