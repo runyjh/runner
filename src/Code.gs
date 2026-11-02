@@ -39,7 +39,7 @@ const CFG = {
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
-  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes' };
+  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -172,8 +172,35 @@ const R_NOTES = {
   g1: '노선코드에서 자동으로 채워집니다. 노선코드를 고치세요.',
   status: '사용 / 중지'
 };
+// camp_addresses 시트: 캠프 주소와 다른 곳 (상차지 등). 캠프 하나에 여러 개 가능
+const CAD = {
+  id: '주소ID', campId: '캠프ID', campName: '캠프명', label: '이름', address: '주소', order: '순서',
+  createdAt: '등록일시', updatedAt: '수정일시'
+};
+const CAD_NOTES = {
+  campName: '캠프명을 입력하면 캠프ID가 자동으로 채워집니다.',
+  label: '예: 상차지, 2상차지, 회차지. 비워 두면 "상차지"',
+  order: '작은 숫자가 앞에 표시됩니다.'
+};
+const CAD_MAX = 10;
+// route_prices 시트: 구분별 단가. 노선코드 앞자리부터의 경로(110-A, 110-A-B …) 하나에 한 줄
+const RP = {
+  id: '단가ID', campId: '캠프ID', campName: '캠프명', level: '구분', path: '구분경로',
+  p1: '원청단가', p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가',
+  tmp: '일시단가', tmpStart: '일시단가 시작일', tmpEnd: '일시단가 종료일',
+  createdAt: '등록일시', updatedAt: '수정일시'
+};
+const RP_PRICE_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5', 'tmp'];
+const RP_NOTES = {
+  campName: '캠프명을 입력하면 캠프ID가 자동으로 채워집니다.',
+  path: '노선코드 앞자리부터 구분을 - 로 이어 씀. 예: 110-A (구분2), 110-A-B (구분3), 110-A-B-C (구분4), 110-A-B-C-D (구분5). 110AB 처럼 써도 자동으로 나뉩니다.',
+  level: '구분경로에서 자동 (구분2~구분5)',
+  p1: '숫자만 (원). 1,200 처럼 써도 됩니다.',
+  tmp: '정해진 기간에만 쓰는 단가. 시작일·종료일을 같이 입력하세요.',
+  tmpStart: '2026-11-01 형식'
+};
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
-const AUTO_SHEETS = ['camps', 'camp_images', 'routes'];
+const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -184,6 +211,8 @@ SCHEMA[SH.MEMO] = M;
 SCHEMA[SH.BIB] = B;
 SCHEMA[SH.CAMPS] = CP;
 SCHEMA[SH.CIMG] = CI;
+SCHEMA[SH.CADDR] = CAD;
+SCHEMA[SH.PRICES] = RP;
 SCHEMA[SH.ROUTES] = R;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
@@ -297,6 +326,11 @@ function ensureColumns(only) {
     } else if (name === SH.CAMPS) {
       Object.keys(CP_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(CP_NOTES[k]); });
       sh.setFrozenColumns(Math.min(c.name + 1, 3));
+    } else if (name === SH.PRICES) {
+      Object.keys(RP_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(RP_NOTES[k]); });
+      sh.getRange(1, c.level + 1).setBackground('#eef2f6');
+    } else if (name === SH.CADDR) {
+      Object.keys(CAD_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(CAD_NOTES[k]); });
     } else if (name === SH.CIMG) {
       Object.keys(CI_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(CI_NOTES[k]); });
     } else if (name === SH.ROUTES) {
@@ -999,6 +1033,8 @@ function onSheetEdit(e) {
       else if (name === SH.CAMPS) { fixCampRow_(sh, c, o); campRenamed = true; }
       else if (name === SH.ROUTES) fixRouteRow_(sh, c, o);
       else if (name === SH.CIMG) fixCampImageRow_(sh, c, o);
+      else if (name === SH.CADDR) fixCampAddrRow_(sh, c, o);
+      else if (name === SH.PRICES) fixPriceRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
     });
     if (campRenamed) syncCampNames_();
@@ -2242,7 +2278,9 @@ function master_() {
   const data = {
     camps: readAll_(SH.CAMPS).filter(function (o) { return o.id; }).map(campView_),
     routes: readAll_(SH.ROUTES).filter(function (o) { return o.id && o.code; }).map(routeView_),
-    images: readAll_(SH.CIMG).filter(function (o) { return o.id; }).map(imageView_)
+    images: readAll_(SH.CIMG).filter(function (o) { return o.id; }).map(imageView_),
+    addresses: readAll_(SH.CADDR).filter(function (o) { return o.id && o.address; }).map(addrView_),
+    prices: readAll_(SH.PRICES).filter(function (o) { return o.id && o.path; }).map(priceView_)
   };
   const json = JSON.stringify(data);
   if (json.length <= MST_CHUNK * 60) {
@@ -2267,7 +2305,7 @@ function adm_routeAll(token) {
 function syncCampNames_() {
   const names = {};
   readAll_(SH.CAMPS).forEach(function (o) { if (o.id) names[o.id] = o.name; });
-  [SH.ROUTES, SH.CIMG].forEach(function (sn) {
+  [SH.ROUTES, SH.CIMG, SH.CADDR, SH.PRICES].forEach(function (sn) {
     const sh = sheet_(sn), c = cols_(sn, true), last = sh.getLastRow();
     if (last < 2) return;
     const ids = sh.getRange(2, c.campId + 1, last - 1, 1).getValues();
@@ -2295,6 +2333,7 @@ function adm_campSave(token, f) {
     if (address.length > 200) fail_('주소가 너무 깁니다.');
     const memo = String(f.memo == null ? '' : f.memo).trim();
     if (memo.length > 2000) fail_('메모가 너무 깁니다. (2000자 이내)');
+    const addrs = f.addresses === undefined ? undefined : cleanAddrs_(f.addresses);
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
@@ -2314,8 +2353,13 @@ function adm_campSave(token, f) {
         writeFields_(SH.CAMPS, row, { name: name, address: address, memo: memo, updatedAt: now });
         if (o.name !== name) syncCampNames_();
       }
+      const camp = campView_(readObj_(SH.CAMPS, row));
+      if (addrs !== undefined) saveAddrs_(camp, addrs, now);
       bumpMaster_();
-      return { ok: true, camp: campView_(readObj_(SH.CAMPS, row)) };
+      return {
+        ok: true, camp: camp,
+        addresses: readAll_(SH.CADDR).filter(function (x) { return x.campId === camp.id && x.address; }).map(addrView_)
+      };
     } finally {
       lock.releaseLock();
     }
@@ -2340,6 +2384,10 @@ function adm_campDelete(token, id) {
       imgs.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
         .forEach(function (r) { sheet_(SH.CIMG).deleteRow(r); });
       sheet_(SH.CAMPS).deleteRow(row);
+      [SH.CADDR, SH.PRICES].forEach(function (sn) {
+        readAll_(sn).filter(function (x) { return x.campId === id; }).map(function (x) { return x._row; })
+          .sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(sn).deleteRow(r); });
+      });
       logAdmin_(a, '캠프 삭제', o.name + ' (' + id + ')', '이미지 ' + imgs.length + '장');
       bumpMaster_();
     } finally {
@@ -2764,4 +2812,198 @@ function fixCampImageRow_(sh, c, o) {
   putCells_(sh, c, o._row, upd);
   putNote_(sh, c, o._row, 'campName', camp.err || '');
   putNote_(sh, c, o._row, 'file', fileIdOf_(o.file) ? '' : '드라이브 이미지 링크를 붙여 넣어 주세요.');
+}
+
+// ── 캠프 주소와 다른 곳 (상차지 등) ──
+function addrView_(o) {
+  return { id: o.id, campId: o.campId, label: o.label || '상차지', address: o.address, order: Number(o.order) || 0 };
+}
+/** 화면에서 받은 주소 목록 정리: 주소가 빈 줄은 버린다 */
+function cleanAddrs_(list) {
+  const out = [];
+  (list || []).forEach(function (x) {
+    const address = str_(x && x.address).replace(/\s+/g, ' ');
+    const label = str_(x && x.label).replace(/\s+/g, ' ') || '상차지';
+    if (!address) return;
+    if (address.length > 200) fail_('주소가 너무 깁니다: ' + address.slice(0, 20) + '…');
+    if (label.length > 20) fail_('주소 이름은 20자 이내로 입력해 주세요: ' + label);
+    out.push({ label: label, address: address });
+  });
+  if (out.length > CAD_MAX) fail_('주소는 캠프마다 ' + CAD_MAX + '개까지 넣을 수 있습니다.');
+  return out;
+}
+/** 캠프의 추가 주소를 받은 목록으로 바꾼다 (잠금 안에서만 호출). 같은 내용이면 쓰지 않는다. */
+function saveAddrs_(camp, list, now) {
+  const sh = sheet_(SH.CADDR);
+  const have = readAll_(SH.CADDR).filter(function (x) { return x.campId === camp.id; })
+    .sort(function (p, q) { return (Number(p.order) || 1e9) - (Number(q.order) || 1e9); });
+  const same = have.length === list.length && have.every(function (x, i) {
+    return (x.label || '상차지') === list[i].label && x.address === list[i].address && Number(x.order) === i + 1;
+  });
+  if (same) return;
+  // 이름·주소가 같은 줄은 주소ID·등록일시를 유지한다
+  const keep = {};
+  have.forEach(function (x) { keep[x.label + '|' + x.address] = keep[x.label + '|' + x.address] || x; });
+  have.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
+    .forEach(function (r) { sh.deleteRow(r); });
+  appendObjs_(SH.CADDR, list.map(function (x, i) {
+    const old = keep[x.label + '|' + x.address];
+    if (old) delete keep[x.label + '|' + x.address];
+    return {
+      id: old ? old.id : newRid_('A'), campId: camp.id, campName: camp.name, label: x.label, address: x.address,
+      order: String(i + 1), createdAt: old ? old.createdAt : now, updatedAt: now
+    };
+  }));
+}
+function fixCampAddrRow_(sh, c, o) {
+  if (!o.id && !o.address && !o.campName && !o.campId && !o.label) return;
+  const upd = {}, now = nowText_();
+  if (!o.id) { upd.id = newRid_('A'); if (!o.createdAt) upd.createdAt = now; }
+  const camp = resolveCamp_(o);
+  if (!camp.err) {
+    if (camp.campId !== o.campId) upd.campId = camp.campId;
+    if (camp.campName !== o.campName) upd.campName = camp.campName;
+  }
+  if (!o.label && o.address) upd.label = '상차지';
+  if (o.order && !/^\d+$/.test(o.order)) upd.order = String(parseInt(o.order, 10) || '');
+  upd.updatedAt = now;
+  putCells_(sh, c, o._row, upd);
+  putNote_(sh, c, o._row, 'campName', camp.err || '');
+  putNote_(sh, c, o._row, 'address', o.address ? '' : '주소를 입력해 주세요.');
+}
+
+// ── 구분별 단가 (구분2~5) ──
+/** 구분경로 정리: '110-a-b' / '110AB' → '110-A-B'. 구분이 2~5개가 아니면 '' */
+function normPath_(v) {
+  const s = normCode_(v);
+  if (!s) return '';
+  let parts;
+  if (s.indexOf('-') >= 0) parts = s.split('-').filter(function (x) { return x; });
+  else { const g = splitCode_(s); parts = [g.g1, g.g2, g.g3, g.g4, g.g5].filter(function (x) { return x; }); }
+  if (parts.length < 2 || parts.length > 5) return '';
+  return parts.join('-');
+}
+function pathLevel_(path) { return path ? path.split('-').length : 0; }
+/** 금액 글자 정리: '1,200원' → '1200'. 비었으면 '', 잘못되면 null */
+function normMoney_(v) {
+  const s = str_(v).replace(/[,\s원₩]/g, '');
+  if (!s) return '';
+  return /^\d{1,9}$/.test(s) ? String(Number(s)) : null;
+}
+function priceView_(o) {
+  const path = normPath_(o.path) || o.path;
+  const v = { id: o.id, campId: o.campId, path: path, level: pathLevel_(path), tmpStart: o.tmpStart, tmpEnd: o.tmpEnd, updatedAt: o.updatedAt };
+  RP_PRICE_KEYS.forEach(function (k) { const m = normMoney_(o[k]); v[k] = m === null ? o[k] : m; });
+  return v;
+}
+
+/**
+ * 캠프의 구분별 단가를 한 번에 저장.
+ * rows = [{ path, p1..p5, tmp, tmpStart, tmpEnd, seen }] — 보낸 경로만 바뀐다. 단가를 모두 비우면 그 줄은 지운다.
+ */
+function adm_priceSave(token, campId, rows) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    rows = rows || [];
+    if (!rows.length) fail_('저장할 단가가 없습니다.');
+    if (rows.length > 2000) fail_('한 번에 2000줄까지 저장할 수 있습니다.');
+    // 1) 값 검사 (잠금 밖)
+    const clean = rows.map(function (r) {
+      const path = normPath_(r.path);
+      if (!path) fail_('구분경로가 올바르지 않습니다: ' + r.path);
+      const x = { path: path, seen: r.seen };
+      RP_PRICE_KEYS.forEach(function (k) {
+        const m = normMoney_(r[k]);
+        if (m === null) fail_(path + ' ' + RP[k] + ': 숫자만 입력해 주세요.');
+        x[k] = m;
+      });
+      x.tmpStart = r.tmpStart ? normDate_(r.tmpStart) : '';
+      x.tmpEnd = r.tmpEnd ? normDate_(r.tmpEnd) : '';
+      if ((r.tmpStart && !x.tmpStart) || (r.tmpEnd && !x.tmpEnd)) fail_(path + ' 일시단가 기간의 날짜 형식을 확인해 주세요.');
+      if (x.tmp && (!x.tmpStart || !x.tmpEnd)) fail_(path + ' 일시단가는 시작일과 종료일을 같이 입력해 주세요.');
+      if (x.tmpStart && x.tmpEnd && x.tmpStart > x.tmpEnd) fail_(path + ' 일시단가 종료일이 시작일보다 빠릅니다.');
+      if (!x.tmp && (x.tmpStart || x.tmpEnd)) fail_(path + ' 일시단가 금액을 입력하거나 기간을 지워 주세요.');
+      x.empty = RP_PRICE_KEYS.every(function (k) { return !x[k]; });
+      return x;
+    });
+    // 2) 저장 (짧게 잠금)
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const camp = campMap_()[campId];
+      if (!camp) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
+      const have = {};
+      readAll_(SH.PRICES).forEach(function (o) {
+        if (o.campId === camp.id) { const p = normPath_(o.path) || o.path; if (!have[p]) have[p] = o; }
+      });
+      clean.forEach(function (x) {
+        const o = have[x.path];
+        if (o && x.seen !== undefined && x.seen !== null && String(x.seen) !== String(o.updatedAt || '')) {
+          fail_(x.path + ' 단가가 다른 곳(다른 관리자 또는 시트)에서 먼저 수정되었습니다. 새로고침한 뒤 다시 해 주세요.');
+        }
+        if (!o && x.seen) fail_(x.path + ' 단가가 다른 곳에서 지워졌습니다. 새로고침한 뒤 다시 해 주세요.');
+      });
+      const now = nowText_(), add = [], del = [];
+      let changed = 0;
+      clean.forEach(function (x) {
+        const o = have[x.path];
+        if (x.empty) { if (o) { del.push(o._row); changed++; } return; }
+        const f = { level: '구분' + pathLevel_(x.path), path: x.path, tmpStart: x.tmpStart, tmpEnd: x.tmpEnd };
+        RP_PRICE_KEYS.forEach(function (k) { f[k] = x[k]; });
+        if (!o) {
+          add.push(Object.assign({ id: newRid_('P'), campId: camp.id, campName: camp.name, createdAt: now, updatedAt: now }, f));
+          changed++;
+          return;
+        }
+        const upd = {};
+        Object.keys(f).forEach(function (k) { if (String(o[k] || '') !== String(f[k])) upd[k] = f[k]; });
+        if (Object.keys(upd).length) { upd.updatedAt = now; writeFields_(SH.PRICES, o._row, upd); changed++; }
+      });
+      appendObjs_(SH.PRICES, add);
+      del.sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.PRICES).deleteRow(r); });
+      if (changed) {
+        logAdmin_(a, '단가 저장', camp.name, clean.slice(0, 20).map(function (x) {
+          return x.path + (x.empty ? ' 삭제' : ' ' + RP_PRICE_KEYS.map(function (k) { return x[k] || '-'; }).join('/'));
+        }).join(', ') + (clean.length > 20 ? ' 외 ' + (clean.length - 20) + '건' : ''));
+      }
+      bumpMaster_();
+      const prices = readAll_(SH.PRICES).filter(function (o) { return o.campId === camp.id && o.path; }).map(priceView_);
+      return { ok: true, changed: changed, prices: prices };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** route_prices 시트를 직접 고쳤을 때 */
+function fixPriceRow_(sh, c, o) {
+  if (!o.id && !o.path && !o.campName && !o.campId) return;
+  const upd = {}, now = nowText_(), notes = {};
+  if (!o.id) { upd.id = newRid_('P'); if (!o.createdAt) upd.createdAt = now; }
+  const camp = resolveCamp_(o);
+  if (!camp.err) {
+    if (camp.campId !== o.campId) upd.campId = camp.campId;
+    if (camp.campName !== o.campName) upd.campName = camp.campName;
+  }
+  const path = normPath_(o.path);
+  if (path) {
+    if (path !== o.path) upd.path = path;
+    const lv = '구분' + pathLevel_(path);
+    if (lv !== o.level) upd.level = lv;
+  } else notes.path = '구분경로를 110-A (구분2) ~ 110-A-B-C-D (구분5) 형식으로 입력해 주세요.';
+  RP_PRICE_KEYS.forEach(function (k) {
+    const m = normMoney_(o[k]);
+    if (m === null) notes[k] = '숫자만 입력해 주세요.';
+    else if (m !== o[k]) upd[k] = m;
+  });
+  ['tmpStart', 'tmpEnd'].forEach(function (k) {
+    if (!o[k]) return;
+    const d = normDate_(o[k]);
+    if (d) { if (d !== o[k]) upd[k] = d; } else notes[k] = '날짜 형식을 확인해 주세요. (예: 2026-11-01)';
+  });
+  if (o.tmp && (!o.tmpStart || !o.tmpEnd)) notes.tmp = '일시단가는 시작일과 종료일을 같이 입력해 주세요.';
+  upd.updatedAt = now;
+  putCells_(sh, c, o._row, upd);
+  putNote_(sh, c, o._row, 'campName', camp.err || '');
+  ['path', 'tmpStart', 'tmpEnd'].concat(RP_PRICE_KEYS).forEach(function (k) { putNote_(sh, c, o._row, k, notes[k] || ''); });
 }

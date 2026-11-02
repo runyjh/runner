@@ -214,7 +214,9 @@
   .camp-item.orphan b { color: var(--danger); }
   .ch-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
   .ch-top h3 { margin: 0 auto 0 0; font-size: 18px; }
-  .kv2 { display: grid; grid-template-columns: 48px 1fr; gap: 6px 12px; font-size: 13px; }
+  .kv2 { display: grid; grid-template-columns: minmax(48px, max-content) 1fr; gap: 6px 12px; font-size: 13px; }
+  .addr-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) 32px; gap: 6px; margin-bottom: 6px; }
+  .addr-row .x { border: 0; background: none; font-size: 20px; color: var(--sub); }
   .kv2 > span:nth-child(odd) { color: var(--sub); }
   .kv2 em, .img-tile em { color: var(--faint); font-style: normal; }
   .pre { white-space: pre-wrap; word-break: break-word; }
@@ -266,6 +268,32 @@
   .iv-desc .btn { height: 48px; }
   .m-top { flex-wrap: wrap; }
   .code-inp { font-size: 16px; text-transform: uppercase; }
+  .rtabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rtabs .tab { font-weight: 600; }
+  .ptools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .ptools .inp { height: 34px; width: auto; font-size: 13px; padding: 0 8px; }
+  .ptools .check { margin: 0; font-size: 13px; }
+  .ptools .grow { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .ptools .grow span { font-size: 12px; color: var(--warn); font-weight: 700; }
+  .pt table { min-width: 980px; }
+  .pt th, .pt td { padding: 6px 5px; }
+  .pt th:first-child, .pt td.pg { position: sticky; left: 0; z-index: 1; background: #fff; }
+  .pt th:first-child { z-index: 3; background: #fafbfc; }
+  .pt td.pg { min-width: 180px; box-shadow: 1px 0 0 var(--line); }
+  .pt tbody tr { cursor: default; }
+  .pt tbody tr:hover, .pt tbody tr:hover td.pg { background: #f9fafb; }
+  .pt tr.lv2 td, .pt tr.lv2 td.pg { background: #f5f8fd; }
+  .pt th.tg { background: #fdf6e9; }
+  .pin { width: 84px; height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; text-align: right; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; background: #fff; }
+  .pin.date { width: 128px; text-align: left; }
+  .pin.dirty { border-color: var(--warn); background: #fffdf7; }
+  .pin:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); }
+  .lvb { display: inline-block; font-size: 10px; color: var(--sub); background: var(--gray-weak); border-radius: 4px; padding: 0 5px; margin-right: 5px; vertical-align: 1px; }
+  .pp { color: var(--faint); font-size: 11px; margin-left: 5px; }
+  .pcnt { color: var(--faint); font-size: 11px; margin-left: 4px; }
+  .tag.ok { background: var(--ok-weak); color: var(--ok); }
+  .tag.gray { background: var(--gray-weak); color: var(--sub); }
+  table.mini td.num, table.mini th.num { text-align: right; }
   @media (max-width: 900px) {
     .rt-wrap { grid-template-columns: minmax(0, 1fr); }
     .camp-side { position: static; max-height: 300px; }
@@ -490,7 +518,9 @@
   <form class="m-box" id="campForm" novalidate style="width:min(520px,100%)">
     <h3 id="cmTitle">캠프 추가</h3>
     <div class="field"><label class="lb" for="cmName">캠프명</label><input class="inp" id="cmName" maxlength="40" autocomplete="off"></div>
-    <div class="field"><label class="lb" for="cmAddr">주소</label><input class="inp" id="cmAddr" maxlength="200" autocomplete="off"></div>
+    <div class="field"><label class="lb" for="cmAddr">캠프 주소</label><input class="inp" id="cmAddr" maxlength="200" autocomplete="off"></div>
+    <div class="field"><span class="lb">상차지 주소 (캠프 주소와 다른 곳일 때. 여러 개 가능)</span><div id="cmAddrs"></div>
+      <button type="button" class="btn sm ghost" id="cmAddrAdd">+ 상차지 주소 추가</button></div>
     <div class="field"><label class="lb" for="cmMemo">메모 (선택)</label><textarea class="inp" id="cmMemo" placeholder="출입 방법, 주차, 연락처 등"></textarea></div>
     <div class="m-actions"><button type="button" class="btn ghost" id="cmCancel">닫기</button><button class="btn" id="cmSave">저장</button></div>
   </form>
@@ -826,6 +856,7 @@
   }
   $$('.nav a[data-view]').forEach((a) => a.addEventListener('click', () => {
     if (a.dataset.view === currentView) return;
+    if (currentView === 'route' && !pricesLeaveOk()) return;
     if (!$('#drawer').classList.contains('hidden')) closeDrawer();
     if (!$('#drawer').classList.contains('hidden')) return; // 저장 안 한 변경이 있어 닫지 않음
     if (!$('#bdrawer').classList.contains('hidden')) closeBib();
@@ -1424,7 +1455,7 @@
   });
 
   // ───── 노선관리 (캠프 > 노선코드) ─────
-  const RT = { camps: [], routes: [], images: [] };
+  const RT = { camps: [], routes: [], images: [], addresses: [], prices: [] };
   const ORPHAN = '__none__';            // 캠프가 지정되지 않은 노선 모음
   const GK = ['g1', 'g2', 'g3', 'g4', 'g5'];
   const CODE_RE = /^[0-9A-Z가-힣_-]+$/;
@@ -1456,20 +1487,22 @@
   }
   const imagesOf = (id) => RT.images.filter((i) => i.campId === id)
     .sort((a, b) => (a.order || 1e9) - (b.order || 1e9) || koSort(a.createdAt, b.createdAt));
+  const addrsOf = (id) => RT.addresses.filter((a) => a.campId === id).sort((a, b) => (a.order || 1e9) - (b.order || 1e9));
+  const mapLink = (addr) => '<a class="maplink" target="_blank" rel="noopener" href="https://map.naver.com/p/search/' + encodeURIComponent(addr) + '">지도 ↗</a>';
   const sortedCamps = () => RT.camps.slice().sort((a, b) => koSort(a.name, b.name));
 
   function loadRoutes() {
     if (!RT.camps.length) $('#campMain').innerHTML = '<div class="sec"><div class="spin"></div></div>';
     return api('adm_routeAll').then((r) => {
       if (!r.ok) return toast(r.msg);
-      RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images;
+      RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images; RT.addresses = r.addresses || []; RT.prices = r.prices || [];
       if (curCamp && curCamp !== ORPHAN && !campById(curCamp)) curCamp = null;
       if (curCamp === ORPHAN && !routesOf(ORPHAN).length) curCamp = null;
       if (!curCamp && RT.camps.length) curCamp = sortedCamps()[0].id;
       renderCampList(); renderCampMain();
     }).catch(() => {});
   }
-  $('#rtReload').addEventListener('click', () => loadRoutes().then(() => toast('새로 불러왔습니다.')));
+  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk()) return; pdirty = {}; loadRoutes().then(() => toast('새로 불러왔습니다.')); });
 
   // 왼쪽 캠프 목록
   function renderCampList() {
@@ -1493,7 +1526,8 @@
   $('#campList').addEventListener('click', (e) => {
     const b = e.target.closest('[data-camp]'); if (!b) return;
     const id = b.dataset.camp, q = normCode($('#campQ').value);
-    if (id !== curCamp) { curCamp = id; resetFilters(); rsel.clear(); }
+    if (id !== curCamp && !pricesLeaveOk()) return;
+    if (id !== curCamp) { curCamp = id; resetFilters(); rsel.clear(); pdirty = {}; }
     if (q && !normCode((campById(id) || {}).name).includes(q) && routesOf(id).some((r) => r.code.includes(q))) rtf.q = q;
     renderCampList(); renderCampMain();
     if (window.innerWidth <= 900) $('#campMain').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1507,6 +1541,7 @@
       return;
     }
     const orphan = curCamp === ORPHAN;
+    if (orphan) rtab = 'routes';
     const c = orphan ? { name: '캠프 미지정', address: '', memo: '' } : campById(curCamp);
     const imgs = orphan ? [] : imagesOf(curCamp);
     m.innerHTML =
@@ -1514,7 +1549,8 @@
         '<div class="ch-top"><h3>' + esc(c.name) + '</h3>' +
           (orphan ? '' : '<button class="btn sm ghost" data-ract="camp-edit">캠프 정보 수정</button><button class="btn sm ghost danger-t" data-ract="camp-del">캠프 삭제</button>') + '</div>' +
         (orphan ? '<p style="margin:0;color:var(--sub);font-size:13px">시트(routes 탭)에서 캠프명이 비었거나, camps 탭에 없는 캠프명을 쓴 노선입니다. 노선을 눌러 캠프를 지정해 주세요.</p>'
-          : '<div class="kv2"><span>주소</span><span>' + (c.address ? esc(c.address) + '<a class="maplink" target="_blank" rel="noopener" href="https://map.naver.com/p/search/' + encodeURIComponent(c.address) + '">지도 ↗</a>' : '<em>없음</em>') + '</span>' +
+          : '<div class="kv2"><span>캠프 주소</span><span>' + (c.address ? esc(c.address) + mapLink(c.address) : '<em>없음</em>') + '</span>' +
+            addrsOf(c.id).map((a) => '<span>' + esc(a.label) + '</span><span>' + esc(a.address) + mapLink(a.address) + '</span>').join('') +
             '<span>메모</span><span class="pre">' + (c.memo ? esc(c.memo) : '<em>없음</em>') + '</span></div>') +
       '</div>' +
       (orphan ? '' :
@@ -1524,12 +1560,18 @@
           '<span>' + (im.desc ? esc(im.desc) : '<em>설명 없음</em>') + '</span></button>').join('') + '</div>'
           : '<div class="no-memo">참고 이미지가 없습니다. 출입구, 주차 위치, 상차 위치 사진 등을 올려 두세요.</div>') +
       '</div>') +
-      '<div class="sec"><div class="sec-h"><h4>노선<small id="rCount"></small></h4>' + (orphan ? '' : '<button class="btn sm" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
+      '<div class="sec"><div class="sec-h"><div class="rtabs">' +
+          '<button class="tab' + (rtab === 'routes' ? ' on' : '') + '" data-rtab="routes">노선 <b id="rCount"></b></button>' +
+          (orphan ? '' : '<button class="tab' + (rtab === 'prices' ? ' on' : '') + '" data-rtab="prices">구분별 단가 <b id="pCount"></b></button>') + '</div>' +
+          (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
+        '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
         '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
         '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th>메모</th><th>수정일시</th></tr></thead>' +
-        '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div>' +
+        '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div></div>' +
+        (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div>') +
       '</div>';
     renderFilters(); renderRoutes(); loadThumbs();
+    if (!orphan) renderPrices();
   }
 
   function renderFilters() {
@@ -1627,13 +1669,30 @@
     cmEdit = c || null;
     $('#cmTitle').textContent = c ? '캠프 정보 수정' : '캠프 추가';
     $('#cmName').value = c ? c.name : ''; $('#cmAddr').value = c ? c.address : ''; $('#cmMemo').value = c ? c.memo : '';
+    $('#cmAddrs').innerHTML = '';
+    (c ? addrsOf(c.id) : []).forEach((a) => addAddrRow(a.label, a.address));
     $('#campModal').classList.remove('hidden'); $('#cmName').focus();
   }
+  function addAddrRow(label, address) {
+    const d = document.createElement('div'); d.className = 'addr-row';
+    d.innerHTML = '<input class="inp" data-al maxlength="20" placeholder="이름" value="' + esc(label || '상차지') + '">' +
+      '<input class="inp" data-aa maxlength="200" placeholder="상차지 주소" value="' + esc(address || '') + '">' +
+      '<button type="button" class="x" aria-label="빼기">×</button>';
+    $('#cmAddrs').appendChild(d);
+    return d;
+  }
+  $('#cmAddrAdd').addEventListener('click', () => {
+    if ($$('.addr-row', $('#cmAddrs')).length >= 10) return toast('주소는 10개까지 넣을 수 있습니다.');
+    addAddrRow('상차지', '').querySelector('[data-aa]').focus();
+  });
+  $('#cmAddrs').addEventListener('click', (e) => { if (e.target.closest('.x')) e.target.closest('.addr-row').remove(); });
   $('#campNew').addEventListener('click', () => openCampModal(null));
   $('#cmCancel').addEventListener('click', () => $('#campModal').classList.add('hidden'));
   $('#campForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const f = { name: $('#cmName').value.trim(), address: $('#cmAddr').value.trim(), memo: $('#cmMemo').value.trim() };
+    const f = { name: $('#cmName').value.trim(), address: $('#cmAddr').value.trim(), memo: $('#cmMemo').value.trim(),
+      addresses: $$('.addr-row', $('#cmAddrs')).map((d) => ({ label: d.querySelector('[data-al]').value.trim(), address: d.querySelector('[data-aa]').value.trim() }))
+        .filter((x) => x.address) };
     if (!f.name) { $('#cmName').focus(); return toast('캠프명을 입력해 주세요.'); }
     if (cmEdit) { f.id = cmEdit.id; f.seen = cmEdit.updatedAt; }
     const b = $('#cmSave'); b.disabled = true;
@@ -1641,6 +1700,7 @@
       if (!r.ok) return toast(r.msg);
       const i = RT.camps.findIndex((x) => x.id === r.camp.id);
       if (i >= 0) RT.camps[i] = r.camp; else RT.camps.push(r.camp);
+      RT.addresses = RT.addresses.filter((x) => x.campId !== r.camp.id).concat(r.addresses || []);
       if (!cmEdit) { curCamp = r.camp.id; resetFilters(); rsel.clear(); }
       $('#campModal').classList.add('hidden');
       renderCampList(); renderCampMain();
@@ -1653,7 +1713,7 @@
     if (!confirm('"' + c.name + '" 캠프를 삭제할까요?' + (ni ? '\n참고 이미지 ' + ni + '장도 함께 지워집니다.' : ''))) return;
     api('adm_campDelete', c.id).then((r) => {
       if (!r.ok) return toast(r.msg);
-      RT.camps = RT.camps.filter((x) => x.id !== c.id); RT.images = RT.images.filter((x) => x.campId !== c.id);
+      RT.camps = RT.camps.filter((x) => x.id !== c.id); RT.images = RT.images.filter((x) => x.campId !== c.id); RT.addresses = RT.addresses.filter((x) => x.campId !== c.id);
       curCamp = RT.camps.length ? sortedCamps()[0].id : null; resetFilters(); rsel.clear();
       renderCampList(); renderCampMain(); toast('캠프를 삭제했습니다.');
     }).catch(() => {});
@@ -1708,6 +1768,7 @@
         '<label><input type="radio" name="rmSt" value="' + v + '"' + (r.status === v ? ' checked' : '') + '> ' + v + '</label>').join('') +
         '<span style="color:var(--faint);font-size:12px">당분간 안 쓰는 노선은 삭제 대신 중지</span></div></div>' +
       '<div class="field"><label class="lb" for="rmMemo">메모</label><textarea class="inp" id="rmMemo">' + esc(r.memo) + '</textarea></div>' +
+      routePriceTable(r) +
       '<div class="meta"><span>등록</span><span>' + esc(r.createdAt || '-') + '</span><span>수정</span><span>' + esc(r.updatedAt || '-') + '</span></div>';
     $('#rmDel').classList.remove('hidden'); $('#rmSave').textContent = '저장'; $('#rmSave').disabled = false;
     rmSplit();
@@ -1935,6 +1996,192 @@
       ivIdx = Math.min(ivIdx, ivList.length - 1); showIv();
     }).catch(() => {});
   });
+
+  // ───── 노선관리: 구분별 단가 (구분2~5, 노선코드 앞자리부터의 경로마다) ─────
+  const PKEYS = ['p1', 'p2', 'p3', 'p4', 'p5', 'tmp'];
+  const PLABEL = { p1: '원청단가', p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가', tmp: '일시단가' };
+  const PALL = PKEYS.concat(['tmpStart', 'tmpEnd']);
+  let rtab = 'routes', pdirty = {};
+  const pf = { level: '', q: '', only: false };
+  const won = (v) => (v === '' || v == null ? '' : Number(v).toLocaleString('ko-KR'));
+  const moneyRaw = (v) => String(v || '').replace(/[,\s원₩]/g, '');
+  const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const pricesOf = (id) => RT.prices.filter((p) => p.campId === id);
+  const dirtyCount = () => Object.keys(pdirty).length;
+  function pricesLeaveOk() {
+    if (!dirtyCount()) return true;
+    if (!confirm('저장하지 않은 단가가 ' + dirtyCount() + '줄 있습니다. 저장하지 않고 넘어갈까요?')) return false;
+    pdirty = {};
+    return true;
+  }
+  /** 캠프 노선에서 구분 경로(110-A, 110-A-B …)를 뽑고, 단가가 입력된 경로도 합친다 */
+  function priceNodes(campId) {
+    const map = new Map();
+    routesOf(campId).forEach((r) => {
+      const g = [r.g1, r.g2, r.g3, r.g4, r.g5];
+      for (let k = 2; k <= 5; k++) {
+        if (!g[k - 1]) break;
+        const path = g.slice(0, k).join('-');
+        const n = map.get(path) || { path, level: k, seg: g[k - 1], routes: 0 };
+        n.routes++; map.set(path, n);
+      }
+    });
+    const prices = {};
+    pricesOf(campId).forEach((p) => {
+      prices[p.path] = p;
+      if (!map.has(p.path)) map.set(p.path, { path: p.path, level: p.level, seg: p.path.split('-').pop(), routes: 0 });
+    });
+    return [...map.values()].map((n) => Object.assign(n, { price: prices[n.path] || null })).sort((a, b) => {
+      const A = a.path.split('-'), B = b.path.split('-');
+      for (let i = 0; i < Math.min(A.length, B.length); i++) { const c = koSort(A[i], B[i]); if (c) return c; }
+      return A.length - B.length;
+    });
+  }
+  function origVal(node, k) { return node.price ? String(node.price[k] || '') : ''; }
+  function curVal(node, k) { const d = pdirty[node.path]; return d && k in d ? d[k] : origVal(node, k); }
+  function tmpState(p) {
+    if (!p || !p.tmp || !p.tmpStart || !p.tmpEnd) return '';
+    const t = todayStr();
+    return t < p.tmpStart ? 'wait' : t > p.tmpEnd ? 'past' : 'on';
+  }
+
+  function renderPrices() {
+    const box = $('#tabPrices'); if (!box) return;
+    box.innerHTML =
+      '<div class="ptools">' +
+        '<select class="inp" id="pfLevel" aria-label="구분"><option value="">구분 전체</option>' + [2, 3, 4, 5].map((k) => '<option value="' + k + '"' + (String(pf.level) === String(k) ? ' selected' : '') + '>구분' + k + '만</option>').join('') + '</select>' +
+        '<input class="inp" id="pfQ" placeholder="구분 검색 (예: 110-A)" value="' + esc(pf.q) + '" autocomplete="off" style="width:170px">' +
+        '<label class="check"><input type="checkbox" id="pfOnly"' + (pf.only ? ' checked' : '') + '> 단가 입력된 것만</label>' +
+        '<div class="grow"><span id="pMsg"></span><button class="btn sm ghost" id="pReset" disabled>되돌리기</button><button class="btn sm" id="pSave" disabled>단가 저장</button></div>' +
+      '</div>' +
+      '<div class="table-wrap rt-table pt"><table><thead><tr><th>구분</th>' +
+        PKEYS.map((k) => '<th' + (k === 'tmp' ? ' class="tg"' : '') + '>' + PLABEL[k] + '</th>').join('') +
+        '<th class="tg">일시단가 시작일</th><th class="tg">일시단가 종료일</th></tr></thead><tbody id="pRows"></tbody></table>' +
+        '<div class="empty hidden" id="pEmpty"></div></div>' +
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">노선코드 앞자리부터 같은 구분끼리 단가가 같습니다. 예: 110-A 와 111-A 는 따로, 구분3은 110-A-B 처럼 앞 구분까지 합쳐서 정합니다. 칸을 고치고 <b>단가 저장</b>을 누르세요. 한 줄의 단가를 모두 지우고 저장하면 그 줄은 지워집니다.</p>';
+    renderPriceRows();
+  }
+  function renderPriceRows() {
+    const nodes = priceNodes(curCamp), q = normCode(pf.q);
+    const set = nodes.filter((n) => n.price).length;
+    if ($('#pCount')) $('#pCount').textContent = set + '/' + nodes.length;
+    const list = nodes.filter((n) => (!pf.level || n.level === +pf.level) && (!q || n.path.replace(/-/g, '').includes(q.replace(/-/g, ''))) &&
+      (!pf.only || n.price || pdirty[n.path]));
+    $('#pRows').innerHTML = list.map((n) => {
+      const st = tmpState(n.price);
+      const cell = (k) => {
+        const v = curVal(n, k), dirty = pdirty[n.path] && k in pdirty[n.path];
+        if (k === 'tmpStart' || k === 'tmpEnd') return '<td><input type="date" class="pin date' + (dirty ? ' dirty' : '') + '" data-pk="' + k + '" value="' + esc(v) + '" aria-label="' + esc(n.path + ' ' + (k === 'tmpStart' ? '일시단가 시작일' : '일시단가 종료일')) + '"></td>';
+        return '<td><input class="pin' + (dirty ? ' dirty' : '') + '" inputmode="numeric" data-pk="' + k + '" value="' + esc(won(v)) + '" aria-label="' + esc(n.path + ' ' + PLABEL[k]) + '"></td>';
+      };
+      return '<tr data-path="' + esc(n.path) + '" class="lv' + n.level + '"><td class="pg"><span style="padding-left:' + ((n.level - 2) * 16) + 'px"><span class="lvb">구분' + n.level + '</span><b class="code">' + esc(n.seg) + '</b><span class="pp">' + esc(n.path) + '</span>' +
+        (n.routes ? '<span class="pcnt">· 노선 ' + n.routes + '</span>' : '<span class="tag" title="이 구분을 쓰는 노선이 없습니다">노선 없음</span>') +
+        (st === 'on' ? '<span class="tag ok">일시 적용 중</span>' : st === 'wait' ? '<span class="tag gray">일시 예정</span>' : st === 'past' ? '<span class="tag gray">일시 지남</span>' : '') +
+        '</span></td>' + PALL.map(cell).join('') + '</tr>';
+    }).join('');
+    const em = $('#pEmpty');
+    em.classList.toggle('hidden', !!list.length);
+    em.innerHTML = nodes.length ? '조건에 맞는 구분이 없습니다.' : '노선이 없습니다. 먼저 노선을 추가하면 구분2~5가 자동으로 나타납니다.';
+    pStatus();
+  }
+  function pStatus() {
+    const n = dirtyCount();
+    $('#pMsg').textContent = n ? n + '줄 바뀜' : '';
+    $('#pSave').disabled = $('#pReset').disabled = !n;
+  }
+  function setPDirty(path, k, v) {
+    const node = priceNodes(curCamp).find((x) => x.path === path); if (!node) return false;
+    const d = pdirty[path] || {};
+    if (v === origVal(node, k)) delete d[k]; else d[k] = v;
+    if (Object.keys(d).length) pdirty[path] = d; else delete pdirty[path];
+    return k in d;
+  }
+
+  // 탭 전환
+  $('#campMain').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-rtab]'); if (!t) return;
+    const v = t.dataset.rtab; if (v === rtab) return;
+    if (rtab === 'prices' && !pricesLeaveOk()) return;
+    rtab = v;
+    $$('[data-rtab]', $('#campMain')).forEach((b) => b.classList.toggle('on', b.dataset.rtab === v));
+    $('#tabRoutes').classList.toggle('hidden', v !== 'routes');
+    $('#tabPrices').classList.toggle('hidden', v !== 'prices');
+    const add = $('[data-ract="route-add"]', $('#campMain')); if (add) add.classList.toggle('hidden', v !== 'routes');
+    if (v === 'prices') renderPrices();
+  });
+  // 단가 칸 입력
+  $('#campMain').addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.id === 'pfQ') { pf.q = t.value; return renderPriceRows(); }
+    if (!t.dataset.pk) return;
+    const path = t.closest('tr[data-path]').dataset.path, k = t.dataset.pk;
+    const v = k === 'tmpStart' || k === 'tmpEnd' ? t.value : moneyRaw(t.value).replace(/^0+(?=\d)/, '');
+    t.classList.toggle('dirty', setPDirty(path, k, v));
+    pStatus();
+  });
+  $('#campMain').addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.id === 'pfLevel') { pf.level = t.value; renderPriceRows(); }
+    else if (t.id === 'pfOnly') { pf.only = t.checked; renderPriceRows(); }
+  });
+  $('#campMain').addEventListener('focusout', (e) => {
+    const t = e.target;
+    if (!t.dataset || !t.dataset.pk || t.type === 'date') return;
+    const raw = moneyRaw(t.value);
+    if (/^\d+$/.test(raw)) t.value = won(raw);
+  });
+  // Enter 로 아래 칸 이동 (엑셀처럼)
+  $('#campMain').addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (e.key !== 'Enter' || !t.dataset || !t.dataset.pk) return;
+    e.preventDefault();
+    const tr = t.closest('tr'), next = e.shiftKey ? tr.previousElementSibling : tr.nextElementSibling;
+    const n = next && next.querySelector('[data-pk="' + t.dataset.pk + '"]');
+    if (n) { n.focus(); if (n.select) n.select(); }
+  });
+  $('#campMain').addEventListener('click', (e) => {
+    if (e.target.id === 'pReset') { pdirty = {}; renderPriceRows(); return; }
+    if (e.target.id !== 'pSave') return;
+    const nodes = {};
+    priceNodes(curCamp).forEach((n) => { nodes[n.path] = n; });
+    const rows = Object.keys(pdirty).map((path) => {
+      const n = nodes[path], row = { path: path };
+      if (n && n.price) row.seen = n.price.updatedAt;
+      PALL.forEach((k) => { row[k] = n ? curVal(n, k) : pdirty[path][k] || ''; });
+      return row;
+    });
+    for (const r of rows) {
+      const bad = PKEYS.find((k) => r[k] && !/^\d{1,9}$/.test(r[k]));
+      if (bad) return toast(r.path + ' ' + PLABEL[bad] + ': 숫자만 입력해 주세요.');
+      if (r.tmp && (!r.tmpStart || !r.tmpEnd)) return toast(r.path + ' 일시단가는 시작일과 종료일을 같이 입력해 주세요.');
+      if (r.tmpStart && r.tmpEnd && r.tmpStart > r.tmpEnd) return toast(r.path + ' 일시단가 종료일이 시작일보다 빠릅니다.');
+      if (!r.tmp && (r.tmpStart || r.tmpEnd)) return toast(r.path + ' 일시단가 금액을 입력하거나 기간을 지워 주세요.');
+    }
+    const b = e.target, camp = curCamp; b.disabled = true; b.textContent = '저장 중…';
+    api('adm_priceSave', camp, rows).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      RT.prices = RT.prices.filter((p) => p.campId !== camp).concat(r.prices);
+      pdirty = {};
+      if (curCamp === camp) renderPriceRows();
+      toast('단가를 저장했습니다. (' + r.changed + '줄)');
+    }).catch(() => {}).finally(() => { b.textContent = '단가 저장'; if (curCamp === camp) pStatus(); });
+  });
+
+  /** 노선 수정 창: 이 노선에 걸린 구분2~5 단가 (보기 전용) */
+  function routePriceTable(r) {
+    const g = [r.g1, r.g2, r.g3, r.g4, r.g5], by = {};
+    pricesOf(r.campId).forEach((p) => { by[p.path] = p; });
+    const rows = [];
+    for (let k = 2; k <= 5; k++) {
+      if (!g[k - 1]) break;
+      const path = g.slice(0, k).join('-'), p = by[path];
+      rows.push('<tr><td><span class="lvb">구분' + k + '</span><b class="code">' + esc(g[k - 1]) + '</b></td>' +
+        PKEYS.map((x) => '<td class="num">' + (p && p[x] ? won(p[x]) : '<span style="color:var(--line)">-</span>') + '</td>').join('') + '</tr>');
+    }
+    if (!rows.length) return '';
+    return '<div class="field"><span class="lb">구분별 단가 (고치려면 "구분별 단가" 탭)</span><div class="prev-wrap" style="max-height:none"><table class="mini"><thead><tr><th>구분</th>' +
+      PKEYS.map((x) => '<th class="num">' + PLABEL[x].replace('단가', '') + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div></div>';
+  }
 
   // 노선관리 창: Esc 로 닫기, 이미지 보기에서 ← → 로 넘기기
   document.addEventListener('keydown', (e) => {
