@@ -240,10 +240,15 @@
 
   // ───── 공통 ─────
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // 브라우저가 저장소를 막아도(시크릿 창, 제3자 데이터 차단 등) 이번 화면에서는 로그인이 유지되도록 메모리에도 보관
+  let memToken = null;
   const store = {
-    get() { try { return localStorage.getItem(TOKEN) || sessionStorage.getItem(TOKEN); } catch (e) { return null; } },
-    set(v, persist) { try { (persist ? localStorage : sessionStorage).setItem(TOKEN, v); } catch (e) {} },
-    del() { try { localStorage.removeItem(TOKEN); sessionStorage.removeItem(TOKEN); } catch (e) {} }
+    get() {
+      try { const v = localStorage.getItem(TOKEN) || sessionStorage.getItem(TOKEN); if (v) return v; } catch (e) {}
+      return memToken;
+    },
+    set(v, persist) { memToken = v; try { (persist ? localStorage : sessionStorage).setItem(TOKEN, v); } catch (e) {} },
+    del() { memToken = null; try { localStorage.removeItem(TOKEN); sessionStorage.removeItem(TOKEN); } catch (e) {} }
   };
   let toastTimer;
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3000); }

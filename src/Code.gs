@@ -154,6 +154,7 @@ function setup() {
 
 /** 빠진 머리글을 오른쪽 끝에 추가하고 서식·숨김·드롭다운·설명을 다시 적용한다. */
 function ensureColumns() {
+  try { ss_().setSpreadsheetTimeZone(CFG.TZ); } catch (e) { /* 권한 문제 시 무시 */ }
   Object.keys(SCHEMA).forEach(function (name) {
     const def = SCHEMA[name];
     if (!ss_().getSheetByName(name)) ss_().insertSheet(name);
@@ -406,6 +407,14 @@ function driverInfo_(id) {
   cache_().put(key, JSON.stringify(info), 600);
   return info;
 }
+/**
+ * 로그인(세션)이 비밀번호 변경보다 나중에 만들어졌는지.
+ * 변경일시가 미래로 기록된 경우(시간대 설정 차이 등)는 무시해서 모든 로그인이 막히지 않게 한다.
+ */
+function sessionAfterPw_(sessionCreated, pwChangedMs) {
+  if (!pwChangedMs || pwChangedMs > Date.now() + 60000) return true;
+  return sessionCreated >= pwChangedMs;
+}
 function mustChange_(o) { return String(o.pwMustChange || '').trim().toUpperCase() === 'Y'; }
 function forgetDriver_(o) {
   const keys = [];
@@ -629,7 +638,7 @@ function api_checkSession(token) {
     const s = getSession_(token);
     if (!s) return { ok: false, code: 'EXPIRED' };
     const info = driverInfo_(s.d);
-    if (!info || info.status !== ST.ACTIVE || s.c < info.pwChangedAt) return { ok: false, code: 'EXPIRED' };
+    if (!info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED' };
     return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId } };
   });
 }
@@ -791,7 +800,7 @@ function api_changePassword(token, currentPassword, newPassword) {
     if (!s) return expired;
     const pw = checkPw_(newPassword);
     const o = driverById_(s.d);
-    if (!o || o.status !== ST.ACTIVE || s.c < toMs_(o.pwChangedAt)) return expired;
+    if (!o || o.status !== ST.ACTIVE || !sessionAfterPw_(s.c, toMs_(o.pwChangedAt))) return expired;
 
     const fk = 'cf:' + o.id;
     const fails = Number(cache_().get(fk) || 0);
@@ -959,7 +968,7 @@ function requireAdmin_(token) {
   const s = getSession_(token);
   if (!s || String(s.d).charAt(0) !== 'A') expired_();
   const a = adminInfo_(s.d);
-  if (!a || a.status !== AST.ACTIVE || s.c < a.pwChangedAt) expired_();
+  if (!a || a.status !== AST.ACTIVE || !sessionAfterPw_(s.c, a.pwChangedAt)) expired_();
   return a;
 }
 /** 관리자 작업 기록 (개인정보 열람·수정 추적용) */
