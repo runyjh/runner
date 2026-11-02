@@ -101,6 +101,8 @@
   .brprev b { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .code-row .inp { flex: 1; }
   .req { color: var(--danger); margin-left: 2px; }
+  #view-drivers th.ck, #view-drivers td.ck { width: 36px; padding-right: 0; }
+  #view-drivers td.ck input, #view-drivers th.ck input { width: 16px; height: 16px; cursor: pointer; }
   .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--danger-weak); color: var(--danger); margin-left: 4px; }
   .dots { letter-spacing: 2px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
@@ -478,9 +480,10 @@
     </div>
     <div class="tabs" id="tabs"></div>
     <div class="tabs sub2" id="ttabs"></div>
+    <div class="rbulk hidden" id="dBulk"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>이름</th><th>기사구분</th><th>기사코드</th><th>배정 캠프 · 라우트</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
+        <thead><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th>이름</th><th>기사구분</th><th>기사코드</th><th>배정 캠프 · 라우트</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -799,7 +802,7 @@
   // ───── 목록 ─────
   let all = [], counts = {}, filter = '전체', tfilter = '', selectedId = '';
   function loadList(keepSel) {
-    $('#rows').innerHTML = '<tr><td colspan="11"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
+    $('#rows').innerHTML = '<tr><td colspan="12"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
     return api('adm_listDrivers').then((r) => {
       if (!r.ok) return toast(r.msg);
       all = r.rows; counts = r.counts;
@@ -835,6 +838,7 @@
     });
   }
   function renderRows() {
+    setTimeout(paintDBulk, 0);
     const list = visibleRows();
     $('#empty').classList.toggle('hidden', list.length > 0);
     $('#empty').textContent = all.length ? '조건에 맞는 기사가 없습니다.' : '등록된 기사가 없습니다.';
@@ -842,6 +846,7 @@
       const dots = Object.keys(DOCS).map((k) => '<i class="dot' + (r.docs[k] ? ' on' : '') + '" title="' + DOCS[k] + '"></i>').join(' ');
       const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw && r.loginId ? '<span class="tag">비밀번호 없음</span>' : '') + (!r.loginId ? '<span class="tag gray">앱 미사용</span>' : '');
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
+        '<td class="ck"><input type="checkbox" data-dck="' + esc(r.id) + '"' + (dsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
         '<td><b>' + esc(r.name) + '</b></td>' +
         '<td>' + (r.driverType ? '<span class="badge t-' + esc(r.driverType) + '">' + esc(r.driverType) + '</span>' : '<span class="badge t-none">미지정</span>') + '</td>' +
         '<td><b class="code">' + esc(r.driverCode) + '</b></td>' +
@@ -852,7 +857,53 @@
         '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
     }).join('');
   }
-  $('#rows').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr && tr.dataset.id) openDrawer(tr.dataset.id); });
+  $('#rows').addEventListener('click', (e) => {
+    if (e.target.closest('td.ck')) return; // 체크박스 칸은 선택만
+    const tr = e.target.closest('tr[data-id]'); if (tr && tr.dataset.id) openDrawer(tr.dataset.id);
+  });
+  // ── 선택한 기사 삭제 ──
+  const dsel = new Set();
+  function paintDBulk() {
+    const have = new Set(all.map((r) => r.id));
+    [...dsel].forEach((id) => { if (!have.has(id)) dsel.delete(id); });
+    const vis = visibleRows();
+    $('#dAll').checked = vis.length > 0 && vis.every((r) => dsel.has(r.id));
+    $('#dAll').indeterminate = !$('#dAll').checked && vis.some((r) => dsel.has(r.id));
+    const b = $('#dBulk');
+    b.classList.toggle('hidden', !dsel.size);
+    b.innerHTML = '<b>' + dsel.size + '명 선택</b><button type="button" class="btn sm danger" id="dBulkDel">선택한 기사 삭제</button><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button>';
+  }
+  $('#rows').addEventListener('change', (e) => {
+    const c = e.target.closest('[data-dck]'); if (!c) return;
+    if (c.checked) dsel.add(c.dataset.dck); else dsel.delete(c.dataset.dck);
+    paintDBulk();
+  });
+  $('#dAll').addEventListener('change', (e) => {
+    visibleRows().forEach((r) => (e.target.checked ? dsel.add(r.id) : dsel.delete(r.id)));
+    renderRows();
+  });
+  $('#dBulk').addEventListener('click', (e) => {
+    if (e.target.id === 'dBulkClear') { dsel.clear(); renderRows(); return; }
+    if (e.target.id !== 'dBulkDel') return;
+    const ids = [...dsel], n = ids.length, names = all.filter((r) => dsel.has(r.id)).map((r) => r.name);
+    const phrase = n + '명 삭제';
+    ask('선택한 기사 ' + n + '명 삭제 — 되돌릴 수 없습니다',
+      names.slice(0, 15).join(', ') + (n > 15 ? ' 외 ' + (n - 15) + '명' : '') + ' 의 정보를 모두 지웁니다. 앱 로그인도 바로 끊기고, 가입 서류 폴더는 드라이브 휴지통으로 옮겨집니다. ' +
+      '스케줄·배번호 기록은 남습니다. 삭제하려면 "' + phrase + '" 를 그대로 입력하세요.', phrase).then((v) => {
+      if (v == null) return;
+      if (v.replace(/\s+/g, '') !== phrase.replace(/\s+/g, '')) return toast('확인 문구가 달라 삭제하지 않았습니다.');
+      const b = $('#dBulkDel'); if (b) { b.disabled = true; b.textContent = '삭제 중…'; }
+      api('adm_deleteDrivers', ids, v).then((r) => {
+        if (!r.ok) { paintDBulk(); return toast(r.msg); }
+        const gone = new Set(r.deleted);
+        all.filter((x) => gone.has(x.id)).forEach((x) => { counts.all = Math.max(0, (counts.all || 1) - 1); if (counts[x.status] != null) counts[x.status] = Math.max(0, counts[x.status] - 1); });
+        all = all.filter((x) => !gone.has(x.id));
+        if (cur && gone.has(cur.id)) closeDrawer(true);
+        dsel.clear(); renderTabs(); renderRows();
+        toast(r.deleted.length + '명을 삭제했습니다.' + (r.docsTrashed ? ' 서류 폴더 ' + r.docsTrashed + '개는 휴지통으로 옮겼습니다.' : '') + (r.missing ? ' (' + r.missing + '명은 이미 없었습니다)' : ''));
+      }).catch(() => paintDBulk());
+    });
+  });
 
   // ───── 상세 ─────
   let cur = null, dirty = {};

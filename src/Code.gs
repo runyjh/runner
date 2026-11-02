@@ -1574,6 +1574,57 @@ function adm_deleteDriver(token, id, confirmName) {
   });
 }
 
+/** 앱이 만든 "기사 서류" 폴더 안의 기사 폴더만 휴지통으로 */
+function trashDriverFolder_(link) {
+  const id = (String(link || '').match(/folders\/([A-Za-z0-9_-]{10,})/) || [])[1] || fileIdOf_(link);
+  if (!id) return false;
+  try {
+    const f = DriveApp.getFolderById(id), parents = f.getParents();
+    while (parents.hasNext()) if (parents.next().getId() === props_().DOCS_FOLDER_ID) { f.setTrashed(true); return true; }
+  } catch (e) { /* 이미 없는 폴더 */ }
+  return false;
+}
+
+/**
+ * 선택한 기사 여러 명 삭제 (되돌릴 수 없음). confirm = '<명수>명 삭제' (예: 3명 삭제) 를 그대로 입력해야 한다.
+ * 한 명 삭제와 같은 처리: 줄 삭제, 로그인 해제, 가입 서류 폴더 휴지통. 스케줄·배번호 기록은 남긴다.
+ */
+function adm_deleteDrivers(token, ids, confirm) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const want = {};
+    (ids || []).forEach(function (id) { if (id) want[String(id)] = 1; });
+    const n = Object.keys(want).length;
+    if (!n) fail_('삭제할 기사를 골라 주세요.');
+    if (n > 500) fail_('한 번에 500명까지 삭제할 수 있습니다.');
+    if (str_(confirm).replace(/\s+/g, '') !== n + '명삭제') fail_('확인 문구가 다릅니다. "' + n + '명 삭제" 를 그대로 입력해 주세요. 삭제하지 않았습니다.');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    let hit = [];
+    try {
+      hit = readAll_(SH.DRIVERS).filter(function (o) { return o.id && want[o.id]; });
+      hit.map(function (o) { return o._row; }).sort(function (p, q) { return q - p; })
+        .forEach(function (r) { sheet_(SH.DRIVERS).deleteRow(r); });
+      hit.forEach(forgetDriver_);
+      const gone = {};
+      hit.forEach(function (o) { gone[o.id] = 1; });
+      const ss = readAll_(SH.SESSIONS).filter(function (x) { return gone[x.driverId]; });
+      ss.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
+        .forEach(function (r) { sheet_(SH.SESSIONS).deleteRow(r); });
+      if (ss.length) cache_().removeAll(ss.map(function (x) { return 'ss:' + x.tokenHash; }));
+      if (hit.length) {
+        logAdmin_(a, '기사 삭제', hit.length + '명', hit.slice(0, 40).map(function (o) { return o.name + ' (' + o.id + ')'; }).join(', ') +
+          (hit.length > 40 ? ' 외 ' + (hit.length - 40) + '명' : '') + (ss.length ? ' · 로그인 ' + ss.length + '건 해제' : ''));
+      }
+    } finally {
+      lock.releaseLock();
+    }
+    let trashed = 0;
+    hit.forEach(function (o) { if (trashDriverFolder_(o.docFolder)) trashed++; });
+    return { ok: true, deleted: hit.map(function (o) { return o.id; }), missing: n - hit.length, docsTrashed: trashed };
+  });
+}
+
 /** 임시 비밀번호 지정 → 기사는 다음 로그인 때 직접 변경 */
 function adm_setTempPassword(token, id, password) {
   return run_(function () {
