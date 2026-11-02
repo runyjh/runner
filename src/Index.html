@@ -325,7 +325,25 @@
       <div><b>품앗이</b><span>준비 중</span></div>
       <div><b>마이페이지</b><span>준비 중</span></div>
     </div>
-    <div class="links"><a id="logoutBtn">로그아웃</a></div>
+    <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
+  </section>
+
+  <!-- ───────────── 비밀번호 변경 ───────────── -->
+  <section id="v-changepw" class="view">
+    <div class="topbar"><button class="back" id="cpBack" aria-label="뒤로">←</button><h2>비밀번호 변경</h2></div>
+    <div class="card" id="cpNotice" style="display:none;background:var(--brand-weak)">
+      <b>임시 비밀번호로 로그인했습니다.</b><br>
+      <span style="color:var(--sub);font-size:14px">계속 사용하려면 기사님만 아는 새 비밀번호로 바꿔 주세요.</span>
+    </div>
+    <form id="cpForm" novalidate>
+      <div class="card">
+        <div class="field" id="cpCurWrap"><label class="lb" for="cpCur">현재 비밀번호</label><div class="pwbox"><input type="password" id="cpCur" autocomplete="current-password"><button type="button" data-toggle="cpCur">보기</button></div></div>
+        <div class="field"><label class="lb" for="cpNew">새 비밀번호</label><div class="pwbox"><input type="password" id="cpNew" autocomplete="new-password" placeholder="영문+숫자 8자 이상"><button type="button" data-toggle="cpNew">보기</button></div></div>
+        <div class="field"><label class="lb" for="cpNew2">새 비밀번호 확인</label><input type="password" id="cpNew2" autocomplete="new-password"></div>
+        <div class="hint">변경하면 다른 기기의 자동 로그인은 해제됩니다.</div>
+      </div>
+      <button class="btn" id="cpBtn" type="submit">비밀번호 변경</button>
+    </form>
   </section>
 
   <!-- ───────────── 시작 화면 ───────────── -->
@@ -427,7 +445,8 @@
       if (r && r.ok) {
         let persist = false;
         try { persist = !!localStorage.getItem(TOKEN); } catch (e) {}
-        store.set(USER, JSON.stringify(r.user), persist); goHome(r.user);
+        store.set(USER, JSON.stringify(r.user), persist);
+        if (r.mustChange) openChangePw(true, ''); else goHome(r.user);
       }
       else { clearSession(); goLogin(); if (cached) toast('다시 로그인해 주세요.'); }
     }).catch(() => { if (!cached) { goLogin(); netErr(); } });
@@ -446,7 +465,7 @@
       store.set(USER, JSON.stringify(r.user), auto);
       store.set(LAST_ID, id, true);
       $('#lgPw').value = '';
-      goHome(r.user);
+      if (r.mustChange) openChangePw(true, pw); else goHome(r.user);
     }).catch(netErr).finally(() => { btn.disabled = false; btn.textContent = '로그인'; });
   });
 
@@ -621,6 +640,50 @@
       resetToken = ''; $('#rsForm1').reset(); $('#rsForm2').reset();
       $('#rsForm2').style.display = 'none'; $('#rsForm1').style.display = 'block';
       clearSession(); goLogin();
+    }).catch(netErr).finally(() => { btn.disabled = false; });
+  });
+
+  // ───── 비밀번호 변경 ─────
+  // forced=true : 임시 비밀번호로 로그인한 직후 → 뒤로 가기 없이 반드시 변경
+  let cpForced = false, cpKnownCurrent = '';
+  function openChangePw(forced, knownCurrent) {
+    cpForced = !!forced; cpKnownCurrent = knownCurrent || '';
+    $('#cpForm').reset();
+    $('#cpNotice').style.display = cpForced ? 'block' : 'none';
+    $('#cpBack').style.visibility = cpForced ? 'hidden' : 'visible';
+    // 방금 로그인할 때 입력한 비밀번호를 알고 있으면 다시 묻지 않는다
+    $('#cpCurWrap').style.display = cpKnownCurrent ? 'none' : 'block';
+    show('changepw');
+  }
+  $('#changePwBtn').addEventListener('click', () => openChangePw(false, ''));
+  $('#cpBack').addEventListener('click', () => {
+    if (cpForced) return;
+    let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {}
+    goHome(user);
+  });
+  $('#cpForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const cur = cpKnownCurrent || $('#cpCur').value, a = $('#cpNew').value, b = $('#cpNew2').value;
+    if (!cur) return toast('현재 비밀번호를 입력해 주세요.');
+    if (!pwRule(a)) return toast('영문과 숫자를 포함해 8~30자로 입력해 주세요.');
+    if (a !== b) return toast('새 비밀번호 확인이 다릅니다.');
+    if (a === cur) return toast('새 비밀번호는 현재 비밀번호와 다르게 정해 주세요.');
+    const token = store.get(TOKEN);
+    if (!token) { clearSession(); goLogin(); return; }
+    const btn = $('#cpBtn'); btn.disabled = true;
+    api('api_changePassword', token, cur, a).then((r) => {
+      if (!r.ok) {
+        toast(r.msg);
+        if (r.code === 'EXPIRED') { clearSession(); goLogin(); }
+        return;
+      }
+      let persist = false;
+      try { persist = !!localStorage.getItem(TOKEN); } catch (err) {}
+      store.set(TOKEN, r.token, persist);
+      cpKnownCurrent = ''; cpForced = false; $('#cpForm').reset();
+      toast(r.msg);
+      let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (err) {}
+      goHome(user);
     }).catch(netErr).finally(() => { btn.disabled = false; });
   });
 })();

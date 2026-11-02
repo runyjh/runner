@@ -52,19 +52,25 @@ const D = {
   docFolder: '서류 폴더',
   createdAt: '가입일시', approvedAt: '승인일시', updatedAt: '수정일시', pwChangedAt: '비밀번호 변경일시',
   memo: '관리자 메모',
-  pwReset: '비밀번호 재설정',
+  pwReset: '비밀번호 재설정', pwMustChange: '비밀번호 변경 필요',
   // ↓ 앱 내부용 (숨김). 사람이 직접 고치지 않고, 위 칸을 고치면 자동으로 갱신된다.
   rrnEnc: '주민등록번호(암호화)', rrnIndex: '주민번호 중복검사키',
   licenseNoEnc: '운전면허번호(암호화)', accountEnc: '계좌번호(암호화)',
   pwHash: '비밀번호 해시', pwSalt: '비밀번호 솔트'
 };
+// 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
+const D_AUTO_ADD = ['pwMustChange'];
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
   rrn: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n생년월일도 자동 갱신됩니다.',
   licenseNo: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.',
   account: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.',
-  pwReset: '새 비밀번호(영문+숫자 8~30자)를 입력하면 바로 적용되고 이 칸은 비워집니다.',
+  pwReset: '새 비밀번호(영문+숫자 8~30자)를 입력하면 바로 적용되고 이 칸은 비워집니다.\n' +
+    '임시 비밀번호로 취급되어, 기사가 다음 로그인 때 새 비밀번호를 직접 정하게 됩니다.\n' +
+    '여러 명에게 같은 임시 비밀번호를 줄 때: 첫 칸에 입력 → 칸 오른쪽 아래 네모를 아래로 끌어 채우기.',
+  pwMustChange: 'Y 이면 다음 로그인 때 기사가 새 비밀번호를 정해야 합니다.\n' +
+    '비밀번호 재설정 칸으로 지정하면 자동으로 Y, 기사가 바꾸면 자동으로 비워집니다.',
   loginId: '직접 새 줄을 추가할 때는 아이디·이름을 먼저 입력하면 기사ID와 가입일시가 자동으로 채워집니다.'
 };
 
@@ -202,11 +208,35 @@ function cols_(name, fresh) {
     const i = head.indexOf(def[k]);
     if (i < 0) missing.push(def[k]); else c[k] = i;
   });
+  const autoable = name === SH.DRIVERS && missing.length &&
+    missing.every(function (label) { return D_AUTO_ADD.some(function (k) { return D[k] === label; }); });
+  if (autoable) {
+    addHeaders_(name, missing);
+    return cols_(name, true);
+  }
   if (missing.length) {
     fail_('DB 시트(' + name + ')에 머리글이 없습니다: ' + missing.join(', ') +
       '. 머리글 이름은 바꾸지 말고, 편집기에서 setup 을 다시 실행해 주세요.');
   }
   return (_cols[name] = c);
+}
+/** 빈 열을 오른쪽 끝에 추가 (안전한 새 열만 자동 추가에 사용) */
+function addHeaders_(name, labels) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = sheet_(name);
+    const head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
+    const need = labels.filter(function (l) { return head.indexOf(l) < 0; });
+    if (!need.length) return;
+    const start = head.length + 1;
+    if (start + need.length - 1 > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), need.length);
+    sh.getRange(1, start, sh.getMaxRows(), need.length).setNumberFormat('@');
+    sh.getRange(1, start, 1, need.length).setValues([need]).setFontWeight('bold').setBackground('#f1f3f4');
+  } finally {
+    lock.releaseLock();
+    clearHeadCache_(name);
+  }
 }
 function clearHeadCache_(name) { delete _cols[name]; cache_().remove('hc:' + name); }
 
@@ -336,10 +366,14 @@ function driverInfo_(id) {
   if (hit) return JSON.parse(hit);
   const o = driverById_(id);
   if (!o) return null;
-  const info = { name: o.name, loginId: o.loginId.toLowerCase(), status: o.status, pwChangedAt: toMs_(o.pwChangedAt) };
+  const info = {
+    name: o.name, loginId: o.loginId.toLowerCase(), status: o.status,
+    pwChangedAt: toMs_(o.pwChangedAt), mustChange: mustChange_(o)
+  };
   cache_().put(key, JSON.stringify(info), 600);
   return info;
 }
+function mustChange_(o) { return String(o.pwMustChange || '').trim().toUpperCase() === 'Y'; }
 function forgetDriver_(o) {
   const keys = [];
   if (o.id) keys.push('dv:' + o.id, 'ir:' + o.id);
@@ -518,7 +552,7 @@ function api_login(loginId, password, auto) {
     if (o.status !== ST.ACTIVE) fail_('사용이 중지된 계정입니다. 관리자에게 문의해 주세요.');
 
     const s = createSession_(o.id, auto === true);
-    return { ok: true, token: s.token, expiresAt: s.expiresAt, user: { name: o.name, loginId: id } };
+    return { ok: true, token: s.token, expiresAt: s.expiresAt, mustChange: mustChange_(o), user: { name: o.name, loginId: id } };
   });
 }
 
@@ -532,7 +566,7 @@ function createSession_(driverId, auto) {
   arr[c.tokenHash] = th; arr[c.driverId] = driverId; arr[c.createdAt] = msText_(now);
   arr[c.expiresAt] = msText_(exp); arr[c.auto] = auto ? 'Y' : 'N';
   sheet_(SH.SESSIONS).appendRow(arr); // 동시 로그인에도 안전한 원자적 추가
-  cache_().put('ss:' + th, JSON.stringify({ d: driverId, c: now, e: exp }), sessTtl_(exp));
+  cache_().put('ss:' + th, JSON.stringify({ d: driverId, c: now, e: exp, a: auto ? 1 : 0 }), sessTtl_(exp));
   return { token: token, expiresAt: exp };
 }
 function sessTtl_(exp) { return Math.max(1, Math.min(CFG.SESS_CACHE, Math.floor((exp - Date.now()) / 1000))); }
@@ -548,7 +582,7 @@ function getSession_(token) {
     const o = readObj_(SH.SESSIONS, row);
     if (!o) return null;
     // 생성일시는 초 단위로 저장되므로 같은 초 안의 비밀번호 변경과 비교할 때 1초 여유를 둔다
-    s = { d: o.driverId, c: toMs_(o.createdAt) + 999, e: toMs_(o.expiresAt) };
+    s = { d: o.driverId, c: toMs_(o.createdAt) + 999, e: toMs_(o.expiresAt), a: o.auto === 'Y' ? 1 : 0 };
     if (s.e > Date.now()) cache_().put('ss:' + th, JSON.stringify(s), sessTtl_(s.e));
   }
   if (!(s.e > Date.now())) return null;
@@ -563,7 +597,7 @@ function api_checkSession(token) {
     if (!s) return { ok: false, code: 'EXPIRED' };
     const info = driverInfo_(s.d);
     if (!info || info.status !== ST.ACTIVE || s.c < info.pwChangedAt) return { ok: false, code: 'EXPIRED' };
-    return { ok: true, user: { name: info.name, loginId: info.loginId } };
+    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId } };
   });
 }
 
@@ -691,9 +725,48 @@ function api_resetPassword(resetToken, newPassword) {
     if (!o) fail_('회원 정보를 찾을 수 없습니다.');
     const fields = passwordFields_(pw);
     fields.updatedAt = fields.pwChangedAt;
+    fields.pwMustChange = '';
     writeFields_(SH.DRIVERS, o._row, fields);
     forgetDriver_(o);
     return { ok: true, msg: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.' };
+  });
+}
+
+// ───────────────────────── API : 비밀번호 변경 (로그인 상태) ─────────────────────────
+/**
+ * 현재 비밀번호 확인 후 새 비밀번호로 바꾼다.
+ * 다른 기기의 로그인은 모두 해제되고, 지금 기기는 새 로그인 토큰으로 계속 사용한다.
+ */
+function api_changePassword(token, currentPassword, newPassword) {
+  return run_(function () {
+    const expired = { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
+    const s = getSession_(token);
+    if (!s) return expired;
+    const pw = checkPw_(newPassword);
+    const o = driverById_(s.d);
+    if (!o || o.status !== ST.ACTIVE || s.c < toMs_(o.pwChangedAt)) return expired;
+
+    const fk = 'cf:' + o.id;
+    const fails = Number(cache_().get(fk) || 0);
+    if (fails >= CFG.LOGIN_MAX_FAIL) fail_('비밀번호 확인 실패가 반복되어 15분간 잠겼습니다.');
+    if (!checkPassword_(String(currentPassword || ''), o)) {
+      cache_().put(fk, String(fails + 1), 900);
+      fail_('현재 비밀번호가 맞지 않습니다.');
+    }
+    cache_().remove(fk);
+    if (pw === String(currentPassword)) fail_('새 비밀번호는 현재 비밀번호와 다르게 정해 주세요.');
+
+    const fields = passwordFields_(pw);
+    fields.updatedAt = fields.pwChangedAt;
+    fields.pwMustChange = '';
+    writeFields_(SH.DRIVERS, o._row, fields);
+    forgetDriver_(o);
+    // 지금 쓰던 로그인은 바로 만료시키고 새 로그인으로 교체
+    cache_().remove('ss:' + s.th);
+    const oldRow = findRow_(SH.SESSIONS, 'tokenHash', s.th);
+    if (oldRow) writeFields_(SH.SESSIONS, oldRow, { expiresAt: msText_(Date.now() - 1000) });
+    const ns = createSession_(o.id, !!s.a);
+    return { ok: true, token: ns.token, expiresAt: ns.expiresAt, msg: '비밀번호가 변경되었습니다.' };
   });
 }
 
@@ -781,6 +854,7 @@ function fixDriverRow_(sh, c, o) {
     if (pwValid_(o.pwReset)) {
       const pf = passwordFields_(o.pwReset);
       Object.keys(pf).forEach(function (k) { upd[k] = pf[k]; });
+      upd.pwMustChange = 'Y'; // 임시 비밀번호 → 다음 로그인 때 기사가 직접 변경
     } else bad('pwReset', '적용 안 됨: 영문과 숫자를 포함해 8~30자로 입력해 주세요.');
     upd.pwReset = ''; // 비밀번호 원문은 시트에 남기지 않는다
   }
