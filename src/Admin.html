@@ -310,6 +310,88 @@
     .rfilters input.inp { width: 100%; }
   }
 
+  /* 스케줄관리 */
+  #view-sched .head { margin-bottom: 10px; }
+  .stools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .stools .inp { height: 36px; width: auto; }
+  .stools .btn { height: 36px; }
+  .stools .check { margin: 0; font-size: 13px; }
+  .stools .grow { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .ssave { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--gray-weak); color: var(--sub); white-space: nowrap; }
+  .ssave.ok { background: var(--ok-weak); color: var(--ok); }
+  .ssave.wait, .ssave.busy { background: var(--warn-weak); color: var(--warn); }
+  .ssave.err { background: var(--danger-weak); color: var(--danger); cursor: pointer; }
+  .swrap { position: relative; background: #fff; border-radius: var(--radius); overflow: auto; max-height: calc(100vh - 190px); outline: none; border: 1px solid var(--line); }
+  .swrap:focus { border-color: #b9cdf0; }
+  table.sg { border-collapse: separate; border-spacing: 0; min-width: 0; width: max-content; font-size: 12px; }
+  .sg th, .sg td { border-right: 1px solid #edf0f3; border-bottom: 1px solid #edf0f3; padding: 0 6px; height: 30px; white-space: nowrap; }
+  .sg thead th { position: sticky; background: #fafbfc; z-index: 3; text-align: center; color: var(--sub); font-weight: 600; }
+  .sg tr.h1 th { top: 0; height: 26px; }
+  .sg tr.h2 th { top: 26px; height: auto; padding: 4px 4px; vertical-align: top; }
+  .sg th.wk-a { background: #eef4fd; color: var(--brand); }
+  .sg th.wk-b { background: #fdf6e9; color: var(--warn); }
+  .sg th.dc { width: 104px; min-width: 104px; max-width: 104px; }
+  .sg th.dc b { display: block; color: var(--ink); font-size: 12px; }
+  .sg th.dc small { display: block; font-size: 10px; color: var(--faint); font-weight: 500; }
+  .sg th.dc i { display: block; font-style: normal; font-size: 10px; border-radius: 4px; margin-top: 2px; padding: 0 3px; white-space: normal; line-height: 1.35; }
+  .sg th.sun b { color: var(--danger); } .sg th.sat b { color: var(--brand); }
+  .sg th.today { background: #e6efff; } .sg th.today b::after { content: ' 오늘'; color: var(--brand); font-size: 10px; }
+  .tg-peak { background: #fff1d6; color: #a15c00; } .tg-hol { background: var(--danger-weak); color: var(--danger); } .tg-wk { background: #f1ecfb; color: #6b46c1; }
+  .sg .fx { position: sticky; background: #fff; z-index: 2; text-align: left; }
+  .sg thead .fx { z-index: 4; background: #fafbfc; }
+  .sg .f1 { left: 0; width: 58px; min-width: 58px; max-width: 58px; overflow: hidden; text-overflow: ellipsis; }
+  .sg .f2 { left: 58px; width: 96px; min-width: 96px; max-width: 96px; overflow: hidden; }
+  .sg .f3 { left: 154px; width: 96px; min-width: 96px; max-width: 96px; overflow: hidden; text-overflow: ellipsis; color: var(--faint); }
+  .sg .f4 { left: 250px; width: 84px; min-width: 84px; max-width: 84px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; box-shadow: 1px 0 0 var(--line); }
+  .sg tr.gtop td { border-top: 2px solid #c9d1da; }
+  .sg tr.dim td { opacity: .55; }
+  .dname { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; max-width: 70px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+  .dname:hover { color: var(--brand); text-decoration: underline; }
+  .tbad { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 3px; margin-left: 3px; vertical-align: middle; }
+  .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; cursor: cell; user-select: none; text-align: center; font-weight: 600; white-space: pre; line-height: 1.25; }
+  .sg td.wk2, .sg th.wk2 { border-left: 2px solid #c9d1da; }
+  .sg td.today { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.04); }
+  .k-work { background: #bfe1f6; color: #0a53a8; }
+  .k-off { background: #f08c8c; color: #fff; }
+  .k-sick { background: #d4edbc; color: #11734b; }
+  .k-mi { background: #d15555; color: #ffcfc9; }
+  .k-yong { background: #e6cff2; color: #5a3286; }
+  .k-chg { background: #0a53a8; color: #bfe0f6; }
+  .k-reg { background: #d9f5ef; color: #0b6b57; }
+  .k-other { background: #fff4d6; color: #7a4d00; }
+  .k-route { color: var(--ink); }
+  .sg td.c.sel { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.16); }
+  .sg td.c.act { outline: 2px solid var(--brand); outline-offset: -2px; }
+  .sg td.c.dup { box-shadow: inset 0 0 0 2px #f59e0b; }
+  .sg td.c.pend { font-style: italic; }
+  .sg td.ex { color: var(--sub); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+  .sg td.num { text-align: center; font-weight: 700; color: var(--ink); }
+  .sg tr.note td.lab, .sg tr.calc td.lab { color: var(--sub); font-weight: 700; background: #f7f8fa; }
+  .nlab { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--sub); cursor: pointer; }
+  .nlab:hover { color: var(--brand); text-decoration: underline; }
+  .sg tr.note td.c { font-weight: 500; text-align: left; background: #fffdf5; }
+  .sg tr.calc td.cc { white-space: nowrap; vertical-align: top; padding: 4px 6px; font-size: 11px; line-height: 1.45; width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; }
+  .sg tr.calc.mi td.cc { color: #e00; font-weight: 700; background: #fff6f6; }
+  .sg tr.calc.du td.cc { color: #b45309; background: #fffaf0; }
+  .sg tr.calc.bk td.cc { color: var(--ink); background: #f8fbff; }
+  .sed { position: absolute; z-index: 30; background: #fff; border: 2px solid var(--brand); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .sed textarea { display: block; width: 100%; border: 0; outline: none; resize: none; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 8px; min-height: 30px; }
+  .sed .sug { max-height: 260px; overflow: auto; border-top: 1px solid var(--line); }
+  .sed .sug button { display: flex; justify-content: space-between; gap: 8px; width: 100%; border: 0; border-bottom: 1px solid #fff; padding: 5px 8px; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+  .sed .sug button.k-route, .sed .sug button:not([class]) { background: #fff; }
+  .sed .sug button.on, .sed .sug button:hover { outline: 2px solid var(--brand); outline-offset: -2px; }
+  .sed .sug small { opacity: .7; font-weight: 500; }
+  .sed .shint { font-size: 10px; color: var(--faint); padding: 3px 8px; border-top: 1px solid var(--line); }
+  .offbtns { display: flex; gap: 4px; margin-bottom: 6px; }
+  .offbtns button { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 700; color: var(--sub); }
+  .offbtns button.on { background: #f08c8c; color: #fff; border-color: #f08c8c; }
+  .slegend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; margin-top: 8px; color: var(--sub); align-items: center; }
+  .slegend span { padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+  @media (max-width: 820px) {
+    .sg .f3, .sg .f4 { display: none; }
+    .swrap { max-height: calc(100vh - 230px); }
+  }
+
   @media (max-width: 1100px) {
     .memo-wrap { grid-template-columns: 1fr; }
     .day-panel { position: static; }
@@ -356,7 +438,7 @@
     <div class="logo">러너 <span>올인원</span></div>
     <nav class="nav">
       <a class="on" data-view="drivers">기사 정보관리</a>
-      <a class="off">스케줄관리 <small>준비 중</small></a>
+      <a data-view="sched">스케줄관리</a>
       <a data-view="route">노선관리</a>
       <a class="off">정산관리 <small>준비 중</small></a>
       <a data-view="memo">업무스케줄</a>
@@ -435,6 +517,32 @@
       <div class="empty hidden" id="bempty"></div>
     </div>
    </section>
+   <section id="view-sched" class="hidden">
+    <div class="head">
+      <h2>스케줄관리 <small id="sCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools"><span class="ssave ok" id="sSave">모두 저장됨</span></div>
+    </div>
+    <div class="stools">
+      <button class="btn ghost" id="sPrev">◀ 이전주</button><button class="btn ghost" id="sToday">이번 주</button><button class="btn ghost" id="sNext">다음주 ▶</button>
+      <input class="inp" type="date" id="sDate" title="날짜 검색 (그 주 일요일부터 2주)">
+      <select class="inp" id="sCamp" aria-label="캠프"></select>
+      <input class="inp" id="sQ" placeholder="이름·아이디·노선 검색" style="width:160px">
+      <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
+      <div class="grow">
+        <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
+        <button class="btn ghost" id="sFill" title="고정·품앗이 기사의 오늘 이후 빈칸을 출근/고정휴무로">빈칸 자동 채우기</button>
+        <button class="btn ghost" id="sReload">새로고침</button>
+        <button class="btn ghost" id="sImport">운영시트 가져오기</button>
+      </div>
+    </div>
+    <div class="swrap" id="sWrap" tabindex="0"></div>
+    <div class="slegend">
+      <span class="k-work">출근</span><span class="k-off">휴무</span><span class="k-sick">병가</span><span class="k-mi">미입차</span><span class="k-yong">용차</span>
+      <span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other">다른 캠프</span><span style="box-shadow:inset 0 0 0 2px #f59e0b">중복</span>
+      <em style="font-style:normal">· 칸을 누르고 입력 (Enter 저장, Alt+Enter 줄바꿈) · 드래그로 여러 칸 선택 · Ctrl+C / Ctrl+V 로 엑셀·구글시트와 복사 · Delete 지우기 · Ctrl+Z 되돌리기 · 고치면 자동 저장</em>
+    </div>
+   </section>
+
    <section id="view-route" class="hidden">
     <div class="head">
       <h2>노선관리</h2>
@@ -571,6 +679,40 @@
     <div class="m-view" id="ivView"></div>
     <div class="iv-desc"><textarea class="inp" id="ivDesc" placeholder="이미지 설명 (예: 정문 들어와서 왼쪽 2번 도크)"></textarea><button class="btn" id="ivSave" disabled>설명 저장</button></div>
   </div>
+</div>
+
+<!-- ───────────── 스케줄: 기사 스케줄 설정 ───────────── -->
+<div class="modal hidden" id="sdModal">
+  <form class="m-box" id="sdForm" novalidate style="width:min(520px,100%)">
+    <h3 id="sdTitle">스케줄 설정</h3>
+    <div class="grid2">
+      <div class="field"><label class="lb" for="sdCamp">소속 캠프</label><select class="inp" id="sdCamp"></select></div>
+      <div class="field"><label class="lb" for="sdRoute">기본노선 (백업 기사는 "백업")</label><input class="inp code-inp" id="sdRoute" list="sdRoutes" autocomplete="off" placeholder="예: 527B, 530AB (F3)"><datalist id="sdRoutes"></datalist></div>
+      <div class="field full"><span class="lb">고정휴무일</span><div class="offbtns" id="sdOffBtns">
+        <button type="button" data-off="0">일</button><button type="button" data-off="1">월</button><button type="button" data-off="2">화</button><button type="button" data-off="3">수</button><button type="button" data-off="4">목</button><button type="button" data-off="5">금</button><button type="button" data-off="6">토</button></div>
+        <input class="inp" id="sdOff" placeholder="예: 목,금 (요일로 적으면 빈칸 자동 채우기에 쓰임)"></div>
+      <div class="field"><label class="lb" for="sdExtra">추가휴무</label><input class="inp" id="sdExtra" placeholder="예: 월,수요일 / 조정 백업에 맞춰서"></div>
+      <div class="field"><label class="lb" for="sdPat">근무형태</label><input class="inp" id="sdPat" list="sdPats" placeholder="예: 5일, 격주"><datalist id="sdPats"><option value="5일"><option value="5.5일"><option value="6일"><option value="격주"><option value="5일 및 격주가능"><option value="3일"></datalist></div>
+      <div class="field full"><label class="lb" for="sdMemo">스케줄 메모 (서브 아이디, 요청사항 등)</label><textarea class="inp" id="sdMemo" style="height:60px"></textarea></div>
+      <div class="field"><label class="lb" for="sdOrder">표 순서 (같은 캠프 안, 작은 숫자가 위)</label><input class="inp" id="sdOrder" inputmode="numeric"></div>
+    </div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="sdOpen" style="margin-right:auto">기사 정보 열기</button><button type="button" class="btn ghost" id="sdCancel">닫기</button><button class="btn" id="sdSave">저장</button></div>
+  </form>
+</div>
+
+<!-- ───────────── 스케줄: 기존 운영시트 가져오기 ───────────── -->
+<div class="modal hidden" id="opsModal">
+  <form class="m-box" id="opsForm" novalidate style="width:min(620px,100%);max-height:90vh;overflow:auto">
+    <h3>기존 운영시트에서 스케줄 가져오기</h3>
+    <p style="margin:0 0 12px;color:var(--sub);font-size:13px">구글시트(뉴버전_운영시트)의 <b>스케쥴</b> 탭과 <b>백업</b> 탭을 읽어, 아이디(쿠팡플렉스 아이디)가 같은 기사에게 날짜별 기록을 옮깁니다. 운영시트는 고치지 않습니다.</p>
+    <div class="field"><label class="lb" for="opsUrl">운영시트 주소</label><input class="inp" id="opsUrl" autocomplete="off" value="https://docs.google.com/spreadsheets/d/1UwnMcMaS5iNwLO_n1BDkDgEnK-ru1N-HZFXhzUhAZQc/edit"></div>
+    <label class="check" style="margin:4px 0"><input type="checkbox" id="opsDrv" checked> 없는 기사는 새로 등록 (구분: 라우트가 백업이면 백업, 용차면 외부용차, 나머지 고정)</label>
+    <label class="check" style="margin:4px 0"><input type="checkbox" id="opsCamp" checked> 없는 캠프는 새로 만들기 (서초1은 회전 D1,D2, 나머지 D1,D2,F3)</label>
+    <label class="check" style="margin:4px 0"><input type="checkbox" id="opsRet" checked> 퇴사 기사도 가져오기 (정지 상태로, 지난 기록 보관용)</label>
+    <label class="check" style="margin:4px 0 12px"><input type="checkbox" id="opsOver"> 이미 입력된 칸도 운영시트 값으로 덮어쓰기</label>
+    <div id="opsOut"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="opsCancel">닫기</button><button type="button" class="btn ghost" id="opsPrev">미리보기</button><button class="btn" id="opsRun" disabled>가져오기</button></div>
+  </form>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -986,6 +1128,8 @@
     $('#view-memo').classList.toggle('hidden', v !== 'memo');
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
     $('#view-route').classList.toggle('hidden', v !== 'route');
+    $('#view-sched').classList.toggle('hidden', v !== 'sched');
+    if (v === 'sched') loadSched();
     if (v === 'bib') loadBib();
     if (v === 'route') loadRoutes();
     if (v === 'drivers' && !driversLoaded) { driversLoaded = true; loadList(); }
@@ -994,6 +1138,7 @@
   $$('.nav a[data-view]').forEach((a) => a.addEventListener('click', () => {
     if (a.dataset.view === currentView) return;
     if (currentView === 'route' && !pricesLeaveOk()) return;
+    if (currentView === 'sched') { if (sEdit) commitEdit(); if (Object.keys(sPending).length) flushSave(); }
     if (!$('#drawer').classList.contains('hidden')) closeDrawer();
     if (!$('#drawer').classList.contains('hidden')) return; // 저장 안 한 변경이 있어 닫지 않음
     if (!$('#bdrawer').classList.contains('hidden')) closeBib();
@@ -2347,6 +2492,744 @@
     if (vis('#imgAddModal')) closeIa();
     else if (vis('#routeModal')) $('#routeModal').classList.add('hidden');
     else if (vis('#campModal')) $('#campModal').classList.add('hidden');
+  });
+
+  // ───── 스케줄 계산 (운영시트 스크립트의 규칙을 그대로 옮김) ─────
+  // 출근일수(V열 COUNTIFS), 백업 명단(updateBackupRoster), 미입차 노선, 중복 배정
+  const SchedCalc = (function () {
+    const KEYWORDS = ['업무', '선탑', '신규'];
+    const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
+    const ALL_ROTS = ['D1', 'D2', 'F3'];
+    const isValidRouteList = (s) => { const p = String(s || '').split(',').map((v) => v.trim()).filter(Boolean); return !!p.length && p.every((x) => /^\d+[A-Za-z]$/.test(x)); };
+    const normRot = (s) => String(s || '').split(',').map((v) => v.trim().toUpperCase()).filter((v) => ALL_ROTS.includes(v));
+    // '101AB' / '101A,102B' / '101A,B' → ['101A','101B',…]
+    function routeExpand(codeCsv) {
+      let lastNum = '';
+      return String(codeCsv || '').split(',').flatMap((cp) => {
+        const t = cp.trim();
+        if (!t) return [];
+        const mm = t.match(/^(\d+)([A-Za-z]+)$/);
+        if (mm) { lastNum = mm[1]; return mm[2].toUpperCase().split('').map((ch) => lastNum + ch); }
+        const a = t.match(/^([A-Za-z]+)$/);
+        if (a && lastNum) return a[1].toUpperCase().split('').map((ch) => lastNum + ch);
+        return [];
+      }).filter(Boolean);
+    }
+    /** 출근일수: 빈칸·휴무·용차·병가·퇴사·미입차·업무(등록)·'휴가' 를 뺀 칸 수 */
+    function isWorkDay(v) {
+      const s = String(v || '').trim();
+      if (!s) return false;
+      if (s === '휴가') return false;
+      return !['휴무', '용차', '병가', '퇴사', '미입차', '업무'].some((w) => s.includes(w));
+    }
+    /** 기본노선 '530AB (F3)' → { routes: '530AB', rot: 'F3' } */
+    function splitBase(defRt) {
+      const s = String(defRt || '').trim();
+      const m = s.match(/\(([^)]*)\)/);
+      return { routes: s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '' };
+    }
+
+    /**
+     * rows: [{ key, camp(짧은 캠프명 예: 강서1, 없으면 ''), name, baseRoute, type, cells: [날짜별 글자] }]
+     * camps: { 짧은캠프명: ['D1','D2','F3'] }  (캠프별 기본 회전)
+     */
+    function compute(rows, camps, nDays) {
+      const defRotArr = (camp) => (camps[camp] && camps[camp].length ? camps[camp] : ALL_ROTS);
+      const campNames = Object.keys(camps).sort((a, b) => b.length - a.length);
+      const counts = {};
+      rows.forEach((r) => { counts[r.key] = r.cells.filter(isWorkDay).length; });
+
+      // 1) 백업 명단: 백업·예비·용차 기사의 칸에서 노선을 뽑아 캠프별로
+      const roster = {};
+      campNames.forEach((c) => { roster[c] = Array.from({ length: nDays }, () => []); });
+      rows.forEach((r) => {
+        const isBackup = /백업|예비|용차/.test(r.baseRoute || '') || /용차/.test(r.camp || '') || r.type === '백업' || r.type === '외부용차';
+        if (!isBackup) return;
+        for (let d = 0; d < nDays; d++) {
+          const cellText = String(r.cells[d] || '').trim();
+          if (!cellText || cellText === '출근' || /휴무|휴가|퇴사/.test(cellText)) continue;
+          const flat = cellText.replace(/\([^)]*\)/g, '').trim();
+          let found = false;
+          campNames.forEach((tc) => {
+            const re = new RegExp(tc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*(\\d+[A-Za-z][A-Za-z0-9,]*)(\\s*\\[.*?\\])?', 'g');
+            let m;
+            while ((m = re.exec(flat)) !== null) {
+              found = true;
+              const add = m[1] + ' ' + r.name + (m[2] || '');
+              if (!roster[tc][d].includes(add)) roster[tc][d].push(add);
+            }
+          });
+          if (!found && roster[r.camp]) {
+            const re = /(\d+[A-Za-z]+)(\s*\[.*?\])?/g;
+            let m;
+            while ((m = re.exec(flat)) !== null) {
+              const add = m[1] + ' ' + r.name + (m[2] || '');
+              if (!roster[r.camp][d].includes(add)) roster[r.camp][d].push(add);
+            }
+          }
+        }
+      });
+
+      // 2) 미입차 + 중복: 날짜마다 (캠프, 노선, 회전) 별로 누가 들어가는지 모은다
+      const missing = [], dups = [], dupCells = new Set();
+      for (let d = 0; d < nDays; d++) {
+        const baseRouteSet = new Set(), present = new Map(), explicitMi = [];
+        const addPresent = (camp, routeList, rotArr, key) => routeList.forEach((rt) => rotArr.forEach((rot) => {
+          const k = [camp, rt, rot].join('|');
+          if (!present.has(k)) present.set(k, new Set());
+          present.get(k).add(key);
+        }));
+        rows.forEach((r) => {
+          const baseCamp = r.camp || '';
+          const defRt = String(r.baseRoute || '').trim();
+          const base = splitBase(defRt);
+          if (defRt && !/백업|예비|용차/.test(defRt)) routeExpand(base.routes).forEach((rt) => baseRouteSet.add(baseCamp + '|' + rt));
+          const lines = String(r.cells[d] || '').replace(/<br\s*\/?>/gi, '\n').split(/\r?\n|\r/).map((v) => v.trim()).filter(Boolean);
+          const flat = lines.join(' ').trim();
+          if (!flat || flat.includes('비고')) return;
+          if (/미입차/.test(flat)) { explicitMi.push({ baseCamp, defRt: base.routes }); return; }
+          let m = flat.match(/^([0-9A-Za-z,]+)\s+업무등록$/);
+          if (m && routeExpand(m[1]).length) { addPresent(baseCamp, routeExpand(m[1]), defRotArr(baseCamp), r.key); return; }
+          if (flat.includes('추가업무등록')) {
+            const tokens = flat.replace(/추가업무등록/g, ' ').split(/\s+/).filter(Boolean);
+            for (let t = 0; t < tokens.length;) {
+              if (!/^[A-Za-z][A-Za-z0-9_]{2,}$/.test(tokens[t])) { t++; continue; }
+              t++;
+              if (t >= tokens.length) break;
+              const rt = tokens[t];
+              if (!/^\d+[A-Za-z,]+$/.test(rt)) { t++; continue; }
+              t++;
+              const list = routeExpand(rt);
+              if (list.length) addPresent(baseCamp, list, defRotArr(baseCamp), r.key);
+            }
+            return;
+          }
+          m = flat.match(/^([0-9A-Za-z,]+)\s+([A-Za-z][A-Za-z0-9_]{2,})\s+업무등록$/);
+          if (m && routeExpand(m[1]).length) { addPresent(baseCamp, routeExpand(m[1]), defRotArr(baseCamp), r.key); return; }
+          if (lines.length >= 3 && lines[2].includes('업무등록') && /[A-Za-z][A-Za-z0-9_]{2,}/.test(lines[1]) && routeExpand(lines[0]).length) {
+            addPresent(baseCamp, routeExpand(lines[0]), defRotArr(baseCamp), r.key); return;
+          }
+          if (EXCL_WORDS.some((w) => flat.includes(w))) return;
+          let cell = flat;
+          const mDyn = cell.match(/^([가-힣]+[0-9])\s*/);
+          const dynCamp = mDyn ? mDyn[1] : '';
+          const finalCamp = dynCamp || baseCamp;
+          if (dynCamp) cell = cell.slice(mDyn[0].length).trim();
+          cell = cell.replace(/\(\s*([A-Za-z][A-Za-z0-9_]{2,})\s*\)/g, '').replace(/\[[^\]]*]/g, '').trim();
+          let rotation = '';
+          const mR = cell.match(/\(\s*([^)]+?)\s*\)/);
+          if (mR) { rotation = mR[1].replace(/\s+/g, ''); cell = cell.replace(/\([^)]*\)/g, '').trim(); }
+          cell = cell.replace(/업무등록/g, '').trim();
+          let code;
+          if (cell === '출근' || (/업무등록/.test(flat) && !/\d+[A-Za-z]+/.test(flat))) {
+            code = base.routes;
+            if (!rotation && base.rot) rotation = base.rot;
+          } else code = cell;
+          const parts = String(code).split(/\s+/);
+          if (parts.length >= 2 && /^\d+[A-Za-z]+$/.test(parts[1])) code = parts[1];
+          let routeList = routeExpand(code);
+          if (!routeList.length) (cell.match(/\d+[A-Za-z]+/g) || []).forEach((rc) => { routeList = routeList.concat(routeExpand(rc)); });
+          let rotArr = normRot(rotation);
+          if (!rotArr.length) rotArr = defRotArr(finalCamp);
+          const hasKey = KEYWORDS.some((k) => routeList.join(',').includes(k));
+          if (routeList.length && (flat.includes('업무') || hasKey || isValidRouteList(routeList.join(',')))) addPresent(finalCamp, routeList, rotArr, r.key);
+        });
+        // 미입차 모으기
+        const miss = new Map();
+        const addMissing = (camp, rt, rot) => { const k = camp + '|' + rt; if (!miss.has(k)) miss.set(k, new Set()); miss.get(k).add(rot); };
+        const byRoute = new Map();
+        present.forEach((who, k) => {
+          const [camp, rt, rot] = k.split('|');
+          if (!byRoute.has(camp + '|' + rt)) byRoute.set(camp + '|' + rt, new Set());
+          byRoute.get(camp + '|' + rt).add(rot);
+        });
+        byRoute.forEach((rots, k) => { const [camp, rt] = k.split('|'); defRotArr(camp).filter((x) => !rots.has(x)).forEach((x) => addMissing(camp, rt, x)); });
+        explicitMi.forEach(({ baseCamp, defRt }) => routeExpand(defRt).forEach((rt) => defRotArr(baseCamp).forEach((rot) => {
+          if (!present.has([baseCamp, rt, rot].join('|'))) addMissing(baseCamp, rt, rot);
+        })));
+        baseRouteSet.forEach((k) => {
+          const [camp, rt] = k.split('|');
+          const covered = defRotArr(camp).some((rot) => present.has([camp, rt, rot].join('|')));
+          if (!covered) defRotArr(camp).forEach((rot) => addMissing(camp, rt, rot));
+        });
+        const grouped = new Map();
+        miss.forEach((rots, k) => {
+          const [camp, rt] = k.split('|');
+          const mr = Array.from(rots).sort();
+          const label = mr.length === defRotArr(camp).length ? '' : '(' + mr.join(',') + ')';
+          const gk = camp + '|' + label;
+          if (!grouped.has(gk)) grouped.set(gk, []);
+          grouped.get(gk).push(rt);
+        });
+        missing.push(Array.from(grouped.keys()).sort().map((gk) => {
+          const [camp, label] = gk.split('|');
+          return (camp ? camp + ' ' : '') + grouped.get(gk).sort().join(',') + label;
+        }));
+        // 중복: 같은 날 같은 캠프·노선·회전에 두 명 이상
+        const dl = [];
+        present.forEach((who, k) => {
+          if (who.size < 2) return;
+          const [camp, rt, rot] = k.split('|');
+          dl.push({ camp, route: rt, rot, keys: Array.from(who) });
+          who.forEach((key) => dupCells.add(key + '|' + d));
+        });
+        dups.push(dl);
+      }
+      return { counts, roster, missing, dups, dupCells };
+    }
+    return { compute, routeExpand, isWorkDay };
+  })();
+
+  // ───── 스케줄관리 (2주 표) ─────
+  const SOPTS = ['출근', '휴무', '고정휴무', '계획된휴무', '병가', '휴가', '미입차', '용차', '노선변경', '라우트변경'];
+  const TYPE_ORDER = { '고정': 0, '품앗이': 1, '백업': 2, '외부용차': 3 };
+  const SD = { start: '', today: '', dates: [], holidays: {}, camps: [], routes: {}, drivers: [], cells: {}, notes: [] };
+  let srows = [], scalc = null, sAct = null, sAnchor = null, sEdit = null, sUndo = [], sBusy = false;
+  const sBase = {}, sPending = {};
+  const sf = { camp: '', q: '', all: false };
+  const shortCamp = (n) => String(n || '').replace(/\s*캠프\s*$/, '').trim();
+  const isoWeek = (ds) => {
+    const p = ds.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2])), day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    return Math.ceil(((d - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
+  };
+  const ymdLocal = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const shiftDays = (ds, n) => { const p = ds.split('-').map(Number); return ymdLocal(new Date(p[0], p[1] - 1, p[2] + n)); };
+  const sget = (row, date) => ((SD.cells[row] || {})[date] || '');
+  /** 칸 글자 → 색 구분 (운영시트 드롭다운 색과 같게) */
+  function cellKind(v) {
+    const s = String(v || '').trim();
+    if (!s) return '';
+    if (s === '출근') return 'k-work';
+    if (/미입차/.test(s)) return 'k-mi';
+    if (/휴무|휴가/.test(s)) return 'k-off';
+    if (/병가/.test(s)) return 'k-sick';
+    if (/용차/.test(s)) return 'k-yong';
+    if (/^(노선|라우트)\s*변경/.test(s)) return 'k-chg';
+    if (/업무등록/.test(s)) return 'k-reg';
+    if (/^[가-힣]+\d\s*\d/.test(s)) return 'k-other';
+    return 'k-route';
+  }
+
+  function loadSched(start) {
+    if (!SD.dates.length) $('#sWrap').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
+    return api('adm_schWeek', start || SD.start || '').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      Object.assign(SD, r);
+      Object.keys(sBase).forEach((k) => delete sBase[k]);
+      Object.keys(SD.cells).forEach((row) => Object.keys(SD.cells[row]).forEach((d) => { sBase[row + '|' + d] = SD.cells[row][d]; }));
+      SD.notes.forEach((n) => { SD.cells[n.id] = n.cells; Object.keys(n.cells).forEach((d) => { sBase[n.id + '|' + d] = n.cells[d]; }); });
+      // 저장 안 된 칸은 화면에 그대로 둔다
+      Object.values(sPending).forEach((x) => { (SD.cells[x.row] = SD.cells[x.row] || {})[x.date] = x.value; });
+      $('#sDate').value = SD.start;
+      renderSchedCamps(); renderSched();
+    }).catch(() => {});
+  }
+  function renderSchedCamps() {
+    const sel = $('#sCamp'), v = sf.camp;
+    sel.innerHTML = '<option value="">캠프 전체</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
+      .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === v ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+  }
+  /** 표에 나올 줄: 승인된 기사 (+ 이 2주에 기록이 있는 다른 기사) → 캠프·구분·순서·이름 순 */
+  function buildRows() {
+    const q = sf.q.trim().toLowerCase();
+    const camps = {};
+    SD.camps.forEach((c) => { camps[c.id] = c; });
+    const list = SD.drivers.filter((d) => {
+      const has = Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k));
+      if (d.status !== '승인' && !has && !sf.all) return false;
+      if (sf.camp && d.campId !== sf.camp) return false;
+      if (q && ![d.name, d.loginId, d.code, d.baseRoute].some((x) => String(x || '').toLowerCase().includes(q))) return false;
+      return true;
+    }).sort((a, b) => {
+      const ca = camps[a.campId] ? camps[a.campId].name : '￿', cb = camps[b.campId] ? camps[b.campId].name : '￿';
+      return koSort(ca, cb) || (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) ||
+        (Number(a.order) || 9999) - (Number(b.order) || 9999) || koSort(a.name, b.name);
+    });
+    const rows = list.map((d) => ({ kind: 'd', row: d.id, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
+    SD.notes.forEach((n) => rows.push({ kind: 'n', row: n.id, note: n }));
+    return rows;
+  }
+  function recalc() {
+    const campRot = {};
+    SD.camps.forEach((c) => { campRot[shortCamp(c.name)] = String(c.rot || 'D1,D2,F3').split(',').filter(Boolean); });
+    const campById = {};
+    SD.camps.forEach((c) => { campById[c.id] = c; });
+    const rows = SD.drivers.filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
+      key: d.id, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type,
+      cells: SD.dates.map((dt) => sget(d.id, dt))
+    }));
+    scalc = SchedCalc.compute(rows, campRot, SD.dates.length);
+  }
+
+  function renderSched() {
+    srows = buildRows(); recalc();
+    const today = SD.today, dates = SD.dates;
+    const hcell = (dt, i) => {
+      const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+      const tags = [];
+      if (+p[2] <= 7) tags.push('<i class="tg-peak">Peak물량</i>');
+      if (SD.holidays[dt]) tags.push('<i class="tg-hol">' + esc(SD.holidays[dt]) + '</i>');
+      if (dow === 0 || dow === 1) tags.push('<i class="tg-wk" title="주말 수행률 ✭중요✭">주말 수행률</i>');
+      return '<th class="dc' + (dt === today ? ' today' : '') + (dow === 0 || SD.holidays[dt] ? ' sun' : dow === 6 ? ' sat' : '') + (i === 7 ? ' wk2' : '') + '" data-col="' + i + '">' +
+        '<b>' + +p[1] + '/' + +p[2] + ' (' + DOW[dow] + ')</b><small>' + isoWeek(dt) + '주차</small>' + tags.join('') + '</th>';
+    };
+    const head = '<thead><tr class="h1"><th class="fx f1" rowspan="2">캠프</th><th class="fx f2" rowspan="2">이름</th><th class="fx f3" rowspan="2">아이디</th><th class="fx f4" rowspan="2">기본노선</th>' +
+      '<th colspan="7" class="wk-a">확정 스케줄 · 변경 불가</th><th colspan="7" class="wk-b wk2">예상 스케줄 · 변동 있음</th>' +
+      '<th rowspan="2" class="ex">출근일수</th><th rowspan="2" class="ex">고정휴무</th><th rowspan="2" class="ex">추가휴무</th><th rowspan="2" class="ex">근무형태</th><th rowspan="2" class="ex">메모</th></tr>' +
+      '<tr class="h2">' + dates.map(hcell).join('') + '</tr></thead>';
+    let prevCamp = null;
+    const body = srows.map((r, ri) => {
+      if (r.kind === 'n') {
+        return '<tr class="note' + (ri && srows[ri - 1].kind === 'd' ? ' gtop' : '') + '"><td class="fx f1 lab">비고</td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
+          dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="5"></td></tr>';
+      }
+      const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp;
+      prevCamp = r.camp;
+      return '<tr class="drv' + (gtop ? ' gtop' : '') + (d.status !== '승인' ? ' dim' : '') + '">' +
+        '<td class="fx f1">' + esc(shortCamp(r.camp) || '-') + '</td>' +
+        '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') + '</td>' +
+        '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
+        dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
+        '<td class="ex num" data-cnt="' + esc(d.id) + '">' + (scalc.counts[d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
+        '<td class="ex">' + esc(d.workPattern || '') + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
+    }).join('');
+    $('#sWrap').innerHTML = '<table class="sg" id="sGrid">' + head + '<tbody>' + body + '</tbody><tbody id="sCalc"></tbody></table>' +
+      (srows.length ? '' : '<div class="empty">표시할 기사가 없습니다. 기사 정보관리에서 기사를 승인하거나, 캠프 필터를 바꿔 보세요.</div>');
+    renderCalc(); paintSel();
+    $('#sCount').textContent = srows.filter((r) => r.kind === 'd').length + '명';
+  }
+  function tdCell(r, ri, dt, ci) {
+    const v = sget(r.row, dt), k = r.row + '|' + dt;
+    const cls = ['c', cellKind(v)];
+    if (sPending[k]) cls.push('pend');
+    if (scalc && scalc.dupCells.has(r.row + '|' + ci)) cls.push('dup');
+    if (dt === SD.today) cls.push('today');
+    if (ci === 7) cls.push('wk2');
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (v.length > 14 ? ' title="' + esc(v) + '"' : '') + '>' + esc(v) + '</td>';
+  }
+  function renderCalc() {
+    const dates = SD.dates, campOk = (short) => !sf.camp || shortCamp((SD.camps.find((c) => c.id === sf.camp) || {}).name) === short;
+    const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f1 lab">' + lab + '</td><td class="fx f2 lab" colspan="3">' + sub + '</td>' +
+      vals.map((v, i) => '<td class="cc' + (i === 7 ? ' wk2' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="5"></td></tr>';
+    let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l) => l.filter((x) => campOk(x.split(' ')[0])).map(esc).join('<br>')));
+    html += line('du', '중복', '같은 노선·회전 2명 이상', scalc.dups.map((l) => l.filter((x) => campOk(x.camp)).map((x) => esc(x.camp + ' ' + x.route + '(' + x.rot + ') ' +
+      x.keys.map((k) => (SD.drivers.find((d) => d.id === k) || {}).name || k).join('·'))).join('<br>')));
+    SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).forEach((c) => {
+      const s = shortCamp(c.name);
+      if (!campOk(s) || !scalc.roster[s]) return;
+      const vals = scalc.roster[s].map((l) => l.map(esc).join('<br>'));
+      if (!vals.some(Boolean) && sf.camp === '') { /* 비어 있는 캠프도 줄은 보여준다 (운영시트와 같게) */ }
+      html += line('bk', esc(s), '백업 명단 (자동)', vals);
+    });
+    $('#sCalc').innerHTML = html;
+  }
+  function refreshAfterChange(changedRows) {
+    recalc();
+    const tb = $('#sGrid'); if (!tb) return;
+    // 바뀐 칸 / 출근일수 / 중복 표시만 다시 그림
+    $$('td.c', tb).forEach((td) => {
+      const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
+      const v = sget(r.row, dt), k = r.row + '|' + dt;
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === SD.today ? 'today' : '', ci === 7 ? 'wk2' : '']
+        .filter(Boolean).join(' ');
+      const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
+      if (td.textContent !== v) td.textContent = v;
+      if (v.length > 14) td.title = v; else td.removeAttribute('title');
+      td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
+    });
+    $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });
+    renderCalc();
+  }
+
+  // ── 값 바꾸기 · 자동 저장 ──
+  function setCells(list, opts) {
+    const undo = [];
+    list.forEach((x) => {
+      const v = String(x.value == null ? '' : x.value).replace(/\r\n?/g, '\n').trim();
+      const before = sget(x.row, x.date);
+      if (v === before) return;
+      (SD.cells[x.row] = SD.cells[x.row] || {})[x.date] = v;
+      if (!v) delete SD.cells[x.row][x.date];
+      const k = x.row + '|' + x.date;
+      if (v === (sBase[k] || '')) delete sPending[k];
+      else sPending[k] = { row: x.row, date: x.date, value: v };
+      undo.push({ row: x.row, date: x.date, value: before });
+    });
+    if (!undo.length) return;
+    if (!(opts && opts.noUndo)) { sUndo.push(undo); if (sUndo.length > 50) sUndo.shift(); }
+    refreshAfterChange();
+    scheduleSave();
+  }
+  let sTimer = null;
+  function scheduleSave() { clearTimeout(sTimer); sStatus('wait'); sTimer = setTimeout(flushSave, 700); }
+  function sStatus(st, msg) {
+    const el = $('#sSave');
+    el.className = 'ssave ' + st;
+    el.textContent = msg || (st === 'wait' ? '저장 대기…' : st === 'busy' ? '저장 중…' : st === 'ok' ? '모두 저장됨' : st === 'err' ? '저장 실패 · 다시 시도' : '');
+  }
+  function flushSave() {
+    if (sBusy) return scheduleSave();
+    const items = Object.keys(sPending).map((k) => Object.assign({}, sPending[k], { old: sBase[k] || '' }));
+    if (!items.length) return sStatus('ok');
+    sBusy = true; sStatus('busy');
+    const sent = {};
+    items.forEach((x) => { sent[x.row + '|' + x.date] = x.value; });
+    api('adm_schSave', items).then((r) => {
+      if (!r.ok) { sStatus('err', '저장 실패: ' + r.msg); return toast(r.msg); }
+      const conf = {};
+      (r.conflicts || []).forEach((c) => { conf[c.row + '|' + c.date] = c; });
+      Object.keys(sent).forEach((k) => {
+        if (conf[k]) return;
+        sBase[k] = sent[k];
+        if (sPending[k] && sPending[k].value === sent[k]) delete sPending[k];
+      });
+      if (r.conflicts && r.conflicts.length) {
+        r.conflicts.forEach((c) => {
+          const k = c.row + '|' + c.date;
+          sBase[k] = c.current; delete sPending[k];
+          (SD.cells[c.row] = SD.cells[c.row] || {})[c.date] = c.current;
+          if (!c.current) delete SD.cells[c.row][c.date];
+        });
+        toast('다른 곳에서 먼저 바뀐 칸 ' + r.conflicts.length + '개는 저장하지 않고 최신 값으로 바꿨습니다.');
+      }
+      refreshAfterChange();
+      sStatus(Object.keys(sPending).length ? 'wait' : 'ok');
+      if (Object.keys(sPending).length) scheduleSave();
+    }).catch(() => { sStatus('err'); }).finally(() => { sBusy = false; });
+  }
+  $('#sSave').addEventListener('click', () => { if ($('#sSave').classList.contains('err')) flushSave(); });
+  window.addEventListener('beforeunload', (e) => { if (Object.keys(sPending).length) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ── 선택 · 키보드 · 편집 ──
+  const nRows = () => srows.length, nCols = () => SD.dates.length;
+  function selRect() {
+    if (!sAct) return null;
+    const a = sAnchor || sAct;
+    return { r1: Math.min(a.r, sAct.r), r2: Math.max(a.r, sAct.r), c1: Math.min(a.c, sAct.c), c2: Math.max(a.c, sAct.c) };
+  }
+  function paintSel() {
+    const tb = $('#sGrid'); if (!tb) return;
+    $$('td.sel, td.act', tb).forEach((td) => td.classList.remove('sel', 'act'));
+    const s = selRect(); if (!s) return;
+    for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) {
+      const td = tb.querySelector('td.c[data-r="' + r + '"][data-c="' + c + '"]');
+      if (td) td.classList.add('sel');
+    }
+    const at = tb.querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]');
+    if (at) { at.classList.add('act'); at.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+  }
+  function moveAct(dr, dc, extend) {
+    if (!sAct) { sAct = { r: 0, c: 0 }; }
+    const n = { r: Math.max(0, Math.min(nRows() - 1, sAct.r + dr)), c: Math.max(0, Math.min(nCols() - 1, sAct.c + dc)) };
+    if (extend) { if (!sAnchor) sAnchor = Object.assign({}, sAct); } else sAnchor = null;
+    sAct = n; paintSel();
+  }
+  $('#sWrap').addEventListener('mousedown', (e) => {
+    const td = e.target.closest('td.c');
+    if (!td || e.button !== 0) return;
+    if (sEdit) commitEdit();
+    const p = { r: +td.dataset.r, c: +td.dataset.c };
+    if (e.shiftKey && sAct) { if (!sAnchor) sAnchor = Object.assign({}, sAct); sAct = p; }
+    else { sAct = p; sAnchor = null; }
+    paintSel(); $('#sWrap').focus({ preventScroll: true });
+    const move = (ev) => {
+      const t = document.elementFromPoint(ev.clientX, ev.clientY), c = t && t.closest && t.closest('td.c');
+      if (!c) return;
+      const q = { r: +c.dataset.r, c: +c.dataset.c };
+      if (q.r !== sAct.r || q.c !== sAct.c) { if (!sAnchor) sAnchor = Object.assign({}, p); sAct = q; paintSel(); }
+    };
+    const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    e.preventDefault();
+  });
+  $('#sWrap').addEventListener('dblclick', (e) => { const td = e.target.closest('td.c'); if (td) openEdit(); });
+  $('#sWrap').addEventListener('click', (e) => {
+    const nb = e.target.closest('[data-note]'); if (nb) return noteMenu(nb.dataset.note);
+    const db = e.target.closest('[data-drv]'); if (db) return openSchDriver(db.dataset.drv);
+    // 휴대폰: 칸을 한 번 누르면 바로 입력
+    const td = e.target.closest('td.c');
+    if (td && window.matchMedia('(pointer: coarse)').matches) openEdit();
+  });
+  $('#sWrap').addEventListener('keydown', (e) => {
+    if (sEdit || !sAct) return;
+    const k = e.key, ctrl = e.ctrlKey || e.metaKey;
+    if (k === 'ArrowUp') { moveAct(-1, 0, e.shiftKey); e.preventDefault(); }
+    else if (k === 'ArrowDown') { moveAct(1, 0, e.shiftKey); e.preventDefault(); }
+    else if (k === 'ArrowLeft') { moveAct(0, -1, e.shiftKey); e.preventDefault(); }
+    else if (k === 'ArrowRight' || k === 'Tab') { moveAct(0, k === 'Tab' && e.shiftKey ? -1 : 1, k !== 'Tab' && e.shiftKey); e.preventDefault(); }
+    else if (k === 'Enter' || k === 'F2') { openEdit(); e.preventDefault(); }
+    else if (k === 'Delete' || k === 'Backspace') { fillSel(''); e.preventDefault(); }
+    else if (ctrl && (k === 'z' || k === 'Z')) { const u = sUndo.pop(); if (u) setCells(u, { noUndo: true }); else toast('되돌릴 것이 없습니다.'); e.preventDefault(); }
+    else if (!ctrl && !e.altKey && k.length === 1) { openEdit(k); e.preventDefault(); }
+  });
+  /** 선택한 칸 모두 같은 값 */
+  function fillSel(v) {
+    const s = selRect(); if (!s) return;
+    const list = [];
+    for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
+    setCells(list);
+  }
+  // 복사 · 붙여넣기 (엑셀·구글시트와 주고받기)
+  function tsvCell(v) { return /[\t\n"]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function parseTsv(t) {
+    const rows = []; let row = [], f = '', q = false;
+    t = t.replace(/\r\n?/g, '\n').replace(/\n$/, '');
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (q) { if (ch === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+      else if (ch === '"' && f === '') q = true;
+      else if (ch === '\t') { row.push(f); f = ''; }
+      else if (ch === '\n') { row.push(f); rows.push(row); row = []; f = ''; }
+      else f += ch;
+    }
+    row.push(f); rows.push(row);
+    return rows;
+  }
+  document.addEventListener('copy', (e) => {
+    if (currentView !== 'sched' || sEdit || document.activeElement !== $('#sWrap')) return;
+    const s = selRect(); if (!s) return;
+    const out = [];
+    for (let r = s.r1; r <= s.r2; r++) { const line = []; for (let c = s.c1; c <= s.c2; c++) line.push(tsvCell(sget(srows[r].row, SD.dates[c]))); out.push(line.join('\t')); }
+    e.clipboardData.setData('text/plain', out.join('\n')); e.preventDefault();
+    toast((s.r2 - s.r1 + 1) * (s.c2 - s.c1 + 1) + '칸을 복사했습니다.');
+  });
+  document.addEventListener('paste', (e) => {
+    if (currentView !== 'sched' || sEdit || document.activeElement !== $('#sWrap') || !sAct) return;
+    const t = e.clipboardData.getData('text/plain'); if (!t) return;
+    e.preventDefault();
+    const grid = parseTsv(t), s = selRect(), list = [];
+    // 한 칸만 복사해서 여러 칸을 골랐으면 모두 채움
+    if (grid.length === 1 && grid[0].length === 1 && s && (s.r1 !== s.r2 || s.c1 !== s.c2)) return fillSel(grid[0][0]);
+    grid.forEach((line, i) => line.forEach((v, j) => {
+      const r = s.r1 + i, c = s.c1 + j;
+      if (r < nRows() && c < nCols()) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
+    }));
+    setCells(list);
+    sAnchor = { r: s.r1, c: s.c1 }; sAct = { r: Math.min(nRows() - 1, s.r1 + grid.length - 1), c: Math.min(nCols() - 1, s.c1 + Math.max.apply(null, grid.map((g) => g.length)) - 1) };
+    paintSel(); toast(list.length + '칸을 붙여 넣었습니다. (Ctrl+Z 로 되돌리기)');
+  });
+
+  // 칸 편집기 (입력 + 추천 목록)
+  function suggestions(r, text) {
+    const t = String(text || '').trim().toUpperCase();
+    const d = r.d, myCamp = d ? d.campId : '', out = [];
+    const push = (v, hint) => { if (v && !out.some((x) => x.v === v)) out.push({ v, hint }); };
+    if (d && d.baseRoute && !/백업|용차/.test(d.baseRoute)) push('출근', d.baseRoute);
+    SOPTS.forEach((o) => push(o));
+    // 노선: 노선관리에 등록된 노선 + 기사들의 기본노선 + 이 2주에 이미 쓴 값
+    const campRoutes = {};
+    const addR = (campId, code) => { code = String(code || '').trim(); if (code && /\d/.test(code) && !/백업|용차/.test(code)) (campRoutes[campId] = campRoutes[campId] || new Set()).add(code); };
+    SD.camps.forEach((c) => (SD.routes[c.id] || []).forEach((code) => addR(c.id, code)));
+    SD.drivers.forEach((x) => { if (x.campId) addR(x.campId, x.baseRoute); });
+    if (d && d.baseRoute && !/백업|용차/.test(d.baseRoute)) push(d.baseRoute, '기본노선');
+    const used = new Set();
+    SD.drivers.forEach((x) => { if (x.campId === myCamp) SD.dates.forEach((dt) => { const v = sget(x.id, dt); if (v && /\d/.test(v) && v.length <= 40) used.add(v); }); });
+    if (d) SD.dates.forEach((dt) => { const v = sget(d.id, dt); if (v && /\d/.test(v) && v.length <= 40) used.add(v); });
+    Array.from(campRoutes[myCamp] || []).sort(koSort).forEach((c) => push(c, '노선'));
+    Array.from(used).sort(koSort).forEach((v) => push(v, '이번 2주에 쓴 값'));
+    SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).forEach((c) => { if (c.id !== myCamp) Array.from(campRoutes[c.id] || []).sort(koSort).forEach((code) => push(shortCamp(c.name) + ' ' + code, '다른 캠프')); });
+    if (!t) return out.slice(0, 14);
+    return out.filter((x) => x.v.toUpperCase().replace(/\s/g, '').includes(t.replace(/\s/g, ''))).slice(0, 14);
+  }
+  function openEdit(initial) {
+    if (!sAct || sEdit) return;
+    const r = srows[sAct.r], dt = SD.dates[sAct.c];
+    const td = $('#sGrid').querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]'); if (!td) return;
+    const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
+    const box = document.createElement('div'); box.className = 'sed';
+    box.style.left = (rc.left - wc.left + wrap.scrollLeft) + 'px'; box.style.top = (rc.top - wc.top + wrap.scrollTop) + 'px';
+    box.style.minWidth = Math.max(rc.width, 170) + 'px';
+    box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea><div class="sug"></div><div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
+    wrap.appendChild(box);
+    const ta = box.querySelector('textarea');
+    ta.value = initial != null ? initial : sget(r.row, dt);
+    sEdit = { box, ta, r, dt, idx: -1 };
+    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
+    const renderSug = () => {
+      const list = suggestions(r, ta.value === sget(r.row, dt) && initial == null ? '' : ta.value);
+      sEdit.list = list; sEdit.idx = Math.min(sEdit.idx, list.length - 1);
+      box.querySelector('.sug').innerHTML = list.map((x, i) => '<button type="button" data-i="' + i + '" class="' + cellKind(x.v) + (i === sEdit.idx ? ' on' : '') + '">' +
+        esc(x.v) + (x.hint ? '<small>' + esc(x.hint) + '</small>' : '') + '</button>').join('');
+    };
+    ta.addEventListener('input', () => { grow(); sEdit.idx = -1; renderSug(); });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeEdit(); $('#sWrap').focus({ preventScroll: true }); }
+      else if (e.key === 'Enter' && e.altKey) { e.preventDefault(); const p = ta.selectionStart; ta.value = ta.value.slice(0, p) + '\n' + ta.value.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = p + 1; grow(); }
+      else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        if (sEdit.idx >= 0 && sEdit.list[sEdit.idx]) ta.value = sEdit.list[sEdit.idx].v;
+        commitEdit();
+        moveAct(e.key === 'Tab' ? 0 : e.shiftKey ? -1 : 1, e.key === 'Tab' ? (e.shiftKey ? -1 : 1) : 0);
+        $('#sWrap').focus({ preventScroll: true });
+      } else if (e.key === 'ArrowDown' && sEdit.list && sEdit.list.length) { e.preventDefault(); sEdit.idx = Math.min(sEdit.list.length - 1, sEdit.idx + 1); renderSug(); }
+      else if (e.key === 'ArrowUp' && sEdit.list && sEdit.list.length && sEdit.idx >= 0) { e.preventDefault(); sEdit.idx--; renderSug(); }
+    });
+    box.querySelector('.sug').addEventListener('mousedown', (e) => {
+      const b = e.target.closest('[data-i]'); if (!b) return;
+      e.preventDefault(); ta.value = sEdit.list[+b.dataset.i].v; commitEdit(); $('#sWrap').focus({ preventScroll: true });
+    });
+    ta.addEventListener('blur', () => setTimeout(() => { if (sEdit && sEdit.ta === ta) commitEdit(); }, 120));
+    grow(); renderSug(); ta.focus();
+    if (initial == null) ta.select(); else ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+  function commitEdit() {
+    if (!sEdit) return;
+    const e = sEdit; sEdit = null;
+    e.box.remove();
+    setCells([{ row: e.r.row, date: e.dt, value: e.ta.value }]);
+  }
+  function closeEdit() { if (sEdit) { sEdit.box.remove(); sEdit = null; } }
+
+  // ── 위쪽 도구 ──
+  function schedGo(start) {
+    if (sEdit) commitEdit();
+    sAct = null; sAnchor = null;
+    loadSched(start);
+  }
+  $('#sPrev').addEventListener('click', () => schedGo(shiftDays(SD.start, -7)));
+  $('#sNext').addEventListener('click', () => schedGo(shiftDays(SD.start, 7)));
+  $('#sToday').addEventListener('click', () => schedGo(SD.today));
+  $('#sDate').addEventListener('change', (e) => { if (e.target.value) schedGo(e.target.value); });
+  $('#sCamp').addEventListener('change', (e) => { sf.camp = e.target.value; sAct = null; sAnchor = null; renderSched(); });
+  $('#sQ').addEventListener('input', (e) => { sf.q = e.target.value; sAct = null; sAnchor = null; renderSched(); });
+  $('#sAll').addEventListener('change', (e) => { sf.all = e.target.checked; renderSched(); });
+  $('#sReload').addEventListener('click', () => schedGo(SD.start));
+  $('#sNoteAdd').addEventListener('click', () => {
+    ask('비고 줄 추가', '날짜별로 메모를 적는 줄을 하나 더 만듭니다. 줄 이름을 입력하세요.', '예: 유정근 비고').then((v) => {
+      if (!v) return;
+      api('adm_schNote', 'add', '', v).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        SD.notes.push({ id: r.id, label: r.label, cells: {} }); SD.cells[r.id] = {}; renderSched();
+      }).catch(() => {});
+    });
+  });
+  function noteMenu(id) {
+    const n = SD.notes.find((x) => x.id === id); if (!n) return;
+    ask('비고 줄 이름 바꾸기', '새 이름을 입력하세요. 이 줄을 지우려면 "삭제"라고 입력하세요. (지우면 이 줄의 모든 날짜 메모가 함께 지워집니다)', n.label).then((v) => {
+      if (!v) return;
+      if (v === '삭제') {
+        if (!confirm('"' + n.label + '" 비고 줄과 그 안의 메모를 모두 지울까요?')) return;
+        return api('adm_schNote', 'delete', id).then((r) => {
+          if (!r.ok) return toast(r.msg);
+          SD.notes = SD.notes.filter((x) => x.id !== id); delete SD.cells[id]; renderSched(); toast('비고 줄을 지웠습니다.');
+        }).catch(() => {});
+      }
+      api('adm_schNote', 'rename', id, v).then((r) => { if (!r.ok) return toast(r.msg); n.label = r.label; renderSched(); }).catch(() => {});
+    });
+  }
+  /** 빈칸 자동 채우기: 고정·품앗이 기사의 오늘 이후 빈칸 → 고정휴무 요일이면 '고정휴무', 아니면 '출근' */
+  function parseOffDays(s) {
+    const t = String(s || '').replace(/요일/g, '').replace(/\s+/g, '');
+    if (!t || !/^[일월화수목금토]([,./][일월화수목금토])*$/.test(t)) return null;
+    return t.split(/[,./]/).map((x) => DOW.indexOf(x));
+  }
+  $('#sFill').addEventListener('click', () => {
+    const list = [], skipped = [];
+    srows.filter((r) => r.kind === 'd' && (r.d.type === '고정' || r.d.type === '품앗이') && r.d.baseRoute && !/백업|용차/.test(r.d.baseRoute)).forEach((r) => {
+      const off = r.d.fixedOff ? parseOffDays(r.d.fixedOff) : [];
+      if (off === null) { skipped.push(r.d.name); return; }
+      SD.dates.forEach((dt) => {
+        if (dt < SD.today || sget(r.row, dt)) return;
+        const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+        list.push({ row: r.row, date: dt, value: off.includes(dow) ? '고정휴무' : '출근' });
+      });
+    });
+    if (!list.length) return toast('채울 빈칸이 없습니다.' + (skipped.length ? ' (고정휴무일을 요일로 적지 않은 기사: ' + skipped.join(', ') + ')' : ''));
+    const nOff = list.filter((x) => x.value === '고정휴무').length;
+    if (!confirm('오늘 이후 빈칸 ' + list.length + '개를 채웁니다.\n출근 ' + (list.length - nOff) + '칸 · 고정휴무 ' + nOff + '칸\n(고정·품앗이 기사만, 이미 적힌 칸은 그대로)' +
+      (skipped.length ? '\n\n고정휴무일을 "월,화"처럼 요일로 적지 않아 건너뛰는 기사: ' + skipped.join(', ') : '') + '\n\n채울까요? (Ctrl+Z 로 되돌릴 수 있습니다)')) return;
+    setCells(list);
+  });
+
+  // ── 기사 스케줄 설정 ──
+  let sdEdit = null;
+  function openSchDriver(id) {
+    const d = SD.drivers.find((x) => x.id === id); if (!d) return;
+    sdEdit = d;
+    $('#sdTitle').textContent = d.name + ' · 스케줄 설정';
+    $('#sdCamp').innerHTML = '<option value="">(소속 캠프 없음)</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
+      .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === d.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+    $('#sdRoute').value = d.baseRoute || ''; $('#sdOff').value = d.fixedOff || ''; $('#sdExtra').value = d.extraOff || '';
+    $('#sdPat').value = d.workPattern || ''; $('#sdMemo').value = d.memo || ''; $('#sdOrder').value = d.order || '';
+    $('#sdRoutes').innerHTML = (SD.routes[d.campId] || []).map((c) => '<option value="' + esc(c) + '">').join('') + '<option value="백업"><option value="용차">';
+    paintOffBtns();
+    $('#sdModal').classList.remove('hidden');
+  }
+  function paintOffBtns() {
+    const days = parseOffDays($('#sdOff').value) || [];
+    $$('[data-off]', $('#sdModal')).forEach((b) => b.classList.toggle('on', days.includes(+b.dataset.off)));
+  }
+  $('#sdOffBtns').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-off]'); if (!b) return;
+    const cur = parseOffDays($('#sdOff').value) || [], i = +b.dataset.off;
+    const next = cur.includes(i) ? cur.filter((x) => x !== i) : cur.concat([i]);
+    $('#sdOff').value = next.sort((a, b2) => a - b2).map((x) => DOW[x]).join(',');
+    paintOffBtns();
+  });
+  $('#sdOff').addEventListener('input', paintOffBtns);
+  $('#sdCamp').addEventListener('change', () => {
+    $('#sdRoutes').innerHTML = (SD.routes[$('#sdCamp').value] || []).map((c) => '<option value="' + esc(c) + '">').join('') + '<option value="백업"><option value="용차">';
+  });
+  $('#sdCancel').addEventListener('click', () => $('#sdModal').classList.add('hidden'));
+  $('#sdOpen').addEventListener('click', () => {
+    const id = sdEdit && sdEdit.id; $('#sdModal').classList.add('hidden');
+    if (id) { switchView('drivers'); openDrawer(id); }
+  });
+  $('#sdForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const d = sdEdit; if (!d) return;
+    const f = { schCampId: $('#sdCamp').value, baseRoute: $('#sdRoute').value.trim(), fixedOff: $('#sdOff').value.trim(), extraOff: $('#sdExtra').value.trim(),
+      workPattern: $('#sdPat').value.trim(), schMemo: $('#sdMemo').value.trim(), schOrder: $('#sdOrder').value.trim() };
+    const was = { schCampId: d.campId || '', baseRoute: d.baseRoute || '', fixedOff: d.fixedOff || '', extraOff: d.extraOff || '', workPattern: d.workPattern || '', schMemo: d.memo || '', schOrder: d.order || '' };
+    Object.keys(f).forEach((k) => { if (f[k] === was[k]) delete f[k]; });
+    if (!Object.keys(f).length) return $('#sdModal').classList.add('hidden');
+    const b = $('#sdSave'); b.disabled = true;
+    api('adm_updateDriver', d.id, f, null).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      return api('adm_schWeek', SD.start).then((w) => {
+        if (w.ok) { SD.drivers = w.drivers; }
+        $('#sdModal').classList.add('hidden'); renderSched(); toast(d.name + ' 기사님 스케줄 설정을 저장했습니다.');
+      });
+    }).catch(() => {}).finally(() => { b.disabled = false; });
+  });
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sdModal').classList.contains('hidden')) $('#sdModal').classList.add('hidden'); });
+  // ── 기존 운영시트 가져오기 ──
+  const opsOpts = () => ({ createDrivers: $('#opsDrv').checked, createCamps: $('#opsCamp').checked, retired: $('#opsRet').checked, overwrite: $('#opsOver').checked });
+  function opsSummary(r) {
+    const li = (t) => '<li>' + t + '</li>';
+    return '<div class="okbox" style="color:var(--ink);background:#f5f8fd"><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">' +
+      li('사람 <b>' + r.people + '명</b>, 기록 <b>' + r.cells.toLocaleString() + '칸</b> (' + esc(r.dateFrom || '-') + ' ~ ' + esc(r.dateTo || '-') + ')') +
+      li('이미 있는 기사와 맞춤: <b>' + r.match.length + '명</b>' + (r.match.length ? ' <span style="color:var(--sub)">(' + r.match.slice(0, 12).map(esc).join(', ') + (r.match.length > 12 ? ' …' : '') + ')</span>' : '')) +
+      li('새로 등록할 기사: <b>' + r.create.length + '명</b>' + (r.create.length ? ' <span style="color:var(--sub)">(' + r.create.slice(0, 12).map(esc).join(', ') + (r.create.length > 12 ? ' …' : '') + ')</span>' : '')) +
+      (r.skipRetired.length ? li('가져오지 않는 퇴사 기사: ' + r.skipRetired.length + '명') : '') +
+      (r.newCamps.length ? li('새로 만들 캠프: ' + r.newCamps.map(esc).join(', ')) : '') +
+      (r.notes.length ? li('비고 줄: ' + r.notes.map(esc).join(', ')) : '') +
+      '</ul></div>' + r.warnings.map((w) => '<div class="warnbox">' + esc(w) + '</div>').join('') +
+      (r.done ? '<div class="okbox">가져오기 완료: 새로 쓴 칸 ' + r.written.toLocaleString() + '개 · 기사 등록 ' + r.driversMade + '명 · 캠프 ' + r.campsMade + '개 · 속성 채움 ' + r.attrsFilled + '명' +
+        (r.kept ? ' · 이미 다른 값이 있어 그대로 둔 칸 ' + r.kept + '개' : '') + '</div>' : '');
+  }
+  $('#sImport').addEventListener('click', () => { $('#opsOut').innerHTML = ''; $('#opsRun').disabled = true; $('#opsModal').classList.remove('hidden'); });
+  $('#opsCancel').addEventListener('click', () => $('#opsModal').classList.add('hidden'));
+  ['opsDrv', 'opsCamp', 'opsRet', 'opsOver', 'opsUrl'].forEach((id) => $('#' + id).addEventListener('input', () => { $('#opsRun').disabled = true; }));
+  $('#opsPrev').addEventListener('click', () => {
+    const b = $('#opsPrev'); b.disabled = true; b.textContent = '읽는 중…';
+    $('#opsOut').innerHTML = '<div style="padding:16px"><div class="spin"></div></div>';
+    api('adm_opsImport', $('#opsUrl').value.trim(), false, opsOpts()).then((r) => {
+      if (!r.ok) { $('#opsOut').innerHTML = ''; return toast(r.msg); }
+      $('#opsOut').innerHTML = opsSummary(r); $('#opsRun').disabled = false;
+    }).catch(() => { $('#opsOut').innerHTML = ''; }).finally(() => { b.disabled = false; b.textContent = '미리보기'; });
+  });
+  $('#opsForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if ($('#opsRun').disabled) return;
+    if (!confirm('미리보기 내용대로 가져올까요?' + ($('#opsOver').checked ? '\n(이미 입력된 칸도 덮어씁니다)' : ''))) return;
+    const b = $('#opsRun'); b.disabled = true; b.textContent = '가져오는 중… (1~2분)';
+    api('adm_opsImport', $('#opsUrl').value.trim(), true, opsOpts()).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      $('#opsOut').innerHTML = opsSummary(r); toast('가져왔습니다.'); loadSched(SD.start);
+    }).catch(() => {}).finally(() => { b.textContent = '가져오기'; });
   });
 
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────

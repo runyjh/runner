@@ -49,6 +49,8 @@ const D = {
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
   carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
+  schCampId: '소속캠프ID', schCamp: '소속캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무',
+  workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
   docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증',
   docFolder: '서류 폴더',
@@ -61,10 +63,13 @@ const D = {
   pwHash: '비밀번호 해시', pwSalt: '비밀번호 솔트'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
-const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode'];
+const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder'];
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
+  schCamp: '스케줄에서 이 기사가 속한 캠프. camps 탭의 캠프명과 같게 쓰면 소속캠프ID가 자동으로 채워집니다.',
+  baseRoute: '평소 맡는 노선. 예: 527B, 530AB (F3), 404D,405AB. 백업 기사는 백업, 용차는 용차',
+  fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
   driverType: '고정 / 백업 / 품앗이 / 외부용차',
   driverCode: '기사마다 겹치지 않는 코드 (영문은 자동 대문자)',
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
@@ -149,9 +154,11 @@ const COMPANY_SHEET = 'company';
 
 // ── 노선관리 (2단계 기준 데이터). 캠프명 > 노선코드 ──
 // camps 시트: 캠프 기본 정보
-const CP = { id: '캠프ID', name: '캠프명', address: '주소', memo: '메모', createdAt: '등록일시', updatedAt: '수정일시' };
+const CP = { id: '캠프ID', name: '캠프명', address: '주소', memo: '메모', rot: '기본 회전', createdAt: '등록일시', updatedAt: '수정일시' };
+const ROTS = ['D1', 'D2', 'F3'];
 const CP_NOTES = {
-  name: '새 줄에 캠프명만 입력해도 캠프ID가 자동으로 채워집니다. 캠프명을 바꾸면 routes·camp_images 탭의 캠프명도 자동으로 바뀝니다.'
+  name: '새 줄에 캠프명만 입력해도 캠프ID가 자동으로 채워집니다. 캠프명을 바꾸면 routes·camp_images 탭의 캠프명도 자동으로 바뀝니다.',
+  rot: '이 캠프에서 운영하는 회전. 예: D1,D2,F3 (비우면 D1,D2,F3). 미입차 계산에 사용'
 };
 // camp_images 시트: 캠프 참고 이미지 (파일은 드라이브 "캠프 참고 이미지" 폴더)
 const CI = {
@@ -1013,6 +1020,7 @@ function onSheetEdit(e) {
   if (!e || !e.range) return;
   const sh = e.range.getSheet(), name = sh.getName();
   if (name === TOOLS.SHEET) { onToolsEdit_(e, sh); return; }
+  if (name === SCH.SHEET) { if (e.range.getRow() === 1) cache_().remove('sch:h'); return; }
   if (!SCHEMA[name] || name === SH.ALOG) return;
   _sheets[name] = sh;
   _ss = sh.getParent();
@@ -1061,6 +1069,14 @@ function fixDriverRow_(sh, c, o) {
   const lid = o.loginId.toLowerCase();
   set('loginId', lid);
   if (!o.id && (lid || o.name)) { set('id', newDriverId_()); if (!o.createdAt) set('createdAt', nowText_()); }
+  if (o.schCamp || o.schCampId) {
+    _campIdx = null;
+    const camp = resolveCamp_({ campName: o.schCamp, campId: o.schCampId });
+    if (camp.err) { if (o.schCamp) bad('schCamp', camp.err); }
+    else { set('schCampId', camp.campId); set('schCamp', camp.campName); }
+  }
+  if (o.baseRoute) set('baseRoute', normBaseRoute_(o.baseRoute));
+  if (o.schOrder && !/^\d{1,5}$/.test(o.schOrder)) bad('schOrder', '숫자로 입력해 주세요.');
   if (o.driverType) {
     const t = normDriverType_(o.driverType);
     if (t) set('driverType', t); else bad('driverType', DTYPES.join(' / ') + ' 중 하나로 입력해 주세요.');
@@ -1122,7 +1138,7 @@ function fixDriverRow_(sh, c, o) {
     upd.updatedAt = nowText_();
     Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(upd[k]); });
   }
-  ['phone', 'rrn', 'licenseNo', 'account', 'pwReset', 'driverType', 'driverCode'].forEach(function (k) {
+  ['phone', 'rrn', 'licenseNo', 'account', 'pwReset', 'driverType', 'driverCode', 'schCamp', 'schOrder'].forEach(function (k) {
     const cell = sh.getRange(o._row, c[k] + 1);
     if (notes[k]) cell.setNote(notes[k]);
     else if (o[k] !== '' || upd[k] !== undefined) cell.clearNote();
@@ -1240,7 +1256,9 @@ const D_EDIT_LABEL = {
   driverType: '기사구분', driverCode: '기사코드',
   qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
   maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
-  rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호'
+  rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
+  schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
+  schMemo: '스케줄 메모', schOrder: '스케줄 순서'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
 
@@ -1421,6 +1439,23 @@ function driverFields_(changes, o) {
       case 'driverType':
         f.driverType = opt(v, '기사구분', 10);
         if (f.driverType && DTYPES.indexOf(f.driverType) < 0) fail_('기사구분은 ' + DTYPES.join(' / ') + ' 중에서 골라 주세요.');
+        break;
+      case 'schCampId': {
+        const id = str_(v);
+        if (!id) { f.schCampId = ''; f.schCamp = ''; break; }
+        const camp = campMap_()[id];
+        if (!camp) fail_('캠프를 찾을 수 없습니다. 노선관리에서 확인해 주세요.');
+        f.schCampId = camp.id; f.schCamp = camp.name;
+        break;
+      }
+      case 'baseRoute': f.baseRoute = normBaseRoute_(opt(v, '기본노선', 60)); break;
+      case 'fixedOff': f.fixedOff = opt(v, '고정휴무일', 60); break;
+      case 'extraOff': f.extraOff = opt(v, '추가휴무', 60); break;
+      case 'workPattern': f.workPattern = opt(v, '근무형태', 30); break;
+      case 'schMemo': f.schMemo = opt(v, '스케줄 메모', 500); break;
+      case 'schOrder':
+        f.schOrder = opt(v, '스케줄 순서', 5);
+        if (f.schOrder && !/^\d{1,5}$/.test(f.schOrder)) fail_('스케줄 순서는 숫자로 입력해 주세요.');
         break;
       case 'driverCode': {
         const code = normDriverCode_(v);
@@ -2289,6 +2324,7 @@ function writeDocResult_(logs, summary) {
 /** 열 추가·삭제·이동 같은 구조 변경 시 머리글 위치 캐시를 지운다 */
 function onSheetChange() {
   Object.keys(SCHEMA).forEach(clearHeadCache_);
+  cache_().remove('sch:h');
   bumpMaster_(); // 행 삭제·추가 등 구조 변경 → 노선 기준 데이터 캐시 버림
 }
 
@@ -2368,7 +2404,17 @@ function fileIdOf_(v) {
   return /^[A-Za-z0-9_-]{20,}$/.test(s) ? s : '';
 }
 function campView_(o) {
-  return { id: o.id, name: o.name, address: o.address, memo: o.memo, createdAt: o.createdAt, updatedAt: o.updatedAt };
+  return { id: o.id, name: o.name, address: o.address, memo: o.memo, rot: normRot_(o.rot).join(',') || ROTS.join(','), createdAt: o.createdAt, updatedAt: o.updatedAt };
+}
+/** 회전 글자 정리: 'd1, d2 f3' → ['D1','D2','F3'] (모르는 값은 버림) */
+function normRot_(v) {
+  const out = [];
+  str_(v).toUpperCase().split(/[\s,\/]+/).forEach(function (x) { if (ROTS.indexOf(x) >= 0 && out.indexOf(x) < 0) out.push(x); });
+  return ROTS.filter(function (r) { return out.indexOf(r) >= 0; });
+}
+/** 기본노선 정리: 영문 대문자, 공백 하나 ('530ab (f3)' → '530AB (F3)') */
+function normBaseRoute_(v) {
+  return str_(v).replace(/\s+/g, ' ').replace(/[a-z]/g, function (ch) { return ch.toUpperCase(); });
 }
 function routeView_(o) {
   const g = splitCode_(o.code);
@@ -2440,6 +2486,21 @@ function adm_routeAll(token) {
 function syncCampNames_() {
   const names = {};
   readAll_(SH.CAMPS).forEach(function (o) { if (o.id) names[o.id] = o.name; });
+  // 기사 소속캠프 이름도 맞춘다
+  (function () {
+    const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS, true), last = sh.getLastRow();
+    if (last < 2) return;
+    const ids = sh.getRange(2, c.schCampId + 1, last - 1, 1).getValues();
+    const rng = sh.getRange(2, c.schCamp + 1, last - 1, 1), cur = rng.getValues();
+    let changed = false;
+    const out = cur.map(function (r, i) {
+      const id = str_(ids[i][0]), now = str_(r[0]);
+      const want = id && names[id] !== undefined ? names[id] : now;
+      if (want !== now) changed = true;
+      return [safeText_(want)];
+    });
+    if (changed) rng.setNumberFormat('@').setValues(out);
+  })();
   [SH.ROUTES, SH.CIMG, SH.CADDR, SH.PRICES].forEach(function (sn) {
     const sh = sheet_(sn), c = cols_(sn, true), last = sh.getLastRow();
     if (last < 2) return;
@@ -2468,6 +2529,8 @@ function adm_campSave(token, f) {
     if (address.length > 200) fail_('주소가 너무 깁니다.');
     const memo = String(f.memo == null ? '' : f.memo).trim();
     if (memo.length > 2000) fail_('메모가 너무 깁니다. (2000자 이내)');
+    const rot = f.rot === undefined ? undefined : normRot_(f.rot).join(',');
+    if (rot === '') fail_('기본 회전을 하나 이상 골라 주세요.');
     const addrs = f.addresses === undefined ? undefined : cleanAddrs_(f.addresses);
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
@@ -2479,13 +2542,15 @@ function adm_campSave(token, f) {
       const now = nowText_();
       let row;
       if (!f.id) {
-        row = appendObj_(SH.CAMPS, { id: newRid_('C'), name: name, address: address, memo: memo, createdAt: now, updatedAt: now });
+        row = appendObj_(SH.CAMPS, { id: newRid_('C'), name: name, address: address, memo: memo, rot: rot || ROTS.join(','), createdAt: now, updatedAt: now });
       } else {
         const o = camps.filter(function (x) { return x.id === f.id; })[0];
         if (!o) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
         conflict_(f.seen, o);
         row = o._row;
-        writeFields_(SH.CAMPS, row, { name: name, address: address, memo: memo, updatedAt: now });
+        const cf = { name: name, address: address, memo: memo, updatedAt: now };
+        if (rot !== undefined) cf.rot = rot;
+        writeFields_(SH.CAMPS, row, cf);
         if (o.name !== name) syncCampNames_();
       }
       const camp = campView_(readObj_(SH.CAMPS, row));
@@ -2898,6 +2963,8 @@ function fixCampRow_(sh, c, o) {
   if (!o.id) { upd.id = newRid_('C'); if (!o.createdAt) upd.createdAt = now; }
   const name = o.name.replace(/\s+/g, ' ');
   if (name !== o.name) upd.name = name;
+  const rot = normRot_(o.rot).join(',');
+  if (o.rot && rot && rot !== o.rot) upd.rot = rot;
   upd.updatedAt = now;
   putCells_(sh, c, o._row, upd);
   const n = campIndex_().count[campKey_(name)] || 0;
@@ -3139,4 +3206,587 @@ function fixPriceRow_(sh, c, o) {
   putCells_(sh, c, o._row, upd);
   putNote_(sh, c, o._row, 'campName', camp.err || '');
   ['num', 'level', 'value', 'tmpStart', 'tmpEnd'].concat(RP_PRICE_KEYS).forEach(function (k) { putNote_(sh, c, o._row, k, notes[k] || ''); });
+}
+
+// ───────────────────────── 관리자 : 스케줄관리 (배차) ─────────────────────────
+/*
+ * schedule 시트 = 기사 1줄 × 날짜 1칸 (기존 운영시트의 '백업' 탭과 같은 모양)
+ *   A~E열: 행ID(기사ID 또는 비고ID) | 구분(기사/비고) | 캠프 | 이름 | 기본노선   ← 캠프·이름·기본노선은 보기 편하라고 적어 두는 사본
+ *   F열부터: 2026-01-01, 2026-01-02 … 날짜마다 1칸. 칸에는 스케줄 글자 그대로 (출근, 휴무, 527B (D1,D2), 안양1 724ABCD …)
+ * 화면은 2주(14칸)씩 읽고, 고친 칸만 골라서 쓴다. 시트에서 직접 고쳐도 그대로 화면에 나온다.
+ */
+const SCH = { SHEET: 'schedule', FIXED: ['행ID', '구분', '캠프', '이름', '기본노선'], KIND_DRIVER: '기사', KIND_NOTE: '비고' };
+const SCH_DAYS = 14;
+const SCH_MAX_TEXT = 300;
+// 대한민국 공휴일 (운영시트 스크립트의 내장 공휴일 사전과 같음)
+const HOLIDAYS = {
+  '2025-01-01': '신정', '2025-01-27': '임시공휴일', '2025-01-28': '설날 연휴', '2025-01-29': '설날', '2025-01-30': '설날 연휴',
+  '2025-03-01': '삼일절', '2025-03-03': '대체공휴일', '2025-05-05': '어린이날·부처님오신날', '2025-05-06': '대체공휴일',
+  '2025-06-03': '대통령선거일', '2025-06-06': '현충일', '2025-08-15': '광복절',
+  '2025-10-03': '개천절', '2025-10-05': '추석 연휴', '2025-10-06': '추석', '2025-10-07': '추석 연휴', '2025-10-08': '대체공휴일', '2025-10-09': '한글날',
+  '2025-12-25': '성탄절',
+  '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
+  '2026-03-01': '삼일절', '2026-03-02': '대체공휴일', '2026-05-05': '어린이날',
+  '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일', '2026-06-03': '지방선거일', '2026-06-06': '현충일',
+  '2026-07-17': '제헌절', '2026-08-15': '광복절', '2026-08-17': '대체공휴일',
+  '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
+  '2026-10-03': '개천절', '2026-10-05': '대체공휴일', '2026-10-09': '한글날', '2026-12-25': '성탄절',
+  '2027-01-01': '신정', '2027-02-06': '설날 연휴', '2027-02-07': '설날', '2027-02-08': '설날 연휴', '2027-02-09': '대체공휴일',
+  '2027-03-01': '삼일절', '2027-05-05': '어린이날', '2027-05-13': '부처님오신날', '2027-06-06': '현충일',
+  '2027-07-17': '제헌절', '2027-08-15': '광복절', '2027-08-16': '대체공휴일',
+  '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴',
+  '2027-10-03': '개천절', '2027-10-04': '대체공휴일', '2027-10-09': '한글날', '2027-10-11': '대체공휴일', '2027-12-25': '성탄절'
+};
+
+function ymd_(d) { return Utilities.formatDate(d, CFG.TZ, 'yyyy-MM-dd'); }
+function parseYmd_(s) { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function addDays_(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+function sundayOf_(d) { return addDays_(d, -d.getDay()); }
+
+/** schedule 시트 (없으면 만든다: 올해 1월 1일 ~ 내년 12월 31일 날짜 칸, 비고 3줄) */
+function schSheet_() {
+  let sh = ss_().getSheetByName(SCH.SHEET);
+  if (sh) return sh;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    sh = ss_().getSheetByName(SCH.SHEET);
+    if (sh) return sh;
+    sh = ss_().insertSheet(SCH.SHEET);
+    const y = new Date().getFullYear();
+    const dates = schDateRange_(new Date(y, 0, 1), new Date(y + 1, 11, 31));
+    const head = SCH.FIXED.concat(dates);
+    if (sh.getMaxColumns() < head.length) sh.insertColumnsAfter(sh.getMaxColumns(), head.length - sh.getMaxColumns());
+    sh.getRange(1, 1, Math.min(sh.getMaxRows(), 300), head.length).setNumberFormat('@');
+    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#f1f3f4');
+    sh.getRange(2, 1, 3, 5).setValues([
+      ['NOTE1', SCH.KIND_NOTE, '', '업무 관련', ''], ['NOTE2', SCH.KIND_NOTE, '', '비고 2', ''], ['NOTE3', SCH.KIND_NOTE, '', '비고 3', '']
+    ]);
+    sh.setFrozenRows(1); sh.setFrozenColumns(5);
+    sh.getRange(1, 1).setNote('행ID = 기사ID(drivers 탭) 또는 비고ID. 이 열과 1행 날짜는 바꾸지 마세요. 날짜 칸은 자유롭게 고쳐도 됩니다.');
+    cache_().remove('sch:h');
+    return sh;
+  } finally {
+    lock.releaseLock();
+  }
+}
+function schDateRange_(from, to) {
+  const out = [];
+  for (let d = new Date(from); d <= to; d = addDays_(d, 1)) out.push(ymd_(d));
+  return out;
+}
+/** 머리글 위치: { fixed: {행ID: 0, …}, dates: {'2026-11-01': 열번호(0부터)}, first, last, w } (캐시) */
+function schHeader_(fresh) {
+  if (!fresh) {
+    const hit = cache_().get('sch:h');
+    if (hit) return JSON.parse(hit);
+  }
+  const sh = schSheet_();
+  const head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(function (v) { return v instanceof Date ? ymd_(v) : str_(v); });
+  const h = { fixed: {}, dates: {}, first: '', last: '', w: head.length };
+  head.forEach(function (t, i) {
+    if (SCH.FIXED.indexOf(t) >= 0) h.fixed[t] = i;
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+      h.dates[t] = i;
+      if (!h.first || t < h.first) h.first = t;
+      if (!h.last || t > h.last) h.last = t;
+    }
+  });
+  SCH.FIXED.forEach(function (t) { if (h.fixed[t] === undefined) fail_('schedule 시트 1행에 "' + t + '" 머리글이 없습니다. 머리글 이름은 바꾸지 마세요.'); });
+  try { cache_().put('sch:h', JSON.stringify(h), CFG.HEAD_CACHE); } catch (e) { /* 무시 */ }
+  return h;
+}
+/** 날짜 칸이 없으면 만든다 (앞쪽은 그 해 1월 1일부터, 뒤쪽은 그 해 12월 31일까지 한 번에) */
+function schEnsureDates_(from, to) {
+  let h = schHeader_();
+  if (h.dates[ymd_(from)] !== undefined && h.dates[ymd_(to)] !== undefined) return h;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    h = schHeader_(true);
+    const sh = schSheet_();
+    if (h.dates[ymd_(to)] === undefined && (!h.last || ymd_(to) > h.last)) {
+      const start = h.last ? addDays_(parseYmd_(h.last), 1) : new Date(from.getFullYear(), 0, 1);
+      const add = schDateRange_(start, new Date(to.getFullYear(), 11, 31));
+      const at = sh.getLastColumn();
+      if (sh.getMaxColumns() < at + add.length) sh.insertColumnsAfter(sh.getMaxColumns(), at + add.length - sh.getMaxColumns());
+      sh.getRange(1, at + 1, sh.getMaxRows(), add.length).setNumberFormat('@');
+      sh.getRange(1, at + 1, 1, add.length).setValues([add]).setFontWeight('bold').setBackground('#f1f3f4');
+    }
+    h = schHeader_(true);
+    if (h.dates[ymd_(from)] === undefined && h.first && ymd_(from) < h.first) {
+      const add = schDateRange_(new Date(from.getFullYear(), 0, 1), addDays_(parseYmd_(h.first), -1));
+      const firstCol = h.dates[h.first] + 1;
+      sh.insertColumnsBefore(firstCol, add.length);
+      sh.getRange(1, firstCol, sh.getMaxRows(), add.length).setNumberFormat('@');
+      sh.getRange(1, firstCol, 1, add.length).setValues([add]).setFontWeight('bold').setBackground('#f1f3f4');
+    }
+    cache_().remove('sch:h');
+    h = schHeader_(true);
+    if (h.dates[ymd_(from)] === undefined || h.dates[ymd_(to)] === undefined) {
+      fail_('schedule 시트의 날짜 칸이 비어 있거나 순서가 섞였습니다. 1행 날짜를 확인해 주세요.');
+    }
+    return h;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** schedule 시트의 캠프·이름·기본노선 사본을 기사 정보에 맞춘다 (다를 때만, 바쁘면 다음에) */
+function schSyncCopies_(sh, h, drivers) {
+  const by = {};
+  drivers.forEach(function (d) { by[d.id] = d; });
+  const last = sh.getLastRow();
+  const fixed = sh.getRange(2, 1, last - 1, 5).getValues();
+  const fix = [];
+  fixed.forEach(function (f, i) {
+    const d = by[str_(f[h.fixed['행ID']])];
+    if (!d) return;
+    [['캠프', d.camp || ''], ['이름', d.name || ''], ['기본노선', d.baseRoute || '']].forEach(function (p) {
+      if (str_(f[h.fixed[p[0]]]) !== p[1]) fix.push([i + 2, h.fixed[p[0]] + 1, p[1]]);
+    });
+  });
+  if (!fix.length) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return;
+  try { fix.forEach(function (x) { sh.getRange(x[0], x[1]).setNumberFormat('@').setValue(safeText_(x[2])); }); }
+  finally { lock.releaseLock(); }
+}
+/** 기사 → 화면용 요약 (스케줄에 필요한 것만, 개인정보 없음) */
+function schDriver_(o) {
+  return {
+    id: o.id, name: o.name, loginId: o.loginId, type: o.driverType, code: o.driverCode, status: o.status,
+    campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute, fixedOff: o.fixedOff, extraOff: o.extraOff,
+    workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo
+  };
+}
+
+/**
+ * 2주 스케줄 읽기. start = 아무 날짜 (그 주 일요일부터 14일)
+ * 반환: dates, holidays, camps, routes(캠프별 노선코드), drivers, cells{행ID:{날짜:값}}, notes[{id,label,cells}]
+ */
+function adm_schWeek(token, start) {
+  return run_(function () {
+    requireAdmin_(token);
+    const base = parseYmd_(start) || new Date();
+    const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
+    const end = addDays_(sun, SCH_DAYS - 1);
+    const h = schEnsureDates_(sun, end);
+    const dates = schDateRange_(sun, end);
+    const sh = schSheet_(), last = sh.getLastRow();
+    const cols = dates.map(function (d) { return h.dates[d]; });
+    const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+    const cells = {}, notes = [], rowIds = {};
+    if (last >= 2) {
+      const fixed = sh.getRange(2, 1, last - 1, 5).getValues();
+      const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+      fixed.forEach(function (f, i) {
+        const id = str_(f[h.fixed['행ID']]);
+        if (!id) return;
+        const kind = str_(f[h.fixed['구분']]);
+        const row = {};
+        dates.forEach(function (d, j) { const v = str_(block[i][cols[j] - c0]); if (v) row[d] = v; });
+        if (kind === SCH.KIND_NOTE) notes.push({ id: id, label: str_(f[h.fixed['이름']]) || id, cells: row });
+        else if (!rowIds[id]) { rowIds[id] = 1; cells[id] = row; }
+      });
+    }
+    const m = master_();
+    const routes = {};
+    m.routes.forEach(function (r) { if (r.status !== RST.OFF) (routes[r.campId] = routes[r.campId] || []).push(r.code); });
+    const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(schDriver_);
+    if (last >= 2) schSyncCopies_(sh, h, drivers);
+    const holidays = {};
+    dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
+    return {
+      ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays,
+      camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
+      routes: routes, drivers: drivers, cells: cells, notes: notes
+    };
+  });
+}
+
+/**
+ * 칸 여러 개 저장. changes = [{ row: 행ID, date: 'yyyy-MM-dd', value: 새 값, old: 화면에 있던 값 }]
+ * 다른 곳에서 먼저 바뀐 칸(old 와 지금 값이 다르고 새 값과도 다름)은 쓰지 않고 conflicts 로 돌려준다.
+ */
+function adm_schSave(token, changes) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    changes = (changes || []).filter(function (x) { return x && x.row && parseYmd_(x.date); });
+    if (!changes.length) return { ok: true, saved: 0, conflicts: [] };
+    if (changes.length > 3000) fail_('한 번에 3000칸까지 저장할 수 있습니다.');
+    changes.forEach(function (x) {
+      x.value = String(x.value == null ? '' : x.value).replace(/\r\n?/g, '\n').trim();
+      x.old = String(x.old == null ? '' : x.old).replace(/\r\n?/g, '\n').trim();
+      if (x.value.length > SCH_MAX_TEXT) fail_('한 칸에 ' + SCH_MAX_TEXT + '자까지 입력할 수 있습니다.');
+    });
+    const dmin = changes.reduce(function (m, x) { return x.date < m ? x.date : m; }, changes[0].date);
+    const dmax = changes.reduce(function (m, x) { return x.date > m ? x.date : m; }, changes[0].date);
+    let h = schEnsureDates_(parseYmd_(dmin), parseYmd_(dmax));
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const sh = schSheet_();
+      // 행 찾기 (없는 기사는 새 줄)
+      const last = sh.getLastRow();
+      const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
+      const rowOf = {};
+      ids.forEach(function (id, i) { if (id && !rowOf[id]) rowOf[id] = i + 2; });
+      const need = {};
+      changes.forEach(function (x) { if (!rowOf[x.row]) need[x.row] = 1; });
+      const newIds = Object.keys(need);
+      if (newIds.length) {
+        const drv = {};
+        readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) drv[o.id] = o; });
+        let r = last + 1;
+        const rows = [];
+        newIds.forEach(function (id) {
+          const o = drv[id];
+          if (!o) return; // 없는 기사·비고는 무시
+          const line = new Array(5).fill('');
+          line[h.fixed['행ID']] = id; line[h.fixed['구분']] = SCH.KIND_DRIVER;
+          line[h.fixed['캠프']] = o.schCamp; line[h.fixed['이름']] = o.name; line[h.fixed['기본노선']] = o.baseRoute;
+          rows.push(line.map(safeText_)); rowOf[id] = r++;
+        });
+        if (rows.length) {
+          if (last + rows.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), rows.length + 200);
+          sh.getRange(last + 1, 1, rows.length, 5).setNumberFormat('@').setValues(rows);
+        }
+      }
+      // 지금 값 읽어서 충돌 확인 (바뀌는 칸을 감싸는 범위를 한 번에)
+      const ok = changes.filter(function (x) { return rowOf[x.row]; });
+      const conflicts = [];
+      if (!ok.length) return { ok: true, saved: 0, conflicts: conflicts };
+      const r0 = Math.min.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
+      const r1 = Math.max.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
+      const cs = ok.map(function (x) { return h.dates[x.date] + 1; });
+      const c0 = Math.min.apply(null, cs), c1 = Math.max.apply(null, cs);
+      const area = (r1 - r0 + 1) * (c1 - c0 + 1);
+      const cur = area <= 60000 ? sh.getRange(r0, c0, r1 - r0 + 1, c1 - c0 + 1).getValues() : null;
+      let saved = 0;
+      ok.forEach(function (x) {
+        const r = rowOf[x.row], c = h.dates[x.date] + 1;
+        const now = str_(cur ? cur[r - r0][c - c0] : sh.getRange(r, c).getValue()).replace(/\r\n?/g, '\n');
+        if (now === x.value) return;
+        if (now !== x.old) { conflicts.push({ row: x.row, date: x.date, current: now }); return; }
+        sh.getRange(r, c).setNumberFormat('@').setValue(safeText_(x.value));
+        saved++;
+      });
+      if (saved) logSchChange_(a, ok, saved);
+      return { ok: true, saved: saved, conflicts: conflicts };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+/** 스케줄 변경 기록: 관리자 작업 기록에 요약만 (칸이 많으면 개수만) */
+function logSchChange_(a, list, saved) {
+  try {
+    const dates = list.map(function (x) { return x.date; }).sort();
+    logAdmin_(a, '스케줄 수정', saved + '칸', dates[0] + (dates.length > 1 ? ' ~ ' + dates[dates.length - 1] : ''));
+  } catch (e) { /* 기록 실패는 무시 */ }
+}
+
+/** 비고 줄: action = add / rename / delete */
+function adm_schNote(token, action, id, label) {
+  return run_(function () {
+    requireAdmin_(token);
+    const h = schHeader_();
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const sh = schSheet_(), last = sh.getLastRow();
+      const fixed = last >= 2 ? sh.getRange(2, 1, last - 1, 5).getValues() : [];
+      const find = function (nid) {
+        for (let i = 0; i < fixed.length; i++) if (str_(fixed[i][h.fixed['행ID']]) === nid) return i + 2;
+        return 0;
+      };
+      label = str_(label).slice(0, 30);
+      if (action === 'add') {
+        let n = 1;
+        while (find('NOTE' + n)) n++;
+        const line = new Array(5).fill('');
+        line[h.fixed['행ID']] = 'NOTE' + n; line[h.fixed['구분']] = SCH.KIND_NOTE; line[h.fixed['이름']] = label || '비고 ' + n;
+        sh.getRange(last + 1, 1, 1, 5).setNumberFormat('@').setValues([line.map(safeText_)]);
+        return { ok: true, id: 'NOTE' + n, label: line[h.fixed['이름']] };
+      }
+      const row = find(String(id || ''));
+      if (!row) fail_('비고 줄을 찾을 수 없습니다. 새로고침해 주세요.');
+      if (action === 'rename') {
+        if (!label) fail_('이름을 입력해 주세요.');
+        sh.getRange(row, h.fixed['이름'] + 1).setNumberFormat('@').setValue(safeText_(label));
+        return { ok: true, id: id, label: label };
+      }
+      if (action === 'delete') { sh.deleteRow(row); return { ok: true }; }
+      fail_('알 수 없는 작업입니다.');
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 기사 앱: 내 스케줄 (이번 주 일요일부터 2주) */
+function api_mySchedule(token) {
+  return run_(function () {
+    const s = getSession_(token);
+    const info = s ? driverInfo_(s.d) : null;
+    if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
+    if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    const sun = sundayOf_(new Date());
+    const end = addDays_(sun, SCH_DAYS - 1);
+    const dates = schDateRange_(sun, end);
+    const out = { ok: true, today: todayText_(), dates: dates, cells: {}, holidays: {} };
+    dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
+    if (!ss_().getSheetByName(SCH.SHEET)) return out;
+    const h = schHeader_();
+    const row = (function () {
+      const sh = schSheet_(), last = sh.getLastRow();
+      if (last < 2) return 0;
+      const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(String(s.d)).matchEntireCell(true).matchCase(true).findNext();
+      return cell ? cell.getRow() : 0;
+    })();
+    if (!row) return out;
+    const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
+    if (!cols.length) return out;
+    const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+    const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
+    dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
+    return out;
+  });
+}
+
+// ───────────────────────── 기존 운영시트 가져오기 (스케쥴·백업 탭) ─────────────────────────
+/*
+ * 뉴버전_운영시트의
+ *   스케쥴 탭: 캠프명 | 명단 | 아이디 | 라우트 | 날짜 14칸 | … | 고정휴무일 | 추가휴무일 | 기타사항 | (메모들)
+ *   백업 탭  : 캠프명 | 명단 | 아이디 | 라우트 | 2026-01-01 / 1주차 | … (날짜별 기록)
+ * 를 아이디(=쿠팡플렉스 아이디)로 기사와 맞춰 schedule 시트로 옮긴다.
+ * 미리보기(run=false)로 무엇이 들어오는지 먼저 보여주고, run=true 일 때만 쓴다.
+ */
+function opsOpen_(url) {
+  const s = str_(url);
+  const m = s.match(/\/d\/([A-Za-z0-9_-]{20,})/);
+  try { return SpreadsheetApp.openById(m ? m[1] : s); }
+  catch (e) { fail_('운영시트를 열 수 없습니다. 주소를 확인하고, 이 프로그램을 만든 구글 계정에 그 시트 보기 권한이 있는지 확인해 주세요.'); }
+}
+function opsDate_(v) {
+  if (v instanceof Date) return ymd_(v);
+  const m = str_(v).match(/(\d{4})\D{1,3}(\d{1,2})\D{1,3}(\d{1,2})/);
+  return m ? m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) : '';
+}
+const OPS_SKIP_CAMP = /^(비고|미입차|퇴사요청)/;
+/** 스케쥴·백업 탭 읽기 → { people[], notes[], dates{}, warnings[] } */
+function opsRead_(book) {
+  const sched = book.getSheetByName('스케쥴'), backup = book.getSheetByName('백업');
+  if (!sched && !backup) fail_('운영시트에서 "스케쥴" 탭과 "백업" 탭을 찾을 수 없습니다.');
+  const people = {}, notes = {}, warnings = [];
+  let order = 0, cells = 0, dashes = 0, odd = 0;
+  const person = function (camp, name, id, route) {
+    const key = id.toLowerCase();
+    if (!people[key]) people[key] = { loginId: id, camp: camp, name: name, route: route, cells: {}, order: ++order };
+    return people[key];
+  };
+  const put = function (target, date, v) {
+    const val = str_(v);
+    if (!val) return;
+    if (val === '-') { dashes++; return; }
+    if (/^\d+[A-Za-z]+(,\d*[A-Za-z]+)*\s+[가-힣]{2,4}$/.test(val)) odd++;
+    target.cells[date] = val; cells++;
+  };
+  // 1) 백업 탭 (날짜별 전체 기록)
+  if (backup) {
+    const last = backup.getLastRow(), w = backup.getLastColumn();
+    if (last >= 3 && w >= 5) {
+      const head = backup.getRange(1, 1, 1, w).getValues()[0];
+      const dcols = [];
+      head.forEach(function (h, i) { const d = i >= 4 ? opsDate_(h) : ''; if (d) dcols.push([i, d]); });
+      backup.getRange(3, 1, last - 2, w).getValues().forEach(function (r) {
+        const camp = str_(r[0]), name = str_(r[1]), id = str_(r[2]), route = str_(r[3]);
+        if (!camp && !id) return;
+        if (/^비고/.test(camp)) { const n = notes[name] || (notes[name] = { key: name, label: route || name, cells: {} }); dcols.forEach(function (x) { put(n, x[1], r[x[0]]); }); return; }
+        if (!id || id === '백업' || OPS_SKIP_CAMP.test(camp) || /백업\s*명단/.test(name)) return;
+        const p = person(camp, name, id, route);
+        dcols.forEach(function (x) { put(p, x[1], r[x[0]]); });
+      });
+    }
+  }
+  // 2) 스케쥴 탭 (지금 보이는 2주는 이쪽이 최신, 기사 속성도 여기서)
+  if (sched) {
+    const last = sched.getLastRow(), w = sched.getLastColumn();
+    const top = sched.getRange(1, 1, Math.min(20, last), w).getValues();
+    let hr = -1;
+    top.forEach(function (r, i) { if (hr < 0 && r.some(function (v) { return str_(v) === '캠프명'; }) && r.some(function (v) { return str_(v) === '아이디'; })) hr = i; });
+    if (hr < 0) warnings.push('스케쥴 탭에서 머리글(캠프명·아이디) 줄을 찾지 못해 기사 속성은 가져오지 않았습니다.');
+    else {
+      const head = top[hr].map(str_), col = function (t) { return head.indexOf(t); };
+      const cC = col('캠프명'), cN = col('명단'), cI = col('아이디'), cR = col('라우트');
+      const cOff = col('고정휴무일'), cExtra = col('추가휴무일'), cEtc = col('기타사항');
+      const dcols = [];
+      head.forEach(function (h, i) { const d = i > cR ? opsDate_(h) : ''; if (d && (cOff < 0 || i < cOff) && !/출근일수/.test(h)) dcols.push([i, d]); });
+      if (last > hr + 1) sched.getRange(hr + 2, 1, last - hr - 1, w).getValues().forEach(function (r) {
+        const camp = str_(r[cC]), name = str_(r[cN]), id = str_(r[cI]), route = str_(r[cR]);
+        if (/^비고/.test(camp)) {
+          const n = notes[name] || (notes[name] = { key: name, label: route || name, cells: {} });
+          n.label = route || n.label;
+          dcols.forEach(function (x) { delete n.cells[x[1]]; put(n, x[1], r[x[0]]); });
+          return;
+        }
+        if (!id || id === '백업' || OPS_SKIP_CAMP.test(camp) || /백업\s*명단/.test(name)) return;
+        const p = person(camp, name, id, route);
+        p.camp = camp; p.name = name; p.route = route; p.order = ++order;
+        dcols.forEach(function (x) { delete p.cells[x[1]]; put(p, x[1], r[x[0]]); });
+        if (cOff >= 0) p.fixedOff = str_(r[cOff]);
+        if (cExtra >= 0) p.extraOff = str_(r[cExtra]);
+        if (cEtc >= 0) p.pattern = str_(r[cEtc]);
+        if (cEtc >= 0) p.memo = r.slice(cEtc + 1).map(str_).filter(String).join(' / ').slice(0, 500);
+      });
+    }
+  }
+  if (dashes) warnings.push('"-" 로만 적힌 칸 ' + dashes + '개는 빈칸으로 보고 가져오지 않았습니다.');
+  if (odd) warnings.push('"408A 임정한" 처럼 노선 + 사람 이름 모양인 칸이 ' + odd + '개 있습니다. 예전 백업 탭에서 줄이 밀려 다른 사람 기록이 섞였을 수 있으니, 가져온 뒤 해당 기사 줄을 확인해 주세요.');
+  return { people: Object.keys(people).map(function (k) { return people[k]; }), notes: Object.keys(notes).map(function (k) { return notes[k]; }), warnings: warnings, cells: cells };
+}
+/** 운영시트의 캠프 표기 → 캠프명 ('강서1캠프' / '퇴사' + 이름 '(서초1)') */
+function opsCampName_(p) {
+  if (/^퇴사/.test(p.camp)) { const m = p.name.match(/\(([가-힣]+\d)\)\s*$/); return m ? m[1] + '캠프' : ''; }
+  return /캠프$/.test(p.camp) ? p.camp : '';
+}
+function opsType_(p) {
+  if (/용차/.test(p.route) || /용차/.test(p.camp)) return '외부용차';
+  if (/백업|예비/.test(p.route)) return '백업';
+  return '고정';
+}
+
+/** 미리보기(run=false) / 가져오기(run=true). opts = { createDrivers, createCamps, retired, overwrite } */
+function adm_opsImport(token, url, run, opts) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    opts = opts || {};
+    const data = opsRead_(opsOpen_(url));
+    const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
+    const byLogin = {};
+    drivers.forEach(function (o) { if (o.loginId) byLogin[o.loginId.toLowerCase()] = o; });
+    const camps = readAll_(SH.CAMPS).filter(function (o) { return o.id; });
+    const campByName = {};
+    camps.forEach(function (c) { campByName[campKey_(c.name)] = c; });
+
+    const plan = { match: [], create: [], skipRetired: [], newCamps: [], cellCount: 0, dateFrom: '', dateTo: '' };
+    data.people.forEach(function (p) {
+      const retired = /^퇴사/.test(p.camp);
+      if (retired && !opts.retired) { plan.skipRetired.push(p.name); return; }
+      const cn = opsCampName_(p);
+      if (cn && !campByName[campKey_(cn)] && plan.newCamps.indexOf(cn) < 0) plan.newCamps.push(cn);
+      const o = byLogin[p.loginId.toLowerCase()];
+      p.retired = retired; p.campName = cn;
+      if (o) { p.driver = o; plan.match.push(p); } else plan.create.push(p);
+      Object.keys(p.cells).forEach(function (d) {
+        plan.cellCount++;
+        if (!plan.dateFrom || d < plan.dateFrom) plan.dateFrom = d;
+        if (!plan.dateTo || d > plan.dateTo) plan.dateTo = d;
+      });
+    });
+    const summary = {
+      ok: true, people: data.people.length, match: plan.match.map(function (p) { return p.name; }),
+      create: plan.create.map(function (p) { return p.name + (p.retired ? ' (퇴사→정지)' : '') + ' · ' + opsType_(p); }),
+      skipRetired: plan.skipRetired, newCamps: plan.newCamps, cells: plan.cellCount, dateFrom: plan.dateFrom, dateTo: plan.dateTo,
+      notes: data.notes.map(function (n) { return n.label; }), warnings: data.warnings
+    };
+    if (!run) return summary;
+    if (!plan.dateFrom) fail_('가져올 스케줄 기록이 없습니다.');
+
+    // 1) 캠프·기사 만들기
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    let made = 0, campsMade = 0, attrs = 0;
+    try {
+      if (opts.createCamps !== false) plan.newCamps.forEach(function (cn) {
+        const now = nowText_();
+        const rot = /^서초1/.test(cn) ? 'D1,D2' : ROTS.join(',');
+        const row = appendObj_(SH.CAMPS, { id: newRid_('C'), name: cn, address: '', memo: '운영시트에서 가져옴', rot: rot, createdAt: now, updatedAt: now });
+        const c = readObj_(SH.CAMPS, row); campByName[campKey_(cn)] = c; campsMade++;
+      });
+      const attrOf = function (p) {
+        const c = p.campName ? campByName[campKey_(p.campName)] : null;
+        return {
+          schCampId: c ? c.id : '', schCamp: c ? c.name : '', baseRoute: normBaseRoute_(p.route),
+          fixedOff: p.fixedOff || '', extraOff: p.extraOff || '', workPattern: p.pattern || '', schMemo: p.memo || '', schOrder: String(p.order)
+        };
+      };
+      if (opts.createDrivers !== false) {
+        const used = {};
+        drivers.forEach(function (o) { used[o.id] = 1; });
+        const stamp = 'D' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss');
+        let seq = 0;
+        const rows = plan.create.map(function (p) {
+          const now = nowText_(), at = attrOf(p);
+          do { p.newId = stamp + ('00' + (++seq)).slice(-3); } while (used[p.newId]);
+          return Object.assign({
+            id: p.newId, loginId: p.loginId.toLowerCase(), name: p.name.replace(/\s*\([가-힣]+\d\)\s*$/, ''), status: p.retired ? ST.STOPPED : ST.ACTIVE,
+            driverType: opsType_(p), createdAt: now, updatedAt: now, approvedAt: p.retired ? '' : now, memo: '운영시트에서 가져옴'
+          }, at);
+        });
+        appendObjs_(SH.DRIVERS, rows);
+        made = rows.length;
+      }
+      // 이미 있는 기사: 비어 있는 스케줄 속성만 채운다
+      plan.match.forEach(function (p) {
+        const at = attrOf(p), o = p.driver, f = {};
+        Object.keys(at).forEach(function (k) { if (at[k] && !o[k]) f[k] = at[k]; });
+        if (Object.keys(f).length) { f.updatedAt = nowText_(); writeFields_(SH.DRIVERS, o._row, f); forgetDriver_(o); attrs++; }
+      });
+    } finally {
+      lock.releaseLock();
+    }
+    // 2) 스케줄 칸 쓰기 (기사 1줄씩 한 번에)
+    const h = schEnsureDates_(parseYmd_(plan.dateFrom), parseYmd_(plan.dateTo));
+    const sh = schSheet_();
+    const lock2 = LockService.getScriptLock();
+    lock2.waitLock(30000);
+    let written = 0, kept = 0;
+    try {
+      const freshDrivers = {};
+      readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) freshDrivers[o.id] = o; });
+      let last = sh.getLastRow();
+      const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
+      const rowOf = {};
+      ids.forEach(function (id, i) { if (id && !rowOf[id]) rowOf[id] = i + 2; });
+      const c0 = h.dates[plan.dateFrom], c1 = h.dates[plan.dateTo];
+      const writeRow = function (rowId, kind, label, cellsMap, drv) {
+        let r = rowOf[rowId];
+        if (!r) {
+          r = ++last;
+          if (r > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 200);
+          const line = new Array(5).fill('');
+          line[h.fixed['행ID']] = rowId; line[h.fixed['구분']] = kind;
+          line[h.fixed['캠프']] = drv ? drv.schCamp : ''; line[h.fixed['이름']] = drv ? drv.name : label; line[h.fixed['기본노선']] = drv ? drv.baseRoute : '';
+          sh.getRange(r, 1, 1, 5).setNumberFormat('@').setValues([line.map(safeText_)]);
+          rowOf[rowId] = r;
+        }
+        const rng = sh.getRange(r, c0 + 1, 1, c1 - c0 + 1), cur = rng.getValues()[0];
+        let changed = false;
+        Object.keys(cellsMap).forEach(function (d) {
+          const i = h.dates[d] - c0;
+          if (i < 0 || i >= cur.length) return;
+          if (str_(cur[i]) && !opts.overwrite) { if (str_(cur[i]) !== cellsMap[d]) kept++; return; }
+          if (str_(cur[i]) !== cellsMap[d]) { cur[i] = safeText_(cellsMap[d]); changed = true; written++; }
+        });
+        if (changed) rng.setNumberFormat('@').setValues([cur]);
+      };
+      plan.match.concat(opts.createDrivers !== false ? plan.create : []).forEach(function (p) {
+        const id = p.driver ? p.driver.id : p.newId;
+        if (id) writeRow(id, SCH.KIND_DRIVER, p.name, p.cells, freshDrivers[id]);
+      });
+      // 비고 줄: 비고1 → NOTE1 …
+      data.notes.forEach(function (n) {
+        const m = String(n.key).match(/(\d+)$/), id = 'NOTE' + (m ? m[1] : '1');
+        writeRow(id, SCH.KIND_NOTE, n.label, n.cells, null);
+        sh.getRange(rowOf[id], h.fixed['이름'] + 1).setNumberFormat('@').setValue(safeText_(n.label));
+      });
+    } finally {
+      lock2.releaseLock();
+    }
+    logAdmin_(a, '운영시트 가져오기', written + '칸', '기사 등록 ' + made + '명, 캠프 ' + campsMade + '개, 속성 ' + attrs + '명');
+    bumpMaster_();
+    return Object.assign(summary, { done: true, written: written, kept: kept, driversMade: made, campsMade: campsMade, attrsFilled: attrs });
+  });
 }

@@ -93,6 +93,27 @@
   .menu div { background: #fff; border-radius: var(--radius); padding: 18px 16px; min-height: 96px; }
   .menu b { display: block; font-size: 16px; }
   .menu span { font-size: 12px; color: var(--sub); }
+  .menu button.tile { background: #fff; border: 0; border-radius: var(--radius); padding: 18px 16px; min-height: 96px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+  .menu button.tile span { color: var(--brand); font-weight: 600; }
+  .wk { background: #fff; border-radius: var(--radius); padding: 14px 14px 6px; margin-bottom: 12px; }
+  .wk h3 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+  .wk h3 small { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .wk h3 small.fix { background: var(--brand-weak); color: var(--brand); }
+  .wk h3 small.est { background: #fdf3e2; color: #c27c0e; }
+  .day { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .day:first-of-type { border-top: 0; }
+  .day .dt { width: 78px; flex: none; font-weight: 700; font-size: 15px; }
+  .day .dt small { display: block; font-size: 11px; color: var(--sub); font-weight: 500; }
+  .day.sun .dt { color: var(--danger); } .day.sat .dt { color: var(--brand); }
+  .day.today { background: var(--brand-weak); margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
+  .day .val { flex: 1; padding: 8px 10px; border-radius: 8px; font-weight: 700; font-size: 15px; white-space: pre-wrap; word-break: break-all; background: #f2f4f6; color: var(--ink); }
+  .day .val.none { color: #b0b8c1; font-weight: 500; background: #fafbfc; }
+  .day .val.k-work { background: #bfe1f6; color: #0a53a8; }
+  .day .val.k-off { background: #f08c8c; color: #fff; }
+  .day .val.k-sick { background: #d4edbc; color: #11734b; }
+  .day .val.k-mi { background: #d15555; color: #ffcfc9; }
+  .day .val.k-yong { background: #e6cff2; color: #5a3286; }
+  .day .val.k-reg { background: #d9f5ef; color: #0b6b57; }
 
   .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); background: rgba(25,31,40,.92);
     color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; opacity: 0; transition: .2s; pointer-events: none;
@@ -323,12 +344,19 @@
   <section id="v-home" class="view">
     <div class="hello"><h2 id="homeName">기사님, 안녕하세요</h2><p>오늘도 안전 운행하세요.</p></div>
     <div class="menu">
-      <div><b>스케줄</b><span>준비 중</span></div>
+      <button class="tile" id="mSched" type="button"><b>스케줄</b><span>내 2주 일정 보기 →</span></button>
       <div><b>정산서 보기</b><span>준비 중</span></div>
       <div><b>품앗이</b><span>준비 중</span></div>
       <div><b>마이페이지</b><span>준비 중</span></div>
     </div>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
+  </section>
+
+  <!-- ───────────── 내 스케줄 ───────────── -->
+  <section id="v-sched" class="view">
+    <div class="topbar"><button class="back" id="scBack" aria-label="뒤로">←</button><h2>내 스케줄</h2></div>
+    <div id="scBody"></div>
+    <p class="hint" style="text-align:center;margin:4px 0 24px">이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.</p>
   </section>
 
   <!-- ───────────── 비밀번호 변경 ───────────── -->
@@ -654,6 +682,43 @@
       clearSession(); goLogin();
     }).catch(netErr).finally(() => { btn.disabled = false; });
   });
+
+  // ───── 내 스케줄 (이번 주 확정 + 다음 주 예상) ─────
+  const DOWK = ['일', '월', '화', '수', '목', '금', '토'];
+  const escH = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function schKind(v) {
+    const s = String(v || '').trim();
+    if (s === '출근') return 'k-work';
+    if (/미입차/.test(s)) return 'k-mi';
+    if (/휴무|휴가/.test(s)) return 'k-off';
+    if (/병가/.test(s)) return 'k-sick';
+    if (/용차/.test(s)) return 'k-yong';
+    if (/업무등록/.test(s)) return 'k-reg';
+    return '';
+  }
+  function openSched() {
+    const token = store.get(TOKEN);
+    if (!token) { clearSession(); goLogin(); return; }
+    $('#scBody').innerHTML = '<div class="card" style="text-align:center;color:var(--sub)">불러오는 중…</div>';
+    show('sched');
+    api('api_mySchedule', token).then((r) => {
+      if (!r.ok) {
+        toast(r.msg || '스케줄을 불러오지 못했습니다.');
+        if (r.code === 'EXPIRED') { clearSession(); goLogin(); }
+        else if (r.code === 'MUST_CHANGE') openChangePw(true, '');
+        return;
+      }
+      const week = (list, title, cls, tag) => '<div class="wk"><h3>' + title + '<small class="' + cls + '">' + tag + '</small></h3>' + list.map((d) => {
+        const p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay(), v = r.cells[d] || '';
+        return '<div class="day' + (d === r.today ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
+          '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (d === r.today ? '<small>오늘</small>' : r.holidays[d] ? '<small>' + escH(r.holidays[d]) + '</small>' : '') + '</div>' +
+          '<div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div></div>';
+      }).join('') + '</div>';
+      $('#scBody').innerHTML = week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
+    }).catch(() => { $('#scBody').innerHTML = ''; netErr(); });
+  }
+  $('#mSched').addEventListener('click', openSched);
+  $('#scBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
 
   // ───── 비밀번호 변경 ─────
   // forced=true : 임시 비밀번호로 로그인한 직후 → 뒤로 가기 없이 반드시 변경
