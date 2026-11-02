@@ -2627,9 +2627,10 @@ function trashCampFile_(fileId) {
     const folderId = props_().CAMP_IMG_FOLDER_ID;
     const file = DriveApp.getFileById(fileId), parents = file.getParents();
     while (parents.hasNext()) {
-      if (parents.next().getId() === folderId) { file.setTrashed(true); return; }
+      if (parents.next().getId() === folderId) { file.setTrashed(true); return true; }
     }
   } catch (e) { /* 이미 없는 파일 */ }
+  return false;
 }
 function cleanDesc_(v) {
   const d = String(v == null ? '' : v).trim();
@@ -3619,5 +3620,108 @@ function api_mySchedule(token) {
     const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
     dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
     return out;
+  });
+}
+
+// ───────────────────────── 데이터 초기화 (메뉴별) ─────────────────────────
+/*
+ * 관리자 화면 각 메뉴의 "데이터 초기화". 확인 문구를 그대로 입력해야만 실행된다.
+ * 지우기 전에 해당 시트들을 "러너 올인원 데이터/초기화 백업" 폴더에 새 구글시트로 복사해 둔다 (되살릴 때 사용).
+ * 머리글(1행)과 설정값(회사 정보 등)은 남기고, 데이터 줄만 지운다.
+ */
+const RESET_PHRASE = '모조리 없앤다';
+const RESET_SECTIONS = {
+  drivers: { label: '기사 정보관리', sheets: [SH.DRIVERS] },
+  sched: { label: '스케줄관리', sheets: [] },        // 스케줄 DB 파일의 schedule 탭
+  route: { label: '노선관리', sheets: [SH.CAMPS, SH.ROUTES, SH.CIMG, SH.CADDR, SH.PRICES] },
+  memo: { label: '업무스케줄', sheets: [SH.MEMO] },
+  bib: { label: '배번호 관리', sheets: [SH.BIB] }
+};
+function resetFolder_() {
+  const root = DriveApp.getFolderById(props_().ROOT_FOLDER_ID), it = root.getFoldersByName('초기화 백업');
+  return it.hasNext() ? it.next() : root.createFolder('초기화 백업');
+}
+/** 시트들을 새 파일로 복사해 두고 그 주소를 돌려준다 */
+function resetBackup_(label, sheets) {
+  const book = SpreadsheetApp.create('러너 올인원 초기화 백업 - ' + label + ' - ' + Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd HHmm'));
+  try { DriveApp.getFileById(book.getId()).moveTo(resetFolder_()); } catch (e) { /* 폴더 이동 실패해도 백업은 유지 */ }
+  const first = book.getSheets();
+  sheets.forEach(function (sh) { sh.copyTo(book).setName(sh.getName()); });
+  first.forEach(function (x) { if (book.getSheets().length > 1) book.deleteSheet(x); });
+  return book.getUrl();
+}
+/** 머리글만 남기고 데이터 칸 비우기 (서식·드롭다운은 그대로) */
+function clearData_(sh) {
+  const last = sh.getLastRow(), w = Math.max(sh.getLastColumn(), 1);
+  if (last < 2) return 0;
+  const rng = sh.getRange(2, 1, last - 1, w);
+  rng.clearContent();
+  try { rng.clearNote(); } catch (e) { /* 무시 */ }
+  return last - 1;
+}
+
+/** section = drivers / sched / route / memo / bib, confirm = 확인 문구 */
+function adm_reset(token, section, confirm) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const sec = RESET_SECTIONS[section];
+    if (!sec) fail_('알 수 없는 메뉴입니다.');
+    if (str_(confirm) !== RESET_PHRASE) fail_('확인 문구가 다릅니다. "' + RESET_PHRASE + '" 를 그대로 입력해 주세요. 아무것도 지우지 않았습니다.');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    let rows = 0, backupUrl = '', trashed = 0, extra = '';
+    const files = [];
+    try {
+      const sheets = section === 'sched' ? [schSheet_()] : sec.sheets.map(function (n) { return sheet_(n); });
+      backupUrl = resetBackup_(sec.label, sheets);
+      if (section === 'drivers') {
+        const list = readAll_(SH.DRIVERS).filter(function (o) { return o.id || o.loginId; });
+        list.forEach(function (o) {
+          forgetDriver_(o);
+          const m = String(o.docFolder || '').match(/folders\/([A-Za-z0-9_-]{10,})/);
+          if (m) files.push(m[1]);
+        });
+        // 기사 로그인 기록도 지운다 (관리자 로그인은 그대로)
+        const ss = sheet_(SH.SESSIONS), c = cols_(SH.SESSIONS, true), last = ss.getLastRow();
+        if (last >= 2) {
+          const vals = ss.getRange(2, 1, last - 1, c.__w).getValues();
+          const keep = vals.filter(function (v) { return String(v[c.driverId]).indexOf(ADMIN_SESSION) === 0; });
+          vals.forEach(function (v) { if (String(v[c.driverId]).indexOf(ADMIN_SESSION) !== 0) cache_().remove('ss:' + str_(v[c.tokenHash])); });
+          ss.getRange(2, 1, last - 1, c.__w).clearContent();
+          if (keep.length) ss.getRange(2, 1, keep.length, c.__w).setNumberFormat('@').setValues(keep.map(function (r) { return r.map(str_); }));
+        }
+        rows = clearData_(sheet_(SH.DRIVERS));
+      } else if (section === 'sched') {
+        const sh = schSheet_(), h = schHeader_(true);
+        rows = clearData_(sh);
+        const notes = [['NOTE1', '업무 관련'], ['NOTE2', '비고 2'], ['NOTE3', '비고 3']].map(function (x) {
+          const line = new Array(5).fill('');
+          line[h.fixed['행ID']] = x[0]; line[h.fixed['구분']] = SCH.KIND_NOTE; line[h.fixed['이름']] = x[1];
+          return line;
+        });
+        sh.getRange(2, 1, 3, 5).setNumberFormat('@').setValues(notes);
+      } else if (section === 'route') {
+        readAll_(SH.CIMG).forEach(function (x) { const f = fileIdOf_(x.file); if (f) files.push(f); });
+        sec.sheets.forEach(function (n) { rows += clearData_(sheet_(n)); });
+        // 기사의 소속캠프도 비운다 (가리킬 캠프가 없어지므로)
+        const dsh = sheet_(SH.DRIVERS), dc = cols_(SH.DRIVERS, true), dl = dsh.getLastRow();
+        if (dl >= 2) { dsh.getRange(2, dc.schCampId + 1, dl - 1, 1).clearContent(); dsh.getRange(2, dc.schCamp + 1, dl - 1, 1).clearContent(); extra = '기사 소속캠프 비움'; }
+        bumpMaster_();
+      } else {
+        rows = clearData_(sheet_(sec.sheets[0]));
+      }
+      logAdmin_(a, '데이터 초기화', sec.label, rows + '줄 삭제' + (extra ? ', ' + extra : '') + ' · 백업: ' + backupUrl);
+    } finally {
+      lock.releaseLock();
+    }
+    // 드라이브 파일(기사 서류 폴더, 캠프 사진)은 휴지통으로 — 잠금 밖에서
+    if (section === 'drivers') files.forEach(function (id) {
+      try {
+        const f = DriveApp.getFolderById(id), ps = f.getParents();
+        while (ps.hasNext()) if (ps.next().getId() === props_().DOCS_FOLDER_ID) { f.setTrashed(true); trashed++; break; }
+      } catch (e) { /* 이미 없음 */ }
+    });
+    if (section === 'route') files.forEach(function (id) { if (trashCampFile_(id)) trashed++; });
+    return { ok: true, rows: rows, backupUrl: backupUrl, trashed: trashed };
   });
 }

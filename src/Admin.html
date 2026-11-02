@@ -460,6 +460,7 @@
       <div class="tools">
         <input class="inp search" id="q" placeholder="이름, 기사코드, 아이디, 연락처, 차량 검색">
         <button class="btn ghost" id="reloadBtn" title="시트의 최신 내용 불러오기">새로고침</button>
+        <button class="btn ghost danger-t" type="button" data-reset="drivers">데이터 초기화</button>
         <button class="btn" id="drvNew">+ 새 기사 등록</button>
       </div>
     </div>
@@ -477,7 +478,7 @@
    <section id="view-memo" class="hidden">
     <div class="head">
       <h2>업무스케줄</h2>
-      <div class="tools"><button class="btn ghost" id="memoReload" title="시트의 최신 내용 불러오기">새로고침</button></div>
+      <div class="tools"><button class="btn ghost danger-t" type="button" data-reset="memo">데이터 초기화</button><button class="btn ghost" id="memoReload" title="시트의 최신 내용 불러오기">새로고침</button></div>
     </div>
     <div class="late-bar hidden" id="lateBar"><span id="lateText"></span><button type="button" id="lateShow">보기</button></div>
     <div class="memo-wrap">
@@ -510,6 +511,7 @@
         <input class="inp search" id="bq" placeholder="이름, 차량번호 검색">
         <button class="btn ghost" id="coBtn">회사 정보</button>
         <button class="btn ghost" id="bibReload">새로고침</button>
+        <button class="btn ghost danger-t" type="button" data-reset="bib">데이터 초기화</button>
         <button class="btn" id="bibNew">새 신청서</button>
       </div>
     </div>
@@ -540,6 +542,7 @@
         <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
         <button class="btn ghost" id="sFill" title="고정·품앗이 기사의 오늘 이후 빈칸을 출근/고정휴무로">빈칸 자동 채우기</button>
         <button class="btn ghost" id="sReload">새로고침</button>
+        <button class="btn ghost danger-t" type="button" data-reset="sched">데이터 초기화</button>
       </div>
     </div>
     <div class="swrap" id="sWrap" tabindex="0"></div>
@@ -555,6 +558,7 @@
       <h2>노선관리</h2>
       <div class="tools">
         <button class="btn ghost" id="rtReload">새로고침</button>
+        <button class="btn ghost danger-t" type="button" data-reset="route">데이터 초기화</button>
         <button class="btn" id="campNew">+ 캠프 추가</button>
       </div>
     </div>
@@ -704,6 +708,15 @@
       <div class="field"><label class="lb" for="sdOrder">표 순서 (같은 캠프 안, 작은 숫자가 위)</label><input class="inp" id="sdOrder" inputmode="numeric"></div>
     </div>
     <div class="m-actions"><button type="button" class="btn ghost" id="sdOpen" style="margin-right:auto">기사 정보 열기</button><button type="button" class="btn ghost" id="sdCancel">닫기</button><button class="btn" id="sdSave">저장</button></div>
+  </form>
+</div>
+
+<!-- ───────────── 데이터 초기화 (확인 문구 입력) ───────────── -->
+<div class="modal hidden" id="rzModal">
+  <form class="m-box" id="rzForm" novalidate style="width:min(540px,100%)">
+    <h3 id="rzTitle">데이터 초기화</h3>
+    <div id="rzBody"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="rzCancel">취소</button><button class="btn danger" id="rzOk" disabled>초기화</button></div>
   </form>
 </div>
 
@@ -3251,6 +3264,57 @@
   });
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sdModal').classList.contains('hidden')) $('#sdModal').classList.add('hidden'); });
+  // ───── 데이터 초기화 (메뉴별, 확인 문구 '모조리 없앤다') ─────
+  const RESET_PHRASE = '모조리 없앤다';
+  const RESET_INFO = {
+    drivers: { label: '기사 정보관리', items: ['모든 기사 정보 (drivers 탭)', '기사 앱 로그인 (관리자 로그인은 그대로)', '가입 서류 폴더 → 드라이브 휴지통'], keep: '스케줄·배번호 신청서 기록은 남습니다.' },
+    sched: { label: '스케줄관리', items: ['스케줄 DB 파일의 모든 날짜 기록', '비고 줄 (빈 비고 줄 3개는 다시 만듦)'], keep: '기사 정보와 기사별 스케줄 설정(소속캠프·기본노선 등)은 남습니다.' },
+    route: { label: '노선관리', items: ['모든 캠프·노선·상차지 주소·구분별 단가', '캠프 참고 이미지 (사진 파일 → 드라이브 휴지통)', '기사의 소속캠프 칸'], keep: '기사 정보와 스케줄 기록은 남습니다.' },
+    memo: { label: '업무스케줄', items: ['모든 날짜별 메모'], keep: '' },
+    bib: { label: '배번호 관리', items: ['모든 배번호 신청서'], keep: '회사 정보(서류 고정 항목)는 남습니다.' }
+  };
+  let rzSection = '', rzDone = false;
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-reset]'); if (!b) return;
+    const info = RESET_INFO[b.dataset.reset]; if (!info) return;
+    rzSection = b.dataset.reset; rzDone = false;
+    $('#rzTitle').textContent = info.label + ' · 데이터 초기화';
+    $('#rzBody').innerHTML = '<div class="missbox"><b>아래 데이터가 모두 지워집니다.</b><ul style="margin:6px 0 0;padding-left:18px">' + info.items.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' +
+      (info.keep ? '<p style="margin:0 0 8px;font-size:13px;color:var(--sub)">' + esc(info.keep) + '</p>' : '') +
+      '<p style="margin:0 0 12px;font-size:13px;color:var(--sub)">지우기 전에 구글 드라이브 <b>러너 올인원 데이터 / 초기화 백업</b> 폴더에 복사본을 만들어 둡니다.</p>' +
+      '<label class="lb" for="rzInput">계속하려면 <b style="color:var(--danger)">' + RESET_PHRASE + '</b> 를 그대로 입력하세요</label>' +
+      '<input class="inp" id="rzInput" autocomplete="off" spellcheck="false" placeholder="' + RESET_PHRASE + '">';
+    $('#rzOk').disabled = true; $('#rzOk').textContent = '초기화'; $('#rzCancel').classList.remove('hidden'); $('#rzCancel').textContent = '취소';
+    $('#rzModal').classList.remove('hidden'); $('#rzInput').focus();
+  });
+  $('#rzBody').addEventListener('input', (e) => { if (e.target.id === 'rzInput') $('#rzOk').disabled = e.target.value.trim() !== RESET_PHRASE; });
+  $('#rzCancel').addEventListener('click', () => $('#rzModal').classList.add('hidden'));
+  $('#rzForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (rzDone) return $('#rzModal').classList.add('hidden');
+    const v = ($('#rzInput') || {}).value || '';
+    if (v.trim() !== RESET_PHRASE) return toast('확인 문구가 다릅니다.');
+    const sec = rzSection, b = $('#rzOk'); b.disabled = true; b.textContent = '지우는 중…'; $('#rzCancel').disabled = true;
+    api('adm_reset', sec, v.trim()).then((r) => {
+      if (!r.ok) { b.textContent = '초기화'; b.disabled = false; return toast(r.msg); }
+      rzDone = true;
+      $('#rzBody').innerHTML = '<div class="okbox">' + esc(RESET_INFO[sec].label) + ' 데이터를 초기화했습니다. (' + r.rows + '줄' + (r.trashed ? ', 드라이브 파일 ' + r.trashed + '개 휴지통' : '') + ')</div>' +
+        '<p style="margin:0;font-size:13px">지운 내용의 복사본: <a href="' + esc(r.backupUrl) + '" target="_blank" rel="noopener">초기화 백업 파일 열기</a></p>';
+      b.textContent = '닫기'; b.disabled = false; $('#rzCancel').classList.add('hidden');
+      afterReset(sec);
+    }).catch(() => { b.textContent = '초기화'; b.disabled = false; }).finally(() => { $('#rzCancel').disabled = false; });
+  });
+  function afterReset(sec) {
+    if (sec === 'drivers') { closeDrawer(true); loadList(); }
+    else if (sec === 'sched') {
+      Object.keys(sPending).forEach((k) => delete sPending[k]); sUndo.length = 0; sAct = null; sAnchor = null;
+      if (currentView === 'sched') loadSched(SD.start); else SD.dates = [];
+    } else if (sec === 'route') { RT.camps = []; RT.routes = []; RT.images = []; RT.addresses = []; RT.prices = []; curCamp = null; pdirty = {}; if (currentView === 'route') loadRoutes(); }
+    else if (sec === 'memo') { if (currentView === 'memo') openMonth(memoMonth || null); }
+    else if (sec === 'bib') { closeBib(true); if (currentView === 'bib') loadBib(); }
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#rzModal').classList.contains('hidden') && !$('#rzOk').textContent.includes('지우는')) $('#rzModal').classList.add('hidden'); });
+
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
   (function boot() {
     const t = store.get();
