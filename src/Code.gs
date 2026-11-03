@@ -284,12 +284,16 @@ function doGet(e) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
+/** 러너 심볼 (화면 로고와 같은 모양, 색은 글자색을 따름) */
+const RUNNER_LOGO_SVG = '<svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg>';
+
 /** 예전 주소로 들어온 사람에게 새 주소 안내 (구글 화면은 자동 이동이 막혀 있어 버튼을 누르게 한다) */
 function movePage_(url, admin) {
   const u = String(url).replace(/[<>"']/g, '');
   const html = '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><base target="_top"></head>' +
     '<body style="margin:0;font-family:-apple-system,BlinkMacSystemFont,\'Apple SD Gothic Neo\',\'Malgun Gothic\',sans-serif;background:#f5f6f8;color:#191f28">' +
     '<div style="max-width:420px;margin:12vh auto;padding:28px 24px;background:#fff;border-radius:16px;text-align:center">' +
+    '<div style="color:#1b64da;margin-bottom:10px">' + RUNNER_LOGO_SVG.replace('class="rlogo"', 'width="80"') + '</div>' +
     '<div style="font-size:22px;font-weight:800;margin-bottom:8px">러너 올인원' + (admin ? ' 관리자' : '') + '</div>' +
     '<div style="font-size:15px;color:#6b7684;line-height:1.6;margin-bottom:22px">앱 주소가 바뀌었습니다.<br>아래 버튼을 눌러 새 주소로 들어가 주세요.<br>' + (admin ? '' : '들어간 뒤 <b>홈 화면에 추가</b>하면 다음부터 바로 열립니다.') + '</div>' +
     '<a href="' + u + '" target="_top" style="display:block;background:#1b64da;color:#fff;text-decoration:none;font-weight:700;font-size:17px;padding:15px;border-radius:12px">새 주소로 열기</a>' +
