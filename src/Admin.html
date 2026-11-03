@@ -3408,7 +3408,7 @@
   }
   $('#sPrev').addEventListener('click', () => { if (sMode === 'month') { sMonth = addMonth(sMonth, -1); schedGo(); } else schedGo(shiftDays(SD.start, -7)); });
   $('#sNext').addEventListener('click', () => { if (sMode === 'month') { sMonth = addMonth(sMonth, 1); schedGo(); } else schedGo(shiftDays(SD.start, 7)); });
-  $('#sToday').addEventListener('click', () => { if (sMode === 'month') sMonth = monthOf(SD.today); schedGo(SD.today); });
+  $('#sToday').addEventListener('click', () => { if (sMode === 'month') sMonth = monthOf(pddDate() || SD.today); schedGo(SD.today); });
   $('#sDate').addEventListener('change', (e) => { if (!e.target.value) return; if (sMode === 'month') sMonth = monthOf(e.target.value); schedGo(e.target.value); });
   $('#sMode').addEventListener('click', (e) => {
     const b = e.target.closest('[data-mode]'); if (!b || b.dataset.mode === sMode) return;

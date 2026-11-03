@@ -131,7 +131,7 @@
   .mc .v.k-work { background: #bfe1f6; color: #0a53a8; } .mc .v.k-off { background: #f08c8c; color: #fff; } .mc .v.k-sick { background: #d4edbc; color: #11734b; }
   .mc .v.k-mi { background: #d15555; color: #ffcfc9; } .mc .v.k-yong { background: #e6cff2; color: #5a3286; } .mc .v.k-reg { background: #d9f5ef; color: #0b6b57; }
   .mc .bkdot { font-size: 9.5px; color: #5a3286; font-weight: 700; }
-  .mc.today .n i { font-style: normal; background: var(--ink); color: #fff; border-radius: 999px; padding: 0 5px; }
+  .mc .pddt { font-style: normal; font-size: 9.5px; font-weight: 800; color: #fff; background: var(--brand); border-radius: 4px; text-align: center; line-height: 1.5; }
   .mc.pdd { background: var(--brand-weak); border-color: var(--brand); }
   .mc.sel { box-shadow: 0 0 0 2px var(--ink); }
   .mdet { margin-top: 12px; }
@@ -744,7 +744,7 @@
   $('#scMode').addEventListener('click', (e) => {
     const b = e.target.closest('[data-m]'); if (!b || b.dataset.m === scMode) return;
     scMode = b.dataset.m; scSel = '';
-    if (scMode === 'month' && !scMonth) scMonth = ymdOf(new Date()).slice(0, 7);
+    if (scMode === 'month' && !scMonth) { const t = new Date(); scMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // PDD(내일)가 있는 달
     paintScMode(); loadSched();
   });
   function loadSched() {
@@ -795,7 +795,7 @@
   function renderMonth(r) {
     scLast = r;
     const pdd = pddOf(r.today), [y, m] = r.month.split('-').map(Number);
-    if (!scSel || !r.dates.includes(scSel)) scSel = r.dates.includes(pdd) ? pdd : r.dates.includes(r.today) ? r.today : r.dates[0];
+    if (!scSel || !r.dates.includes(scSel)) scSel = r.dates.includes(pdd) ? pdd : r.dates[0];
     const lead = new Date(y, m - 1, 1).getDay();
     let work = 0, off = 0;
     r.dates.forEach((d) => { const v = String(r.cells[d] || ''); if (!v) return; if (/휴무|휴가|병가|퇴사/.test(v)) off++; else if (!/미입차/.test(v)) work++; });
@@ -803,8 +803,9 @@
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((d) => {
       const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', nb = ((r.backup || {})[d] || []).length;
-      cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === r.today ? ' today' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
-        '<span class="n">' + (d === r.today ? '<i>' + day + '</i>' : day) + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + '</span>' +
+      cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
+        '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + '</span>' +
+        (d === pdd ? '<em class="pddt">PDD</em>' : '') +
         (v ? '<span class="v ' + schKind(v) + '">' + escH(v) + '</span>' : '') +
         (nb ? '<span class="bkdot">백업 ' + nb + '</span>' : '') + '</button>');
     });
