@@ -802,7 +802,24 @@
   };
   let toastTimer;
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3000); }
-  const call = (fn, ...args) => new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+  // ───── 서버 호출 ─────
+  // 구글 앱스크립트 주소에서 열리면 google.script.run, 깃허브 페이지에서 열리면 웹앱 주소(RUNNER_CONFIG.api)로 POST.
+  const RUNNER_API = (window.RUNNER_CONFIG && window.RUNNER_CONFIG.api) || '';
+  function gsCall(fn, args) {
+    if (window.google && google.script && google.script.run) {
+      return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+    }
+    if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(() => { if (ctl) ctl.abort(); }, 60000);
+    return fetch(RUNNER_API, {
+      method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: ctl ? ctl.signal : undefined
+    }).then((r) => r.text()).then((t) => {
+      try { return JSON.parse(t); } catch (e) { throw new Error('BAD_RESPONSE'); } // 구글이 바쁠 때 오는 오류 화면 등
+    }).finally(() => clearTimeout(timer));
+  }
+  const call = (fn, ...args) => gsCall(fn, args);
   /** 관리자 API 호출: 로그인 만료면 로그인 화면으로 */
   async function api(fn, ...args) {
     let r;

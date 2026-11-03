@@ -41,6 +41,8 @@ function walk(dir) {
 }
 
 walk(path.join(ROOT, 'src'));
+walk(path.join(ROOT, 'site'));
+checkJs('scripts/build-pages.js', fs.readFileSync(path.join(ROOT, 'scripts', 'build-pages.js'), 'utf8').replace(/^#!.*\n/, ''));
 
 if (failed) {
   console.error('\n문법 오류 ' + failed + '건 / ' + count + '개 검사. 배포하지 않습니다.');

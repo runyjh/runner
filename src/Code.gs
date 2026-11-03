@@ -28,6 +28,7 @@ const CFG = {
   SESSION_AUTO_DAYS: 30,         // 자동 로그인 유지 기간
   SESSION_HOURS: 12,             // 자동 로그인 미선택 시 유지 시간
   LOGIN_MAX_FAIL: 10,            // 연속 실패 허용 횟수 (초과 시 15분 잠금)
+  SIGNUP_PER_HOUR: 30,           // 전체 가입 신청 1시간 최대 건수 (자동 가입 공격으로 드라이브가 가득 차는 것 방지)
   RESET_MAX_TRY: 5,              // 비밀번호 찾기 본인확인 시도 횟수 (초과 시 30분 잠금)
   RESET_TOKEN_SEC: 600,          // 비밀번호 재설정 허용 시간(초)
   PW_ITER: 200,                  // 비밀번호 해시 반복 횟수
@@ -73,9 +74,9 @@ const D_NOTES = {
   driverType: '고정 / 백업 / 품앗이 / 외부용차',
   driverCode: '기사마다 겹치지 않는 코드 (영문은 자동 대문자)',
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
-  rrn: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n생년월일도 자동 갱신됩니다.',
-  licenseNo: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.',
-  account: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.',
+  rrn: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n생년월일도 자동 갱신됩니다.\n※ 시트에 직접 입력한 원래 번호는 구글 시트 "버전 기록"에 남습니다. 가능하면 관리자 화면에서 입력하세요.',
+  licenseNo: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n※ 시트 "버전 기록"에 남으므로 가능하면 관리자 화면에서 입력하세요.',
+  account: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n※ 시트 "버전 기록"에 남으므로 가능하면 관리자 화면에서 입력하세요.',
   pwReset: '새 비밀번호(영문+숫자 8~30자)를 입력하면 바로 적용되고 이 칸은 비워집니다.\n' +
     '임시 비밀번호로 취급되어, 기사가 다음 로그인 때 새 비밀번호를 직접 정하게 됩니다.\n' +
     '여러 명에게 같은 임시 비밀번호를 줄 때: 첫 칸에 입력 → 칸 오른쪽 아래 네모를 아래로 끌어 채우기.',
@@ -240,10 +241,40 @@ const DOCS = {
 };
 
 // ───────────────────────── 웹앱 진입점 ─────────────────────────
+var GLOBAL_ = typeof globalThis !== 'undefined' ? globalThis : this; // 앱스크립트 V8: 최상위 함수는 전역 객체에 있다
+
+/**
+ * 깃허브 페이지 화면이 부르는 입구 (google.script.run 대신 POST).
+ * 본문: {"fn":"api_login","args":[...]}  → 그 함수의 반환값을 JSON 으로 돌려준다.
+ * - 이름이 api_ / adm_ 로 시작하고 _ 로 끝나지 않는 함수만 부를 수 있다 (setup 등 관리 함수는 막힘).
+ * - 화면은 Content-Type: text/plain 으로 보내 CORS 사전 요청 없이 바로 처리된다.
+ */
+function doPost(e) {
+  let out;
+  try {
+    const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const fn = String(req.fn || '');
+    const f = /^(api|adm)_[A-Za-z0-9_]+$/.test(fn) && !/_$/.test(fn) ? GLOBAL_[fn] : null;
+    if (typeof f !== 'function') out = { ok: false, code: 'UNKNOWN_FN', msg: '알 수 없는 요청입니다. 화면을 새로고침해 주세요.' };
+    else {
+      out = f.apply(null, Array.isArray(req.args) ? req.args : []);
+      if (out === undefined) out = null;
+    }
+  } catch (err) {
+    out = { ok: false, msg: '서버 오류: ' + (err && err.message || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 function doGet(e) {
+  const prm = (e && e.parameter) || {};
+  if (prm.ping) return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
+  // 깃허브 페이지로 옮긴 뒤: 스크립트 속성 PAGES_URL 이 있으면 예전 주소는 새 주소 안내 화면을 보여 준다 (?stay=1 이면 예전 화면)
+  const pages = str_(props_().PAGES_URL).replace(/\/+$/, '');
+  if (pages && !prm.stay) return movePage_(pages + '/' + (prm.page === 'admin' ? 'admin.html' : ''), prm.page === 'admin');
   // 템플릿 평가 없이 파일을 그대로 내보내 첫 화면 응답을 빠르게 한다.
   // 웹앱 주소 뒤에 ?page=admin 을 붙이면 관리자 화면
-  if (e && e.parameter && e.parameter.page === 'admin') {
+  if (prm.page === 'admin') {
     return HtmlService.createHtmlOutputFromFile('Admin')
       .setTitle('러너 올인원 관리자')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -253,12 +284,37 @@ function doGet(e) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
+/** 예전 주소로 들어온 사람에게 새 주소 안내 (구글 화면은 자동 이동이 막혀 있어 버튼을 누르게 한다) */
+function movePage_(url, admin) {
+  const u = String(url).replace(/[<>"']/g, '');
+  const html = '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><base target="_top"></head>' +
+    '<body style="margin:0;font-family:-apple-system,BlinkMacSystemFont,\'Apple SD Gothic Neo\',\'Malgun Gothic\',sans-serif;background:#f5f6f8;color:#191f28">' +
+    '<div style="max-width:420px;margin:12vh auto;padding:28px 24px;background:#fff;border-radius:16px;text-align:center">' +
+    '<div style="font-size:22px;font-weight:800;margin-bottom:8px">러너 올인원' + (admin ? ' 관리자' : '') + '</div>' +
+    '<div style="font-size:15px;color:#6b7684;line-height:1.6;margin-bottom:22px">앱 주소가 바뀌었습니다.<br>아래 버튼을 눌러 새 주소로 들어가 주세요.<br>' + (admin ? '' : '들어간 뒤 <b>홈 화면에 추가</b>하면 다음부터 바로 열립니다.') + '</div>' +
+    '<a href="' + u + '" target="_top" style="display:block;background:#1b64da;color:#fff;text-decoration:none;font-weight:700;font-size:17px;padding:15px;border-radius:12px">새 주소로 열기</a>' +
+    '<div style="margin-top:14px;font-size:12px;color:#8b95a1;word-break:break-all">' + u + '</div></div></body></html>';
+  return HtmlService.createHtmlOutput(html).setTitle('러너 올인원').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
 // ───────────────────────── 설정 / 업그레이드 ─────────────────────────
+/**
+ * 편집기(또는 스크립트 주인)에서만 실행되게 막는다.
+ * 웹앱 화면의 google.script.run 은 _ 로 끝나지 않는 함수를 누구나 부를 수 있으므로,
+ * setup 같은 관리 함수는 '지금 실행하는 사람 = 스크립트 주인' 일 때만 진행한다.
+ * (익명 방문자는 이메일이 비어 있고, 다른 구글 계정은 주인과 다르다)
+ */
+function editorOnly_() {
+  let me = '', owner = '';
+  try { me = Session.getActiveUser().getEmail(); owner = Session.getEffectiveUser().getEmail(); } catch (e) { /* 무시 */ }
+  if (!me || me !== owner) throw new Error('이 함수는 Apps Script 편집기에서만 실행할 수 있습니다.');
+}
 /**
  * 편집기에서 실행. 처음이면 DB 시트, 서류 폴더, 암호화 키를 만들고,
  * 이미 있으면 빠진 열·서식·트리거만 보충한다. (여러 번 실행해도 안전)
  */
 function setup() {
+  editorOnly_();
   const p = PropertiesService.getScriptProperties();
   if (!p.getProperty('DB_ID')) {
     const root = DriveApp.createFolder('러너 올인원 데이터');
@@ -277,7 +333,7 @@ function setup() {
     });
     _props = null;
   }
-  ensureColumns();
+  ensureColumns_();
   ensureCompany_();
   ensureTools_();
   installTriggers_();
@@ -286,7 +342,9 @@ function setup() {
 }
 
 /** 빠진 머리글을 오른쪽 끝에 추가하고 서식·숨김·드롭다운·설명을 다시 적용한다. */
-function ensureColumns(only) {
+/** 편집기에서 직접 실행할 때 (빠진 열·서식 보충) */
+function ensureColumns() { editorOnly_(); ensureColumns_(); }
+function ensureColumns_(only) {
   if (!only) { try { ss_().setSpreadsheetTimeZone(CFG.TZ); } catch (e) { /* 권한 문제 시 무시 */ } }
   (only || Object.keys(SCHEMA)).forEach(function (name) {
     const def = SCHEMA[name];
@@ -392,7 +450,7 @@ function sheet_(name) {
   if (!sh && AUTO_SHEETS.indexOf(name) >= 0) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
-    try { if (!ss_().getSheetByName(name)) ensureColumns([name]); } finally { lock.releaseLock(); }
+    try { if (!ss_().getSheetByName(name)) ensureColumns_([name]); } finally { lock.releaseLock(); }
     sh = ss_().getSheetByName(name);
   }
   if (!sh) fail_('DB 시트 "' + name + '"을(를) 찾을 수 없습니다. 시트 이름을 바꾸지 마세요.');
@@ -884,6 +942,8 @@ function api_logout(token) {
 function api_signup(form, files) {
   return run_(function () {
     const f = validateSignup_(form);
+    const hk = 'su:' + Utilities.formatDate(new Date(), CFG.TZ, 'yyyyMMddHH');
+    if (Number(cache_().get(hk) || 0) >= CFG.SIGNUP_PER_HOUR) fail_('지금 가입 신청이 많아 잠시 막혀 있습니다. 1시간 뒤에 다시 시도하거나 사무실로 연락해 주세요.');
     files = files || {};
     Object.keys(DOCS).forEach(function (k) {
       const x = files[k];
@@ -946,6 +1006,7 @@ function api_signup(form, files) {
     } finally {
       lock.releaseLock();
     }
+    cache_().put(hk, String(Number(cache_().get(hk) || 0) + 1), 3700);
     return { ok: true, msg: '가입 신청이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.' };
   });
 }
@@ -2377,6 +2438,7 @@ function onToolsEdit_(e, sh) {
 
 /** 편집기에서 직접 실행할 때 */
 function linkUploadedDocs() {
+  editorOnly_();
   Logger.log(JSON.stringify(linkUploadedDocs_()));
 }
 
@@ -2520,6 +2582,7 @@ function cleanupSessions() {
 // ───────────────────────── 관리자용 도구 (편집기에서 실행) ─────────────────────────
 /** 개인정보 암복호화가 정상인지 확인 */
 function testCrypto() {
+  editorOnly_();
   const enc = encrypt_('900101-1234567');
   Logger.log(enc);
   Logger.log(decrypt_(enc));

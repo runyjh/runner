@@ -112,6 +112,12 @@
   .day .bk { font-size: 12.5px; color: #5a3286; background: #f5eefb; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; }
   .day .bk b { font-weight: 700; margin-right: 4px; }
   .day .bk.none { color: #b0b8c1; background: transparent; padding: 0 2px; }
+  .inst { display: block; width: 100%; text-align: left; border: 0; background: var(--brand); color: #fff; border-radius: var(--radius); padding: 14px 16px; margin: 12px 0 4px; font: inherit; }
+  .inst b { display: block; font-size: 16px; } .inst span { font-size: 13px; opacity: .85; }
+  .ihelp { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; z-index: 50; padding: 16px; }
+  .ihelp .ibox { background: #fff; border-radius: 16px; padding: 20px; width: min(420px, 100%); }
+  .ihelp ol { padding-left: 20px; line-height: 1.8; font-size: 15px; margin: 10px 0 16px; }
+  .hidden { display: none !important; }
   .segm { margin-left: auto; display: flex; background: #e9ecef; border-radius: 10px; padding: 3px; }
   .segm button { border: 0; background: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 14px; color: var(--sub); }
   .segm button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -375,13 +381,17 @@
   <section id="v-home" class="view">
     <div class="hello"><h2 id="homeName">기사님, 안녕하세요</h2><p>오늘도 안전 운행하세요.</p></div>
     <div class="menu">
-      <button class="tile" id="mSched" type="button"><b>스케줄</b><span>내 2주 일정 보기 →</span></button>
+      <button class="tile" id="mSched" type="button"><b>스케줄</b><span>2주·한 달 일정 보기 →</span></button>
       <div><b>정산서 보기</b><span>준비 중</span></div>
       <div><b>품앗이</b><span>준비 중</span></div>
       <div><b>마이페이지</b><span>준비 중</span></div>
     </div>
+    <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
   </section>
+  <div class="ihelp hidden" id="instHelp" role="dialog"><div class="ibox">
+    <b>홈 화면에 추가하기</b><ol id="instSteps"></ol>
+    <button class="btn" type="button" id="instClose">확인</button></div></div>
 
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
@@ -426,10 +436,24 @@
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const TOKEN = 'runner.token', USER = 'runner.user', LAST_ID = 'runner.lastId';
 
-  // ───── 서버 호출 (google.script.run → Promise) ─────
-  const api = (fn, ...args) => new Promise((resolve, reject) => {
-    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
-  });
+  // ───── 서버 호출 ─────
+  // 구글 앱스크립트 주소에서 열리면 google.script.run, 깃허브 페이지에서 열리면 웹앱 주소(RUNNER_CONFIG.api)로 POST.
+  const RUNNER_API = (window.RUNNER_CONFIG && window.RUNNER_CONFIG.api) || '';
+  function gsCall(fn, args) {
+    if (window.google && google.script && google.script.run) {
+      return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+    }
+    if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(() => { if (ctl) ctl.abort(); }, 60000);
+    return fetch(RUNNER_API, {
+      method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: ctl ? ctl.signal : undefined
+    }).then((r) => r.text()).then((t) => {
+      try { return JSON.parse(t); } catch (e) { throw new Error('BAD_RESPONSE'); } // 구글이 바쁠 때 오는 오류 화면 등
+    }).finally(() => clearTimeout(timer));
+  }
+  const api = (fn, ...args) => gsCall(fn, args);
 
   // ───── 저장소 (자동 로그인 = localStorage, 아니면 sessionStorage) ─────
   // 브라우저가 저장소를 막아도(시크릿 창, 제3자 데이터 차단 등) 이번 화면에서는 로그인이 유지되도록 메모리에도 보관
@@ -828,6 +852,27 @@
       $('#scDet').innerHTML = dayRow(scLast, scSel);
     }
   });
+  // ───── 앱 설치 (깃허브 페이지에서 열렸을 때만) ─────
+  // 안드로이드 크롬·삼성 인터넷: 설치 창을 바로 띄움 / 아이폰: 사파리 '공유 → 홈 화면에 추가' 안내
+  (function installer() {
+    const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    if (standalone || !window.RUNNER_CONFIG) return;
+    const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
+    const inApp = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(ua);
+    let deferred = null;
+    const btn = $('#instBtn');
+    const help = (steps) => { $('#instSteps').innerHTML = steps.map((x) => '<li>' + x + '</li>').join(''); $('#instHelp').classList.remove('hidden'); };
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; btn.classList.remove('hidden'); });
+    window.addEventListener('appinstalled', () => { btn.classList.add('hidden'); deferred = null; });
+    if (ios || inApp) btn.classList.remove('hidden');
+    btn.addEventListener('click', () => {
+      if (deferred) { deferred.prompt(); deferred.userChoice.finally(() => { deferred = null; }); return; }
+      if (inApp) return help(['오른쪽 아래(또는 위) <b>⋮</b> 또는 <b>공유</b> 버튼을 누릅니다', '<b>다른 브라우저로 열기</b>(크롬·사파리)를 누릅니다', '열린 화면에서 이 버튼을 다시 누릅니다']);
+      if (ios) return help(['아래쪽 <b>공유 버튼(□↑)</b>을 누릅니다', '<b>홈 화면에 추가</b>를 누릅니다', '오른쪽 위 <b>추가</b>를 누르면 끝']);
+      help(['오른쪽 위 <b>⋮</b> 메뉴를 누릅니다', '<b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 누릅니다', '<b>설치</b>를 누르면 끝']);
+    });
+    $('#instClose').addEventListener('click', () => $('#instHelp').classList.add('hidden'));
+  })();
   $('#mSched').addEventListener('click', openSched);
   $('#scBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
 
