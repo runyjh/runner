@@ -1,0 +1,52 @@
+# main 브랜치에 화면 코드가 올라오면 깃허브 페이지(기사 앱·관리자 화면)를 새로 만든다.
+# 필요한 설정: Settings → Pages → Source = GitHub Actions
+#             Settings → Secrets and variables → Actions → Variables → RUNNER_API_URL (웹앱 /exec 주소)
+name: 깃허브 페이지 배포
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**.html'
+      - 'site/**'
+      - 'scripts/build-pages.js'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 화면 만들기
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/check.js
+      - name: 페이지 만들기
+        env:
+          RUNNER_API_URL: ${{ vars.RUNNER_API_URL }}
+        run: node scripts/build-pages.js
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: 페이지 올리기
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
