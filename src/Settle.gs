@@ -2073,3 +2073,38 @@ function api_mySlip(token, month) {
     };
   });
 }
+
+// ───────────────────────── 노선관리: 라우트별 1일 평균 물량 (쿠팡 정산서 기준) ─────────────────────────
+/**
+ * 최근 정산월 2개(쿠팡 정산서가 올라온 달)의 배송 줄로 캠프·라우트(예: 527B)별 1일 평균 물량.
+ * 반환 { months: ['2026-10', …], vol: { '강서1|527B': { avg, days, qty } } } — 30분 캐시 (정산 DB 가 바뀌면 새로)
+ */
+function adm_routeVolumes(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!props_().STL_DB_ID) return { ok: true, months: [], vol: {} };
+    const key = 'stl:vol:' + stlVer_();
+    const hit = stlCacheGet_(key);
+    if (hit) return hit;
+    stlLoad_(STL_SMALL);
+    const kinds = stlKinds_();
+    const months = stlMonths_().withData.slice(-2);
+    const acc = {};
+    months.forEach(function (m) {
+      stlReadMonth_('stl_raw', m).forEach(function (r) {
+        const kind = kinds[r.kind] || '';
+        if (kind !== '배송' || !r.route) return;
+        const qty = stlNum_(r.qty) + stlNum_(r.ret);
+        if (!qty) return;
+        const k = stlShort_(r.camp) + '|' + normCode_(r.route);
+        const a = acc[k] || (acc[k] = { qty: 0, dates: {} });
+        a.qty += qty; a.dates[stlYmd_(r.date)] = 1;
+      });
+    });
+    const vol = {};
+    Object.keys(acc).forEach(function (k) { const d = Object.keys(acc[k].dates).length; vol[k] = { avg: d ? Math.round(acc[k].qty / d) : 0, days: d, qty: acc[k].qty }; });
+    const out = { ok: true, months: months, vol: vol };
+    stlCachePut_(key, out, 1800);
+    return out;
+  });
+}

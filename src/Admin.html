@@ -395,6 +395,7 @@
   .rt-table th, .rt-table td { padding: 8px 10px; }
   .rt-table th.ck, .rt-table td.ck { width: 34px; padding-right: 0; }
   .rt-table td.g { color: var(--sub); }
+  .rt-table td.vol { white-space: nowrap; font-variant-numeric: tabular-nums; } .rt-table td.vol small { color: var(--sub); font-size: 11px; }
   .code, .rt-table td.g, .gchips b, .code-inp { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .5px; }
   .rt-table tr.off td { color: var(--faint); }
   .rt-table .memo-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
@@ -2882,13 +2883,14 @@
     return api('adm_routeAll').then((r) => {
       if (!r.ok) return toast(r.msg);
       RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images; RT.addresses = r.addresses || []; RT.prices = r.prices || [];
+      if (!RVOL) loadVolumes();
       if (curCamp && curCamp !== ORPHAN && !campById(curCamp)) curCamp = null;
       if (curCamp === ORPHAN && !routesOf(ORPHAN).length) curCamp = null;
       if (!curCamp && RT.camps.length) curCamp = sortedCamps()[0].id;
       renderCampList(); renderCampMain();
     }).catch(() => {});
   }
-  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk()) return; pdirty = {}; loadRoutes().then(() => toast('새로 불러왔습니다.')); });
+  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk()) return; pdirty = {}; RVOL = null; loadRoutes().then(() => toast('새로 불러왔습니다.')); });
 
   // 왼쪽 캠프 목록
   function renderCampList() {
@@ -2952,7 +2954,7 @@
           (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
         '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
         '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
-        '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th>메모</th><th>수정일시</th></tr></thead>' +
+        '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th title="쿠팡 정산서 최근 2개월 · 라우트별 배송건수 ÷ 배송한 날 수">1일 평균물량</th><th>메모</th><th>수정일시</th></tr></thead>' +
         '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div></div>' +
         (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div>') +
       '</div>';
@@ -2988,7 +2990,7 @@
       '<tr data-rid="' + esc(r.id) + '"' + (r.status === '정지' ? ' class="off"' : '') + '>' +
       '<td class="ck"><input type="checkbox" data-rck="' + esc(r.id) + '"' + (rsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
       '<td><b class="code">' + esc(r.code) + '</b></td>' + GK.map((k) => '<td class="g">' + esc(r[k]) + '</td>').join('') +
-      '<td><span class="badge ' + (r.status === '정지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' +
+      '<td><span class="badge ' + (r.status === '정지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' + volCell(r) +
       '<td class="sub memo-cell" title="' + esc(r.memo) + '">' + esc(r.memo) + '</td><td class="sub">' + esc(String(r.updatedAt || '').slice(0, 16)) + '</td></tr>').join('');
     const em = $('#rEmpty');
     em.classList.toggle('hidden', !!list.length);
@@ -2996,6 +2998,22 @@
     $('#rAll').checked = !!list.length && list.every((r) => rsel.has(r.id));
     renderBulk();
   }
+  // 1일 평균물량 (쿠팡 정산서 기준, 정산 코드 = 번호+글자 마다)
+  let RVOL = null;
+  function loadVolumes() {
+    api('adm_routeVolumes').then((r) => { if (r && r.ok) { RVOL = r; if ($('#rRows')) renderRoutes(); } }).catch(() => {});
+  }
+  function volCell(r) {
+    if (!RVOL) return '<td class="sub">…</td>';
+    const camp = campById(r.campId), cs = camp ? shortCamp(camp.name).replace(/\s/g, '').toUpperCase() : '';
+    const letters = GK.slice(1).map((k) => r[k]).filter(Boolean);
+    const codes = letters.length ? letters.map((L) => [L, r.g1 + L]) : [['', r.code]];
+    const parts = codes.map(([L, c]) => { const v = RVOL.vol[cs + '|' + c]; return v ? { L, c, v } : null; }).filter(Boolean);
+    if (!parts.length) return '<td class="sub">-</td>';
+    const tip = parts.map((p) => p.c + ': ' + p.v.avg + '건 (' + p.v.days + '일 · 합 ' + p.v.qty + '건)').join('\n') + '\n기간: ' + (RVOL.months || []).join(', ') + ' 정산';
+    return '<td class="vol" title="' + esc(tip) + '">' + parts.map((p) => (p.L ? '<small>' + esc(p.L) + '</small> ' : '') + '<b>' + wnV(p.v.avg) + '</b>').join(' · ') + '</td>';
+  }
+  const wnV = (v) => (Math.round(Number(v) || 0)).toLocaleString('ko-KR');
   function renderBulk() {
     const have = new Set(RT.routes.map((r) => r.id));
     rsel = new Set([...rsel].filter((id) => have.has(id)));
