@@ -167,6 +167,13 @@
   table.up tr.key td { background: #e3f2fd; } table.up tr.mi td { background: #ffebee; } table.up tr.dup td { background: #fff8e1; }
   table.up tr.sep td { background: #000; padding: 2px; }
   table.up td.n { color: var(--sub); text-align: right; }
+  .catlist .crow { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .catlist .crow:first-child { border-top: 0; }
+  .catlist .crow .inp { flex: 1; height: 34px; }
+  .catlist .crow .n { width: 54px; text-align: right; color: var(--sub); font-size: 12px; flex: none; }
+  .catlist .crow button { height: 34px; min-width: 34px; border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer; color: var(--sub); }
+  .catlist .crow button:disabled { opacity: .35; cursor: default; }
+  .catlist .crow button.del { color: var(--danger); padding: 0 10px; }
   .actbl td { vertical-align: middle; } .actbl tr.off td { color: var(--faint); }
   .actbl .cp { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 2px 7px; font-size: 12px; color: var(--sub); cursor: pointer; margin-left: 4px; }
   .actbl .cp:hover { border-color: var(--brand); color: var(--brand); }
@@ -533,6 +540,7 @@
         <input class="inp search" id="acQ" placeholder="서비스명, 아이디, 담당자, 메모 검색" autocomplete="off">
         <select class="inp" id="acCamp" aria-label="캠프"></select>
         <button class="btn ghost danger-t" type="button" data-reset="accounts">데이터 초기화</button>
+        <button class="btn ghost" id="acCatEdit" title="분류 추가·이름 바꾸기·순서·삭제">분류 편집</button>
         <button class="btn ghost" id="acReload" title="시트의 최신 내용 불러오기">새로고침</button>
         <button class="btn" id="acNew">+ 새 계정</button>
       </div>
@@ -756,6 +764,17 @@
     <label class="check hidden" id="acPwClearWrap"><input type="checkbox" id="acPwClear"> 저장된 비밀번호 지우기</label>
     <div class="m-actions"><button type="button" class="btn ghost danger-t" id="acDel" style="margin-right:auto">삭제</button><button type="button" class="btn ghost" id="acCancel">닫기</button><button class="btn" id="acSave">저장</button></div>
   </form>
+</div>
+
+<!-- ───────────── 계정 분류 편집 ───────────── -->
+<div class="modal hidden" id="acCatModal">
+  <div class="m-box" style="width:min(520px,100%);max-height:90vh;overflow:auto">
+    <h3>분류 편집</h3>
+    <p style="margin:0 0 12px;color:var(--sub);font-size:13px">이름을 고치면 그 분류의 계정도 함께 바뀝니다. 순서는 ↑↓ 로 바꾸면 위쪽 탭 순서가 됩니다.</p>
+    <div id="acCatList" class="catlist"></div>
+    <div style="display:flex;gap:6px;margin-top:12px"><input class="inp" id="acCatNew" maxlength="30" placeholder="새 분류 이름 (예: 택배사 시스템)" style="flex:1"><button type="button" class="btn" id="acCatAdd">추가</button></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="acCatClose">닫기</button></div>
+  </div>
 </div>
 
 <!-- ───────────── 공지 작성·수정 ───────────── -->
@@ -1621,7 +1640,9 @@
   }
   function renderAccounts() {
     const cnt = { '전체': AC.accounts.length };
+    AC.categories.forEach((k) => { cnt[k] = 0; }); // 분류 편집에서 정한 순서대로 (계정이 없어도 탭 표시)
     AC.accounts.forEach((x) => { const k = x.category || '기타'; cnt[k] = (cnt[k] || 0) + 1; });
+    if (acCat !== '전체' && cnt[acCat] === undefined) acCat = '전체';
     $('#acTabs').innerHTML = Object.keys(cnt).map((k) => '<button class="tab' + (k === acCat ? ' on' : '') + '" data-ac="' + esc(k) + '">' + esc(k) + '<b>' + cnt[k] + '</b></button>').join('');
     const list = acVisible();
     $('#acCount').textContent = AC.accounts.length + '개';
@@ -1688,6 +1709,66 @@
     $('#acDel').classList.toggle('hidden', !x);
     $('#acModal').classList.remove('hidden'); (x ? $('#acId') : $('#acCat')).focus();
   }
+  // 분류 편집
+  function renderCatList() {
+    const used = {};
+    AC.accounts.forEach((x) => { const k = x.category || '기타'; used[k] = (used[k] || 0) + 1; });
+    const cats = AC.categories;
+    $('#acCatList').innerHTML = cats.map((c, i) => '<div class="crow" data-cat="' + esc(c) + '">' +
+      '<input class="inp" value="' + esc(c) + '" maxlength="30" aria-label="분류 이름">' +
+      '<span class="n">계정 ' + (used[c] || 0) + '</span>' +
+      '<button type="button" data-mv="-1" title="위로"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+      '<button type="button" data-mv="1" title="아래로"' + (i === cats.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '<button type="button" class="del" data-cdel>삭제</button></div>').join('') || '<div class="sub">분류가 없습니다.</div>';
+  }
+  function catOp(op) {
+    return api('adm_accCats', op).then((r) => {
+      if (!r.ok) { toast(r.msg); renderCatList(); return; }
+      AC.categories = r.categories; if (r.msg) toast(r.msg);
+      if (op.action === 'rename' && acCat === op.name) acCat = op.newName;
+      if (op.action === 'delete' && acCat === op.name) acCat = '전체';
+      if (op.action === 'rename' || op.action === 'delete') loadAccounts(); else { acFill(); renderAccounts(); }
+      renderCatList();
+    }).catch(() => {});
+  }
+  $('#acCatEdit').addEventListener('click', () => { renderCatList(); $('#acCatModal').classList.remove('hidden'); });
+  $('#acCatClose').addEventListener('click', () => $('#acCatModal').classList.add('hidden'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#acCatModal').classList.contains('hidden')) $('#acCatModal').classList.add('hidden'); });
+  $('#acCatAdd').addEventListener('click', () => {
+    const n = $('#acCatNew').value.trim(); if (!n) return toast('새 분류 이름을 입력해 주세요.');
+    $('#acCatNew').value = ''; catOp({ action: 'add', name: n });
+  });
+  $('#acCatNew').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); $('#acCatAdd').click(); } });
+  // 이름 바꾸기: 칸에서 나오거나 Enter
+  const catRename = (inp) => {
+    const row = inp.closest('[data-cat]'), from = row.dataset.cat, to = inp.value.trim();
+    if (!to) { inp.value = from; return toast('분류 이름을 비울 수 없습니다. 지우려면 삭제를 누르세요.'); }
+    if (to !== from) catOp({ action: 'rename', name: from, newName: to });
+  };
+  $('#acCatList').addEventListener('focusout', (e) => { if (e.target.matches('.crow .inp')) catRename(e.target); });
+  $('#acCatList').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing && e.target.matches('.crow .inp')) { e.preventDefault(); e.target.blur(); } });
+  $('#acCatList').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-cat]'); if (!row) return;
+    const name = row.dataset.cat, i = AC.categories.indexOf(name);
+    const mv = e.target.closest('[data-mv]');
+    if (mv) {
+      const j = i + Number(mv.dataset.mv); if (j < 0 || j >= AC.categories.length) return;
+      const names = AC.categories.slice(); [names[i], names[j]] = [names[j], names[i]];
+      AC.categories = names; renderCatList(); renderAccounts();
+      return catOp({ action: 'order', names });
+    }
+    if (e.target.closest('[data-cdel]')) {
+      const n = AC.accounts.filter((x) => (x.category || '기타') === name).length;
+      let moveTo = '';
+      if (n) {
+        const others = AC.categories.filter((x) => x !== name);
+        moveTo = prompt('"' + name + '" 분류의 계정 ' + n + '개를 어느 분류로 옮길까요?\n(있는 분류: ' + others.join(', ') + ')', others.includes('기타') ? '기타' : (others[0] || '기타'));
+        if (moveTo === null) return;
+        moveTo = moveTo.trim() || '기타';
+      } else if (!confirm('"' + name + '" 분류를 지울까요?')) return;
+      catOp({ action: 'delete', name, moveTo });
+    }
+  });
   $('#acNew').addEventListener('click', () => openAccount(null));
   $('#acStatus').addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) $$('#acStatus [data-st]').forEach((x) => x.classList.toggle('on', x === b)); });
   $('#acPwShow').addEventListener('click', () => { const v = $('#acPw').type === 'password'; $('#acPw').type = v ? 'text' : 'password'; $('#acPwShow').textContent = v ? '가리기' : '보기'; });

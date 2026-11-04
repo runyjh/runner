@@ -40,7 +40,7 @@ const CFG = {
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
-  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts' };
+  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -139,6 +139,8 @@ const AC = {
   owner: '사용자·담당자', url: '접속 주소', memo: '메모', status: '상태', pwChangedAt: '비밀번호 변경일',
   author: '등록자', createdAt: '등록일시', updatedAt: '수정일시', pwEnc: '비밀번호(암호화)'
 };
+// account_categories 시트: 계정관리 분류 목록 (순서대로 탭에 보임). 시트에서 직접 고쳐도 된다.
+const ACAT = { name: '분류', order: '순서' };
 const AC_NOTES = {
   password: '새 비밀번호를 그대로 입력하면 자동 암호화되고 ●●●● 로 바뀝니다. 지우면 저장된 비밀번호도 지워집니다.\n' +
     '※ 시트에 직접 입력한 원래 값은 구글 시트 "버전 기록"에 남습니다. 가능하면 관리자 화면 > 계정관리에서 입력하세요.',
@@ -249,7 +251,7 @@ const RP_NOTES = {
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -265,6 +267,7 @@ SCHEMA[SH.PRICES] = RP;
 SCHEMA[SH.ROUTES] = R;
 SCHEMA[SH.NOTICE] = N;
 SCHEMA[SH.ACC] = AC;
+SCHEMA[SH.ACAT] = ACAT;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -2268,8 +2271,8 @@ function adm_accList(token) {
   return run_(function () {
     requireAdmin_(token);
     const list = readAll_(SH.ACC).filter(function (o) { return o.id && (o.service || o.loginId); }).map(accView_);
-    const cats = ACC_CATS.slice();
-    list.forEach(function (x) { if (x.category && cats.indexOf(x.category) < 0) cats.push(x.category); });
+    const cats = accCats_();
+    list.forEach(function (x) { if (x.category && cats.indexOf(x.category) < 0) cats.push(x.category); }); // 시트에 직접 쓴 새 분류도 보이게
     return { ok: true, accounts: list, categories: cats, camps: master_().camps.map(function (c) { return c.name; }) };
   });
 }
@@ -2300,6 +2303,7 @@ function adm_accSave(token, x) {
     try {
       const now = nowText_();
       let row;
+      if (f.category && accCats_().indexOf(f.category) < 0) accCatWrite_(accCats_().concat([f.category]));
       if (!x.id) {
         row = appendObj_(SH.ACC, Object.assign({ id: newAccId_(), author: a.name, createdAt: now, updatedAt: now }, f));
         logAdmin_(a, '계정 등록', f.service + (f.camp ? ' (' + f.camp + ')' : ''), f.loginId);
@@ -2311,6 +2315,99 @@ function adm_accSave(token, x) {
         if (pwChanged) logAdmin_(a, '계정 비밀번호 변경', f.service + (f.camp ? ' (' + f.camp + ')' : ''), f.loginId);
       }
       return { ok: true, account: accView_(readObj_(SH.ACC, row)) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+// ── 계정관리 분류 목록 (account_categories 시트) ──
+/** 분류 이름 목록 (순서대로). 시트가 비어 있으면 기본 분류로 채운다 */
+function accCats_() {
+  const rows = readAll_(SH.ACAT).filter(function (o) { return o.name; });
+  if (!rows.length) { accCatWrite_(ACC_CATS); return ACC_CATS.slice(); }
+  rows.sort(function (a, b) { return (Number(a.order) || 999) - (Number(b.order) || 999) || a._row - b._row; });
+  const out = [];
+  rows.forEach(function (o) { if (out.indexOf(o.name) < 0) out.push(o.name); });
+  return out;
+}
+/** 분류 목록을 통째로 다시 쓴다 (순서 1,2,3…) + accounts 탭 드롭다운 갱신 */
+function accCatWrite_(names) {
+  const sh = sheet_(SH.ACAT), c = cols_(SH.ACAT, true), last = sh.getLastRow();
+  if (last >= 2) sh.getRange(2, 1, last - 1, c.__w).clearContent();
+  if (names.length) {
+    const rows = names.map(function (n, i) { const r = new Array(c.__w).fill(''); r[c.name] = n; r[c.order] = String(i + 1); return r; });
+    sh.getRange(2, 1, rows.length, c.__w).setNumberFormat('@').setValues(rows);
+  }
+  try {
+    const ac = sheet_(SH.ACC), cc = cols_(SH.ACC);
+    if (names.length) ac.getRange(2, cc.category + 1, ac.getMaxRows() - 1, 1)
+      .setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(names, true).setAllowInvalid(true).build());
+  } catch (e) { /* 드롭다운은 실패해도 무시 */ }
+}
+function accCatName_(v) {
+  const n = str_(v).replace(/\s+/g, ' ');
+  if (!n) fail_('분류 이름을 입력해 주세요.');
+  if (n.length > 30) fail_('분류 이름은 30자까지 쓸 수 있습니다.');
+  if (/[,]/.test(n)) fail_('분류 이름에는 쉼표(,)를 쓸 수 없습니다.');
+  return n;
+}
+/** accounts 탭에서 분류 칸이 from 인 줄을 모두 to 로 바꾼다. 바꾼 줄 수 반환 */
+function accMoveCat_(from, to) {
+  const sh = sheet_(SH.ACC), c = cols_(SH.ACC, true), last = sh.getLastRow();
+  if (last < 2) return 0;
+  const rng = sh.getRange(2, c.category + 1, last - 1, 1), vals = rng.getValues();
+  let n = 0;
+  vals.forEach(function (r) { if (str_(r[0]) === from) { r[0] = to; n++; } });
+  if (n) { rng.setNumberFormat('@').setValues(vals); }
+  return n;
+}
+
+/**
+ * 분류 편집. op = { action: 'add' | 'rename' | 'delete' | 'order', name, newName, moveTo, names }
+ * - rename: 그 분류를 쓰는 계정도 모두 새 이름으로
+ * - delete: 그 분류를 쓰는 계정은 moveTo 로 옮김 (비우면 '기타')
+ * - order : names 순서대로 저장
+ */
+function adm_accCats(token, op) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    op = op || {};
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      let cats = accCats_(), msg = '';
+      // 시트에 직접 쓴 분류도 목록에 포함
+      readAll_(SH.ACC).forEach(function (o) { if (o.category && cats.indexOf(o.category) < 0) cats.push(o.category); });
+      if (op.action === 'add') {
+        const n = accCatName_(op.name);
+        if (cats.indexOf(n) >= 0) fail_('이미 있는 분류입니다.');
+        cats.push(n); msg = '"' + n + '" 분류를 추가했습니다.';
+        logAdmin_(a, '계정 분류 추가', n, '');
+      } else if (op.action === 'rename') {
+        const from = str_(op.name), to = accCatName_(op.newName);
+        if (cats.indexOf(from) < 0) fail_('분류를 찾을 수 없습니다. 새로고침해 주세요.');
+        if (from === to) return { ok: true, categories: cats, msg: '' };
+        const moved = accMoveCat_(from, to);
+        cats = cats.map(function (x) { return x === from ? to : x; }).filter(function (x, i, arr) { return arr.indexOf(x) === i; });
+        msg = '"' + from + '" → "' + to + '" 로 바꿨습니다.' + (moved ? ' (계정 ' + moved + '개 함께 변경)' : '');
+        logAdmin_(a, '계정 분류 이름 변경', from + ' → ' + to, moved + '개');
+      } else if (op.action === 'delete') {
+        const name = str_(op.name);
+        if (cats.indexOf(name) < 0) fail_('분류를 찾을 수 없습니다. 새로고침해 주세요.');
+        const to = op.moveTo ? accCatName_(op.moveTo) : '기타';
+        if (to === name) fail_('옮길 분류를 다른 것으로 골라 주세요.');
+        const moved = accMoveCat_(name, to);
+        cats = cats.filter(function (x) { return x !== name; });
+        if (moved && cats.indexOf(to) < 0) cats.push(to);
+        msg = '"' + name + '" 분류를 지웠습니다.' + (moved ? ' 계정 ' + moved + '개는 "' + to + '"(으)로 옮겼습니다.' : '');
+        logAdmin_(a, '계정 분류 삭제', name, moved ? moved + '개 → ' + to : '');
+      } else if (op.action === 'order') {
+        const want = (op.names || []).map(str_).filter(function (x) { return cats.indexOf(x) >= 0; });
+        cats = want.concat(cats.filter(function (x) { return want.indexOf(x) < 0; }));
+      } else fail_('알 수 없는 작업입니다.');
+      accCatWrite_(cats);
+      return { ok: true, categories: cats, msg: msg };
     } finally {
       lock.releaseLock();
     }
@@ -4655,7 +4752,7 @@ const RESET_SECTIONS = {
   route: { label: '노선관리', sheets: [SH.CAMPS, SH.ROUTES, SH.CIMG, SH.CADDR, SH.PRICES] },
   memo: { label: '업무스케줄', sheets: [SH.MEMO] },
   notice: { label: '공지사항', sheets: [SH.NOTICE] },
-  accounts: { label: '계정관리', sheets: [SH.ACC] },
+  accounts: { label: '계정관리', sheets: [SH.ACC] }, // 분류 목록(account_categories)은 남긴다
   bib: { label: '배번호 관리', sheets: [SH.BIB] }
 };
 function resetFolder_() {
