@@ -1805,11 +1805,46 @@
   }
   $('#docClose').addEventListener('click', () => { $('#docModal').classList.add('hidden'); $('#docView').innerHTML = ''; if (docUrl) { URL.revokeObjectURL(docUrl); docUrl = null; } });
 
+  // ───── 뒤로가기 = 이전 화면 (열린 창·서랍이 있으면 먼저 닫음, 첫 화면에서만 앱 종료) ─────
+  const viewHist = [];
+  let viewRestoring = false, admGuard = false, admSkip = false;
+  const openModals = () => $$('.modal').filter((m) => !m.classList.contains('hidden'));
+  const shownDrawer = () => ['#drawer', '#bdrawer'].map((x) => $(x)).find((d) => d && !d.classList.contains('hidden'));
+  function admSyncBack() {
+    const need = viewHist.length > 0 || openModals().length > 0 || !!shownDrawer();
+    if (need && !admGuard) { try { history.pushState({ adm: 1 }, ''); admGuard = true; } catch (e) {} }
+    else if (!need && admGuard) { admGuard = false; admSkip = true; try { history.back(); } catch (e) { admSkip = false; } }
+  }
+  window.addEventListener('popstate', () => {
+    if (admSkip) { admSkip = false; return; }
+    admGuard = false;
+    const ms = openModals();
+    if (ms.length) {
+      const m = ms[ms.length - 1];
+      const btn = Array.from(m.querySelectorAll('button, a.btn')).find((b) => /(Close|Cancel|No)$/.test(b.id || '') || /^(닫기|취소|아니오)$/.test((b.textContent || '').trim()));
+      if (btn) btn.click(); else m.classList.add('hidden');
+    } else if (shownDrawer()) {
+      if (shownDrawer().id === 'drawer') closeDrawer(); else closeBib();
+    } else if (viewHist.length) {
+      const v = viewHist.pop(), a = document.querySelector('.nav a[data-view="' + v + '"]');
+      viewRestoring = true;
+      try { if (a) a.click(); } finally { viewRestoring = false; }
+      if (currentView !== v) viewHist.push(v); // 저장 안 한 내용이 있어 못 옮겼으면 다시 넣는다
+    }
+    setTimeout(admSyncBack, 0);
+  });
+  try {
+    const mo = new MutationObserver(() => admSyncBack());
+    $$('.modal, #drawer, #bdrawer').forEach((el) => mo.observe(el, { attributes: true, attributeFilter: ['class'] }));
+  } catch (e) {}
+
   // ───── 화면 전환 (기사 정보관리 / 업무스케줄) ─────
   let currentView = 'drivers';
   let driversLoaded = false;
   function switchView(v) {
+    if (v !== currentView && !viewRestoring) { viewHist.push(currentView); if (viewHist.length > 30) viewHist.shift(); }
     currentView = v;
+    setTimeout(admSyncBack, 0);
     $$('.nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === v));
     $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
     $('#view-memo').classList.toggle('hidden', v !== 'memo');

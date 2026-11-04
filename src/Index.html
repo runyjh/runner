@@ -291,6 +291,10 @@
     color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; opacity: 0; transition: .2s; pointer-events: none;
     max-width: calc(100% - 32px); text-align: center; z-index: 50; }
   .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .busy { position: fixed; inset: 0; z-index: 70; display: none; cursor: progress; background: transparent; align-items: center; justify-content: center; }
+  .busy.on { display: flex; }
+  .busy .spin { opacity: 0; transition: opacity .15s; }
+  .busy.spin-on { background: rgba(245,246,248,.35); } .busy.spin-on .spin { opacity: 1; }
   .loading { position: fixed; inset: 0; background: rgba(245,246,248,.7); display: none; align-items: center; justify-content: center;
     flex-direction: column; gap: 12px; z-index: 40; color: var(--sub); font-size: 14px; }
   .loading.on { display: flex; }
@@ -678,6 +682,7 @@
   </section>
 </div>
 
+<div class="busy" id="busy" aria-hidden="true"><div class="spin"></div></div>
 <div class="loading" id="loading"><div class="spin"></div><div id="loadingText">처리 중…</div></div>
 <div class="toast" id="toast"></div>
 <div class="layer" id="postLayer"><div class="box"><div class="head">주소 검색<button type="button" id="postClose" aria-label="닫기">×</button></div><div id="postcodeWrap"></div></div></div>
@@ -706,7 +711,20 @@
       try { return JSON.parse(t); } catch (e) { throw new Error('BAD_RESPONSE'); } // 구글이 바쁠 때 오는 오류 화면 등
     }).finally(() => clearTimeout(timer));
   }
-  const api = (fn, ...args) => gsCall(fn, args);
+  // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
+  const API_BG = ['api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  let apiBusy = 0, busyTimer = 0;
+  function busy(on) {
+    apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
+    const el = document.getElementById('busy'); if (!el) return;
+    if (apiBusy) { el.classList.add('on'); clearTimeout(busyTimer); busyTimer = setTimeout(() => { if (apiBusy) el.classList.add('spin-on'); }, 300); }
+    else { clearTimeout(busyTimer); el.classList.remove('on', 'spin-on'); }
+  }
+  const api = (fn, ...args) => {
+    if (API_BG.includes(fn)) return gsCall(fn, args);
+    busy(true);
+    return gsCall(fn, args).finally(() => busy(false));
+  };
 
   // ───── 저장소 (자동 로그인 = localStorage, 아니면 sessionStorage) ─────
   // 브라우저가 저장소를 막아도(시크릿 창, 제3자 데이터 차단 등) 이번 화면에서는 로그인이 유지되도록 메모리에도 보관
@@ -721,10 +739,46 @@
   };
 
   // ───── 화면 전환 / 알림 ─────
+  let curView = 'splash';
   function show(name) {
     $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + name));
     window.scrollTo(0, 0);
+    curView = name;
+    syncBack();
   }
+  // ───── 휴대폰 뒤로가기 = 이전 화면 (홈·로그인 화면에서만 앱 종료) ─────
+  const BASE_VIEWS = ['home', 'login', 'splash', 'pending'];
+  const BACK_BTN = {
+    signup: '#v-signup .back', reset: '#v-reset .back', notice: '#ntBack', sched: '#scBack', changepw: '#cpBack', pumasi: '#pmBack', pmdetail: '#pdBack',
+    pmform: '#pfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack'
+  };
+  const OVERLAYS = ['#pmAsk', '#instHelp', '#ntPop'];
+  let backGuard = false, backSkip = false;
+  const overlayOpen = () => OVERLAYS.find((sel) => { const el = document.querySelector(sel); return el && !el.classList.contains('hidden'); }) || (document.getElementById('postLayer') && document.getElementById('postLayer').classList.contains('on') ? '#postLayer' : '');
+  function syncBack() {
+    const need = !BASE_VIEWS.includes(curView) || !!overlayOpen();
+    if (need && !backGuard) { try { history.pushState({ runner: 1 }, ''); backGuard = true; } catch (e) {} }
+    else if (!need && backGuard) { backGuard = false; backSkip = true; try { history.back(); } catch (e) { backSkip = false; } }
+  }
+  window.addEventListener('popstate', () => {
+    if (backSkip) { backSkip = false; return; }
+    backGuard = false;
+    const ov = overlayOpen();
+    if (ov === '#pmAsk') document.getElementById('pmAskNo').click();
+    else if (ov === '#ntPop') document.getElementById('ntPopOk').click();
+    else if (ov === '#postLayer') document.getElementById('postLayer').classList.remove('on');
+    else if (ov) document.querySelector(ov).classList.add('hidden');
+    else {
+      const btn = BACK_BTN[curView] ? document.querySelector(BACK_BTN[curView]) : null;
+      if (btn && btn.style.visibility !== 'hidden') btn.click();
+    }
+    setTimeout(syncBack, 0);
+  });
+  // 팝업이 열리고 닫힐 때도 뒤로가기 자리를 맞춘다
+  try {
+    const mo = new MutationObserver(() => syncBack());
+    setTimeout(() => OVERLAYS.concat(['#postLayer']).forEach((sel) => { const el = document.querySelector(sel); if (el) mo.observe(el, { attributes: true, attributeFilter: ['class'] }); }), 0);
+  } catch (e) {}
   let toastTimer;
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('on');
