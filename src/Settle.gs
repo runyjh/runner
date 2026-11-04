@@ -1088,12 +1088,20 @@ function stlCompute_(month) {
 
   // 확인 필요
   const warnings = [];
+  // 쿠팡 ID 뒤에 (이름): 아이디 관리의 명의자 → 없으면 기사 정보의 쿠팡플렉스 아이디로 찾은 기사
+  const cidNm = function (cid) {
+    const c = str_(cid);
+    if (!c || /[가-힣]/.test(c)) return c;
+    const k = stlLogin_(c), x = X.by[k], d = D.byLogin[k];
+    const nm = x && x.ownerName ? x.ownerName : d ? d.name : '';
+    return c + ' (' + (nm || '이름 미확인') + ')';
+  };
   const W = function (key, label, list, level) { if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, 50), level: level || 'warn' }); };
   W('unreg', '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
-    Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return u.cid + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad');
-  W('noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정)', drivers.filter(function (d) { return !d.ownerId; }).map(function (d) { return d.cids.join(', ') + ' · ' + won_(d.sales) + '원'; }), 'bad');
-  W('badSub', '서브인데 메인 아이디를 찾을 수 없음 (따로 정산됨)', X.badSub);
-  W('stopped', '중지된 아이디에 배송 기록', Object.keys(warn.stopped), 'info');
+    Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return cidNm(u.cid) + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad');
+  W('noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정)', drivers.filter(function (d) { return !d.ownerId; }).map(function (d) { return d.cids.map(cidNm).join(', ') + ' · ' + won_(d.sales) + '원'; }), 'bad');
+  W('badSub', '서브인데 메인 아이디를 찾을 수 없음 (따로 정산됨)', X.badSub.map(cidNm));
+  W('stopped', '중지된 아이디에 배송 기록', Object.keys(warn.stopped).map(cidNm), 'info');
   W('noCamp', '노선관리에 없는 캠프', Object.keys(warn.noCamp), 'bad');
   W('noPrice', '단가 미입력 (노선관리 → 구분별 단가)', Object.keys(warn.noPrice).map(function (k) {
     const w = warn.noPrice[k]; return w.camp + ' ' + w.route + (w.type ? ' · ' + w.type + '단가' : '') + ' · ' + won_(w.qty) + '건' + (w.routeKnown ? '' : ' (노선 미등록)');
@@ -1103,7 +1111,7 @@ function stlCompute_(month) {
   W('noAcc', '계좌 미입력', drivers.filter(function (d) { return d.net > 0 && !d.hasAccount; }).map(function (d) { return d.name; }));
   W('noBiz', '사업자번호 미입력', drivers.filter(function (d) { return d.invoice > 0 && !d.bizNo && d.mode !== '용차내역'; }).map(function (d) { return d.name; }), 'info');
   W('minus', '실입금 마이너스', drivers.filter(function (d) { return d.net < 0; }).map(function (d) { return d.name + ' ' + won_(d.net); }), 'bad');
-  W('round', '이번 차수 변동 ID', rounds.changed.map(function (x) { return x.cid + ' ' + (x.diff > 0 ? '+' : '') + won_(x.diff); }), 'info');
+  W('round', '이번 차수 변동 ID', rounds.changed.map(function (x) { return cidNm(x.cid) + ' ' + (x.diff > 0 ? '+' : '') + won_(x.diff); }), 'info');
   W('yong', '용차내역 방식인데 이 달 용차 기록 없음', drivers.filter(function (d) { return d.mode === '용차내역' && !S[d.id].yongLines.length && S[d.id].qty; }).map(function (d) { return d.name + ' ' + won_(S[d.id].qty) + '건'; }));
   const today = todayText_();
   W('adv', '가불금 미상계 (상계일 지남)', Object.keys(adv).filter(function (id) { return adv[id].overdue > 0; }).map(function (id) { return adv[id].name + ' ' + won_(adv[id].overdue) + '원'; }));
