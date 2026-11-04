@@ -532,7 +532,7 @@
         </div>
         <div class="row">
           <div class="field"><label class="lb" for="pfCamp">센터(캠프)<span class="req">*</span></label><select id="pfCamp"></select></div>
-          <div class="field"><label class="lb" for="pfRoute">라우트</label><input type="text" id="pfRoute" list="pfRouteDL" placeholder="예: 527B" autocomplete="off"><datalist id="pfRouteDL"></datalist></div>
+          <div class="field"><label class="lb" for="pfRouteSel">라우트</label><select id="pfRouteSel"></select><input type="text" id="pfRoute" class="hidden" placeholder="라우트 직접 입력 (예: 527B)" autocomplete="off" style="margin-top:6px"></div>
         </div>
         <div class="field"><label class="lb" for="pfArea">배송지<span class="req">*</span></label><input type="text" id="pfArea" placeholder="예: 강서구 화곡동" maxlength="40"></div>
         <div class="row">
@@ -1301,7 +1301,7 @@
     $('#pfDate').value = v.date || ''; $('#pfDate').min = raw ? '' : f.today;
     $('#pfTime').value = v.time || ''; $('#pfArea').value = v.area || ''; $('#pfQty').value = v.qty || '';
     $('#pfCamp').value = v.campId || f.myCampId || ''; pmRoutes();
-    $('#pfRoute').value = raw ? (v.route || '') : (f.myRoute || '');
+    pmSetRoute(raw ? (v.route || '') : (f.myRoute || ''));
     $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || '당일지급'; $('#pfPrice').value = v.price || '';
     $('#pfDesc').value = raw ? (v.desc || '') : f.descTemplate; $('#pfSecret').value = raw ? (v.secret || '') : f.secretTemplate;
     pmAttach = null; pmRemoveAttach = false; $('#pfFile').value = ''; $('#pfPrev').classList.add('hidden'); $('#pfFileHint').textContent = raw ? '바꾸지 않음' : '없음';
@@ -1311,7 +1311,19 @@
   function pmSetKind(k) { $$('#pfKind button').forEach((b) => b.classList.toggle('on', b.dataset.k === k)); }
   function pmRoutes() {
     const c = (pmFormData ? pmFormData.camps : []).find((x) => x.id === $('#pfCamp').value);
-    $('#pfRouteDL').innerHTML = c ? c.routes.map((r) => '<option value="' + escH(r) + '">').join('') : '';
+    const cur = $('#pfRoute').value.trim();
+    $('#pfRouteSel').innerHTML = !c ? '<option value="">센터를 먼저 고르세요</option>'
+      : '<option value="">선택 안 함</option>' + c.routes.map((r) => '<option value="' + escH(r) + '">' + escH(r) + '</option>').join('') + '<option value="__other">직접 입력…</option>';
+    pmSetRoute(cur);
+  }
+  /** 라우트 값 → 러너 노선 목록에 있으면 그 줄 선택, 없으면 '직접 입력' 칸에 */
+  function pmSetRoute(val) {
+    val = String(val || '').trim().toUpperCase();
+    const sel = $('#pfRouteSel'), has = val && Array.from(sel.options).some((o) => o.value === val && o.value !== '__other');
+    const other = !!val && !has && Array.from(sel.options).some((o) => o.value === '__other');
+    sel.value = has ? val : other ? '__other' : '';
+    $('#pfRoute').value = has || other ? val : '';
+    $('#pfRoute').classList.toggle('hidden', !other);
   }
   let pmPriceSeq = 0;
   function pmSuggestPrice() {
@@ -1339,8 +1351,14 @@
     show('pumasi'); loadPmList();
   });
   $('#pfKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) pmSetKind(b.dataset.k); });
-  $('#pfCamp').addEventListener('change', () => { pmRoutes(); pmSuggestPrice(); });
+  $('#pfCamp').addEventListener('change', () => { $('#pfRoute').value = ''; $('#pfPrice').value = ''; $('#pfPriceHint').textContent = ''; pmRoutes(); });
   $('#pfRoute').addEventListener('change', pmSuggestPrice);
+  $('#pfRouteSel').addEventListener('change', () => {
+    const v = $('#pfRouteSel').value, other = v === '__other';
+    $('#pfRoute').classList.toggle('hidden', !other);
+    $('#pfRoute').value = other ? '' : v;
+    if (other) $('#pfRoute').focus(); else pmSuggestPrice();
+  });
   $('#pfFile').addEventListener('change', () => {
     const file = $('#pfFile').files && $('#pfFile').files[0]; if (!file) return;
     if (!/^image\//.test(file.type)) { toast('이미지 파일만 올릴 수 있습니다.'); $('#pfFile').value = ''; return; }
