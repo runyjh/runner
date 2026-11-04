@@ -27,6 +27,8 @@ self.addEventListener('push', (e) => {
     const front = list.find((c) => c.visibilityState === 'visible' && c.focused);
     list.forEach((c) => c.postMessage({ type: 'pm-push', jobId: jobId }));
     if (front) return; // 앱 화면에서 바로 보여 줌
+    // 아이콘 숫자: 알림 창에 쌓인 러너 알림 수 (앱을 열면 안 읽은 알림 수로 다시 맞춤)
+    try { if (self.navigator && self.navigator.setAppBadge) self.registration.getNotifications().then((l) => self.navigator.setAppBadge(l.length + 1)).catch(() => {}); } catch (err) { /* 무시 */ }
     return self.registration.showNotification(title, {
       body: body, tag: 'pm-' + (jobId || Date.now()), renotify: true, data: { jobId: jobId },
       icon: 'icons/icon-192.png', badge: 'icons/favicon-48.png', vibrate: [120, 60, 120]
@@ -35,6 +37,7 @@ self.addEventListener('push', (e) => {
 });
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
+  try { if (self.navigator && self.navigator.clearAppBadge) self.registration.getNotifications().then((l) => (l.length ? self.navigator.setAppBadge(l.length) : self.navigator.clearAppBadge())).catch(() => {}); } catch (err) { /* 무시 */ }
   const jobId = (e.notification.data || {}).jobId || '';
   const url = new URL(jobId ? './?pm=' + encodeURIComponent(jobId) : './', self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
