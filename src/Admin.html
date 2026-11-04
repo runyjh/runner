@@ -3833,11 +3833,20 @@
       x.keys.map((k) => (SD.drivers.find((d) => d.id === k) || {}).name || k).join('·'))).join('<br>')));
     SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).forEach((c) => {
       const s = shortCamp(c.name);
+      if (s === '품앗이') return; // 품앗이 줄은 아래에서 따로 (품앗이로 받은 라우트)
       if (!campOk(s) || !scalc.roster[s]) return;
       const vals = scalc.roster[s].map((l) => l.map(esc).join('<br>'));
       if (!vals.some(Boolean) && sf.camp === '') { /* 비어 있는 캠프도 줄은 보여준다 (운영시트와 같게) */ }
       html += line('bk', esc(s), '백업 명단 (자동)', vals);
     });
+    // 품앗이: 품앗이 줄(대신 뛰는 기사)의 그날 라우트 + 이름 (예: 강서1 529A 계동희)
+    const pmCamp = SD.camps.some((c) => shortCamp(c.name) === '품앗이');
+    if ((SD.pmRows || []).length || pmCamp) {
+      const campShort = sf.camp ? shortCamp((SD.camps.find((c) => c.id === sf.camp) || {}).name).replace(/\s/g, '') : '';
+      const vals = dates.map((dt) => (SD.pmRows || []).flatMap((p) => String(sget(p.id, dt) || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
+        .filter((x) => !campShort || x.replace(/\s/g, '').includes(campShort)).map((x) => esc(x + ' ' + p.name))).join('<br>'));
+      html += line('bk', '품앗이', '품앗이로 받은 라우트', vals);
+    }
     $('#sCalc').innerHTML = html;
   }
   function refreshAfterChange(changedRows) {
