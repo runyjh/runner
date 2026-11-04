@@ -52,9 +52,7 @@ const D = {
   carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
   schCampId: '소속캠프ID', schCamp: '소속캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무',
   workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서',
-  // 정산관리 (Settle.gs) — 서브 쿠팡 ID 줄은 '정산 대상 기사ID'에 메인 기사를 넣으면 한 기사로 합쳐 정산
-  stlOwner: '정산 대상 기사ID', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
-  tmpPrice: '기사 일시단가', tmpRoutes: '기사 일시단가 노선', tmpFrom: '기사 일시단가 시작일', tmpTo: '기사 일시단가 종료일',
+  // 정산관리: 명의자 세금계산서 정보 (정산 기준인 쿠팡 아이디·단가 구분·일시단가는 정산 DB 의 아이디 관리·일시단가 탭)
   bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
   docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증',
@@ -69,7 +67,7 @@ const D = {
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
-  'stlOwner', 'stlMode', 'insEx', 'fbCut', 'tmpPrice', 'tmpRoutes', 'tmpFrom', 'tmpTo', 'bizNo', 'bizName', 'bizEmail'];
+  'bizNo', 'bizName', 'bizEmail'];
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
@@ -243,18 +241,15 @@ const CAD_MAX = 10;
 const RP = {
   id: '단가ID', campId: '캠프ID', campName: '캠프명', num: '숫자(구분1)', level: '구분', value: '글자',
   p1: '원청단가', p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가',
-  tmp: '일시단가', tmpStart: '일시단가 시작일', tmpEnd: '일시단가 종료일',
   createdAt: '등록일시', updatedAt: '수정일시'
 };
-const RP_PRICE_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5', 'tmp'];
+const RP_PRICE_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5']; // 일시단가는 정산관리(기사 + 기간)로 옮김
 const RP_NOTES = {
   campName: '캠프명을 입력하면 캠프ID가 자동으로 채워집니다.',
   num: '노선코드 앞 숫자. 예: 110ABCD 이면 110',
   level: '구분2 / 구분3 / 구분4 / 구분5 (2 처럼 숫자만 써도 됨)',
   value: '그 구분 자리의 글자. 예: 110ABCD 의 구분3 은 B',
   p1: '숫자만 (원). 1,200 처럼 써도 됩니다.',
-  tmp: '정해진 기간에만 쓰는 단가. 시작일·종료일을 같이 입력하세요.',
-  tmpStart: '2026-11-01 형식'
 };
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
@@ -3809,7 +3804,7 @@ function normMoney_(v) {
 function priceView_(o) {
   const v = {
     id: o.id, campId: o.campId, num: normCode_(o.num), level: normLevel_(o.level), value: normCode_(o.value),
-    tmpStart: o.tmpStart, tmpEnd: o.tmpEnd, updatedAt: o.updatedAt
+    updatedAt: o.updatedAt
   };
   RP_PRICE_KEYS.forEach(function (k) { const m = normMoney_(o[k]); v[k] = m === null ? o[k] : m; });
   return v;
@@ -3817,7 +3812,7 @@ function priceView_(o) {
 
 /**
  * 캠프의 구분별 단가를 한 번에 저장.
- * rows = [{ num, level, value, p1..p5, tmp, tmpStart, tmpEnd, seen }] — 보낸 줄만 바뀐다. 단가를 모두 비우면 그 줄은 지운다.
+ * rows = [{ num, level, value, p1..p5, seen }] — 보낸 줄만 바뀐다. 단가를 모두 비우면 그 줄은 지운다.
  */
 function adm_priceSave(token, campId, rows) {
   return run_(function () {
@@ -3836,12 +3831,6 @@ function adm_priceSave(token, campId, rows) {
         if (m === null) fail_(name + ' ' + RP[k] + ': 숫자만 입력해 주세요.');
         x[k] = m;
       });
-      x.tmpStart = r.tmpStart ? normDate_(r.tmpStart) : '';
-      x.tmpEnd = r.tmpEnd ? normDate_(r.tmpEnd) : '';
-      if ((r.tmpStart && !x.tmpStart) || (r.tmpEnd && !x.tmpEnd)) fail_(name + ' 일시단가 기간의 날짜 형식을 확인해 주세요.');
-      if (x.tmp && (!x.tmpStart || !x.tmpEnd)) fail_(name + ' 일시단가는 시작일과 종료일을 같이 입력해 주세요.');
-      if (x.tmpStart && x.tmpEnd && x.tmpStart > x.tmpEnd) fail_(name + ' 일시단가 종료일이 시작일보다 빠릅니다.');
-      if (!x.tmp && (x.tmpStart || x.tmpEnd)) fail_(name + ' 일시단가 금액을 입력하거나 기간을 지워 주세요.');
       x.empty = RP_PRICE_KEYS.every(function (k) { return !x[k]; });
       return x;
     });
@@ -3869,7 +3858,7 @@ function adm_priceSave(token, campId, rows) {
       clean.forEach(function (x) {
         const o = have[x.key];
         if (x.empty) { if (o) { del.push(o._row); changed++; } return; }
-        const f = { num: x.num, level: '구분' + x.level, value: x.value, tmpStart: x.tmpStart, tmpEnd: x.tmpEnd };
+        const f = { num: x.num, level: '구분' + x.level, value: x.value };
         RP_PRICE_KEYS.forEach(function (k) { f[k] = x[k]; });
         if (!o) {
           add.push(Object.assign({ id: newRid_('P'), campId: camp.id, campName: camp.name, createdAt: now, updatedAt: now }, f));
@@ -3915,16 +3904,10 @@ function fixPriceRow_(sh, c, o) {
     if (m === null) notes[k] = '숫자만 입력해 주세요.';
     else if (m !== o[k]) upd[k] = m;
   });
-  ['tmpStart', 'tmpEnd'].forEach(function (k) {
-    if (!o[k]) return;
-    const d = normDate_(o[k]);
-    if (d) { if (d !== o[k]) upd[k] = d; } else notes[k] = '날짜 형식을 확인해 주세요. (예: 2026-11-01)';
-  });
-  if (o.tmp && (!o.tmpStart || !o.tmpEnd)) notes.tmp = '일시단가는 시작일과 종료일을 같이 입력해 주세요.';
   upd.updatedAt = now;
   putCells_(sh, c, o._row, upd);
   putNote_(sh, c, o._row, 'campName', camp.err || '');
-  ['num', 'level', 'value', 'tmpStart', 'tmpEnd'].concat(RP_PRICE_KEYS).forEach(function (k) { putNote_(sh, c, o._row, k, notes[k] || ''); });
+  ['num', 'level', 'value'].concat(RP_PRICE_KEYS).forEach(function (k) { putNote_(sh, c, o._row, k, notes[k] || ''); });
 }
 
 // ───────────────────────── 관리자 : 스케줄관리 (배차) ─────────────────────────

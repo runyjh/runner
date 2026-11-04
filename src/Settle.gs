@@ -27,25 +27,37 @@ const STL_TABS = {
     month: '정산월', round: '차수', file: '파일명', url: '파일 링크', at: '불러온 시각', cid: '쿠팡ID',
     amt: '쿠팡 금액', prev: '직전 차수 금액', diff: '변동액', memo: '변경사유'
   },
-  stl_adjust: { month: '정산월', name: '기사명', driverId: '기사ID', item: '항목', amt: '금액', memo: '메모' },
-  stl_advance: { name: '기사명', driverId: '기사ID', date: '지급일', amt: '가불금', due: '상계 예정일', paid: '상환금', memo: '메모' },
-  stl_yongcha: {
-    date: '날짜', who: '수행자', whoId: '수행자 기사ID', route: '라우트', mode: '지급구분', price: '단가/금액', qty: '건수',
-    payer: '차액부담 기사', payerId: '차액부담 기사ID', payerPrice: '부담 기준단가', memo: '메모'
+  // 정산의 기준 = 쿠팡 아이디. 메인 아이디 + 서브 아이디 = 정산 묶음 하나, 정산금은 메인 아이디 명의자에게
+  stl_ids: {
+    cid: '쿠팡ID', role: '구분', main: '메인 아이디', owner: '명의자', ownerId: '명의자 기사ID', type: '단가 구분',
+    mode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감', status: '상태', memo: '메모'
   },
-  stl_regular: { name: '기사명', driverId: '기사ID', item: '항목', amt: '월 금액', from: '시작월', to: '종료월', memo: '메모' },
-  stl_target: { name: '기사명', driverId: '기사ID', item: '항목', goal: '연 목표 계산서', unit: '단위' },
-  stl_split: { from: '원 기사', fromId: '원 기사ID', to: '받는 기사', toId: '받는 기사ID', target: '목표 실수령', unit: '단위', repeat: '매달 반복', month: '적용월' },
-  stl_leave: { name: '기사명', driverId: '기사ID', month: '퇴사월', amt: '보류금' },
+  // 한 아이디로 여러 기사가 일할 때: 그 기간 그 아이디로 일한 기사 (지급은 명의자, 일시단가·근무일 판단에 씀)
+  stl_usage: { cid: '쿠팡ID', name: '일한 기사', driverId: '기사ID', from: '시작일', to: '종료일', memo: '메모' },
+  // 기사 일시단가: 그 기사가 일한 날(아이디 사용 기록 기준)의 배송에만 적용
+  stl_tmp: { name: '기사', driverId: '기사ID', from: '시작일', to: '종료일', price: '일시단가', routes: '적용 노선', memo: '메모' },
+  stl_adjust: { month: '정산월', name: '명의자', acct: '정산 아이디', item: '항목', amt: '금액', memo: '메모' },
+  stl_advance: { name: '명의자', acct: '정산 아이디', date: '지급일', amt: '가불금', due: '상계 예정일', paid: '상환금', memo: '메모' },
+  stl_yongcha: {
+    date: '날짜', who: '수행자', whoId: '수행 정산 아이디', route: '라우트', mode: '지급구분', price: '단가/금액', qty: '건수',
+    payer: '차액부담', payerId: '차액부담 정산 아이디', payerPrice: '부담 기준단가', memo: '메모'
+  },
+  stl_regular: { name: '명의자', acct: '정산 아이디', item: '항목', amt: '월 금액', from: '시작월', to: '종료월', memo: '메모' },
+  stl_target: { name: '명의자', acct: '정산 아이디', item: '항목', goal: '연 목표 계산서', unit: '단위' },
+  stl_split: { from: '원 명의자', fromId: '원 정산 아이디', to: '받는 명의자', toId: '받는 정산 아이디', target: '목표 실수령', unit: '단위', repeat: '매달 반복', month: '적용월' },
+  stl_leave: { name: '명의자', acct: '정산 아이디', month: '퇴사월', amt: '보류금' },
   stl_items: { order: '순서', side: '구분', name: '항목 이름', method: '계산 방식', show: '표시', taxCut: '계산서에서 빼기', desc: '설명' },
   stl_camps: { camp: '캠프명', expense: '경비공제율', san: '산재율', goy: '고용율', runner: '러너부담률' },
   stl_kinds: { raw: '쿠팡 구분 값', std: '표준 분류' },
   stl_config: { label: '항목', value: '값', desc: '설명' },
-  stl_pay: { month: '정산월', driverId: '기사ID', name: '기사명', checked: '입금체크', date: '입금일', memo: '메모' },
+  stl_pay: { month: '정산월', acct: '정산 아이디', name: '명의자', checked: '입금체크', date: '입금일', memo: '메모' },
   stl_close: { month: '정산월', at: '마감일시', admin: '관리자' },
-  stl_closed: { month: '정산월', driverId: '기사ID', data: '결과(자동)' }
+  stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' }
 };
 const STL_TAB_NOTES = {
+  stl_ids: '정산의 기준. 쿠팡 아이디 한 줄 = 하나. 구분: 메인 / 서브(메인 아이디 칸에 메인 쿠팡ID). 명의자 = 정산금·세금계산서를 받는 기사(이름). 단가 구분: 고정 / 백업 / 품앗이 / 외부용차. 정산 방식: 비우면 구분별 단가 / 원청단가 / 용차내역. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
+  stl_usage: '한 아이디로 여러 기사가 일할 때, 그 아이디로 일한 기사와 기간. 비우면 명의자가 일한 것으로 봅니다. 정산금은 항상 명의자에게 갑니다.',
+  stl_tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.',
   stl_raw: '쿠팡 정산 엑셀을 [정산관리 → 쿠팡 정산서 올리기]로 넣으면 자동으로 채워집니다. 한 정산월에는 마지막으로 올린 차수만 남습니다.',
   stl_adjust: '기사별 월 추가지급·차감. 항목은 stl_items 의 "항목 이름". 금액은 차감도 양수로.',
   stl_advance: '가불금 원장. 상환하면 상환금 칸에 금액. 그 달 정산에서 빼려면 stl_adjust 에 "가불금 상환" 줄을 넣으세요.',
@@ -108,7 +120,10 @@ const STL_CFG = [
   ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일']
 ];
 
-const STL_DRIVER_FIELDS = ['stlOwner', 'stlMode', 'insEx', 'fbCut', 'tmpPrice', 'tmpRoutes', 'tmpFrom', 'tmpTo', 'bizNo', 'bizName', 'bizEmail'];
+const STL_DRIVER_FIELDS = ['bizNo', 'bizName', 'bizEmail']; // 기사(사람) 정보: 명의자의 세금계산서용
+const STL_ROLES = ['메인', '서브'];
+const STL_ID_STATUS = ['사용', '중지'];
+const STL_TYPES = ['고정', '백업', '품앗이', '외부용차'];
 const STL_MODES = ['', '원청단가', '용차내역'];
 const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외부용차': 'p5' };
 
@@ -118,7 +133,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
-const STL_SMALL = ['stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
+const STL_SMALL = ['stl_ids', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
   if (_stlSS) return _stlSS;
   const id = props_().STL_DB_ID;
@@ -588,35 +603,129 @@ function stlDrivers_() {
     (byName[o.name] = byName[o.name] || []).push(o);
     if (o.loginId) byLogin[stlLogin_(o.loginId)] = o;
   });
-  const ownerOf = function (o) {
-    const t = str_(o.stlOwner);
-    if (!t || t === o.id) return o;
-    if (byId[t]) return byId[t];
-    const n = (byName[t] || []).filter(function (x) { return x.id !== o.id; });
-    return n.length === 1 ? n[0] : o;
-  };
-  const owners = {};
-  all.forEach(function (o) {
-    const w = ownerOf(o);
-    o._owner = w.id;
-    const g = owners[w.id] || (owners[w.id] = { id: w.id, members: [] });
-    g.members.push(o.id);
-  });
-  return { all: all, byId: byId, byLogin: byLogin, owners: owners, ownerOf: ownerOf, byName: byName };
+  return { all: all, byId: byId, byLogin: byLogin, byName: byName };
 }
-/** 이름(또는 기사ID) → 정산 대상 기사ID. 못 찾으면 '' */
-function stlResolve_(D, name, id) {
-  if (id && D.byId[id]) return D.byId[id]._owner;
+/** 이름 · 기사ID · "이름 (아이디)" → 기사(사람) ID. 못 찾으면 '' */
+function stlPerson_(D, name, id) {
+  if (id && D.byId[id]) return id;
   const n = str_(name);
   if (!n) return '';
-  if (D.byId[n]) return D.byId[n]._owner;
-  const m = n.match(/\(([^)]+)\)\s*$/); // "이름 (아이디)"
-  if (m && D.byLogin[stlLogin_(m[1])]) return D.byLogin[stlLogin_(m[1])]._owner;
+  if (D.byId[n]) return n;
+  const m = n.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  if (m) {
+    const lg = D.byLogin[stlLogin_(m[2])];
+    if (lg) return lg.id;
+    const nm = D.byName[m[1]] || [];
+    if (nm.length === 1) return nm[0].id;
+  }
   const list = D.byName[n] || [];
-  const owners = {};
-  list.forEach(function (o) { owners[o._owner] = 1; });
-  const ks = Object.keys(owners);
-  return ks.length === 1 ? ks[0] : '';
+  return list.length === 1 ? list[0].id : '';
+}
+/**
+ * 아이디 목록(stl_ids) → { by: {아이디키: 정보}, groups: {메인키: {cids, ownerId}} }
+ * 아이디키 = 쿠팡ID 에서 @ 뒤를 뗀 소문자. 서브 아이디는 '메인 아이디'의 묶음으로 들어간다.
+ * stl_ids 가 비어 있으면 기사 정보(쿠팡플렉스 아이디)로 처음 한 번 채운다.
+ */
+function stlIds_(D) {
+  let rows = stlRead_('stl_ids');
+  if (!rows.length && D.all.some(function (o) { return o.loginId; })) { stlSeedIds_(D); rows = stlRead_('stl_ids'); }
+  const by = {}, groups = {};
+  rows.forEach(function (r) {
+    const k = stlLogin_(r.cid);
+    if (!k || by[k]) return;
+    const ownerId = stlPerson_(D, r.owner, r.ownerId);
+    by[k] = {
+      key: k, cid: r.cid, role: r.role === '서브' ? '서브' : '메인', mainRaw: r.main, ownerId: ownerId, ownerName: ownerId ? D.byId[ownerId].name : r.owner,
+      type: STL_TYPES.indexOf(r.type) >= 0 ? r.type : '', mode: STL_MODES.indexOf(r.mode) >= 0 ? r.mode : '', insEx: stlYes_(r.insEx), fbCut: r.fbCut,
+      stopped: r.status === '중지', _row: r._row
+    };
+  });
+  const bad = [];
+  Object.keys(by).forEach(function (k) {
+    const x = by[k];
+    let m = x.role === '서브' ? stlLogin_(x.mainRaw) : k;
+    if (x.role === '서브' && (!by[m] || by[m].role === '서브' || m === k)) { bad.push(x.cid); m = k; }
+    x.mainKey = m;
+  });
+  Object.keys(by).forEach(function (k) {
+    const x = by[k], g = groups[x.mainKey] || (groups[x.mainKey] = { key: x.mainKey, cids: [], main: by[x.mainKey] });
+    g.cids.push(x.cid);
+  });
+  Object.keys(groups).forEach(function (k) { const g = groups[k]; g.cid = g.main.cid; g.ownerId = g.main.ownerId; });
+  return { by: by, groups: groups, badSub: bad };
+}
+function stlSeedIds_(D) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (stlRead_('stl_ids').length) return;
+    const rows = [], tmp = [], old = stlLegacyDrv_();
+    D.all.forEach(function (o0) {
+      const o = Object.assign({}, o0, old[o0.id] || {});
+      if (!o.loginId) return;
+      // 예전 방식(기사 정보의 '정산 대상 기사ID')을 아이디 기준으로 옮긴다
+      const ow = o.stlOwner && D.byId[o.stlOwner] && D.byId[o.stlOwner].id !== o.id ? D.byId[o.stlOwner] : null;
+      rows.push({
+        cid: o.loginId, role: ow ? '서브' : '메인', main: ow ? ow.loginId : '', owner: (ow || o).name, ownerId: (ow || o).id,
+        type: STL_TYPES.indexOf(o.driverType) >= 0 ? o.driverType : '', mode: STL_MODES.indexOf(o.stlMode) >= 0 ? o.stlMode : '',
+        insEx: stlYes_(o.insEx) ? 'Y' : '', fbCut: ow ? '' : (o.fbCut || ''), status: o.status === ST.ACTIVE ? '사용' : '중지', memo: '기사 정보에서 자동 생성'
+      });
+      if (stlNum_(o.tmpPrice) > 0) tmp.push({ name: o.name, driverId: o.id, from: o.tmpFrom, to: o.tmpTo, price: o.tmpPrice, routes: o.tmpRoutes, memo: '기사 정보에서 옮김' });
+    });
+    stlWriteAll_('stl_ids', rows);
+    if (tmp.length && !stlRead_('stl_tmp').length) stlWriteAll_('stl_tmp', tmp);
+  } finally {
+    lock.releaseLock();
+  }
+}
+/** 예전 버전이 drivers 탭에 만든 정산 열(있으면)을 읽는다: 아이디 관리로 옮기기 위해 */
+function stlLegacyDrv_() {
+  const out = {};
+  try {
+    const sh = sheet_(SH.DRIVERS), last = sh.getLastRow();
+    if (last < 2) return out;
+    const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    const L = { stlOwner: '정산 대상 기사ID', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감', tmpPrice: '기사 일시단가', tmpRoutes: '기사 일시단가 노선', tmpFrom: '기사 일시단가 시작일', tmpTo: '기사 일시단가 종료일' };
+    const idc = head.indexOf(D.id), cs = {};
+    Object.keys(L).forEach(function (k) { const i = head.indexOf(L[k]); if (i >= 0) cs[k] = i; });
+    if (idc < 0 || !Object.keys(cs).length) return out;
+    sh.getRange(2, 1, last - 1, head.length).getValues().forEach(function (v) {
+      const id = str_(v[idc]);
+      if (!id) return;
+      const o = {};
+      Object.keys(cs).forEach(function (k) { o[k] = str_(v[cs[k]]); });
+      out[id] = o;
+    });
+  } catch (e) { /* 예전 열이 없으면 무시 */ }
+  return out;
+}
+/** 정산 묶음(메인 아이디) 찾기: 쿠팡ID · "명의자 (아이디)" · 명의자 이름 → 메인 아이디키. 못 찾으면 '' */
+function stlAcct_(X, D, name, acct) {
+  const a = stlLogin_(acct);
+  if (a && X.by[a]) return X.by[a].mainKey;
+  const n = str_(name);
+  if (!n) return '';
+  if (X.by[stlLogin_(n)]) return X.by[stlLogin_(n)].mainKey;
+  const m = n.match(/\(([^)]+)\)\s*$/);
+  if (m && X.by[stlLogin_(m[1])]) return X.by[stlLogin_(m[1])].mainKey;
+  const pid = stlPerson_(D, n, '');
+  if (!pid) return '';
+  const gs = Object.keys(X.groups).filter(function (k) { return X.groups[k].ownerId === pid; });
+  if (gs.length === 1) return gs[0];
+  const own = D.byId[pid].loginId ? stlLogin_(D.byId[pid].loginId) : '';
+  return gs.indexOf(own) >= 0 ? own : '';
+}
+function stlAcctLabel_(X, D, key) {
+  const g = X.groups[key];
+  if (!g) return '';
+  return (g.ownerId ? D.byId[g.ownerId].name : '명의자 없음') + ' (' + String(g.cid).replace(/@.*$/, '') + ')';
+}
+/** 그 아이디로 그 날 일한 기사 (사용 기록 → 없으면 명의자) */
+function stlWorkerOf_(ctx, key, date) {
+  const list = ctx.usage[key];
+  if (list) for (let i = 0; i < list.length; i++) if (stlInRange_(date, list[i].from, list[i].to)) return list[i].driverId;
+  const x = ctx.ids.by[key];
+  return x ? x.ownerId : '';
 }
 
 // ───────────────────────── 단가 (러너 올인원 DB 노선관리) ─────────────────────────
@@ -660,32 +769,43 @@ function stlPriceIndex_() {
   }
   return { find: find, campByShort: campByShort, campOf: campOf };
 }
-function stlInRange_(date, from, to) {
-  return (!from || date >= stlYmd_(from)) && (!to || date <= stlYmd_(to));
-}
 /**
- * 배송 한 줄의 기사 단가 (VAT포함).
- * 1) 기사 일시단가(기간·노선 맞을 때) 2) 정산 방식 용차내역 → 0 3) 원청단가 → 쿠팡 단가×1.1 (10원 반올림)
- * 4) 노선관리 구분별 단가: 일시단가(기간 안) > 기사구분별 단가(고정=기사단가, 백업, 품앗이, 외부용차=외부단가)
+ * 배송 한 줄의 기사 단가 (VAT포함). 기준은 아이디.
+ * 1) 정산 방식 용차내역 → 0 (용차 표 금액으로 지급)
+ * 2) 그 날 그 아이디로 일한 기사의 일시단가 (기간·노선이 맞을 때)
+ * 3) 원청단가 → 쿠팡 단가 × 1.1 (10원 반올림)
+ * 4) 노선관리 구분별 단가: 아이디의 단가 구분 (고정 = 기사단가, 백업 = 백업단가, 품앗이 = 품앗이단가, 외부용차 = 외부단가)
  */
-function stlUnit_(ctx, idDrv, owner, r) {
-  const mode = str_(idDrv.stlMode) || str_(owner.stlMode);
+function stlUnit_(ctx, idx, r, worker) {
+  const main = ctx.ids.by[idx.mainKey] || idx;
+  const mode = idx.mode || main.mode;
   if (mode === '용차내역') return { u: 0, how: '용차내역' };
-  const tp = stlNum_(owner.tmpPrice);
-  if (tp > 0 && stlInRange_(r.date, owner.tmpFrom, owner.tmpTo)) {
-    const list = str_(owner.tmpRoutes).toUpperCase().replace(/\s+/g, '');
-    const rt = normCode_(r.route), cr = stlShort_(r.camp) + '|' + rt;
-    if (!list || (',' + list + ',').indexOf(',' + rt + ',') >= 0 || (',' + list + ',').indexOf(',' + cr + ',') >= 0) return { u: tp, how: '일시' };
-  }
+  const t = stlTmpFor_(ctx, worker, r);
+  if (t) return { u: t, how: '일시' };
   if (mode === '원청단가') return { u: stlR10_(stlNum_(r.price) * (1 + ctx.cfg.vat)), how: '원청' };
   const f = ctx.price.find(r.camp, r.route);
-  if (!f.row) return { u: 0, missing: true, how: '' , f: f };
-  if (stlNum_(f.row.tmp) > 0 && f.row.tmpStart && f.row.tmpEnd && stlInRange_(r.date, f.row.tmpStart, f.row.tmpEnd)) return { u: stlNum_(f.row.tmp), how: '노선일시' };
-  const type = str_(idDrv.driverType) || str_(owner.driverType) || '고정';
-  const key = STL_TYPE_KEY[type] || 'p2';
-  const v = stlNum_(f.row[key]);
+  const ow = ctx.D.byId[main.ownerId];
+  const type = idx.type || main.type || (ow && STL_TYPES.indexOf(ow.driverType) >= 0 ? ow.driverType : '') || '고정';
+  if (!f.row) return { u: 0, missing: true, how: type, f: f };
+  const v = stlNum_(f.row[STL_TYPE_KEY[type] || 'p2']);
   if (!v) return { u: 0, missing: true, how: type, f: f };
   return { u: v, how: type };
+}
+/** 기사 일시단가 (stl_tmp): 그 기사·날짜·노선에 맞는 단가, 없으면 0 */
+function stlTmpFor_(ctx, driverId, r) {
+  const list = driverId ? ctx.tmp[driverId] : null;
+  if (!list) return 0;
+  const rt = normCode_(r.route), cr = stlShort_(r.camp) + '|' + rt;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const t = list[i];
+    if (!stlInRange_(r.date, t.from, t.to)) continue;
+    const rs = str_(t.routes).toUpperCase().replace(/\s+/g, '');
+    if (!rs || (',' + rs + ',').indexOf(',' + rt + ',') >= 0 || (',' + rs + ',').indexOf(',' + cr + ',') >= 0) return stlNum_(t.price);
+  }
+  return 0;
+}
+function stlInRange_(date, from, to) {
+  return (!from || date >= stlYmd_(from)) && (!to || date <= stlYmd_(to));
 }
 
 // ───────────────────────── 근무일수 (스케줄 DB) ─────────────────────────
@@ -726,19 +846,29 @@ function stlCompute_(month) {
   const P = stlPeriod_(month);
   stlLoad_(STL_SMALL);
   const cfg = stlCfg_();
-  const ctx = { cfg: cfg, price: stlPriceIndex_() };
   const kinds = stlKinds_(), items = stlItems_(), campIns = stlCampIns_(cfg);
-  const D = stlDrivers_();
+  const D = stlDrivers_(), X = stlIds_(D);
+  const ctx = { cfg: cfg, price: stlPriceIndex_(), D: D, ids: X, usage: {}, tmp: {} };
+  stlRead_('stl_usage').forEach(function (u) {
+    const k = stlLogin_(u.cid), pid = stlPerson_(D, u.name, u.driverId);
+    if (k && pid) (ctx.usage[k] = ctx.usage[k] || []).push({ driverId: pid, from: u.from, to: u.to });
+  });
+  stlRead_('stl_tmp').forEach(function (t) {
+    const pid = stlPerson_(D, t.name, t.driverId);
+    if (pid && stlNum_(t.price) > 0) (ctx.tmp[pid] = ctx.tmp[pid] || []).push(t);
+  });
   const raw = stlReadMonth_('stl_raw', month);
   const loss = stlReadMonth_('stl_loss', month);
   const sched = stlSchedule_(P.from, P.to);
-  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {} };
+  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {} };
   const S = {};
-  const sum = function (ownerId) {
-    if (S[ownerId]) return S[ownerId];
-    const o = D.byId[ownerId];
-    return (S[ownerId] = {
-      id: ownerId, name: o.name, owner: o, ids: {}, qty: 0, base: 0, inc: 0, freshRaw: 0, fresh: 0, fbCut: 0, unc: 0, etc: 0,
+  /** 정산 묶음(메인 아이디) 하나의 합계. 정산금은 메인 아이디 명의자에게 */
+  const sum = function (gkey) {
+    if (S[gkey]) return S[gkey];
+    const g = X.groups[gkey], main = g.main, o = D.byId[g.ownerId] || {};
+    return (S[gkey] = {
+      id: gkey, cid: g.cid, name: o.name || '(명의자 없음) ' + String(g.cid).replace(/@.*$/, ''), owner: o, ownerId: g.ownerId || '',
+      type: main.type, mode: main.mode, insEx: main.insEx, fbCutTxt: main.fbCut, workers: {}, ids: {}, qty: 0, base: 0, inc: 0, freshRaw: 0, fresh: 0, fbCut: 0, unc: 0, etc: 0,
       loss: 0, lossCp: 0, sales: 0, supplyCp: 0, campPay: {}, routes: {}, daily: {}, lossLines: [], yong: [], yongPay: 0, yongCut: 0, yongLines: [],
       noPriceQty: 0, rows: 0
     });
@@ -753,16 +883,18 @@ function stlCompute_(month) {
     company.sales += sales; company.supplyCp += total + fresh;
     const kind = kinds[r.kind] || '미분류';
     const login = stlLogin_(r.cid);
-    const d = D.byLogin[login];
-    if (!d) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.sales += sales; u.qty += qty; company.unregSales += sales; return; }
-    const owner = D.byId[d._owner];
-    const s = sum(owner.id);
+    const idx = X.by[login];
+    if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.sales += sales; u.qty += qty; company.unregSales += sales; return; }
+    if (idx.stopped) warn.stopped[r.cid] = 1;
+    const s = sum(idx.mainKey);
+    const worker = stlWorkerOf_(ctx, login, r.date);
     s.ids[r.cid] = 1; s.sales += sales; s.supplyCp += total + fresh; s.rows++;
     const camp = r.camp;
     if (camp && !ctx.price.campByShort[stlShort_(camp)]) warn.noCamp[camp] = 1;
     let pay = 0;
     if (kind === '배송' || kind === '수기반영') {
-      const u = stlUnit_(ctx, d, owner, r);
+      const u = stlUnit_(ctx, idx, r, worker);
+      const wk = s.workers[worker || '_'] || (s.workers[worker || '_'] = { qty: 0, amt: 0, dates: {}, cids: {} });
       if (u.missing && r.route) {
         const k = camp + '|' + r.route;
         const w = warn.noPrice[k] || (warn.noPrice[k] = { camp: camp, route: r.route, qty: 0, type: u.how, routeKnown: u.f ? u.f.routeKnown : false });
@@ -771,13 +903,14 @@ function stlCompute_(month) {
       const incU = stlHalfDown_(stlHalfDown_(stlNum_(r.inc) * (1 + cfg.vat)) * cfg.incRate);
       const base = stlR0_(qty * u.u), inc = stlR0_(qty * incU);
       s.base += base; s.inc += inc; s.qty += qty; pay = base + inc;
+      wk.qty += qty; wk.amt += pay; wk.dates[r.date] = 1; wk.cids[r.cid] = 1;
       const rk = camp + '|' + normCode_(r.route) + '|' + u.u + '|' + incU;
       const rl = s.routes[rk] || (s.routes[rk] = { camp: camp, route: normCode_(r.route), how: u.how, unit: u.u, inc: incU, qty: 0, amt: 0 });
       rl.qty += qty; rl.amt += pay;
       const dl = s.daily[r.date] || (s.daily[r.date] = { qty: 0, amt: 0 });
       dl.qty += qty; dl.amt += pay;
       const dk = r.date + '|' + login;
-      (byDateLogin[dk] = byDateLogin[dk] || []).push({ route: normCode_(r.route), qty: qty, sales: sales, unit: u.u, camp: camp });
+      (byDateLogin[dk] = byDateLogin[dk] || []).push({ route: normCode_(r.route), qty: qty, sales: sales, unit: u.u, camp: camp, cid: r.cid });
     } else if (kind === '프레시백') {
       pay = stlR0_(fresh * cfg.freshRate); s.freshRaw += fresh; s.fresh += pay;
     } else if (kind === '미계약') {
@@ -792,9 +925,9 @@ function stlCompute_(month) {
     if (pay) s.campPay[stlShort_(camp)] = (s.campPay[stlShort_(camp)] || 0) + pay;
   });
 
-  // 프레시백 차감 (기사 정보 '프레시백 차감': 13% 처럼 비율 → 100원 반올림 / 금액 → 그대로) → 러너 몫
+  // 프레시백 차감 (메인 아이디의 '프레시백 차감': 13% 처럼 비율 → 100원 반올림 / 금액 → 그대로) → 러너 몫
   Object.keys(S).forEach(function (id) {
-    const s = S[id], t = str_(s.owner.fbCut);
+    const s = S[id], t = str_(s.fbCutTxt);
     if (!t || !s.fresh) return;
     const n = stlNum_(t);
     const cut = /%$/.test(t.replace(/\s/g, '')) || (n > 0 && n < 1) ? stlR100_(s.fresh * stlRate_(t, 0)) : Math.round(n);
@@ -805,12 +938,12 @@ function stlCompute_(month) {
   loss.forEach(function (r) {
     const amt = stlNum_(r.amt);
     company.lossCp += amt;
-    const d = D.byLogin[stlLogin_(r.cid)];
-    if (!d) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.loss = (u.loss || 0) + amt; return; }
-    const s = sum(d._owner);
+    const idx = X.by[stlLogin_(r.cid)];
+    if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.loss = (u.loss || 0) + amt; return; }
+    const s = sum(idx.mainKey);
     const share = stlR10_(amt * (cfg.lossVat ? 1 + cfg.vat : 1) * cfg.lossRate);
     s.loss += share; s.lossCp += amt;
-    s.lossLines.push({ date: stlYmd_(r.date), camp: r.camp, type: r.type, detail: r.detail, item: r.item, waybill: r.waybill, amt: share });
+    s.lossLines.push({ date: stlYmd_(r.date), cid: r.cid, camp: r.camp, type: r.type, detail: r.detail, item: r.item, waybill: r.waybill, amt: share });
   });
 
   // 용차
@@ -818,13 +951,12 @@ function stlCompute_(month) {
   const yongOut = [];
   yong.forEach(function (y) {
     const date = stlYmd_(y.date), route = normCode_(y.route);
-    const whoOwner = stlResolve_(D, y.who, y.whoId);
-    const who = whoOwner ? D.byId[whoOwner] : null;
+    const whoKey = stlAcct_(X, D, y.who, y.whoId);
+    const wg = whoKey ? X.groups[whoKey] : null;
     let autoQty = 0, sales = 0, camp = '', perfUnitSum = 0, found = false;
-    if (who) {
-      D.owners[whoOwner].members.forEach(function (mid) {
-        const lg = stlLogin_(D.byId[mid].loginId);
-        (byDateLogin[date + '|' + lg] || []).forEach(function (x) {
+    if (wg) {
+      wg.cids.forEach(function (c) {
+        (byDateLogin[date + '|' + stlLogin_(c)] || []).forEach(function (x) {
           if (route && x.route !== route) return;
           found = true; autoQty += x.qty; sales += x.sales; camp = camp || x.camp; perfUnitSum += x.qty * x.unit;
         });
@@ -833,31 +965,29 @@ function stlCompute_(month) {
     const qty = stlNum_(y.qty) || autoQty;
     const isAmt = str_(y.mode) === '금액';
     const payAmt = isAmt ? stlR0_(stlNum_(y.price)) : stlR0_((stlNum_(y.price) || cfg.yongPrice) * qty);
-    const whoMode = who ? (str_(who.stlMode)) : '';
     let existing = 0;
-    if (who && whoMode !== '용차내역') {
+    if (wg && wg.main.mode !== '용차내역') {
       if (route && (camp || y.route)) {
-        const u = stlUnit_(ctx, who, who, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 });
+        const u = stlUnit_(ctx, wg.main, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 }, stlWorkerOf_(ctx, whoKey, date));
         existing = stlR0_(u.u * qty);
       } else existing = stlR0_(perfUnitSum);
     }
     const extra = payAmt - existing;
-    const payerOwner = stlResolve_(D, y.payer, y.payerId);
+    const payerOwner = stlAcct_(X, D, y.payer, y.payerId);
     let payerPrice = stlNum_(y.payerPrice), cut = 0;
     if (payerOwner && qty) {
       if (!payerPrice) {
-        const pd = D.byId[payerOwner];
-        payerPrice = stlUnit_(ctx, pd, pd, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 }).u;
+        payerPrice = stlUnit_(ctx, X.groups[payerOwner].main, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 }, stlWorkerOf_(ctx, payerOwner, date)).u;
       }
       cut = stlR0_(payAmt / qty - payerPrice) * qty;
     }
     const line = {
-      date: date, who: who ? who.name : y.who, whoId: whoOwner, route: route, mode: isAmt ? '금액' : '건당', price: y.price, qty: qty, autoQty: found ? autoQty : '',
+      date: date, who: wg ? stlAcctLabel_(X, D, whoKey) : y.who, whoId: whoKey, route: route, mode: isAmt ? '금액' : '건당', price: y.price, qty: qty, autoQty: found ? autoQty : '',
       payAmt: payAmt, sales: sales, profit: sales - payAmt, camp: camp, existing: existing, extra: extra,
-      payer: payerOwner ? D.byId[payerOwner].name : y.payer, payerId: payerOwner, payerPrice: payerPrice, cut: cut, memo: y.memo, _row: y._row
+      payer: payerOwner ? stlAcctLabel_(X, D, payerOwner) : y.payer, payerId: payerOwner, payerPrice: payerPrice, cut: cut, memo: y.memo, _row: y._row
     };
     yongOut.push(line);
-    if (who) { const s = sum(whoOwner); s.yongPay += extra; s.yongLines.push(line); }
+    if (wg) { const s = sum(whoKey); s.yongPay += extra; s.yongLines.push(line); }
     if (payerOwner && cut) { const s = sum(payerOwner); s.yongCut += cut; s.yongLines.push(line); }
   });
 
@@ -870,24 +1000,24 @@ function stlCompute_(month) {
   };
   const adjBad = [];
   stlRead_('stl_adjust').filter(function (a) { return a.month === month; }).forEach(function (a) {
-    const id = stlResolve_(D, a.name, a.driverId);
-    if (!id) { adjBad.push(a.name || a.driverId); return; }
+    const id = stlAcct_(X, D, a.name, a.acct);
+    if (!id) { adjBad.push(a.name || a.acct); return; }
     addAdj(id, a.item, stlNum_(a.amt), a.memo, false);
   });
   stlRead_('stl_regular').forEach(function (a) {
     if (a.from && month < a.from.slice(0, 7)) return;
     if (a.to && month > a.to.slice(0, 7)) return;
-    addAdj(stlResolve_(D, a.name, a.driverId), a.item, stlNum_(a.amt), '정기 (설정)', true);
+    addAdj(stlAcct_(X, D, a.name, a.acct), a.item, stlNum_(a.amt), '정기 (설정)', true);
   });
   stlRead_('stl_leave').forEach(function (a) {
-    const id = stlResolve_(D, a.name, a.driverId), m = str_(a.month).slice(0, 7), amt = stlNum_(a.amt) || cfg.leaveAmt;
+    const id = stlAcct_(X, D, a.name, a.acct), m = str_(a.month).slice(0, 7), amt = stlNum_(a.amt) || cfg.leaveAmt;
     if (!id || !stlMonthOk_(m)) return;
     if (m === month) addAdj(id, '퇴사 보류금', amt, m + ' 퇴사 보류 (자동)', true);
     if (stlAddMonth_(m, 1) === month) addAdj(id, '보류금 반환', amt, m + ' 퇴사 보류금 반환 (자동)', true);
   });
 
   // 기사별 마무리 계산
-  Object.keys(S).forEach(function (id) { S[id].sched = stlOwnerSched_(D, id, sched); });
+  Object.keys(S).forEach(function (id) { S[id].sched = stlGroupSched_(ctx, X.groups[id], sched, P); });
   const fin = function (id, extra) { return stlFinish_(S[id], (adj[id] || []).concat(extra || []), items, cfg, campIns); };
 
   // 동일인 매출 분할 → 목표 매출 자동 수당
@@ -896,7 +1026,7 @@ function stlCompute_(month) {
   stlRead_('stl_split').forEach(function (a) {
     const repeat = !a.repeat || stlYes_(a.repeat);
     if (!repeat && str_(a.month).slice(0, 7) !== month) return;
-    const from = stlResolve_(D, a.from, a.fromId), to = stlResolve_(D, a.to, a.toId);
+    const from = stlAcct_(X, D, a.from, a.fromId), to = stlAcct_(X, D, a.to, a.toId);
     const target = stlNum_(a.target), unit = stlNum_(a.unit) || 10000;
     if (!from || !to || !target || !S[from]) return;
     const netAt = function (x) { return fin(from, (extraAdj[from] || []).concat([{ item: '매출 분할 이전', amt: x, auto: true }])).net; };
@@ -909,12 +1039,12 @@ function stlCompute_(month) {
       while (netAt(x + unit) >= target && guard++ < 1000) x += unit;
     }
     if (x > 0) {
-      pushExtra(from, { item: '매출 분할 이전', amt: x, memo: '→ ' + D.byId[to].name + ' 발행분 (자동)', auto: true });
-      pushExtra(to, { item: '매출 분할 수령', amt: x, memo: '← ' + D.byId[from].name + ' 분할분 (자동)', auto: true });
+      pushExtra(from, { item: '매출 분할 이전', amt: x, memo: '→ ' + stlAcctLabel_(X, D, to) + ' 발행분 (자동)', auto: true });
+      pushExtra(to, { item: '매출 분할 수령', amt: x, memo: '← ' + stlAcctLabel_(X, D, from) + ' 분할분 (자동)', auto: true });
     }
   });
   stlRead_('stl_target').forEach(function (a) {
-    const id = stlResolve_(D, a.name, a.driverId), goal = stlNum_(a.goal), unit = stlNum_(a.unit) || 10000;
+    const id = stlAcct_(X, D, a.name, a.acct), goal = stlNum_(a.goal), unit = stlNum_(a.unit) || 10000;
     if (!id || !goal || !a.item) return;
     sum(id);
     const inv = fin(id, extraAdj[id]).invoice;
@@ -923,9 +1053,9 @@ function stlCompute_(month) {
   });
 
   // 가불·입금 상태
-  const adv = stlAdvances_(D);
+  const adv = stlAdvances_(X, D);
   const payRows = {};
-  stlRead_('stl_pay').filter(function (p) { return p.month === month; }).forEach(function (p) { payRows[p.driverId] = p; });
+  stlRead_('stl_pay').filter(function (p) { return p.month === month; }).forEach(function (p) { payRows[stlLogin_(p.acct)] = p; });
   const rounds = stlRounds_(month);
 
   const drivers = [], slips = {};
@@ -934,8 +1064,13 @@ function stlCompute_(month) {
     const s = S[id], f = fin(id, extraAdj[id]);
     const o = s.owner;
     const p = payRows[id] || {};
+    const workers = Object.keys(s.workers).map(function (w) {
+      const x = s.workers[w];
+      return { id: w === '_' ? '' : w, name: w === '_' ? '(명의자 없음)' : (D.byId[w] ? D.byId[w].name : w), qty: x.qty, amt: x.amt, days: Object.keys(x.dates).length, dates: Object.keys(x.dates).sort(), cids: Object.keys(x.cids), owner: w === s.ownerId };
+    }).sort(function (a, b) { return b.qty - a.qty; });
     const row = {
-      id: id, name: s.name, ids: Object.keys(s.ids).length, cids: Object.keys(s.ids), type: o.driverType || '', mode: o.stlMode || '',
+      id: id, cid: s.cid, name: s.name, ownerId: s.ownerId, ids: X.groups[id].cids.length, cids: X.groups[id].cids.slice(), usedCids: Object.keys(s.ids), type: s.type || '', mode: s.mode || '',
+      workers: workers.filter(function (w) { return !w.owner; }).map(function (w) { return w.name; }),
       workDays: s.sched.days, qty: s.qty, sales: s.sales,
       base: s.base, inc: s.inc, fresh: s.fresh, fbCut: s.fbCut, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
@@ -946,7 +1081,7 @@ function stlCompute_(month) {
     };
     drivers.push(row);
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
-      daily: s.daily, sched: s.sched.cells, loss: s.lossLines, yong: s.yongLines, members: D.owners[id] ? D.owners[id].members.map(function (m) { return D.byId[m].loginId; }) : [] };
+      daily: s.daily, sched: s.sched.cells, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers };
     ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'profit', 'runnerIns', 'fbCut', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
   });
   drivers.sort(function (a, b) { return b.sales - a.sales || koCmp_(a.name, b.name); });
@@ -954,8 +1089,11 @@ function stlCompute_(month) {
   // 확인 필요
   const warnings = [];
   const W = function (key, label, list, level) { if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, 50), level: level || 'warn' }); };
-  W('unreg', '기사 정보에 없는 쿠팡 ID (지급 계산 안 됨 — 기사 정보관리에 쿠팡플렉스 아이디를 넣거나 서브 ID 로 추가)',
+  W('unreg', '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
     Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return u.cid + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad');
+  W('noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정)', drivers.filter(function (d) { return !d.ownerId; }).map(function (d) { return d.cids.join(', ') + ' · ' + won_(d.sales) + '원'; }), 'bad');
+  W('badSub', '서브인데 메인 아이디를 찾을 수 없음 (따로 정산됨)', X.badSub);
+  W('stopped', '중지된 아이디에 배송 기록', Object.keys(warn.stopped), 'info');
   W('noCamp', '노선관리에 없는 캠프', Object.keys(warn.noCamp), 'bad');
   W('noPrice', '단가 미입력 (노선관리 → 구분별 단가)', Object.keys(warn.noPrice).map(function (k) {
     const w = warn.noPrice[k]; return w.camp + ' ' + w.route + (w.type ? ' · ' + w.type + '단가' : '') + ' · ' + won_(w.qty) + '건' + (w.routeKnown ? '' : ' (노선 미등록)');
@@ -985,16 +1123,22 @@ function stlYongCamp_(ctx, route) { return route ? ctx.price.campOf(route) : '';
 function koCmp_(a, b) { return String(a || '').localeCompare(String(b || ''), 'ko'); }
 function won_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
-/** 근무일: 그 기사 + 서브 ID 기사 줄 중 하루라도 출근이면 1일 */
-function stlOwnerSched_(D, ownerId, sched) {
-  const members = D.owners[ownerId] ? D.owners[ownerId].members : [ownerId];
+/** 근무일: 날짜마다 그 묶음 아이디로 일한 기사(사용 기록 → 명의자)의 기사스케줄 칸이 출근이면 1일 */
+function stlGroupSched_(ctx, g, sched, P) {
   const cells = {};
-  members.forEach(function (m) {
-    const row = sched[m];
-    if (!row) return;
-    Object.keys(row).forEach(function (d) { if (!cells[d] || (!stlIsWorkDay_(cells[d]) && stlIsWorkDay_(row[d]))) cells[d] = row[d]; });
+  let days = 0;
+  schDateRange_(parseYmd_(P.from), parseYmd_(P.to)).forEach(function (d) {
+    const ws = {};
+    g.cids.forEach(function (c) { const w = stlWorkerOf_(ctx, stlLogin_(c), d); if (w) ws[w] = 1; });
+    let cell = '', work = false;
+    Object.keys(ws).forEach(function (w) {
+      const v = (sched[w] || {})[d];
+      if (!v) return;
+      if (stlIsWorkDay_(v)) { if (!work) cell = v; work = true; } else if (!cell) cell = v;
+    });
+    if (cell) cells[d] = cell;
+    if (work) days++;
   });
-  const days = Object.keys(cells).filter(function (d) { return stlIsWorkDay_(cells[d]); }).length;
   return { days: days, cells: cells };
 }
 
@@ -1039,7 +1183,7 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
   const supply = Math.round(invoice / (1 + cfg.vat)), tax = invoice - supply;
   // 산재·고용: 캠프별 산식 (기사 지급액 비중으로 안분)
   const ins = { base: 0, bosu: 0, exp: cfg.expense, san: cfg.san, goy: cfg.goy, runner: cfg.runner, sanD: 0, goyD: 0, sanAct: 0, goyAct: 0 };
-  const excluded = stlYes_(s.owner.insEx) || str_(s.owner.stlMode) === '용차내역';
+  const excluded = !!s.insEx || s.mode === '용차내역';
   let san = 0, goy = 0, runnerIns = 0, insGain = 0;
   if (!excluded && invoice > 0) {
     let tw = 0, we = 0, ws = 0, wg = 0, wr = 0;
@@ -1074,12 +1218,12 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
   return { lines: list, pay: pay, taxDed: taxDed, invoice: invoice, supply: supply, tax: tax, san: san, goy: goy, depDed: depDed, depAdd: depAdd, net: net, ins: ins, runnerIns: runnerIns, insGain: insGain };
 }
 
-function stlAdvances_(D) {
+function stlAdvances_(X, D) {
   const out = {}, today = todayText_();
   stlRead_('stl_advance').forEach(function (a) {
-    const id = stlResolve_(D, a.name, a.driverId);
+    const id = stlAcct_(X, D, a.name, a.acct);
     if (!id) return;
-    const o = out[id] || (out[id] = { name: D.byId[id].name, total: 0, paid: 0, left: 0, overdue: 0 });
+    const o = out[id] || (out[id] = { name: stlAcctLabel_(X, D, id), total: 0, paid: 0, left: 0, overdue: 0 });
     const amt = stlNum_(a.amt), paid = stlNum_(a.paid), left = Math.max(0, amt - paid);
     o.total += amt; o.paid += paid; o.left += left;
     if (left > 0 && a.due && stlYmd_(a.due) < today) o.overdue += left;
@@ -1135,7 +1279,7 @@ function stlResult_(month, fresh) {
     rows.forEach(function (r) {
       try {
         const o = JSON.parse(r.data);
-        if (r.driverId === '_summary') summary = o; else slips[r.driverId] = o;
+        if (r.acct === '_summary') summary = o; else slips[r.acct] = o;
       } catch (e) { /* 손상된 줄은 건너뜀 */ }
     });
     if (summary) {
@@ -1157,7 +1301,7 @@ function stlResult_(month, fresh) {
 /** 입금체크·입금일·메모는 계산과 따로 (체크할 때마다 다시 계산하지 않게) */
 function stlPayOverlay_(res, month) {
   const pay = {};
-  stlRead_('stl_pay').forEach(function (p) { if (p.month === month) pay[p.driverId] = p; });
+  stlRead_('stl_pay').forEach(function (p) { if (p.month === month) pay[stlLogin_(p.acct)] = p; });
   res.summary.drivers.forEach(function (d) { const p = pay[d.id] || {}; d.checked = stlYes_(p.checked); d.payDate = p.date || ''; d.payMemo = p.memo || ''; });
   return res;
 }
@@ -1275,12 +1419,22 @@ function adm_stlImport(token, p) {
       });
       stlReplaceMonth_('stl_raw', month, rawObjs);
       stlReplaceMonth_('stl_loss', month, lossObjs);
+      // 아이디 관리에 없는 쿠팡ID 는 자동 추가 (명의자는 쿠팡플렉스 아이디가 같은 기사)
+      const D = stlDrivers_(), X = stlIds_(D), addIds = [], seen = {};
+      rawObjs.concat(lossObjs).forEach(function (o) {
+        const k = stlLogin_(o.cid);
+        if (!k || X.by[k] || seen[k]) return;
+        seen[k] = 1;
+        const d = D.byLogin[k];
+        addIds.push({ cid: o.cid, role: '메인', owner: d ? d.name : '', ownerId: d ? d.id : '', type: d && STL_TYPES.indexOf(d.driverType) >= 0 ? d.driverType : '', status: '사용', memo: month + ' 정산서에서 자동 추가' });
+      });
+      if (addIds.length) stlAppend_('stl_ids', addIds);
       stlAppend_('stl_rounds', hist);
       stlBump_();
       const changed = hist.filter(function (h) { return h.diff; }).length;
       const totalAmt = Object.keys(after).reduce(function (s, k) { return s + after[k]; }, 0);
       logAdmin_(a, '쿠팡 정산서 반영', month + ' ' + round + '차', rawObjs.length + '줄 · 분실 ' + lossObjs.length + '줄 · 변동 ID ' + changed);
-      return { ok: true, month: month, round: round, rows: rawObjs.length, loss: lossObjs.length, ids: Object.keys(after).length, changed: changed, total: Math.round(totalAmt) };
+      return { ok: true, month: month, round: round, rows: rawObjs.length, loss: lossObjs.length, ids: Object.keys(after).length, changed: changed, total: Math.round(totalAmt), newIds: addIds.map(function (x) { return x.cid + (x.owner ? ' → ' + x.owner : ' (명의자 없음)'); }) };
     } finally {
       lock.releaseLock();
     }
@@ -1301,8 +1455,8 @@ function adm_stlClose(token, month, close) {
         if (rows.some(function (r) { return r.month === month; })) fail_('이미 마감된 달입니다.');
         const res = stlCompute_(month);
         res.summary.computedAt = nowText_();
-        const snap = [{ month: month, driverId: '_summary', data: JSON.stringify(res.summary) }];
-        Object.keys(res.slips).forEach(function (id) { snap.push({ month: month, driverId: id, data: JSON.stringify(res.slips[id]) }); });
+        const snap = [{ month: month, acct: '_summary', data: JSON.stringify(res.summary) }];
+        Object.keys(res.slips).forEach(function (id) { snap.push({ month: month, acct: id, data: JSON.stringify(res.slips[id]) }); });
         if (snap.some(function (s) { return s.data.length > 49000; })) fail_('결과가 너무 커서 마감 기록을 저장할 수 없습니다.');
         stlReplaceMonth_('stl_closed', month, snap);
         stlWriteAll_('stl_close', others.concat([{ month: month, at: nowText_(), admin: a.name }]));
@@ -1328,16 +1482,16 @@ function adm_stlPaySet(token, month, list) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
-      const D = stlDrivers_();
+      const D = stlDrivers_(), X = stlIds_(D);
       const rows = stlRead_('stl_pay');
       const by = {};
-      rows.forEach(function (r) { if (r.month === month) by[r.driverId] = r; });
+      rows.forEach(function (r) { if (r.month === month) by[stlLogin_(r.acct)] = r; });
       const today = todayText_(), add = [];
       list.forEach(function (x) {
-        const id = str_(x.id);
-        if (!D.byId[id]) fail_('기사를 찾을 수 없습니다.');
-        const cur = by[id], r = cur ? Object.assign({}, cur) : { month: month, driverId: id };
-        r.name = D.byId[id].name;
+        const id = stlLogin_(x.id);
+        if (!X.groups[id]) fail_('정산 아이디를 찾을 수 없습니다. 새로고침해 주세요.');
+        const cur = by[id], r = cur ? Object.assign({}, cur) : { month: month, acct: id };
+        r.name = stlAcctLabel_(X, D, id);
         if (x.checked !== undefined) { r.checked = x.checked ? 'TRUE' : 'FALSE'; if (x.checked && !r.date) r.date = today; if (!x.checked) r.date = ''; }
         if (x.date !== undefined) r.date = x.date ? stlYmd_(x.date) : '';
         if (x.memo !== undefined) r.memo = str_(x.memo).slice(0, 200);
@@ -1359,10 +1513,10 @@ function adm_stlPayList(token, month) {
     const r = stlResult_(month, false);
     const D = stlDrivers_();
     const list = r.summary.drivers.filter(function (d) { return d.net !== 0; }).map(function (d) {
-      const o = D.byId[d.id] || {};
+      const o = D.byId[d.ownerId] || {};
       let acc = '';
       try { acc = o.accountEnc ? fmtAccount_(decrypt_(o.accountEnc), o.bankName) : ''; } catch (e) { acc = ''; }
-      return { id: d.id, name: d.name, bank: o.bankName || '', account: acc, holder: o.accountHolder || d.name, pay: d.invoice + d.depAdd, ded: d.san + d.goy + d.depDed, net: d.net, checked: d.checked, payDate: d.payDate, memo: d.payMemo, supply: d.supply, tax: d.tax, bizNo: o.bizNo || '', bizName: o.bizName || '' };
+      return { id: d.id, cid: d.cid, cids: d.cids, workers: d.workers, name: d.name, bank: o.bankName || '', account: acc, holder: o.accountHolder || d.name, pay: d.invoice + d.depAdd, ded: d.san + d.goy + d.depDed, net: d.net, checked: d.checked, payDate: d.payDate, memo: d.payMemo, supply: d.supply, tax: d.tax, bizNo: o.bizNo || '', bizName: o.bizName || '' };
     });
     logAdmin_(a, '입금목록 조회 (계좌번호 표시)', month, list.length + '명');
     return { ok: true, month: month, list: list, dates: r.summary.dates };
@@ -1371,20 +1525,25 @@ function adm_stlPayList(token, month) {
 function fmtAccount_(d, bank) { return String(d || ''); }
 
 // ── 표 편집 (공제·가불·용차·설정 등) ──
+// 열: [키, 제목, 종류, (찾은 ID 를 넣을 키)]
+//  acct = 정산 묶음(명의자 또는 쿠팡ID) / acctOrText = 정산 묶음 또는 용차업체 이름 / person = 기사(사람)
 const STL_EDIT = {
-  adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '기사', 'driver'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '메모', 'text']] },
-  advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '기사', 'driver'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
-  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (기사/용차업체)', 'driverOrText'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 기사', 'driver'], ['payerPrice', '부담 기준단가 (비우면 자동)', 'money'], ['memo', '메모', 'text']] },
-  regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '기사', 'driver'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
-  target: { sheet: 'stl_target', scope: 'all', cols: [['name', '기사', 'driver'], ['item', '항목', 'item'], ['goal', '연 목표 계산서 (VAT포함)', 'money'], ['unit', '단위', 'money']] },
-  split: { sheet: 'stl_split', scope: 'all', cols: [['from', '원 기사 (발행 줄일 사람)', 'driver'], ['to', '받는 기사', 'driver'], ['target', '목표 실수령', 'money'], ['unit', '단위', 'money'], ['repeat', '매달 반복', ['Y', 'N']], ['month', '적용월 (반복 N 일 때)', 'month']] },
-  leave: { sheet: 'stl_leave', scope: 'all', cols: [['name', '기사', 'driver'], ['month', '퇴사월', 'month'], ['amt', '보류금 (비우면 기본)', 'money']] },
+  ids: { sheet: 'stl_ids', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['role', '구분', STL_ROLES], ['main', '메인 아이디 (서브일 때)', 'text'], ['owner', '명의자 (정산금 받는 기사)', 'person', 'ownerId'],
+    ['type', '단가 구분', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=구분별 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
+  usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text']] },
+  tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
+  adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '메모', 'text']] },
+  advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
+  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면 자동)', 'money'], ['memo', '메모', 'text']] },
+  regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
+  target: { sheet: 'stl_target', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['goal', '연 목표 계산서 (VAT포함)', 'money'], ['unit', '단위', 'money']] },
+  split: { sheet: 'stl_split', scope: 'all', cols: [['from', '원 명의자 (발행 줄일 아이디)', 'acct', 'fromId'], ['to', '받는 명의자', 'acct', 'toId'], ['target', '목표 실수령', 'money'], ['unit', '단위', 'money'], ['repeat', '매달 반복', ['Y', 'N']], ['month', '적용월 (반복 N 일 때)', 'month']] },
+  leave: { sheet: 'stl_leave', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['month', '퇴사월', 'month'], ['amt', '보류금 (비우면 기본)', 'money']] },
   items: { sheet: 'stl_items', scope: 'all', cols: [['order', '순서', 'text'], ['side', '구분', ['지급', '차감']], ['name', '항목 이름', 'text'], ['method', '계산 방식', STL_METHODS], ['show', '표시', ['항상', '금액 있을 때']], ['taxCut', '계산서에서 빼기 (차감만)', ['', 'Y', 'N']], ['desc', '설명', 'text']] },
   camps: { sheet: 'stl_camps', scope: 'all', cols: [['camp', '캠프명', 'camp'], ['expense', '경비공제율', 'text'], ['san', '산재율 (기사분)', 'text'], ['goy', '고용율 (기사분)', 'text'], ['runner', '러너부담률', 'text']] },
   kinds: { sheet: 'stl_kinds', scope: 'all', cols: [['raw', '쿠팡 구분 값', 'text'], ['std', '표준 분류', STL_STD_KINDS]] },
   config: { sheet: 'stl_config', scope: 'all', fixed: true, cols: [['label', '항목', 'readonly'], ['value', '값', 'text'], ['desc', '설명', 'readonly']] }
 };
-const STL_DRIVER_KEYS = { name: 'driverId', who: 'whoId', payer: 'payerId', from: 'fromId', to: 'toId' };
 function stlEditRows_(name, month) {
   const E = STL_EDIT[name];
   let rows = stlRead_(E.sheet);
@@ -1408,20 +1567,33 @@ function stlTableView_(name, month) {
     if (!E) fail_('알 수 없는 표입니다.');
     if (E.scope !== 'all' && !stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     if (name === 'config') stlCfg_();
+    const D = stlDrivers_(), X = stlIds_(D);
     const rows = stlEditRows_(name, month);
-    const D = stlDrivers_();
-    const owners = Object.keys(D.owners).map(function (id) { const o = D.byId[id]; return { id: id, name: o.name, loginId: o.loginId, status: o.status }; })
-      .sort(function (a, b) { return (a.status === ST.ACTIVE ? 0 : 1) - (b.status === ST.ACTIVE ? 0 : 1) || koCmp_(a.name, b.name); });
+    const accts = Object.keys(X.groups).map(function (k) { return { id: k, label: stlAcctLabel_(X, D, k), stopped: X.groups[k].main.stopped }; })
+      .sort(function (a, b) { return (a.stopped ? 1 : 0) - (b.stopped ? 1 : 0) || koCmp_(a.label, b.label); });
+    const persons = D.all.map(function (o) { return { id: o.id, label: (D.byName[o.name] || []).length > 1 ? o.name + ' (' + (o.loginId || o.id) + ')' : o.name, status: o.status }; })
+      .sort(function (a, b) { return (a.status === ST.ACTIVE ? 0 : 1) - (b.status === ST.ACTIVE ? 0 : 1) || koCmp_(a.label, b.label); });
     let calc = null;
     if (name === 'yongcha' || name === 'advance') {
       if (name === 'yongcha') { const r = stlResult_(month, false); calc = {}; (r.summary.yong || []).forEach(function (y) { calc[y._row] = y; }); }
       else calc = null;
     }
     return {
-      ok: true, name: name, month: month, cols: E.cols.map(function (c) { return { k: c[0], label: c[1], type: Array.isArray(c[2]) ? 'select' : c[2], opts: Array.isArray(c[2]) ? c[2] : null }; }),
-      rows: rows.map(function (r) { const o = { _row: r._row }; E.cols.forEach(function (c) { o[c[0]] = r[c[0]] || ''; }); Object.keys(STL_DRIVER_KEYS).forEach(function (k) { if (r[STL_DRIVER_KEYS[k]] !== undefined) o[STL_DRIVER_KEYS[k]] = r[STL_DRIVER_KEYS[k]]; }); if (calc && calc[r._row]) o._calc = calc[r._row]; return o; }),
+      ok: true, name: name, month: month, cols: E.cols.map(function (c) { return { k: c[0], label: c[1], type: Array.isArray(c[2]) ? 'select' : c[2], opts: Array.isArray(c[2]) ? c[2] : null, idk: c[3] || '' }; }),
+      rows: rows.map(function (r) {
+        const o = { _row: r._row };
+        E.cols.forEach(function (c) {
+          o[c[0]] = r[c[0]] || '';
+          if (c[3]) {
+            o[c[3]] = r[c[3]] || '';
+            if ((c[2] === 'acct' || c[2] === 'acctOrText') && o[c[0]]) { const k = stlAcct_(X, D, r[c[0]], r[c[3]]); if (k) o[c[0]] = stlAcctLabel_(X, D, k); }
+          }
+        });
+        if (calc && calc[r._row]) o._calc = calc[r._row];
+        return o;
+      }),
       seen: stlRowsHash_(rows, E.cols), fixed: !!E.fixed, closed: E.scope !== 'all' ? !!stlClosedInfo_(month) : false,
-      owners: owners, items: stlItems_().list.map(function (i) { return i.name; }),
+      accts: accts, persons: persons, items: stlItems_().list.map(function (i) { return i.name; }),
       camps: master_().camps.map(function (c) { return stlShort_(c.name); }).sort(koCmp_)
     };
   }
@@ -1434,7 +1606,8 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     if (!E) fail_('알 수 없는 표입니다.');
     if (E.scope !== 'all' && !stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     if (!Array.isArray(rows) || rows.length > 3000) fail_('줄이 너무 많습니다.');
-    const D = stlDrivers_();
+    const D = stlDrivers_(), X = stlIds_(D);
+    const seenCid = {};
     const clean = rows.map(function (r, i) {
       const o = {};
       E.cols.forEach(function (c) {
@@ -1444,11 +1617,21 @@ function adm_stlTableSave(token, name, month, rows, seen) {
         if (t === 'date' && v) { v = stlYmd_(v); if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) fail_((i + 1) + '번째 줄 ' + c[1] + ': 2026-10-01 형식'); }
         if (t === 'month' && v) { v = v.slice(0, 7); if (!stlMonthOk_(v)) fail_((i + 1) + '번째 줄 ' + c[1] + ': 2026-10 형식'); }
         if (Array.isArray(t) && v && t.indexOf(v) < 0) fail_((i + 1) + '번째 줄 ' + c[1] + ': ' + t.filter(Boolean).join('/') + ' 중에서');
-        if ((t === 'driver' || t === 'driverOrText') && v) {
-          const id = stlResolve_(D, v, str_(r[STL_DRIVER_KEYS[c[0]]]));
-          if (!id && t === 'driver') fail_((i + 1) + '번째 줄: 기사 "' + v + '"를 찾을 수 없습니다.');
-          o[STL_DRIVER_KEYS[c[0]]] = id;
-          if (id) v = D.byId[id].name;
+        if ((t === 'acct' || t === 'acctOrText') && v) {
+          const k = stlAcct_(X, D, v, str_(r[c[3]]));
+          if (!k && t === 'acct') fail_((i + 1) + '번째 줄: "' + v + '" 정산 아이디를 찾을 수 없습니다 (아이디 관리에 있는 명의자 또는 쿠팡ID).');
+          o[c[3]] = k ? X.groups[k].cid : '';
+          if (k) v = X.groups[k].ownerId ? D.byId[X.groups[k].ownerId].name : v;
+        } else if (t === 'acct' || t === 'acctOrText') o[c[3]] = '';
+        if (t === 'person') {
+          const pid = v ? stlPerson_(D, v, str_(r[c[3]])) : '';
+          if (v && !pid) fail_((i + 1) + '번째 줄: 기사 "' + v + '"를 찾을 수 없습니다 (같은 이름이 여럿이면 "이름 (아이디)").');
+          o[c[3]] = pid;
+          if (pid) v = D.byId[pid].name;
+        }
+        if (t === 'cid' && v) {
+          v = v.replace(/\s+/g, '');
+          if (name === 'ids') { const k = stlLogin_(v); if (seenCid[k]) fail_((i + 1) + '번째 줄: 쿠팡ID ' + v + ' 가 두 번 있습니다.'); seenCid[k] = 1; }
         }
         o[c[0]] = v;
       });
@@ -1456,6 +1639,18 @@ function adm_stlTableSave(token, name, month, rows, seen) {
       if (E.scope === 'date' && o.date && stlMonthOfDate_(o.date) !== month) fail_((i + 1) + '번째 줄 날짜가 ' + month + ' 정산기간(' + stlPeriod_(month).from + ' ~ ' + stlPeriod_(month).to + ') 밖입니다.');
       return o;
     }).filter(function (o) { return E.cols.some(function (c) { return c[2] !== 'readonly' && o[c[0]]; }) || E.fixed; });
+    if (name === 'ids') {
+      clean.forEach(function (o, i) {
+        if (!o.cid) fail_((i + 1) + '번째 줄: 쿠팡ID 를 넣어 주세요.');
+        if (o.role === '서브') {
+          const m = stlLogin_(o.main), hit = clean.filter(function (x) { return stlLogin_(x.cid) === m; })[0];
+          if (!m || !hit) fail_(o.cid + ': 서브는 메인 아이디 칸에 아이디 목록에 있는 메인 쿠팡ID 를 넣어 주세요.');
+          if (hit.role === '서브') fail_(o.cid + ': 메인 아이디 ' + o.main + ' 도 서브입니다. 메인을 골라 주세요.');
+        }
+        if (o.fbCut && !/^\d+(\.\d+)?%?$/.test(o.fbCut.replace(/[,\s원]/g, ''))) fail_(o.cid + ': 프레시백 차감은 13% 또는 금액');
+        if (!o.status) o.status = '사용';
+      });
+    }
     const lock = LockService.getScriptLock();
     lock.waitLock(30000);
     try {
@@ -1498,14 +1693,14 @@ function stlDriverView_() {
   {
     const D = stlDrivers_();
     const list = D.all.map(function (o) {
-      const x = { id: o.id, name: o.name, loginId: o.loginId, status: o.status, type: o.driverType || '', bank: o.bankName || '', account: o.account || '', holder: o.accountHolder || '', ownerName: o._owner !== o.id ? D.byId[o._owner].name : '' };
+      const x = { id: o.id, name: o.name, loginId: o.loginId, status: o.status, type: o.driverType || '', bank: o.bankName || '', account: o.account || '', holder: o.accountHolder || '' };
       STL_DRIVER_FIELDS.forEach(function (k) { x[k] = o[k] || ''; });
       return x;
     }).sort(function (a, b) { return (a.status === ST.ACTIVE ? 0 : 1) - (b.status === ST.ACTIVE ? 0 : 1) || koCmp_(a.name, b.name); });
     return { ok: true, drivers: list, modes: STL_MODES };
   }
 }
-/** changes = [{ id, f: { stlOwner, stlMode, … } }] */
+/** changes = [{ id, f: { bizNo, bizName, bizEmail } }] (명의자 세금계산서 정보) */
 function adm_stlDriverSave(token, changes) {
   return run_(function () {
     const a = requireAdmin_(token);
@@ -1522,18 +1717,7 @@ function adm_stlDriverSave(token, changes) {
         Object.keys(ch.f || {}).forEach(function (k) {
           if (STL_DRIVER_FIELDS.indexOf(k) < 0) return;
           let v = str_(ch.f[k]).slice(0, 200);
-          if (k === 'stlOwner' && v) {
-            const t = D.byId[v] ? v : stlResolve_(D, v, '');
-            if (!t) fail_(o.name + ': 정산 대상 기사 "' + v + '"를 찾을 수 없습니다.');
-            if (t === o.id) v = '';
-            else { if (D.byId[t].stlOwner && D.byId[t].stlOwner !== t) fail_(o.name + ': ' + D.byId[t].name + ' 기사도 다른 기사에 묶여 있습니다. 메인 기사를 고르세요.'); v = t; }
-          }
-          if (k === 'stlMode' && STL_MODES.indexOf(v) < 0) fail_('정산 방식은 비우거나 원청단가 / 용차내역');
-          if (k === 'insEx') v = stlYes_(v) ? 'Y' : '';
-          if (k === 'tmpPrice' && v) { const m = normMoney_(v); if (m === null) fail_(o.name + ': 일시단가는 숫자만'); v = m; }
-          if ((k === 'tmpFrom' || k === 'tmpTo') && v) { v = stlYmd_(v); if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) fail_(o.name + ': 날짜는 2026-10-01 형식'); }
           if (k === 'bizNo' && v) { const d = v.replace(/\D/g, ''); if (d.length !== 10) fail_(o.name + ': 사업자등록번호 10자리'); v = d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3'); }
-          if (k === 'fbCut' && v && !/^\d+(\.\d+)?%?$/.test(v.replace(/[,\s원]/g, ''))) fail_(o.name + ': 프레시백 차감은 13% 또는 금액');
           f[k] = v;
         });
         if (Object.keys(f).length) { f.updatedAt = nowText_(); writeFields_(SH.DRIVERS, o._row, f); forgetDriver_(o); n++; }

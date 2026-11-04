@@ -3,8 +3,9 @@
  *
  *  - 쿠팡 원천 · 분실파손 · 차수이력 · 공제·가감 · 가불금 · 용차내역 · 설정(항목·지급률·산재고용·정기수당·목표수당·매출분할·퇴사보류)
  *    → 정산 DB 탭으로 복사
- *  - 기사마스터 → 러너 올인원 DB drivers 의 "빈 칸만" 채움 (계좌·사업자·정산 방식·프백 차감·일시단가·서브 ID 묶기)
- *    러너 올인원 DB 에 없는 쿠팡 ID 는 상태 '정지'로 기사 줄을 새로 만든다 (앱 로그인 불가)
+ *  - 기사마스터(한 줄 = 쿠팡 아이디) → 정산 DB 아이디 관리(stl_ids: 메인/서브·명의자·단가 구분·정산 방식·보험 제외·프백 차감)
+ *    + 일시단가(stl_tmp, 기사 + 기간) + 아이디 사용 기록(stl_usage: 명의자가 아닌 기사가 그 아이디를 쓰는 경우)
+ *  - 명의자(기사)의 계좌·사업자 정보는 러너 올인원 DB drivers 의 "빈 칸만" 채움. 명의자가 러너 DB 에 없으면 '정지' 기사로 새로 만든다
  *  - 노선단가 → 노선관리 구분별 단가의 "빈 칸만" 채움 (원청단가 = 쿠팡 원단가, 기사단가 = 고정단가, 백업단가)
  *    opts.overwritePrices 면 다른 값도 덮어씀
  *  - 마지막에 기존 시트 조회월 결과와 새 계산을 기사별로 비교해 돌려준다
@@ -47,21 +48,26 @@ function adm_stlMigrate(token, src, opts) {
       if (!opts.dry) { bumpMaster_(); _cols[SH.DRIVERS] = null; }
 
       // ── 4) 정산 DB ──
-      const D = opts.dry ? null : stlDrivers_();
-      const nameMap = mgNameMap_(master, D);
-      const res = function (name) { return D ? (nameMap[name] || stlResolve_(D, name, '')) : ''; };
-      const nm = function (id, name) { return id && D ? D.byId[id].name : name; };
+      const idRows = mgIdRows_(master, rep.drivers);
+      rep.ids = { count: idRows.ids.length, subs: idRows.ids.filter(function (x) { return x.role === '서브'; }).map(function (x) { return x.cid + ' → ' + x.main; }), usage: idRows.usage.map(function (u) { return u.cid + ' : ' + u.name + ' (명의자 ' + u._owner + ')'; }), tmp: idRows.tmp.length };
       const have = ['stl_raw', 'stl_adjust', 'stl_advance', 'stl_yongcha'].filter(function (t) { return stlSheet_(t).getLastRow() > 1; });
       if (have.length && !opts.replace && !opts.dry) fail_('정산 DB 에 이미 기록이 있습니다 (' + have.join(', ') + '). "기존 기록 지우고 다시" 를 체크해 주세요.');
       rep.existing = have;
+      let D = null, X = null, nameMap = {};
+      const res = function (name) { if (!X) return ''; const k = nameMap[name] || stlAcct_(X, D, name, ''); return k ? X.groups[k].cid : ''; };
+      const nm = function (acct, name) { const g = acct && X ? X.groups[stlLogin_(acct)] : null; return g && g.ownerId ? D.byId[g.ownerId].name : name; };
       if (!opts.dry) {
+        stlWriteAll_('stl_ids', idRows.ids);
+        stlWriteAll_('stl_usage', idRows.usage);
+        stlWriteAll_('stl_tmp', idRows.tmp);
+        D = stlDrivers_(); X = stlIds_(D); nameMap = mgNameMap_(master, X);
         raw.raw.sort(function (x, y) { return x.month < y.month ? -1 : x.month > y.month ? 1 : 0; });
         raw.loss.sort(function (x, y) { return x.month < y.month ? -1 : x.month > y.month ? 1 : 0; });
         stlWriteAll_('stl_raw', raw.raw);
         stlWriteAll_('stl_loss', raw.loss);
         stlWriteAll_('stl_rounds', rounds);
-        stlWriteAll_('stl_adjust', adj.adjust.map(function (x) { const id = res(x.name); return Object.assign(x, { driverId: id, name: nm(id, x.name) }); }));
-        stlWriteAll_('stl_advance', adj.advance.map(function (x) { const id = res(x.name); return Object.assign(x, { driverId: id, name: nm(id, x.name) }); }));
+        stlWriteAll_('stl_adjust', adj.adjust.map(function (x) { const id = res(x.name); return Object.assign(x, { acct: id, name: nm(id, x.name) }); }));
+        stlWriteAll_('stl_advance', adj.advance.map(function (x) { const id = res(x.name); return Object.assign(x, { acct: id, name: nm(id, x.name) }); }));
         stlWriteAll_('stl_yongcha', adj.yongcha.map(function (x) {
           const w = res(x.who), p = res(x.payer);
           return Object.assign(x, { whoId: w, who: nm(w, x.who), payerId: p, payer: nm(p, x.payer) });
@@ -69,19 +75,19 @@ function adm_stlMigrate(token, src, opts) {
         if (setup.items.length) stlWriteAll_('stl_items', setup.items);
         if (setup.kinds.length) stlWriteAll_('stl_kinds', setup.kinds);
         if (setup.camps.length) stlWriteAll_('stl_camps', setup.camps);
-        stlWriteAll_('stl_regular', setup.regular.map(function (x) { const id = res(x.name); return Object.assign(x, { driverId: id, name: nm(id, x.name) }); }));
-        stlWriteAll_('stl_target', setup.target.map(function (x) { const id = res(x.name); return Object.assign(x, { driverId: id, name: nm(id, x.name) }); }));
+        stlWriteAll_('stl_regular', setup.regular.map(function (x) { const id = res(x.name); return Object.assign(x, { acct: id, name: nm(id, x.name) }); }));
+        stlWriteAll_('stl_target', setup.target.map(function (x) { const id = res(x.name); return Object.assign(x, { acct: id, name: nm(id, x.name) }); }));
         stlWriteAll_('stl_split', setup.split.map(function (x) {
           const f = res(x.from), t = res(x.to);
           return Object.assign(x, { fromId: f, from: nm(f, x.from), toId: t, to: nm(t, x.to) });
         }));
-        stlWriteAll_('stl_leave', setup.leave.map(function (x) { const id = res(x.name); return Object.assign(x, { driverId: id, name: nm(id, x.name) }); }));
+        stlWriteAll_('stl_leave', setup.leave.map(function (x) { const id = res(x.name); return Object.assign(x, { acct: id, name: nm(id, x.name) }); }));
         // 설정 값
         const cfgRows = STL_CFG.map(function (d) { return { label: d[1], value: setup.config[d[0]] !== undefined ? setup.config[d[0]] : d[2], desc: d[3] }; });
         stlWriteAll_('stl_config', cfgRows);
         stlBump_();
         const unresolved = {};
-        adj.adjust.concat(adj.advance, setup.regular, setup.target, setup.leave).forEach(function (x) { if (x.name && !x.driverId) unresolved[x.name] = 1; });
+        adj.adjust.concat(adj.advance, setup.regular, setup.target, setup.leave).forEach(function (x) { if (x.name && !x.acct) unresolved[x.name] = 1; });
         adj.yongcha.forEach(function (x) { if (x.payer && !x.payerId) unresolved[x.payer] = 1; });
         rep.unresolved = Object.keys(unresolved);
         logAdmin_(a, '기존 정산 시트 이관', book.getName(), JSON.stringify(rep.read));
@@ -293,34 +299,69 @@ function mgPrices_(sh) {
   return out;
 }
 
-/** 기사마스터 → drivers 빈 칸 채우기 */
+/** 이름 비교용: 띄어쓰기·괄호 안 글자 빼기 */
+function mgNm_(v) { return str_(v).replace(/\([^)]*\)/g, '').replace(/\s+/g, ''); }
+/** 한 글자 차이(오타)까지 같은 이름으로 본다 */
+function mgSameName_(a, b) {
+  a = mgNm_(a); b = mgNm_(b);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.length !== b.length || a.length < 2) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++;
+  return d <= 1;
+}
+/**
+ * 기사마스터 → 명의자(기사) 정하기 + 명의자 계좌·사업자 빈 칸 채우기.
+ * 명의자 = 기사마스터 '기사명'. 러너 DB 에서 ① 그 아이디의 기사가 같은 이름(예금주·표시명, 한 글자 오타 허용)이면 그 기사
+ * ② 아니면 같은 이름의 기사(한 명일 때) ③ 없으면 '정지' 상태로 새로 만든다.
+ * 그 아이디의 러너 기사가 명의자와 다른 사람이면 "아이디 사용 기록"(그 기사가 이 아이디로 일함)으로 남긴다.
+ */
 function mgDrivers_(master, dry) {
-  const rep = { created: [], filled: 0, fields: {}, conflicts: [], linked: [] };
+  const rep = { created: [], filled: 0, fields: {}, conflicts: [], ownerOf: {}, workerOf: {} };
   const all = readAll_(SH.DRIVERS);
-  const byLogin = {};
-  all.forEach(function (o) { if (o.loginId) byLogin[stlLogin_(o.loginId)] = o; });
-  // 메인 ID 줄 (같은 기사명의 '메인')
-  const mainOf = {};
-  master.forEach(function (x) { if (x.sub !== '서브' && !mainOf[x.name]) mainOf[x.name] = x; });
-  const created = {};
+  const byLogin = {}, byName = {};
+  all.forEach(function (o) { if (o.loginId) byLogin[stlLogin_(o.loginId)] = o; (byName[mgNm_(o.name)] = byName[mgNm_(o.name)] || []).push(o); });
+  const person = {}; // 기사명 → 러너 기사
   master.forEach(function (x) {
-    const lg = stlLogin_(x.cid);
-    if (!lg || byLogin[lg]) return;
-    const obj = { id: dry ? 'NEW_' + lg : newDriverId_(), loginId: lg, name: x.disp || x.name, status: ST.STOPPED, createdAt: nowText_(), updatedAt: nowText_(), memo: '정산 이관으로 추가 (기사마스터: ' + x.name + ')' };
-    if (!dry) { obj._row = appendObj_(SH.DRIVERS, obj); }
-    byLogin[lg] = obj; created[lg] = 1;
-    rep.created.push(obj.name + ' (' + lg + ')');
+    if (person[x.name]) return;
+    const lg = byLogin[stlLogin_(x.cid)];
+    let d = null;
+    if (lg && (mgSameName_(lg.name, x.name) || mgSameName_(lg.name, x.disp) || mgSameName_(lg.name, x.holder))) d = lg;
+    if (!d) { const n = byName[mgNm_(x.name)] || []; if (n.length === 1) d = n[0]; }
+    if (!d) {
+      // 같은 기사명의 다른 아이디 줄에서 찾기
+      master.forEach(function (y) {
+        if (d || y.name !== x.name) return;
+        const l2 = byLogin[stlLogin_(y.cid)];
+        if (l2 && (mgSameName_(l2.name, y.name) || mgSameName_(l2.name, y.holder))) d = l2;
+      });
+    }
+    if (!d) {
+      const obj = { id: dry ? 'NEW_' + x.name : newDriverId_(), name: x.disp || x.name, status: ST.STOPPED, createdAt: nowText_(), updatedAt: nowText_(), memo: '정산 이관으로 추가 (기사마스터 명의자: ' + x.name + ')' };
+      if (!dry) obj._row = appendObj_(SH.DRIVERS, obj);
+      d = obj;
+      rep.created.push(obj.name);
+    }
+    person[x.name] = d;
   });
   master.forEach(function (x) {
-    const d = byLogin[stlLogin_(x.cid)];
-    if (!d) return;
-    const isMain = x.sub !== '서브';
+    const k = stlLogin_(x.cid), d = person[x.name];
+    rep.ownerOf[k] = d.id;
+    const lg = byLogin[k];
+    if (lg && lg.id !== d.id) rep.workerOf[k] = { id: lg.id, name: lg.name, owner: d.name };
+  });
+  // 명의자 계좌·사업자 정보 (빈 칸만)
+  const done = {};
+  master.forEach(function (x) {
+    const d = person[x.name];
+    if (done[d.id] && x.sub === '서브') return;
     const f = {};
-    const fill = function (k, val, label) {
+    const fill = function (key, val, label) {
       if (!val) return;
-      const cur = str_(d[k]);
-      if (!cur) { f[k] = val; rep.fields[label] = (rep.fields[label] || 0) + 1; }
-      else if (cur !== val && k !== 'account') rep.conflicts.push(d.name + ' · ' + label + ': 러너 "' + cur + '" / 기존 "' + val + '"');
+      const cur = str_(d[key]);
+      if (!cur) { f[key] = val; rep.fields[label] = (rep.fields[label] || 0) + 1; }
+      else if (cur !== val && key !== 'account') rep.conflicts.push(d.name + ' · ' + label + ': 러너 "' + cur + '" / 기존 "' + val + '"');
     };
     fill('bankName', x.bank, '은행');
     fill('accountHolder', x.holder, '예금주');
@@ -330,30 +371,39 @@ function mgDrivers_(master, dry) {
     if (biz.length === 10) fill('bizNo', biz.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3'), '사업자번호');
     fill('bizName', x.bizName, '상호');
     fill('bizEmail', x.email, '계산서 이메일');
-    if (DTYPES.indexOf(x.code) >= 0) fill('driverType', x.code, '기사구분');
-    const mode = x.mode === '용차형' ? '용차내역' : (x.code === '대표' || x.code === '운영자') ? '원청단가' : '';
-    fill('stlMode', mode, '정산 방식');
-    if (x.san === 'N' && x.goy === 'N') fill('insEx', 'Y', '산재·고용 제외');
-    if (isMain) {
-      fill('fbCut', x.fbCut, '프레시백 차감');
-      if (stlNum_(x.tmp) > 0) {
-        fill('tmpPrice', String(stlNum_(x.tmp)), '기사 일시단가');
-        fill('tmpRoutes', x.tmpRoutes, '일시단가 노선');
-        fill('tmpFrom', stlYmd_(x.tmpFrom), '일시단가 시작일');
-        fill('tmpTo', stlYmd_(x.tmpTo), '일시단가 종료일');
-      }
-    } else {
-      const main = mainOf[x.name], md = main ? byLogin[stlLogin_(main.cid)] : null;
-      if (md && md.id !== d.id) { fill('stlOwner', md.id, '정산 대상 기사'); rep.linked.push(x.cid + ' → ' + md.name); }
-    }
     if (Object.keys(f).length) {
       rep.filled++;
-      if (!dry) { f.updatedAt = nowText_(); writeFields_(SH.DRIVERS, d._row, f); forgetDriver_(d); }
+      if (!dry && d._row) { f.updatedAt = nowText_(); writeFields_(SH.DRIVERS, d._row, f); forgetDriver_(d); }
       Object.assign(d, f);
     }
+    done[d.id] = 1;
   });
   rep.conflicts = rep.conflicts.slice(0, 80);
+  rep.person = {};
+  Object.keys(person).forEach(function (n) { rep.person[n] = { id: person[n].id, name: person[n].name }; });
   return rep;
+}
+/** 기사마스터 → 아이디 관리 · 일시단가 · 아이디 사용 기록 줄 */
+function mgIdRows_(master, dr) {
+  const mainOf = {};
+  master.forEach(function (x) { if (x.sub !== '서브' && !mainOf[x.name]) mainOf[x.name] = x; });
+  const ids = [], tmp = [], usage = [], seen = {};
+  master.forEach(function (x) {
+    const k = stlLogin_(x.cid);
+    if (!k || seen[k]) return;
+    seen[k] = 1;
+    const p = dr.person[x.name] || {}, m = mainOf[x.name];
+    const sub = x.sub === '서브' && m && stlLogin_(m.cid) !== k;
+    ids.push({
+      cid: x.cid, role: sub ? '서브' : '메인', main: sub ? m.cid : '', owner: p.name || x.name, ownerId: p.id || '',
+      type: STL_TYPES.indexOf(x.code) >= 0 ? x.code : '', mode: x.mode === '용차형' ? '용차내역' : (x.code === '대표' || x.code === '운영자') ? '원청단가' : '',
+      insEx: x.san === 'N' && x.goy === 'N' ? 'Y' : '', fbCut: sub ? '' : x.fbCut, status: !x.status || x.status === '근무' ? '사용' : '중지', memo: '기존 정산 시트 기사마스터'
+    });
+    if (!sub && stlNum_(x.tmp) > 0) tmp.push({ name: p.name || x.name, driverId: p.id || '', from: stlYmd_(x.tmpFrom), to: stlYmd_(x.tmpTo), price: String(stlNum_(x.tmp)), routes: x.tmpRoutes, memo: '기존 정산 시트 기사마스터' });
+    const w = dr.workerOf[k];
+    if (w) usage.push({ cid: x.cid, name: w.name, driverId: w.id, from: '', to: '', memo: '러너 DB 에서 이 아이디의 기사 (명의자 ' + w.owner + ')', _owner: w.owner });
+  });
+  return { ids: ids, tmp: tmp, usage: usage };
 }
 /** 노선단가 → 노선관리 구분별 단가 빈 칸 채우기 */
 function mgPriceFill_(rows, dry, overwrite) {
@@ -404,15 +454,15 @@ function mgPriceFill_(rows, dry, overwrite) {
   rep.conflicts = rep.conflicts.slice(0, 120);
   return rep;
 }
-/** 기존 시트 기사명(표시명) → 러너 정산 대상 기사ID */
-function mgNameMap_(master, D) {
+/** 기존 시트 기사명(표시명) → 정산 아이디(메인 아이디키) */
+function mgNameMap_(master, X) {
   const out = {};
-  if (!D) return out;
+  if (!X) return out;
   master.forEach(function (x) {
-    const d = D.byLogin[stlLogin_(x.cid)];
-    if (!d) return;
-    if (!out[x.disp]) out[x.disp] = d._owner;
-    if (!out[x.name]) out[x.name] = d._owner;
+    const idx = X.by[stlLogin_(x.cid)];
+    if (!idx) return;
+    if (!out[x.disp]) out[x.disp] = idx.mainKey;
+    if (!out[x.name]) out[x.name] = idx.mainKey;
   });
   return out;
 }
@@ -428,8 +478,8 @@ function mgCompare_(sh, master) {
   if (hr < 0) return null;
   const h = v[hr];
   const C = { name: 1, qty: mgFindCol_(h, '배송건수'), invoice: mgFindCol_(h, '세금계산서합계'), san: mgFindCol_(h, '산재(기사)'), goy: mgFindCol_(h, '고용(기사)'), net: mgFindCol_(h, '실입금액') };
-  const D = stlDrivers_();
-  const map = mgNameMap_(master, D);
+  const D = stlDrivers_(), X = stlIds_(D);
+  const map = mgNameMap_(master, X);
   const res = stlCompute_(month);
   const byId = {};
   res.summary.drivers.forEach(function (d) { byId[d.id] = d; });
@@ -438,10 +488,10 @@ function mgCompare_(sh, master) {
   for (let r = hr + 1; r < v.length; r++) {
     const name = str_(v[r][C.name]);
     if (!name) { if (!str_(v[r][0])) break; continue; }
-    const id = map[name] || stlResolve_(D, name, '');
+    const id = map[name] || stlAcct_(X, D, name, '');
     const n = id ? byId[id] : null;
     if (id) seen[id] = 1;
-    const o = { name: name, newName: n ? n.name : (id ? D.byId[id].name : ''), oldQty: stlNum_(v[r][C.qty]), newQty: n ? n.qty : 0,
+    const o = { name: name, newName: n ? n.name + ' (' + n.cids.map(function (c) { return String(c).replace(/@.*$/, ''); }).join(', ') + ')' : (id ? stlAcctLabel_(X, D, id) : ''), oldQty: stlNum_(v[r][C.qty]), newQty: n ? n.qty : 0,
       oldInvoice: stlNum_(v[r][C.invoice]), newInvoice: n ? n.invoice : 0, oldNet: stlNum_(v[r][C.net]), newNet: n ? n.net : 0 };
     o.diff = Math.round(o.newNet - o.oldNet);
     rows.push(o);
