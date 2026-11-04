@@ -208,6 +208,32 @@
   .pushst.on { color: var(--ok); }
   .day .pmx.r-done { background: #e5f6ec; color: #0b6b3a; }
   .mc .pmok { font-size: 9.5px; color: #0b6b3a; font-weight: 800; }
+  /* 정산서 */
+  .sl-top { display: flex; gap: 8px; align-items: center; margin: -4px 0 12px; }
+  .sl-top select { flex: 1; }
+  .sl-card { background: #fff; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; }
+  .sl-card h3 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .sl-card h3 small { font-size: 12px; color: var(--sub); font-weight: 600; }
+  .sl-kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 14px; }
+  .sl-kv span { color: var(--sub); } .sl-kv b { text-align: right; font-weight: 600; word-break: break-all; }
+  .sl-line { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14.5px; }
+  .sl-line:first-of-type { border-top: 0; }
+  .sl-line small { display: block; color: var(--sub); font-size: 12px; }
+  .sl-line b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sl-line.tot { border-top: 2px solid var(--ink); font-weight: 800; font-size: 15.5px; }
+  .sl-line .neg { color: var(--danger); }
+  .sl-inv { border: 2px solid var(--brand); background: #f3f7ff; }
+  .sl-inv h3 { color: var(--brand); }
+  .sl-amt { background: var(--brand); color: #fff; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .sl-amt span { font-size: 13px; font-weight: 700; } .sl-amt b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .sl-due { color: var(--danger); font-weight: 700; }
+  .sl-net { display: flex; justify-content: space-between; align-items: baseline; }
+  .sl-net b { font-size: 22px; font-weight: 800; }
+  .sl-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sl-tbl th, .sl-tbl td { padding: 6px 4px; border-top: 1px solid var(--line); text-align: left; }
+  .sl-tbl th { color: var(--sub); font-weight: 600; font-size: 12px; border-top: 0; }
+  .sl-tbl td.n, .sl-tbl th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .sl-warn { background: #fdf3e2; color: #8a5a00; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
   .mc .pmdot { font-size: 9.5px; color: #8a5a00; font-weight: 700; }
   .ntcard { background: #fff; border-radius: var(--radius); padding: 14px 16px 6px; margin: 0 0 12px; }
   .ntcard h3 { margin: 0 0 6px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
@@ -492,7 +518,7 @@
     <div class="ntcard hidden" id="ntCard"></div>
     <div class="menu">
       <button class="tile" id="mSched" type="button"><b>스케줄</b><span>2주·한 달 일정 보기 →</span></button>
-      <div><b>정산서 보기</b><span>준비 중</span></div>
+      <button class="tile" id="mSettle" type="button"><b>정산서 보기</b><span>월별 정산서·세금계산서 →</span></button>
       <button class="tile" id="mPm" type="button"><b>품앗이</b><span>품앗이 일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
     </div>
@@ -611,6 +637,12 @@
     <p class="hint" style="text-align:center">최근 30일 알림입니다. 누르면 그 일감으로 갑니다.</p>
   </section>
   <div class="pmbanner" id="pmBanner" role="status" aria-live="polite"><div><b id="pbT"></b><span id="pbB"></span></div><i id="pbX" aria-label="닫기">×</i></div>
+
+  <section id="v-settle" class="view">
+    <div class="topbar"><button class="back" id="slBack" aria-label="뒤로">←</button><h2>정산서</h2></div>
+    <div class="sl-top"><select id="slMonth"></select></div>
+    <div id="slBody"></div>
+  </section>
 
   <section id="v-myinfo" class="view">
     <div class="topbar"><button class="back" id="miBack" aria-label="뒤로">←</button><h2>내 정보</h2></div>
@@ -1476,6 +1508,71 @@
     }).catch(() => { $('#pmmList').innerHTML = ''; netErr(); });
   }
   $('#pmmBack').addEventListener('click', openMyPage);
+
+  // ───── 정산서 보기 (사무실에서 마감한 달 · 설정에 따라 계산 중인 달도) ─────
+  const slWon = (v) => (Math.round(Number(v) || 0)).toLocaleString('ko-KR');
+  const slMonthTxt = (m) => { const p = String(m || '').split('-'); return p.length === 2 ? p[0] + '년 ' + (+p[1]) + '월 정산' : m; };
+  const slMd = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? (+p[1]) + '/' + (+p[2]) : (d || ''); };
+  function openSettle() {
+    show('settle');
+    const token = pmTok(); if (!token) return;
+    $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
+    api('api_mySettle', token).then((r) => {
+      if (!pmOk(r, '정산서를 불러오지 못했습니다.')) { $('#slBody').innerHTML = ''; return; }
+      if (!r.months.length) {
+        $('#slMonth').innerHTML = ''; $('#slMonth').disabled = true;
+        $('#slBody').innerHTML = '<div class="pmempty">' + (r.noId ? '기사님 이름으로 된 정산 아이디가 없습니다.<br>사무실에 문의해 주세요.' : '아직 볼 수 있는 정산서가 없습니다.<br>사무실에서 정산을 마감하면 여기에 나옵니다.') + '</div>';
+        return;
+      }
+      $('#slMonth').disabled = false;
+      $('#slMonth').innerHTML = r.months.map((m) => '<option value="' + escH(m.month) + '">' + escH(slMonthTxt(m.month)) + (m.closed ? '' : ' (확정 전)') + '</option>').join('');
+      loadSlip(r.months[0].month);
+    }).catch(() => { $('#slBody').innerHTML = ''; netErr(); });
+  }
+  function loadSlip(month) {
+    const token = pmTok(); if (!token) return;
+    $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
+    api('api_mySlip', token, month).then((r) => {
+      if (!pmOk(r, '정산서를 불러오지 못했습니다.')) { $('#slBody').innerHTML = ''; return; }
+      $('#slBody').innerHTML = (r.closed ? '' : '<div class="sl-warn">⚠️ 아직 마감 전이라 금액이 바뀔 수 있습니다. 세금계산서는 마감 후 금액으로 발행해 주세요.</div>') + r.slips.map((sl) => slipCard(r, sl)).join('');
+    }).catch(() => { $('#slBody').innerHTML = ''; netErr(); });
+  }
+  function slipCard(r, sl) {
+    const d = sl.row, co = r.company || {}, D = r.dates || {}, P = r.period || {};
+    const line = (l, sign) => '<div class="sl-line"><div>' + escH(l.name) + (l.memo ? '<small>' + escH(l.memo) + '</small>' : '') + '</div><b' + (sign === '−' ? ' class="neg"' : '') + '>' + (l.amt ? sign + slWon(l.amt) : (l.method === '고용보험' && sl.ins && !sl.ins.excluded && sl.ins.bosu > 0 ? '0' : '-')) + '</b></div>';
+    const pays = sl.lines.filter((l) => l.side === '지급' && l.method !== '입금가산'), adds = sl.lines.filter((l) => l.method === '입금가산'), deds = sl.lines.filter((l) => l.side === '차감');
+    const dedSum = deds.reduce((a, l) => a + l.amt, 0);
+    const days = Object.keys(sl.daily || {}).filter((x) => x >= P.from && x <= P.to).sort();
+    const dayRows = days.map((x) => { const v = sl.daily[x]; return '<tr><td>' + slMd(x) + '</td><td>' + escH(v.route || (sl.sched || {})[x] || '') + '</td><td class="n">' + slWon(v.qty) + '</td><td class="n">' + slWon(v.amt) + '</td></tr>'; }).join('');
+    const routes = (sl.routes || []).map((x) => '<tr><td>' + escH(x.camp) + ' ' + escH(x.route) + '</td><td class="n">' + slWon(x.qty) + '</td><td class="n">' + slWon(x.unit + x.inc) + '</td><td class="n">' + slWon(x.amt) + '</td></tr>').join('');
+    const etc = (sl.yong || []).map((y) => '<tr><td>' + slMd(y.date) + '</td><td>용차 ' + escH((y.camp || '') + ' ' + (y.route || '')) + '</td><td class="n">' + (y.mine ? '+' + slWon(y.extra) : '−' + slWon(y.cut)) + '</td></tr>').join('') +
+      (sl.loss || []).map((x) => '<tr><td>' + slMd(x.date) + '</td><td>분실 · ' + escH(x.item || x.detail || x.type || '') + '</td><td class="n">−' + slWon(x.amt) + '</td></tr>').join('');
+    const moved = (sl.movedIn || []).concat(sl.movedOut || []);
+    return '<div class="sl-card"><h3>' + escH(slMonthTxt(r.month)) + '<small>' + slMd(P.from) + ' ~ ' + slMd(P.to) + '</small></h3><div class="sl-kv">' +
+      '<span>정산 아이디</span><b>' + escH((d.cids || []).map((x) => String(x).replace(/@.*/, '')).join(', ')) + '</b>' +
+      '<span>근무일수</span><b>' + slWon(d.workDays) + '일</b><span>총 배송수량</span><b>' + slWon(d.qty) + '건</b>' +
+      '<span>지급일</span><b>' + escH(D.pay || '') + '</b></div></div>' +
+      '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '+')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>+' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
+      '<div class="sl-card"><h3>차감 · 공제</h3>' + deds.map((l) => line(l, '−')).join('') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +
+      '<div class="sl-card sl-inv"><h3>📄 세금계산서 발행 <small>기사님 → ' + escH(co.name || '러너') + '</small></h3>' +
+      '<div class="sl-amt"><span>발행 금액 (합계)</span><b>' + slWon(d.invoice) + '원</b></div><div class="sl-kv">' +
+      '<span>공급가액</span><b>' + slWon(d.supply) + '</b><span>세액</span><b>' + slWon(d.tax) + '</b>' +
+      '<span>공급받는자</span><b>' + escH((co.name || '') + (co.ceo ? ' / 대표 ' + co.ceo : '')) + '</b>' +
+      '<span>사업자번호</span><b>' + escH(co.bizNo || '') + '</b>' + (co.email ? '<span>이메일</span><b>' + escH(co.email) + '</b>' : '') +
+      '<span>작성일자</span><b>' + escH(D.writeDate || '') + '</b><span>품목</span><b>배송(' + escH(r.month) + ')</b>' +
+      '<span class="sl-due">발행기한</span><b class="sl-due">' + escH(D.invoice || '') + ' 까지</b></div></div>' +
+      '<div class="sl-card"><div class="sl-net"><span style="font-weight:700">실 입금액</span><b>' + slWon(d.net) + '원</b></div>' +
+      '<div style="font-size:12.5px;color:var(--sub);margin-top:4px">' + escH([d.bank, d.account, d.holder ? '(' + d.holder + ')' : ''].filter(Boolean).join(' ')) + '</div></div>' +
+      (moved.length ? '<div class="sl-card"><h3>다른 아이디 사용</h3><table class="sl-tbl"><thead><tr><th>내용</th><th>기간</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' +
+        moved.map((m) => '<tr><td>' + escH(m.label) + '</td><td>' + slMd(m.from) + (m.to && m.to !== m.from ? '~' + slMd(m.to) : '') + '</td><td class="n">' + slWon(m.qty) + '</td><td class="n">' + slWon(m.amt) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
+      (routes ? '<div class="sl-card"><h3>노선별 내역 <small>부가세 포함</small></h3><table class="sl-tbl"><thead><tr><th>노선</th><th class="n">건수</th><th class="n">단가</th><th class="n">금액</th></tr></thead><tbody>' + routes + '</tbody></table></div>' : '') +
+      (dayRows ? '<div class="sl-card"><h3>일자별 내역</h3><table class="sl-tbl"><thead><tr><th>날짜</th><th>노선</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' + dayRows + '</tbody></table></div>' : '') +
+      (etc ? '<div class="sl-card"><h3>용차 · 분실파손</h3><table class="sl-tbl"><tbody>' + etc + '</tbody></table></div>' : '');
+  }
+  $('#mSettle').addEventListener('click', openSettle);
+  $('#slBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
+  $('#slMonth').addEventListener('change', () => loadSlip($('#slMonth').value));
+
 
   // ───── 품앗이 알림: ① 앱을 켜 둔 동안 30초마다 확인해 화면 위에 띄움 ② 휴대폰 푸시(앱을 닫아도) ─────
   const PM_SEEN = 'runner.pmSeen', PUSH_TOK = 'runner.fcmTok';

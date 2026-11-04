@@ -117,7 +117,8 @@ const STL_CFG = [
   ['payShift', '기사 지급일이 휴일이면 다음 영업일 (Y/N)', 'N', ''],
   ['invDay', '세금계산서 발행기한 (익월, 일)', '10', ''],
   ['leaveAmt', '퇴사 보류금 기본 금액', '100000', ''],
-  ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일']
+  ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일'],
+  ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임']
 ];
 
 const STL_DRIVER_FIELDS = ['bizNo', 'bizName', 'bizEmail']; // 기사(사람) 정보: 명의자의 세금계산서용
@@ -556,7 +557,7 @@ function stlCfg_() {
     expense: rate('expense'), san: rate('san'), commute: rate('commute'), goy: rate('goy'), goyMin: stlNum_(g.goyMin),
     runner: rate('runner'), insBasis: str_(g.insBasis) === '부가세포함' ? '부가세포함' : '공급가',
     payDay: stlNum_(g.payDay) || 20, cpDay: stlNum_(g.cpDay) || 15, payShift: stlYes_(g.payShift), invDay: stlNum_(g.invDay) || 10,
-    leaveAmt: stlNum_(g.leaveAmt) || 100000, email: str_(g.email)
+    leaveAmt: stlNum_(g.leaveAmt) || 100000, email: str_(g.email), appOpen: /계산|모두|전부|y/i.test(str_(g.appShow))
   };
 }
 function stlItems_() {
@@ -2018,4 +2019,55 @@ function stlIdsToDrivers_(token) {
     }
   });
   return out;
+}
+
+// ───────────────────────── 기사 앱: 내 정산서 ─────────────────────────
+/** 기사 본인이 명의자인 정산 묶음(메인 아이디키) 목록 */
+function stlMyGroups_(driverId) {
+  const D = stlDrivers_(), X = stlIds_(D);
+  return Object.keys(X.groups).filter(function (k) { return X.groups[k].ownerId === driverId; });
+}
+/** 기사 앱: 볼 수 있는 정산월 목록 (마감한 달, 설정에 따라 계산 중인 달도) */
+function api_mySettle(token) {
+  return run_(function () {
+    const u = pmUser_(token);
+    if (!props_().STL_DB_ID) return { ok: true, months: [] };
+    stlLoad_(STL_SMALL);
+    const cfg = stlCfg_(), groups = stlMyGroups_(u.id);
+    if (!groups.length) return { ok: true, months: [], noId: true };
+    const closed = {};
+    stlRead_('stl_close').forEach(function (x) { if (stlMonthOk_(x.month)) closed[x.month] = 1; });
+    const months = stlMonths_().withData.filter(function (m) { return closed[m] || cfg.appOpen; }).sort().reverse()
+      .map(function (m) { return { month: m, closed: !!closed[m] }; });
+    return { ok: true, months: months };
+  });
+}
+/** 기사 앱: 그 달 내 정산서 (명의자인 묶음 모두). 러너 내부 숫자(회사이익·러너 부담 등)는 빼고 보낸다 */
+function api_mySlip(token, month) {
+  return run_(function () {
+    const u = pmUser_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const cfg = stlCfg_(), closed = stlClosedInfo_(month);
+    if (!closed && !cfg.appOpen) fail_('아직 마감되지 않은 달입니다. 사무실에서 마감하면 볼 수 있습니다.');
+    const r = stlResult_(month, false), groups = stlMyGroups_(u.id);
+    let co = {};
+    try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
+    const slips = groups.map(function (g) { return r.slips[g]; }).filter(Boolean).map(function (sl) {
+      const d = sl.row;
+      return {
+        row: {
+          name: d.name, cids: d.cids, workDays: d.workDays, workDaysSrc: d.workDaysSrc, qty: d.qty, pay: d.pay, taxDed: d.taxDed, invoice: d.invoice, supply: d.supply, tax: d.tax,
+          san: d.san, goy: d.goy, depDed: d.depDed, depAdd: d.depAdd, net: d.net, bank: d.bank, holder: d.holder, account: d.account, bizNo: d.bizNo, movedIn: d.movedIn, movedOut: d.movedOut
+        },
+        lines: sl.lines, routes: sl.routes, daily: sl.daily, sched: sl.sched, loss: sl.loss,
+        yong: (sl.yong || []).map(function (y) { return { date: y.date, route: y.route, camp: y.camp, qty: y.qty, extra: y.extra, cut: y.cut, mine: y.whoId === d.id, memo: y.memo }; }),
+        movedIn: sl.movedIn, movedOut: sl.movedOut, ins: sl.ins ? { excluded: sl.ins.excluded, bosu: sl.ins.bosu } : null
+      };
+    });
+    if (!slips.length) fail_('이 달 정산 기록이 없습니다.');
+    return {
+      ok: true, month: month, closed: !!closed, period: r.summary.period, dates: r.summary.dates, slips: slips,
+      company: { name: co.branchName || '', ceo: co.branchCeo || '', bizNo: co.branchBizNo || '', email: cfg.email }
+    };
+  });
 }
