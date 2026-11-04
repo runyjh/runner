@@ -177,6 +177,8 @@
   .stw.bad { background: var(--danger-weak); color: #a1262b; }
   .stw.info { background: var(--gray-weak); color: var(--sub); }
   .stw summary { cursor: pointer; font-weight: 700; }
+  .stw .vset { display: inline-block; width: auto; height: 26px; padding: 0 6px; font-size: 12px; margin-left: 6px; vertical-align: middle; font-weight: 600; }
+  .vtag { display: inline-block; padding: 1px 6px; border-radius: 8px; background: #eef4ff; color: #1d4ed8; font-size: 11px; font-weight: 700; vertical-align: middle; }
   .stw ul { margin: 6px 0 0; padding-left: 18px; columns: 2; }
   table.sttbl { font-size: 13px; }
   table.sttbl th, table.sttbl td { padding: 8px 10px; }
@@ -843,6 +845,7 @@
       <div class="tabs sub2 hidden" id="stIdTabs">
         <button class="tab on" data-idt="ids">아이디 목록</button>
         <button class="tab" data-idt="usage">아이디 사용 기록 (한 아이디 여러 기사)</button>
+        <button class="tab" data-idt="vendors">용차업체</button>
         <button class="tab" data-idt="drv">명의자 사업자 정보</button>
       </div>
       <div class="tabs sub2 hidden" id="stCfgTabs">
@@ -879,7 +882,7 @@
       <div class="table-wrap"><table class="sttbl" id="payTable"></table></div>
     </div>
     <div id="stp-drv" class="hidden">
-      <div class="tabs sub2" id="stIdTabs2"><button class="tab" data-idt="ids">아이디 목록</button><button class="tab" data-idt="usage">아이디 사용 기록 (한 아이디 여러 기사)</button><button class="tab on" data-idt="drv">명의자 사업자 정보</button></div>
+      <div class="tabs sub2" id="stIdTabs2"><button class="tab" data-idt="ids">아이디 목록</button><button class="tab" data-idt="usage">아이디 사용 기록 (한 아이디 여러 기사)</button><button class="tab" data-idt="vendors">용차업체</button><button class="tab on" data-idt="drv">명의자 사업자 정보</button></div>
       <p class="sub st-help">정산금·세금계산서를 받는 <b>명의자</b>의 사업자 정보입니다. 러너 올인원 DB 의 기사 정보(drivers 탭)에 저장됩니다. 은행·계좌는 기사 정보관리에서 고칩니다.</p>
       <div class="st-tools"><input class="inp search" id="sdQ2" placeholder="이름·쿠팡ID 검색" autocomplete="off"><label class="check" style="margin:0"><input type="checkbox" id="sdActive" checked> 승인 기사만</label><span class="sub" id="sdDirty"></span><button class="btn sm" id="sdSave2" disabled>저장</button></div>
       <div class="table-wrap"><table class="sttbl ed" id="sdTable"></table></div>
@@ -4814,7 +4817,8 @@
     split: '한 사람이 두 이름으로 계산서를 나눌 때: 원 기사 실수령이 목표 이상이 되는 범위에서 나머지를 받는 기사로 넘깁니다 (세무사 확인 필수).',
     leave: '퇴사월 명세서에 "퇴사 보류금"(입금 차감) → 다음 달에 "보류금 반환"(입금 가산). 다음 달 분실파손은 계산서에서 그대로 빠집니다.',
     kinds: '쿠팡 정산서 "구분" 값을 계산 분류로 바꾸는 표. 새 구분값이 나오면 여기에 추가하세요.',
-    ids: '정산의 기준은 쿠팡 아이디입니다. 메인 아이디 + 서브 아이디(메인 아이디 칸에 메인 쿠팡ID)가 정산서 하나로 합쳐지고, 정산금·세금계산서·입금은 메인 아이디의 명의자에게 갑니다. 단가 구분(고정/백업/품앗이/외부용차)은 메인 아이디는 기사 정보관리의 기사구분이 최우선이고(기사구분이 비어 있을 때만 이 칸), 서브 아이디는 이 칸에 적은 값이 우선입니다. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
+    vendors: '용차업체가 등록한 쿠팡 아이디를 업체 단위로 정산합니다. 건당 단가 = 업체에 주는 단가(VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부단가). 산재·고용 공제 Y = 기사처럼 공제. 아이디 목록의 [용차업체] 칸에서 업체를 고르거나, 아이디별 정산 경고창의 [용차업체로 지정]으로 한 번에 넣을 수 있습니다. 업체 아이디는 기사 정보관리에 등록되지 않습니다.',
+    ids: '정산의 기준은 쿠팡 아이디입니다. 용차업체 아이디는 명의자를 비우고 [용차업체] 칸에서 업체를 고르세요 (업체별 정산서 1장). 메인 아이디 + 서브 아이디(메인 아이디 칸에 메인 쿠팡ID)가 정산서 하나로 합쳐지고, 정산금·세금계산서·입금은 메인 아이디의 명의자에게 갑니다. 단가 구분(고정/백업/품앗이/외부용차)은 메인 아이디는 기사 정보관리의 기사구분이 최우선이고(기사구분이 비어 있을 때만 이 칸), 서브 아이디는 이 칸에 적은 값이 우선입니다. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
     usage: '한 아이디로 여러 기사가 일할 때 기록합니다 (기간을 비우면 계속). 기록이 없는 날은 명의자가 일한 것으로 봅니다. 기록한 기간에 그 아이디로 잡힌 매출(배송·프레시백·미계약·프로모션·분실파손)은 일한 기사 본인 정산으로 자동으로 옮겨지고, 단가도 그 기사 아이디 기준으로 계산됩니다. 일한 기사에게 본인 정산 아이디가 없으면 명의자에게 남기고 "확인 필요"에 띄웁니다.',
     tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 그 기사가 일한 날(아이디 사용 기록 기준, 기록이 없으면 명의자)의 배송에만 적용됩니다. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.'
   };
@@ -4852,14 +4856,17 @@
       k('러너 잉여 (프백 잉여 + 보험 차액)', wn((t.fbKeep || 0) + t.fbCut + t.insGain), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 보험 ' + wn(t.insGain)) +
       k('러너 보험 실부담', wn(t.runnerIns), '공단 실납부 − 기사 공제') +
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
-    $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count + '</summary><ul>' +
-      w.items.map((x) => '<li>' + esc(x) + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
+    const vsel = (wk, i) => '<select class="inp vset" data-vw="' + esc(wk) + '" data-vi="' + i + '" aria-label="용차업체로 지정"><option value="">🚚 용차업체로 지정…</option>' +
+      (s.vendors || []).map((v) => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('') + '<option value="__new">+ 새 업체…</option></select>';
+    $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count +
+      (w.acts && w.acts.length > 1 ? ' ' + vsel(w.key, 'all').replace('🚚 용차업체로 지정…', '🚚 전부 한 업체로…') : '') + '</summary><ul>' +
+      w.items.map((x, i) => '<li>' + esc(x) + (w.acts && w.acts[i] ? ' ' + vsel(w.key, i) : '') + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
     const q = $('#stQ').value.trim().toLowerCase();
     const list = s.drivers.filter((d) => !q || d.name.toLowerCase().includes(q) || d.cids.some((x) => x.toLowerCase().includes(q)) || (d.workers || []).some((x) => x.toLowerCase().includes(q)));
     STX.slipIds = list.map((d) => d.id);
     const H = ['명의자', '정산 아이디 (메인 · 서브)', '근무일', '배송건수', '지급 합계', '분실파손금액', '세금계산서', '공급가', '세액', '산재', '고용', '공제금액', '실입금', '회사이익금', '입금'];
     const num = (v, neg) => '<td class="n' + (neg && v < 0 ? ' neg' : '') + '">' + wnz(v) + '</td>';
-    const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
+    const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.vendor ? ' <span class="vtag">용차업체' + (d.vendorPrice ? ' · 건당 ' + wn(d.vendorPrice) : '') + '</span>' : '') + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
       '<td class="sub">' + d.cids.map((x, i) => (i ? '<span style="opacity:.7">' : '<b style="color:var(--ink)">') + esc(x.replace(/@.*/, '')) + (i ? '</span>' : '</b>')).join(', ') +
         (d.workers && d.workers.length ? '<br><small>일한 기사: ' + esc(d.workers.join(', ')) + '</small>' : '') +
         (d.movedIn && d.movedIn.length ? '<br><small style="color:var(--ok)">' + esc(d.movedIn.join(', ')) + '</small>' : '') +
@@ -5056,7 +5063,7 @@
     const lname = (l) => (l.method === '용차수행' || (l.method === '용차지출' && yongAllOurs) ? String(l.name).replace(/용차/g, '품앗이') : l.name);
     return '<h2>' + ymTitle(r.month) + ' ' + esc(co.name || '러너') + ' 정산서 (급여내역서) — ' + esc(d.name) + '</h2>' +
       '<div class="cols"><div><h4>① 기본 정보 · 정산 요약 (부가세 포함)</h4><table><tbody>' +
-      '<tr><th>기사명</th><td>' + esc(d.name) + '</td><th>정산월</th><td>' + esc(r.month) + '</td></tr>' +
+      '<tr><th>' + (d.vendor ? '업체명' : '기사명') + '</th><td>' + esc(d.name) + '</td><th>정산월</th><td>' + esc(r.month) + '</td></tr>' +
       '<tr><th>정산 아이디</th><td>' + esc(d.cids.map((x) => x.replace(/@.*/, '')).join(', ')) + '</td><th>정산기간</th><td>' + mdTxt(P.from) + ' ~ ' + mdTxt(P.to) + '</td></tr>' +
       '<tr><th>총 배송수량</th><td>' + wn(d.qty) + '건</td><th>근무일수</th><td>' + wdTxt(d) + '</td></tr>' +
       '<tr><th>일평균 수량</th><td>' + (d.workDays ? (Math.round(d.qty / d.workDays * 10) / 10) + '건' : Object.keys(s.daily).length ? (Math.round(d.qty / Object.keys(s.daily).length * 10) / 10) + '건 <small class="sub">(배송일 ' + Object.keys(s.daily).length + '일 기준)</small>' : '-') + '</td><th>계산서 발행기한</th><td>' + esc(D.invoice || '') + ' 까지</td></tr>' +
@@ -5065,7 +5072,7 @@
       Array.from({ length: n }, (_, i) => { const p = pays.concat(adds)[i], q = deds[i]; return '<tr>' + (p ? li(p, '').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + (q ? li(q, '−').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + '</tr>'; }).join('') +
       '<tr class="big"><td>지급 합계</td><td class="n">' + wn(d.pay + d.depAdd) + '</td><td>공제 합계</td><td class="n">−' + wn(dedSum) + '</td></tr></tbody></table>' +
       // 세금계산서 발행 안내 (기사가 이 칸만 보고 바로 발행할 수 있게) + 실 입금액
-      '<div class="invbox"><div class="ihd">📄 세금계산서 발행 <small>기사님 → ' + esc(co.name || '러너') + '</small></div>' +
+      '<div class="invbox"><div class="ihd">📄 세금계산서 발행 <small>' + (d.vendor ? esc(d.name) : '기사님') + ' → ' + esc(co.name || '러너') + '</small></div>' +
       '<div class="iamt"><span>발행 금액 (합계)</span><b>' + wn(d.invoice) + '원</b></div>' +
       '<table><tbody><tr><th>공급가액</th><td class="n">' + wn(d.supply) + '</td><th>세액</th><td class="n">' + wn(d.tax) + '</td></tr>' +
       '<tr><th>공급받는자</th><td colspan="3">' + esc(co.name || '') + (co.ceo ? ' / 대표 ' + esc(co.ceo) : '') + '</td></tr>' +
@@ -5413,6 +5420,23 @@
     STX.idt = b.dataset.idt; STX.edDirty = false; STX.tab = ''; stShowTab('ids');
   }));
   onSearch($('#stQ'), renderStList);
+  // 경고창: 미등록·명의자 없는 아이디 → 용차업체 아이디로 한 번에 지정
+  $('#stWarn').addEventListener('click', (e) => { if (e.target.closest('.vset')) e.preventDefault(); });
+  $('#stWarn').addEventListener('change', (e) => {
+    const t = e.target.closest('.vset'); if (!t) return;
+    let v = t.value; t.value = '';
+    if (!v) return;
+    if (v === '__new') { v = (prompt('용차업체 이름을 입력해 주세요.') || '').trim(); if (!v) return; }
+    const w = (STX.sum.warnings || []).find((x) => x.key === t.dataset.vw); if (!w || !w.acts) return;
+    const cids = t.dataset.vi === 'all' ? w.acts.flatMap((a) => a.cids) : (w.acts[+t.dataset.vi] || {}).cids || [];
+    if (!cids.length) return;
+    if (!confirm(cids.map((c) => c.replace(/@.*/, '')).join(', ') + '\n→ 용차업체 "' + v + '" 아이디로 지정할까요?\n(기사정보에는 등록하지 않고, 업체 정산서 1장으로 묶습니다)')) return;
+    api('adm_stlSetVendor', cids, v).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      toast('"' + v + '" 업체 아이디로 지정했습니다' + (r.vendorAdded ? ' · 아이디 관리 → 용차업체에서 건당 단가를 넣어 주세요.' : '.'));
+      STX.sum = null; loadSettle(STX.month, true);
+    }).catch(() => {});
+  });
 
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
   (function boot() {
