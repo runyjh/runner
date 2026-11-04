@@ -141,6 +141,9 @@
   .menu span { font-size: 12px; color: var(--sub); }
   .menu button.tile { background: #fff; border: 0; border-radius: var(--radius); padding: 18px 16px; min-height: 96px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
   .menu button.tile span { color: var(--brand); font-weight: 600; }
+  /* 카드 제목 앞 파란 세로 막대 */
+  .menu .tile > b { position: relative; padding-left: 10px; margin-bottom: 4px; }
+  .menu .tile > b::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 4px; height: 1.05em; border-radius: 2px; background: var(--brand); }
   .wk { background: #fff; border-radius: var(--radius); padding: 14px 14px 6px; margin-bottom: 12px; }
   .wk h3 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
   .wk h3 small { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
@@ -614,7 +617,7 @@
       <button class="tile" id="mSettle" type="button"><b>정산서 보기</b><span>월별 정산서·세금계산서 →</span></button>
       <button class="tile" id="mPm" type="button"><b>품앗이</b><span>품앗이 일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
-      <div class="tile wide bdtile" id="mBoard" role="button" tabindex="0"><b>💬 자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
+      <div class="tile wide bdtile" id="mBoard" role="button" tabindex="0"><b>자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
     </div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
