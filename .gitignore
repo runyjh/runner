@@ -1,0 +1,21 @@
+# clasp 인증·연결 정보는 저장소에 올리지 않는다 (GitHub Secrets 사용)
+.clasprc.json
+.clasp.json
+
+# 백엔드 데이터·개인정보 파일은 절대 저장소에 두지 않는다 (구글 드라이브에만 보관)
+*.xlsx
+*.csv
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.heic
+
+# 단, 깃허브 페이지 앱 아이콘은 올린다
+!site/icons/*.png
+
+# 깃허브 페이지 빌드 결과
+_site/
+
+node_modules/
+.DS_Store
