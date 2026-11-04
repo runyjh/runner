@@ -476,7 +476,7 @@
     <div class="menu">
       <button class="tile" id="mSched" type="button"><b>스케줄</b><span>2주·한 달 일정 보기 →</span></button>
       <div><b>정산서 보기</b><span>준비 중</span></div>
-      <button class="tile" id="mPm" type="button"><b>품앗이</b><span>용차 일감 찾기·맡기기 →</span></button>
+      <button class="tile" id="mPm" type="button"><b>품앗이</b><span>품앗이 일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span></button>
     </div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
@@ -504,11 +504,11 @@
   </section>
 
 
-  <!-- ───────────── 품앗이 (기사끼리 용차 일감 주고받기) ───────────── -->
+  <!-- ───────────── 품앗이 (기사끼리 품앗이 일감 주고받기) ───────────── -->
   <section id="v-pumasi" class="view">
     <div class="topbar"><button class="back" id="pmBack" aria-label="뒤로">←</button><h2>품앗이</h2>
       <button class="btn sm" id="pmNew" type="button" style="margin-left:auto;height:38px">+ 일감 올리기</button></div>
-    <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.<small>기사님끼리 용차 일감을 맡기고 대신 뛰어 주세요.</small></div>
+    <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.<small>기사님끼리 품앗이 일감을 맡기고 대신 뛰어 주세요.</small></div>
     <div class="pmfil"><input type="search" id="pmQ" placeholder="배송지·센터 검색 (예: 화곡동, 강서1)" enterkeyhint="search" autocomplete="off"><button class="btn sm" id="pmGo" type="button" style="height:44px">검색</button></div>
     <label class="pmchk"><input type="checkbox" id="pmAvail"> 지원 가능 오더만 보기</label>
     <div class="pmsum" id="pmSum"></div>
@@ -1126,8 +1126,8 @@
   $('#mSched').addEventListener('click', openSched);
   $('#scBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
 
-  // ───── 품앗이 (바로일 '용차' 방식: 올리기 → 지원 → 통화 후 협의·확정 → 직접 정산) ─────
-  const PM_KIND = { '주간': '용차☀️ 주간', '야간': '용차🌙 야간', '일택': '일택📦' };
+  // ───── 품앗이 (바로일 방식: 올리기 → 지원 → 통화 후 협의·확정 → 직접 정산) ─────
+  const PM_KIND = { '주간': '품앗이☀️ 주간', '야간': '품앗이🌙 야간', '일택': '일택📦' };
   const PM_ST = { '모집 중': 'open', '배차 협의중': 'talk', '배차 확정': 'done', '모집 마감': 'closed', '취소': 'cancel', '완료': 'end' };
   const PM_STL = { '모집 마감': '모집 마감', '취소': '취소된 일감', '완료': '완료', '배차 확정': '배차 확정', '배차 협의중': '배차 협의중' };
   let pmFrom = 'home', pmDetFrom = 'pumasi', pmCurId = '', pmMineKind = 'posted', pmFormData = null, pmEditId = '', pmAttach = null, pmRemoveAttach = false;
