@@ -35,7 +35,6 @@ const common = [
   '<script>window.RUNNER_CONFIG = ' + JSON.stringify({ api: api, ver: ver }) + ';</script>',
   '<link rel="preconnect" href="https://script.google.com">',
   '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',
-  '<link rel="icon" type="image/png" href="icons/favicon-48.png">',
   '<meta name="theme-color" content="#1b64da">',
   '<meta name="referrer" content="no-referrer">'
 ];
@@ -44,6 +43,7 @@ const pages = [
   {
     src: 'Index.html', out: 'index.html', title: '러너 올인원',
     head: common.concat([
+      '<link rel="icon" type="image/png" href="icons/favicon-48.png">',
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
       '<link rel="manifest" href="manifest.webmanifest">',
       '<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">',
@@ -55,15 +55,17 @@ const pages = [
     ])
   },
   {
-    src: 'Admin.html', out: 'admin.html', title: '러너 올인원 관리자',
+    // 관리자는 admin/ 폴더에 둔다: 기사 앱(./)과 설치 범위가 겹치면 크롬이 관리자 화면을 기사 앱 일부로 보고 따로 설치하지 못한다
+    src: 'Admin.html', out: 'admin/index.html', title: '러너 올인원 관리자',
     head: common.concat([
+      '<link rel="icon" type="image/png" href="../icons/favicon-48.png">',
       '<meta name="viewport" content="width=device-width, initial-scale=1">', '<meta name="robots" content="noindex">',
-      '<link rel="manifest" href="admin.webmanifest">',
-      '<link rel="apple-touch-icon" href="icons/admin-apple-touch-icon.png">',
+      '<link rel="manifest" href="manifest.webmanifest">',
+      '<link rel="apple-touch-icon" href="../icons/admin-apple-touch-icon.png">',
       '<meta name="apple-mobile-web-app-capable" content="yes">',
       '<meta name="mobile-web-app-capable" content="yes">',
       '<meta name="apple-mobile-web-app-title" content="러너 관리자">',
-      SW,
+      SW.replace("register(\'sw.js\')", "register(\'../sw.js\')"),
       // 관리자 화면 보안 정책: 서버(구글 웹앱) 외의 곳으로는 데이터를 보낼 수 없고, 다른 곳의 스크립트도 실행되지 않는다
       '<meta http-equiv="Content-Security-Policy" content="' + [
         "default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
@@ -80,8 +82,19 @@ pages.forEach((p) => {
   if (!/<meta charset="utf-8">/.test(html)) throw new Error(p.src + ': <meta charset="utf-8"> 를 찾지 못했습니다.');
   // 앱스크립트는 setTitle 로 제목을 붙이므로, 페이지용에는 <title> 을 직접 넣는다
   html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<title>' + p.title + '</title>\n' + p.head.join('\n'));
+  fs.mkdirSync(path.dirname(path.join(OUT, p.out)), { recursive: true });
   fs.writeFileSync(path.join(OUT, p.out), html);
   console.log('OK   _site/' + p.out);
 });
+// 관리자 앱 설치 정보 (admin/ 기준 경로로 옮김)
+const am = JSON.parse(fs.readFileSync(path.join(ROOT, 'site', 'admin.webmanifest'), 'utf8'));
+am.id = './'; am.start_url = './'; am.scope = './';
+am.icons = am.icons.map((i) => Object.assign({}, i, { src: '../' + i.src.replace(/^\.\//, '') }));
+fs.writeFileSync(path.join(OUT, 'admin', 'manifest.webmanifest'), JSON.stringify(am, null, 2));
+fs.rmSync(path.join(OUT, 'admin.webmanifest'), { force: true });
+// 예전 관리자 주소(admin.html) → admin/ 로 이동
+fs.writeFileSync(path.join(OUT, 'admin.html'), '<!DOCTYPE html><meta charset="utf-8"><title>러너 올인원 관리자</title>' +
+  '<meta http-equiv="refresh" content="0; url=admin/"><script>location.replace("admin/" + location.search + location.hash);</script>' +
+  '<a href="admin/">관리자 화면으로 이동</a>');
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 console.log('\n깃허브 페이지용 화면을 만들었습니다 (웹앱: ' + api.replace(/\/s\/(.{6}).*\/exec/, '/s/$1…/exec') + ')');
