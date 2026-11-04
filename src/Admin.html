@@ -920,7 +920,7 @@
       <div class="field full"><label class="lb" for="acUrl">접속 주소</label><input class="inp" id="acUrl" maxlength="500" placeholder="예: https://wing.coupang.com" spellcheck="false"></div>
       <div class="field full"><label class="lb" for="acMemo">메모 (2단계 인증 휴대폰, 결제일 등)</label><textarea class="inp" id="acMemo" maxlength="2000" style="height:70px"></textarea></div>
     </div>
-    <div class="field"><span class="lb">상태</span><div class="seg" id="acStatus"><button type="button" data-st="사용" class="on">사용</button><button type="button" data-st="중지">중지</button></div></div>
+    <div class="field"><span class="lb">상태</span><div class="seg" id="acStatus"><button type="button" data-st="사용" class="on">사용</button><button type="button" data-st="정지">정지</button></div></div>
     <label class="check hidden" id="acPwClearWrap"><input type="checkbox" id="acPwClear"> 저장된 비밀번호 지우기</label>
     <div class="m-actions"><button type="button" class="btn ghost danger-t" id="acDel" style="margin-right:auto">삭제</button><button type="button" class="btn ghost" id="acCancel">닫기</button><button class="btn" id="acSave">저장</button></div>
   </form>
@@ -1464,7 +1464,7 @@
       if (!m) { whole.set(r.code, (whole.get(r.code) !== false) && !!r.stopped); return; }
       if (!groups.has(m[1])) groups.set(m[1], new Map());
       const g = groups.get(m[1]);
-      m[2].split('').forEach((ch) => g.set(ch, (g.has(ch) ? g.get(ch) : true) && !!r.stopped)); // 모든 노선이 중지일 때만 중지
+      m[2].split('').forEach((ch) => g.set(ch, (g.has(ch) ? g.get(ch) : true) && !!r.stopped)); // 모든 노선이 정지일 때만 정지
     });
     return { groups, whole };
   }
@@ -1483,7 +1483,7 @@
       '<button type="button" class="sp' + (special === '용차' ? ' on' : '') + '" data-' + p + 'sp="용차">용차</button></div>' +
       (list.length ? '<div class="ugrid">' + nums.map((n) => {
         const g = groups.get(n), letters = [...g.keys()].sort(), allOn = letters.every((ch) => sel.includes(n + ch));
-        return '<div class="urow"><b class="code">' + esc(n) + '</b><div class="ul">' + letters.map((ch) => btn(n + ch, ch, g.get(ch), g.get(ch) ? n + ch + ' 중지된 노선' : n + ch)).join('') + '</div>' +
+        return '<div class="urow"><b class="code">' + esc(n) + '</b><div class="ul">' + letters.map((ch) => btn(n + ch, ch, g.get(ch), g.get(ch) ? n + ch + ' 정지된 노선' : n + ch)).join('') + '</div>' +
           '<button type="button" class="uall' + (allOn ? ' on' : '') + '" data-' + p + 'all="' + esc(n) + '">전체</button></div>';
       }).join('') +
       ([...whole.keys()].length ? '<div class="urow"><b class="sub" style="font-size:12px">기타</b><div class="ul">' + [...whole.keys()].sort(koSort).map((c) => btn(c, c, whole.get(c))).join('') + '</div></div>' : '') +
@@ -1507,7 +1507,7 @@
   }
 
   const campRots = (id) => { const c = CR && CR.camps.find((x) => x.id === id); return String((c && c.rot) || 'D1,D2,F3').split(',').filter(Boolean); };
-  const campList = (id) => (CR ? CR.routes.filter((r) => r.campId === id).map((r) => ({ code: r.code, stopped: r.status === '중지' })) : []);
+  const campList = (id) => (CR ? CR.routes.filter((r) => r.campId === id).map((r) => ({ code: r.code, stopped: r.status === '정지' })) : []);
   function composeBR() { return aSel ? composeUnits(aSel.units, aSel.special, aSel.rots, campRots(aSel.campId)) : ''; }
   function assignSec() {
     return '<div class="sec" id="aSec"><h4>배정 캠프 · 라우트</h4><div id="aBody"><div class="spin" style="width:20px;height:20px"></div></div>' +
@@ -1831,8 +1831,8 @@
     $('#acCount').textContent = AC.accounts.length + '개';
     $('#acEmpty').classList.toggle('hidden', list.length > 0);
     $('#acEmpty').textContent = AC.accounts.length ? '조건에 맞는 계정이 없습니다.' : '아직 등록된 계정이 없습니다. 오른쪽 위 "+ 새 계정"으로 추가하세요.';
-    $('#acRows').innerHTML = list.map((x) => '<tr data-ac-id="' + esc(x.id) + '"' + (x.status === '중지' ? ' class="off"' : '') + '>' +
-      '<td><span class="cat">' + esc(x.category || '기타') + '</span></td><td><b>' + esc(x.service) + '</b>' + (x.status === '중지' ? ' <span class="badge b-정지">중지</span>' : '') + '</td>' +
+    $('#acRows').innerHTML = list.map((x) => '<tr data-ac-id="' + esc(x.id) + '"' + (x.status === '정지' ? ' class="off"' : '') + '>' +
+      '<td><span class="cat">' + esc(x.category || '기타') + '</span></td><td><b>' + esc(x.service) + '</b>' + (x.status === '정지' ? ' <span class="badge b-정지">정지</span>' : '') + '</td>' +
       '<td>' + (x.camp ? esc(x.camp) : '<span class="sub">공통</span>') + '</td>' +
       '<td>' + esc(x.loginId) + (x.loginId ? '<button type="button" class="cp" data-cp-id="' + esc(x.id) + '">복사</button>' : '') + '</td>' +
       '<td>' + (x.hasPw ? '<span class="pw' + (acShown[x.id] ? ' show' : '') + '">' + (acShown[x.id] ? esc(acShown[x.id]) : '●●●●●●') + '</span>' +
@@ -1985,7 +1985,7 @@
     }).catch(() => {}).finally(() => { btn.disabled = false; });
   });
   $('#acDel').addEventListener('click', () => {
-    if (!acEdit || !confirm('"' + acEdit.service + (acEdit.camp ? ' (' + acEdit.camp + ')' : '') + '" 계정을 삭제할까요?\n\n저장된 비밀번호도 함께 지워집니다. 잠시 안 쓰는 계정이면 상태를 "중지"로 바꾸세요.')) return;
+    if (!acEdit || !confirm('"' + acEdit.service + (acEdit.camp ? ' (' + acEdit.camp + ')' : '') + '" 계정을 삭제할까요?\n\n저장된 비밀번호도 함께 지워집니다. 잠시 안 쓰는 계정이면 상태를 "정지"로 바꾸세요.')) return;
     api('adm_accDelete', acEdit.id).then((r) => { if (!r.ok) return toast(r.msg); acClose(); toast('계정을 삭제했습니다.'); loadAccounts(); }).catch(() => {});
   });
 
@@ -2789,7 +2789,7 @@
     $('#rFilters').innerHTML = '<input class="inp" data-rf="q" placeholder="노선코드·메모 검색" value="' + esc(rtf.q) + '" autocomplete="off">' +
       GK.map((k, i) => sel(k, '구분' + (i + 1))).join('') +
       '<select class="inp" data-rf="status" aria-label="사용여부"><option value="">사용여부 전체</option>' +
-      ['사용', '중지'].map((v) => '<option' + (rtf.status === v ? ' selected' : '') + '>' + v + '</option>').join('') + '</select>' +
+      ['사용', '정지'].map((v) => '<option' + (rtf.status === v ? ' selected' : '') + '>' + v + '</option>').join('') + '</select>' +
       '<button class="btn sm ghost" data-ract="rf-reset" style="height:34px">초기화</button>';
   }
   function filteredRoutes() {
@@ -2803,10 +2803,10 @@
     const all = routesOf(curCamp), list = filteredRoutes();
     $('#rCount').textContent = list.length === all.length ? all.length + '개' : list.length + ' / ' + all.length + '개';
     $('#rRows').innerHTML = list.map((r) =>
-      '<tr data-rid="' + esc(r.id) + '"' + (r.status === '중지' ? ' class="off"' : '') + '>' +
+      '<tr data-rid="' + esc(r.id) + '"' + (r.status === '정지' ? ' class="off"' : '') + '>' +
       '<td class="ck"><input type="checkbox" data-rck="' + esc(r.id) + '"' + (rsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
       '<td><b class="code">' + esc(r.code) + '</b></td>' + GK.map((k) => '<td class="g">' + esc(r[k]) + '</td>').join('') +
-      '<td><span class="badge ' + (r.status === '중지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' +
+      '<td><span class="badge ' + (r.status === '정지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' +
       '<td class="sub memo-cell" title="' + esc(r.memo) + '">' + esc(r.memo) + '</td><td class="sub">' + esc(String(r.updatedAt || '').slice(0, 16)) + '</td></tr>').join('');
     const em = $('#rEmpty');
     em.classList.toggle('hidden', !!list.length);
@@ -2819,7 +2819,7 @@
     rsel = new Set([...rsel].filter((id) => have.has(id)));
     const b = $('#rBulk'); if (!b) return;
     b.classList.toggle('hidden', !rsel.size);
-    b.innerHTML = '<b>' + rsel.size + '개 선택</b><button class="btn sm ok" data-ract="bulk-on">사용</button><button class="btn sm ghost" data-ract="bulk-off">중지</button>' +
+    b.innerHTML = '<b>' + rsel.size + '개 선택</b><button class="btn sm ok" data-ract="bulk-on">사용</button><button class="btn sm ghost" data-ract="bulk-off">정지</button>' +
       '<button class="btn sm danger" data-ract="bulk-del">삭제</button><button class="btn sm ghost" data-ract="bulk-clear">선택 해제</button>';
   }
 
@@ -2848,14 +2848,14 @@
     else if (act === 'rf-reset') { resetFilters(); renderFilters(); renderRoutes(); }
     else if (act === 'bulk-clear') { rsel.clear(); renderRoutes(); }
     else if (act === 'bulk-on' || act === 'bulk-off') {
-      const st = act === 'bulk-on' ? '사용' : '중지';
+      const st = act === 'bulk-on' ? '사용' : '정지';
       api('adm_routeStatus', [...rsel], st).then((r) => {
         if (!r.ok) return toast(r.msg);
         r.routes.forEach(patchRoute); rsel.clear(); renderRoutes(); toast(r.routes.length + '개 노선을 ' + st + '(으)로 바꿨습니다.');
       }).catch(() => {});
     } else if (act === 'bulk-del') {
       const n = rsel.size;
-      if (!confirm('선택한 노선 ' + n + '개를 삭제할까요?\n삭제하면 되돌릴 수 없습니다. 잠시 쓰지 않는 노선이면 "중지"를 권장합니다.')) return;
+      if (!confirm('선택한 노선 ' + n + '개를 삭제할까요?\n삭제하면 되돌릴 수 없습니다. 잠시 쓰지 않는 노선이면 "정지"를 권장합니다.')) return;
       api('adm_routeDelete', [...rsel]).then((r) => {
         if (!r.ok) return toast(r.msg);
         dropRoutes(r.deleted); rsel.clear(); renderCampList(); renderCampMain(); toast(r.deleted.length + '개 노선을 삭제했습니다.');
@@ -2969,9 +2969,9 @@
       '<div class="field"><label class="lb" for="rmCamp">캠프 (바꾸면 그 캠프로 옮겨집니다)</label><select class="inp" id="rmCamp">' +
         (known ? '' : '<option value="">(캠프 미지정)</option>') +
         camps.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === r.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></div>' +
-      '<div class="field"><span class="lb">사용여부</span><div class="radios">' + ['사용', '중지'].map((v) =>
+      '<div class="field"><span class="lb">사용여부</span><div class="radios">' + ['사용', '정지'].map((v) =>
         '<label><input type="radio" name="rmSt" value="' + v + '"' + (r.status === v ? ' checked' : '') + '> ' + v + '</label>').join('') +
-        '<span style="color:var(--faint);font-size:12px">당분간 안 쓰는 노선은 삭제 대신 중지</span></div></div>' +
+        '<span style="color:var(--faint);font-size:12px">당분간 안 쓰는 노선은 삭제 대신 정지</span></div></div>' +
       '<div class="field"><label class="lb" for="rmMemo">메모</label><textarea class="inp" id="rmMemo">' + esc(r.memo) + '</textarea></div>' +
       routePriceTable(r) +
       '<div class="meta"><span>등록</span><span>' + esc(r.createdAt || '-') + '</span><span>수정</span><span>' + esc(r.updatedAt || '-') + '</span></div>';
@@ -3025,7 +3025,7 @@
   });
   $('#rmDel').addEventListener('click', () => {
     const r0 = rmEdit; if (!r0) return;
-    if (!confirm('노선 ' + r0.code + '을(를) 삭제할까요?\n되돌릴 수 없습니다. 잠시 쓰지 않는 노선이면 "중지"를 권장합니다.')) return;
+    if (!confirm('노선 ' + r0.code + '을(를) 삭제할까요?\n되돌릴 수 없습니다. 잠시 쓰지 않는 노선이면 "정지"를 권장합니다.')) return;
     api('adm_routeDelete', [r0.id]).then((r) => {
       if (!r.ok) return toast(r.msg);
       dropRoutes(r.deleted); $('#routeModal').classList.add('hidden');
@@ -4500,7 +4500,7 @@
   function ownerLabel(o, all) { return all.filter((x) => x.name === o.name).length > 1 ? o.name + ' (' + (o.loginId || o.id) + ')' : o.name; }
   function renderEditor() {
     const T = STX.table, rows = STX.edRows, ro = T.closed;
-    const dl = '<datalist id="stAcctDL">' + (T.accts || []).map((o) => '<option value="' + esc(o.label) + '">' + (o.stopped ? '중지' : '') + '</option>').join('') + '</datalist>' +
+    const dl = '<datalist id="stAcctDL">' + (T.accts || []).map((o) => '<option value="' + esc(o.label) + '">' + (o.stopped ? '정지' : '') + '</option>').join('') + '</datalist>' +
       '<datalist id="stPersonDL">' + (T.persons || []).map((o) => '<option value="' + esc(o.label) + '">' + esc(o.status !== '승인' ? o.status : '') + '</option>').join('') + '</datalist>';
     const calcH = T.name === 'yongcha' ? ['자동건수', '지급액', '쿠팡매출', '기존지급', '추가지급', '부담 차감'] : T.name === 'advance' ? ['잔여'] : [];
     const cell = (r, i, c) => {

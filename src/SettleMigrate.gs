@@ -397,7 +397,7 @@ function mgIdRows_(master, dr) {
     ids.push({
       cid: x.cid, role: sub ? '서브' : '메인', main: sub ? m.cid : '', owner: p.name || x.name, ownerId: p.id || '',
       type: STL_TYPES.indexOf(x.code) >= 0 ? x.code : '', mode: x.mode === '용차형' ? '용차내역' : (x.code === '대표' || x.code === '운영자') ? '원청단가' : '',
-      insEx: x.san === 'N' && x.goy === 'N' ? 'Y' : '', fbCut: sub ? '' : x.fbCut, status: !x.status || x.status === '근무' ? '사용' : '중지', memo: '기존 정산 시트 기사마스터'
+      insEx: x.san === 'N' && x.goy === 'N' ? 'Y' : '', fbCut: sub ? '' : x.fbCut, status: !x.status || x.status === '근무' ? '사용' : '정지', memo: '기존 정산 시트 기사마스터'
     });
     if (!sub && stlNum_(x.tmp) > 0) tmp.push({ name: p.name || x.name, driverId: p.id || '', from: stlYmd_(x.tmpFrom), to: stlYmd_(x.tmpTo), price: String(stlNum_(x.tmp)), routes: x.tmpRoutes, memo: '기존 정산 시트 기사마스터' });
     const w = dr.workerOf[k];

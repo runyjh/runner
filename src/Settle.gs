@@ -122,7 +122,7 @@ const STL_CFG = [
 
 const STL_DRIVER_FIELDS = ['bizNo', 'bizName', 'bizEmail']; // 기사(사람) 정보: 명의자의 세금계산서용
 const STL_ROLES = ['메인', '서브'];
-const STL_ID_STATUS = ['사용', '중지'];
+const STL_ID_STATUS = ['사용', '정지']; // 예전 값 '중지' 도 정지로 읽는다
 const STL_TYPES = ['고정', '백업', '품앗이', '외부용차'];
 const STL_MODES = ['', '원청단가', '용차내역'];
 const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외부용차': 'p5' };
@@ -639,7 +639,7 @@ function stlIds_(D) {
     by[k] = {
       key: k, cid: r.cid, role: r.role === '서브' ? '서브' : '메인', mainRaw: r.main, ownerId: ownerId, ownerName: ownerId ? D.byId[ownerId].name : r.owner,
       type: STL_TYPES.indexOf(r.type) >= 0 ? r.type : '', mode: STL_MODES.indexOf(r.mode) >= 0 ? r.mode : '', insEx: stlYes_(r.insEx), fbCut: r.fbCut,
-      stopped: r.status === '중지', _row: r._row
+      stopped: r.status === '정지' || r.status === '중지', _row: r._row
     };
   });
   const bad = [];
@@ -670,7 +670,7 @@ function stlSeedIds_(D) {
       rows.push({
         cid: o.loginId, role: ow ? '서브' : '메인', main: ow ? ow.loginId : '', owner: (ow || o).name, ownerId: (ow || o).id,
         type: STL_TYPES.indexOf(o.driverType) >= 0 ? o.driverType : '', mode: STL_MODES.indexOf(o.stlMode) >= 0 ? o.stlMode : '',
-        insEx: stlYes_(o.insEx) ? 'Y' : '', fbCut: ow ? '' : (o.fbCut || ''), status: o.status === ST.ACTIVE ? '사용' : '중지', memo: '기사 정보에서 자동 생성'
+        insEx: stlYes_(o.insEx) ? 'Y' : '', fbCut: ow ? '' : (o.fbCut || ''), status: o.status === ST.ACTIVE ? '사용' : '정지', memo: '기사 정보에서 자동 생성'
       });
       if (stlNum_(o.tmpPrice) > 0) tmp.push({ name: o.name, driverId: o.id, from: o.tmpFrom, to: o.tmpTo, price: o.tmpPrice, routes: o.tmpRoutes, memo: '기사 정보에서 옮김' });
     });
@@ -1132,7 +1132,7 @@ function stlCompute_(month) {
   W('noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정)', drivers.filter(function (d) { return !d.ownerId; }).map(function (d) { return d.cids.map(cidNm).join(', ') + ' · ' + won_(d.sales) + '원'; }), 'bad');
   W('badSub', '서브인데 메인 아이디를 찾을 수 없음 (따로 정산됨)', X.badSub.map(cidNm));
   W('moveNo', '아이디 사용 기록의 기사에게 본인 정산 아이디가 없음 (명의자 정산에 남김 — 아이디 관리에 그 기사 아이디 추가)', Object.keys(warn.moveNo).map(function (k) { const w = warn.moveNo[k]; return w.name + ' · ' + cidNm(w.cid) + ' ' + w.dates.length + '일'; }));
-  W('stopped', '중지된 아이디에 배송 기록', Object.keys(warn.stopped).map(cidNm), 'info');
+  W('stopped', '정지된 아이디에 배송 기록', Object.keys(warn.stopped).map(cidNm), 'info');
   W('noCamp', '노선관리에 없는 캠프', Object.keys(warn.noCamp), 'bad');
   W('noPrice', '단가 미입력 (노선관리 → 구분별 단가)', Object.keys(warn.noPrice).map(function (k) {
     const w = warn.noPrice[k]; return w.camp + ' ' + w.route + (w.type ? ' · ' + w.type + '단가' : '') + ' · ' + won_(w.qty) + '건' + (w.routeKnown ? '' : ' (노선 미등록)');
@@ -1775,6 +1775,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
         }
         if (o.fbCut && !/^\d+(\.\d+)?%?$/.test(o.fbCut.replace(/[,\s원]/g, ''))) fail_(o.cid + ': 프레시백 차감은 13% 또는 금액');
         if (!o.status) o.status = '사용';
+        if (o.status === '중지') o.status = '정지';
       });
     }
     const lock = LockService.getScriptLock();
@@ -1920,7 +1921,7 @@ function stlEnsureIdFor_(o) {
     }
     stlAppend_('stl_ids', [{
       cid: o.loginId, role: '메인', main: '', owner: o.name, ownerId: o.id, type: STL_TYPES.indexOf(o.driverType) >= 0 ? o.driverType : '',
-      mode: '', insEx: '', fbCut: '', status: o.status === ST.STOPPED ? '중지' : '사용', memo: '기사 정보관리에서 자동 추가'
+      mode: '', insEx: '', fbCut: '', status: o.status === ST.STOPPED ? '정지' : '사용', memo: '기사 정보관리에서 자동 추가'
     }]);
     stlBump_();
   } catch (e) { console.error('아이디 관리 연동 실패: ' + (e && e.message)); }
@@ -1943,7 +1944,7 @@ function stlIdsToDrivers_(token) {
     const pid = stlPerson_(D, owner, r.ownerId);
     const type = STL_TYPES.indexOf(r.type) >= 0 ? r.type : '';
     if (!pid) {
-      const f = { name: owner, driverType: type || '고정', status: r.status === '중지' ? ST.STOPPED : ST.ACTIVE, memo: '정산관리 아이디 관리에서 자동 등록' };
+      const f = { name: owner, driverType: type || '고정', status: (r.status === '정지' || r.status === '중지') ? ST.STOPPED : ST.ACTIVE, memo: '정산관리 아이디 관리에서 자동 등록' };
       if (main && !usedLogin[k]) f.loginId = String(r.cid).replace(/@.*$/, '');
       let res = adm_createDriver(token, f);
       if (!res.ok && f.loginId) { delete f.loginId; res = adm_createDriver(token, f); }

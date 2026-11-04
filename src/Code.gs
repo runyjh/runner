@@ -139,7 +139,7 @@ const N_NOTES = {
 
 // accounts 시트 (회사가 쓰는 다른 프로그램·서비스 계정: 쿠팡 어드민, 팀즈, 메일, 홈택스 등. 기사 계정 아님)
 const ACC_MASK = '●●●●●●●●';
-const ACST = { ON: '사용', OFF: '중지' };
+const ACST = { ON: '사용', OFF: '정지' }; // 예전 값 '중지' 도 정지로 읽는다
 const ACC_CATS = ['쿠팡', '팀즈', '메일', '홈택스·세무', '은행·카드', '통신·인터넷', '기타'];
 const AC = {
   id: '계정ID', category: '분류', service: '서비스명', camp: '캠프', loginId: '아이디', password: '비밀번호',
@@ -214,7 +214,7 @@ const CI_NOTES = {
   order: '작은 숫자가 앞에 표시됩니다.'
 };
 // routes 시트: 노선 (구분1~5는 노선코드에서 자동으로 나뉜다)
-const RST = { ON: '사용', OFF: '중지' };
+const RST = { ON: '사용', OFF: '정지' }; // 예전 값 '중지' 도 정지로 읽는다
 const R = {
   id: '노선ID', campId: '캠프ID', campName: '캠프명', code: '노선코드',
   g1: '구분1', g2: '구분2', g3: '구분3', g4: '구분4', g5: '구분5',
@@ -2296,7 +2296,7 @@ function newAccId_() { return uniqId_('AC'); }
 function accView_(o) {
   return {
     id: o.id, category: o.category, service: o.service, camp: o.camp, loginId: o.loginId, hasPw: !!o.pwEnc,
-    owner: o.owner, url: o.url, memo: o.memo, status: o.status === ACST.OFF ? ACST.OFF : ACST.ON,
+    owner: o.owner, url: o.url, memo: o.memo, status: (o.status === ACST.OFF || o.status === '중지') ? ACST.OFF : ACST.ON,
     pwChangedAt: o.pwChangedAt, author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt
   };
 }
@@ -2327,7 +2327,7 @@ function adm_accSave(token, x) {
       category: str_(x.category).slice(0, 30), service: str_(x.service).slice(0, 60), camp: str_(x.camp).slice(0, 30),
       loginId: str_(x.loginId).slice(0, 200), owner: str_(x.owner).slice(0, 60), url: accUrl_(x.url).slice(0, 500),
       memo: String(x.memo == null ? '' : x.memo).replace(/\r\n?/g, '\n').trim().slice(0, 2000),
-      status: x.status === ACST.OFF ? ACST.OFF : ACST.ON
+      status: (x.status === ACST.OFF || x.status === '중지') ? ACST.OFF : ACST.ON
     };
     if (!f.service) fail_('서비스명을 입력해 주세요. (예: 쿠팡 어드민, 팀즈, 홈택스)');
     let pwChanged = false;
@@ -3166,7 +3166,7 @@ function routeView_(o) {
   const g = splitCode_(o.code);
   return {
     id: o.id, campId: o.campId, code: normCode_(o.code), g1: g.g1, g2: g.g2, g3: g.g3, g4: g.g4, g5: g.g5,
-    status: o.status === RST.OFF ? RST.OFF : RST.ON, memo: o.memo, createdAt: o.createdAt, updatedAt: o.updatedAt
+    status: (o.status === RST.OFF || o.status === '중지') ? RST.OFF : RST.ON, memo: o.memo, createdAt: o.createdAt, updatedAt: o.updatedAt
   };
 }
 function imageView_(o) {
@@ -3541,7 +3541,8 @@ function adm_routeSave(token, f) {
   return run_(function () {
     requireAdmin_(token);
     f = f || {};
-    if (f.status !== undefined && f.status !== RST.ON && f.status !== RST.OFF) fail_('사용여부는 사용 또는 중지만 됩니다.');
+    if (f.status === '중지') f.status = RST.OFF;
+    if (f.status !== undefined && f.status !== RST.ON && f.status !== RST.OFF) fail_('사용여부는 사용 또는 정지만 됩니다.');
     const memo = f.memo === undefined ? undefined : String(f.memo || '').trim();
     if (memo && memo.length > 1000) fail_('메모가 너무 깁니다. (1000자 이내)');
     const code = f.code === undefined ? undefined : checkCode_(f.code);
@@ -3628,7 +3629,8 @@ function adm_routeBulkAdd(token, campId, text) {
 function adm_routeStatus(token, ids, status) {
   return run_(function () {
     requireAdmin_(token);
-    if (status !== RST.ON && status !== RST.OFF) fail_('사용여부는 사용 또는 중지만 됩니다.');
+    if (status === '중지') status = RST.OFF;
+    if (status !== RST.ON && status !== RST.OFF) fail_('사용여부는 사용 또는 정지만 됩니다.');
     const want = {};
     (ids || []).forEach(function (id) { want[String(id)] = 1; });
     const lock = LockService.getScriptLock();
@@ -3726,7 +3728,7 @@ function fixRouteRow_(sh, c, o) {
   if (code !== o.code) upd.code = code;
   const g = splitCode_(code);
   Object.keys(g).forEach(function (k) { if (o[k] !== g[k]) upd[k] = g[k]; });
-  const st = /^(중지|n|no|x|off|미사용|사용안함|0)$/i.test(o.status) ? RST.OFF : RST.ON;
+  const st = /^(중지|정지|n|no|x|off|미사용|사용안함|0)$/i.test(o.status) ? RST.OFF : RST.ON;
   if (st !== o.status) upd.status = st;
   const camp = resolveCamp_(o);
   if (!camp.err) {
