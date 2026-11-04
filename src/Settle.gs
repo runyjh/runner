@@ -931,7 +931,7 @@ function stlCompute_(month) {
       warn.kind[r.kind || '(빈칸)'] = (warn.kind[r.kind || '(빈칸)'] || 0) + 1;
     }
     if (pay) s.campPay[stlShort_(camp)] = (s.campPay[stlShort_(camp)] || 0) + pay;
-    if (mv) stlMoveNote_(s, sum(idx.mainKey), r, worker, X, D, idx, pay, (kind === '배송' || kind === '수기반영') ? qty : 0);
+    if (mv) stlMoveNote_(s, sum(idx.mainKey), r, worker, X, D, idx, pay, (kind === '배송' || kind === '수기반영') ? qty : 0, mv.key);
   });
 
   // 프레시백 차감 (메인 아이디의 '프레시백 차감': 13% 처럼 비율 → 100원 반올림 / 금액 → 그대로) → 러너 몫
@@ -954,7 +954,7 @@ function stlCompute_(month) {
     const s = sum(mv ? mv.key : idx.mainKey);
     const share = stlR10_(amt * (cfg.lossVat ? 1 + cfg.vat : 1) * cfg.lossRate);
     s.loss += share; s.lossCp += amt;
-    if (mv) stlMoveNote_(s, sum(idx.mainKey), lr, mv.worker, X, D, idx, -share, 0);
+    if (mv) stlMoveNote_(s, sum(idx.mainKey), lr, mv.worker, X, D, idx, -share, 0, mv.key);
     s.lossLines.push({ date: stlYmd_(r.date), cid: r.cid, camp: r.camp, type: r.type, detail: r.detail, item: r.item, waybill: r.waybill, amt: share });
   });
 
@@ -1192,12 +1192,13 @@ function stlMoveOf_(ctx, idx, worker, r, warn) {
   }
   return null;
 }
-/** 옮긴 줄 기록: 일한 기사 명세서 '○○ (명의자 아이디) 사용분' / 명의자 명세서 '○○ 사용분 이전' */
-function stlMoveNote_(sIn, sOut, r, worker, X, D, idx, amt, qty) {
+/** 옮긴 줄 기록: 일한 기사 쪽 '+ ymk1004 윤미경(정민녕) 사용' / 명의자 쪽 '- kyungjin0087 민경진 사용' (일한 기사 본인 아이디) */
+function stlMoveNote_(sIn, sOut, r, worker, X, D, idx, amt, qty, wkey) {
   const cid = String(r.cid).replace(/@.*$/, ''), ownerName = X.groups[idx.mainKey].ownerId && D.byId[X.groups[idx.mainKey].ownerId] ? D.byId[X.groups[idx.mainKey].ownerId].name : '명의자 없음';
   const wName = D.byId[worker] ? D.byId[worker].name : worker;
-  const a = sIn.movedIn[cid] || (sIn.movedIn[cid] = { label: '사용분 + ' + cid + ' ' + ownerName + ' 사용', cid: cid, who: ownerName, qty: 0, amt: 0, dates: {} });
-  const b = sOut.movedOut[worker + '|' + cid] || (sOut.movedOut[worker + '|' + cid] = { label: '사용분 - ' + cid + ' ' + wName + ' 사용', cid: cid, who: wName, qty: 0, amt: 0, dates: {} });
+  const wCid = wkey && X.groups[wkey] ? String(X.groups[wkey].cid).replace(/@.*$/, '') : '';
+  const a = sIn.movedIn[cid] || (sIn.movedIn[cid] = { label: '+ ' + cid + ' ' + ownerName + ' 사용', cid: cid, who: ownerName, qty: 0, amt: 0, dates: {} });
+  const b = sOut.movedOut[worker + '|' + cid] || (sOut.movedOut[worker + '|' + cid] = { label: '- ' + (wCid || cid) + ' ' + wName + ' 사용', cid: wCid || cid, who: wName, qty: 0, amt: 0, dates: {} });
   [a, b].forEach(function (x) { x.qty += qty; x.amt += amt; if (qty) x.dates[r.date] = 1; });
 }
 function stlMoveList_(m) {
@@ -1836,4 +1837,24 @@ function adm_stlRoundInfo(token, month) {
 function stlNewExec_() {
   _stlSS = null; _stlTv = null; _stlFresh = false;
   [_stlSh, _stlCols, _stlTab, _stlMon].forEach(function (o) { Object.keys(o).forEach(function (k) { delete o[k]; }); });
+}
+
+/**
+ * 기사 정보관리에서 기사구분을 바꾸면 그 기사 본인 아이디(쿠팡플렉스 아이디 = 메인)의 단가 구분도 같이 바꾼다.
+ * 아이디의 단가 구분이 예전 기사구분과 같았거나 비어 있을 때만 (따로 정해 둔 값은 그대로).
+ */
+function stlSyncIdType_(driverId, loginId, oldType, newType) {
+  try {
+    if (!loginId || STL_TYPES.indexOf(newType) < 0 || !props_().STL_DB_ID) return 0;
+    const k = stlLogin_(loginId);
+    let n = 0;
+    stlRead_('stl_ids').forEach(function (r) {
+      if (stlLogin_(r.cid) !== k || (r.ownerId && r.ownerId !== driverId)) return;
+      if (r.type && r.type !== oldType) return;
+      if (r.type === newType) return;
+      stlSetRow_('stl_ids', r._row, { type: newType }); n++;
+    });
+    if (n) stlBump_();
+    return n;
+  } catch (e) { console.error('아이디 단가 구분 맞추기 실패: ' + (e && e.message)); return 0; }
 }

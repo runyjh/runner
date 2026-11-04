@@ -1667,6 +1667,8 @@ function adm_updateDriver(token, id, changes, seenRev) {
       writeFields_(SH.DRIVERS, o._row, f);
       forgetDriver_(o);
       if (f.loginId) forgetDriver_({ loginId: f.loginId });
+      // 기사구분이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가 구분도 맞춘다
+      if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
       logAdmin_(a, '기사 정보 수정', o.name + ' (' + o.id + ')', changed.join(', ') +
         (f.status ? ' → ' + f.status : ''));
       const fresh = readObj_(SH.DRIVERS, o._row);
