@@ -112,15 +112,21 @@ const STL_DRIVER_FIELDS = ['stlOwner', 'stlMode', 'insEx', 'fbCut', 'tmpPrice', 
 const STL_MODES = ['', '원청단가', '용차내역'];
 const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외부용차': 'p5' };
 
-// ───────────────────────── 정산 DB 파일 / 시트 ─────────────────────────
-let _stlSS = null;
-const _stlSh = {}, _stlCols = {};
+// ───────────────────────── 정산 DB 파일 / 시트 (빠른 읽기·쓰기) ─────────────────────────
+// 읽기: 탭 내용을 캐시(탭마다 버전)에 두고, 없으면 필요한 탭을 Sheets API 한 번(batchGet)으로 읽는다.
+// 쓰기: 쓴 내용을 바로 캐시에 넣는다(다시 읽지 않음). 시트에서 손으로 고치면 편집 트리거가 그 탭 캐시만 버린다.
+let _stlSS = null, _stlTv = null, _stlFresh = false;
+const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
+const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
+const STL_SMALL = ['stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
   if (_stlSS) return _stlSS;
   const id = props_().STL_DB_ID;
   if (id) {
-    try { return (_stlSS = SpreadsheetApp.openById(id)); }
+    try { _stlSS = SpreadsheetApp.openById(id); }
     catch (e) { fail_('정산 DB 파일을 열 수 없습니다. 드라이브 휴지통에 있는지 확인하거나, 스크립트 속성 STL_DB_ID 를 비우면 새로 만듭니다.'); }
+    stlEnsureTrigger_(_stlSS);
+    return _stlSS;
   }
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -133,39 +139,96 @@ function stlSS_() {
     try { book.setSpreadsheetTimeZone(CFG.TZ); } catch (e) { /* 무시 */ }
     p.setProperty('STL_DB_ID', book.getId());
     _props = null;
+    try { installSheetTriggers_(book); } catch (e) { console.error('정산 DB 트리거 설치 실패: ' + e); }
+    cache_().put('stl:trg', '1', CFG.CACHE_MAX);
+    stlTouchAll_();
     return (_stlSS = book);
   } finally {
     lock.releaseLock();
   }
 }
-/** 탭 (없으면 머리글을 넣어 만들고, 기본값이 있는 탭은 기본 줄도 넣는다) */
+/** 정산 DB 에 편집 트리거가 있는지 6시간에 한 번만 확인 (손으로 고친 내용을 캐시에 반영하기 위해) */
+function stlEnsureTrigger_(book) {
+  if (cache_().get('stl:trg')) return;
+  try { installSheetTriggers_(book); cache_().put('stl:trg', '1', CFG.CACHE_MAX); } catch (e) { console.error('정산 DB 트리거 확인 실패: ' + e); }
+}
+// ── 탭별 버전 (캐시 키). 버전이 바뀌면 그 탭의 예전 캐시는 쓰지 않는다 ──
+function stlTv_() {
+  if (_stlTv) return _stlTv;
+  let v = null;
+  try { v = JSON.parse(cache_().get('stl:tv') || 'null'); } catch (e) { v = null; }
+  if (!v || !v._) v = { _: Date.now().toString(36) };
+  return (_stlTv = v);
+}
+function stlVerOf_(name) { const v = stlTv_(); return v._ + '.' + (v[name] || 0); }
+function stlTouch_(names) {
+  const v = stlTv_();
+  [].concat(names).forEach(function (n) { v[n] = (v[n] || 0) + 1; delete _stlTab[n]; Object.keys(_stlMon).forEach(function (k) { if (k.indexOf(n + '|') === 0) delete _stlMon[k]; }); });
+  try { cache_().put('stl:tv', JSON.stringify(v), CFG.CACHE_MAX); } catch (e) { /* 무시 */ }
+}
+function stlTouchAll_() {
+  _stlTv = { _: Date.now().toString(36) + Math.random().toString(36).slice(2, 5) };
+  Object.keys(_stlTab).forEach(function (k) { delete _stlTab[k]; });
+  Object.keys(_stlMon).forEach(function (k) { delete _stlMon[k]; });
+  Object.keys(_stlCols).forEach(function (k) { delete _stlCols[k]; });
+  try { cache_().put('stl:tv', JSON.stringify(_stlTv), CFG.CACHE_MAX); } catch (e) { /* 무시 */ }
+}
+/** 시트에서 정산 DB 를 손으로 고쳤을 때 (Code.gs 의 편집·구조변경 트리거에서 부름) */
+function stlOnEdit_(name) { if (STL_TABS[name]) stlTouch_(name); else stlTouchAll_(); }
+// ── 캐시 (100KB 넘으면 나눠 담기) ──
+function stlCGet_(key) {
+  const ck = cache_(), head = ck.get(key);
+  if (head === null || head === undefined) return null;
+  if (head.charAt(0) !== '#') { try { return JSON.parse(head); } catch (e) { return null; } }
+  const n = Number(head.slice(1)), keys = [];
+  for (let i = 0; i < n; i++) keys.push(key + ':' + i);
+  const got = ck.getAll(keys);
+  if (!keys.every(function (k) { return got[k] != null; })) return null;
+  try { return JSON.parse(keys.map(function (k) { return got[k]; }).join('')); } catch (e) { return null; }
+}
+function stlCPut_(key, obj, sec) {
+  const json = JSON.stringify(obj), CH = 90000;
+  if (json.length > CH * 90) return;
+  try {
+    if (json.length <= CH) { cache_().put(key, json, sec); return; }
+    const put = {};
+    let i = 0;
+    for (let p = 0; p < json.length; p += CH) put[key + ':' + (i++)] = json.slice(p, p + CH);
+    put[key] = '#' + i;
+    cache_().putAll(put, sec);
+  } catch (e) { /* 캐시 실패해도 결과는 그대로 */ }
+}
+// ── 시트 핸들 ──
 function stlSheet_(name) {
   if (_stlSh[name]) return _stlSh[name];
   const book = stlSS_();
   let sh = book.getSheetByName(name);
-  if (!sh) {
-    const lock = LockService.getScriptLock();
-    lock.waitLock(30000);
-    try {
-      sh = book.getSheetByName(name);
-      if (!sh) {
-        const blank = book.getSheets().filter(function (x) { return x.getLastRow() === 0 && x.getLastColumn() === 0 && /^(시트|Sheet)\d*$/.test(x.getName()); });
-        sh = book.insertSheet(name);
-        blank.forEach(function (x) { try { book.deleteSheet(x); } catch (e) { /* 마지막 시트는 못 지움 */ } });
-        const head = Object.keys(STL_TABS[name]).map(function (k) { return STL_TABS[name][k]; });
-        if (sh.getMaxColumns() < head.length) sh.insertColumnsAfter(sh.getMaxColumns(), head.length - sh.getMaxColumns());
-        sh.getRange(1, 1, sh.getMaxRows(), head.length).setNumberFormat('@');
-        sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#f1f3f4');
-        sh.setFrozenRows(1);
-        if (STL_TAB_NOTES[name]) sh.getRange(1, 1).setNote(STL_TAB_NOTES[name]);
-        const seed = stlSeed_(name);
-        if (seed.length) sh.getRange(2, 1, seed.length, head.length).setValues(seed);
-      }
-    } finally {
-      lock.releaseLock();
-    }
-  }
+  if (!sh) sh = stlCreateTab_(name);
   return (_stlSh[name] = sh);
+}
+function stlCreateTab_(name) {
+  const book = stlSS_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    let sh = book.getSheetByName(name);
+    if (sh) return sh;
+    const blank = book.getSheets().filter(function (x) { return x.getLastRow() === 0 && x.getLastColumn() === 0 && /^(시트|Sheet)\d*$/.test(x.getName()); });
+    sh = book.insertSheet(name);
+    blank.forEach(function (x) { try { book.deleteSheet(x); } catch (e) { /* 마지막 시트는 못 지움 */ } });
+    const head = Object.keys(STL_TABS[name]).map(function (k) { return STL_TABS[name][k]; });
+    if (sh.getMaxColumns() < head.length) sh.insertColumnsAfter(sh.getMaxColumns(), head.length - sh.getMaxColumns());
+    sh.getRange(1, 1, sh.getMaxRows(), head.length).setNumberFormat('@');
+    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#f1f3f4');
+    sh.setFrozenRows(1);
+    if (STL_TAB_NOTES[name]) sh.getRange(1, 1).setNote(STL_TAB_NOTES[name]);
+    const seed = stlSeed_(name);
+    if (seed.length) sh.getRange(2, 1, seed.length, head.length).setValues(seed);
+    stlTabSet_(name, head, seed);
+    return sh;
+  } finally {
+    lock.releaseLock();
+  }
 }
 function stlSeed_(name) {
   if (name === 'stl_items') return STL_ITEM_DEFAULT.map(function (r) { return r.slice(); });
@@ -176,36 +239,101 @@ function stlSeed_(name) {
   }
   return [];
 }
-/** 머리글 → 열 번호. 없는 머리글은 오른쪽 끝에 만든다 (정산 DB 탭은 모두 자동) */
+// ── 읽기 ──
+/** 작은 탭 여러 개를 한 번에 준비 (캐시 → 없으면 Sheets API batchGet 한 번) */
+function stlLoad_(names) {
+  const need = names.filter(function (n) { return !_stlTab[n]; });
+  if (!need.length) return;
+  const keys = need.map(function (n) { return 'stl:t:' + n + ':' + stlVerOf_(n); });
+  const miss = [];
+  if (!_stlFresh) {
+    need.forEach(function (n, i) { const hit = stlCGet_(keys[i]); if (hit) _stlTab[n] = hit; else miss.push(n); });
+  } else need.forEach(function (n) { miss.push(n); });
+  if (!miss.length) return;
+  const got = stlBatchGet_(miss);
+  miss.forEach(function (n) { stlTabSet_(n, got[n].head, got[n].rows); });
+}
+/** 탭 내용 읽기: Sheets API(advanced service) 가 있으면 한 번에, 없으면 탭마다 */
+function stlBatchGet_(names) {
+  const out = {};
+  const book = stlSS_();
+  // 없는 탭은 먼저 만든다 (만들면서 내용이 정해짐)
+  const have = {};
+  try { book.getSheets().forEach(function (s) { have[s.getName()] = 1; }); } catch (e) { /* 무시 */ }
+  const want = [];
+  names.forEach(function (n) {
+    if (!have[n]) { stlCreateTab_(n); out[n] = _stlTab[n]; } else want.push(n);
+  });
+  if (!want.length) return out;
+  let done = false;
+  if (typeof Sheets !== 'undefined' && Sheets.Spreadsheets && Sheets.Spreadsheets.Values) {
+    try {
+      const res = Sheets.Spreadsheets.Values.batchGet(book.getId(), {
+        ranges: want.map(function (n) { return "'" + n + "'!A1:AZ"; }), valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING'
+      });
+      (res.valueRanges || []).forEach(function (vr, i) {
+        const vals = vr.values || [];
+        out[want[i]] = { head: (vals[0] || []).map(String), rows: vals.slice(1) };
+      });
+      done = want.every(function (n) { return out[n]; });
+    } catch (e) { console.error('batchGet 실패, 탭마다 읽기로 바꿈: ' + e); }
+  }
+  if (!done) {
+    want.forEach(function (n) {
+      if (out[n]) return;
+      const sh = stlSheet_(n), lr = sh.getLastRow(), lc = Math.max(sh.getLastColumn(), 1);
+      const vals = lr >= 1 ? sh.getRange(1, 1, lr, lc).getValues() : [[]];
+      out[n] = { head: vals[0].map(String), rows: vals.slice(1) };
+    });
+  }
+  return out;
+}
+/** 메모리·캐시에 탭 내용 저장 */
+function stlTabSet_(name, head, rows) {
+  const t = { head: head.map(String), rows: rows.map(function (r) { return r.map(function (v) { return v instanceof Date ? str_(v) : v === null || v === undefined ? '' : v; }); }) };
+  _stlTab[name] = t;
+  delete _stlCols[name];
+  stlCPut_('stl:t:' + name + ':' + stlVerOf_(name), t, CFG.CACHE_MAX);
+}
+function stlTab_(name) { stlLoad_([name]); return _stlTab[name]; }
+/** 머리글 → 열 번호. 없는 머리글은 시트 오른쪽 끝에 만든다 */
 function stlCols_(name) {
   if (_stlCols[name]) return _stlCols[name];
-  const sh = stlSheet_(name), def = STL_TABS[name];
-  let head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
+  const def = STL_TABS[name];
+  let head;
+  if (STL_BIG.indexOf(name) >= 0) {
+    const hk = 'stl:h:' + name + ':' + stlTv_()._;
+    head = _stlFresh ? null : stlCGet_(hk);
+    if (!head) {
+      const sh = stlSheet_(name);
+      head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
+      stlCPut_(hk, head, CFG.CACHE_MAX);
+    }
+  } else head = stlTab_(name).head;
   const miss = Object.keys(def).filter(function (k) { return head.indexOf(def[k]) < 0; }).map(function (k) { return def[k]; });
   if (miss.length) {
+    const sh = stlSheet_(name);
     const start = head.filter(function (x) { return x !== ''; }).length + 1;
     if (start + miss.length - 1 > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), miss.length);
     sh.getRange(1, start, sh.getMaxRows(), miss.length).setNumberFormat('@');
     sh.getRange(1, start, 1, miss.length).setValues([miss]).setFontWeight('bold').setBackground('#f1f3f4');
-    head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    head = head.slice(0, start - 1).concat(miss);
+    stlTouch_(name);
   }
   const c = { __w: head.length };
   Object.keys(def).forEach(function (k) { c[k] = head.indexOf(def[k]); });
   return (_stlCols[name] = c);
 }
+function stlObj_(name, c, v, row) {
+  const o = { _row: row };
+  let any = false;
+  Object.keys(STL_TABS[name]).forEach(function (k) { o[k] = c[k] >= 0 ? str_(v[c[k]]) : ''; if (o[k]) any = true; });
+  return any ? o : null;
+}
 /** 탭 전체 → 객체 목록 (_row = 시트 행 번호) */
 function stlRead_(name) {
-  const sh = stlSheet_(name), c = stlCols_(name), last = sh.getLastRow();
-  if (last < 2) return [];
-  const vals = sh.getRange(2, 1, last - 1, c.__w).getValues();
-  const keys = Object.keys(STL_TABS[name]);
-  const out = [];
-  vals.forEach(function (v, i) {
-    const o = { _row: i + 2 };
-    let any = false;
-    keys.forEach(function (k) { o[k] = str_(v[c[k]]); if (o[k]) any = true; });
-    if (any) out.push(o);
-  });
+  const t = stlTab_(name), c = stlCols_(name), out = [];
+  t.rows.forEach(function (v, i) { const o = stlObj_(name, c, v, i + 2); if (o) out.push(o); });
   return out;
 }
 function stlRow_(name, obj) {
@@ -213,67 +341,130 @@ function stlRow_(name, obj) {
   Object.keys(STL_TABS[name]).forEach(function (k) { if (obj[k] !== undefined && obj[k] !== null) arr[c[k]] = safeText_(String(obj[k])); });
   return arr;
 }
-/** 잠금 안에서: 탭 전체를 objs 로 다시 쓴다 (작은 탭용). 사람이 넣은 다른 열은 지워지지 않게 정의된 열만 쓴다 */
+// ── 쓰기 (쓴 내용을 바로 캐시에 반영) ──
+/** 잠금 안에서: 탭 전체를 objs 로 다시 쓴다 (작은 탭용). 정의되지 않은 열(사람이 추가한 열)은 그대로 둔다 */
 function stlWriteAll_(name, objs) {
-  const sh = stlSheet_(name), c = stlCols_(name), last = sh.getLastRow();
-  const keep = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
-  const keys = Object.keys(STL_TABS[name]);
+  const big = STL_BIG.indexOf(name) >= 0;
+  const t = big ? stlBigAll_(name) : stlTab_(name), c = stlCols_(name), sh = stlSheet_(name);
+  const keep = t.rows, keys = Object.keys(STL_TABS[name]);
   const rows = objs.map(function (o, i) {
-    const arr = keep[i] ? keep[i].slice() : new Array(c.__w).fill('');
+    const arr = keep[i] ? keep[i].slice() : [];
+    while (arr.length < c.__w) arr.push('');
     keys.forEach(function (k) { arr[c[k]] = o[k] === undefined || o[k] === null ? '' : safeText_(String(o[k])); });
     return arr;
   });
-  if (last >= 2) sh.getRange(2, 1, last - 1, c.__w).clearContent();
-  if (rows.length) {
-    if (rows.length + 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), rows.length + 100 - sh.getMaxRows());
-    sh.getRange(2, 1, rows.length, c.__w).setNumberFormat('@').setValues(rows);
+  const n = Math.max(rows.length, keep.length);
+  if (n) {
+    const all = [];
+    for (let i = 0; i < n; i++) all.push(rows[i] || new Array(c.__w).fill(''));
+    if (n + 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), n + 100 - sh.getMaxRows());
+    sh.getRange(2, 1, n, c.__w).setNumberFormat('@').setValues(all);
   }
+  stlTouch_(name);
+  if (!big) stlTabSet_(name, t.head.length >= c.__w ? t.head : stlHeadOf_(name, c), rows);
 }
+function stlHeadOf_(name, c) {
+  const h = new Array(c.__w).fill('');
+  Object.keys(STL_TABS[name]).forEach(function (k) { h[c[k]] = STL_TABS[name][k]; });
+  return h;
+}
+/** 큰 탭 전체 (이관 때만) */
+function stlBigAll_(name) {
+  const sh = stlSheet_(name), lr = sh.getLastRow(), lc = Math.max(sh.getLastColumn(), 1);
+  const vals = lr >= 1 ? sh.getRange(1, 1, lr, lc).getValues() : [[]];
+  return { head: vals[0].map(String), rows: vals.slice(1) };
+}
+/** 잠금 안에서: 탭 끝에 줄 붙이기 */
 function stlAppend_(name, objs) {
   if (!objs.length) return;
   const sh = stlSheet_(name), c = stlCols_(name);
   const rows = objs.map(function (o) { return stlRow_(name, o); });
-  const r = sh.getLastRow() + 1;
+  const big = STL_BIG.indexOf(name) >= 0;
+  const r = big ? sh.getLastRow() + 1 : stlTab_(name).rows.length + 2;
   if (r + rows.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), rows.length + 500);
   sh.getRange(r, 1, rows.length, c.__w).setNumberFormat('@').setValues(rows);
+  if (big) { stlTouch_(name); return; }
+  const t = _stlTab[name];
+  stlTouch_(name);
+  stlTabSet_(name, t.head, t.rows.concat(rows));
 }
-/** 정산월 열이 같은 줄들의 위치 (정산월 묶음은 항상 붙어 있게 쓴다) */
-function stlMonthBlock_(name, month) {
+/** 잠금 안에서: 한 줄만 고치기 (row = 시트 행 번호) */
+function stlSetRow_(name, row, obj) {
+  const sh = stlSheet_(name), c = stlCols_(name), t = stlTab_(name);
+  const cur = (t.rows[row - 2] || []).slice();
+  while (cur.length < c.__w) cur.push('');
+  Object.keys(obj).forEach(function (k) { if (c[k] >= 0) cur[c[k]] = safeText_(String(obj[k] == null ? '' : obj[k])); });
+  sh.getRange(row, 1, 1, c.__w).setNumberFormat('@').setValues([cur]);
+  const rows = t.rows.slice();
+  while (rows.length < row - 1) rows.push([]);
+  rows[row - 2] = cur;
+  stlTouch_(name);
+  stlTabSet_(name, t.head, rows);
+}
+// ── 큰 탭 (쿠팡 원천 · 분실 · 마감 결과): 정산월 묶음 위치를 기억해 그 달만 읽는다 ──
+function stlIndex_(name) {
+  const key = 'stl:ix:' + name + ':' + stlVerOf_(name);
+  let ix = _stlFresh ? null : stlCGet_(key);
+  if (ix) return ix;
   const sh = stlSheet_(name), c = stlCols_(name), last = sh.getLastRow();
-  if (last < 2) return null;
-  const col = sh.getRange(2, c.month + 1, last - 1, 1).getValues();
-  let first = -1, end = -1, split = false;
-  for (let i = 0; i < col.length; i++) {
-    if (str_(col[i][0]) === month) { if (first < 0) first = i; else if (end !== i - 1) split = true; end = i; }
+  ix = { last: last, m: {} };
+  if (last >= 2) {
+    const col = sh.getRange(2, c.month + 1, last - 1, 1).getValues();
+    for (let i = 0; i < col.length; i++) {
+      const m = str_(col[i][0]);
+      if (!m) continue;
+      const b = ix.m[m];
+      if (!b) ix.m[m] = [i + 2, i + 2, 0];
+      else { if (b[1] !== i + 1) b[2] = 1; b[1] = i + 2; } // [시작행, 끝행, 나뉨]
+    }
   }
-  if (first < 0) return null;
-  return { start: first + 2, n: end - first + 1, split: split };
+  stlCPut_(key, ix, CFG.CACHE_MAX);
+  return ix;
+}
+function stlMonthBlock_(name, month) {
+  const b = stlIndex_(name).m[month];
+  return b ? { start: b[0], n: b[1] - b[0] + 1, split: !!b[2] } : null;
 }
 function stlReadMonth_(name, month) {
-  const b = stlMonthBlock_(name, month);
-  if (!b) return [];
-  const sh = stlSheet_(name), c = stlCols_(name), keys = Object.keys(STL_TABS[name]);
-  return sh.getRange(b.start, 1, b.n, c.__w).getValues().filter(function (v) { return str_(v[c.month]) === month; }).map(function (v) {
-    const o = {};
-    keys.forEach(function (k) { o[k] = str_(v[c[k]]); });
-    return o;
-  });
+  const mk = name + '|' + month;
+  if (_stlMon[mk]) return _stlMon[mk];
+  const key = 'stl:m:' + name + ':' + month + ':' + stlVerOf_(name);
+  let rows = _stlFresh ? null : stlCGet_(key);
+  if (!rows) {
+    const b = stlMonthBlock_(name, month);
+    rows = [];
+    if (b) {
+      const sh = stlSheet_(name), c = stlCols_(name), keys = Object.keys(STL_TABS[name]);
+      sh.getRange(b.start, 1, b.n, c.__w).getValues().forEach(function (v) {
+        if (str_(v[c.month]) !== month) return;
+        const o = {};
+        keys.forEach(function (k) { o[k] = c[k] >= 0 ? str_(v[c[k]]) : ''; });
+        rows.push(o);
+      });
+    }
+    stlCPut_(key, rows, CFG.CACHE_MAX);
+  }
+  return (_stlMon[mk] = rows);
 }
 /** 잠금 안에서: 그 정산월 줄을 지우고 새 줄을 맨 끝에 붙인다 */
 function stlReplaceMonth_(name, month, objs) {
   const sh = stlSheet_(name);
-  let b = stlMonthBlock_(name, month);
-  while (b) {
+  const b = stlMonthBlock_(name, month);
+  if (b) {
     if (b.split) {
       // 손으로 줄을 옮겨 묶음이 나뉜 경우: 아래에서부터 한 줄씩 지운다
       const c = stlCols_(name), col = sh.getRange(2, c.month + 1, sh.getLastRow() - 1, 1).getValues();
       for (let i = col.length - 1; i >= 0; i--) if (str_(col[i][0]) === month) sh.deleteRow(i + 2);
-      break;
-    }
-    sh.deleteRows(b.start, b.n);
-    b = stlMonthBlock_(name, month);
+    } else sh.deleteRows(b.start, b.n);
   }
+  stlTouch_(name);
   stlAppend_(name, objs);
+  // 새 위치·내용을 바로 기억 (다음 조회 때 시트를 다시 읽지 않음)
+  const ix = stlIndex_(name);
+  const mk = name + '|' + month;
+  _stlMon[mk] = objs.map(function (o) { const x = {}; Object.keys(STL_TABS[name]).forEach(function (k) { x[k] = o[k] === undefined || o[k] === null ? '' : String(o[k]); }); return x; });
+  stlCPut_('stl:m:' + name + ':' + month + ':' + stlVerOf_(name), _stlMon[mk], CFG.CACHE_MAX);
+  return ix;
 }
 
 // ───────────────────────── 값 정리 ─────────────────────────
@@ -533,6 +724,7 @@ function stlSchedule_(from, to) {
  */
 function stlCompute_(month) {
   const P = stlPeriod_(month);
+  stlLoad_(STL_SMALL);
   const cfg = stlCfg_();
   const ctx = { cfg: cfg, price: stlPriceIndex_() };
   const kinds = stlKinds_(), items = stlItems_(), campIns = stlCampIns_(cfg);
@@ -899,10 +1091,7 @@ function stlRounds_(month) {
   let latest = 0, file = '', at = '';
   rows.forEach(function (r) { const n = stlNum_(r.round); if (n >= latest) { latest = n; file = r.file; at = r.at; } });
   const changed = rows.filter(function (r) { return stlNum_(r.round) === latest && latest > 1 && stlNum_(r.diff); }).map(function (r) { return { cid: r.cid, diff: stlNum_(r.diff), memo: r.memo }; });
-  if (!latest) {
-    const b = stlMonthBlock_('stl_raw', month);
-    if (b) latest = stlNum_(stlSheet_('stl_raw').getRange(b.start, stlCols_('stl_raw').round + 1).getValue());
-  }
+  if (!latest) { const r0 = stlReadMonth_('stl_raw', month)[0]; if (r0) latest = stlNum_(r0.round); }
   return { latest: latest, file: file, at: at, changed: changed };
 }
 /** 쿠팡 입금예정일 · 기사 지급일 · 계산서 발행기한 */
@@ -919,26 +1108,16 @@ function stlDates_(month, cfg) {
 }
 
 // ───────────────────────── 캐시 · 마감 ─────────────────────────
-function stlVer_() { return cache_().get('stl:v') || '0'; }
-function stlBump_() { cache_().put('stl:v', String(Date.now()), CFG.CACHE_MAX); }
-function stlCacheGet_(key) {
-  const ck = cache_(), n = Number(ck.get(key + ':n') || 0);
-  if (!n) return null;
-  const keys = [];
-  for (let i = 0; i < n; i++) keys.push(key + ':' + i);
-  const got = ck.getAll(keys);
-  if (!keys.every(function (k) { return got[k] != null; })) return null;
-  try { return JSON.parse(keys.map(function (k) { return got[k]; }).join('')); } catch (e) { return null; }
+/** 계산 결과 캐시 키: 정산 DB 탭 버전(입금 탭 제외) + 기사 정보 버전 */
+function stlVer_() {
+  const v = stlTv_();
+  const txt = v._ + ':' + Object.keys(v).filter(function (k) { return k !== '_' && k !== 'stl_pay'; }).sort().map(function (k) { return k + v[k]; }).join(',');
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, txt, Utilities.Charset.UTF_8)).slice(0, 22);
 }
-function stlCachePut_(key, obj, sec) {
-  const json = JSON.stringify(obj), CH = 90000;
-  if (json.length > CH * 80) return;
-  const put = {};
-  let i = 0;
-  for (let p = 0; p < json.length; p += CH) put[key + ':' + (i++)] = json.slice(p, p + CH);
-  put[key + ':n'] = String(i);
-  try { cache_().putAll(put, sec); } catch (e) { /* 캐시 실패해도 결과는 그대로 */ }
-}
+/** 기사 정보·설정 등 정산 DB 밖의 데이터가 바뀌었을 때 계산 결과만 버린다 */
+function stlBump_() { stlTouch_('_x'); }
+function stlCacheGet_(key) { return stlCGet_(key); }
+function stlCachePut_(key, obj, sec) { stlCPut_(key, obj, sec); }
 function stlClosedInfo_(month) {
   const r = stlRead_('stl_close').filter(function (x) { return x.month === month; })[0];
   return r ? { at: r.at, admin: r.admin } : null;
@@ -960,22 +1139,26 @@ function stlResult_(month, fresh) {
       } catch (e) { /* 손상된 줄은 건너뜀 */ }
     });
     if (summary) {
-      // 입금체크는 마감 뒤에도 바뀌므로 다시 읽는다
-      const pay = {};
-      stlRead_('stl_pay').filter(function (p) { return p.month === month; }).forEach(function (p) { pay[p.driverId] = p; });
-      summary.drivers.forEach(function (d) { const p = pay[d.id] || {}; d.checked = stlYes_(p.checked); d.payDate = p.date || ''; d.payMemo = p.memo || ''; });
       summary.closed = closed;
       hit = { summary: summary, slips: slips };
       stlCachePut_(key, hit, 600);
-      return hit;
+      return stlPayOverlay_(hit, month);
     }
   }
+  if (fresh) _stlFresh = true;
   const key = 'stl:r:' + month + ':' + stlVer_() + ':' + masterVer_();
-  if (!fresh) { const hit = stlCacheGet_(key); if (hit) return hit; }
+  if (!fresh) { const hit = stlCacheGet_(key); if (hit) return stlPayOverlay_(hit, month); }
   const res = stlCompute_(month);
   res.summary.closed = null;
   res.summary.computedAt = nowText_();
-  stlCachePut_(key, res, 300);
+  stlCachePut_(key, res, 600);
+  return stlPayOverlay_(res, month);
+}
+/** 입금체크·입금일·메모는 계산과 따로 (체크할 때마다 다시 계산하지 않게) */
+function stlPayOverlay_(res, month) {
+  const pay = {};
+  stlRead_('stl_pay').forEach(function (p) { if (p.month === month) pay[p.driverId] = p; });
+  res.summary.drivers.forEach(function (d) { const p = pay[d.id] || {}; d.checked = stlYes_(p.checked); d.payDate = p.date || ''; d.payMemo = p.memo || ''; });
   return res;
 }
 function stlAssertOpen_(month) {
@@ -995,10 +1178,7 @@ function adm_stlMonth(token, month, fresh) {
 }
 function stlMonths_() {
   const set = {};
-  try {
-    const sh = stlSheet_('stl_raw'), c = stlCols_('stl_raw'), last = sh.getLastRow();
-    if (last >= 2) sh.getRange(2, c.month + 1, last - 1, 1).getValues().forEach(function (v) { const m = str_(v[0]); if (stlMonthOk_(m)) set[m] = 1; });
-  } catch (e) { /* 정산 DB 가 아직 없으면 빈 목록 */ }
+  try { Object.keys(stlIndex_('stl_raw').m).forEach(function (m) { if (stlMonthOk_(m)) set[m] = 1; }); } catch (e) { /* 정산 DB 가 아직 없으면 빈 목록 */ }
   const withData = Object.keys(set).sort();
   const cur = stlMonthNow_();
   set[cur] = 1; set[stlAddMonth_(cur, -1)] = 1;
@@ -1152,21 +1332,20 @@ function adm_stlPaySet(token, month, list) {
       const rows = stlRead_('stl_pay');
       const by = {};
       rows.forEach(function (r) { if (r.month === month) by[r.driverId] = r; });
-      const today = todayText_();
+      const today = todayText_(), add = [];
       list.forEach(function (x) {
         const id = str_(x.id);
         if (!D.byId[id]) fail_('기사를 찾을 수 없습니다.');
-        const r = by[id] || (by[id] = { month: month, driverId: id });
+        const cur = by[id], r = cur ? Object.assign({}, cur) : { month: month, driverId: id };
         r.name = D.byId[id].name;
         if (x.checked !== undefined) { r.checked = x.checked ? 'TRUE' : 'FALSE'; if (x.checked && !r.date) r.date = today; if (!x.checked) r.date = ''; }
         if (x.date !== undefined) r.date = x.date ? stlYmd_(x.date) : '';
         if (x.memo !== undefined) r.memo = str_(x.memo).slice(0, 200);
+        if (cur) stlSetRow_('stl_pay', cur._row, r); else add.push(r);
       });
-      stlWriteAll_('stl_pay', rows.filter(function (r) { return r.month !== month; }).concat(Object.keys(by).map(function (k) { return by[k]; })));
-      cache_().remove('stl:cl:' + month + ':' + stlVer_());
-      stlBump_();
-      logAdmin_(a, '입금체크', month, list.length + '명');
-      return { ok: true };
+      if (add.length) stlAppend_('stl_pay', add);
+      if (list.length > 3) logAdmin_(a, '입금체크', month, list.length + '명');
+      return { ok: true, today: today };
     } finally {
       lock.releaseLock();
     }
@@ -1220,6 +1399,11 @@ function stlRowsHash_(rows, cols) {
 function adm_stlTable(token, name, month) {
   return run_(function () {
     requireAdmin_(token);
+    return stlTableView_(name, month);
+  });
+}
+function stlTableView_(name, month) {
+  {
     const E = STL_EDIT[name];
     if (!E) fail_('알 수 없는 표입니다.');
     if (E.scope !== 'all' && !stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
@@ -1240,7 +1424,7 @@ function adm_stlTable(token, name, month) {
       owners: owners, items: stlItems_().list.map(function (i) { return i.name; }),
       camps: master_().camps.map(function (c) { return stlShort_(c.name); }).sort(koCmp_)
     };
-  });
+  }
 }
 /** 표 저장: 보이는 범위(그 달 / 전체)의 줄을 rows 로 바꾼다. seen 이 다르면(다른 곳에서 먼저 고침) 거절 */
 function adm_stlTableSave(token, name, month, rows, seen) {
@@ -1292,10 +1476,13 @@ function adm_stlTableSave(token, name, month, rows, seen) {
       stlWriteAll_(E.sheet, out);
       stlBump_();
       logAdmin_(a, '정산 표 저장', name + (E.scope !== 'all' ? ' ' + month : ''), clean.length + '줄');
-      return { ok: true, rows: clean.length };
     } finally {
       lock.releaseLock();
     }
+    // 저장 직후 화면에 쓸 표 (다시 부르지 않아도 되게)
+    let table = null;
+    try { table = stlTableView_(name, month); } catch (e) { table = null; }
+    return { ok: true, rows: clean.length, table: table };
   });
 }
 
@@ -1304,6 +1491,11 @@ function adm_stlDrivers(token) {
   return run_(function () {
     requireAdmin_(token);
     cols_(SH.DRIVERS, true); // 새 정산 열 자동 추가
+    return stlDriverView_();
+  });
+}
+function stlDriverView_() {
+  {
     const D = stlDrivers_();
     const list = D.all.map(function (o) {
       const x = { id: o.id, name: o.name, loginId: o.loginId, status: o.status, type: o.driverType || '', bank: o.bankName || '', account: o.account || '', holder: o.accountHolder || '', ownerName: o._owner !== o.id ? D.byId[o._owner].name : '' };
@@ -1311,7 +1503,7 @@ function adm_stlDrivers(token) {
       return x;
     }).sort(function (a, b) { return (a.status === ST.ACTIVE ? 0 : 1) - (b.status === ST.ACTIVE ? 0 : 1) || koCmp_(a.name, b.name); });
     return { ok: true, drivers: list, modes: STL_MODES };
-  });
+  }
 }
 /** changes = [{ id, f: { stlOwner, stlMode, … } }] */
 function adm_stlDriverSave(token, changes) {
@@ -1348,10 +1540,12 @@ function adm_stlDriverSave(token, changes) {
       });
       stlBump_();
       logAdmin_(a, '기사 정산정보 수정', n + '명', '');
-      return { ok: true, saved: n };
     } finally {
       lock.releaseLock();
     }
+    _cols[SH.DRIVERS] = null;
+    const view = stlDriverView_();
+    return { ok: true, saved: view ? changes.length : 0, drivers: view.drivers, modes: view.modes };
   });
 }
 
@@ -1363,4 +1557,10 @@ function adm_stlRoundInfo(token, month) {
     const r = stlRounds_(month);
     return { ok: true, month: month, latest: r.latest, closed: !!stlClosedInfo_(month), period: stlPeriod_(month) };
   });
+}
+
+/** (내부) 실행마다 새로 시작하는 메모리 상태를 비운다 — 다음 실행과 같은 상태로 시험할 때 */
+function stlNewExec_() {
+  _stlSS = null; _stlTv = null; _stlFresh = false;
+  [_stlSh, _stlCols, _stlTab, _stlMon].forEach(function (o) { Object.keys(o).forEach(function (k) { delete o[k]; }); });
 }

@@ -757,6 +757,7 @@ function sessionAfterPw_(sessionCreated, pwChangedMs) {
 }
 function mustChange_(o) { return String(o.pwMustChange || '').trim().toUpperCase() === 'Y'; }
 function forgetDriver_(o) {
+  try { stlBump_(); } catch (e) { /* 기사 정보가 바뀌면 정산 계산 결과도 다시 */ }
   const keys = [];
   if (o.id) keys.push('dv:' + o.id, 'ir:' + o.id);
   if (o.loginId) keys.push('lr:' + String(o.loginId).toLowerCase());
@@ -1186,6 +1187,8 @@ function api_changePassword(token, currentPassword, newPassword) {
 function onSheetEdit(e) {
   if (!e || !e.range) return;
   const sh = e.range.getSheet(), name = sh.getName();
+  if (/^stl_/.test(name)) { stlOnEdit_(name); return; } // 정산 DB 를 손으로 고침 → 그 탭 캐시만 버림
+  if (name === SH.DRIVERS) { try { stlBump_(); } catch (x) { /* 정산 캐시 */ } }
   if (name === TOOLS.SHEET) { onToolsEdit_(e, sh); return; }
   if (name === SCH.SHEET) { onSchEdit_(e, sh); return; }
   if (!SCHEMA[name] || name === SH.ALOG) return;
@@ -3034,7 +3037,8 @@ function writeDocResult_(logs, summary) {
 }
 
 /** 열 추가·삭제·이동 같은 구조 변경 시 머리글 위치 캐시를 지운다 */
-function onSheetChange() {
+function onSheetChange(e) {
+  try { stlTouchAll_(); } catch (x) { /* 정산 DB 캐시 (행·탭 추가·삭제 등 구조 변경) */ }
   cache_().remove('nt:all');
   Object.keys(SCHEMA).forEach(clearHeadCache_);
   cache_().remove('sch:h');

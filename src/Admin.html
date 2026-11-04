@@ -4512,7 +4512,8 @@
         if (!r.ok) { b.disabled = false; return toast(r.msg); }
         toast('저장했습니다 (' + r.rows + '줄). 정산에 바로 반영됩니다.');
         STX.edDirty = false; STX.sum = null;
-        loadEditor(STX.table.name);
+        if (r.table && r.table.ok) { STX.table = r.table; STX.edRows = r.table.rows.map((x) => Object.assign({}, x)); renderEditor(); }
+        else loadEditor(STX.table.name);
         api('adm_stlMonth', STX.month, false).then((x) => { if (x.ok) { STX.sum = x.summary; paintStInfo(); } }).catch(() => {});
       }).catch(() => { b.disabled = false; });
     }
@@ -4596,14 +4597,19 @@
     const x = c || m; if (!x) return;
     const id = c ? c.dataset.pay : m.dataset.pmemo;
     const body = c ? { id, checked: c.checked } : { id, memo: m.value };
+    // 화면 먼저 바꾸고 서버에 저장 (실패하면 되돌림)
+    const it = STX.pay.list.find((y) => y.id === id), was = it ? { checked: it.checked, payDate: it.payDate, memo: it.memo } : null;
+    const apply = (v) => {
+      if (!it) return;
+      Object.assign(it, v);
+      if (STX.sum) { const d = STX.sum.drivers.find((y) => y.id === id); if (d) { d.checked = it.checked; d.payDate = it.payDate; d.payMemo = it.memo; } }
+    };
+    const today = ymdLocal(new Date());
+    if (c) apply({ checked: c.checked, payDate: c.checked ? (it && it.payDate || today) : '' }); else apply({ memo: m.value });
+    if (c) renderPay();
     api('adm_stlPaySet', STX.month, [body]).then((r) => {
-      if (!r.ok) { toast(r.msg); return loadPay(); }
-      const it = STX.pay.list.find((y) => y.id === id);
-      if (it && c) { it.checked = c.checked; it.payDate = c.checked ? (it.payDate || new Date().toISOString().slice(0, 10)) : ''; }
-      if (it && m) it.memo = m.value;
-      if (STX.sum) { const d = STX.sum.drivers.find((y) => y.id === id); if (d && c) { d.checked = c.checked; d.payDate = it ? it.payDate : ''; } }
-      renderPay();
-    }).catch(() => {});
+      if (!r.ok) { toast(r.msg); apply(was); renderPay(); }
+    }).catch(() => { apply(was); renderPay(); });
   });
   $('#payCopy').addEventListener('click', () => {
     const P = STX.pay; if (!P) return;
@@ -4658,7 +4664,8 @@
     $('#sdSave2').disabled = true;
     api('adm_stlDriverSave', changes).then((r) => {
       if (!r.ok) { $('#sdSave2').disabled = false; return toast(r.msg); }
-      toast(r.saved + '명 저장했습니다.'); STX.sum = null; loadStDrivers();
+      toast(r.saved + '명 저장했습니다.'); STX.sum = null;
+      if (r.drivers) { STX.drv = { ok: true, drivers: r.drivers, modes: r.modes }; STX.drvDirty = {}; renderStDrivers(); } else loadStDrivers();
     }).catch(() => { $('#sdSave2').disabled = false; });
   });
   // ── 기존 시트 가져오기 ──
