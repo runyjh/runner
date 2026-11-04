@@ -167,6 +167,10 @@
   table.up tr.key td { background: #e3f2fd; } table.up tr.mi td { background: #ffebee; } table.up tr.dup td { background: #fff8e1; }
   table.up tr.sep td { background: #000; padding: 2px; }
   table.up td.n { color: var(--sub); text-align: right; }
+  .nt-imp { color: var(--danger); font-weight: 800; margin-right: 4px; }
+  .b-게시 { background: var(--ok-weak); color: var(--ok); } .b-숨김 { background: var(--gray-weak); color: var(--sub); }
+  .b-예약 { background: var(--warn-weak); color: var(--warn); } .b-종료 { background: var(--gray-weak); color: var(--sub); }
+  #ntRows td.t { max-width: 420px; } #ntRows td.t small { display: block; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(25,31,40,.92); color: #fff;
@@ -484,6 +488,7 @@
       <a data-view="route">노선관리</a>
       <a class="off">정산관리 <small>준비 중</small></a>
       <a data-view="memo">업무스케줄</a>
+      <a data-view="notice">공지사항</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a data-view="bib">배번호 관리</a>
     </nav>
@@ -513,6 +518,25 @@
     </div>
    </section>
 
+   <section id="view-notice" class="hidden">
+    <div class="head">
+      <h2>공지사항 <small id="ntCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools">
+        <button class="btn ghost danger-t" type="button" data-reset="notice">데이터 초기화</button>
+        <button class="btn ghost" id="ntReload" title="시트의 최신 내용 불러오기">새로고침</button>
+        <button class="btn" id="ntNew">+ 새 공지</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">게시 중인 공지는 기사 앱 홈에 바로 보입니다. <b>중요</b> 공지는 맨 위에 고정되고, 기사님이 처음 볼 때 팝업으로 한 번 뜹니다.</p>
+    <div class="tabs" id="ntTabs"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>상태</th><th>제목</th><th>대상</th><th>게시 기간</th><th>작성자</th><th>수정일</th></tr></thead>
+        <tbody id="ntRows"></tbody>
+      </table>
+      <div class="empty hidden" id="ntEmpty"></div>
+    </div>
+   </section>
    <section id="view-memo" class="hidden">
     <div class="head">
       <h2>업무스케줄</h2>
@@ -680,6 +704,25 @@
     <p style="margin:0 0 12px;color:var(--sub);font-size:13px">기사님은 이 비밀번호로 로그인한 뒤 새 비밀번호를 직접 정하게 됩니다. 기존 로그인은 모두 해제됩니다.</p>
     <div class="field"><label class="lb" for="pwNew">임시 비밀번호 (영문+숫자 8자 이상)</label><input class="inp" id="pwNew" autocomplete="off"></div>
     <div class="m-actions"><button type="button" class="btn ghost" id="pwCancel">취소</button><button class="btn" id="pwOk">지정</button></div>
+  </form>
+</div>
+
+<!-- ───────────── 공지 작성·수정 ───────────── -->
+<div class="modal hidden" id="ntModal">
+  <form class="m-box" id="ntForm" novalidate style="width:min(640px,100%);max-height:92vh;overflow:auto">
+    <h3 id="ntTitleH">새 공지</h3>
+    <div class="field"><label class="lb" for="ntTitle">제목</label><input class="inp" id="ntTitle" maxlength="100" placeholder="예: 11월 추석 연휴 배송 일정 안내"></div>
+    <div class="field"><label class="lb" for="ntBody">내용</label><textarea class="inp" id="ntBody" maxlength="5000" style="height:200px;line-height:1.6" placeholder="기사님께 보일 내용을 입력하세요. 줄바꿈은 그대로 보입니다."></textarea></div>
+    <label class="check"><input type="checkbox" id="ntImp"> <b style="color:var(--danger)">중요</b>&nbsp;— 맨 위 고정, 처음 볼 때 팝업으로 한 번 보여 줌</label>
+    <div class="field"><span class="lb">보낼 대상</span>
+      <div class="seg" id="ntTgtMode"><button type="button" data-tm="all" class="on">전체 기사</button><button type="button" data-tm="camp">캠프 선택</button></div>
+      <div class="rchips hidden" id="ntCamps" style="margin-top:8px"></div></div>
+    <div class="grid2">
+      <div class="field"><label class="lb" for="ntStart">게시 시작일 (비우면 바로)</label><input class="inp" type="date" id="ntStart"></div>
+      <div class="field"><label class="lb" for="ntEnd">게시 종료일 (비우면 계속)</label><input class="inp" type="date" id="ntEnd"></div>
+    </div>
+    <div class="field"><span class="lb">상태</span><div class="seg" id="ntStatus"><button type="button" data-st="게시" class="on">게시</button><button type="button" data-st="숨김">숨김</button></div></div>
+    <div class="m-actions"><button type="button" class="btn ghost danger-t" id="ntDel" style="margin-right:auto">삭제</button><button type="button" class="btn ghost" id="ntCancel">닫기</button><button class="btn" id="ntSave">저장</button></div>
   </form>
 </div>
 
@@ -1480,6 +1523,8 @@
     $$('.nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === v));
     $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
     $('#view-memo').classList.toggle('hidden', v !== 'memo');
+    $('#view-notice').classList.toggle('hidden', v !== 'notice');
+    if (v === 'notice') loadNotices();
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
     $('#view-route').classList.toggle('hidden', v !== 'route');
     $('#view-sched').classList.toggle('hidden', v !== 'sched');
@@ -1499,6 +1544,78 @@
     if (!$('#bdrawer').classList.contains('hidden')) return;
     switchView(a.dataset.view);
   }));
+
+  // ───── 공지사항 ─────
+  let NT = { notices: [], camps: [], today: '' }, ntFilter = '전체', ntEdit = null;
+  const ntState = (n) => n.status === '숨김' ? '숨김' : n.start && n.start > NT.today ? '예약' : n.end && n.end < NT.today ? '종료' : '게시';
+  function loadNotices() {
+    api('adm_noticeList').then((r) => { if (!r.ok) return toast(r.msg); NT = r; renderNotices(); }).catch(() => {});
+  }
+  function renderNotices() {
+    const cnt = { '전체': NT.notices.length, '게시': 0, '예약': 0, '종료': 0, '숨김': 0 };
+    NT.notices.forEach((n) => { cnt[ntState(n)]++; });
+    $('#ntTabs').innerHTML = Object.keys(cnt).map((k) => '<button class="tab' + (k === ntFilter ? ' on' : '') + '" data-nf="' + k + '">' + (k === '게시' ? '게시 중' : k) + '<b>' + cnt[k] + '</b></button>').join('');
+    $('#ntCount').textContent = '게시 중 ' + cnt['게시'] + '건';
+    const list = NT.notices.filter((n) => ntFilter === '전체' || ntState(n) === ntFilter);
+    $('#ntEmpty').classList.toggle('hidden', list.length > 0);
+    $('#ntEmpty').textContent = NT.notices.length ? '해당하는 공지가 없습니다.' : '아직 공지가 없습니다. 오른쪽 위 "+ 새 공지"로 기사님께 알릴 내용을 올려 보세요.';
+    $('#ntRows').innerHTML = list.map((n) => {
+      const st = ntState(n), per = (n.start || '등록일부터') + ' ~ ' + (n.end || '계속');
+      return '<tr data-nt="' + esc(n.id) + '"><td><span class="badge b-' + st + '">' + (st === '게시' ? '게시 중' : st) + '</span></td>' +
+        '<td class="t"><b>' + (n.important ? '<span class="nt-imp">[중요]</span>' : '') + esc(n.title) + '</b><small>' + esc(String(n.body || '').replace(/\s+/g, ' ').slice(0, 80)) + '</small></td>' +
+        '<td>' + (n.target ? esc(n.target) : '<span class="sub">전체</span>') + '</td><td class="sub">' + esc(per) + '</td>' +
+        '<td class="sub">' + esc(n.author || '') + '</td><td class="sub">' + esc(String(n.updatedAt || n.createdAt || '').slice(0, 16)) + '</td></tr>';
+    }).join('');
+  }
+  $('#ntTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-nf]'); if (!b) return; ntFilter = b.dataset.nf; renderNotices(); });
+  $('#ntReload').addEventListener('click', loadNotices);
+  function openNotice(n) {
+    ntEdit = n || null;
+    $('#ntTitleH').textContent = n ? '공지 수정' : '새 공지';
+    $('#ntTitle').value = n ? n.title : ''; $('#ntBody').value = n ? n.body : '';
+    $('#ntImp').checked = !!(n && n.important);
+    $('#ntStart').value = n ? n.start : ''; $('#ntEnd').value = n ? n.end : '';
+    const tg = n && n.target ? n.target.split(',').map((x) => x.trim().replace(/캠프$/, '')).filter(Boolean) : [];
+    const names = NT.camps.slice().sort(koSort);
+    tg.forEach((x) => { if (!names.some((c) => c.replace(/\s*캠프$/, '') === x)) names.push(x); }); // 노선관리에서 지워진 캠프도 표시
+    $('#ntCamps').innerHTML = names.length ? names.map((c) => { const k = c.replace(/\s*캠프$/, ''); return '<button type="button" data-nc="' + esc(k) + '" class="' + (tg.includes(k) ? 'on' : '') + '">' + esc(c) + '</button>'; }).join('')
+      : '<span class="sub" style="font-size:13px">노선관리에 등록된 캠프가 없습니다.</span>';
+    setTgtMode(tg.length ? 'camp' : 'all');
+    setNtStatus(n ? n.status : '게시');
+    $('#ntDel').classList.toggle('hidden', !n);
+    $('#ntModal').classList.remove('hidden'); $('#ntTitle').focus();
+  }
+  function setTgtMode(m) { $$('#ntTgtMode [data-tm]').forEach((b) => b.classList.toggle('on', b.dataset.tm === m)); $('#ntCamps').classList.toggle('hidden', m !== 'camp'); }
+  function setNtStatus(v) { $$('#ntStatus [data-st]').forEach((b) => b.classList.toggle('on', b.dataset.st === v)); }
+  $('#ntTgtMode').addEventListener('click', (e) => { const b = e.target.closest('[data-tm]'); if (b) setTgtMode(b.dataset.tm); });
+  $('#ntStatus').addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) setNtStatus(b.dataset.st); });
+  $('#ntCamps').addEventListener('click', (e) => { const b = e.target.closest('[data-nc]'); if (b) b.classList.toggle('on'); });
+  $('#ntNew').addEventListener('click', () => openNotice(null));
+  $('#ntRows').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-nt]'); if (!tr) return; const n = NT.notices.find((x) => x.id === tr.dataset.nt); if (n) openNotice(n); });
+  const ntClose = () => $('#ntModal').classList.add('hidden');
+  $('#ntCancel').addEventListener('click', ntClose);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#ntModal').classList.contains('hidden')) ntClose(); });
+  $('#ntForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const campMode = $('#ntTgtMode [data-tm="camp"]').classList.contains('on');
+    const target = campMode ? $$('#ntCamps [data-nc].on').map((b) => b.dataset.nc).join(', ') : '';
+    if (campMode && !target) return toast('공지를 보낼 캠프를 하나 이상 골라 주세요.');
+    const n = {
+      id: ntEdit ? ntEdit.id : '', title: $('#ntTitle').value.trim(), body: $('#ntBody').value, important: $('#ntImp').checked, target: target,
+      start: $('#ntStart').value, end: $('#ntEnd').value, status: $('#ntStatus [data-st].on').dataset.st
+    };
+    if (!n.title) return toast('제목을 입력해 주세요.');
+    const btn = $('#ntSave'); btn.disabled = true;
+    api('adm_noticeSave', n).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      ntClose(); toast(ntEdit ? '공지를 고쳤습니다.' : (n.status === '게시' ? '공지를 올렸습니다. 기사 앱에 바로 보입니다.' : '공지를 저장했습니다 (숨김).'));
+      loadNotices();
+    }).catch(() => {}).finally(() => { btn.disabled = false; });
+  });
+  $('#ntDel').addEventListener('click', () => {
+    if (!ntEdit || !confirm('"' + ntEdit.title + '" 공지를 삭제할까요?\n\n기사 앱에서도 바로 사라집니다. 잠시 내리려면 삭제 대신 상태를 "숨김"으로 바꾸세요.')) return;
+    api('adm_noticeDelete', ntEdit.id).then((r) => { if (!r.ok) return toast(r.msg); ntClose(); toast('공지를 삭제했습니다.'); loadNotices(); }).catch(() => {});
+  });
 
   // ───── 업무스케줄 ─────
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
@@ -3719,6 +3836,7 @@
     drivers: { label: '기사 정보관리', items: ['모든 기사 정보 (drivers 탭)', '기사 앱 로그인 (관리자 로그인은 그대로)', '가입 서류 폴더 → 드라이브 휴지통'], keep: '스케줄·배번호 신청서 기록은 남습니다.' },
     sched: { label: '스케줄관리', items: ['스케줄 DB 파일의 모든 날짜 기록', '비고 줄 (빈 비고 줄 3개는 다시 만듦)'], keep: '기사 정보와 기사별 스케줄 설정(소속캠프·기본노선 등)은 남습니다.' },
     route: { label: '노선관리', items: ['모든 캠프·노선·상차지 주소·구분별 단가', '캠프 참고 이미지 (사진 파일 → 드라이브 휴지통)', '기사의 소속캠프 칸'], keep: '기사 정보와 스케줄 기록은 남습니다.' },
+    notice: { label: '공지사항', items: ['모든 공지 (notices 탭)'], keep: '' },
     memo: { label: '업무스케줄', items: ['모든 날짜별 메모'], keep: '' },
     bib: { label: '배번호 관리', items: ['모든 배번호 신청서'], keep: '회사 정보(서류 고정 항목)는 남습니다.' }
   };
