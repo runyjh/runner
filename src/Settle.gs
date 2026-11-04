@@ -1195,14 +1195,20 @@ function stlMoveOf_(ctx, idx, worker, r, warn) {
   }
   return null;
 }
-/** 옮긴 줄 기록: 일한 기사 쪽 '+ ymk1004 윤미경(정민녕) 사용' / 명의자 쪽 '- 타인 아이디 사용' (아이디 칸 = 사용된 아이디) */
+/** 옮긴 줄 기록: 일한 기사 쪽 '+ ymk1004 윤미경(정민녕) 사용' / 명의자 쪽 '- 타인 민경진이 사용' (아이디 칸 = 사용된 아이디) */
 function stlMoveNote_(sIn, sOut, r, worker, X, D, idx, amt, qty, wkey) {
   const cid = String(r.cid).replace(/@.*$/, ''), ownerName = X.groups[idx.mainKey].ownerId && D.byId[X.groups[idx.mainKey].ownerId] ? D.byId[X.groups[idx.mainKey].ownerId].name : '명의자 없음';
   const wName = D.byId[worker] ? D.byId[worker].name : worker;
   const wCid = wkey && X.groups[wkey] ? String(X.groups[wkey].cid).replace(/@.*$/, '') : '';
   const a = sIn.movedIn[cid] || (sIn.movedIn[cid] = { label: '+ ' + cid + ' ' + ownerName + ' 사용', cid: cid, who: ownerName, qty: 0, amt: 0, dates: {} });
-  const b = sOut.movedOut[worker + '|' + cid] || (sOut.movedOut[worker + '|' + cid] = { label: '- 타인 아이디 사용', cid: cid, who: wName, wCid: wCid, qty: 0, amt: 0, dates: {} });
+  const b = sOut.movedOut[worker + '|' + cid] || (sOut.movedOut[worker + '|' + cid] = { label: '- 타인 ' + wName + stlIga_(wName) + ' 사용', cid: cid, who: wName, wCid: wCid, qty: 0, amt: 0, dates: {} });
   [a, b].forEach(function (x) { x.qty += qty; x.amt += amt; if (qty) x.dates[r.date] = 1; });
+}
+/** 이름 뒤 조사: 받침 있으면 '이', 없으면 '가' (민경진 → 민경진이, 김도유 → 김도유가) */
+function stlIga_(name) {
+  const c = String(name || '').trim().slice(-1).charCodeAt(0);
+  if (c >= 0xAC00 && c <= 0xD7A3) return (c - 0xAC00) % 28 ? '이' : '가';
+  return '(이)가';
 }
 function stlMoveList_(m) {
   return Object.keys(m).map(function (k) { const x = m[k], ds = Object.keys(x.dates).sort(); return { label: x.label, cid: x.cid, who: x.who, qty: x.qty, amt: x.amt, days: ds.length, from: ds[0] || '', to: ds[ds.length - 1] || '' }; });
