@@ -260,7 +260,7 @@ function api_pmSave(token, job) {
       return { ok: true, id: id };
     } finally {
       lock.releaseLock();
-      pmPushSend_(out);
+      pmAfter_(out);
     }
   });
 }
@@ -295,7 +295,7 @@ function api_pmApply(token, id, memo) {
       return { ok: true };
     } finally {
       lock.releaseLock();
-      pmPushSend_(out);
+      pmAfter_(out);
     }
   });
 }
@@ -311,6 +311,7 @@ function api_pmCancelApply(token, id) {
       writeFields_(SH.PAPP, a._row, { status: PAST.CANCEL, updatedAt: now });
       // 확정된 기사가 취소하면 일감은 다시 모집 중
       out.push(pmA_(j.posterId, j.poster, j, j.acceptedId === u.id ? 'cancelOk' : 'cancel', u.info.name));
+      if (j.acceptedId === u.id && j.status === PST.DONE) pmSchOp_(out, 'clear', u.id, j);
       pmAlertAdd_(out);
       if (j.acceptedId === u.id) writeFields_(SH.PJOB, row, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now });
       else if (j.status === PST.TALK && a.status === PAST.TALK && !readAll_(SH.PAPP).some(function (x) { return x.jobId === id && x.id !== a.id && x.status === PAST.TALK; })) writeFields_(SH.PJOB, row, { status: PST.OPEN, updatedAt: now });
@@ -318,7 +319,7 @@ function api_pmCancelApply(token, id) {
       return { ok: true };
     } finally {
       lock.releaseLock();
-      pmPushSend_(out);
+      pmAfter_(out);
     }
   });
 }
@@ -353,16 +354,19 @@ function api_pmDecide(token, jobId, appId, action) {
           else if (pmActiveApp_(x)) { writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'lost')); }
         });
         writeFields_(SH.PJOB, jr, { status: PST.DONE, acceptedId: a.driverId, accepted: a.name, updatedAt: now });
+        if (j.status === PST.DONE && j.acceptedId && j.acceptedId !== a.driverId) pmSchOp_(out, 'clear', j.acceptedId, j);
+        pmSchOp_(out, 'set', a.driverId, j);
       } else if (action === 'reject') {
         writeFields_(SH.PAPP, a._row, { status: PAST.NO, updatedAt: now });
         out.push(pmA_(a.driverId, a.name, j, 'reject'));
-        if (j.acceptedId === a.driverId) writeFields_(SH.PJOB, jr, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now });
+        if (j.acceptedId === a.driverId) { writeFields_(SH.PJOB, jr, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now }); pmSchOp_(out, 'clear', a.driverId, j); }
         else if (j.status === PST.TALK && !apps.some(function (x) { return x.id !== a.id && x.status === PAST.TALK; })) writeFields_(SH.PJOB, jr, { status: PST.OPEN, updatedAt: now });
       } else if (action === 'back') {
         // 확정 풀기 / 미선정 되돌리기 → 지원 상태
         writeFields_(SH.PAPP, a._row, { status: PAST.APPLY, updatedAt: now });
         if (j.acceptedId === a.driverId) {
           out.push(pmA_(a.driverId, a.name, j, 'unaccept'));
+          pmSchOp_(out, 'clear', a.driverId, j);
           apps.forEach(function (x) { if (x.id !== a.id && x.status === PAST.NO) writeFields_(SH.PAPP, x._row, { status: PAST.APPLY, updatedAt: now }); });
           writeFields_(SH.PJOB, jr, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now });
         }
@@ -372,7 +376,7 @@ function api_pmDecide(token, jobId, appId, action) {
       return { ok: true };
     } finally {
       lock.releaseLock();
-      pmPushSend_(out);
+      pmAfter_(out);
     }
   });
 }
@@ -394,6 +398,7 @@ function api_pmClose(token, id, action) {
         writeFields_(SH.PJOB, jr, { status: PST.OPEN, updatedAt: now });
       } else if (action === 'cancel') {
         writeFields_(SH.PJOB, jr, { status: PST.CANCEL, acceptedId: '', accepted: '', updatedAt: now });
+        if (j.status === PST.DONE && j.acceptedId) pmSchOp_(out, 'clear', j.acceptedId, j);
         readAll_(SH.PAPP).forEach(function (x) { if (x.jobId === j.id && pmActiveApp_(x)) { writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'canceled')); } });
       } else fail_('알 수 없는 작업입니다.');
       pmAlertAdd_(out);
@@ -401,7 +406,7 @@ function api_pmClose(token, id, action) {
       return { ok: true };
     } finally {
       lock.releaseLock();
-      pmPushSend_(out);
+      pmAfter_(out);
     }
   });
 }
@@ -738,6 +743,87 @@ function pmDoneOf_(me, cells, myCamp) {
     if (j.posterId !== me || j.status !== PST.DONE || !set[j.date] || !j.route) return;
     if (!pmCellMatch_(cells[j.date], j, myCamp)) return;
     (out[j.date] = out[j.date] || []).push({ id: j.id, camp: j.camp, route: j.route, accepted: j.accepted });
+  });
+  return out;
+}
+
+// ───────────────────────── 어드민 기사스케줄 연동 ─────────────────────────
+/** 처리 뒤 (잠금을 푼 다음): 휴대폰 푸시 + 기사스케줄 품앗이 줄 반영 */
+function pmAfter_(out) {
+  pmPushSend_(out);
+  if (out && out.sch && out.sch.length) pmSchApply_(out.sch);
+}
+/** 기사스케줄 품앗이 줄 칸에 적을 글자: '강서1 527B' (라우트가 없으면 배송지) */
+function pmSchText_(j) {
+  return (String(j.camp || '').replace(/\s*캠프$/, '') + ' ' + (normCode_(j.route) || String(j.area || '').trim())).trim();
+}
+function pmSchOp_(out, op, driverId, j) {
+  if (!driverId || !j || !j.date) return;
+  (out.sch = out.sch || []).push({ op: op, driverId: String(driverId), date: j.date, value: pmSchText_(j) });
+}
+/**
+ * 스케줄 DB 의 품앗이 줄에 쓰기. set = 칸에 그 글자를 넣음(이미 다른 글이 있으면 줄을 바꿔 덧붙임), clear = 그 글자만 지움.
+ * 품앗이 줄이 없으면 비고 줄 바로 위에 새로 만든다. 스케줄 DB 가 없거나 실패해도 품앗이 처리는 그대로 (기록만 남김).
+ */
+function pmSchApply_(ops) {
+  try {
+    if (!props_().SCH_DB_ID) return;
+    const ds = ops.map(function (o) { return o.date; }).sort();
+    const h0 = schEnsureDates_(parseYmd_(ds[0]), parseYmd_(ds[ds.length - 1]));
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const sh = schSheet_(), h = schHeader_(true) || h0, F = h.fixed;
+      const read = function () {
+        const last = sh.getLastRow();
+        return last >= 2 ? sh.getRange(2, 1, last - 1, 5).getValues() : [];
+      };
+      let fixed = read();
+      const rowOf = function (id) { for (let i = 0; i < fixed.length; i++) if (str_(fixed[i][F['행ID']]) === id) return i + 2; return 0; };
+      ops.forEach(function (o) {
+        const id = SCH_PM_PREFIX + o.driverId, col = h.dates[o.date];
+        if (col === undefined) return;
+        let r = rowOf(id);
+        if (!r) {
+          if (o.op !== 'set') return;
+          const d = driverById_(o.driverId);
+          if (!d) return;
+          let at = 0;
+          for (let i = 0; i < fixed.length; i++) if (str_(fixed[i][F['구분']]) === SCH.KIND_NOTE || /^NOTE\d+$/.test(str_(fixed[i][F['행ID']]))) { at = i + 2; break; }
+          if (at) sh.insertRowBefore(at); else at = fixed.length + 2;
+          const line = new Array(5).fill('');
+          line[F['행ID']] = id; line[F['구분']] = SCH.KIND_PM; line[F['캠프']] = SCH.KIND_PM; line[F['이름']] = d.name;
+          sh.getRange(at, 1, 1, 5).setNumberFormat('@').setValues([line.map(safeText_)]);
+          fixed = read(); r = at;
+        }
+        const c = sh.getRange(r, col + 1), cur = str_(c.getValue());
+        const lines = cur ? cur.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean) : [];
+        const has = lines.indexOf(o.value) >= 0;
+        let next = null;
+        if (o.op === 'set' && !has) next = lines.concat([o.value]).join('\n');
+        if (o.op === 'clear' && has) next = lines.filter(function (x) { return x !== o.value; }).join('\n');
+        if (next !== null) c.setNumberFormat('@').setValue(safeText_(next));
+      });
+    } finally {
+      lock.releaseLock();
+    }
+  } catch (e) {
+    console.error('기사스케줄 품앗이 반영 실패: ' + (e && e.message));
+  }
+}
+/**
+ * 어드민 기사스케줄: 품앗이로 맡겨 배차 확정된 칸 { 기사ID: { 날짜: '품앗이 → 이지원' } }
+ * 그날 그 기사 칸의 캠프·라우트가 일감과 같을 때만 (기사 앱 '배차확정 완료' 와 같은 규칙)
+ */
+function pmAdminMarks_(cells, dates, byDrv) {
+  const out = {}, set = {};
+  dates.forEach(function (d) { set[d] = 1; });
+  pmData_().jobs.forEach(function (j) {
+    if (j.status !== PST.DONE || !set[j.date] || !j.route) return;
+    const row = cells[j.posterId] || {}, d = byDrv[j.posterId] || {};
+    if (!pmCellMatch_(row[j.date], j, d.camp || '')) return;
+    const m = out[j.posterId] || (out[j.posterId] = {});
+    m[j.date] = (m[j.date] ? m[j.date] + ', ' : '') + '품앗이 → ' + (j.accepted || '');
   });
   return out;
 }

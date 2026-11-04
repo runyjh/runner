@@ -497,6 +497,10 @@
   .nlab { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--sub); cursor: pointer; }
   .nlab:hover { color: var(--brand); text-decoration: underline; }
   .sg tr.note td.c { font-weight: 500; text-align: left; background: #fffdf5; }
+  .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
+  .sg tr.pmr td.c { background: #fffbef; }
+  .sg td.c.pmk { box-shadow: inset 0 -3px 0 #12a150; }
+  .sg td.c.pmk::after { content: attr(data-pm); display: block; font-size: 10px; font-weight: 800; color: #0b6b3a; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sg tr.calc td.cc { white-space: nowrap; vertical-align: top; padding: 4px 6px; font-size: 11px; line-height: 1.45; width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; }
   .sg tr.calc.mi td.cc { color: #e00; font-weight: 700; background: #fff6f6; }
   .sg tr.calc.du td.cc { color: #b45309; background: #fffaf0; }
@@ -3723,6 +3727,13 @@
       return koSort(ca, cb) || drvCmp(a, b);
     });
     const rows = list.map((d) => ({ kind: 'd', row: d.id, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
+    // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트
+    const campShort = sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
+    (SD.pmRows || []).filter((p) => {
+      if (q && ![p.name, p.loginId].some((x) => String(x || '').toLowerCase().includes(q))) return false;
+      if (campShort && !SD.dates.some((dt) => sget(p.id, dt).replace(/\s/g, '').includes(campShort))) return false;
+      return true;
+    }).forEach((p) => rows.push({ kind: 'p', row: p.id, p }));
     SD.notes.forEach((n) => rows.push({ kind: 'n', row: n.id, note: n }));
     return rows;
   }
@@ -3762,8 +3773,14 @@
       '<tr class="h2">' + dates.map(hcell).join('') + '</tr></thead>';
     let prevCamp = null;
     const body = srows.map((r, ri) => {
+      if (r.kind === 'p') {
+        const first = !ri || srows[ri - 1].kind !== 'p';
+        return '<tr class="pmr' + (first ? ' gtop' : '') + '"><td class="fx f1 lab" title="품앗이 배차 확정 때 자동으로 적힙니다. 직접 고쳐도 됩니다.">품앗이</td>' +
+          '<td class="fx f2 lab">' + esc(r.p.name) + '</td><td class="fx f3">' + esc(r.p.loginId || '') + '</td><td class="fx f4"></td>' +
+          dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex num">' + dates.filter((dt) => sget(r.row, dt)).length + '</td><td class="ex" colspan="4"></td></tr>';
+      }
       if (r.kind === 'n') {
-        return '<tr class="note' + (ri && srows[ri - 1].kind === 'd' ? ' gtop' : '') + '"><td class="fx f1 lab" title="이 줄의 글은 업무스케줄과 연동됩니다">비고 <span class="nlink">↔ 업무</span></td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
+        return '<tr class="note' + (ri && srows[ri - 1].kind !== 'n' ? ' gtop' : '') + '"><td class="fx f1 lab" title="이 줄의 글은 업무스케줄과 연동됩니다">비고 <span class="nlink">↔ 업무</span></td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="5"></td></tr>';
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp;
@@ -3789,7 +3806,12 @@
     if (scalc && scalc.dupCells.has(r.row + '|' + ci)) cls.push('dup');
     if (dt === pddDate()) cls.push('today');
     if (sepCol(ci)) cls.push('wk2');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (v.length > 14 ? ' title="' + esc(v) + '"' : '') + '>' + esc(v) + '</td>';
+    const pm = pmMark(r.row, dt);
+    if (pm) cls.push('pmk');
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm ? ' title="' + esc(v + (pm ? '\n' + pm : '')) + '"' : '') + '>' + esc(v) + '</td>';
+  }
+  /** 이 기사가 품앗이로 맡겨 배차 확정된 날 (칸의 캠프·라우트가 일감과 같을 때) */
+  function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || '';
   }
   function renderCalc() {
     const dates = SD.dates, campOk = (short) => !sf.camp || shortCamp((SD.camps.find((c) => c.id === sf.camp) || {}).name) === short;
@@ -3815,7 +3837,7 @@
     $$('td.c', tb).forEach((td) => {
       const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
       const v = sget(r.row, dt), k = r.row + '|' + dt;
-      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '']
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
       if (td.textContent !== v) td.textContent = v;

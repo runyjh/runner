@@ -3945,7 +3945,9 @@ function fixPriceRow_(sh, c, o) {
  *   F열부터: 2026-01-01, 2026-01-02 … 날짜마다 1칸. 칸에는 스케줄 글자 그대로 (출근, 휴무, 527B (D1,D2), 안양1 724ABCD …)
  * 화면은 2주(14칸)씩 읽고, 고친 칸만 골라서 쓴다. 시트에서 직접 고쳐도 그대로 화면에 나온다.
  */
-const SCH = { SHEET: 'schedule', FIXED: ['행ID', '구분', '캠프', '이름', '기본노선'], KIND_DRIVER: '기사', KIND_NOTE: '비고' };
+const SCH = { SHEET: 'schedule', FIXED: ['행ID', '구분', '캠프', '이름', '기본노선'], KIND_DRIVER: '기사', KIND_NOTE: '비고', KIND_PM: '품앗이' };
+// 품앗이 줄: 행ID = 'PM' + 기사ID. 품앗이로 남의 일을 대신 뛰는 기사 1명 = 1줄, 날짜 칸 = 그날 뛰는 캠프·라우트 (배차 확정 때 자동으로 적힘)
+const SCH_PM_PREFIX = 'PM';
 const SCH_DAYS = 14;
 const SCH_MAX_TEXT = 300;
 // 대한민국 공휴일 (운영시트 스크립트의 내장 공휴일 사전과 같음)
@@ -4206,10 +4208,19 @@ function schRead_(sun, end) {
   if (last >= 2) schSyncCopies_(sh, h, drivers);
   const holidays = {};
   dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
+  // 품앗이 줄 (대신 뛰는 기사) + 내 일을 품앗이로 맡겨 배차 확정된 칸 표시
+  const byDrv = {};
+  drivers.forEach(function (d) { byDrv[d.id] = d; });
+  const pmRows = Object.keys(cells).filter(function (id) { return id.indexOf(SCH_PM_PREFIX) === 0 && byDrv[id.slice(SCH_PM_PREFIX.length)]; }).map(function (id) {
+    const d = byDrv[id.slice(SCH_PM_PREFIX.length)];
+    return { id: id, driverId: d.id, name: d.name, loginId: d.loginId || '', campId: d.campId || '' };
+  }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+  let pmMarks = {};
+  try { pmMarks = pmAdminMarks_(cells, dates, byDrv); } catch (e) { pmMarks = {}; }
   return {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays,
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
-    routes: routes, drivers: drivers, cells: cells, notes: notes
+    routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks
   };
 }
 
@@ -4260,11 +4271,12 @@ function adm_schSave(token, changes) {
         let r = last + 1;
         const rows = [];
         newIds.forEach(function (id) {
-          const o = drv[id];
+          const pm = id.indexOf(SCH_PM_PREFIX) === 0 && drv[id.slice(SCH_PM_PREFIX.length)];
+          const o = pm || drv[id];
           if (!o) return; // 없는 기사·비고는 무시
           const line = new Array(5).fill('');
-          line[h.fixed['행ID']] = id; line[h.fixed['구분']] = SCH.KIND_DRIVER;
-          line[h.fixed['캠프']] = o.schCamp; line[h.fixed['이름']] = o.name; line[h.fixed['기본노선']] = o.baseRoute;
+          line[h.fixed['행ID']] = id; line[h.fixed['구분']] = pm ? SCH.KIND_PM : SCH.KIND_DRIVER;
+          line[h.fixed['캠프']] = pm ? SCH.KIND_PM : o.schCamp; line[h.fixed['이름']] = o.name; line[h.fixed['기본노선']] = pm ? '' : o.baseRoute;
           rows.push(line.map(safeText_)); rowOf[id] = r++;
         });
         if (rows.length) {
@@ -5100,6 +5112,7 @@ function onSchEdit_(e, sh) {
       const v = all[r - 2] || [];
       const id = str_(v[F['행ID']]), kind = str_(v[F['구분']]), camp = str_(v[F['캠프']]), name = str_(v[F['이름']]);
       if (/^NOTE/.test(id)) { if (kind !== SCH.KIND_NOTE) cell(r, '구분').setValue(SCH.KIND_NOTE); noteEdited = true; continue; }
+      if (id.indexOf(SCH_PM_PREFIX) === 0 && byId[id.slice(SCH_PM_PREFIX.length)]) { if (kind !== SCH.KIND_PM) cell(r, '구분').setValue(SCH.KIND_PM); cell(r, '행ID').clearNote(); continue; }
       if (id) {
         const o = byId[id];
         if (o) {
