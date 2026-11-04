@@ -189,6 +189,13 @@
   table.sttbl.ed td.calc { color: var(--sub); font-size: 12px; white-space: nowrap; }
   table.sttbl .inp.dirty { border-color: var(--warn); background: #fffdf7; }
   .ed-bar { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+  .ed-bar .edq { width: 220px; height: 32px; }
+  table.ed th.srt { cursor: pointer; user-select: none; white-space: nowrap; }
+  table.ed th.srt:hover { color: var(--brand); }
+  table.ed th.srt i { font-style: normal; color: var(--brand); margin-left: 3px; }
+  #lbar { position: fixed; left: 0; top: 0; height: 3px; width: 0; background: var(--brand); z-index: 9999; opacity: 0; pointer-events: none; box-shadow: 0 0 6px rgba(27,100,218,.5); }
+  #lbar.on { opacity: 1; width: 80%; transition: width 6s cubic-bezier(.1,.6,.2,1), opacity .2s; }
+  #lbar.on.done { width: 100%; opacity: 0; transition: width .2s ease-out, opacity .3s .15s; }
   .ed-del { border: 0; background: none; color: var(--faint); font-size: 16px; padding: 0 6px; }
   .ed-del:hover { color: var(--danger); }
   .mg-box { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 12px; font-size: 13px; }
@@ -887,6 +894,7 @@
 </aside>
 
 <!-- ───────────── 새 신청서: 기사 고르기 ───────────── -->
+<div id="lbar" aria-hidden="true"></div>
 <div class="modal hidden" id="pickModal">
   <div class="m-box">
     <h3>신청서를 만들 기사 선택</h3>
@@ -1178,10 +1186,21 @@
   }
   const call = (fn, ...args) => gsCall(fn, args);
   /** 관리자 API 호출: 로그인 만료면 로그인 화면으로 */
+  // 화면 맨 위 로딩바: 서버와 주고받는 동안 표시
+  let apiPending = 0, lbarTimer = 0;
+  function lbar(on) {
+    apiPending = Math.max(0, apiPending + (on ? 1 : -1));
+    const el = document.getElementById('lbar'); if (!el) return;
+    clearTimeout(lbarTimer);
+    if (apiPending) { el.classList.remove('done'); el.classList.add('on'); }
+    else { el.classList.add('done'); lbarTimer = setTimeout(() => el.classList.remove('on', 'done'), 350); }
+  }
   async function api(fn, ...args) {
     let r;
+    lbar(true);
     try { r = await call(fn, store.get(), ...args); }
     catch (e) { toast('연결이 원활하지 않습니다. 잠시 후 다시 시도해 주세요.'); throw e; }
+    finally { lbar(false); }
     if (r && r.code === 'EXPIRED') { store.del(); showLogin(); toast(r.msg); throw new Error('EXPIRED'); }
     return r;
   }
@@ -4652,6 +4671,7 @@
   }
   // ── 표 편집 ──
   function loadEditor(name) {
+    if (!STX.table || STX.table.name !== name) STX.edQ = ''; // 다른 표로 바꾸면 검색어 비움
     $('#stEditHelp').textContent = ST_HELP[name] || '';
     $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
     return api('adm_stlTable', name, STX.month).then((r) => {
@@ -4687,16 +4707,42 @@
       if (T.name === 'advance') { const left = (Number(String(r.amt).replace(/,/g, '')) || 0) - (Number(String(r.paid).replace(/,/g, '')) || 0); return '<td class="calc"' + (left > 0 ? ' style="color:var(--danger);font-weight:700"' : '') + '>' + wnz(left) + '</td>'; }
       return '';
     };
-    const head = '<thead><tr>' + T.cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + calcH.map((h) => '<th class="n">' + h + '</th>').join('') + (T.fixed ? '' : '<th></th>') + '</tr></thead>';
-    const body = rows.map((r, i) => '<tr>' + T.cols.map((c) => cell(r, i, c)).join('') + calc(r) + (T.fixed || ro ? '' : '<td><button class="ed-del" data-del="' + i + '" title="줄 지우기">×</button></td>') + '</tr>').join('');
+    // 정렬: 제목을 누르면 오름차순 → 내림차순 → 원래 순서 (화면 순서만 바뀌고 저장 순서는 그대로)
+    const so = STX.edSort && STX.edSort.t === T.name ? STX.edSort : null;
+    const order = rows.map((r, i) => i);
+    if (so) {
+      const num = (v) => { const n = Number(String(v).replace(/[,\s원%]/g, '')); return String(v).trim() !== '' && !isNaN(n) ? n : null; };
+      order.sort((a, b) => {
+        const x = rows[a][so.k] == null ? '' : String(rows[a][so.k]), y = rows[b][so.k] == null ? '' : String(rows[b][so.k]);
+        if (!x && y) return 1; if (x && !y) return -1;
+        const nx = num(x), ny = num(y);
+        const c = nx !== null && ny !== null ? nx - ny : x.localeCompare(y, 'ko', { numeric: true });
+        return (so.dir === 'desc' ? -c : c) || a - b;
+      });
+    }
+    const head = '<thead><tr>' + T.cols.map((c) => '<th class="srt" data-sort="' + esc(c.k) + '" title="눌러서 정렬">' + esc(c.label) + (so && so.k === c.k ? '<i>' + (so.dir === 'desc' ? '▼' : '▲') + '</i>' : '') + '</th>').join('') + calcH.map((h) => '<th class="n">' + h + '</th>').join('') + (T.fixed ? '' : '<th></th>') + '</tr></thead>';
+    const body = order.map((i) => { const r = rows[i]; return '<tr data-ri="' + i + '">' + T.cols.map((c) => cell(r, i, c)).join('') + calc(r) + (T.fixed || ro ? '' : '<td><button class="ed-del" data-del="' + i + '" title="줄 지우기">×</button></td>') + '</tr>'; }).join('');
     const scope = T.name === 'adjust' || T.name === 'yongcha' ? ymTitle(STX.month) + ' 정산 · ' : '';
     $('#stEditor').innerHTML = dl + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : (T.fixed ? '' : '<button class="btn ghost sm" id="edAdd">+ 줄 추가</button>') +
       '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button>') +
-      '<span class="sub">' + scope + rows.length + '줄 · 정산 DB "stl_' + esc(T.name) + '" 탭에서도 직접 고칠 수 있습니다</span></div>' +
+      '<input class="inp edq" id="edQ" type="search" placeholder="검색 (이름·아이디 등)" value="' + esc(STX.edQ || '') + '"><span class="sub" id="edCnt">' + scope + rows.length + '줄 · 정산 DB "stl_' + esc(T.name) + '" 탭에서도 직접 고칠 수 있습니다</span></div>' +
       '<div class="table-wrap"><table class="sttbl ed">' + head + '<tbody>' + body + '</tbody></table>' + (rows.length ? '' : '<div class="empty">기록이 없습니다.</div>') + '</div>';
+    edFilter();
+  }
+  /** 검색: 줄 안의 모든 칸(입력값·선택값)에서 찾아 맞는 줄만 보이기 (저장할 때는 숨긴 줄도 그대로 저장) */
+  function edFilter() {
+    const q = String(STX.edQ || '').trim().toLowerCase().replace(/\s+/g, '');
+    let shown = 0;
+    $$('#stEditor table.ed tbody tr').forEach((tr) => {
+      const txt = Array.from(tr.querySelectorAll('input, select')).map((el) => el.value).join(' ') + ' ' + tr.textContent;
+      const ok = !q || txt.toLowerCase().replace(/\s+/g, '').includes(q);
+      tr.style.display = ok ? '' : 'none'; if (ok) shown++;
+    });
+    const c = $('#edCnt'); if (c && q) c.textContent = '검색 ' + shown + '줄 / 전체 ' + STX.edRows.length + '줄';
   }
   function edMark() { STX.edDirty = true; const s = $('#edSave'), u = $('#edUndo'); if (s) s.disabled = false; if (u) u.disabled = false; }
   $('#stEditor').addEventListener('input', (e) => {
+    if (e.target.id === 'edQ') { STX.edQ = e.target.value; return edFilter(); }
     const el = e.target.closest('[data-k]'); if (!el) return;
     const r = STX.edRows[+el.dataset.r], k = el.dataset.k;
     r[k] = el.value;
@@ -4706,6 +4752,12 @@
   });
   $('#stEditor').addEventListener('change', (e) => { const el = e.target.closest('select[data-k]'); if (el) { STX.edRows[+el.dataset.r][el.dataset.k] = el.value; el.classList.add('dirty'); edMark(); } });
   $('#stEditor').addEventListener('click', (e) => {
+    const sh = e.target.closest('th[data-sort]');
+    if (sh) {
+      const k = sh.dataset.sort, T = STX.table, cur = STX.edSort && STX.edSort.t === T.name && STX.edSort.k === k ? STX.edSort.dir : '';
+      STX.edSort = cur === '' ? { t: T.name, k, dir: 'asc' } : cur === 'asc' ? { t: T.name, k, dir: 'desc' } : null;
+      return renderEditor();
+    }
     if (e.target.id === 'edAdd') {
       const o = {}; STX.table.cols.forEach((c) => { o[c.k] = ''; });
       if (STX.table.name === 'yongcha') { o.mode = '건당'; o.date = STX.sum ? STX.sum.period.from : ''; }
