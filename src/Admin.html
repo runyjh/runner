@@ -456,6 +456,8 @@
   .xp-table .pin.empty { background: #fff4f4; border-color: #f3c4c4; }
   .xp-table tr.off td { color: var(--faint); }
   .xp-sum { font-size: 12px; color: var(--sub); }
+  .xp-bulk { background: #f6f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .xp-bulk > b { font-size: 13px; margin-right: 2px; }
   .pin:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); }
   .lvb { display: inline-block; font-size: 10px; color: var(--sub); background: var(--gray-weak); border-radius: 4px; padding: 0 5px; margin-right: 5px; vertical-align: 1px; }
   .pp { color: var(--faint); font-size: 11px; margin-left: 5px; }
@@ -3082,6 +3084,12 @@
         '<input class="inp" id="xpQ" placeholder="캠프·정산코드 검색" value="' + esc(XP.q) + '" autocomplete="off" style="width:150px">' +
         '<div class="grow"><span id="xpMsg"></span><button class="btn sm ghost" id="xpCopy">엑셀로 복사</button><button class="btn sm ghost" id="xpReset" disabled>되돌리기</button><button class="btn sm" id="xpSave" disabled>단가 저장</button></div>' +
       '</div>' +
+      '<div class="ptools xp-bulk"><b>일괄 설정</b>' +
+        '<select class="inp" id="xpBk" aria-label="일괄 설정할 단가">' + PKEYS.map((k) => opt(k, PLABEL[k], XP.bk || 'p2')).join('') + '</select>' +
+        '<input class="inp" id="xpBv" inputmode="numeric" placeholder="금액 (비우면 지움)" autocomplete="off" style="width:140px">' +
+        '<label class="check"><input type="checkbox" id="xpBe"' + (XP.be ? ' checked' : '') + '> 빈 칸만</label>' +
+        '<button class="btn sm" id="xpBgo">보이는 줄에 적용</button><span class="xp-sum" id="xpBn"></span>' +
+      '</div>' +
       '<div class="table-wrap rt-table pt xp-table"><table><thead><tr>' +
         xpCols().map((c) => '<th class="srt" data-xps="' + c.k + '">' + c.t + (XP.sort.k === c.k ? (XP.sort.d > 0 ? ' ▲' : ' ▼') : '') + '</th>').join('') +
       '</tr></thead><tbody id="xpRows"></tbody></table><div class="empty hidden" id="xpEmptyMsg"></div></div>' +
@@ -3123,7 +3131,9 @@
     em.textContent = all.length ? '조건에 맞는 정산코드가 없습니다.' : '노선이 없습니다.';
     xpStatus();
   }
+  function xpBn() { const el = $('#xpBn'); if (!el) return; const k = $('#xpBk').value, l = xpList(); el.textContent = '대상 ' + ($('#xpBe').checked ? l.filter((r) => !xpCur(r, k)).length : l.length) + '줄'; }
   function xpStatus() {
+    xpBn();
     const n = xpDirtyN();
     $('#xpMsg').textContent = n ? n + '줄 바뀜' : '';
     $('#xpSave').disabled = $('#xpReset').disabled = !n;
@@ -3131,6 +3141,7 @@
   const xpFind = (ak) => xpRows().find((r) => r.ak === ak);
   $('#allPrices').addEventListener('input', (e) => {
     const t = e.target;
+    if (t.id === 'xpBv') return;
     if (t.id === 'xpQ') { if (e.isComposing) return; XP.q = t.value; return xpRenderRows(); }
     if (!t.dataset.xpk) return;
     const ak = t.closest('tr[data-ak]').dataset.ak, k = t.dataset.xpk, row = xpFind(ak); if (!row) return;
@@ -3144,13 +3155,19 @@
   $('#allPrices').addEventListener('change', (e) => {
     const t = e.target, m = { xpCamp: 'camp', xpLevel: 'level', xpSt: 'st', xpEmpty: 'empty' }[t.id];
     if (m) { XP[m] = t.value; xpRenderRows(); }
+    if (t.id === 'xpBk') { XP.bk = t.value; xpBn(); }
+    if (t.id === 'xpBe') { XP.be = t.checked; xpBn(); }
   });
   $('#allPrices').addEventListener('focusout', (e) => {
-    const t = e.target; if (!t.dataset || !t.dataset.xpk) return;
+    const t = e.target;
+    if (t.id === 'xpBv') { const r = moneyRaw(t.value); if (/^\d+$/.test(r)) t.value = won(r); return; }
+    if (!t.dataset || !t.dataset.xpk) return;
     const raw = moneyRaw(t.value); if (/^\d+$/.test(raw)) t.value = won(raw);
   });
   $('#allPrices').addEventListener('keydown', (e) => {
-    const t = e.target; if (e.key !== 'Enter' || !t.dataset || !t.dataset.xpk) return;
+    const t = e.target;
+    if (e.key === 'Enter' && t.id === 'xpBv') { e.preventDefault(); return $('#xpBgo').click(); }
+    if (e.key !== 'Enter' || !t.dataset || !t.dataset.xpk) return;
     e.preventDefault();
     const tr = e.shiftKey ? t.closest('tr').previousElementSibling : t.closest('tr').nextElementSibling;
     const n = tr && tr.querySelector('[data-xpk="' + t.dataset.xpk + '"]'); if (n) { n.focus(); n.select(); }
@@ -3163,6 +3180,20 @@
       return xpRender();
     }
     if (e.target.id === 'xpReset') { adirty = {}; return xpRenderRows(); }
+    if (e.target.id === 'xpBgo') {
+      const k = $('#xpBk').value, raw = moneyRaw($('#xpBv').value).replace(/^0+(?=\d)/, ''), only = $('#xpBe').checked;
+      if (raw && !/^\d{1,9}$/.test(raw)) return toast('금액은 숫자만 입력해 주세요.');
+      const list = xpList().filter((r) => !only || !xpCur(r, k));
+      if (!list.length) return toast('적용할 줄이 없습니다.');
+      if (!raw && !confirm('보이는 ' + list.length + '줄의 ' + PLABEL[k] + '를 지울까요?')) return;
+      list.forEach((r) => {
+        const d = adirty[r.ak] || {};
+        if (raw === xpOrig(r, k)) delete d[k]; else d[k] = raw;
+        if (Object.keys(d).length) adirty[r.ak] = d; else delete adirty[r.ak];
+      });
+      xpRenderRows();
+      return toast(list.length + '줄의 ' + PLABEL[k] + '를 ' + (raw ? won(raw) + '원으로' : '빈 칸으로') + ' 바꿨습니다. 단가 저장을 눌러야 저장됩니다.');
+    }
     if (e.target.id === 'xpCopy') {
       const cols = xpCols();
       const lines = [cols.map((c) => c.t).join('\t')].concat(xpList().map((r) => [r.c.name, r.code, '구분' + r.n.level].concat(PKEYS.map((k) => xpCur(r, k))).concat([r.vol == null ? '' : Math.round(r.vol), r.st]).join('\t')));
