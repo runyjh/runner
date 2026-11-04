@@ -177,6 +177,17 @@
   .stw.bad { background: var(--danger-weak); color: #a1262b; }
   .stw.info { background: var(--gray-weak); color: var(--sub); }
   .stw summary { cursor: pointer; font-weight: 700; }
+  .ti-ed { display: grid; grid-template-columns: 380px 1fr; gap: 16px; padding: 14px 16px 18px; }
+  @media (max-width: 980px) { .ti-ed { grid-template-columns: 1fr; } }
+  .ti-ed .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-bottom: 10px; }
+  .ti-ed .fg label { font-size: 12px; color: var(--sub); display: flex; flex-direction: column; gap: 2px; }
+  .ti-ed .fg label.w2 { grid-column: 1 / -1; }
+  .ti-ed h4 { margin: 10px 0 6px; font-size: 13px; }
+  .ti-ed .inp { height: 34px; font-size: 13.5px; }
+  .ti-it { width: 100%; border-collapse: collapse; font-size: 12.5px; } .ti-it td, .ti-it th { padding: 2px; } .ti-it .inp { height: 30px; padding: 0 6px; font-size: 12.5px; }
+  .ti-prev svg { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .ti-prev .tg { display: flex; gap: 6px; margin-bottom: 6px; }
+  .ti-nts { cursor: pointer; }
   .btn.pmsw { background: #f2f4f6; color: var(--sub); } .btn.pmsw b { color: var(--danger); margin-left: 4px; }
   .btn.pmsw.on { background: #e6f7ee; color: #11734b; } .btn.pmsw.on b { color: #0b6b3a; }
   .bm-ban { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
@@ -648,6 +659,7 @@
       <a data-view="settle">정산관리</a>
       <a data-view="memo">업무스케줄</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
+      <a data-view="taxinv">세금계산서 역발행</a>
       <a data-view="bib">배번호 관리</a>
       <a data-view="notice">공지사항</a>
       <a data-view="board">게시판 관리</a>
@@ -699,6 +711,35 @@
         <tbody id="acRows"></tbody>
       </table>
       <div class="empty hidden" id="acEmpty"></div>
+    </div>
+   </section>
+   <section id="view-taxinv" class="hidden">
+    <div class="head">
+      <h2>세금계산서 역발행 <small id="tiCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools">
+        <input class="inp" type="month" id="tiMonth" title="정산월" style="width:auto">
+        <button class="btn" id="tiFromStl" title="이 정산월의 기사별 세금계산서 발행 금액으로 1장씩 만듭니다">정산서에서 만들기</button>
+        <button class="btn ghost" id="tiNew">+ 직접 작성</button>
+        <button class="btn ghost" id="tiReload">새로고침</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">전자세금계산서 발행을 어려워하는 기사님(공급자) 대신 러너(공급받는자)가 세금계산서를 만듭니다. 기사님께는 <b>공급자 보관용</b> 그림으로 전달되고, 기사 앱 <b>정산서 보기</b>에서도 볼 수 있습니다. 단가는 부가세 포함 금액 (공급가액 = 단가÷1.1 반올림). 데이터: 러너 올인원 DB <b>tax_invoices</b> 탭.</p>
+    <div class="tabs" id="tiTabs"><button class="tab on" data-ti="list">발행내역</button><button class="tab" data-ti="sup">거래처별 현황</button><button class="tab" data-ti="month">월별 발행현황</button></div>
+    <div id="tiPane-list">
+      <div class="ptools">
+        <select class="inp" id="tiFMonth" style="width:auto"></select>
+        <select class="inp" id="tiFNts" style="width:auto"><option value="">국세청 등록 전체</option><option>미등록</option><option>등록</option></select>
+        <select class="inp" id="tiFSup" style="width:auto"><option value="">공급자 전체</option></select>
+        <input class="inp search" id="tiQ" placeholder="공급자·사업자번호·품목 검색" style="width:200px">
+      </div>
+      <div class="rbulk hidden" id="tiBulk"></div>
+      <div class="table-wrap"><table><thead><tr><th class="ck"><input type="checkbox" id="tiAll" aria-label="모두 선택"></th><th>코드</th><th>작성일자</th><th>공급자</th><th>사업자번호</th><th>품목</th><th>공급가액</th><th>세액</th><th>합계금액</th><th>구분</th><th>국세청</th><th>기사 앱</th></tr></thead><tbody id="tiRows"></tbody><tfoot id="tiFoot"></tfoot></table>
+        <div class="empty hidden" id="tiEmpty"></div></div>
+    </div>
+    <div id="tiPane-sup" class="hidden"><div class="table-wrap"><table><thead><tr><th>번호</th><th>공급자</th><th>사업자등록번호</th><th>발행 건수</th><th>영수</th><th>청구</th><th>국세청등록</th><th>미등록</th><th>공급가액</th><th>세액</th><th>합계금액</th></tr></thead><tbody id="tiSupRows"></tbody></table></div></div>
+    <div id="tiPane-month" class="hidden">
+      <div class="ptools"><select class="inp" id="tiYear" style="width:auto"></select><span class="sub" style="font-size:12px">칸: 발행 건수 · 합계금액</span></div>
+      <div class="table-wrap"><table id="tiMonthTbl"></table></div>
     </div>
    </section>
    <section id="view-board" class="hidden">
@@ -1000,6 +1041,14 @@
 </div>
 
 <!-- ───────────── 품앗이 일감 상세 ───────────── -->
+<div class="modal hidden" id="tiModal">
+  <div class="m-box" style="width:min(1180px,100%);max-height:94vh;overflow:auto;padding:0">
+    <div class="m-top"><b id="tiTitle">세금계산서</b><span class="grow"></span>
+      <button class="btn sm ghost" id="tiPngSup">공급자 보관용 그림</button><button class="btn sm ghost" id="tiPngBuy">공급받는자 보관용 그림</button>
+      <button class="btn sm ghost danger-t" id="tiDel">삭제</button><button class="btn sm" id="tiSave">저장</button><button class="btn sm ghost" id="tiClose">닫기</button></div>
+    <div class="ti-ed" id="tiEd"></div>
+  </div>
+</div>
 <div class="modal hidden" id="bmModal">
   <div class="m-box" style="width:min(860px,100%);max-height:90vh;overflow:auto;padding:0">
     <div class="m-top"><b id="bmTitle">게시글</b><button class="btn sm ghost" id="bmClose">닫기</button></div>
@@ -1972,6 +2021,8 @@
     $('#view-memo').classList.toggle('hidden', v !== 'memo');
     $('#view-notice').classList.toggle('hidden', v !== 'notice');
     $('#view-board').classList.toggle('hidden', v !== 'board');
+    $('#view-taxinv').classList.toggle('hidden', v !== 'taxinv');
+    if (v === 'taxinv') loadTax();
     if (v === 'board') loadBoardAdm();
     $('#view-acc').classList.toggle('hidden', v !== 'acc');
     if (v === 'acc') loadAccounts();
@@ -5291,7 +5342,7 @@
     (navigator.clipboard ? navigator.clipboard.writeText(tsv) : Promise.reject()).then(() => toast(list.length + '명 복사했습니다 (은행, 계좌번호, 예금주, 금액).')).catch(() => toast('복사하지 못했습니다.'));
   });
   // ── 기사 정산정보 ──
-  const SD_COLS = [['bizNo', '사업자등록번호', 'text'], ['bizName', '상호', 'text'], ['bizEmail', '계산서 이메일', 'text']];
+  const SD_COLS = [['bizNo', '사업자등록번호', 'text'], ['bizName', '상호', 'text'], ['bizCeo', '대표자 (비우면 이름)', 'text'], ['bizAddr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'], ['bizEmail', '계산서 이메일', 'text']];
   function loadStDrivers() {
     $('#sdTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
     return api('adm_stlDrivers').then((r) => { if (!r.ok) return toast(r.msg); STX.drv = r; STX.drvDirty = {}; renderStDrivers(); }).catch(() => {});
@@ -5584,6 +5635,383 @@
     }).catch(() => {});
   });
 
+
+  // ───── 세금계산서 그림 (별지 제11호 서식 모양) — 관리자·기사 앱 공용 ─────
+  // t = { date:'2026-10-31', book1, book2, serial, sup:{no,name,ceo,addr,type,item}, buy:{…}, items:[{md:'10-31',name,spec,qty,price,supply,tax,note}], supply, tax, total, cash, check, bill, credit, kind:'영수'|'청구', note }
+  // copy = 'sup' (공급자 보관용 · 적색) | 'buy' (공급받는자 보관용 · 청색)
+  const TAXDOC = (function () {
+    const W = 1100, H = 600;
+    const xe = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const num = (v) => (Number(v) || 0).toLocaleString('ko-KR');
+    function svg(t, copy) {
+      const C = copy === 'buy' ? '#1c5fd4' : '#d6336c', ink = '#111', F = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR','Nanum Gothic',sans-serif";
+      let o = '';
+      const rect = (x, y, w, h, fill) => { o += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + (fill || 'none') + '" stroke="' + C + '" stroke-width="1.2"/>'; };
+      const txt = (x, y, s, opt) => {
+        opt = opt || {};
+        o += '<text x="' + x + '" y="' + y + '" font-family="' + F + '" font-size="' + (opt.size || 15) + '" fill="' + (opt.color || ink) + '"' + (opt.bold ? ' font-weight="700"' : '') +
+          ' text-anchor="' + (opt.anchor || 'start') + '" dominant-baseline="middle"' + (opt.ls ? ' letter-spacing="' + opt.ls + '"' : '') + '>' + xe(s) + '</text>';
+      };
+      // 글자가 칸보다 길면 줄여서
+      const fit = (s, w, size) => { s = String(s || ''); const n = [...s].reduce((a, ch) => a + (/[ㄱ-힝]/.test(ch) ? 1 : 0.58), 0); return Math.max(9, Math.min(size, Math.floor((w - 8) / Math.max(n, 1)))); };
+      const cell = (x, y, w, h, s, opt) => { opt = Object.assign({ anchor: 'middle' }, opt || {}); if (opt.box !== false) rect(x, y, w, h, opt.fill); if (s !== '' && s != null) txt(opt.anchor === 'end' ? x + w - 6 : opt.anchor === 'start' ? x + 6 : x + w / 2, y + h / 2 + 1, s, Object.assign({}, opt, { size: fit(s, w, opt.size || 15) })); };
+      const lab = (x, y, w, h, s) => cell(x, y, w, h, s, { color: C, size: 13, fill: copy === 'buy' ? '#f1f6ff' : '#fff5f8' });
+      const X = 20, Y = 20, R = W - 20; // 바깥 틀
+      o += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fff"/>';
+      txt(X, 10, '[별지 제11호 서식]', { size: 11, color: '#555' });
+      txt(R, 10, copy === 'buy' ? '(청색)' : '(적색)', { size: 11, color: C, anchor: 'end' });
+      // 1) 제목
+      rect(X, Y, R - X, 64);
+      txt(X + 250, Y + 32, '세  금  계  산  서', { size: 30, bold: true, color: C, anchor: 'middle', ls: 4 });
+      txt(X + 470, Y + 32, copy === 'buy' ? '(공급받는자 보관용)' : '(공급자 보관용)', { size: 15, color: C, anchor: 'middle' });
+      const bx = R - 360;
+      lab(bx, Y, 90, 32, '책 번 호'); cell(bx + 90, Y, 135, 32, (t.book1 || '') + ' 권', { anchor: 'end' }); cell(bx + 225, Y, 135, 32, (t.book2 || '') + ' 호', { anchor: 'end' });
+      lab(bx, Y + 32, 90, 32, '일련번호'); cell(bx + 90, Y + 32, 270, 32, t.serial || '');
+      // 2) 공급자 · 공급받는자
+      const py = Y + 64, rh = 40, half = (R - X) / 2;
+      const party = (x0, title, p) => {
+        lab(x0, py, 34, rh * 4, '');
+        [...title].forEach((ch, i) => txt(x0 + 17, py + 30 + i * (rh * 4 - 40) / Math.max(title.length - 1, 1), ch, { size: 15, color: C, anchor: 'middle', bold: true }));
+        const lx = x0 + 34, vw = half - 34 - 86;
+        lab(lx, py, 86, rh, '등록번호'); cell(lx + 86, py, vw, rh, p.no || '', { size: 18, bold: true, ls: 1 });
+        lab(lx, py + rh, 86, rh, '상호(법인명)'); cell(lx + 86, py + rh, vw * 0.5, rh, p.name || ''); lab(lx + 86 + vw * 0.5, py + rh, 40, rh, '성명'); cell(lx + 126 + vw * 0.5, py + rh, vw * 0.5 - 40, rh, (p.ceo || '') + '  (인)');
+        lab(lx, py + rh * 2, 86, rh, '사업장 주소'); cell(lx + 86, py + rh * 2, vw, rh, p.addr || '', { size: 13, anchor: 'start' });
+        lab(lx, py + rh * 3, 86, rh, '업태'); cell(lx + 86, py + rh * 3, vw * 0.5, rh, p.type || '', { size: 13 }); lab(lx + 86 + vw * 0.5, py + rh * 3, 40, rh, '종목'); cell(lx + 126 + vw * 0.5, py + rh * 3, vw * 0.5 - 40, rh, p.item || '', { size: 13 });
+      };
+      party(X, '공급자', t.sup || {});
+      party(X + half, '공급받는자', t.buy || {});
+      // 3) 작성일 · 공급가액 · 세액 (자리별 칸)
+      const dy = py + rh * 4, d = String(t.date || '').split('-');
+      const sup = String(Math.round(Number(t.supply) || 0)), tax = String(Math.round(Number(t.tax) || 0));
+      const SD = 11, TD = 10, dw = 24;
+      let x = X;
+      lab(x, dy, 150, 26, '작        성'); lab(x + 150, dy, 56, 26, '공란수'); lab(x + 206, dy, SD * dw, 26, '공  급  가  액'); lab(x + 206 + SD * dw, dy, TD * dw, 26, '세        액'); lab(x + 206 + (SD + TD) * dw, dy, R - (x + 206 + (SD + TD) * dw), 26, '비      고');
+      const y2 = dy + 26, units = ['백', '십', '억', '천', '백', '십', '만', '천', '백', '십', '일'];
+      lab(x, y2, 60, 20, '년'); lab(x + 60, y2, 45, 20, '월'); lab(x + 105, y2, 45, 20, '일'); lab(x + 150, y2, 56, 20, '');
+      units.forEach((u, i) => lab(x + 206 + i * dw, y2, dw, 20, u)); units.slice(1).forEach((u, i) => lab(x + 206 + (SD + i) * dw, y2, dw, 20, u));
+      const y3 = y2 + 20, bigY = R - (x + 206 + (SD + TD) * dw);
+      cell(x, y3, 60, 34, d[0] || '', { size: 16 }); cell(x + 60, y3, 45, 34, d[1] ? String(+d[1]) : '', { size: 16 }); cell(x + 105, y3, 45, 34, d[2] ? String(+d[2]) : '', { size: 16 });
+      cell(x + 150, y3, 56, 34, sup === '0' ? '' : String(SD - sup.length), { size: 16 });
+      for (let i = 0; i < SD; i++) { const k = i - (SD - sup.length); cell(x + 206 + i * dw, y3, dw, 34, sup !== '0' && k >= 0 ? sup[k] : '', { size: 17, bold: true }); }
+      for (let i = 0; i < TD; i++) { const k = i - (TD - tax.length); cell(x + 206 + (SD + i) * dw, y3, dw, 34, tax !== '0' && k >= 0 ? tax[k] : '', { size: 17, bold: true }); }
+      cell(x + 206 + (SD + TD) * dw, dy + 26, bigY, 54, t.note || '', { size: 13 });
+      // 4) 품목
+      const iy = y3 + 34, cw = [40, 40, 300, 100, 70, 130, 150, 120];
+      cw.push(R - X - cw.reduce((a, b) => a + b, 0));
+      const heads = ['월', '일', '품        목', '규 격', '수 량', '단  가', '공 급 가 액', '세  액', '비 고'];
+      let cx = X;
+      heads.forEach((h, i) => { lab(cx, iy, cw[i], 28, h); cx += cw[i]; });
+      const items = (t.items || []).slice(0, 4);
+      while (items.length < 4) items.push(null);
+      items.forEach((it, r) => {
+        const yy = iy + 28 + r * 32, md = it && it.md ? String(it.md).split('-') : [];
+        const vals = it ? [md[0] ? String(+md[0]) : '', md[1] ? String(+md[1]) : '', it.name || '', it.spec || '', it.qty ? num(it.qty) : '', it.price ? num(it.price) : '', it.supply ? num(it.supply) : '', it.tax ? num(it.tax) : '', it.note || ''] : ['', '', '', '', '', '', '', '', ''];
+        cx = X;
+        vals.forEach((v, i) => { cell(cx, yy, cw[i], 32, v, { anchor: i >= 4 && i <= 7 ? 'end' : i === 2 ? 'start' : 'middle', size: 15 }); cx += cw[i]; });
+      });
+      // 5) 합계
+      const sy = iy + 28 + 4 * 32, sw = [210, 160, 160, 160, 160];
+      sw.push(R - X - sw.reduce((a, b) => a + b, 0));
+      cx = X;
+      ['합 계 금 액', '현      금', '수      표', '어      음', '외상미수금'].forEach((h, i) => { lab(cx, sy, sw[i], 26, h); cx += sw[i]; });
+      const last = cx;
+      rect(last, sy, sw[5], 60);
+      txt(last + 14, sy + 30, '이 금액을', { size: 15, color: C });
+      txt(last + sw[5] / 2 + 26, sy + 30, t.kind === '청구' ? '청구' : '영수', { size: 20, bold: true, anchor: 'middle' });
+      txt(last + sw[5] - 14, sy + 30, '함', { size: 15, color: C, anchor: 'end' });
+      cx = X;
+      [t.total, t.cash, t.check, t.bill, t.credit].forEach((v, i) => { cell(cx, sy + 26, sw[i], 34, Number(v) ? num(v) : '', { anchor: 'end', size: i === 0 ? 18 : 15, bold: i === 0 }); cx += sw[i]; });
+      txt(X, sy + 76, "22226-28131일 '96.2.27 개정", { size: 11, color: '#777' });
+      txt(R, sy + 76, '182mm×128mm 인쇄용지 · 러너 올인원 역발행', { size: 11, color: '#777', anchor: 'end' });
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg>';
+    }
+    /** SVG → PNG Blob (2배 선명하게) */
+    function png(t, copy, scale) {
+      scale = scale || 2;
+      return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = W * scale; c.height = H * scale;
+          const g = c.getContext('2d');
+          g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+          g.drawImage(img, 0, 0, c.width, c.height);
+          c.toBlob((b) => (b ? res(b) : rej(new Error('그림을 만들지 못했습니다.'))), 'image/png');
+        };
+        img.onerror = () => rej(new Error('그림을 만들지 못했습니다.'));
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg(t, copy));
+      });
+    }
+    function fileName(t, copy) {
+      return (String(t.date || '').replace(/-/g, '') + '_' + ((t.sup && (t.sup.name || t.sup.ceo)) || '공급자') + '_세금계산서_' + (copy === 'buy' ? '공급받는자보관용' : '공급자보관용') + '.png').replace(/[\\/:*?"<>|\s]+/g, '_');
+    }
+    function download(blob, name) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    }
+    return { svg, png, fileName, download, W, H };
+  })();
+
+  // ───── 묶음 파일 만들기: ZIP(압축 없이) · XLSX ─────
+  const ZIPW = (function () {
+    const T = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
+    const crc = (u) => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = T[(c ^ u[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    /** files = [{ name, data: Uint8Array }] → Blob */
+    function zip(files, mime) {
+      const enc = new TextEncoder(), parts = [], cd = [];
+      let off = 0;
+      const dt = new Date(), dosT = (dt.getHours() << 11) | (dt.getMinutes() << 5) | (dt.getSeconds() >> 1), dosD = ((dt.getFullYear() - 1980) << 9) | ((dt.getMonth() + 1) << 5) | dt.getDate();
+      files.forEach((f) => {
+        const nm = enc.encode(f.name), d = f.data, c = crc(d);
+        const h = new DataView(new ArrayBuffer(30));
+        h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true); h.setUint16(10, dosT, true); h.setUint16(12, dosD, true);
+        h.setUint32(14, c, true); h.setUint32(18, d.length, true); h.setUint32(22, d.length, true); h.setUint16(26, nm.length, true); h.setUint16(28, 0, true);
+        parts.push(new Uint8Array(h.buffer), nm, d);
+        const e = new DataView(new ArrayBuffer(46));
+        e.setUint32(0, 0x02014b50, true); e.setUint16(4, 20, true); e.setUint16(6, 20, true); e.setUint16(8, 0x0800, true); e.setUint16(10, 0, true); e.setUint16(12, dosT, true); e.setUint16(14, dosD, true);
+        e.setUint32(16, c, true); e.setUint32(20, d.length, true); e.setUint32(24, d.length, true); e.setUint16(28, nm.length, true); e.setUint32(42, off, true);
+        cd.push(new Uint8Array(e.buffer), nm);
+        off += 30 + nm.length + d.length;
+      });
+      const cdLen = cd.reduce((a, x) => a + x.length, 0);
+      const end = new DataView(new ArrayBuffer(22));
+      end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cdLen, true); end.setUint32(16, off, true);
+      return new Blob(parts.concat(cd, [new Uint8Array(end.buffer)]), { type: mime || 'application/zip' });
+    }
+    const xe = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    const colName = (i) => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+    /** rows = [[값…]…] (행 번호 그대로) → .xlsx Blob. 숫자는 숫자 칸, 나머지는 글자 칸 */
+    function xlsx(rows, sheetName) {
+      const enc = new TextEncoder();
+      const body = rows.map((r, ri) => r ? '<row r="' + (ri + 1) + '">' + r.map((v, ci) => {
+        if (v === '' || v == null) return '';
+        const ref = colName(ci) + (ri + 1);
+        return typeof v === 'number' ? '<c r="' + ref + '"><v>' + v + '</v></c>' : '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xe(v) + '</t></is></c>';
+      }).join('') + '</row>' : '').join('');
+      const f = (name, x) => ({ name, data: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + x) });
+      return zip([
+        f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'),
+        f('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
+        f('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + xe(sheetName || 'Sheet1') + '" sheetId="1" r:id="rId1"/></sheets></workbook>'),
+        f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'),
+        f('xl/worksheets/sheet1.xml', '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + body + '</sheetData></worksheet>')
+      ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+    return { zip, xlsx };
+  })();
+
+  // ───── 세금계산서 역발행 ─────
+  const TX = { list: [], sups: [], buyer: {}, tab: 'list', sel: new Set(), cur: null, dirty: false };
+  const tiFmtNo = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.length === 10 ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : String(v || ''); };
+  function loadTax() {
+    if (!$('#tiMonth').value) { const t = new Date(); t.setDate(1); t.setMonth(t.getMonth() - 1); $('#tiMonth').value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2); }
+    $('#tiRows').innerHTML = '<tr><td colspan="12" class="sub">불러오는 중…</td></tr>';
+    return api('adm_tiList').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      TX.list = r.list; TX.sups = r.suppliers; TX.buyer = r.buyer;
+      const have = new Set(TX.list.map((t) => t.id)); [...TX.sel].forEach((id) => { if (!have.has(id)) TX.sel.delete(id); });
+      const months = [...new Set(TX.list.map((t) => String(t.date).slice(0, 7)))].sort().reverse(), fm = $('#tiFMonth').value;
+      $('#tiFMonth').innerHTML = '<option value="">작성월 전체</option>' + months.map((m) => '<option value="' + m + '"' + (m === fm ? ' selected' : '') + '>' + m.replace('-', '년 ') + '월</option>').join('');
+      const fs = $('#tiFSup').value, sn = [...new Set(TX.list.map((t) => t.sup.name))].sort((a, b) => a.localeCompare(b, 'ko'));
+      $('#tiFSup').innerHTML = '<option value="">공급자 전체</option>' + sn.map((n) => '<option' + (n === fs ? ' selected' : '') + '>' + esc(n) + '</option>').join('');
+      const ys = [...new Set(TX.list.map((t) => String(t.date).slice(0, 4)))].sort().reverse(), fy = $('#tiYear').value || ys[0] || String(new Date().getFullYear());
+      $('#tiYear').innerHTML = (ys.length ? ys : [fy]).map((y) => '<option' + (y === fy ? ' selected' : '') + '>' + y + '</option>').join('');
+      renderTax();
+    }).catch(() => {});
+  }
+  function tiFiltered() {
+    const fm = $('#tiFMonth').value, fn = $('#tiFNts').value, fs = $('#tiFSup').value, q = $('#tiQ').value.trim().toLowerCase().replace(/\s+/g, '');
+    return TX.list.filter((t) => (!fm || String(t.date).startsWith(fm)) && (!fn || t.nts === fn) && (!fs || t.sup.name === fs) &&
+      (!q || [t.sup.name, t.sup.ceo, t.sup.no, t.id].concat(t.items.map((i) => i.name)).join(' ').toLowerCase().replace(/\s+/g, '').includes(q.replace(/-/g, '')) || String(t.sup.no).replace(/-/g, '').includes(q.replace(/-/g, ''))));
+  }
+  function renderTax() {
+    const list = tiFiltered();
+    $('#tiCount').textContent = TX.list.length + '장';
+    $('#tiRows').innerHTML = list.map((t) => '<tr data-ti="' + esc(t.id) + '"><td class="ck"><input type="checkbox" data-tck="' + esc(t.id) + '"' + (TX.sel.has(t.id) ? ' checked' : '') + '></td><td class="sub">' + esc(t.id) + '</td><td>' + esc(t.date) + '</td>' +
+      '<td><b>' + esc(t.sup.name) + '</b>' + (t.sup.ceo && t.sup.ceo !== t.sup.name ? ' <span class="sub">' + esc(t.sup.ceo) + '</span>' : '') + '</td><td class="sub">' + esc(t.sup.no) + '</td>' +
+      '<td>' + esc((t.items[0] || {}).name || '') + (t.items.length > 1 ? ' 외 ' + (t.items.length - 1) : '') + '</td><td class="n">' + wn(t.supply) + '</td><td class="n">' + wn(t.tax) + '</td><td class="n"><b>' + wn(t.total) + '</b></td>' +
+      '<td>' + esc(t.kind) + '</td><td><span class="badge ti-nts ' + (t.nts === '등록' ? 'b-승인' : 'b-승인대기') + '" data-tnts="' + esc(t.id) + '" title="눌러서 바꾸기">' + esc(t.nts) + '</span></td><td>' + (t.pub ? '<span class="sub">공개</span>' : '<span class="badge b-정지">숨김</span>') + '</td></tr>').join('');
+    const sum = (k) => list.reduce((a, t) => a + (t[k] || 0), 0);
+    $('#tiFoot').innerHTML = list.length ? '<tr><td></td><td colspan="5"><b>합계 ' + list.length + '장</b></td><td class="n"><b>' + wn(sum('supply')) + '</b></td><td class="n"><b>' + wn(sum('tax')) + '</b></td><td class="n"><b>' + wn(sum('total')) + '</b></td><td colspan="3"></td></tr>' : '';
+    const em = $('#tiEmpty'); em.classList.toggle('hidden', !!list.length); em.textContent = TX.list.length ? '조건에 맞는 계산서가 없습니다.' : '아직 계산서가 없습니다. 위쪽 정산월을 고르고 [정산서에서 만들기]를 누르거나 [+ 직접 작성]하세요.';
+    const on = list.filter((t) => TX.sel.has(t.id)).length, all = $('#tiAll');
+    all.checked = !!list.length && on === list.length; all.indeterminate = on > 0 && on < list.length;
+    const b = $('#tiBulk'); b.classList.toggle('hidden', !TX.sel.size);
+    b.innerHTML = '<b>' + TX.sel.size + '장 선택</b><button class="btn sm" data-tb="png-sup">공급자 보관용 그림 내보내기 (ZIP)</button><button class="btn sm ghost" data-tb="png-buy">공급받는자 보관용 (ZIP)</button><button class="btn sm ghost" data-tb="hometax">홈택스 업로드 엑셀</button>' +
+      '<button class="btn sm ghost" data-tb="nts:등록">국세청 등록 처리</button><button class="btn sm ghost" data-tb="nts:미등록">미등록으로</button><button class="btn sm ghost" data-tb="pub:N">기사 앱 숨김</button><button class="btn sm ghost" data-tb="pub:Y">기사 앱 공개</button><button class="btn sm ghost danger-t" data-tb="delete">삭제</button><button class="btn sm ghost" data-tb="none">선택 해제</button>';
+    renderTaxSup(); renderTaxMonth();
+  }
+  function tiAgg(list) {
+    const by = {};
+    list.forEach((t) => { const k = t.sup.no + '|' + t.sup.name, x = by[k] || (by[k] = { name: t.sup.name, no: t.sup.no, n: 0, r: 0, c: 0, ok: 0, no2: 0, supply: 0, tax: 0, total: 0, m: {} });
+      x.n++; t.kind === '청구' ? x.c++ : x.r++; t.nts === '등록' ? x.ok++ : x.no2++; x.supply += t.supply; x.tax += t.tax; x.total += t.total;
+      const mm = +String(t.date).slice(5, 7), mx = x.m[mm] || (x.m[mm] = { n: 0, total: 0 }); mx.n++; mx.total += t.total; });
+    return Object.values(by).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  }
+  function renderTaxSup() {
+    const fm = $('#tiFMonth').value, rows = tiAgg(TX.list.filter((t) => !fm || String(t.date).startsWith(fm)));
+    $('#tiSupRows').innerHTML = rows.map((x, i) => '<tr class="clk" data-tsup="' + esc(x.name) + '"><td>' + (i + 1) + '</td><td><b>' + esc(x.name) + '</b></td><td class="sub">' + esc(x.no) + '</td><td class="n">' + x.n + '</td><td class="n">' + x.r + '</td><td class="n">' + x.c + '</td><td class="n">' + x.ok + '</td><td class="n">' + x.no2 + '</td><td class="n">' + wn(x.supply) + '</td><td class="n">' + wn(x.tax) + '</td><td class="n"><b>' + wn(x.total) + '</b></td></tr>').join('') ||
+      '<tr><td colspan="11" class="sub">계산서가 없습니다.</td></tr>';
+  }
+  function renderTaxMonth() {
+    const y = $('#tiYear').value, rows = tiAgg(TX.list.filter((t) => String(t.date).startsWith(y + '-')));
+    const M = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const tot = { n: 0, total: 0 }, mt = {};
+    rows.forEach((x) => M.forEach((m) => { const v = x.m[m]; if (v) { mt[m] = mt[m] || { n: 0, total: 0 }; mt[m].n += v.n; mt[m].total += v.total; tot.n += v.n; tot.total += v.total; } }));
+    const c = (v) => v ? '<td class="n">' + v.n + '건<br><b>' + wn(v.total) + '</b></td>' : '<td class="sub" style="text-align:center">-</td>';
+    $('#tiMonthTbl').innerHTML = '<thead><tr><th>번호</th><th>공급자</th><th>사업자등록번호</th>' + M.map((m) => '<th>' + m + '월</th>').join('') + '<th>합계</th></tr></thead><tbody>' +
+      (rows.map((x, i) => { const s = { n: 0, total: 0 }; M.forEach((m) => { if (x.m[m]) { s.n += x.m[m].n; s.total += x.m[m].total; } }); return '<tr><td>' + (i + 1) + '</td><td><b>' + esc(x.name) + '</b></td><td class="sub">' + esc(x.no) + '</td>' + M.map((m) => c(x.m[m])).join('') + c(s) + '</tr>'; }).join('') || '<tr><td colspan="16" class="sub">' + esc(y) + '년 계산서가 없습니다.</td></tr>') +
+      '</tbody>' + (rows.length ? '<tfoot><tr><td colspan="3"><b>합계</b></td>' + M.map((m) => c(mt[m])).join('') + c(tot) + '</tr></tfoot>' : '');
+  }
+  $('#tiTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-ti]'); if (!b) return; TX.tab = b.dataset.ti; $$('#tiTabs .tab').forEach((x) => x.classList.toggle('on', x === b)); ['list', 'sup', 'month'].forEach((k) => $('#tiPane-' + k).classList.toggle('hidden', k !== TX.tab)); });
+  ['#tiFMonth', '#tiFNts', '#tiFSup'].forEach((s) => $(s).addEventListener('change', renderTax));
+  $('#tiYear').addEventListener('change', renderTaxMonth);
+  onSearch($('#tiQ'), renderTax);
+  $('#tiReload').addEventListener('click', loadTax);
+  $('#tiSupRows').addEventListener('click', (e) => { const tr = e.target.closest('[data-tsup]'); if (!tr) return; $('#tiFSup').value = tr.dataset.tsup; $('#tiTabs [data-ti="list"]').click(); renderTax(); });
+  $('#tiAll').addEventListener('change', (e) => { tiFiltered().forEach((t) => { if (e.target.checked) TX.sel.add(t.id); else TX.sel.delete(t.id); }); renderTax(); });
+  $('#tiRows').addEventListener('click', (e) => {
+    const ck = e.target.closest('[data-tck]');
+    if (ck) { if (ck.checked) TX.sel.add(ck.dataset.tck); else TX.sel.delete(ck.dataset.tck); return renderTax(); }
+    if (e.target.closest('td.ck')) return;
+    const nb = e.target.closest('[data-tnts]');
+    if (nb) { const t = TX.list.find((x) => x.id === nb.dataset.tnts); return api('adm_tiBulk', [t.id], 'nts:' + (t.nts === '등록' ? '미등록' : '등록')).then((r) => { if (!r.ok) return toast(r.msg); t.nts = t.nts === '등록' ? '미등록' : '등록'; renderTax(); }).catch(() => {}); }
+    const tr = e.target.closest('[data-ti]'); if (tr) openTax(TX.list.find((t) => t.id === tr.dataset.ti));
+  });
+  $('#tiFromStl').addEventListener('click', () => {
+    const m = $('#tiMonth').value; if (!m) return toast('정산월을 골라 주세요.');
+    const have = TX.list.filter((t) => t.month === m).length;
+    const over = have ? confirm(m + ' 정산월 계산서가 이미 ' + have + '장 있습니다.\n[확인] 정산서 금액으로 새로 고침 (공급자 정보도 다시 가져옴)\n[취소] 없는 기사만 새로 만들기') : false;
+    $('#tiFromStl').disabled = true;
+    api('adm_tiFromSettle', m, over).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      let msg = r.made.length + '장 만들었습니다.';
+      if (r.noBiz.length) msg += '\n\n사업자번호가 없어 건너뜀 (정산관리 → 아이디 관리 → 명의자 사업자 정보에서 넣어 주세요): ' + r.noBiz.join(', ');
+      if (r.skipped.length) msg += '\n\n건너뜀: ' + r.skipped.join(', ');
+      alert(msg); $('#tiFMonth').value = ''; loadTax();
+    }).catch(() => {}).finally(() => { $('#tiFromStl').disabled = false; });
+  });
+  // 일괄 작업
+  async function tiExportPng(list, copy) {
+    if (!list.length) return;
+    toast('그림 만드는 중… (' + list.length + '장)');
+    const files = [], used = {};
+    for (const t of list) {
+      const b = await TAXDOC.png(t, copy, 2);
+      let nm = TAXDOC.fileName(t, copy); if (used[nm]) nm = nm.replace(/\.png$/, '_' + t.id + '.png'); used[nm] = 1;
+      files.push({ name: nm, data: new Uint8Array(await b.arrayBuffer()) });
+    }
+    if (files.length === 1) { TAXDOC.download(new Blob([files[0].data], { type: 'image/png' }), files[0].name); return; }
+    TAXDOC.download(ZIPW.zip(files), '세금계산서_' + (copy === 'buy' ? '공급받는자보관용' : '공급자보관용') + '_' + list.length + '장.zip');
+  }
+  function tiHometax(list) {
+    if (list.length > 100) return toast('홈택스 업로드 양식은 한 번에 100장까지입니다. 나눠서 내보내 주세요.');
+    const head = ['전자(세금)계산서 종류\n(01:일반, 02:영세율)', '작성일자', '공급자 등록번호\n("-" 없이 입력)', '공급자\n 종사업장번호', '공급자 상호', '공급자 성명', '공급자 사업장주소', '공급자 업태', '공급자 종목', '공급자 이메일',
+      '공급받는자 등록번호\n("-" 없이 입력)', '공급받는자 \n종사업장번호', '공급받는자 상호', '공급받는자 성명', '공급받는자 사업장주소', '공급받는자 업태', '공급받는자 종목', '공급받는자 이메일1', '공급받는자 이메일2', '공급가액', '세액', '비고'];
+    for (let i = 1; i <= 4; i++) head.push('일자' + i + '\n(2자리, 작성년월 제외)', '품목' + i, '규격' + i, '수량' + i, '단가' + i, '공급가액' + i, '세액' + i, '품목비고' + i);
+    head.push('현금', '수표', '어음', '외상미수금', '영수(01),\n청구(02)');
+    const rows = [['엑셀 업로드 양식(전자세금계산서-일반(영세율))'], ['★주황색으로 표시된 부분은 필수입력항목으로 반드시 입력하셔야 합니다.'], ['★실제 업로드할 DATA는 7행부터 입력하여야 합니다. 최대 100건까지 입력이 가능하나, 발급은 최대 10건씩 처리가 됩니다.(100건 초과 자료는 처리 안됨)'], ['★러너 올인원 세금계산서 역발행에서 만든 파일입니다.'], [], head];
+    const nd = (v) => String(v || '').replace(/\D/g, '');
+    list.forEach((t) => {
+      const r = ['01', nd(t.date), nd(t.sup.no), '', t.sup.name, t.sup.ceo, t.sup.addr, t.sup.type, t.sup.item, t.sup.email, nd(t.buy.no), '', t.buy.name, t.buy.ceo, t.buy.addr, t.buy.type, t.buy.item, t.buy.email, '', t.supply, t.tax, t.note];
+      for (let i = 0; i < 4; i++) { const it = t.items[i]; if (it) r.push(String(it.md || '').slice(-2), it.name, it.spec, it.qty || '', it.price || '', it.supply, it.tax, it.note); else r.push('', '', '', '', '', '', '', ''); }
+      r.push(t.cash || '', t.check || '', t.bill || '', t.credit || '', t.kind === '청구' ? '02' : '01');
+      rows.push(r);
+    });
+    TAXDOC.download(ZIPW.xlsx(rows, '엑셀업로드양식'), '홈택스_세금계산서_업로드_' + list.length + '건.xlsx');
+  }
+  $('#tiBulk').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tb]'); if (!b) return;
+    const act = b.dataset.tb, list = TX.list.filter((t) => TX.sel.has(t.id));
+    if (act === 'none') { TX.sel.clear(); return renderTax(); }
+    if (act === 'png-sup' || act === 'png-buy') return tiExportPng(list, act === 'png-buy' ? 'buy' : 'sup').catch((er) => toast(er.message));
+    if (act === 'hometax') return tiHometax(list);
+    if (act === 'delete' && !confirm(list.length + '장의 세금계산서를 지울까요? 되돌릴 수 없습니다.')) return;
+    api('adm_tiBulk', [...TX.sel], act).then((r) => { if (!r.ok) return toast(r.msg); toast(r.n + '장 처리했습니다.'); if (act === 'delete') TX.sel.clear(); loadTax(); }).catch(() => {});
+  });
+  // 작성 · 수정 창
+  $('#tiNew').addEventListener('click', () => openTax(null));
+  function tiBlank() {
+    const t = new Date(), d = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+    return { id: '', month: $('#tiMonth').value || '', date: d, book1: '', book2: '', serial: '', kind: '영수', nts: '미등록', pub: true, supId: '', supDriverId: '', sup: { no: '', name: '', ceo: '', addr: '', type: '', item: '', email: '' }, buy: Object.assign({}, TX.buyer), items: [{ md: d.slice(5), name: '', spec: '', qty: 1, price: 0, supply: 0, tax: 0, note: '' }], cash: 0, check: 0, bill: 0, credit: 0, note: '' };
+  }
+  function tiCalc(t) {
+    t.items.forEach((it) => { if (!it.fixed) { const tot = (Number(it.qty) || 0) * (Number(it.price) || 0); it.supply = Math.round(tot / 1.1); it.tax = tot - it.supply; } });
+    t.supply = t.items.reduce((a, i) => a + (i.supply || 0), 0); t.tax = t.items.reduce((a, i) => a + (i.tax || 0), 0); t.total = t.supply + t.tax;
+  }
+  function openTax(t) {
+    TX.cur = t ? JSON.parse(JSON.stringify(t)) : tiBlank();
+    if (t) TX.cur.items.forEach((it) => { const tot = (it.qty || 0) * (it.price || 0); it.fixed = it.supply + it.tax === tot && Math.round(tot / 1.1) !== it.supply; });
+    TX.dirty = false;
+    $('#tiTitle').textContent = t ? '세금계산서 ' + t.id + ' · ' + t.sup.name : '세금계산서 직접 작성';
+    $('#tiDel').classList.toggle('hidden', !t);
+    renderTaxEd();
+    $('#tiModal').classList.remove('hidden');
+  }
+  function renderTaxEd() {
+    const t = TX.cur; tiCalc(t);
+    const inp = (k, v, ph, type) => '<input class="inp" data-tf="' + k + '" value="' + esc(v == null ? '' : v) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + (type ? ' type="' + type + '"' : '') + '>';
+    const party = (p, pre) => '<div class="fg"><label>등록번호' + inp(pre + '.no', p.no, '000-00-00000') + '</label><label>상호(법인명)' + inp(pre + '.name', p.name) + '</label><label>성명(대표자)' + inp(pre + '.ceo', p.ceo) + '</label><label>이메일' + inp(pre + '.email', p.email) + '</label>' +
+      '<label class="w2">사업장 주소' + inp(pre + '.addr', p.addr) + '</label><label>업태' + inp(pre + '.type', p.type) + '</label><label>종목' + inp(pre + '.item', p.item) + '</label></div>';
+    $('#tiEd').innerHTML = '<div>' +
+      '<h4>공급자 (기사님)</h4><div class="fg"><label class="w2">기사·업체에서 불러오기<select class="inp" id="tiSupPick"><option value="">— 골라서 채우기 —</option>' + TX.sups.map((s) => '<option value="' + esc(s.id) + '"' + (s.id === t.supId ? ' selected' : '') + '>' + esc(s.label) + (s.no ? ' · ' + esc(s.no) : ' · 사업자번호 없음') + (s.active ? '' : ' (정지)') + '</option>').join('') + '</select></label></div>' + party(t.sup, 'sup') +
+      '<h4>공급받는자 (러너)</h4>' + party(t.buy, 'buy') +
+      '<h4>작성 정보</h4><div class="fg"><label>작성일자' + inp('date', t.date, '', 'date') + '</label><label>정산월' + inp('month', t.month, '', 'month') + '</label>' +
+        '<label>권' + inp('book1', t.book1) + '</label><label>호' + inp('book2', t.book2) + '</label><label>일련번호' + inp('serial', t.serial) + '</label>' +
+        '<label>영수 / 청구<select class="inp" data-tf="kind">' + ['영수', '청구'].map((k) => '<option' + (t.kind === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label>' +
+        '<label>국세청 등록<select class="inp" data-tf="nts">' + ['미등록', '등록'].map((k) => '<option' + (t.nts === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label>' +
+        '<label>기사 앱<select class="inp" data-tf="pub"><option value="1"' + (t.pub ? ' selected' : '') + '>공개 (정산서 보기에서 보임)</option><option value="0"' + (t.pub ? '' : ' selected') + '>숨김</option></select></label>' +
+        '<label class="w2">비고' + inp('note', t.note) + '</label>' +
+        '<label>현금' + inp('cash', t.cash || '', '', 'number') + '</label><label>수표' + inp('check', t.check || '', '', 'number') + '</label><label>어음' + inp('bill', t.bill || '', '', 'number') + '</label><label>외상미수금' + inp('credit', t.credit || '', '', 'number') + '</label></div>' +
+      '<h4>품목 (4줄까지 · 단가는 부가세 포함)</h4><table class="ti-it"><thead><tr><th>월-일</th><th>품목</th><th>규격</th><th>수량</th><th>단가</th></tr></thead><tbody>' +
+        [0, 1, 2, 3].map((i) => { const it = t.items[i] || {}; return '<tr><td><input class="inp" data-it="' + i + '.md" value="' + esc(it.md || '') + '" placeholder="10-31" style="width:62px"></td><td><input class="inp" data-it="' + i + '.name" value="' + esc(it.name || '') + '"></td><td><input class="inp" data-it="' + i + '.spec" value="' + esc(it.spec || '') + '" style="width:60px"></td>' +
+          '<td><input class="inp" type="number" data-it="' + i + '.qty" value="' + esc(it.qty || '') + '" style="width:54px"></td><td><input class="inp" type="number" data-it="' + i + '.price" value="' + esc(it.price || '') + '" style="width:100px"></td></tr>' +
+          (it.name || it.price ? '<tr><td></td><td colspan="4" class="sub" style="font-size:11.5px">공급가액 ' + wn(it.supply) + ' · 세액 ' + wn(it.tax) + (it.fixed ? ' (정산서 금액 그대로)' : '') + '</td></tr>' : ''); }).join('') + '</tbody></table>' +
+      '<p style="margin:8px 0 0"><b>공급가액 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax) + ' · 합계 ' + wn(t.total) + '</b></p></div>' +
+      '<div class="ti-prev"><div class="tg"><span class="sub" style="font-size:12px">미리보기 — 기사님께는 위쪽(공급자 보관용 · 적색)이 전달됩니다.</span></div>' + TAXDOC.svg(t, 'sup') + '<div style="height:10px"></div>' + TAXDOC.svg(t, 'buy') + '</div>';
+  }
+  function tiSet(path, v) {
+    const t = TX.cur, [a, b] = path.split('.');
+    if (b) t[a][b] = v; else if (a === 'pub') t.pub = v === '1'; else if (['cash', 'check', 'bill', 'credit'].includes(a)) t[a] = Number(v) || 0; else t[a] = v;
+    TX.dirty = true;
+  }
+  let tiRT = 0;
+  const tiRe = () => { clearTimeout(tiRT); tiRT = setTimeout(() => { const f = document.activeElement, key = f && (f.dataset.tf || f.dataset.it), pos = f && f.selectionStart; renderTaxEd(); if (key) { const n = $('#tiEd [data-tf="' + key + '"], #tiEd [data-it="' + key + '"]'); if (n) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (e) {} } } }, 350); };
+  $('#tiEd').addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.dataset.tf) { tiSet(el.dataset.tf, el.value); return tiRe(); }
+    if (el.dataset.it) {
+      const [i, k] = el.dataset.it.split('.'), t = TX.cur;
+      while (t.items.length <= +i) t.items.push({ md: '', name: '', spec: '', qty: 1, price: 0, supply: 0, tax: 0, note: '' });
+      const it = t.items[+i]; it[k] = k === 'qty' || k === 'price' ? Number(el.value) || 0 : el.value;
+      if (k === 'qty' || k === 'price') it.fixed = false;
+      TX.dirty = true; return tiRe();
+    }
+  });
+  $('#tiEd').addEventListener('change', (e) => {
+    if (e.target.id === 'tiSupPick') {
+      const s = TX.sups.find((x) => x.id === e.target.value); if (!s) return;
+      const t = TX.cur; t.supId = s.id; t.supDriverId = s.driverId; t.sup = { no: tiFmtNo(s.no), name: s.name, ceo: s.ceo, addr: s.addr, type: s.type, item: s.item, email: s.email }; TX.dirty = true; renderTaxEd();
+      if (!s.no) toast('이 기사는 사업자번호가 없습니다. 직접 넣거나 정산관리 → 명의자 사업자 정보에서 넣어 주세요.');
+      return;
+    }
+    if (e.target.tagName === 'SELECT' && e.target.dataset.tf) { tiSet(e.target.dataset.tf, e.target.value); renderTaxEd(); }
+  });
+  $('#tiClose').addEventListener('click', () => { if (TX.dirty && !confirm('저장하지 않은 내용이 있습니다. 닫을까요?')) return; $('#tiModal').classList.add('hidden'); });
+  $('#tiSave').addEventListener('click', () => {
+    const t = TX.cur, body = Object.assign({}, t, { items: t.items.filter((i) => i.name || i.price) });
+    $('#tiSave').disabled = true;
+    api('adm_tiSave', body).then((r) => { if (!r.ok) return toast(r.msg); toast('저장했습니다.'); TX.dirty = false; $('#tiModal').classList.add('hidden'); loadTax(); }).catch(() => {}).finally(() => { $('#tiSave').disabled = false; });
+  });
+  $('#tiDel').addEventListener('click', () => {
+    if (!TX.cur.id || !confirm('이 세금계산서를 지울까요?')) return;
+    api('adm_tiBulk', [TX.cur.id], 'delete').then((r) => { if (!r.ok) return toast(r.msg); toast('지웠습니다.'); TX.sel.delete(TX.cur.id); $('#tiModal').classList.add('hidden'); loadTax(); }).catch(() => {});
+  });
+  $('#tiPngSup').addEventListener('click', () => { tiCalc(TX.cur); TAXDOC.png(TX.cur, 'sup').then((b) => TAXDOC.download(b, TAXDOC.fileName(TX.cur, 'sup'))).catch((er) => toast(er.message)); });
+  $('#tiPngBuy').addEventListener('click', () => { tiCalc(TX.cur); TAXDOC.png(TX.cur, 'buy').then((b) => TAXDOC.download(b, TAXDOC.fileName(TX.cur, 'buy'))).catch((er) => toast(er.message)); });
 
   // ───── 게시판 관리 ─────
   const BM = { status: '전체', posts: [], count: {}, cur: '' };

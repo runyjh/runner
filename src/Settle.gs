@@ -34,7 +34,7 @@ const STL_TABS = {
   },
   // 용차업체: 업체가 등록한 쿠팡 아이디는 아이디 관리에서 명의자 대신 '용차업체'를 고르면 업체별 정산서 1장으로 묶인다 (기사정보 등록 없음)
   stl_vendors: {
-    name: '업체명', price: '건당 단가', ins: '산재·고용 공제', bizNo: '사업자번호', ceo: '대표자', phone: '연락처',
+    name: '업체명', price: '건당 단가', ins: '산재·고용 공제', bizNo: '사업자번호', ceo: '대표자', phone: '연락처', addr: '사업장 주소', bizType: '업태', bizItem: '종목',
     bank: '은행', account: '계좌번호', holder: '예금주', email: '이메일', status: '상태', memo: '메모'
   },
   // 한 아이디로 여러 기사가 일할 때: 그 기간 그 아이디로 일한 기사 (지급은 명의자, 일시단가·근무일 판단에 씀)
@@ -127,7 +127,7 @@ const STL_CFG = [
   ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임']
 ];
 
-const STL_DRIVER_FIELDS = ['bizNo', 'bizName', 'bizEmail']; // 기사(사람) 정보: 명의자의 세금계산서용
+const STL_DRIVER_FIELDS = ['bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem']; // 기사(사람) 정보: 명의자의 세금계산서용
 const STL_ROLES = ['메인', '서브'];
 const STL_ID_STATUS = ['사용', '정지']; // 예전 값 '중지' 도 정지로 읽는다
 const STL_TYPES = ['고정', '백업', '품앗이', '외부용차'];
@@ -689,7 +689,7 @@ function stlVendors_() {
     if (by[k]) return;
     const v = {
       key: k, name: name, price: stlNum_(r.price), ins: !/^n/i.test(str_(r.ins)), bizNo: str_(r.bizNo), ceo: str_(r.ceo), phone: str_(r.phone),
-      bank: str_(r.bank), account: str_(r.account), holder: str_(r.holder), email: str_(r.email), stopped: r.status === '정지' || r.status === '중지'
+      bank: str_(r.bank), account: str_(r.account), holder: str_(r.holder), email: str_(r.email), addr: str_(r.addr), bizType: str_(r.bizType), bizItem: str_(r.bizItem), stopped: r.status === '정지' || r.status === '중지'
     };
     by[k] = v; list.push(v);
   });
@@ -1808,7 +1808,7 @@ function fmtAccount_(d, bank) {
 const STL_EDIT = {
   ids: { sheet: 'stl_ids', scope: 'all', cols: [['owner', '명의자 (정산금 받는 기사)', 'person', 'ownerId'], ['vendor', '용차업체 (명의자 대신)', 'vendor'], ['cid', '쿠팡ID', 'cid'], ['role', '구분', STL_ROLES], ['main', '메인 아이디 (서브일 때)', 'text'],
     ['type', '단가 구분', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=구분별 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
-  vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['price', '건당 단가 (VAT포함 · 비우면 외부단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'],
+  vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['price', '건당 단가 (VAT포함 · 비우면 외부단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'], ['addr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'],
     ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['holder', '예금주', 'text'], ['email', '이메일 (계산서)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text']] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
@@ -2242,8 +2242,10 @@ function api_mySlip(token, month) {
       };
     });
     if (!slips.length) fail_('이 달 정산 기록이 없습니다.');
+    let taxInv = [];
+    try { taxInv = tiForDriver_(u.id, month); } catch (e) { taxInv = []; }
     return {
-      ok: true, month: month, closed: !!closed, period: r.summary.period, dates: r.summary.dates, slips: slips,
+      ok: true, month: month, closed: !!closed, period: r.summary.period, dates: r.summary.dates, slips: slips, taxInv: taxInv,
       company: { name: co.branchName || '', ceo: co.branchCeo || '', bizNo: co.branchBizNo || '', email: cfg.email }
     };
   });

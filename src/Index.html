@@ -2015,9 +2015,147 @@
     $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     api('api_mySlip', token, month).then((r) => {
       if (!pmOk(r, '정산서를 불러오지 못했습니다.')) { $('#slBody').innerHTML = ''; return; }
-      $('#slBody').innerHTML = (r.closed ? '' : '<div class="sl-warn">⚠️ 아직 마감 전이라 금액이 바뀔 수 있습니다. 세금계산서는 마감 후 금액으로 발행해 주세요.</div>') + r.slips.map((sl) => slipCard(r, sl)).join('');
+      slTax = r.taxInv || [];
+      $('#slBody').innerHTML = (r.closed ? '' : '<div class="sl-warn">⚠️ 아직 마감 전이라 금액이 바뀔 수 있습니다. 세금계산서는 마감 후 금액으로 발행해 주세요.</div>') + taxCards(slTax) + r.slips.map((sl) => slipCard(r, sl)).join('');
     }).catch(() => { $('#slBody').innerHTML = ''; netErr(); });
   }
+  // ───── 세금계산서 그림 (별지 제11호 서식 모양) — 관리자·기사 앱 공용 ─────
+  // t = { date:'2026-10-31', book1, book2, serial, sup:{no,name,ceo,addr,type,item}, buy:{…}, items:[{md:'10-31',name,spec,qty,price,supply,tax,note}], supply, tax, total, cash, check, bill, credit, kind:'영수'|'청구', note }
+  // copy = 'sup' (공급자 보관용 · 적색) | 'buy' (공급받는자 보관용 · 청색)
+  const TAXDOC = (function () {
+    const W = 1100, H = 600;
+    const xe = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const num = (v) => (Number(v) || 0).toLocaleString('ko-KR');
+    function svg(t, copy) {
+      const C = copy === 'buy' ? '#1c5fd4' : '#d6336c', ink = '#111', F = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR','Nanum Gothic',sans-serif";
+      let o = '';
+      const rect = (x, y, w, h, fill) => { o += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + (fill || 'none') + '" stroke="' + C + '" stroke-width="1.2"/>'; };
+      const txt = (x, y, s, opt) => {
+        opt = opt || {};
+        o += '<text x="' + x + '" y="' + y + '" font-family="' + F + '" font-size="' + (opt.size || 15) + '" fill="' + (opt.color || ink) + '"' + (opt.bold ? ' font-weight="700"' : '') +
+          ' text-anchor="' + (opt.anchor || 'start') + '" dominant-baseline="middle"' + (opt.ls ? ' letter-spacing="' + opt.ls + '"' : '') + '>' + xe(s) + '</text>';
+      };
+      // 글자가 칸보다 길면 줄여서
+      const fit = (s, w, size) => { s = String(s || ''); const n = [...s].reduce((a, ch) => a + (/[ㄱ-힝]/.test(ch) ? 1 : 0.58), 0); return Math.max(9, Math.min(size, Math.floor((w - 8) / Math.max(n, 1)))); };
+      const cell = (x, y, w, h, s, opt) => { opt = Object.assign({ anchor: 'middle' }, opt || {}); if (opt.box !== false) rect(x, y, w, h, opt.fill); if (s !== '' && s != null) txt(opt.anchor === 'end' ? x + w - 6 : opt.anchor === 'start' ? x + 6 : x + w / 2, y + h / 2 + 1, s, Object.assign({}, opt, { size: fit(s, w, opt.size || 15) })); };
+      const lab = (x, y, w, h, s) => cell(x, y, w, h, s, { color: C, size: 13, fill: copy === 'buy' ? '#f1f6ff' : '#fff5f8' });
+      const X = 20, Y = 20, R = W - 20; // 바깥 틀
+      o += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fff"/>';
+      txt(X, 10, '[별지 제11호 서식]', { size: 11, color: '#555' });
+      txt(R, 10, copy === 'buy' ? '(청색)' : '(적색)', { size: 11, color: C, anchor: 'end' });
+      // 1) 제목
+      rect(X, Y, R - X, 64);
+      txt(X + 250, Y + 32, '세  금  계  산  서', { size: 30, bold: true, color: C, anchor: 'middle', ls: 4 });
+      txt(X + 470, Y + 32, copy === 'buy' ? '(공급받는자 보관용)' : '(공급자 보관용)', { size: 15, color: C, anchor: 'middle' });
+      const bx = R - 360;
+      lab(bx, Y, 90, 32, '책 번 호'); cell(bx + 90, Y, 135, 32, (t.book1 || '') + ' 권', { anchor: 'end' }); cell(bx + 225, Y, 135, 32, (t.book2 || '') + ' 호', { anchor: 'end' });
+      lab(bx, Y + 32, 90, 32, '일련번호'); cell(bx + 90, Y + 32, 270, 32, t.serial || '');
+      // 2) 공급자 · 공급받는자
+      const py = Y + 64, rh = 40, half = (R - X) / 2;
+      const party = (x0, title, p) => {
+        lab(x0, py, 34, rh * 4, '');
+        [...title].forEach((ch, i) => txt(x0 + 17, py + 30 + i * (rh * 4 - 40) / Math.max(title.length - 1, 1), ch, { size: 15, color: C, anchor: 'middle', bold: true }));
+        const lx = x0 + 34, vw = half - 34 - 86;
+        lab(lx, py, 86, rh, '등록번호'); cell(lx + 86, py, vw, rh, p.no || '', { size: 18, bold: true, ls: 1 });
+        lab(lx, py + rh, 86, rh, '상호(법인명)'); cell(lx + 86, py + rh, vw * 0.5, rh, p.name || ''); lab(lx + 86 + vw * 0.5, py + rh, 40, rh, '성명'); cell(lx + 126 + vw * 0.5, py + rh, vw * 0.5 - 40, rh, (p.ceo || '') + '  (인)');
+        lab(lx, py + rh * 2, 86, rh, '사업장 주소'); cell(lx + 86, py + rh * 2, vw, rh, p.addr || '', { size: 13, anchor: 'start' });
+        lab(lx, py + rh * 3, 86, rh, '업태'); cell(lx + 86, py + rh * 3, vw * 0.5, rh, p.type || '', { size: 13 }); lab(lx + 86 + vw * 0.5, py + rh * 3, 40, rh, '종목'); cell(lx + 126 + vw * 0.5, py + rh * 3, vw * 0.5 - 40, rh, p.item || '', { size: 13 });
+      };
+      party(X, '공급자', t.sup || {});
+      party(X + half, '공급받는자', t.buy || {});
+      // 3) 작성일 · 공급가액 · 세액 (자리별 칸)
+      const dy = py + rh * 4, d = String(t.date || '').split('-');
+      const sup = String(Math.round(Number(t.supply) || 0)), tax = String(Math.round(Number(t.tax) || 0));
+      const SD = 11, TD = 10, dw = 24;
+      let x = X;
+      lab(x, dy, 150, 26, '작        성'); lab(x + 150, dy, 56, 26, '공란수'); lab(x + 206, dy, SD * dw, 26, '공  급  가  액'); lab(x + 206 + SD * dw, dy, TD * dw, 26, '세        액'); lab(x + 206 + (SD + TD) * dw, dy, R - (x + 206 + (SD + TD) * dw), 26, '비      고');
+      const y2 = dy + 26, units = ['백', '십', '억', '천', '백', '십', '만', '천', '백', '십', '일'];
+      lab(x, y2, 60, 20, '년'); lab(x + 60, y2, 45, 20, '월'); lab(x + 105, y2, 45, 20, '일'); lab(x + 150, y2, 56, 20, '');
+      units.forEach((u, i) => lab(x + 206 + i * dw, y2, dw, 20, u)); units.slice(1).forEach((u, i) => lab(x + 206 + (SD + i) * dw, y2, dw, 20, u));
+      const y3 = y2 + 20, bigY = R - (x + 206 + (SD + TD) * dw);
+      cell(x, y3, 60, 34, d[0] || '', { size: 16 }); cell(x + 60, y3, 45, 34, d[1] ? String(+d[1]) : '', { size: 16 }); cell(x + 105, y3, 45, 34, d[2] ? String(+d[2]) : '', { size: 16 });
+      cell(x + 150, y3, 56, 34, sup === '0' ? '' : String(SD - sup.length), { size: 16 });
+      for (let i = 0; i < SD; i++) { const k = i - (SD - sup.length); cell(x + 206 + i * dw, y3, dw, 34, sup !== '0' && k >= 0 ? sup[k] : '', { size: 17, bold: true }); }
+      for (let i = 0; i < TD; i++) { const k = i - (TD - tax.length); cell(x + 206 + (SD + i) * dw, y3, dw, 34, tax !== '0' && k >= 0 ? tax[k] : '', { size: 17, bold: true }); }
+      cell(x + 206 + (SD + TD) * dw, dy + 26, bigY, 54, t.note || '', { size: 13 });
+      // 4) 품목
+      const iy = y3 + 34, cw = [40, 40, 300, 100, 70, 130, 150, 120];
+      cw.push(R - X - cw.reduce((a, b) => a + b, 0));
+      const heads = ['월', '일', '품        목', '규 격', '수 량', '단  가', '공 급 가 액', '세  액', '비 고'];
+      let cx = X;
+      heads.forEach((h, i) => { lab(cx, iy, cw[i], 28, h); cx += cw[i]; });
+      const items = (t.items || []).slice(0, 4);
+      while (items.length < 4) items.push(null);
+      items.forEach((it, r) => {
+        const yy = iy + 28 + r * 32, md = it && it.md ? String(it.md).split('-') : [];
+        const vals = it ? [md[0] ? String(+md[0]) : '', md[1] ? String(+md[1]) : '', it.name || '', it.spec || '', it.qty ? num(it.qty) : '', it.price ? num(it.price) : '', it.supply ? num(it.supply) : '', it.tax ? num(it.tax) : '', it.note || ''] : ['', '', '', '', '', '', '', '', ''];
+        cx = X;
+        vals.forEach((v, i) => { cell(cx, yy, cw[i], 32, v, { anchor: i >= 4 && i <= 7 ? 'end' : i === 2 ? 'start' : 'middle', size: 15 }); cx += cw[i]; });
+      });
+      // 5) 합계
+      const sy = iy + 28 + 4 * 32, sw = [210, 160, 160, 160, 160];
+      sw.push(R - X - sw.reduce((a, b) => a + b, 0));
+      cx = X;
+      ['합 계 금 액', '현      금', '수      표', '어      음', '외상미수금'].forEach((h, i) => { lab(cx, sy, sw[i], 26, h); cx += sw[i]; });
+      const last = cx;
+      rect(last, sy, sw[5], 60);
+      txt(last + 14, sy + 30, '이 금액을', { size: 15, color: C });
+      txt(last + sw[5] / 2 + 26, sy + 30, t.kind === '청구' ? '청구' : '영수', { size: 20, bold: true, anchor: 'middle' });
+      txt(last + sw[5] - 14, sy + 30, '함', { size: 15, color: C, anchor: 'end' });
+      cx = X;
+      [t.total, t.cash, t.check, t.bill, t.credit].forEach((v, i) => { cell(cx, sy + 26, sw[i], 34, Number(v) ? num(v) : '', { anchor: 'end', size: i === 0 ? 18 : 15, bold: i === 0 }); cx += sw[i]; });
+      txt(X, sy + 76, "22226-28131일 '96.2.27 개정", { size: 11, color: '#777' });
+      txt(R, sy + 76, '182mm×128mm 인쇄용지 · 러너 올인원 역발행', { size: 11, color: '#777', anchor: 'end' });
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + o + '</svg>';
+    }
+    /** SVG → PNG Blob (2배 선명하게) */
+    function png(t, copy, scale) {
+      scale = scale || 2;
+      return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = W * scale; c.height = H * scale;
+          const g = c.getContext('2d');
+          g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+          g.drawImage(img, 0, 0, c.width, c.height);
+          c.toBlob((b) => (b ? res(b) : rej(new Error('그림을 만들지 못했습니다.'))), 'image/png');
+        };
+        img.onerror = () => rej(new Error('그림을 만들지 못했습니다.'));
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg(t, copy));
+      });
+    }
+    function fileName(t, copy) {
+      return (String(t.date || '').replace(/-/g, '') + '_' + ((t.sup && (t.sup.name || t.sup.ceo)) || '공급자') + '_세금계산서_' + (copy === 'buy' ? '공급받는자보관용' : '공급자보관용') + '.png').replace(/[\\/:*?"<>|\s]+/g, '_');
+    }
+    function download(blob, name) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    }
+    return { svg, png, fileName, download, W, H };
+  })();
+
+  // 정산서 보기: 사무실이 대신 만든 세금계산서 (공급자 보관용 그림)
+  let slTax = [];
+  function taxCards(list) {
+    if (!list.length) return '';
+    return '<div class="sl-card sl-tax"><h3>📄 세금계산서 (공급자 보관용)</h3><p class="hint" style="margin:0 0 10px">사무실에서 기사님 대신 발행한 세금계산서입니다. 그림을 눌러 크게 보거나 <b>저장</b>해 보관하세요.</p>' +
+      list.map((t, i) => '<div class="sl-taxi"><div class="sl-line"><div>' + escH(t.date) + ' · ' + escH((t.items[0] || {}).name || '') + '<small>공급가액 ' + slWon(t.supply) + ' · 세액 ' + slWon(t.tax) + '</small></div><b>' + slWon(t.total) + '</b></div>' +
+        '<div class="sl-taximg" id="slTaxImg' + i + '"><button class="btn ghost" type="button" data-taxv="' + i + '" style="height:44px">세금계산서 그림 보기</button></div></div>').join('') + '</div>';
+  }
+  $('#slBody').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-taxv]'), sv = e.target.closest('[data-taxs]');
+    if (sv) { const t = slTax[+sv.dataset.taxs]; return TAXDOC.png(t, 'sup', 2).then((bl) => TAXDOC.download(bl, TAXDOC.fileName(t, 'sup'))).catch((er) => toast(er.message)); }
+    if (!b) return;
+    const i = +b.dataset.taxv, t = slTax[i]; b.disabled = true; b.textContent = '그림 만드는 중…';
+    TAXDOC.png(t, 'sup', 2).then((bl) => {
+      const url = URL.createObjectURL(bl);
+      $('#slTaxImg' + i).innerHTML = '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="세금계산서 공급자 보관용" style="width:100%;border:1px solid var(--line);border-radius:8px"></a>' +
+        '<button class="btn" type="button" data-taxs="' + i + '" style="height:44px;margin-top:8px">그림 저장</button><p class="hint" style="margin:6px 0 0;text-align:center">저장이 안 되면 그림을 길게 눌러 "이미지 저장"을 누르세요.</p>';
+    }).catch((er) => { b.disabled = false; b.textContent = '세금계산서 그림 보기'; toast(er.message); });
+  });
   function slipCard(r, sl) {
     const d = sl.row, co = r.company || {}, D = r.dates || {}, P = r.period || {};
     const yAllOurs = (sl.yong || []).filter((y) => !y.mine).every((y) => y.ours);

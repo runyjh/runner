@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -55,7 +55,7 @@ const D = {
   schCampId: '소속캠프ID', schCamp: '소속캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무',
   workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서',
   // 정산관리: 명의자 세금계산서 정보 (정산 기준인 쿠팡 아이디·단가 구분·일시단가는 정산 DB 의 아이디 관리·일시단가 탭)
-  bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일',
+  bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
   docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증',
   docFolder: '서류 폴더',
@@ -192,7 +192,10 @@ const COMPANY = [
   ['branchAddr', '영업점 주소', '경기도 부천시 소사구 양지로237, 9층 972호(옥길동, 광양프런티어밸리 5차)'],
   ['branchPhone', '영업점 연락처', '010-9599-0808'],
   ['branchBizNo', '영업점 사업자번호', '654-37-01141'],
-  ['court', '관할법원 (OO지방법원의 OO)', '서울중앙']
+  ['court', '관할법원 (OO지방법원의 OO)', '서울중앙'],
+  ['branchBizType', '영업점 업태', '운수 및 창고업'],
+  ['branchBizItem', '영업점 종목', '택배업'],
+  ['branchEmail', '영업점 이메일 (세금계산서)', '']
 ];
 const COMPANY_SHEET = 'company';
 
@@ -285,10 +288,17 @@ const BBN = { driverId: '기사ID', name: '기사', until: '정지 끝 (비우�
 const BWD = { word: '금칙어', memo: '메모' };
 // 앱 설정 (키 | 값 | 설명): 품앗이 일감 올리기 ON/OFF 등. 시트에서 값만 고쳐도 됨
 const APS = { key: '키', value: '값', memo: '설명' };
+// 세금계산서 역발행 (Tax.gs): 기사(공급자) → 러너(공급받는자). 한 줄 = 계산서 1장, 품목은 4줄까지
+const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권', book2: '호', serial: '일련번호', kind: '영수/청구', nts: '국세청등록', pub: '기사 앱 공개',
+  supId: '공급자 정산ID', supNo: '공급자 등록번호', supName: '공급자 상호', supCeo: '공급자 성명', supAddr: '공급자 주소', supType: '공급자 업태', supItem: '공급자 종목', supEmail: '공급자 이메일', supDriverId: '공급자 기사ID',
+  buyNo: '공급받는자 등록번호', buyName: '공급받는자 상호', buyCeo: '공급받는자 성명', buyAddr: '공급받는자 주소', buyType: '공급받는자 업태', buyItem: '공급받는자 종목', buyEmail: '공급받는자 이메일',
+  supply: '공급가액', tax: '세액', total: '합계금액', cash: '현금', check: '수표', bill: '어음', credit: '외상미수금', note: '비고',
+  i1md: '품목1 월일', i1name: '품목1 품목', i1spec: '품목1 규격', i1qty: '품목1 수량', i1price: '품목1 단가', i1supply: '품목1 공급가액', i1tax: '품목1 세액', i1note: '품목1 비고', i2md: '품목2 월일', i2name: '품목2 품목', i2spec: '품목2 규격', i2qty: '품목2 수량', i2price: '품목2 단가', i2supply: '품목2 공급가액', i2tax: '품목2 세액', i2note: '품목2 비고', i3md: '품목3 월일', i3name: '품목3 품목', i3spec: '품목3 규격', i3qty: '품목3 수량', i3price: '품목3 단가', i3supply: '품목3 공급가액', i3tax: '품목3 세액', i3note: '품목3 비고', i4md: '품목4 월일', i4name: '품목4 품목', i4spec: '품목4 규격', i4qty: '품목4 수량', i4price: '품목4 단가', i4supply: '품목4 공급가액', i4tax: '품목4 세액', i4note: '품목4 비고',
+  createdAt: '작성일시', updatedAt: '수정일시', admin: '처리 관리자' };
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -316,6 +326,7 @@ SCHEMA[SH.BREP] = BRP;
 SCHEMA[SH.BBAN] = BBN;
 SCHEMA[SH.BWORD] = BWD;
 SCHEMA[SH.APPSET] = APS;
+SCHEMA[SH.TAXINV] = TI;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
