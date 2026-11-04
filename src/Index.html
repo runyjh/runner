@@ -227,6 +227,10 @@
   .pmbanner i { font-style: normal; margin-left: auto; opacity: .6; font-size: 18px; line-height: 1; padding: 2px 0 0 6px; }
   .pmal { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: #fff; padding: 14px 16px; font: inherit; color: var(--ink); cursor: pointer; }
   .pmal:first-child { border-top: 0; }
+  /* 알림 카드: 머릿글(위) · 내용(아래) — 마이페이지 목록 버튼의 가로 배치를 덮어씀 */
+  .mylist button.pmal { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0; font-weight: 400; }
+  .mylist button.pmal::after { content: none; }
+  .mylist button.pmal b { width: 100%; font-weight: 700; }
   .pmal b { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; } .pmal b small { color: var(--sub); font-weight: 500; font-size: 12px; flex: none; }
   .pmal span { display: block; font-size: 13.5px; color: #4e5968; margin-top: 3px; line-height: 1.5; }
   .pmal.unread { background: #f3f7ff; } .pmal.unread b::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); margin: 7px 6px 0 0; flex: none; }
