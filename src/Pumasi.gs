@@ -1056,3 +1056,40 @@ function adm_pmAction(token, jobId, action, appId) {
     return r;
   });
 }
+/**
+ * 관리자 일괄 삭제: 일감 줄 + 그 일감의 지원 줄을 시트에서 지운다 (되돌릴 수 없음).
+ * 진행 중(모집 중·협의중·확정)이고 배차일이 지나지 않은 일감은 지원 기사에게 취소 알림, 확정된 일감은 기사스케줄 품앗이 칸도 지운다.
+ */
+function adm_pmDelete(token, ids) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!Array.isArray(ids) || !ids.length || ids.length > 500) fail_('삭제할 일감을 골라 주세요.');
+    const want = {};
+    ids.forEach(function (id) { want[str_(id)] = 1; });
+    const lock = LockService.getScriptLock(), out = [];
+    lock.waitLock(30000);
+    let n = 0;
+    try {
+      const today = todayText_();
+      const jobs = readAll_(SH.PJOB).filter(function (j) { return want[j.id]; });
+      const apps = readAll_(SH.PAPP).filter(function (x) { return want[x.jobId]; });
+      jobs.forEach(function (j) {
+        const live = (j.status === PST.OPEN || j.status === PST.TALK || j.status === PST.DONE) && j.date >= today;
+        if (!live) return;
+        apps.forEach(function (x) { if (x.jobId === j.id && pmActiveApp_(x)) out.push(pmA_(x.driverId, x.name, j, 'canceled')); });
+        out.push(pmA_(j.posterId, j.poster, j, 'admin', 'cancel'));
+        if (j.status === PST.DONE && j.acceptedId) pmSchOp_(out, 'clear', j.acceptedId, j);
+      });
+      apps.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.PAPP).deleteRow(r); });
+      jobs.map(function (j) { return j._row; }).sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.PJOB).deleteRow(r); });
+      n = jobs.length;
+      pmAlertAdd_(out);
+      pmTouch_();
+      logAdmin_(a, '품앗이 일감 삭제', n + '건', jobs.map(function (j) { return j.date + ' ' + j.poster; }).slice(0, 20).join(', '));
+    } finally {
+      lock.releaseLock();
+      pmAfter_(out);
+    }
+    return { ok: true, deleted: n };
+  });
+}

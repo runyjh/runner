@@ -4594,6 +4594,50 @@ function api_mySchedule(token, month) {
 }
 
 /**
+ * 기사 앱 '캠프전체': 내 소속 캠프 기사들의 2주 스케줄 + 내 캠프에 들어오는 백업 명단.
+ * 기사 순서는 기사스케줄(관리자) 줄 순서. 연락처 등 개인정보는 보내지 않는다.
+ */
+function api_campSchedule(token) {
+  return run_(function () {
+    const s = getSession_(token);
+    const info = s ? driverInfo_(s.d) : null;
+    if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
+    if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    const sun = sundayOf_(new Date()), dates = schDateRange_(sun, addDays_(sun, SCH_DAYS - 1));
+    const out = { ok: true, today: todayText_(), dates: dates, holidays: {}, camp: '', drivers: [], backup: {} };
+    dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
+    const all = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
+    const me = all.filter(function (o) { return o.id === String(s.d); })[0];
+    if (!me || !me.schCampId) { out.noCamp = true; return out; }
+    const camp = master_().camps.filter(function (c) { return c.id === me.schCampId; })[0];
+    out.camp = camp ? String(camp.name).replace(/\s*캠프\s*$/, '').trim() : (me.schCamp || '');
+    const mates = all.filter(function (o) { return o.schCampId === me.schCampId && o.status === ST.ACTIVE; });
+    const byId = {};
+    mates.forEach(function (o) { byId[o.id] = { id: o.id, name: o.name, route: o.baseRoute || '', type: o.driverType || '', me: o.id === me.id, cells: {}, order: 1e9 }; });
+    if (props_().SCH_DB_ID && schSS_().getSheetByName(SCH.SHEET)) {
+      const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+      const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
+      if (last >= 2 && cols.length) {
+        const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+        const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues();
+        const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+        ids.forEach(function (r, i) {
+          const x = byId[str_(r[0])];
+          if (!x || x.order < 1e9) return;
+          x.order = i;
+          dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(block[i][c - c0]); if (v) x.cells[d] = v; } });
+        });
+        try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1).list; } catch (e) { out.backup = {}; }
+      }
+    }
+    out.drivers = Object.keys(byId).map(function (k) { return byId[k]; })
+      .sort(function (a, b) { return a.order - b.order || a.name.localeCompare(b.name, 'ko'); })
+      .map(function (x) { delete x.order; return x; });
+    return out;
+  });
+}
+
+/**
  * 기사 앱용: 내 캠프의 날짜별 백업 명단 { camp: '강서1', list: { 'yyyy-MM-dd': ['527B 김영환', …] } }
  * 관리자 화면 SchedCalc 의 백업 명단 계산(운영시트 updateBackupRoster)과 같은 규칙.
  * 백업 기사 = 기본노선에 백업·예비·용차, 또는 기사구분이 백업·외부용차.

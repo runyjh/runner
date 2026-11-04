@@ -192,6 +192,7 @@
   table.sttbl .inp.dirty { border-color: var(--warn); background: #fffdf7; }
   .ed-bar { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
   .ed-bar .edq { width: 220px; height: 32px; }
+  th.dsrt { cursor: pointer; user-select: none; white-space: nowrap; } th.dsrt:hover { color: var(--brand); } th.dsrt i { font-style: normal; color: var(--brand); margin-left: 3px; }
   table.ed th.srt { cursor: pointer; user-select: none; white-space: nowrap; }
   table.ed th.srt:hover { color: var(--brand); }
   table.ed th.srt i { font-style: normal; color: var(--brand); margin-left: 3px; }
@@ -514,6 +515,7 @@
   .sg tr.dim td { opacity: .55; }
   .dname { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; max-width: 70px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
   .dname:hover { color: var(--brand); text-decoration: underline; }
+  .sg .drt { display: none; font-size: 11px; font-weight: 700; color: var(--brand); line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .sg .mv { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; gap: 1px; background: #fff; }
   .sg tr.drv:hover .mv, .sg tr.drv.moved .mv { display: flex; }
   .sg .mv button { border: 1px solid var(--line); background: #fff; color: var(--sub); border-radius: 3px; width: 18px; height: 13px; padding: 0; font-size: 8px; line-height: 11px; cursor: pointer; }
@@ -566,6 +568,9 @@
   .slegend span { padding: 1px 6px; border-radius: 4px; font-weight: 600; }
   @media (max-width: 820px) {
     .sg .f3, .sg .f4 { display: none; }
+    /* 모바일: 아이디·기본노선 칸 대신 이름 아래에 배정 라우트 */
+    .sg .f2 { width: 112px; min-width: 112px; max-width: 112px; box-shadow: 1px 0 0 var(--line); }
+    .sg .drt { display: block; }
     .swrap { max-height: calc(100vh - 230px); }
   }
 
@@ -652,7 +657,7 @@
     <div class="rbulk hidden" id="dBulk"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th>이름</th><th>기사구분</th><th>기사코드</th><th>배정 캠프 · 라우트</th><th>쿠팡플렉스 아이디</th><th>연락처</th><th>상태</th><th>차량</th><th>서류</th><th>가입일</th><th>비고</th></tr></thead>
+        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="driverType">기사구분</th><th class="dsrt" data-ds="driverCode">기사코드</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status">상태</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -711,9 +716,10 @@
     </div>
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사 앱 품앗이에 올라온 일감입니다. 줄을 누르면 지원자·연락처를 보고 사무실에서 <b>배차 확정 · 확정 풀기 · 마감 · 취소</b>를 할 수 있습니다 (처리하면 기사님께 알림이 갑니다). 데이터는 러너 올인원 DB 의 <b>pumasi_jobs · pumasi_apps</b> 탭.</p>
     <div class="tabs" id="paTabs"></div>
+    <div class="rbulk hidden" id="paBulk"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>상태</th><th>배차일</th><th>입차</th><th>구분</th><th>센터 · 라우트</th><th>배송지</th><th>물량</th><th>건당 단가</th><th>지급</th><th>올린 기사</th><th>지원</th><th>확정 기사</th><th>등록</th></tr></thead>
+        <thead><tr><th class="ck"><input type="checkbox" id="paAll" aria-label="보이는 일감 모두 선택"></th><th>상태</th><th>배차일</th><th>입차</th><th>구분</th><th>센터 · 라우트</th><th>배송지</th><th>물량</th><th>건당 단가</th><th>지급</th><th>올린 기사</th><th>지원</th><th>확정 기사</th><th>등록</th></tr></thead>
         <tbody id="paRows"></tbody>
       </table>
       <div class="empty hidden" id="paEmpty"></div>
@@ -1354,9 +1360,19 @@
   onSearch($('#q'), () => renderRows());
   $('#reloadBtn').addEventListener('click', () => loadList(true));
 
+  // 머리글을 누르면 오름차순 → 내림차순 → 정렬 해제
+  let dsort = { k: '', d: 0 };
+  const dsVal = (r, k) => k === 'camp' ? String(r.schCamp || '') + ' ' + String(r.baseRoute || '') : k === 'docs' ? Object.keys(DOCS).filter((x) => r.docs && r.docs[x]).length : String(r[k] == null ? '' : r[k]);
+  function paintDSort() { $$('#dHead th.dsrt').forEach((th) => { const i = th.querySelector('i'); if (i) i.remove(); if (th.dataset.ds === dsort.k && dsort.d) th.insertAdjacentHTML('beforeend', '<i>' + (dsort.d > 0 ? '▲' : '▼') + '</i>'); }); }
+  $('#dHead').addEventListener('click', (e) => {
+    const th = e.target.closest('th.dsrt'); if (!th) return;
+    const k = th.dataset.ds;
+    dsort = dsort.k !== k ? { k, d: 1 } : dsort.d === 1 ? { k, d: -1 } : { k: '', d: 0 };
+    paintDSort(); renderRows();
+  });
   function visibleRows() {
     const q = nfc($('#q').value.trim()), qd = q.replace(/\D/g, '');
-    return all.filter((r) => {
+    const out = all.filter((r) => {
       // 검색할 때는 상태·구분 탭과 상관없이 전체에서 찾는다 (승인대기 탭에 있어도 승인된 기사가 나오도록)
       if (!q && filter !== '전체' && r.status !== filter) return false;
       if (!q && tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
@@ -1364,6 +1380,15 @@
       return [r.name, r.driverCode, r.loginId, r.carName, r.carNo, r.schCamp, r.baseRoute, r.phone].some((v) => nfc(v).indexOf(q) >= 0) ||
         (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
     });
+    if (dsort.k && dsort.d) {
+      const k = dsort.k;
+      out.sort((a, b) => {
+        const x = dsVal(a, k), y = dsVal(b, k);
+        if (x === '' && y !== '') return 1; if (y === '' && x !== '') return -1; // 빈 칸은 늘 맨 뒤
+        return dsort.d * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'ko', { numeric: true }));
+      });
+    }
+    return out;
   }
   function renderRows() {
     setTimeout(paintDBulk, 0);
@@ -1941,7 +1966,7 @@
   }
   function loadPumasi() {
     paDefaultRange();
-    $('#paRows').innerHTML = '<tr><td colspan="13" class="sub">불러오는 중…</td></tr>';
+    $('#paRows').innerHTML = '<tr><td colspan="14" class="sub">불러오는 중…</td></tr>';
     api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
       if (!r.ok) return toast(r.msg);
       PA.jobs = r.jobs; PA.count = r.count; renderPumasi();
@@ -1951,18 +1976,52 @@
     $('#paTabs').innerHTML = PA_ST.map((st) => '<button class="tab' + (PA.status === st ? ' on' : '') + '" data-pst="' + esc(st) + '">' + esc(st) + ' <b>' + (st === '전체' ? PA.jobs.length : (PA.jobs.filter((j) => j.status === st).length)) + '</b></button>').join('');
     const list = PA.jobs.filter((j) => PA.status === '전체' || j.status === PA.status);
     $('#paCount').textContent = list.length + '건';
-    $('#paRows').innerHTML = list.map((j) => '<tr data-pa="' + esc(j.id) + '"><td>' + paBadge(j.status) + '</td><td><b>' + paDay(j.date) + '</b></td><td>' + esc(j.time) + '</td><td>' + esc(paKind[j.kind] || j.kind) + '</td>' +
+    const have = new Set(PA.jobs.map((j) => j.id)); [...paSel].forEach((id) => { if (!have.has(id)) paSel.delete(id); });
+    $('#paRows').innerHTML = list.map((j) => '<tr data-pa="' + esc(j.id) + '"><td class="ck"><input type="checkbox" data-pck="' + esc(j.id) + '"' + (paSel.has(j.id) ? ' checked' : '') + ' aria-label="선택"></td><td>' + paBadge(j.status) + '</td><td><b>' + paDay(j.date) + '</b></td><td>' + esc(j.time) + '</td><td>' + esc(paKind[j.kind] || j.kind) + '</td>' +
       '<td>' + esc(String(j.camp || '').replace(/\s*캠프$/, '')) + (j.route ? ' <b>' + esc(j.route) + '</b>' : '') + '</td><td>' + esc(j.area) + '</td><td>' + esc(j.qty) + (j.top ? ' · ' + esc(j.top) : '') + '</td>' +
       '<td class="n">' + wn(j.price) + '원</td><td>' + esc(j.pay) + '</td><td>' + esc(j.poster) + '</td>' +
       '<td>' + (j.apps ? j.apps + '명' + (j.newApps ? ' <span class="badge b-반려">새 ' + j.newApps + '</span>' : '') : '<span class="sub">-</span>') + '</td><td>' + (j.accepted ? '<b>' + esc(j.accepted) + '</b>' : '<span class="sub">-</span>') + '</td>' +
       '<td class="sub">' + esc(String(j.createdAt || '').slice(5, 16)) + '</td></tr>').join('');
     const em = $('#paEmpty'); em.classList.toggle('hidden', !!list.length); em.textContent = '이 기간에 ' + (PA.status === '전체' ? '' : PA.status + ' ') + '품앗이 일감이 없습니다.';
+    paPaintBulk(list);
   }
+  // ── 일괄 선택 · 삭제 ──
+  const paSel = new Set();
+  function paPaintBulk(list) {
+    list = list || PA.jobs.filter((j) => PA.status === '전체' || j.status === PA.status);
+    const b = $('#paBulk');
+    b.classList.toggle('hidden', !paSel.size);
+    b.innerHTML = '<b>' + paSel.size + '건 선택</b><button class="btn sm ghost" id="paSelNone">선택 해제</button><button class="btn sm danger" id="paDel">선택 삭제</button>';
+    const all = $('#paAll'); const on = list.filter((j) => paSel.has(j.id)).length;
+    all.checked = !!list.length && on === list.length; all.indeterminate = on > 0 && on < list.length;
+  }
+  $('#paAll').addEventListener('change', (e) => {
+    const list = PA.jobs.filter((j) => PA.status === '전체' || j.status === PA.status);
+    list.forEach((j) => { if (e.target.checked) paSel.add(j.id); else paSel.delete(j.id); });
+    renderPumasi();
+  });
+  $('#paBulk').addEventListener('click', (e) => {
+    if (e.target.id === 'paSelNone') { paSel.clear(); return renderPumasi(); }
+    if (e.target.id !== 'paDel') return;
+    const ids = [...paSel], jobs = PA.jobs.filter((j) => paSel.has(j.id));
+    const live = jobs.filter((j) => ['모집 중', '배차 협의중', '배차 확정'].includes(j.status)).length;
+    if (!confirm(ids.length + '건의 품앗이 일감을 삭제할까요?\n지원 기록도 같이 지워지고 되돌릴 수 없습니다.' + (live ? '\n\n진행 중인 일감 ' + live + '건은 지원한 기사님께 취소 알림이 가고, 배차 확정된 일감은 기사스케줄 품앗이 칸도 지웁니다.' : ''))) return;
+    e.target.disabled = true;
+    api('adm_pmDelete', ids).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      paSel.clear(); toast(r.deleted + '건을 삭제했습니다.'); loadPumasi();
+    }).catch(() => {}).finally(() => { e.target.disabled = false; });
+  });
   $('#paTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-pst]'); if (b) { PA.status = b.dataset.pst; renderPumasi(); } });
   $('#paReload').addEventListener('click', loadPumasi);
   $('#paFrom').addEventListener('change', loadPumasi); $('#paTo').addEventListener('change', loadPumasi);
   let paQT = 0; $('#paQ').addEventListener('input', () => { clearTimeout(paQT); paQT = setTimeout(loadPumasi, 400); });
-  $('#paRows').addEventListener('click', (e) => { const tr = e.target.closest('[data-pa]'); if (tr) openPumasi(tr.dataset.pa); });
+  $('#paRows').addEventListener('click', (e) => {
+    const ck = e.target.closest('[data-pck]');
+    if (ck) { if (ck.checked) paSel.add(ck.dataset.pck); else paSel.delete(ck.dataset.pck); return paPaintBulk(); }
+    if (e.target.closest('td.ck')) return;
+    const tr = e.target.closest('[data-pa]'); if (tr) openPumasi(tr.dataset.pa);
+  });
   $('#paClose').addEventListener('click', () => $('#paModal').classList.add('hidden'));
   function openPumasi(id) {
     PA.cur = id;
@@ -4221,6 +4280,7 @@
       return '<tr class="drv' + (gtop ? ' gtop' : '') + (d.status !== '승인' ? ' dim' : '') + (d.id === sMoved ? ' moved' : '') + '">' +
         '<td class="fx f1">' + esc(shortCamp(r.camp) || '-') + '</td>' +
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
+        (d.baseRoute ? '<small class="drt" title="기본노선(배정 라우트)">' + esc(d.baseRoute) + '</small>' : '') +
         '<span class="mv"><button data-mv="-1" data-mid="' + esc(d.id) + '" title="위로">▲</button><button data-mv="1" data-mid="' + esc(d.id) + '" title="아래로">▼</button></span></td>' +
         '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
