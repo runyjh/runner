@@ -233,7 +233,7 @@ function api_pmSave(token, job) {
       const file = pmFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(job.attach.data), job.attach.mime, (f.date + '_' + f.camp + '_' + (f.route || f.area) + '_' + u.info.name).replace(/[\\\/:*?"<>|]/g, ' ') + ext));
       attachUrl = file.getUrl();
     }
-    const lock = LockService.getScriptLock();
+    const lock = LockService.getScriptLock(), out = [];
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -247,7 +247,10 @@ function api_pmSave(token, job) {
         f.updatedAt = now;
         writeFields_(SH.PJOB, row, f);
         // 지원 기록의 배차일도 맞춘다 (같은 날 2회 제한 계산용)
-        if (f.date !== o.date) readAll_(SH.PAPP).forEach(function (a) { if (a.jobId === o.id) writeFields_(SH.PAPP, a._row, { date: f.date }); });
+        const oapps = readAll_(SH.PAPP).filter(function (a) { return a.jobId === o.id; });
+        if (f.date !== o.date) oapps.forEach(function (a) { writeFields_(SH.PAPP, a._row, { date: f.date }); });
+        oapps.forEach(function (a) { if (pmActiveApp_(a)) out.push(pmA_(a.driverId, a.name, Object.assign({}, o, f), 'edit')); });
+        pmAlertAdd_(out);
         pmTouch_();
         return { ok: true, id: o.id };
       }
@@ -257,6 +260,7 @@ function api_pmSave(token, job) {
       return { ok: true, id: id };
     } finally {
       lock.releaseLock();
+      pmPushSend_(out);
     }
   });
 }
@@ -276,7 +280,7 @@ function api_pmApply(token, id, memo) {
     const u = pmUser_(token);
     const me = driverById_(u.id) || {};
     if (!me.docQual) fail_('화물운송 종사자격증을 등록한 기사만 지원할 수 있습니다. 사무실에 자격증 등록을 요청해 주세요.');
-    const lock = LockService.getScriptLock();
+    const lock = LockService.getScriptLock(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(id), today = todayText_();
@@ -285,17 +289,20 @@ function api_pmApply(token, id, memo) {
       if (why) fail_(why);
       const now = nowText_();
       appendObj_(SH.PAPP, { id: uniqId_('A'), jobId: j.id, driverId: u.id, name: u.info.name, date: j.date, status: PAST.APPLY, memo: String(memo || '').trim().slice(0, 200), createdAt: now, updatedAt: now });
+      out.push(pmA_(j.posterId, j.poster, j, 'apply', u.info.name));
+      pmAlertAdd_(out);
       pmTouch_();
       return { ok: true };
     } finally {
       lock.releaseLock();
+      pmPushSend_(out);
     }
   });
 }
 function api_pmCancelApply(token, id) {
   return run_(function () {
     const u = pmUser_(token);
-    const lock = LockService.getScriptLock();
+    const lock = LockService.getScriptLock(), out = [];
     lock.waitLock(20000);
     try {
       const a = readAll_(SH.PAPP).filter(function (x) { return x.jobId === id && x.driverId === u.id && pmActiveApp_(x); })[0];
@@ -303,12 +310,15 @@ function api_pmCancelApply(token, id) {
       const j = pmJobById_(id), row = findRow_(SH.PJOB, 'id', j.id), now = nowText_();
       writeFields_(SH.PAPP, a._row, { status: PAST.CANCEL, updatedAt: now });
       // 확정된 기사가 취소하면 일감은 다시 모집 중
+      out.push(pmA_(j.posterId, j.poster, j, j.acceptedId === u.id ? 'cancelOk' : 'cancel', u.info.name));
+      pmAlertAdd_(out);
       if (j.acceptedId === u.id) writeFields_(SH.PJOB, row, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now });
       else if (j.status === PST.TALK && a.status === PAST.TALK && !readAll_(SH.PAPP).some(function (x) { return x.jobId === id && x.id !== a.id && x.status === PAST.TALK; })) writeFields_(SH.PJOB, row, { status: PST.OPEN, updatedAt: now });
       pmTouch_();
       return { ok: true };
     } finally {
       lock.releaseLock();
+      pmPushSend_(out);
     }
   });
 }
@@ -321,7 +331,7 @@ function api_pmCancelApply(token, id) {
 function api_pmDecide(token, jobId, appId, action) {
   return run_(function () {
     const u = pmUser_(token);
-    const lock = LockService.getScriptLock();
+    const lock = LockService.getScriptLock(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(jobId), jr = findRow_(SH.PJOB, 'id', j.id);
@@ -335,29 +345,34 @@ function api_pmDecide(token, jobId, appId, action) {
         if (j.status === PST.DONE) fail_('이미 배차가 확정되었습니다. 확정을 먼저 풀어 주세요.');
         writeFields_(SH.PAPP, a._row, { status: PAST.TALK, updatedAt: now });
         writeFields_(SH.PJOB, jr, { status: PST.TALK, updatedAt: now });
+        out.push(pmA_(a.driverId, a.name, j, 'talk'));
       } else if (action === 'accept') {
         if (j.date < todayText_()) fail_('배차일이 지난 일감입니다.');
         apps.forEach(function (x) {
-          if (x.id === a.id) writeFields_(SH.PAPP, x._row, { status: PAST.OK, updatedAt: now });
-          else if (pmActiveApp_(x)) writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now });
+          if (x.id === a.id) { writeFields_(SH.PAPP, x._row, { status: PAST.OK, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'accept')); }
+          else if (pmActiveApp_(x)) { writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'lost')); }
         });
         writeFields_(SH.PJOB, jr, { status: PST.DONE, acceptedId: a.driverId, accepted: a.name, updatedAt: now });
       } else if (action === 'reject') {
         writeFields_(SH.PAPP, a._row, { status: PAST.NO, updatedAt: now });
+        out.push(pmA_(a.driverId, a.name, j, 'reject'));
         if (j.acceptedId === a.driverId) writeFields_(SH.PJOB, jr, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now });
         else if (j.status === PST.TALK && !apps.some(function (x) { return x.id !== a.id && x.status === PAST.TALK; })) writeFields_(SH.PJOB, jr, { status: PST.OPEN, updatedAt: now });
       } else if (action === 'back') {
         // 확정 풀기 / 미선정 되돌리기 → 지원 상태
         writeFields_(SH.PAPP, a._row, { status: PAST.APPLY, updatedAt: now });
         if (j.acceptedId === a.driverId) {
+          out.push(pmA_(a.driverId, a.name, j, 'unaccept'));
           apps.forEach(function (x) { if (x.id !== a.id && x.status === PAST.NO) writeFields_(SH.PAPP, x._row, { status: PAST.APPLY, updatedAt: now }); });
           writeFields_(SH.PJOB, jr, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now });
         }
       } else fail_('알 수 없는 작업입니다.');
+      pmAlertAdd_(out);
       pmTouch_();
       return { ok: true };
     } finally {
       lock.releaseLock();
+      pmPushSend_(out);
     }
   });
 }
@@ -365,7 +380,7 @@ function api_pmDecide(token, jobId, appId, action) {
 function api_pmClose(token, id, action) {
   return run_(function () {
     const u = pmUser_(token);
-    const lock = LockService.getScriptLock();
+    const lock = LockService.getScriptLock(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(id), jr = findRow_(SH.PJOB, 'id', j.id), now = nowText_();
@@ -373,17 +388,20 @@ function api_pmClose(token, id, action) {
       if (action === 'close') {
         if (j.status === PST.DONE) fail_('배차가 확정된 일감입니다.');
         writeFields_(SH.PJOB, jr, { status: PST.CLOSED, updatedAt: now });
+        readAll_(SH.PAPP).forEach(function (x) { if (x.jobId === j.id && (x.status === PAST.APPLY || x.status === PAST.TALK)) out.push(pmA_(x.driverId, x.name, j, 'closed')); });
       } else if (action === 'reopen') {
         if (j.date < todayText_()) fail_('배차일이 지난 일감은 다시 열 수 없습니다.');
         writeFields_(SH.PJOB, jr, { status: PST.OPEN, updatedAt: now });
       } else if (action === 'cancel') {
         writeFields_(SH.PJOB, jr, { status: PST.CANCEL, acceptedId: '', accepted: '', updatedAt: now });
-        readAll_(SH.PAPP).forEach(function (x) { if (x.jobId === j.id && pmActiveApp_(x)) writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); });
+        readAll_(SH.PAPP).forEach(function (x) { if (x.jobId === j.id && pmActiveApp_(x)) { writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'canceled')); } });
       } else fail_('알 수 없는 작업입니다.');
+      pmAlertAdd_(out);
       pmTouch_();
       return { ok: true };
     } finally {
       lock.releaseLock();
+      pmPushSend_(out);
     }
   });
 }
@@ -456,4 +474,232 @@ function pmScheduleOf_(me, dates) {
     (out[a.date] = out[a.date] || []).push({ role: '지원', id: j.id, text: (j.camp ? j.camp.replace(/\s*캠프$/, '') + ' ' : '') + (j.route || j.area) + ' · ' + j.time, status: a.status });
   });
   return out;
+}
+
+// ───────────────────────── 알림 (앱 안 실시간 알림 + 휴대폰 푸시) ─────────────────────────
+/** 일감 짧은 이름: 11/10 강서1 527B */
+function pmJobLabel_(j) {
+  const p = String(j.date || '').split('-');
+  return (p.length === 3 ? (+p[1]) + '/' + (+p[2]) + ' ' : '') + String(j.camp || '').replace(/\s*캠프$/, '') + ' ' + (j.route || j.area || '');
+}
+const PM_ALERT_TEXT = {
+  apply: function (j, who) { return ['🙋 새 지원', who + ' 기사님이 ' + pmJobLabel_(j) + ' 일감에 지원했습니다. 전화로 협의해 주세요.']; },
+  cancel: function (j, who) { return ['지원 취소', who + ' 기사님이 ' + pmJobLabel_(j) + ' 지원을 취소했습니다.']; },
+  cancelOk: function (j, who) { return ['⚠️ 확정 기사 취소', '확정된 ' + who + ' 기사님이 ' + pmJobLabel_(j) + ' 일을 취소했습니다. 다시 모집 중입니다.']; },
+  talk: function (j) { return ['📞 배차 협의 중', j.poster + ' 기사님이 ' + pmJobLabel_(j) + ' 일감을 협의 중으로 바꿨습니다. 전화를 받아 주세요.']; },
+  accept: function (j) { return ['✅ 배차 확정', pmJobLabel_(j) + ' 일감이 기사님으로 확정되었습니다. 배송지코드·연락처를 확인하세요.']; },
+  lost: function (j) { return ['미선정', pmJobLabel_(j) + ' 일감은 다른 기사님으로 확정되었습니다.']; },
+  reject: function (j) { return ['미선정', pmJobLabel_(j) + ' 일감에 선정되지 않았습니다.']; },
+  unaccept: function (j) { return ['⚠️ 배차 확정 취소', pmJobLabel_(j) + ' 일감의 배차 확정이 풀렸습니다.']; },
+  closed: function (j) { return ['모집 마감', pmJobLabel_(j) + ' 일감의 모집이 마감되었습니다.']; },
+  canceled: function (j) { return ['⚠️ 일감 취소', pmJobLabel_(j) + ' 일감이 취소되었습니다.']; },
+  edit: function (j) { return ['✏️ 일감 내용 변경', pmJobLabel_(j) + ' 일감 내용이 바뀌었습니다. 확인해 주세요.']; }
+};
+/** 알림 1건 만들기 (아직 저장 전) */
+function pmA_(driverId, name, j, kind, who) {
+  const t = PM_ALERT_TEXT[kind](j, who || '');
+  return { driverId: String(driverId || ''), name: name || '', jobId: j.id, kind: kind, title: t[0], text: t[1] };
+}
+/** 알림을 시트에 쌓고 받는 기사의 알림 버전을 올린다 (앱이 다음 확인 때 바로 가져감) */
+function pmAlertAdd_(list) {
+  list = (list || []).filter(function (a) { return a && a.driverId; });
+  if (!list.length) return;
+  const now = nowText_();
+  appendObjs_(SH.PALERT, list.map(function (a) { return { id: uniqId_('N'), driverId: a.driverId, name: a.name, jobId: a.jobId, kind: a.kind, text: a.title + ' · ' + a.text, createdAt: now, readAt: '' }; }));
+  const seen = {};
+  list.forEach(function (a) { if (!seen[a.driverId]) { seen[a.driverId] = 1; pmAlertBump_(a.driverId); } });
+}
+function pmAlertBump_(driverId) {
+  if (!driverId) return;
+  try { cache_().put('pmn:' + driverId, String(Date.now()), CFG.CACHE_MAX); } catch (e) { /* 무시 */ }
+}
+function pmAlertVer_(driverId) {
+  const c = cache_(), k = 'pmn:' + driverId;
+  let v = c.get(k);
+  if (!v) { v = 'r' + Date.now(); try { c.put(k, v, CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
+  return v;
+}
+/**
+ * 앱이 30초마다 부른다: 알림 버전이 같으면 바로 { same: true } (시트를 읽지 않음)
+ * 바뀌었으면 최근 30일 내 알림 50건 + 안 읽은 수
+ */
+function api_pmAlerts(token, ver) {
+  return run_(function () {
+    const u = pmUser_(token);
+    const v = pmAlertVer_(u.id);
+    if (ver && ver === v) return { ok: true, same: true, ver: v };
+    const from = ymd_(addDays_(new Date(), -30));
+    const list = readAll_(SH.PALERT).filter(function (a) { return a.driverId === u.id && a.id && String(a.createdAt).slice(0, 10) >= from; })
+      .sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    return {
+      ok: true, ver: v, unread: list.filter(function (a) { return !a.readAt; }).length,
+      alerts: list.slice(0, 50).map(function (a) {
+        const i = String(a.text).indexOf(' · ');
+        return { id: a.id, jobId: a.jobId, kind: a.kind, title: i > 0 ? a.text.slice(0, i) : a.text, text: i > 0 ? a.text.slice(i + 3) : '', at: a.createdAt, read: !!a.readAt };
+      })
+    };
+  });
+}
+/** 읽음 표시: ids 배열, 또는 'all' */
+function api_pmAlertsRead(token, ids) {
+  return run_(function () {
+    const u = pmUser_(token);
+    const want = ids === 'all' ? null : {};
+    if (want) (ids || []).forEach(function (x) { want[String(x)] = 1; });
+    const now = nowText_();
+    let n = 0;
+    readAll_(SH.PALERT).forEach(function (a) {
+      if (a.driverId !== u.id || a.readAt || (want && !want[a.id])) return;
+      writeFields_(SH.PALERT, a._row, { readAt: now }); n++;
+    });
+    if (n) pmAlertBump_(u.id);
+    return { ok: true, marked: n };
+  });
+}
+
+// ───── 휴대폰 푸시 (Firebase Cloud Messaging) ─────
+// 스크립트 속성 FCM_WEB = 파이어베이스 웹앱 설정 JSON (+ "vapidKey"), FCM_SA = 서비스 계정 키 JSON. 둘 다 있어야 켜진다.
+function pmPushCfg_() {
+  const p = props_();
+  let web = null, sa = null;
+  try { web = p.FCM_WEB ? JSON.parse(p.FCM_WEB) : null; } catch (e) { web = null; }
+  try { sa = p.FCM_SA ? JSON.parse(p.FCM_SA) : null; } catch (e) { sa = null; }
+  if (web && !(web.apiKey && web.projectId && web.messagingSenderId && web.appId && web.vapidKey)) web = null;
+  if (sa && !(sa.client_email && sa.private_key)) sa = null;
+  return { web: web, sa: sa };
+}
+/** 앱: 푸시를 켤 수 있는지 + 파이어베이스 웹 설정 */
+function api_pmPushConfig(token) {
+  return run_(function () {
+    pmUser_(token);
+    const c = pmPushCfg_();
+    if (!c.web || !c.sa) return { ok: true, on: false };
+    return { ok: true, on: true, web: { apiKey: c.web.apiKey, authDomain: c.web.authDomain || '', projectId: c.web.projectId, messagingSenderId: c.web.messagingSenderId, appId: c.web.appId }, vapidKey: c.web.vapidKey };
+  });
+}
+/** 앱: 이 기기를 푸시 받는 기기로 등록 (같은 토큰이면 기사만 바꿔 씀) */
+function api_pmPushSave(token, fcmToken, device) {
+  return run_(function () {
+    const u = pmUser_(token);
+    fcmToken = String(fcmToken || '').trim();
+    if (!/^[\w:\-]{20,400}$/.test(fcmToken)) fail_('기기 정보를 확인할 수 없습니다.');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.PPUSH, 'token', fcmToken), now = nowText_();
+      const f = { driverId: u.id, name: u.info.name, device: String(device || '').slice(0, 60) };
+      if (row) writeFields_(SH.PPUSH, row, f);
+      else appendObj_(SH.PPUSH, Object.assign({ token: fcmToken, createdAt: now, lastOk: '' }, f));
+      try { cache_().remove('pmt:' + u.id); } catch (e) { /* 무시 */ }
+      return { ok: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+/** 앱: 푸시 끄기·로그아웃 → 이 기기 지우기 */
+function api_pmPushDel(token, fcmToken) {
+  return run_(function () {
+    const s = getSession_(token);
+    fcmToken = String(fcmToken || '').trim();
+    if (!fcmToken) return { ok: true };
+    const row = findRow_(SH.PPUSH, 'token', fcmToken);
+    if (row) {
+      const o = readObj_(SH.PPUSH, row);
+      if (!s || o.driverId === String(s.d)) { sheet_(SH.PPUSH).deleteRow(row); try { cache_().remove('pmt:' + o.driverId); } catch (e) { /* 무시 */ } }
+    }
+    return { ok: true };
+  });
+}
+/** 서비스 계정으로 FCM 접근 토큰 (50분 캐시) */
+function pmFcmToken_(sa) {
+  const c = cache_(), hit = c.get('fcm:at');
+  if (hit) return hit;
+  const b64 = function (o) { return Utilities.base64EncodeWebSafe(typeof o === 'string' ? o : JSON.stringify(o)).replace(/=+$/, ''); };
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64({ alg: 'RS256', typ: 'JWT' });
+  const claim = b64({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/firebase.messaging', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 });
+  const sig = Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(head + '.' + claim, sa.private_key)).replace(/=+$/, '');
+  const res = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post', muteHttpExceptions: true,
+    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: head + '.' + claim + '.' + sig }
+  });
+  const j = JSON.parse(res.getContentText() || '{}');
+  if (!j.access_token) throw new Error('FCM 토큰 발급 실패: ' + res.getContentText().slice(0, 200));
+  c.put('fcm:at', j.access_token, 3000);
+  return j.access_token;
+}
+/** 기사의 푸시 기기 토큰 목록 (10분 캐시) */
+function pmPushTokens_(driverId) {
+  const c = cache_(), k = 'pmt:' + driverId, hit = c.get(k);
+  if (hit) return JSON.parse(hit);
+  const list = readAll_(SH.PPUSH).filter(function (o) { return o.driverId === driverId && o.token; }).map(function (o) { return o.token; });
+  c.put(k, JSON.stringify(list), 600);
+  return list;
+}
+/** 알림 목록을 휴대폰 푸시로 보낸다. 설정이 없거나 실패해도 앱 안 알림은 그대로 (조용히 넘어감) */
+function pmPushSend_(list) {
+  try {
+    list = (list || []).filter(function (a) { return a && a.driverId; });
+    if (!list.length) return 0;
+    const cfg = pmPushCfg_();
+    if (!cfg.sa || !cfg.web) return 0;
+    const reqs = [], meta = [];
+    list.forEach(function (a) {
+      pmPushTokens_(a.driverId).forEach(function (t) {
+        meta.push({ token: t, driverId: a.driverId });
+        reqs.push({ token: t, a: a });
+      });
+    });
+    if (!reqs.length) return 0;
+    const at = pmFcmToken_(cfg.sa), url = 'https://fcm.googleapis.com/v1/projects/' + (cfg.sa.project_id || cfg.web.projectId) + '/messages:send';
+    const res = UrlFetchApp.fetchAll(reqs.map(function (r) {
+      return {
+        url: url, method: 'post', contentType: 'application/json', muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + at },
+        payload: JSON.stringify({ message: { token: r.token, data: { title: r.a.title, body: r.a.text, jobId: String(r.a.jobId || ''), kind: r.a.kind }, webpush: { headers: { Urgency: 'high', TTL: '86400' } } } })
+      };
+    }));
+    let sent = 0;
+    const dead = [];
+    res.forEach(function (x, i) {
+      const code = x.getResponseCode();
+      if (code === 200) sent++;
+      else if (code === 404 || (code === 400 && /UNREGISTERED|INVALID_ARGUMENT/.test(x.getContentText()))) dead.push(meta[i]);
+      else if (code === 401) cache_().remove('fcm:at');
+    });
+    if (dead.length) {
+      const gone = {};
+      dead.forEach(function (d) { gone[d.token] = 1; });
+      const rows = readAll_(SH.PPUSH).filter(function (o) { return gone[o.token]; }).map(function (o) { return o._row; }).sort(function (a, b) { return b - a; });
+      rows.forEach(function (r) { sheet_(SH.PPUSH).deleteRow(r); });
+      dead.forEach(function (d) { cache_().remove('pmt:' + d.driverId); });
+    }
+    return sent;
+  } catch (e) {
+    console.error('푸시 전송 실패: ' + (e && e.message));
+    return 0;
+  }
+}
+/**
+ * 처음 한 번: Apps Script 편집기에서 이 함수를 골라 ▶ 실행 → 권한 허용 (외부 서비스 연결 권한)
+ * 설정이 맞으면 '푸시 준비 완료' 가, 틀리면 무엇이 틀렸는지 실행 로그에 나온다.
+ */
+function pmPushSetupCheck() {
+  const c = pmPushCfg_();
+  if (!c.web) { console.log('스크립트 속성 FCM_WEB 이 없거나 형식이 틀립니다 (apiKey, projectId, messagingSenderId, appId, vapidKey 필요).'); return; }
+  if (!c.sa) { console.log('스크립트 속성 FCM_SA 가 없거나 형식이 틀립니다 (서비스 계정 키 JSON 전체를 붙여 넣어 주세요).'); return; }
+  cache_().remove('fcm:at');
+  pmFcmToken_(c.sa);
+  console.log('푸시 준비 완료. 등록된 기기 ' + readAll_(SH.PPUSH).length + '대.');
+}
+/** 매일 새벽(세션 정리 때): 60일 지난 알림 줄을 지운다 */
+function pmAlertCleanup_() {
+  if (!sheet_(SH.PALERT)) return;
+  const from = ymd_(addDays_(new Date(), -60));
+  const rows = readAll_(SH.PALERT).filter(function (a) { return a.createdAt && String(a.createdAt).slice(0, 10) < from; }).map(function (a) { return a._row; });
+  if (!rows.length) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try { rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet_(SH.PALERT).deleteRow(r); }); }
+  finally { lock.releaseLock(); }
 }

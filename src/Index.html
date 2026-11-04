@@ -191,6 +191,21 @@
   .day .pmx { font-size: 12.5px; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; cursor: pointer; border: 0; text-align: left; font: inherit; font-size: 12.5px; }
   .day .pmx b { margin-right: 4px; }
   .day .pmx.r-수행 { background: #fff4d6; color: #8a5a00; } .day .pmx.r-맡김 { background: #e8f0fd; color: #0a53a8; } .day .pmx.r-지원 { background: #f2f4f6; color: #4e5968; }
+  .tile { position: relative; }
+  .tbdg { font-style: normal; position: absolute; top: 10px; right: 10px; min-width: 22px; height: 22px; border-radius: 999px; background: var(--danger); color: #fff !important; font-size: 12px !important; font-weight: 800 !important; display: flex; align-items: center; justify-content: center; padding: 0 6px; }
+  .pmbanner { position: fixed; left: 50%; top: 12px; transform: translate(-50%, -140%); width: min(448px, calc(100% - 24px)); background: #191f28; color: #fff; border-radius: 14px; padding: 12px 14px; z-index: 60;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25); transition: transform .25s ease-out; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; }
+  .pmbanner.on { transform: translate(-50%, 0); }
+  .pmbanner b { display: block; font-size: 15px; } .pmbanner span { display: block; font-size: 13.5px; opacity: .85; line-height: 1.45; margin-top: 2px; }
+  .pmbanner i { font-style: normal; margin-left: auto; opacity: .6; font-size: 18px; line-height: 1; padding: 2px 0 0 6px; }
+  .pmal { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: #fff; padding: 14px 16px; font: inherit; color: var(--ink); cursor: pointer; }
+  .pmal:first-child { border-top: 0; }
+  .pmal b { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; } .pmal b small { color: var(--sub); font-weight: 500; font-size: 12px; flex: none; }
+  .pmal span { display: block; font-size: 13.5px; color: #4e5968; margin-top: 3px; line-height: 1.5; }
+  .pmal.unread { background: #f3f7ff; } .pmal.unread b::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); margin: 7px 6px 0 0; flex: none; }
+  .pmal.unread b { justify-content: flex-start; } .pmal.unread b small { margin-left: auto; }
+  .pushst { font-style: normal; font-size: 13px; font-weight: 700; margin-left: auto; margin-right: 8px; color: var(--sub); }
+  .pushst.on { color: var(--ok); }
   .mc .pmdot { font-size: 9.5px; color: #8a5a00; font-weight: 700; }
   .ntcard { background: #fff; border-radius: var(--radius); padding: 14px 16px 6px; margin: 0 0 12px; }
   .ntcard h3 { margin: 0 0 6px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
@@ -477,7 +492,7 @@
       <button class="tile" id="mSched" type="button"><b>스케줄</b><span>2주·한 달 일정 보기 →</span></button>
       <div><b>정산서 보기</b><span>준비 중</span></div>
       <button class="tile" id="mPm" type="button"><b>품앗이</b><span>품앗이 일감 찾기·맡기기 →</span></button>
-      <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span></button>
+      <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
     </div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
@@ -565,6 +580,10 @@
     <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.</div>
     <div class="card" id="myCard"><div style="text-align:center;color:var(--sub)">불러오는 중…</div></div>
     <div class="mylist">
+      <button type="button" data-my="alerts">🔔 알림<em id="myAlertCnt"></em></button>
+      <button type="button" data-my="push">📲 휴대폰 알림 받기<em class="pushst" id="myPushSt"></em></button>
+    </div>
+    <div class="mylist">
       <button type="button" data-my="new">품앗이 일감 올리기</button>
       <button type="button" data-my="posted">품앗이 관리 (지원자 보기)<em id="myNew"></em></button>
       <button type="button" data-my="applied">지원한 품앗이</button>
@@ -582,6 +601,14 @@
     <p class="hint" id="pmmHint" style="margin:-6px 0 12px"></p>
     <div id="pmmList"></div>
   </section>
+
+  <section id="v-pmalerts" class="view">
+    <div class="topbar"><button class="back" id="paBack" aria-label="뒤로">←</button><h2>알림</h2>
+      <button class="btn sm ghost" id="paAll" type="button" style="margin-left:auto;height:38px">모두 읽음</button></div>
+    <div class="mylist" id="paList"></div>
+    <p class="hint" style="text-align:center">최근 30일 알림입니다. 누르면 그 일감으로 갑니다.</p>
+  </section>
+  <div class="pmbanner" id="pmBanner" role="status" aria-live="polite"><div><b id="pbT"></b><span id="pbB"></span></div><i id="pbX" aria-label="닫기">×</i></div>
 
   <section id="v-myinfo" class="view">
     <div class="topbar"><button class="back" id="miBack" aria-label="뒤로">←</button><h2>내 정보</h2></div>
@@ -714,7 +741,10 @@
 
   // ───── 시작: 자동 로그인 ─────
   // 저장된 사용자 정보가 있으면 홈을 먼저 보여주고(체감 속도), 서버 확인은 뒤에서 한다.
-  function goHome(user) { $('#homeName').textContent = (user && user.name ? user.name + ' 기사님' : '기사님') + ', 안녕하세요'; show('home'); setTimeout(() => loadNotices(), 0); }
+  function goHome(user) {
+    $('#homeName').textContent = (user && user.name ? user.name + ' 기사님' : '기사님') + ', 안녕하세요'; show('home'); setTimeout(() => loadNotices(), 0);
+    if (window.pmAlertStart) setTimeout(() => window.pmAlertStart(), 0);
+  }
   function goLogin() {
     const last = store.get(LAST_ID);
     if (last) $('#lgId').value = last;
@@ -758,6 +788,7 @@
 
   $('#logoutBtn').addEventListener('click', () => {
     const token = store.get(TOKEN);
+    if (window.pmAlertStop) window.pmAlertStop(token);
     clearSession(); goLogin();
     if (token) api('api_logout', token).catch(() => {});
   });
@@ -1201,6 +1232,7 @@
   function pmBackFromDetail() {
     if (pmDetFrom === 'sched') { show('sched'); loadSched(); }
     else if (pmDetFrom === 'mine') { show('pmmine'); loadPmMine(); }
+    else if (pmDetFrom === 'alerts') openPmAlerts();
     else { show('pumasi'); loadPmList(); }
   }
   $('#pdBack').addEventListener('click', pmBackFromDetail);
@@ -1386,7 +1418,7 @@
 
   // 마이페이지
   function openMyPage() {
-    show('mypage');
+    show('mypage'); paintAlertBadges(); paintPushState();
     const token = pmTok(); if (!token) return;
     api('api_myInfo', token).then((r) => {
       if (!pmOk(r)) return;
@@ -1407,6 +1439,8 @@
     const k = b.dataset.my;
     if (k === 'new') return openPmForm('', 'mypage');
     if (k === 'info') return show('myinfo');
+    if (k === 'alerts') return openPmAlerts();
+    if (k === 'push') return pushToggle();
     if (k === 'pw') return openChangePw(false, '');
     if (k === 'logout') return $('#logoutBtn').click();
     pmMineKind = k; show('pmmine'); loadPmMine();
@@ -1434,6 +1468,185 @@
     }).catch(() => { $('#pmmList').innerHTML = ''; netErr(); });
   }
   $('#pmmBack').addEventListener('click', openMyPage);
+
+  // ───── 품앗이 알림: ① 앱을 켜 둔 동안 30초마다 확인해 화면 위에 띄움 ② 휴대폰 푸시(앱을 닫아도) ─────
+  const PM_SEEN = 'runner.pmSeen', PUSH_TOK = 'runner.fcmTok';
+  let paVer = '', paList = [], paUnread = 0, paTimer = 0, paBusy = false, paTok = '', paFirst = true;
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
+  const seenGet = () => { try { return JSON.parse(lsGet(PM_SEEN) || '[]'); } catch (e) { return []; } };
+  function paintAlertBadges() {
+    const n = paUnread;
+    ['#mMyBdg'].forEach((sel) => { const b = $(sel); if (!b) return; b.textContent = n > 99 ? '99+' : String(n); b.classList.toggle('hidden', !n); });
+    const c = $('#myAlertCnt'); if (c) c.innerHTML = n ? '<span class="bdg nw">' + n + '</span>' : '';
+  }
+  let bannerTimer = 0, bannerJob = '';
+  function showBanner(title, body, jobId) {
+    $('#pbT').textContent = title; $('#pbB').textContent = body || ''; bannerJob = jobId || '';
+    const b = $('#pmBanner'); b.classList.add('on');
+    try { if (navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch (e) {}
+    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 7000);
+  }
+  $('#pmBanner').addEventListener('click', (e) => {
+    $('#pmBanner').classList.remove('on');
+    if (e.target.closest('#pbX') || !bannerJob) return;
+    const a = paList.find((x) => x.jobId === bannerJob && !x.read);
+    if (a) markAlerts([a.id]);
+    openPmDetail(bannerJob, 'pumasi');
+  });
+  /** 새 알림이 오면: 배너, 배지, 보고 있는 화면 새로고침 */
+  function onNewAlerts(fresh) {
+    if (!fresh.length) return;
+    const top = fresh[0];
+    showBanner(top.title + (fresh.length > 1 ? ' 외 ' + (fresh.length - 1) + '건' : ''), top.text, top.jobId);
+    const ids = new Set(fresh.map((a) => a.jobId));
+    if ($('#v-pmdetail').classList.contains('on') && ids.has(pmCurId)) loadPmDetail();
+    else if ($('#v-pumasi').classList.contains('on')) loadPmList();
+    else if ($('#v-pmmine').classList.contains('on')) loadPmMine();
+    else if ($('#v-pmalerts').classList.contains('on')) renderPmAlerts();
+    else if ($('#v-sched').classList.contains('on')) loadSched();
+  }
+  function pollAlerts(force) {
+    const token = store.get(TOKEN);
+    if (!token || paBusy) return;
+    if (token !== paTok) { paTok = token; paVer = ''; paList = []; paUnread = 0; paFirst = true; }
+    if (!force && document.hidden) return;
+    paBusy = true;
+    api('api_pmAlerts', token, paVer).then((r) => {
+      if (!r || !r.ok) { if (r && r.code === 'EXPIRED') pmAlertStop(); return; }
+      paVer = r.ver;
+      if (r.same) return;
+      paList = r.alerts || []; paUnread = r.unread || 0; paintAlertBadges();
+      // 배너는 아직 안 띄운 '안 읽은' 알림만 (처음 열 때는 최근 하루 것만)
+      const seen = seenGet(), dayAgo = Date.now() - 86400000;
+      const fresh = paList.filter((a) => !a.read && !seen.includes(a.id) && (!paFirst || new Date(String(a.at).replace(' ', 'T')).getTime() > dayAgo));
+      lsSet(PM_SEEN, JSON.stringify(seen.concat(paList.map((a) => a.id)).slice(-300)));
+      paFirst = false;
+      onNewAlerts(fresh);
+    }).catch(() => {}).finally(() => { paBusy = false; });
+  }
+  window.pmAlertStart = function () {
+    if (!paTimer) paTimer = setInterval(() => pollAlerts(false), 30000);
+    pollAlerts(true);
+    pushRefresh();
+  };
+  window.pmAlertStop = function (token) {
+    clearInterval(paTimer); paTimer = 0; paVer = ''; paList = []; paUnread = 0; paTok = ''; paintAlertBadges();
+    const t = lsGet(PUSH_TOK);
+    if (t && token) { api('api_pmPushDel', token, t).catch(() => {}); lsSet(PUSH_TOK, null); }
+  };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && paTimer) pollAlerts(true); });
+  function markAlerts(ids) {
+    const token = store.get(TOKEN); if (!token) return Promise.resolve();
+    paList.forEach((a) => { if (ids === 'all' || ids.includes(a.id)) { if (!a.read) paUnread = Math.max(0, paUnread - 1); a.read = true; } });
+    paintAlertBadges();
+    return api('api_pmAlertsRead', token, ids).then((r) => { if (r && r.ok) { paVer = ''; } }).catch(() => {});
+  }
+  // 알림 목록 화면
+  const agoText = (at) => {
+    const t = new Date(String(at).replace(' ', 'T')).getTime(), m = Math.floor((Date.now() - t) / 60000);
+    if (!(m >= 0)) return String(at).slice(5, 16);
+    if (m < 1) return '방금'; if (m < 60) return m + '분 전'; if (m < 1440) return Math.floor(m / 60) + '시간 전';
+    return String(at).slice(5, 10).replace('-', '/');
+  };
+  function renderPmAlerts() {
+    $('#paList').innerHTML = paList.length ? paList.map((a) => '<button type="button" class="pmal' + (a.read ? '' : ' unread') + '" data-al="' + escH(a.id) + '" data-pj="' + escH(a.jobId) + '">' +
+      '<b>' + escH(a.title) + '<small>' + escH(agoText(a.at)) + '</small></b><span>' + escH(a.text) + '</span></button>').join('')
+      : '<div class="pmempty">아직 알림이 없습니다.</div>';
+  }
+  function openPmAlerts() { show('pmalerts'); renderPmAlerts(); paVer = ''; pollAlerts(true); }
+  $('#paBack').addEventListener('click', openMyPage);
+  $('#paAll').addEventListener('click', () => { markAlerts('all'); renderPmAlerts(); });
+  $('#paList').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-al]'); if (!b) return;
+    markAlerts([b.dataset.al]);
+    if (b.dataset.pj) openPmDetail(b.dataset.pj, 'alerts');
+  });
+
+  // ── 휴대폰 푸시 (깃허브 페이지에서 연 앱 + 알림 허용한 기기만) ──
+  const FB_VER = '10.12.2';
+  const pushCapable = () => !!(window.RUNNER_CONFIG && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document);
+  const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  let pushCfg = null, fbMsg = null;
+  function loadScript(src) {
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('알림 도구를 불러오지 못했습니다.')); document.head.appendChild(s); });
+  }
+  function getPushCfg() {
+    if (pushCfg) return Promise.resolve(pushCfg);
+    return api('api_pmPushConfig', store.get(TOKEN)).then((r) => { if (r && r.ok) pushCfg = r; return pushCfg || { on: false }; });
+  }
+  async function fbToken(cfg) {
+    if (!window.firebase) {
+      await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-messaging-compat.js');
+    }
+    if (!fbMsg) { if (!firebase.apps.length) firebase.initializeApp(cfg.web); fbMsg = firebase.messaging(); }
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    return fbMsg.getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: reg });
+  }
+  const deviceName = () => { const u = navigator.userAgent; return (/iPhone/.test(u) ? '아이폰' : /iPad/.test(u) ? '아이패드' : /Android/.test(u) ? '안드로이드' : 'PC') + (/SamsungBrowser/.test(u) ? ' 삼성인터넷' : /CriOS|Chrome/.test(u) ? ' 크롬' : /Safari/.test(u) ? ' 사파리' : ''); };
+  function paintPushState() {
+    const el = $('#myPushSt'); if (!el) return;
+    el.className = 'pushst';
+    if (!pushCapable()) { el.textContent = window.RUNNER_CONFIG ? '이 기기 미지원' : '앱에서만'; return; }
+    if (isIOS && !standalone()) { el.textContent = '홈 화면 설치 필요'; return; }
+    if (Notification.permission === 'denied') { el.textContent = '차단됨'; return; }
+    if (lsGet(PUSH_TOK) && Notification.permission === 'granted') { el.textContent = '켜짐'; el.classList.add('on'); return; }
+    el.textContent = '꺼짐';
+  }
+  /** 앱을 열 때: 이미 켠 기기면 토큰을 새로 받아 서버와 맞춘다 (바뀌었을 수 있음) */
+  function pushRefresh() {
+    if (!pushCapable() || !lsGet(PUSH_TOK) || Notification.permission !== 'granted') return;
+    getPushCfg().then((cfg) => {
+      if (!cfg.on) return;
+      return fbToken(cfg).then((t) => { if (t) { lsSet(PUSH_TOK, t); return api('api_pmPushSave', store.get(TOKEN), t, deviceName()); } });
+    }).catch(() => {});
+  }
+  async function pushToggle() {
+    if (!pushCapable()) return toast(window.RUNNER_CONFIG ? '이 휴대폰·브라우저는 알림을 받을 수 없습니다. 크롬이나 사파리로 열어 주세요.' : '설치한 러너 앱(깃허브 주소)에서 켤 수 있습니다.');
+    if (isIOS && !standalone()) return pmAsk('홈 화면에 먼저 설치해 주세요', '아이폰은 러너 앱을 홈 화면에 설치한 뒤에만 알림을 받을 수 있습니다 (iOS 16.4 이상).\n\n사파리 아래쪽 공유 버튼(□↑) → 홈 화면에 추가 → 설치한 아이콘으로 열고 다시 켜 주세요.', '확인');
+    const token = store.get(TOKEN); if (!token) return;
+    const cur = lsGet(PUSH_TOK);
+    if (cur && Notification.permission === 'granted') {
+      const v = await pmAsk('휴대폰 알림을 끌까요?', '앱을 열어 둔 동안의 화면 알림은 계속 받습니다.', '끄기');
+      if (v === null) return;
+      try { if (fbMsg) await fbMsg.deleteToken(); } catch (e) {}
+      api('api_pmPushDel', token, cur).catch(() => {}); lsSet(PUSH_TOK, null); paintPushState(); return toast('휴대폰 알림을 껐습니다.');
+    }
+    loading(true, '알림 켜는 중…');
+    try {
+      const cfg = await getPushCfg();
+      if (!cfg.on) { loading(false); return toast('아직 휴대폰 알림이 준비되지 않았습니다. 사무실에 문의해 주세요.'); }
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { loading(false); paintPushState(); return toast(perm === 'denied' ? '알림이 차단되어 있습니다. 휴대폰 설정 → 앱(브라우저) → 알림에서 허용해 주세요.' : '알림을 허용해야 받을 수 있습니다.'); }
+      const t = await fbToken(cfg);
+      if (!t) throw new Error('기기 등록에 실패했습니다.');
+      const r = await api('api_pmPushSave', token, t, deviceName());
+      if (!pmOk(r)) return;
+      lsSet(PUSH_TOK, t); paintPushState(); toast('휴대폰 알림을 켰습니다. 앱을 닫아도 배차 소식이 옵니다.');
+    } catch (e) {
+      toast((e && e.message) || '알림을 켜지 못했습니다.');
+    } finally { loading(false); }
+  }
+  // 알림을 눌러 앱이 열렸을 때 (?pm=일감ID) / 앱이 열려 있을 때 서비스 워커가 보낸 소식
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === 'pm-open' && d.jobId && store.get(TOKEN)) openPmDetail(d.jobId, 'alerts');
+    else if (d.type === 'pm-push') pollAlerts(true);
+  });
+  (function openFromLink() {
+    const m = location.search.match(/[?&]pm=([\w-]+)/);
+    if (!m) return;
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    const wait = setInterval(() => {
+      if (!store.get(TOKEN)) return;
+      if ($('#v-home').classList.contains('on')) { clearInterval(wait); openPmDetail(m[1], 'alerts'); }
+    }, 300);
+    setTimeout(() => clearInterval(wait), 20000);
+  })();
+
   $('#pmmList').addEventListener('click', (e) => { const c = e.target.closest('[data-pj]'); if (c) openPmDetail(c.dataset.pj, 'mine'); });
 
 

@@ -41,7 +41,7 @@ const CFG = {
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
-  PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps' };
+  PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -268,10 +268,14 @@ const PJ_NOTES = {
 };
 const PA = { id: '지원ID', jobId: '일감ID', driverId: '지원 기사ID', name: '지원 기사', date: '배차일자', status: '상태', memo: '한마디', createdAt: '지원일시', updatedAt: '수정일시' };
 const PA_NOTES = { status: '지원 / 협의 중 / 확정 / 미선정 / 지원 취소' };
+// 품앗이 알림: 기사 1명에게 가는 알림 1건 = 1줄 (앱 안 알림 + 휴대폰 푸시)
+const PN = { id: '알림ID', driverId: '받는 기사ID', name: '받는 기사', jobId: '일감ID', kind: '종류', text: '내용', createdAt: '보낸일시', readAt: '읽은일시' };
+// 휴대폰 푸시 받는 기기: 기사가 '휴대폰 알림 받기'를 켠 기기 1대 = 1줄. 지우면 그 기기로는 안 감
+const PT = { token: '기기 토큰', driverId: '기사ID', name: '기사', device: '기기', createdAt: '등록일시', lastOk: '마지막 전송' };
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -290,6 +294,8 @@ SCHEMA[SH.ACC] = AC;
 SCHEMA[SH.ACAT] = ACAT;
 SCHEMA[SH.PJOB] = PJ;
 SCHEMA[SH.PAPP] = PA;
+SCHEMA[SH.PALERT] = PN;
+SCHEMA[SH.PPUSH] = PT;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -1239,6 +1245,7 @@ function onSheetEdit(e) {
       else if (name === SH.PRICES) fixPriceRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
       else if (name === SH.PJOB || name === SH.PAPP) pmTouch_();
+      else if (name === SH.PALERT) pmAlertBump_(o.driverId);
     });
     if (campRenamed) syncCampNames_();
   } finally {
@@ -3077,6 +3084,7 @@ function cleanupSessions() {
     if (keep.length) sh.getRange(2, 1, keep.length, c.__w).setNumberFormat('@').setValues(keep);
   } finally {
     lock.releaseLock();
+    try { pmAlertCleanup_(); } catch (e) { console.error('품앗이 알림 정리 실패: ' + (e && e.message)); } // 60일 지난 품앗이 알림 정리
   }
 }
 
