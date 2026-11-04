@@ -115,6 +115,8 @@ const M = {
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전해서 자동으로 추가하는 열 (시트별)
 const AUTO_ADD_COLS = { work_memo: ['cat'] };
+// 예전 버전이 쓰던 머리글 (지금은 정산 DB 로 옮겨짐). 남아 있어도 '이름 바뀐 머리글'로 보지 않는다
+const LEGACY_HEADS = { drivers: ['정산 대상 기사ID', '정산 방식', '산재·고용 제외', '프레시백 차감', '기사 일시단가', '기사 일시단가 노선', '기사 일시단가 시작일', '기사 일시단가 종료일'] };
 const M_NOTES = {
   date: '2026-11-03 형식. 2026.11.3, 2026/11/3 처럼 입력해도 자동으로 맞춰집니다.',
   time: '선택. 09:30 형식 (24시간)',
@@ -193,9 +195,10 @@ const COMPANY = [
   ['branchPhone', '영업점 연락처', '010-9599-0808'],
   ['branchBizNo', '영업점 사업자번호', '654-37-01141'],
   ['court', '관할법원 (OO지방법원의 OO)', '서울중앙'],
-  ['branchBizType', '영업점 업태', '운수 및 창고업'],
-  ['branchBizItem', '영업점 종목', '택배업'],
-  ['branchEmail', '영업점 이메일 (세금계산서)', '']
+  // ↓ 세금계산서 역발행(공급받는자)에만 쓰는 항목 — 배번호 서류의 빈 항목 검사에서는 뺀다
+  ['branchBizType', '영업점 업태', '운수 및 창고업', 'tax'],
+  ['branchBizItem', '영업점 종목', '택배업', 'tax'],
+  ['branchEmail', '영업점 이메일 (세금계산서)', '', 'tax']
 ];
 const COMPANY_SHEET = 'company';
 
@@ -563,7 +566,7 @@ function sheet_(name) {
   if (_sheets[name]) return _sheets[name];
   let sh = ss_().getSheetByName(name);
   if (!sh && AUTO_CREATE.indexOf(name) >= 0) {
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try { if (!ss_().getSheetByName(name)) ensureColumns_([name]); } finally { lock.releaseLock(); }
     sh = ss_().getSheetByName(name);
@@ -592,7 +595,12 @@ function cols_(name, fresh) {
     const i = head.indexOf(def[k]);
     if (i < 0) missing.push(def[k]); else c[k] = i;
   });
-  const autoable = missing.length && (AUTO_CREATE.indexOf(name) >= 0 || (name === SH.DRIVERS &&
+  // 시트에 모르는 머리글이 없으면(= 누가 머리글 이름을 바꾼 게 아니면) 새로 생긴 열은 그냥 추가해도 안전하다
+  const known = Object.keys(def).map(function (k) { return def[k]; }).concat(LEGACY_HEADS[name] || []);
+  const core = [def[Object.keys(def)[0]]].concat((HIDDEN[name] || []).map(function (k) { return def[k]; }));
+  const noRename = head.every(function (h) { return !h || known.indexOf(h) >= 0; }) &&
+    missing.every(function (l) { return core.indexOf(l) < 0; });
+  const autoable = missing.length && (noRename || AUTO_CREATE.indexOf(name) >= 0 || (name === SH.DRIVERS &&
     missing.every(function (label) { return D_AUTO_ADD.some(function (k) { return D[k] === label; }); })) ||
     (AUTO_ADD_COLS[name] && missing.every(function (label) { return AUTO_ADD_COLS[name].some(function (k) { return def[k] === label; }); })));
   if (autoable) {
@@ -607,7 +615,7 @@ function cols_(name, fresh) {
 }
 /** 빈 열을 오른쪽 끝에 추가 (안전한 새 열만 자동 추가에 사용) */
 function addHeaders_(name, labels) {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(20000);
   try {
     const sh = sheet_(name);
@@ -623,13 +631,45 @@ function addHeaders_(name, labels) {
     clearHeadCache_(name);
   }
 }
+/** 여러 줄 지우기: 아래 줄부터, 붙어 있는 줄은 한 번에 (줄 번호가 밀리지 않게) */
+function delRows_(sh, rows) {
+  const rs = rows.filter(function (r, i, a) { return r >= 2 && a.indexOf(r) === i; }).sort(function (a, b) { return b - a; });
+  for (let i = 0; i < rs.length;) {
+    let j = i + 1;
+    while (j < rs.length && rs[j] === rs[j - 1] - 1) j++;
+    sh.deleteRows(rs[j - 1], j - i);
+    i = j;
+  }
+  return rs.length;
+}
 function clearHeadCache_(name) { delete _cols[name]; cache_().remove('hc:' + name); }
+
+// ───────────────────────── 잠금 (겹쳐 잡아도 안전) ─────────────────────────
+/**
+ * LockService 스크립트 잠금을 감싼 것. 잠금 안에서 부른 함수가 또 잠금을 잡았다 풀어도
+ * 바깥 잠금이 먼저 풀리지 않도록 횟수를 센다 (열 자동 추가·시트 자동 생성이 저장 중에 일어나는 경우 등).
+ */
+var _lockN = 0, _lockObj = null;
+function scriptLock_() {
+  let mine = false;
+  const real = function () { return _lockObj || (_lockObj = LockService.getScriptLock()); };
+  return {
+    waitLock: function (ms) { if (mine) return; if (_lockN === 0) real().waitLock(ms); _lockN++; mine = true; },
+    tryLock: function (ms) { if (mine) return true; if (_lockN === 0 && !real().tryLock(ms)) return false; _lockN++; mine = true; return true; },
+    hasLock: function () { return mine; },
+    releaseLock: function () { if (!mine) return; mine = false; _lockN = Math.max(0, _lockN - 1); if (_lockN === 0) real().releaseLock(); }
+  };
+}
 
 // ───────────────────────── 응답 래퍼 ─────────────────────────
 function run_(fn) {
   try { return fn(); }
   catch (err) {
     if (err && err.userMsg) return err.code ? { ok: false, code: err.code, msg: err.userMsg } : { ok: false, msg: err.userMsg };
+    if (/lock timeout|lock.*too long|잠금.*(시간|초과)/i.test(String(err && err.message || err))) {
+      console.warn('잠금 대기 시간 초과: ' + (err && err.message));
+      return { ok: false, code: 'BUSY', msg: '다른 저장 작업이 처리 중입니다. 잠시 후 다시 시도해 주세요.' };
+    }
     console.error(err && err.stack ? err.stack : err);
     return { ok: false, msg: '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' };
   }
@@ -738,9 +778,31 @@ function safeText_(v) {
 }
 function writeFields_(name, row, fields) {
   const c = cols_(name, true), sh = sheet_(name);
-  Object.keys(fields).forEach(function (k) {
-    sh.getRange(row, c[k] + 1).setNumberFormat('@').setValue(safeText_(fields[k]));
-  });
+  // 붙어 있는 열은 한 번에 쓴다 (호출 수 줄이기). 사이에 낀 다른 열은 건드리지 않는다.
+  const cells = Object.keys(fields).filter(function (k) { return c[k] !== undefined; })
+    .map(function (k) { return [c[k], safeText_(fields[k])]; }).sort(function (a, b) { return a[0] - b[0]; });
+  for (let i = 0; i < cells.length;) {
+    let j = i + 1;
+    while (j < cells.length && cells[j][0] === cells[j - 1][0] + 1) j++;
+    const vals = [cells.slice(i, j).map(function (x) { return x[1]; })];
+    sh.getRange(row, cells[i][0] + 1, 1, j - i).setNumberFormat('@').setValues(vals);
+    i = j;
+  }
+}
+/**
+ * 잠금 안에서 행 번호가 그대로인지(그 사이 다른 줄이 지워져 밀리지 않았는지) 확인하고 쓴다.
+ * 밀렸으면 key 값으로 줄을 다시 찾는다. 못 찾으면 0.
+ */
+function writeByKey_(name, key, value, row, fields) {
+  const lock = scriptLock_();
+  lock.waitLock(20000);
+  try {
+    let r = row;
+    if (r) { const o = readObj_(name, r); if (!o || o[key] !== String(value)) r = 0; }
+    if (!r) r = findRow_(name, key, value);
+    if (r) writeFields_(name, r, fields);
+    return r;
+  } finally { lock.releaseLock(); }
 }
 /** 잠금 안에서만 호출: 마지막 행 다음 줄에 객체를 한 번에 쓴다 */
 function appendObj_(name, obj) {
@@ -1045,8 +1107,7 @@ function api_logout(token) {
     if (!token) return { ok: true };
     const th = tokenHash_(token);
     cache_().remove('ss:' + th);
-    const row = findRow_(SH.SESSIONS, 'tokenHash', th);
-    if (row) writeFields_(SH.SESSIONS, row, { expiresAt: nowText_() });
+    writeByKey_(SH.SESSIONS, 'tokenHash', th, 0, { expiresAt: nowText_() });
     return { ok: true };
   });
 }
@@ -1093,7 +1154,7 @@ function api_signup(form, files) {
     }
 
     // 3) 저장 (짧게 잠금 → 재확인 → 한 줄 추가)
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       if (findRow_(SH.DRIVERS, 'loginId', f.loginId) || findRow_(SH.DRIVERS, 'rrnIndex', rrnIdx)) {
@@ -1182,7 +1243,7 @@ function api_resetPassword(resetToken, newPassword) {
     const fields = passwordFields_(pw);
     fields.updatedAt = fields.pwChangedAt;
     fields.pwMustChange = '';
-    writeFields_(SH.DRIVERS, o._row, fields);
+    if (!writeByKey_(SH.DRIVERS, 'id', o.id, o._row, fields)) fail_('회원 정보를 찾을 수 없습니다.');
     forgetDriver_(o);
     return { ok: true, msg: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.' };
   });
@@ -1215,12 +1276,11 @@ function api_changePassword(token, currentPassword, newPassword) {
     const fields = passwordFields_(pw);
     fields.updatedAt = fields.pwChangedAt;
     fields.pwMustChange = '';
-    writeFields_(SH.DRIVERS, o._row, fields);
+    if (!writeByKey_(SH.DRIVERS, 'id', o.id, o._row, fields)) return expired;
     forgetDriver_(o);
     // 지금 쓰던 로그인은 바로 만료시키고 새 로그인으로 교체
     cache_().remove('ss:' + s.th);
-    const oldRow = findRow_(SH.SESSIONS, 'tokenHash', s.th);
-    if (oldRow) writeFields_(SH.SESSIONS, oldRow, { expiresAt: msText_(Date.now() - 1000) });
+    writeByKey_(SH.SESSIONS, 'tokenHash', s.th, 0, { expiresAt: msText_(Date.now() - 1000) });
     const ns = createSession_(o.id, !!s.a);
     return { ok: true, token: ns.token, expiresAt: ns.expiresAt, msg: '비밀번호가 변경되었습니다.' };
   });
@@ -1251,7 +1311,7 @@ function onSheetEdit(e) {
     if (AUTO_SHEETS.indexOf(name) >= 0) bumpMaster_();
     if (n === 1) return;
   }
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   if (!lock.tryLock(15000)) return;
   try {
     const c = cols_(name, true);
@@ -1474,7 +1534,7 @@ function adm_changePassword(token, currentPassword, newPassword) {
     }
     cache_().remove(fk);
     if (pw === String(currentPassword)) fail_('새 비밀번호는 현재 비밀번호와 다르게 정해 주세요.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     let ns;
     try {
@@ -1594,7 +1654,7 @@ function adm_listDrivers(token) {
  * 반환: [{ name, oldId, newId }]
  */
 function repairDriverIds_(a) {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(30000);
   const out = [];
   try {
@@ -1642,8 +1702,7 @@ function repairDriverIds_(a) {
 
     // 겹친 ID 로 열린 로그인 해제
     const ss = readAll_(SH.SESSIONS).filter(function (x) { return dupIds[x.driverId]; });
-    ss.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
-      .forEach(function (r) { sheet_(SH.SESSIONS).deleteRow(r); });
+    delRows_(sheet_(SH.SESSIONS), ss.map(function (x) { return x._row; }));
     if (ss.length) cache_().removeAll(ss.map(function (x) { return 'ss:' + x.tokenHash; }));
 
     logAdmin_(a, '기사ID 중복 정리', out.length + '명',
@@ -1686,7 +1745,7 @@ function adm_updateDriver(token, id, changes, seenRev) {
   return run_(function () {
     const a = requireAdmin_(token);
     changes = changes || {};
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const o = driverById_(String(id || ''));
@@ -1852,7 +1911,7 @@ function adm_createDriver(token, fields, tempPw) {
     if (!fields.status) fields.status = ST.ACTIVE;
     const pw = tempPw ? checkPw_(tempPw) : '';
     if (pw && !str_(fields.loginId)) fail_('앱 로그인용 비밀번호를 지정하려면 쿠팡플렉스 아이디를 입력해 주세요.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const r = driverFields_(fields, { _row: -1, loginId: '', approvedAt: '' });
@@ -1882,7 +1941,7 @@ function adm_deleteDriver(token, id, confirmName) {
   return run_(function () {
     const a = requireAdmin_(token);
     let o, folderId = '';
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       o = driverById_(String(id || ''));
@@ -1892,8 +1951,7 @@ function adm_deleteDriver(token, id, confirmName) {
       forgetDriver_(o);
       // 이 기사의 로그인 기록 지우기
       const ss = readAll_(SH.SESSIONS).filter(function (x) { return x.driverId === o.id; });
-      ss.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
-        .forEach(function (r) { sheet_(SH.SESSIONS).deleteRow(r); });
+      delRows_(sheet_(SH.SESSIONS), ss.map(function (x) { return x._row; }));
       if (ss.length) cache_().removeAll(ss.map(function (x) { return 'ss:' + x.tokenHash; }));
       folderId = (String(o.docFolder || '').match(/folders\/([A-Za-z0-9_-]{10,})/) || [])[1] || fileIdOf_(o.docFolder);
       logAdmin_(a, '기사 삭제', o.name + ' (' + o.id + ')', [o.driverType, o.driverCode].filter(String).join(' ') + (ss.length ? ', 로그인 ' + ss.length + '건 해제' : ''));
@@ -1938,19 +1996,17 @@ function adm_deleteDrivers(token, ids, confirm) {
     if (!n) fail_('삭제할 기사를 골라 주세요.');
     if (n > 500) fail_('한 번에 500명까지 삭제할 수 있습니다.');
     if (str_(confirm).replace(/\s+/g, '') !== n + '명삭제') fail_('확인 문구가 다릅니다. "' + n + '명 삭제" 를 그대로 입력해 주세요. 삭제하지 않았습니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     let hit = [];
     try {
       hit = readAll_(SH.DRIVERS).filter(function (o) { return o.id && want[o.id]; });
-      hit.map(function (o) { return o._row; }).sort(function (p, q) { return q - p; })
-        .forEach(function (r) { sheet_(SH.DRIVERS).deleteRow(r); });
+      delRows_(sheet_(SH.DRIVERS), hit.map(function (o) { return o._row; }));
       hit.forEach(forgetDriver_);
       const gone = {};
       hit.forEach(function (o) { gone[o.id] = 1; });
       const ss = readAll_(SH.SESSIONS).filter(function (x) { return gone[x.driverId]; });
-      ss.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; })
-        .forEach(function (r) { sheet_(SH.SESSIONS).deleteRow(r); });
+      delRows_(sheet_(SH.SESSIONS), ss.map(function (x) { return x._row; }));
       if (ss.length) cache_().removeAll(ss.map(function (x) { return 'ss:' + x.tokenHash; }));
       if (hit.length) {
         logAdmin_(a, '기사 삭제', hit.length + '명', hit.slice(0, 40).map(function (o) { return o.name + ' (' + o.id + ')'; }).join(', ') +
@@ -1975,10 +2031,11 @@ function adm_setTempPassword(token, id, password) {
     const f = passwordFields_(pw);
     f.pwMustChange = 'Y';
     f.updatedAt = f.pwChangedAt;
-    writeFields_(SH.DRIVERS, o._row, f);
+    const row = writeByKey_(SH.DRIVERS, 'id', o.id, o._row, f);
+    if (!row) fail_('기사를 찾을 수 없습니다.');
     forgetDriver_(o);
     logAdmin_(a, '임시 비밀번호 지정', o.name + ' (' + o.id + ')', '');
-    return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, o._row)) };
+    return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, row)) };
   });
 }
 
@@ -2102,7 +2159,7 @@ function adm_memoSave(token, memo) {
     if (memo.done !== undefined) f.done = memo.done ? 'Y' : '';
     if (memo.cat !== undefined) f.cat = str_(memo.cat).slice(0, 30);
 
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -2130,7 +2187,7 @@ function adm_memoSave(token, memo) {
 function adm_memoDelete(token, id) {
   return run_(function () {
     requireAdmin_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.MEMO, 'id', String(id || ''));
@@ -2255,7 +2312,7 @@ function adm_noticeSave(token, n) {
     if (n.start && !f.start) fail_('게시 시작일을 확인해 주세요.');
     if (n.end && !f.end) fail_('게시 종료일을 확인해 주세요.');
     if (f.start && f.end && f.end < f.start) fail_('게시 종료일이 시작일보다 빠릅니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -2280,7 +2337,7 @@ function adm_noticeSave(token, n) {
 function adm_noticeDelete(token, id) {
   return run_(function () {
     const a = requireAdmin_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.NOTICE, 'id', String(id || ''));
@@ -2372,7 +2429,7 @@ function adm_accSave(token, x) {
       f.pwChangedAt = pw ? todayText_() : '';
       pwChanged = true;
     }
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -2399,7 +2456,12 @@ function adm_accSave(token, x) {
 /** 분류 이름 목록 (순서대로). 시트가 비어 있으면 기본 분류로 채운다 */
 function accCats_() {
   const rows = readAll_(SH.ACAT).filter(function (o) { return o.name; });
-  if (!rows.length) { accCatWrite_(ACC_CATS); return ACC_CATS.slice(); }
+  if (!rows.length) {
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try { if (!readAll_(SH.ACAT).some(function (o) { return o.name; })) accCatWrite_(ACC_CATS); } finally { lock.releaseLock(); }
+    return accCats_();
+  }
   rows.sort(function (a, b) { return (Number(a.order) || 999) - (Number(b.order) || 999) || a._row - b._row; });
   const out = [];
   rows.forEach(function (o) { if (out.indexOf(o.name) < 0) out.push(o.name); });
@@ -2447,7 +2509,7 @@ function adm_accCats(token, op) {
   return run_(function () {
     const a = requireAdmin_(token);
     op = op || {};
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       let cats = accCats_(), msg = '';
@@ -2506,7 +2568,7 @@ function adm_accReveal(token, id, why) {
 function adm_accDelete(token, id) {
   return run_(function () {
     const a = requireAdmin_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.ACC, 'id', String(id || ''));
@@ -2565,7 +2627,8 @@ function ensureCompany_() {
 function companyInfo_() {
   const sh = ss_().getSheetByName(COMPANY_SHEET);
   const out = {};
-  COMPANY.forEach(function (c) { out[c[0]] = ''; });
+  // 시트에 아직 없는 항목(코드 업데이트로 새로 생긴 항목)은 기본값. 시트에서 비워 둔 값은 빈칸 그대로
+  COMPANY.forEach(function (c) { out[c[0]] = c[2] || ''; });
   if (!sh) return out;
   const last = sh.getLastRow();
   if (last < 2) return out;
@@ -2621,7 +2684,7 @@ function bibMissing_(d, app, co) {
   need(app.applyDate, '신청일'); need(app.contractStart, '계약 시작일'); need(app.contractEnd, '계약 종료일');
   need(app.careerStart && app.careerEnd, '경력기간'); need(app.carNo, '차량번호');
   need(app.fuel, '연료'); need(app.bodyType, '형태'); need(app.manageMethod, '허가 후 관리 방법');
-  COMPANY.forEach(function (c) { need(co[c[0]], '회사 정보: ' + c[1]); });
+  COMPANY.forEach(function (c) { if (c[3] !== 'tax') need(co[c[0]], '회사 정보: ' + c[1]); });
   return miss;
 }
 function readAll_(name) {
@@ -2719,7 +2782,7 @@ function adm_bibSave(token, data) {
     if (f.contractStart && f.contractEnd && f.contractEnd < f.contractStart) fail_('계약 종료일이 시작일보다 빠릅니다.');
     if (f.careerStart && f.careerEnd && f.careerEnd < f.careerStart) fail_('경력 종료가 시작보다 빠릅니다.');
 
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -2773,7 +2836,7 @@ function adm_bibSave(token, data) {
 function adm_bibStatus(token, id, action, value) {
   return run_(function () {
     const a = requireAdmin_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const app = bibById_(id);
@@ -2811,7 +2874,7 @@ function adm_bibStatus(token, id, action, value) {
 function adm_bibDelete(token, id) {
   return run_(function () {
     const a = requireAdmin_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const app = bibById_(id);
@@ -2855,9 +2918,10 @@ function adm_bibPrint(token, id, allowMissing) {
     };
     const f = { printedAt: nowText_(), snapshotEnc: encrypt_(JSON.stringify(data)), updatedAt: nowText_() };
     if (app.status === BST.DRAFT) f.status = BST.PRINTED;
-    writeFields_(SH.BIB, app._row, f);
+    const row = writeByKey_(SH.BIB, 'id', app.id, app._row, f);
+    if (!row) fail_('신청서를 찾을 수 없습니다.');
     logAdmin_(a, '배번호 서류 출력', d.name + ' (' + d.id + ')', '서류 4종' + (missing.length ? ' (빈 항목 ' + missing.length + '개)' : ''));
-    return { ok: true, data: data, detail: bibDetail_(readObj_(SH.BIB, app._row)) };
+    return { ok: true, data: data, detail: bibDetail_(readObj_(SH.BIB, row)) };
   });
 }
 
@@ -3015,7 +3079,7 @@ function folderFromUrl_(url) {
 }
 
 function linkUploadedDocs_() {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   if (!lock.tryLock(30000)) {
     writeDocResult_([], '다른 작업이 진행 중입니다. 잠시 후 다시 체크해 주세요.');
     return { busy: true };
@@ -3107,7 +3171,7 @@ function onSheetChange(e) {
 
 /** 매일 새벽 만료된 세션을 한 번에 정리 (setup 에서 트리거 등록) */
 function cleanupSessions() {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(30000);
   try {
     const sh = sheet_(SH.SESSIONS), c = cols_(SH.SESSIONS, true);
@@ -3311,7 +3375,7 @@ function adm_campSave(token, f) {
     const rot = f.rot === undefined ? undefined : normRot_(f.rot).join(',');
     if (rot === '') fail_('기본 회전을 하나 이상 골라 주세요.');
     const addrs = f.addresses === undefined ? undefined : cleanAddrs_(f.addresses);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const camps = readAll_(SH.CAMPS).filter(function (o) { return o.id || o.name; });
@@ -3349,7 +3413,7 @@ function adm_campDelete(token, id) {
   return run_(function () {
     const a = requireAdmin_(token);
     id = String(id || '');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     let files = [];
     try {
@@ -3425,7 +3489,7 @@ function adm_campImageAdd(token, campId, img) {
     const ext = /png/.test(img.mime) ? '.png' : /webp/.test(img.mime) ? '.webp' : '.jpg';
     const fname = (camp.name + '_' + (desc.split('\n')[0].slice(0, 30) || '이미지') + '_' + id).replace(/[\\\/:*?"<>|]/g, ' ') + ext;
     const file = campImgFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(img.data), img.mime, fname));
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const max = readAll_(SH.CIMG).filter(function (x) { return x.campId === camp.id; })
@@ -3452,7 +3516,7 @@ function adm_campImageSave(token, id, f) {
     requireAdmin_(token);
     f = f || {};
     const desc = cleanDesc_(f.desc);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.CIMG, 'id', String(id || ''));
@@ -3472,7 +3536,7 @@ function adm_campImageOrder(token, campId, ids) {
   return run_(function () {
     requireAdmin_(token);
     ids = (ids || []).map(String);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const rows = {};
@@ -3493,7 +3557,7 @@ function adm_campImageDelete(token, id) {
   return run_(function () {
     requireAdmin_(token);
     let fileId = '';
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.CIMG, 'id', String(id || ''));
@@ -3579,7 +3643,7 @@ function adm_routeSave(token, f) {
     const memo = f.memo === undefined ? undefined : String(f.memo || '').trim();
     if (memo && memo.length > 1000) fail_('메모가 너무 깁니다. (1000자 이내)');
     const code = f.code === undefined ? undefined : checkCode_(f.code);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const camps = campMap_(), routes = readAll_(SH.ROUTES);
@@ -3632,7 +3696,7 @@ function adm_routeBulkAdd(token, campId, text) {
     const list = String(text || '').split(/[\s,;]+/).map(normCode_).filter(function (x) { return x; });
     if (!list.length) fail_('노선코드를 입력해 주세요.');
     if (list.length > 500) fail_('한 번에 500개까지 추가할 수 있습니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const camp = campMap_()[campId];
@@ -3666,7 +3730,7 @@ function adm_routeStatus(token, ids, status) {
     if (status !== RST.ON && status !== RST.OFF) fail_('사용여부는 사용 또는 정지만 됩니다.');
     const want = {};
     (ids || []).forEach(function (id) { want[String(id)] = 1; });
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_(), done = [];
@@ -3690,7 +3754,7 @@ function adm_routeDelete(token, ids) {
     const a = requireAdmin_(token);
     const want = {};
     (ids || []).forEach(function (id) { want[String(id)] = 1; });
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const hit = readAll_(SH.ROUTES).filter(function (r) { return want[r.id]; });
@@ -3903,7 +3967,7 @@ function adm_priceSave(token, campId, rows) {
       return x;
     });
     // 2) 저장 (짧게 잠금)
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const camp = campMap_()[campId];
@@ -4028,7 +4092,7 @@ function schSS_() {
     try { return (_schSS = SpreadsheetApp.openById(id)); }
     catch (e) { fail_('스케줄 DB 파일을 열 수 없습니다. 드라이브 휴지통에 있는지 확인하거나, 스크립트 속성 SCH_DB_ID 를 비우면 새로 만듭니다.'); }
   }
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(30000);
   try {
     const p = PropertiesService.getScriptProperties();
@@ -4060,7 +4124,7 @@ function schSheet_() {
   const book = schSS_();
   let sh = book.getSheetByName(SCH.SHEET);
   if (sh) return sh;
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(30000);
   try {
     sh = book.getSheetByName(SCH.SHEET);
@@ -4113,7 +4177,7 @@ function schHeader_(fresh) {
 function schEnsureDates_(from, to) {
   let h = schHeader_();
   if (h.dates[ymd_(from)] !== undefined && h.dates[ymd_(to)] !== undefined) return h;
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(30000);
   try {
     h = schHeader_(true);
@@ -4160,7 +4224,7 @@ function schSyncCopies_(sh, h, drivers) {
     });
   });
   if (!fix.length) return;
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   if (!lock.tryLock(3000)) return;
   try { fix.forEach(function (x) { sh.getRange(x[0], x[1]).setNumberFormat('@').setValue(safeText_(x[2])); }); }
   finally { lock.releaseLock(); }
@@ -4222,7 +4286,7 @@ function schRead_(sun, end) {
   }
   // 비고 줄은 첫 줄(업무 관련) 하나만 쓴다: 예전에 만든 둘째·셋째 비고 줄은 한 번만 지우고, 그 줄의 메모는 첫 줄로 옮긴다
   if (!props_().SCH_NOTE_TRIM) {
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     try {
       if (notes.length > 1) {
@@ -4241,7 +4305,7 @@ function schRead_(sun, end) {
   }
   // 비고 줄은 업무스케줄(work_memo)과 연동: 시트에 남아 있는 예전 비고 글은 업무스케줄로 옮기고, 칸 내용은 메모에서 만든다
   if (notes.length && (!cache_().get('sch:nmig') || notes.some(function (n) { return Object.keys(n.cells).length; }))) {
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     try { schMigrateNotes_(sh, schHeader_(true)); cache_().put('sch:nmig', '1', 600); } finally { lock.releaseLock(); }
   }
@@ -4299,7 +4363,7 @@ function adm_schSave(token, changes) {
     const dmin = changes.reduce(function (m, x) { return x.date < m ? x.date : m; }, changes[0].date);
     const dmax = changes.reduce(function (m, x) { return x.date > m ? x.date : m; }, changes[0].date);
     let h = schEnsureDates_(parseYmd_(dmin), parseYmd_(dmax));
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const sh = schSheet_();
@@ -4464,7 +4528,7 @@ function schNoteSave_(a, changes) {
     }
     saved++;
   });
-  dels.sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.MEMO).deleteRow(r); });
+  delRows_(sheet_(SH.MEMO), dels);
   return { saved: saved, conflicts: conflicts };
 }
 /** 비고 줄 이름이 바뀌면 메모의 '비고 줄' 칸도 바꾼다 / 지우면 첫 줄로 돌린다 */
@@ -4490,7 +4554,7 @@ function adm_schNote(token, action, id, label) {
   return run_(function () {
     requireAdmin_(token);
     const h = schHeader_();
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const sh = schSheet_(), last = sh.getLastRow();
@@ -4545,7 +4609,7 @@ function adm_schOrder(token, list) {
       if (!id || !(n >= 1 && n <= 99999) || Math.floor(n) !== n) fail_('순서 값이 올바르지 않습니다.');
       want[id] = String(n);
     });
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const c = cols_(SH.DRIVERS, true), sh = sheet_(SH.DRIVERS), last = sh.getLastRow();
@@ -4763,7 +4827,8 @@ function adm_schUploadTable(token, start) {
       target: ymd_(addDays_(new Date(), 1))
     });
     let url = '';
-    try { url = schWriteUpload_(res); } catch (e) { res.sheetError = String(e && e.message || e); }
+    const lock = scriptLock_();
+    try { lock.waitLock(20000); url = schWriteUpload_(res); } catch (e) { res.sheetError = String(e && e.message || e); } finally { lock.releaseLock(); }
     res.url = url;
     res.ok = true;
     logAdmin_(a, '어드민 업로드 테이블 생성', data.dates[0] + ' ~ ' + data.dates[data.dates.length - 1],
@@ -5121,7 +5186,7 @@ function adm_reset(token, section, confirm) {
     const sec = RESET_SECTIONS[section];
     if (!sec) fail_('알 수 없는 메뉴입니다.');
     if (str_(confirm) !== RESET_PHRASE) fail_('확인 문구가 다릅니다. "' + RESET_PHRASE + '" 를 그대로 입력해 주세요. 아무것도 지우지 않았습니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     let rows = 0, backupUrl = '', trashed = 0, extra = '';
     const files = [];
@@ -5164,7 +5229,7 @@ function adm_reset(token, section, confirm) {
       } else if (section === 'pumasi') {
         [SH.PJOB, SH.PAPP, SH.PAVAIL].forEach(function (n) { rows += clearData_(sheet_(n)); });
         const al = readAll_(SH.PALERT).filter(function (x) { return x.id && x.kind !== 'board'; }).map(function (x) { return x._row; }).sort(function (p, q) { return q - p; });
-        al.forEach(function (r) { sheet_(SH.PALERT).deleteRow(r); });
+        delRows_(sheet_(SH.PALERT), al);
         rows += al.length;
         pmTouch_();
         try { readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) pmAlertBump_(o.id); }); } catch (e) { /* 무시 */ }
@@ -5211,7 +5276,7 @@ function adm_campRoutes(token) {
 function onSchEdit_(e, sh) {
   const r0 = e.range.getRow(), n = e.range.getNumRows();
   if (r0 === 1) { cache_().remove('sch:h'); if (n === 1) return; }
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   if (!lock.tryLock(15000)) return;
   try {
     const h = schHeader_(true);

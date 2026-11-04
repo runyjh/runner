@@ -278,7 +278,7 @@ function api_pmSave(token, job) {
       const file = pmFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(job.attach.data), job.attach.mime, (f.date + '_' + f.camp + '_' + (f.route || f.area) + '_' + u.info.name).replace(/[\\\/:*?"<>|]/g, ' ') + ext));
       attachUrl = file.getUrl();
     }
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -341,7 +341,7 @@ function api_pmApply(token, id, memo) {
     const u = pmUser_(token);
     const me = driverById_(u.id) || {};
     if (!me.docQual) fail_('화물운송 종사자격증을 등록한 기사만 지원할 수 있습니다. 사무실에 자격증 등록을 요청해 주세요.');
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(id), today = todayText_();
@@ -363,7 +363,7 @@ function api_pmApply(token, id, memo) {
 function api_pmCancelApply(token, id) {
   return run_(function () {
     const u = pmUser_(token);
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(20000);
     try {
       const a = readAll_(SH.PAPP).filter(function (x) { return x.jobId === id && x.driverId === u.id && pmActiveApp_(x); })[0];
@@ -396,7 +396,7 @@ function api_pmDecide(token, jobId, appId, action) {
 /** posterId 가 비어 있으면 관리자 (아무 일감이나) */
 function pmDecide_(posterId, jobId, appId, action) {
   {
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(jobId), jr = findRow_(SH.PJOB, 'id', j.id);
@@ -451,7 +451,7 @@ function api_pmClose(token, id, action) {
 }
 function pmClose_(posterId, id, action) {
   {
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(id), jr = findRow_(SH.PJOB, 'id', j.id), now = nowText_();
@@ -606,11 +606,11 @@ function api_pmAvailSave(token, list, memo, info) {
       seen[dt] = 1;
       rows.push(Object.assign({ id: uniqId_('V'), driverId: u.id, name: u.info.name, date: dt, kind: PM_AVAIL_KINDS.indexOf(x.kind) >= 0 ? x.kind : '무관', memo: m, createdAt: now }, inf));
     });
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const old = readAll_(SH.PAVAIL).filter(function (a) { return a.driverId === u.id && (!pmDate_(a.date) || pmDate_(a.date) >= today); }).map(function (a) { return a._row; });
-      old.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet_(SH.PAVAIL).deleteRow(r); });
+      delRows_(sheet_(SH.PAVAIL), old);
       if (rows.length) appendObjs_(SH.PAVAIL, rows);
       pmTouch_();
     } finally {
@@ -656,7 +656,7 @@ function api_pmOfferReply(token, jobId, yes) {
   return run_(function () {
     const u = pmUser_(token);
     let appId = '', j = null;
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(20000);
     try {
       j = pmJobById_(jobId);
@@ -682,7 +682,7 @@ function api_pmOfferReply(token, jobId, yes) {
     if (yes) {
       pmDecide_(j.posterId, j.id, appId, 'accept'); // 배차 확정 (확정 알림·스케줄 반영은 기존 방식 그대로)
       const o2 = [pmA_(j.posterId, j.poster, j, 'offerOk', u.info.name)];
-      const lk = LockService.getScriptLock();
+      const lk = scriptLock_();
       lk.waitLock(20000);
       try { pmAlertAdd_(o2); } finally { lk.releaseLock(); pmAfter_(o2); }
     }
@@ -766,10 +766,14 @@ function api_pmAlertsRead(token, ids) {
     if (want) (ids || []).forEach(function (x) { want[String(x)] = 1; });
     const now = nowText_();
     let n = 0;
-    readAll_(SH.PALERT).forEach(function (a) {
-      if (a.driverId !== u.id || a.readAt || (want && !want[a.id])) return;
-      writeFields_(SH.PALERT, a._row, { readAt: now }); n++;
-    });
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      readAll_(SH.PALERT).forEach(function (a) {
+        if (a.driverId !== u.id || a.readAt || (want && !want[a.id])) return;
+        writeFields_(SH.PALERT, a._row, { readAt: now }); n++;
+      });
+    } finally { lock.releaseLock(); }
     if (n) pmAlertBump_(u.id);
     return { ok: true, marked: n };
   });
@@ -821,7 +825,7 @@ function api_pmPushSave(token, fcmToken, device) {
     const u = pmUser_(token);
     fcmToken = String(fcmToken || '').trim();
     if (!/^[\w:\-]{20,400}$/.test(fcmToken)) fail_('기기 정보를 확인할 수 없습니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.PPUSH, 'token', fcmToken), now = nowText_();
@@ -841,11 +845,15 @@ function api_pmPushDel(token, fcmToken) {
     const s = getSession_(token);
     fcmToken = String(fcmToken || '').trim();
     if (!fcmToken) return { ok: true };
-    const row = findRow_(SH.PPUSH, 'token', fcmToken);
-    if (row) {
-      const o = readObj_(SH.PPUSH, row);
-      if (!s || o.driverId === String(s.d)) { sheet_(SH.PPUSH).deleteRow(row); try { cache_().remove('pmt:' + o.driverId); } catch (e) { /* 무시 */ } }
-    }
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.PPUSH, 'token', fcmToken);
+      if (row) {
+        const o = readObj_(SH.PPUSH, row);
+        if (!s || o.driverId === String(s.d)) { sheet_(SH.PPUSH).deleteRow(row); try { cache_().remove('pmt:' + o.driverId); } catch (e) { /* 무시 */ } }
+      }
+    } finally { lock.releaseLock(); }
     return { ok: true };
   });
 }
@@ -909,7 +917,7 @@ function pmPushSend_(list) {
       const gone = {};
       dead.forEach(function (d) { gone[d.token] = 1; });
       const rows = readAll_(SH.PPUSH).filter(function (o) { return gone[o.token]; }).map(function (o) { return o._row; }).sort(function (a, b) { return b - a; });
-      rows.forEach(function (r) { sheet_(SH.PPUSH).deleteRow(r); });
+      delRows_(sheet_(SH.PPUSH), rows);
       dead.forEach(function (d) { cache_().remove('pmt:' + d.driverId); });
     }
     return sent;
@@ -939,11 +947,11 @@ function pmPushSetupCheck() {
 function pmAlertCleanup_() {
   if (!sheet_(SH.PALERT)) return;
   const from = ymd_(addDays_(new Date(), -60));
-  const rows = readAll_(SH.PALERT).filter(function (a) { return a.createdAt && String(a.createdAt).slice(0, 10) < from; }).map(function (a) { return a._row; });
-  if (!rows.length) return;
-  const lock = LockService.getScriptLock();
+  const old = function () { return readAll_(SH.PALERT).filter(function (a) { return a.createdAt && String(a.createdAt).slice(0, 10) < from; }).map(function (a) { return a._row; }); };
+  if (!old().length) return;
+  const lock = scriptLock_();
   lock.waitLock(30000);
-  try { rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet_(SH.PALERT).deleteRow(r); }); }
+  try { delRows_(sheet_(SH.PALERT), old()); } // 줄 번호는 잠금 안에서 다시 읽는다
   finally { lock.releaseLock(); }
 }
 
@@ -1002,7 +1010,7 @@ function pmStlUsageApply_(ops) {
     const list = ops.filter(function (o) { return o.jobId && (o.op === 'clear' || o.useId === '주는 기사 아이디'); });
     if (!list.length) return;
     const tag = function (o) { return '품앗이 자동 ' + o.jobId; };
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       let rows = stlRead_('stl_usage'), changed = false;
@@ -1036,7 +1044,7 @@ function pmSchApply_(ops) {
     if (!props_().SCH_DB_ID) return;
     const ds = ops.map(function (o) { return o.date; }).sort();
     const h0 = schEnsureDates_(parseYmd_(ds[0]), parseYmd_(ds[ds.length - 1]));
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const sh = schSheet_(), h = schHeader_(true) || h0, F = h.fixed;
@@ -1158,7 +1166,7 @@ function adm_pmDelete(token, ids) {
     if (!Array.isArray(ids) || !ids.length || ids.length > 500) fail_('삭제할 일감을 골라 주세요.');
     const want = {};
     ids.forEach(function (id) { want[str_(id)] = 1; });
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(30000);
     let n = 0;
     try {
@@ -1172,8 +1180,8 @@ function adm_pmDelete(token, ids) {
         out.push(pmA_(j.posterId, j.poster, j, 'admin', 'cancel'));
         if (j.status === PST.DONE && j.acceptedId) pmSchOp_(out, 'clear', j.acceptedId, j);
       });
-      apps.map(function (x) { return x._row; }).sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.PAPP).deleteRow(r); });
-      jobs.map(function (j) { return j._row; }).sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.PJOB).deleteRow(r); });
+      delRows_(sheet_(SH.PAPP), apps.map(function (x) { return x._row; }));
+      delRows_(sheet_(SH.PJOB), jobs.map(function (j) { return j._row; }));
       n = jobs.length;
       pmAlertAdd_(out);
       pmTouch_();
@@ -1190,7 +1198,7 @@ function adm_pmDelete(token, ids) {
 function adm_pmPostSet(token, on) {
   return run_(function () {
     const a = requireAdmin_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try { appSetPut_('pmPostOn', on ? 'ON' : 'OFF', '품앗이 일감 올리기 (ON/OFF) — 관리자 품앗이 관리에서 바꿈'); } finally { lock.releaseLock(); }
     logAdmin_(a, '품앗이 일감 올리기 ' + (on ? '켜기' : '끄기'), '', '');

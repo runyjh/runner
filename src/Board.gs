@@ -147,7 +147,7 @@ function api_bdSave(token, post) {
       const file = bdFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(post.attach.data), post.attach.mime, (todayText_() + '_' + u.info.name + '_' + f.title).replace(/[\\\/:*?"<>|]/g, ' ').slice(0, 80) + ext));
       attachUrl = file.getUrl();
     }
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -183,7 +183,7 @@ function bdFolder_() {
 function api_bdDelete(token, id) {
   return run_(function () {
     const u = pmUser_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const x = bdPostById_(id);
@@ -219,7 +219,7 @@ function api_bdComment(token, postId, body, parentId) {
     if (!body) fail_('댓글을 입력해 주세요.');
     if (body.length > 500) fail_('댓글은 500자까지 쓸 수 있습니다.');
     bdCheck_(body);
-    const lock = LockService.getScriptLock(), out = [];
+    const lock = scriptLock_(), out = [];
     lock.waitLock(20000);
     try {
       const x = bdPostById_(postId);
@@ -249,7 +249,7 @@ function api_bdComment(token, postId, body, parentId) {
 function api_bdCommentDel(token, id) {
   return run_(function () {
     const u = pmUser_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.BCMT, 'id', String(id || ''));
@@ -269,7 +269,7 @@ function api_bdCommentDel(token, id) {
 function api_bdLike(token, id) {
   return run_(function () {
     const u = pmUser_(token);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const x = bdPostById_(id);
@@ -287,7 +287,7 @@ function api_bdReport(token, kind, id, reason) {
     const u = pmUser_(token);
     if (kind !== '글' && kind !== '댓글') fail_('신고할 대상을 확인해 주세요.');
     reason = str_(reason).trim().slice(0, 200);
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const sh = kind === '글' ? SH.BPOST : SH.BCMT;
@@ -357,7 +357,7 @@ function adm_bdAction(token, kind, id, action) {
     const a = requireAdmin_(token);
     const st = { hide: BD_ST.HIDE, show: BD_ST.OPEN, delete: BD_ST.DEL }[action];
     if (!st || (kind !== '글' && kind !== '댓글')) fail_('알 수 없는 작업입니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const sh = kind === '글' ? SH.BPOST : SH.BCMT;
@@ -384,11 +384,11 @@ function adm_bdBan(token, driverId, days, memo, unban) {
     const a = requireAdmin_(token);
     const o = driverById_(str_(driverId));
     if (!o) fail_('기사를 찾을 수 없습니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const rows = readAll_(SH.BBAN).filter(function (b) { return b.driverId === o.id; }).map(function (b) { return b._row; }).sort(function (x, y) { return y - x; });
-      rows.forEach(function (r) { sheet_(SH.BBAN).deleteRow(r); });
+      delRows_(sheet_(SH.BBAN), rows);
       if (!unban) {
         const n = Number(days) || 0;
         appendObj_(SH.BBAN, { driverId: o.id, name: o.name, until: n > 0 ? ymd_(addDays_(new Date(), n - 1)) : '', memo: str_(memo).slice(0, 200), admin: a.name, createdAt: nowText_() });

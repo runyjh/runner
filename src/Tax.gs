@@ -88,9 +88,12 @@ function tiRow_(t) {
 }
 function bizNoFmt_(v) { const d = str_(v).replace(/\D/g, ''); return d.length === 10 ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : str_(v); }
 function tiNewId_() {
-  let max = 0;
+  // 잠금 안에서 호출. 마지막 계산서를 지운 뒤에도 같은 번호를 다시 쓰지 않도록 지금까지 준 가장 큰 번호를 따로 적어 둔다
+  let max = Number(str_(readAll_(SH.APPSET).filter(function (o) { return o.key === 'tiSeq'; }).map(function (o) { return o.value; })[0])) || 0;
   readAll_(SH.TAXINV).forEach(function (r) { const m = String(r.id || '').match(/^T(\d+)D$/); if (m) max = Math.max(max, Number(m[1])); });
-  return function () { max++; return 'T' + max + 'D'; };
+  const f = function () { max++; return 'T' + max + 'D'; };
+  f.save = function () { appSetPut_('tiSeq', String(max), '세금계산서 역발행: 마지막으로 준 계산서 번호 (지우지 마세요)'); };
+  return f;
 }
 
 // ───────────────────────── 관리자 ─────────────────────────
@@ -108,7 +111,7 @@ function adm_tiSave(token, t) {
   return run_(function () {
     const a = requireAdmin_(token);
     const row = tiRow_(t || {});
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_();
@@ -120,8 +123,9 @@ function adm_tiSave(token, t) {
         logAdmin_(a, '세금계산서 수정', t.id, row.supName + ' ' + row.total);
         return { ok: true, id: t.id };
       }
-      const id = tiNewId_()();
+      const next = tiNewId_(), id = next();
       appendObj_(SH.TAXINV, Object.assign({ id: id, createdAt: now, updatedAt: now, admin: a.name }, row));
+      next.save();
       logAdmin_(a, '세금계산서 작성', id, row.supName + ' ' + row.total);
       return { ok: true, id: id };
     } finally { lock.releaseLock(); }
@@ -136,12 +140,12 @@ function adm_tiBulk(token, ids, action) {
     ids.forEach(function (id) { want[str_(id)] = 1; });
     const m = String(action || '').match(/^(nts|pub|kind):(.+)$/);
     if (action !== 'delete' && !m) fail_('알 수 없는 작업입니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     let n = 0;
     try {
       const rows = readAll_(SH.TAXINV).filter(function (r) { return want[r.id]; });
-      if (action === 'delete') rows.map(function (r) { return r._row; }).sort(function (x, y) { return y - x; }).forEach(function (r) { sheet_(SH.TAXINV).deleteRow(r); n++; });
+      if (action === 'delete') n = delRows_(sheet_(SH.TAXINV), rows.map(function (r) { return r._row; }));
       else {
         const f = {};
         if (m[1] === 'nts') f.nts = TI_NTS.indexOf(m[2]) >= 0 ? m[2] : '미등록';
@@ -168,7 +172,7 @@ function adm_tiFromSettle(token, month, overwrite) {
     const dates = stlDates_(month, cfg), buyer = tiBuyer_();
     const sups = {};
     tiSuppliers_().forEach(function (s) { sups[s.id] = s; });
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     const made = [], skipped = [], noBiz = [];
     try {
@@ -198,7 +202,7 @@ function adm_tiFromSettle(token, month, overwrite) {
         add.push(Object.assign({ id: next(), createdAt: now, updatedAt: now, admin: a.name }, row));
         made.push(d.name);
       });
-      if (add.length) appendObjs_(SH.TAXINV, add);
+      if (add.length) { appendObjs_(SH.TAXINV, add); next.save(); }
       logAdmin_(a, '세금계산서 정산에서 만들기', month, made.length + '장');
     } finally { lock.releaseLock(); }
     return { ok: true, made: made, skipped: skipped, noBiz: noBiz };

@@ -38,7 +38,7 @@ function adm_stlMigrate(token, src, opts) {
       master: master.length, prices: priceRows.length
     };
 
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     try {
       // ── 2) 기사 (러너 올인원 DB) ──

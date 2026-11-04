@@ -1359,7 +1359,12 @@
   })();
 
   // ───── 로그인 ─────
-  function showLogin() { $('#app').classList.add('hidden'); closeDrawer(true); $('#login').classList.remove('hidden'); $('#lgId').focus(); }
+  function showLogin() {
+    $('#app').classList.add('hidden'); closeDrawer(true);
+    try { closeBib(true); } catch (e) {}
+    $$('.modal').forEach((m) => m.classList.add('hidden')); // 로그인 만료 때 열려 있던 창이 로그인 화면 위에 남지 않게
+    $('#login').classList.remove('hidden'); $('#lgId').focus();
+  }
   let me = null;
   function showApp(admin) {
     me = admin;
@@ -1450,7 +1455,7 @@
   }
   // 위임 방식 검색칸(노선 필터 등): 조합이 끝나면 input 을 한 번 더 보내 결과를 그린다
   document.addEventListener('compositionend', (e) => {
-    if (e.target.matches && e.target.matches('[data-rf], #pfQ')) e.target.dispatchEvent(new Event('input', { bubbles: true }));
+    if (e.target.matches && e.target.matches('[data-rf], #pfQ, #xpQ')) e.target.dispatchEvent(new Event('input', { bubbles: true }));
   });
   const nfc = (v) => String(v == null ? '' : v).normalize('NFC').toLowerCase();
   onSearch($('#q'), () => renderRows());
@@ -1511,7 +1516,7 @@
     const tr = e.target.closest('tr[data-id]'); if (tr && tr.dataset.id) openDrawer(tr.dataset.id);
   });
   // ── 선택한 기사 삭제 ──
-  const dsel = new Set();
+  const dsel = new Set(); let dDeleting = false;
   function paintDBulk() {
     const have = new Set(all.map((r) => r.id));
     [...dsel].forEach((id) => { if (!have.has(id)) dsel.delete(id); });
@@ -1520,7 +1525,7 @@
     $('#dAll').indeterminate = !$('#dAll').checked && vis.some((r) => dsel.has(r.id));
     const b = $('#dBulk');
     b.classList.toggle('hidden', !dsel.size);
-    b.innerHTML = '<b>' + dsel.size + '명 선택</b><button type="button" class="btn sm danger" id="dBulkDel">선택한 기사 삭제</button><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button>';
+    b.innerHTML = '<b>' + dsel.size + '명 선택</b><button type="button" class="btn sm danger" id="dBulkDel"' + (dDeleting ? ' disabled>삭제 중…' : '>선택한 기사 삭제') + '</button><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button>';
   }
   $('#rows').addEventListener('change', (e) => {
     const c = e.target.closest('[data-dck]'); if (!c) return;
@@ -1533,7 +1538,7 @@
   });
   $('#dBulk').addEventListener('click', (e) => {
     if (e.target.id === 'dBulkClear') { dsel.clear(); renderRows(); return; }
-    if (e.target.id !== 'dBulkDel') return;
+    if (e.target.id !== 'dBulkDel' || dDeleting) return;
     const ids = [...dsel], n = ids.length, names = all.filter((r) => dsel.has(r.id)).map((r) => r.name);
     const phrase = n + '명 삭제';
     ask('선택한 기사 ' + n + '명 삭제 — 되돌릴 수 없습니다',
@@ -1541,8 +1546,9 @@
       '스케줄·배번호 기록은 남습니다. 삭제하려면 "' + phrase + '" 를 그대로 입력하세요.', phrase).then((v) => {
       if (v == null) return;
       if (v.replace(/\s+/g, '') !== phrase.replace(/\s+/g, '')) return toast('확인 문구가 달라 삭제하지 않았습니다.');
-      const b = $('#dBulkDel'); if (b) { b.disabled = true; b.textContent = '삭제 중…'; }
+      dDeleting = true; paintDBulk();
       api('adm_deleteDrivers', ids, v).then((r) => {
+        dDeleting = false;
         if (!r.ok) { paintDBulk(); return toast(r.msg); }
         const gone = new Set(r.deleted);
         all.filter((x) => gone.has(x.id)).forEach((x) => { counts.all = Math.max(0, (counts.all || 1) - 1); if (counts[x.status] != null) counts[x.status] = Math.max(0, counts[x.status] - 1); });
@@ -1550,7 +1556,7 @@
         if (cur && gone.has(cur.id)) closeDrawer(true);
         dsel.clear(); renderTabs(); renderRows();
         toast(r.deleted.length + '명을 삭제했습니다.' + (r.docsTrashed ? ' 서류 폴더 ' + r.docsTrashed + '개는 휴지통으로 옮겼습니다.' : '') + (r.missing ? ' (' + r.missing + '명은 이미 없었습니다)' : ''));
-      }).catch(() => paintDBulk());
+      }).catch(() => { dDeleting = false; paintDBulk(); });
     });
   });
 
@@ -2037,12 +2043,14 @@
     if (v === 'sched') loadSched();
     if (v === 'bib') loadBib();
     if (v === 'route') loadRoutes();
-    if (v === 'drivers' && !driversLoaded) { driversLoaded = true; loadList(); }
+    // 기사 정보는 스케줄·배번호·정산·초기화 화면에서도 바뀌므로, 다른 메뉴에서 돌아오면 다시 불러온다 (선택 탭은 유지)
+    if (v === 'drivers') { const first = !driversLoaded; driversLoaded = true; loadList(!first); }
     if (v === 'memo') openMonth(memoMonth || null);
   }
   $$('.nav a[data-view]').forEach((a) => a.addEventListener('click', () => {
     if (a.dataset.view === currentView) return;
-    if (currentView === 'route' && !pricesLeaveOk()) return;
+    if (currentView === 'route' && (!pricesLeaveOk() || !xpLeaveOk())) return;
+    if (currentView === 'settle' && !stLeaveOk()) return;
     if (currentView === 'sched') { if (sEdit) commitEdit(); if (Object.keys(sPending).length) flushSave(); }
     if (!$('#drawer').classList.contains('hidden')) closeDrawer();
     if (!$('#drawer').classList.contains('hidden')) return; // 저장 안 한 변경이 있어 닫지 않음
@@ -2067,7 +2075,9 @@
   function loadPumasi() {
     paDefaultRange();
     $('#paRows').innerHTML = '<tr><td colspan="14" class="sub">불러오는 중…</td></tr>';
+    const seq = PA.seq = (PA.seq || 0) + 1; // 늦게 온 예전 응답이 새 결과를 덮지 않게
     api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
+      if (seq !== PA.seq) return;
       if (!r.ok) return toast(r.msg);
       PA.jobs = r.jobs; PA.count = r.count; paintPostSw(r.postOn !== false); renderPumasi();
     }).catch(() => {});
@@ -2091,7 +2101,7 @@
     list = list || PA.jobs.filter((j) => PA.status === '전체' || j.status === PA.status);
     const b = $('#paBulk');
     b.classList.toggle('hidden', !paSel.size);
-    b.innerHTML = '<b>' + paSel.size + '건 선택</b><button class="btn sm ghost" id="paSelNone">선택 해제</button><button class="btn sm danger" id="paDel">선택 삭제</button>';
+    b.innerHTML = '<b>' + paSel.size + '건 선택</b><button class="btn sm ghost" id="paSelNone">선택 해제</button><button class="btn sm danger" id="paDel"' + (PA.deleting ? ' disabled>삭제 중…' : '>선택 삭제') + '</button>';
     const all = $('#paAll'); const on = list.filter((j) => paSel.has(j.id)).length;
     all.checked = !!list.length && on === list.length; all.indeterminate = on > 0 && on < list.length;
   }
@@ -2102,15 +2112,15 @@
   });
   $('#paBulk').addEventListener('click', (e) => {
     if (e.target.id === 'paSelNone') { paSel.clear(); return renderPumasi(); }
-    if (e.target.id !== 'paDel') return;
+    if (e.target.id !== 'paDel' || PA.deleting) return;
     const ids = [...paSel], jobs = PA.jobs.filter((j) => paSel.has(j.id));
     const live = jobs.filter((j) => ['모집 중', '배차 협의중', '배차 확정'].includes(j.status)).length;
     if (!confirm(ids.length + '건의 품앗이 일감을 삭제할까요?\n지원 기록도 같이 지워지고 되돌릴 수 없습니다.' + (live ? '\n\n진행 중인 일감 ' + live + '건은 지원한 기사님께 취소 알림이 가고, 배차 확정된 일감은 기사스케줄 품앗이 칸도 지웁니다.' : ''))) return;
-    e.target.disabled = true;
+    PA.deleting = true; paPaintBulk();
     api('adm_pmDelete', ids).then((r) => {
       if (!r.ok) return toast(r.msg);
       paSel.clear(); toast(r.deleted + '건을 삭제했습니다.'); loadPumasi();
-    }).catch(() => {}).finally(() => { e.target.disabled = false; });
+    }).catch(() => {}).finally(() => { PA.deleting = false; paPaintBulk(); });
   });
   $('#paTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-pst]'); if (b) { PA.status = b.dataset.pst; renderPumasi(); } });
   $('#paReload').addEventListener('click', loadPumasi);
@@ -2129,11 +2139,13 @@
     if (e.target.closest('td.ck')) return;
     const tr = e.target.closest('[data-pa]'); if (tr) openPumasi(tr.dataset.pa);
   });
-  $('#paClose').addEventListener('click', () => $('#paModal').classList.add('hidden'));
+  $('#paClose').addEventListener('click', () => { PA.cur = ''; $('#paModal').classList.add('hidden'); });
   function openPumasi(id) {
     PA.cur = id;
+    $('#paTitle').textContent = '불러오는 중…'; $('#paBody').dataset.jid = '';
     $('#paBody').innerHTML = '<div class="sub">불러오는 중…</div>'; $('#paModal').classList.remove('hidden');
     api('adm_pmJob', id).then((r) => {
+      if (PA.cur !== id) return; // 그 사이 창을 닫았거나 다른 일감을 열었으면 늦게 온 응답은 버린다
       if (!r.ok) { $('#paModal').classList.add('hidden'); return toast(r.msg); }
       const j = r.job, raw = j.status, live = raw === '모집 중' || raw === '배차 협의중';
       $('#paTitle').innerHTML = paBadge(j.view) + ' ' + paDay(j.date) + ' ' + esc(String(j.camp || '').replace(/\s*캠프$/, '')) + ' ' + esc(j.route || j.area);
@@ -2164,16 +2176,18 @@
         '<div class="pa-h">지원자 ' + r.apps.length + '명</div>' +
         (r.apps.length ? '<div class="table-wrap"><table class="pa-ap"><thead><tr><th>기사</th><th>상태</th><th>연락처</th><th>캠프 · 차량</th><th>화물자격증</th><th>한마디</th><th>지원</th><th></th></tr></thead><tbody>' + apps + '</tbody></table></div>' : '<div class="sub" style="font-size:13px">아직 지원자가 없습니다.</div>') +
         '<div class="pa-acts">' + acts.join('') + '<span class="sub" style="font-size:12px;align-self:center;margin-left:auto">처리하면 올린 기사·지원 기사에게 알림이 갑니다.</span></div>';
+      $('#paBody').dataset.jid = id;
     }).catch(() => {});
   }
   $('#paBody').addEventListener('click', (e) => {
     const b = e.target.closest('[data-paact]'); if (!b) return;
+    const jid = $('#paBody').dataset.jid; if (!jid || jid !== PA.cur) return; // 화면에 보이는 일감에만 처리
     const act = b.dataset.paact, label = { talk: '협의 중으로 표시', accept: '이 기사로 배차 확정', reject: '이 지원자 거절', back: '지원 상태로 되돌리기', close: '모집 마감', reopen: '다시 모집', cancel: '일감 취소' }[act];
     if (!confirm(label + ' 할까요?' + (act === 'accept' ? '\n다른 지원자는 미선정이 되고, 확정 기사에게만 배송지코드·연락처가 보입니다.' : act === 'cancel' ? '\n지원자는 모두 미선정이 됩니다.' : ''))) return;
     b.disabled = true;
-    api('adm_pmAction', PA.cur, act, b.dataset.ap || '').then((r) => {
+    api('adm_pmAction', jid, act, b.dataset.ap || '').then((r) => {
       if (!r.ok) { b.disabled = false; return toast(r.msg); }
-      toast(label + ' 했습니다.'); openPumasi(PA.cur); loadPumasi();
+      toast(label + ' 했습니다.'); if (PA.cur === jid) openPumasi(jid); loadPumasi();
     }).catch(() => { b.disabled = false; });
   });
 
@@ -2499,7 +2513,11 @@
     $('#dayTitle').textContent = dateLabel(selDate) + (selDate === memoToday ? ' · 오늘' : '');
     $('#memoDate').value = selDate;
     const list = memos.filter((x) => x.date === selDate);
+    // 수정 중인 메모 칸은 다시 그리지 않고 그대로 둔다 (다른 메모 완료·추가 때 입력하던 내용이 사라지지 않게)
+    const editing = {};
+    $$('#memoList .memo').forEach((el) => { if ($('.edit', el) && !el.dataset.done) editing[el.dataset.id] = el; });
     $('#memoList').innerHTML = list.length ? list.map(memoHtml).join('') : '<div class="no-memo">이 날짜의 메모가 없습니다.</div>';
+    $$('#memoList .memo').forEach((el) => { if (editing[el.dataset.id]) el.replaceWith(editing[el.dataset.id]); });
   }
   function memoHtml(x) {
     return '<div class="memo' + (x.done ? ' done' : '') + '" data-id="' + esc(x.id) + '">' +
@@ -2513,6 +2531,7 @@
   $('#memoText').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#memoAdd').requestSubmit(); });
   $('#memoAdd').addEventListener('submit', (e) => {
     e.preventDefault();
+    if ($('#memoAddBtn').disabled) return; // 저장 중 (Ctrl+Enter 두 번)
     const content = $('#memoText').value.trim(), date = $('#memoDate').value || selDate, time = $('#memoTime').value;
     if (!content) return toast('내용을 입력해 주세요.');
     const b = $('#memoAddBtn'); b.disabled = true;
@@ -2561,7 +2580,7 @@
       if ($('[data-f="cat"]', box)) fillCats($('[data-f="cat"]', box), catOf(m));
       $('textarea', box).focus();
     } else if (act === 'cancel') {
-      renderDay();
+      box.dataset.done = '1'; renderDay();
     } else if (act === 'save') {
       const date = $('[data-f="date"]', box).value, time = $('[data-f="time"]', box).value, content = $('[data-f="content"]', box).value.trim();
       if (!content) return toast('내용을 입력해 주세요.');
@@ -2570,7 +2589,7 @@
       api('adm_memoSave', { id: id, date: date, time: time, content: content, cat: cat }).then((r) => {
         if (!r.ok) { toast(r.msg); e.target.disabled = false; return; }
         if (r.memo.date !== m.date) toast(dateLabel(r.memo.date) + '(으)로 옮겼습니다.');
-        upsertMemo(r.memo); refreshLate();
+        box.dataset.done = '1'; upsertMemo(r.memo); refreshLate();
       }).catch(() => { e.target.disabled = false; });
     }
   });
@@ -4259,10 +4278,13 @@
   }
   const sOrderPend = {}; // 기사 줄 ▲▼ 로 바꾼, 아직 저장 전인 순서 {기사ID: 순서}
   let sOrderTimer = 0, sMoved = '';
+  let sLoadSeq = 0;
   function loadSched(start) {
     if (!SD.dates.length) $('#sWrap').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     paintModeUi();
+    const seq = ++sLoadSeq;
     return fetchSched(start).then((r) => {
+      if (seq !== sLoadSeq) return; // 다음달·다음주를 빨리 눌렀을 때 예전 응답은 버린다
       if (!r.ok) return toast(r.msg);
       Object.assign(SD, r);
       SD.drivers.forEach((d) => { if (d.id in sOrderPend) d.order = String(sOrderPend[d.id]); }); // 아직 저장 전인 순서
@@ -4354,8 +4376,12 @@
     if (p.length !== 3) return '';
     return ymdLocal(new Date(+p[0], +p[1] - 1, +p[2] + 1));
   }
+  let sRowSig = '';
   function renderSched() {
     srows = buildRows(); recalc();
+    // 보이는 줄 구성이 바뀌면(전체 보기, 비고 줄 삭제, 새로 불러오기 등) 줄 번호 기준 선택은 다른 기사를 가리킬 수 있으므로 푼다
+    const sig = srows.map((x) => x.kind + ':' + x.row).join('|');
+    if (sig !== sRowSig) { if (sRowSig) { sAct = null; sAnchor = null; } sRowSig = sig; }
     const today = pddDate(), dates = SD.dates;
     const hcell = (dt, i) => {
       const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
@@ -4522,7 +4548,11 @@
     }).catch(() => { sStatus('err'); }).finally(() => { sBusy = false; });
   }
   $('#sSave').addEventListener('click', () => { if ($('#sSave').classList.contains('err')) flushSave(); });
-  window.addEventListener('beforeunload', (e) => { if (Object.keys(sPending).length) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', (e) => {
+    // 저장하지 않은 변경이 하나라도 있으면 창 닫기·새로고침 전에 묻는다
+    const n = (o) => Object.keys(o || {}).length;
+    if (n(sPending) || n(pdirty) || n(adirty) || n(dirty) || n(bdirty) || STX.edDirty || n(STX.drvDirty)) { e.preventDefault(); e.returnValue = ''; }
+  });
 
   // ── 선택 · 키보드 · 편집 ──
   const nRows = () => srows.length, nCols = () => SD.dates.length;
@@ -4978,6 +5008,10 @@
     } else if (sec === 'route') { RT.camps = []; RT.routes = []; RT.images = []; RT.addresses = []; RT.prices = []; curCamp = null; pdirty = {}; if (currentView === 'route') loadRoutes(); }
     else if (sec === 'memo') { if (currentView === 'memo') openMonth(memoMonth || null); }
     else if (sec === 'bib') { closeBib(true); if (currentView === 'bib') loadBib(); }
+    else if (sec === 'notice') { if (currentView === 'notice') loadNotices(); }
+    else if (sec === 'accounts') { if (currentView === 'acc') loadAccounts(); }
+    else if (sec === 'pumasi') { paSel.clear(); PA.jobs = []; if (currentView === 'pumasi') loadPumasi(); }
+    if (sec !== 'drivers') driversLoaded = false;
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#rzModal').classList.contains('hidden') && !$('#rzOk').textContent.includes('지우는')) $('#rzModal').classList.add('hidden'); });
 
@@ -5062,8 +5096,14 @@
     $('#stEmpty').classList.toggle('hidden', !!s.drivers.length);
     $('#stEmpty').textContent = s.round ? '정산할 기사가 없습니다.' : '이 달 쿠팡 정산서가 아직 없습니다. 오른쪽 위 [쿠팡 정산서 올리기]로 엑셀을 넣어 주세요.';
   }
+  /** 정산관리에서 저장하지 않은 표 편집·기사 정산정보가 있으면 버릴지 묻는다 */
+  function stLeaveOk() {
+    if (!STX.edDirty && !Object.keys(STX.drvDirty).length) return true;
+    if (!confirm('정산관리에 저장하지 않은 변경이 있습니다. 버리고 넘어갈까요?')) return false;
+    STX.edDirty = false; STX.drvDirty = {}; return true;
+  }
   function stShowTab(tab, keep) {
-    if (STX.tab !== tab && STX.edDirty && !confirm('저장하지 않은 변경이 있습니다. 버리고 넘어갈까요?')) return;
+    if (STX.tab !== tab && (STX.edDirty || Object.keys(STX.drvDirty).length) && !stLeaveOk()) return;
     STX.tab = tab; STX.edDirty = false;
     $$('#stTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.st === tab));
     $('#stp-list').classList.toggle('hidden', tab !== 'list');
@@ -5219,9 +5259,12 @@
   // ── 명세서 ──
   function openSlip(id) {
     STX.slipAt = STX.slipIds.indexOf(id);
+    const seq = STX.slipSeq = (STX.slipSeq || 0) + 1;
     $('#stSlipModal').classList.remove('hidden');
+    $('#stSlipTitle').textContent = '불러오는 중…';
     $('#stSlip').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     api('adm_stlSlip', STX.month, id).then((r) => {
+      if (seq !== STX.slipSeq) return; // 다음·이전을 빨리 눌렀을 때 늦게 온 정산서는 버린다
       if (!r.ok) { $('#stSlipModal').classList.add('hidden'); return toast(r.msg); }
       $('#stSlip').innerHTML = slipHtml(r);
       $('#stSlipTitle').textContent = r.slip.row.name + ' · ' + ymTitle(r.month) + ' 정산서';
@@ -5598,11 +5641,11 @@
       .finally(() => { b.disabled = false; b.textContent = '반영'; });
   });
   // ── 상단 ──
-  $('#stMonth').addEventListener('change', () => { STX.sum = null; loadSettle($('#stMonth').value); });
-  const stStep = (n) => { const i = STX.months.indexOf(STX.month) + n; if (i >= 0 && i < STX.months.length) { STX.sum = null; loadSettle(STX.months[i]); } };
+  $('#stMonth').addEventListener('change', () => { if (!stLeaveOk()) { $('#stMonth').value = STX.month; return; } STX.sum = null; loadSettle($('#stMonth').value); });
+  const stStep = (n) => { const i = STX.months.indexOf(STX.month) + n; if (i >= 0 && i < STX.months.length) { if (!stLeaveOk()) return; STX.sum = null; loadSettle(STX.months[i]); } };
   $('#stPrev').addEventListener('click', () => stStep(-1));
   $('#stNext').addEventListener('click', () => stStep(1));
-  $('#stRecalc').addEventListener('click', () => loadSettle(STX.month, true));
+  $('#stRecalc').addEventListener('click', () => { if (stLeaveOk()) loadSettle(STX.month, true); });
   $('#stCloseBtn').addEventListener('click', () => {
     const s = STX.sum; if (!s) { loadSettle(STX.month); return toast('정산을 다시 불러왔습니다. 한 번 더 눌러 주세요.'); }
     const close = !s.closed;
@@ -5878,7 +5921,11 @@
     if (ck) { if (ck.checked) TX.sel.add(ck.dataset.tck); else TX.sel.delete(ck.dataset.tck); return renderTax(); }
     if (e.target.closest('td.ck')) return;
     const nb = e.target.closest('[data-tnts]');
-    if (nb) { const t = TX.list.find((x) => x.id === nb.dataset.tnts); return api('adm_tiBulk', [t.id], 'nts:' + (t.nts === '등록' ? '미등록' : '등록')).then((r) => { if (!r.ok) return toast(r.msg); t.nts = t.nts === '등록' ? '미등록' : '등록'; renderTax(); }).catch(() => {}); }
+    if (nb) {
+      const t = TX.list.find((x) => x.id === nb.dataset.tnts); if (!t || t._busy) return;
+      const want = t.nts === '등록' ? '미등록' : '등록'; t._busy = 1; nb.style.opacity = '.5';
+      return api('adm_tiBulk', [t.id], 'nts:' + want).then((r) => { if (!r.ok) return toast(r.msg); t.nts = want; }).catch(() => {}).finally(() => { t._busy = 0; renderTax(); });
+    }
     const tr = e.target.closest('[data-ti]'); if (tr) openTax(TX.list.find((t) => t.id === tr.dataset.ti));
   });
   $('#tiFromStl').addEventListener('click', () => {
@@ -6018,7 +6065,9 @@
   const bmBadge = (st) => '<span class="badge ' + (st === '공개' ? 'b-승인' : st === '숨김' ? 'b-승인대기' : 'b-정지') + '">' + esc(st) + '</span>';
   function loadBoardAdm() {
     $('#bmRows').innerHTML = '<tr><td colspan="8" class="sub">불러오는 중…</td></tr>';
+    const seq = BM.seq = (BM.seq || 0) + 1;
     api('adm_bdList', { status: BM.status, q: $('#bmQ').value.trim() }).then((r) => {
+      if (seq !== BM.seq) return;
       if (!r.ok) return toast(r.msg);
       BM.posts = r.posts; BM.count = r.count; renderBoardAdm(r);
     }).catch(() => {});
@@ -6041,7 +6090,7 @@
   $('#bmReload').addEventListener('click', loadBoardAdm);
   let bmQT = 0; $('#bmQ').addEventListener('input', () => { clearTimeout(bmQT); bmQT = setTimeout(loadBoardAdm, 400); });
   $('#bmRows').addEventListener('click', (e) => { const tr = e.target.closest('[data-bm]'); if (tr) openBoardAdm(tr.dataset.bm); });
-  $('#bmClose').addEventListener('click', () => $('#bmModal').classList.add('hidden'));
+  $('#bmClose').addEventListener('click', () => { BM.cur = ''; $('#bmModal').classList.add('hidden'); });
   $('#bmBanBtn').addEventListener('click', () => {
     const id = $('#bmBanDrv').value; if (!id) return toast('정지할 기사를 골라 주세요.');
     const days = $('#bmBanDays').value, name = $('#bmBanDrv').selectedOptions[0].textContent;
@@ -6054,8 +6103,10 @@
   });
   function openBoardAdm(id) {
     BM.cur = id;
+    $('#bmTitle').textContent = '불러오는 중…';
     $('#bmBody').innerHTML = '<div class="sub">불러오는 중…</div>'; $('#bmModal').classList.remove('hidden');
     api('adm_bdPost', id).then((r) => {
+      if (BM.cur !== id) return;
       if (!r.ok) { $('#bmBody').innerHTML = ''; return toast(r.msg); }
       const p = r.post, cms = r.comments, reps = r.reports;
       $('#bmTitle').textContent = '[' + p.cat + '] ' + p.title;
@@ -6078,7 +6129,7 @@
     if (b) {
       const lab = { hide: '숨김', show: '다시 공개', delete: '삭제' }[b.dataset.bma];
       if (b.dataset.bma === 'delete' && !confirm(b.dataset.k + '을(를) 삭제할까요? 기사 앱에서 보이지 않게 됩니다 (시트에는 남음).')) return;
-      return api('adm_bdAction', b.dataset.k, b.dataset.i, b.dataset.bma).then((r) => { if (!r.ok) return toast(r.msg); toast(b.dataset.k + ' ' + lab + ' 처리했습니다.'); openBoardAdm(BM.cur); loadBoardAdm(); }).catch(() => {});
+      return api('adm_bdAction', b.dataset.k, b.dataset.i, b.dataset.bma).then((r) => { if (!r.ok) return toast(r.msg); toast(b.dataset.k + ' ' + lab + ' 처리했습니다.'); if (BM.cur) openBoardAdm(BM.cur); loadBoardAdm(); }).catch(() => {});
     }
     const bn = e.target.closest('[data-bmban]');
     if (bn) { $('#bmModal').classList.add('hidden'); $('#bmBanDrv').value = bn.dataset.bmban; $('#bmBanMemo').focus(); toast(bn.dataset.n + ' 기사님: 기간·사유를 정하고 [정지]를 누르세요.'); }

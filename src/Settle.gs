@@ -152,7 +152,7 @@ function stlSS_() {
     stlEnsureTrigger_(_stlSS);
     return _stlSS;
   }
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(30000);
   try {
     const p = PropertiesService.getScriptProperties();
@@ -181,12 +181,22 @@ function stlTv_() {
   if (_stlTv) return _stlTv;
   let v = null;
   try { v = JSON.parse(cache_().get('stl:tv') || 'null'); } catch (e) { v = null; }
-  if (!v || !v._) v = { _: Date.now().toString(36) };
+  if (!v || !v._) {
+    v = { _: Date.now().toString(36) + Math.random().toString(36).slice(2, 5) };
+    try { cache_().put('stl:tv', JSON.stringify(v), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } // 다음 실행도 같은 묶음을 쓰게
+  }
   return (_stlTv = v);
 }
 function stlVerOf_(name) { const v = stlTv_(); return v._ + '.' + (v[name] || 0); }
 function stlTouch_(names) {
-  const v = stlTv_();
+  // 다른 실행이 그 사이 올린 번호를 덮어써 옛 캐시가 되살아나지 않도록, 최신 번호를 다시 읽어 합친다
+  let cur = null;
+  try { cur = JSON.parse(cache_().get('stl:tv') || 'null'); } catch (e) { cur = null; }
+  const mem = stlTv_();
+  if (cur && cur._ === mem._) Object.keys(cur).forEach(function (k) { if (k !== '_' && (cur[k] || 0) > (mem[k] || 0)) mem[k] = cur[k]; });
+  else if (cur && cur._) { Object.keys(mem).forEach(function (k) { delete mem[k]; }); Object.assign(mem, cur); }
+  else if (!cur) mem._ = Date.now().toString(36) + Math.random().toString(36).slice(2, 5); // 캐시가 비었으면 새 묶음
+  const v = mem;
   [].concat(names).forEach(function (n) { v[n] = (v[n] || 0) + 1; delete _stlTab[n]; Object.keys(_stlMon).forEach(function (k) { if (k.indexOf(n + '|') === 0) delete _stlMon[k]; }); });
   try { cache_().put('stl:tv', JSON.stringify(v), CFG.CACHE_MAX); } catch (e) { /* 무시 */ }
 }
@@ -232,7 +242,7 @@ function stlSheet_(name) {
 }
 function stlCreateTab_(name) {
   const book = stlSS_();
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(30000);
   try {
     let sh = book.getSheetByName(name);
@@ -336,13 +346,25 @@ function stlCols_(name) {
   } else head = stlTab_(name).head;
   const miss = Object.keys(def).filter(function (k) { return head.indexOf(def[k]) < 0; }).map(function (k) { return def[k]; });
   if (miss.length) {
-    const sh = stlSheet_(name);
-    const start = head.filter(function (x) { return x !== ''; }).length + 1;
-    if (start + miss.length - 1 > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), miss.length);
-    sh.getRange(1, start, sh.getMaxRows(), miss.length).setNumberFormat('@');
-    sh.getRange(1, start, 1, miss.length).setValues([miss]).setFontWeight('bold').setBackground('#f1f3f4');
-    head = head.slice(0, start - 1).concat(miss);
-    stlTouch_(name);
+    // 잠금 안에서 실제 머리글을 다시 읽고(캐시가 옛것일 수 있음), 마지막 머리글 오른쪽에만 추가한다 (중간 빈 칸·사람이 추가한 열 보호)
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const sh = stlSheet_(name);
+      head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
+      const need = miss.filter(function (l) { return head.indexOf(l) < 0; });
+      if (need.length) {
+        let last = head.length;
+        while (last > 0 && head[last - 1] === '') last--;
+        const start = last + 1;
+        if (start + need.length - 1 > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), start + need.length - 1 - sh.getMaxColumns());
+        sh.getRange(1, start, sh.getMaxRows(), need.length).setNumberFormat('@');
+        sh.getRange(1, start, 1, need.length).setValues([need]).setFontWeight('bold').setBackground('#f1f3f4');
+        head = head.slice(0, last).concat(need);
+      }
+      if (STL_BIG.indexOf(name) >= 0) stlCPut_('stl:h:' + name + ':' + stlTv_()._, head, CFG.CACHE_MAX);
+      stlTouch_(name);
+    } finally { lock.releaseLock(); }
   }
   const c = { __w: head.length };
   Object.keys(def).forEach(function (k) { c[k] = head.indexOf(def[k]); });
@@ -549,7 +571,7 @@ function stlCfg_() {
   rows.forEach(function (o) { map[o.label] = o.value; });
   const missing = STL_CFG.filter(function (d) { return !(d[1] in map); });
   if (missing.length) {
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try { stlAppend_('stl_config', missing.map(function (d) { return { label: d[1], value: d[2], desc: d[3] }; })); } finally { lock.releaseLock(); }
     missing.forEach(function (d) { map[d[1]] = d[2]; });
@@ -700,7 +722,7 @@ function stlVendorOwner_(v) {
   return { name: v.name, bankName: v.bank, accountHolder: v.holder || v.name, account: v.account ? String(v.account).replace(/\d(?=\d{4})/g, '*') : '', accountRaw: v.account, bizNo: v.bizNo, bizName: v.name, bizEmail: v.email, phone: v.phone, vendor: true };
 }
 function stlSeedIds_(D) {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock_();
   lock.waitLock(20000);
   try {
     if (stlRead_('stl_ids').length) return;
@@ -1614,7 +1636,7 @@ function adm_stlImport(token, p) {
     };
     const rawObjs = raw.map(function (r) { return clean(STL_RAW_IN, r); }).filter(function (o) { return o.cid; });
     const lossObjs = loss.map(function (r) { return clean(STL_LOSS_IN, r); }).filter(function (o) { return o.cid; });
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     try {
       stlAssertOpen_(month);
@@ -1662,7 +1684,7 @@ function adm_stlClose(token, month, close) {
   return run_(function () {
     const a = requireAdmin_(token);
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     try {
       const rows = stlRead_('stl_close');
@@ -1716,7 +1738,7 @@ function adm_stlPaySet(token, month, list) {
   return run_(function () {
     const a = requireAdmin_(token);
     if (!stlMonthOk_(month) || !Array.isArray(list) || !list.length || list.length > 500) fail_('입금 정보를 확인해 주세요.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const D = stlDrivers_(), X = stlIds_(D);
@@ -1954,7 +1976,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
         if (o.status === '중지') o.status = '정지';
       });
     }
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     try {
       if (E.scope !== 'all') stlAssertOpen_(month);
@@ -2012,7 +2034,7 @@ function adm_stlDriverSave(token, changes) {
   return run_(function () {
     const a = requireAdmin_(token);
     if (!Array.isArray(changes) || !changes.length || changes.length > 500) fail_('저장할 내용이 없습니다.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const D = stlDrivers_();
@@ -2172,7 +2194,7 @@ function adm_stlSetVendor(token, cids, vendor) {
     vendor = str_(vendor).slice(0, 60);
     if (!vendor) fail_('업체명을 넣어 주세요.');
     if (!Array.isArray(cids) || !cids.length || cids.length > 200) fail_('아이디를 골라 주세요.');
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock_();
     lock.waitLock(30000);
     let n = 0, added = 0, vAdd = 0;
     try {
