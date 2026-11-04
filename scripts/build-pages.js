@@ -9,7 +9,15 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, '_site');
-const api = String(process.env.RUNNER_API_URL || '').trim();
+const varUrl = String(process.env.RUNNER_API_URL || '').trim();
+const depId = String(process.env.DEPLOYMENT_ID || '').trim();
+// 자동 배포가 새 버전을 올리는 배포(DEPLOYMENT_ID)가 있으면 그 주소를 쓴다.
+// (RUNNER_API_URL 에 다른 배포 주소를 넣으면 그 배포는 옛 코드에 머물러 '알 수 없는 요청'이 날 수 있음)
+const depUrl = /^[\w-]{20,}$/.test(depId) ? 'https://script.google.com/macros/s/' + depId + '/exec' : '';
+const api = depUrl || varUrl;
+if (depUrl && varUrl && depUrl !== varUrl) {
+  console.log('::warning::RUNNER_API_URL 이 자동 배포(DEPLOYMENT_ID)와 다른 배포를 가리킵니다. 화면은 자동 배포 쪽 주소를 씁니다.');
+}
 
 if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(api)) {
   console.error('RUNNER_API_URL 이 없거나 형식이 다릅니다.\n' +
