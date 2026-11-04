@@ -4437,7 +4437,7 @@
       k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax)) +
       k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 입금차감 ' + wn(t.depDed)) +
       k('회사이익 (공급가)', wn(t.profit), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
-      k('러너 잉여 (프백 차감 + 보험 차액)', wn(t.fbCut + t.insGain), '프백 ' + wn(t.fbCut) + ' · 보험 ' + wn(t.insGain)) +
+      k('러너 잉여 (프백 잉여 + 보험 차액)', wn((t.fbKeep || 0) + t.fbCut + t.insGain), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 보험 ' + wn(t.insGain)) +
       k('러너 보험 실부담', wn(t.runnerIns), '공단 실납부 − 기사 공제') +
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
     $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count + '</summary><ul>' +

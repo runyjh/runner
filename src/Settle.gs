@@ -99,7 +99,7 @@ const STL_METHODS = ['배송기본', '프레시백', '미계약', '기타프로�
 const STL_CFG = [
   ['vat', '부가세율', '10%', '쿠팡 정산서 금액(공급가) → 부가세 포함 환산'],
   ['incRate', '프백 가중치(추가인센티브) 기사 지급률', '100%', ''],
-  ['freshRate', '프레시백 회수 인센티브 기사 지급률', '100%', '100% = 전액 기사'],
+  ['freshRate', '프레시백 회수 인센티브 기사 지급률', '100%', '100% = 전액 기사. 나머지는 러너 프백 잉여'],
   ['uncFee', '미계약 라우트 업체 수수료율', '10%', '기사 지급 = 미계약 금액 × (1 − 수수료율)'],
   ['etcRate', '기타(프로모션·소급) 기사 지급률', '0%', ''],
   ['lossRate', '분실파손 기사 부담률', '100%', ''],
@@ -133,7 +133,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261104b';
+const STL_CALC_VER = '20261104c';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -874,7 +874,7 @@ function stlCompute_(month) {
     const g = X.groups[gkey], main = g.main, o = D.byId[g.ownerId] || {};
     return (S[gkey] = {
       id: gkey, cid: g.cid, name: o.name || '(명의자 없음) ' + String(g.cid).replace(/@.*$/, ''), owner: o, ownerId: g.ownerId || '',
-      type: main.type, mode: main.mode, insEx: main.insEx, fbCutTxt: main.fbCut, workers: {}, ids: {}, qty: 0, base: 0, inc: 0, freshRaw: 0, fresh: 0, fbCut: 0, unc: 0, etc: 0,
+      type: main.type, mode: main.mode, insEx: main.insEx, fbCutTxt: main.fbCut, workers: {}, ids: {}, qty: 0, base: 0, inc: 0, freshRaw: 0, fresh: 0, fbCut: 0, fbKeep: 0, unc: 0, etc: 0,
       loss: 0, lossCp: 0, sales: 0, supplyCp: 0, campPay: {}, routes: {}, daily: {}, lossLines: [], yong: [], yongPay: 0, yongCut: 0, yongLines: [],
       noPriceQty: 0, rows: 0, movedIn: {}, movedOut: {}
     });
@@ -926,6 +926,7 @@ function stlCompute_(month) {
       (byDateLogin[dk] = byDateLogin[dk] || []).push({ route: normCode_(r.route), qty: qty, sales: sales, unit: u.u, camp: camp, cid: r.cid });
     } else if (kind === '프레시백') {
       pay = stlR0_(fresh * cfg.freshRate); s.freshRaw += fresh; s.fresh += pay;
+      s.fbKeep += fresh - pay; // 프백 잉여: 쿠팡 회수 인센티브 중 기사 지급률(예 89%) 밖의 몫 → 러너
     } else if (kind === '미계약') {
       pay = stlR0_(total * (1 + cfg.vat) * (1 - cfg.uncFee)); s.unc += pay;
     } else if (kind === '기타') {
@@ -1085,7 +1086,7 @@ function stlCompute_(month) {
     });
   });
   const drivers = [], slips = {};
-  const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, profit: 0, runnerIns: 0, fbCut: 0, insGain: 0, sales: 0 };
+  const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, profit: 0, runnerIns: 0, fbCut: 0, fbKeep: 0, insGain: 0, sales: 0 };
   Object.keys(S).forEach(function (id) {
     const s = S[id], f = fin(id, extraAdj[id]);
     const o = s.owner;
@@ -1098,7 +1099,7 @@ function stlCompute_(month) {
       id: id, cid: s.cid, name: s.name, ownerId: s.ownerId, ids: X.groups[id].cids.length, cids: X.groups[id].cids.slice(), usedCids: Object.keys(s.ids), type: s.type || '', mode: s.mode || '',
       workers: workers.filter(function (w) { return !w.owner; }).map(function (w) { return w.name; }),
       workDays: s.sched.days, qty: s.qty, sales: s.sales,
-      base: s.base, inc: s.inc, fresh: s.fresh, fbCut: s.fbCut, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
+      base: s.base, inc: s.inc, fresh: s.fresh, fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
       profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!o.accountEnc, bizNo: o.bizNo || '',
@@ -1110,7 +1111,7 @@ function stlCompute_(month) {
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
       daily: s.daily, sched: s.sched.cells, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers,
       movedIn: stlMoveList_(s.movedIn), movedOut: stlMoveList_(s.movedOut) };
-    ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'profit', 'runnerIns', 'fbCut', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
+    ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
   });
   drivers.sort(function (a, b) { return b.sales - a.sales || koCmp_(a.name, b.name); });
 
