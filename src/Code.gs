@@ -52,6 +52,10 @@ const D = {
   carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
   schCampId: '소속캠프ID', schCamp: '소속캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무',
   workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서',
+  // 정산관리 (Settle.gs) — 서브 쿠팡 ID 줄은 '정산 대상 기사ID'에 메인 기사를 넣으면 한 기사로 합쳐 정산
+  stlOwner: '정산 대상 기사ID', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
+  tmpPrice: '기사 일시단가', tmpRoutes: '기사 일시단가 노선', tmpFrom: '기사 일시단가 시작일', tmpTo: '기사 일시단가 종료일',
+  bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
   docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증',
   docFolder: '서류 폴더',
@@ -64,7 +68,8 @@ const D = {
   pwHash: '비밀번호 해시', pwSalt: '비밀번호 솔트'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
-const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder'];
+const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
+  'stlOwner', 'stlMode', 'insEx', 'fbCut', 'tmpPrice', 'tmpRoutes', 'tmpFrom', 'tmpTo', 'bizNo', 'bizName', 'bizEmail'];
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {

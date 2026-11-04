@@ -148,6 +148,64 @@
   .meta { font-size: 12px; color: var(--sub); display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
   .warnbox { background: var(--warn-weak); color: #8a5a00; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
 
+
+  /* 정산관리 */
+  .st-info { font-size: 13px; color: var(--sub); margin: -4px 0 12px; display: flex; gap: 6px 14px; flex-wrap: wrap; }
+  .st-info b { color: var(--ink); }
+  .st-info .closed { color: #fff; background: var(--ink); border-radius: 6px; padding: 1px 8px; font-weight: 700; }
+  #view-settle .head { flex-wrap: wrap; gap: 8px; }
+  #view-settle .head .tools { flex-wrap: wrap; }
+  .st-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .st-tools .search { max-width: 260px; }
+  .st-help { font-size: 13px; margin: 0 0 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .kpi { background: #fff; border-radius: 10px; padding: 12px 14px; }
+  .kpi small { display: block; font-size: 12px; color: var(--sub); }
+  .kpi b { font-size: 18px; }
+  .kpi em { display: block; font-style: normal; font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+  .stw { border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; background: var(--warn-weak); color: #7a4f00; }
+  .stw.bad { background: var(--danger-weak); color: #a1262b; }
+  .stw.info { background: var(--gray-weak); color: var(--sub); }
+  .stw summary { cursor: pointer; font-weight: 700; }
+  .stw ul { margin: 6px 0 0; padding-left: 18px; columns: 2; }
+  table.sttbl { font-size: 13px; }
+  table.sttbl th, table.sttbl td { padding: 8px 10px; }
+  table.sttbl td.n, table.sttbl th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.sttbl tr.clk { cursor: pointer; } table.sttbl tr.clk:hover td { background: #f5f8ff; }
+  table.sttbl tr.tot td { font-weight: 700; background: #fafbfc; }
+  table.sttbl td.neg { color: var(--danger); font-weight: 700; }
+  table.sttbl.ed td { padding: 4px 6px; }
+  table.sttbl.ed .inp { height: 32px; padding: 0 8px; font-size: 13px; min-width: 70px; }
+  table.sttbl.ed td.calc { color: var(--sub); font-size: 12px; white-space: nowrap; }
+  table.sttbl .inp.dirty { border-color: var(--warn); background: #fffdf7; }
+  .ed-bar { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+  .ed-del { border: 0; background: none; color: var(--faint); font-size: 16px; padding: 0 6px; }
+  .ed-del:hover { color: var(--danger); }
+  .mg-box { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 12px; font-size: 13px; }
+  .mg-box p { margin: 0 0 10px; }
+  .mg-sec { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; font-size: 13px; }
+  .mg-sec h4 { margin: 0 0 6px; font-size: 14px; }
+  .mg-sec ul { margin: 4px 0 0; padding-left: 18px; max-height: 220px; overflow: auto; }
+  .up-sum { background: var(--gray-weak); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; line-height: 1.7; }
+  .m-box.slip-box { width: min(1080px, 100%); max-height: 94vh; display: flex; flex-direction: column; padding: 0; }
+  .slip { overflow: auto; padding: 18px 22px; font-size: 12.5px; }
+  .slip h2 { font-size: 17px; margin: 0 0 12px; }
+  .slip h4 { font-size: 13px; margin: 14px 0 6px; padding: 4px 8px; background: #eef3fb; border-radius: 4px; }
+  .slip .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .slip table { min-width: 0; width: 100%; font-size: 12px; }
+  .slip th, .slip td { padding: 4px 6px; border: 1px solid #e3e6ea; white-space: nowrap; }
+  .slip td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .slip .big td { font-size: 14px; font-weight: 700; }
+  .slip .smemo { color: var(--faint); font-size: 11px; white-space: normal; }
+  .slip .foot { color: var(--sub); font-size: 11.5px; margin-top: 6px; }
+  @media print {
+    body * { visibility: hidden; }
+    #stSlipBox, #stSlipBox * { visibility: visible; }
+    #stSlipModal { position: absolute; inset: 0; background: #fff; display: block; padding: 0; }
+    #stSlipBox.m-box { position: absolute; left: 0; top: 0; width: 100%; max-height: none; box-shadow: none; border-radius: 0; }
+    .slip { overflow: visible; padding: 0; }
+    .noprint { display: none !important; }
+  }
   /* 모달 */
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; }
   .m-box { background: #fff; border-radius: 14px; width: min(420px, 100%); padding: 20px; }
@@ -510,7 +568,7 @@
       <a class="on" data-view="drivers">기사 정보관리</a>
       <a data-view="sched">기사스케줄</a>
       <a data-view="route">노선관리</a>
-      <a class="off">정산관리 <small>준비 중</small></a>
+      <a data-view="settle">정산관리</a>
       <a data-view="memo">업무스케줄</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a data-view="bib">배번호 관리</a>
@@ -679,6 +737,75 @@
         <div class="camp-list" id="campList"></div>
       </div>
       <div id="campMain"></div>
+    </div>
+   </section>
+   <section id="view-settle" class="hidden">
+    <div class="head">
+      <h2>정산관리</h2>
+      <div class="tools">
+        <button class="btn ghost sm" id="stPrev" aria-label="이전 달">◀</button>
+        <select class="inp" id="stMonth" aria-label="정산월" style="width:auto"></select>
+        <button class="btn ghost sm" id="stNext" aria-label="다음 달">▶</button>
+        <button class="btn ghost" id="stRecalc" title="시트에서 직접 고친 내용까지 다시 계산">다시 계산</button>
+        <button class="btn ghost" id="stCloseBtn">마감</button>
+        <button class="btn" id="stUpBtn">쿠팡 정산서 올리기</button>
+        <input type="file" id="stFile" accept=".xlsx,.csv" class="hidden">
+      </div>
+    </div>
+    <div class="st-info" id="stInfo"></div>
+    <div class="tabs" id="stTabs">
+      <button class="tab on" data-st="list">기사별 정산</button>
+      <button class="tab" data-st="adjust">공제·가감</button>
+      <button class="tab" data-st="advance">가불금</button>
+      <button class="tab" data-st="yongcha">용차</button>
+      <button class="tab" data-st="pay">입금목록</button>
+      <button class="tab" data-st="drv">기사 정산정보</button>
+      <button class="tab" data-st="cfg">정산 설정</button>
+    </div>
+    <div id="stp-list">
+      <div class="kpis" id="stKpi"></div>
+      <div id="stWarn"></div>
+      <div class="st-tools"><input class="inp search" id="stQ" placeholder="이름·쿠팡ID 검색" autocomplete="off"><span class="sub" id="stCnt"></span></div>
+      <div class="table-wrap"><table class="sttbl" id="stTable"></table><div class="empty hidden" id="stEmpty"></div></div>
+    </div>
+    <div id="stp-edit" class="hidden">
+      <div class="tabs sub2 hidden" id="stCfgTabs">
+        <button class="tab on" data-cfg="config">지급률·보험·일정</button>
+        <button class="tab" data-cfg="items">명세서 항목</button>
+        <button class="tab" data-cfg="camps">캠프별 산재·고용</button>
+        <button class="tab" data-cfg="regular">정기 수당·공제</button>
+        <button class="tab" data-cfg="target">목표 매출 수당</button>
+        <button class="tab" data-cfg="split">동일인 매출 분할</button>
+        <button class="tab" data-cfg="leave">퇴사 보류금</button>
+        <button class="tab" data-cfg="kinds">쿠팡 구분값</button>
+        <button class="tab" data-cfg="migrate">기존 정산 시트 가져오기</button>
+      </div>
+      <p class="sub st-help" id="stEditHelp"></p>
+      <div id="stEditor"></div>
+      <div id="stMigrate" class="hidden">
+        <div class="mg-box">
+          <p>예전에 쓰던 <b>러너_쿠팡정산관리_2026</b> 시트의 기록(쿠팡 원천·분실·차수, 공제·가불·용차, 설정)을 정산 DB 로 옮기고, 기사마스터의 계좌·사업자·정산 방식은 <b>기사 정보의 빈 칸만</b>, 노선단가는 <b>노선관리 구분별 단가의 빈 칸만</b> 채웁니다. 먼저 <b>미리보기</b>로 확인하세요.</p>
+          <input class="inp" id="mgUrl" placeholder="기존 정산 시트 주소 (https://docs.google.com/spreadsheets/d/…)" value="https://docs.google.com/spreadsheets/d/1FGT4imiZAk3nk4QVNcyH82RtAPBkXz_1m87KsUByids/edit">
+          <label class="check"><input type="checkbox" id="mgReplace"> 정산 DB 에 이미 있는 기록을 지우고 다시 가져오기</label>
+          <label class="check"><input type="checkbox" id="mgPrices"> 노선관리 단가가 기존 시트와 다르면 기존 시트 값으로 바꾸기</label>
+          <div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" id="mgDry">미리보기</button><button class="btn" id="mgRun">가져오기</button></div>
+        </div>
+        <div id="mgOut"></div>
+      </div>
+    </div>
+    <div id="stp-pay" class="hidden">
+      <div class="st-tools">
+        <span class="sub" id="payInfo"></span>
+        <label class="check" style="margin:0"><input type="checkbox" id="payOnlyLeft" checked> 미입금만</label>
+        <button class="btn ghost sm" id="payCopy" title="은행 대량이체에 붙여넣기: 은행, 계좌번호, 예금주, 금액">대량이체용 복사</button>
+        <button class="btn ghost sm" id="payReload">새로고침</button>
+      </div>
+      <div class="table-wrap"><table class="sttbl" id="payTable"></table></div>
+    </div>
+    <div id="stp-drv" class="hidden">
+      <p class="sub st-help">러너 올인원 DB 의 기사 정보(drivers 탭)에 저장됩니다. <b>서브 쿠팡 ID</b> 기사 줄에는 <b>정산 대상</b>에 메인 기사를 고르면 금액이 그 기사 명세서·입금으로 합쳐집니다. 은행·계좌는 기사 정보관리에서 고칩니다.</p>
+      <div class="st-tools"><input class="inp search" id="sdQ2" placeholder="이름·쿠팡ID 검색" autocomplete="off"><label class="check" style="margin:0"><input type="checkbox" id="sdActive" checked> 승인 기사만</label><span class="sub" id="sdDirty"></span><button class="btn sm" id="sdSave2" disabled>저장</button></div>
+      <div class="table-wrap"><table class="sttbl ed" id="sdTable"></table></div>
     </div>
    </section>
   </main>
@@ -922,6 +1049,27 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ───────────── 정산: 쿠팡 정산서 올리기 확인 ───────────── -->
+<div class="modal hidden" id="stUpModal">
+  <div class="m-box" style="width:min(520px,100%)">
+    <h3>쿠팡 정산서 올리기</h3>
+    <div id="stUpInfo" class="up-sum"></div>
+    <div class="grid2">
+      <div class="field"><label class="lb" for="stUpMonth">정산월</label><input class="inp" id="stUpMonth" type="month"></div>
+      <div class="field"><label class="lb" for="stUpRound">차수</label><select class="inp" id="stUpRound"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+    </div>
+    <p class="sub" id="stUpNote" style="font-size:13px"></p>
+    <div class="m-actions"><button type="button" class="btn ghost" id="stUpCancel">닫기</button><button class="btn" id="stUpOk">반영</button></div>
+  </div>
+</div>
+<!-- ───────────── 정산: 명세서 ───────────── -->
+<div class="modal hidden" id="stSlipModal">
+  <div class="m-box slip-box" id="stSlipBox">
+    <div class="m-top noprint"><b id="stSlipTitle">정산서</b><button class="btn ghost sm" id="stSlipPrev">◀ 이전 기사</button><button class="btn ghost sm" id="stSlipNext">다음 기사 ▶</button><button class="btn sm" id="stSlipPrint">인쇄 · PDF</button><button class="btn ghost sm" id="stSlipClose">닫기</button></div>
+    <div class="slip" id="stSlip"></div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -1612,6 +1760,8 @@
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
     $('#view-route').classList.toggle('hidden', v !== 'route');
     $('#view-sched').classList.toggle('hidden', v !== 'sched');
+    $('#view-settle').classList.toggle('hidden', v !== 'settle');
+    if (v === 'settle') loadSettle();
     if (v === 'sched') loadSched();
     if (v === 'bib') loadBib();
     if (v === 'route') loadRoutes();
@@ -4194,6 +4344,541 @@
     else if (sec === 'bib') { closeBib(true); if (currentView === 'bib') loadBib(); }
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#rzModal').classList.contains('hidden') && !$('#rzOk').textContent.includes('지우는')) $('#rzModal').classList.add('hidden'); });
+
+  // ───── 정산관리 ─────
+  const STX = { month: '', months: [], sum: null, items: [], tab: 'list', cfg: 'config', table: null, edRows: [], edDirty: false, slipIds: [], slipAt: -1, drv: null, drvDirty: {}, pay: null, up: null };
+  const wn = (v) => (Math.round(Number(v) || 0)).toLocaleString('ko-KR');
+  const wnz = (v) => (Number(v) ? wn(v) : '-');
+  const ymTitle = (m) => (m ? +m.slice(0, 4) + '년 ' + +m.slice(5, 7) + '월' : '');
+  const mdTxt = (d) => (d ? +d.slice(5, 7) + '/' + +d.slice(8, 10) : '');
+  const ST_DRV_ID = { name: 'driverId', who: 'whoId', payer: 'payerId', from: 'fromId', to: 'toId' };
+  const ST_HELP = {
+    adjust: '이 정산월에 기사별로 더 주거나 빼는 돈. 항목에 따라 세금계산서에 반영(지급·계산서 차감)되거나 입금액에서만 빠집니다(가불금 상환·기타 공제). 차감도 양수로 입력. 배송 기본 같은 자동 항목을 고르면 그 금액에 ± 조정됩니다.',
+    advance: '기사에게 내준 가불금. 상환하면 상환금 칸에 입력하세요. 그 달 정산에서 빼려면 [공제·가감]에 "가불금 상환" 줄을 넣습니다. 상계 예정일이 지났는데 남은 금액이 있으면 기사별 정산 화면에 경고가 뜹니다.',
+    yongcha: '이 정산기간 날짜의 용차 기록. 우리 기사가 대신 뛰면 수행자에 그 기사 → 노선 단가와의 차액만 추가 지급. 용차업체(정산 방식 "용차내역" 기사)는 이 금액으로 지급. 차액부담 기사를 넣으면 (용차 금액 − 그 기사 단가×건수)를 그 기사 계산서에서 뺍니다.',
+    config: '지급률·보험·일정 기본값. 바꾸면 마감하지 않은 달 전체가 다시 계산됩니다.',
+    items: '명세서에 나오는 줄 이름표. 계산 방식이 "직접입력"인 항목은 [공제·가감]에서 금액을 넣습니다. "입금가산" = 계산서에는 빼고 실입금에만 더함. 자동 항목(배송기본·분실파손 등)의 계산 방식은 바꾸지 마세요.',
+    camps: '캠프마다 기사에게 공제할 산재·고용 산식. 빈 칸은 기본값(지급률·보험 탭). 기사가 여러 캠프를 뛰면 지급액 비중대로 나눕니다. 공단 실제 납부는 항상 기본값으로 계산하고, 차이는 러너 몫으로 잡힙니다.',
+    regular: '매달 똑같이 주거나 빼는 돈. 시작월·종료월(2026-11 처럼) 사이의 정산월에 자동으로 들어갑니다. 그만둘 땐 줄을 지우지 말고 종료월을 넣으세요.',
+    target: '1년 계산서 합계가 목표에 맞도록 매달 수당 자동 계산: 수당 = 연 목표 ÷ 12 − 수당 빼고 이번 달 계산서 (단위 아래 버림).',
+    split: '한 사람이 두 이름으로 계산서를 나눌 때: 원 기사 실수령이 목표 이상이 되는 범위에서 나머지를 받는 기사로 넘깁니다 (세무사 확인 필수).',
+    leave: '퇴사월 명세서에 "퇴사 보류금"(입금 차감) → 다음 달에 "보류금 반환"(입금 가산). 다음 달 분실파손은 계산서에서 그대로 빠집니다.',
+    kinds: '쿠팡 정산서 "구분" 값을 계산 분류로 바꾸는 표. 새 구분값이 나오면 여기에 추가하세요.'
+  };
+  function loadSettle(month, fresh) {
+    if (!STX.sum) $('#stTable').innerHTML = '<tr><td style="padding:40px"><div class="spin"></div></td></tr>';
+    return api('adm_stlMonth', month || STX.month || '', !!fresh).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      STX.month = r.month; STX.months = r.months; STX.sum = r.summary; STX.items = r.items || [];
+      const sel = $('#stMonth');
+      sel.innerHTML = STX.months.slice().reverse().map((m) => '<option value="' + m + '"' + (m === STX.month ? ' selected' : '') + '>' + ymTitle(m) + ' 정산</option>').join('');
+      paintStInfo();
+      if (STX.tab === 'list') renderStList();
+      else stShowTab(STX.tab, true);
+      if (fresh) toast('다시 계산했습니다.');
+    }).catch(() => {});
+  }
+  function paintStInfo() {
+    const s = STX.sum; if (!s) return;
+    const d = s.dates || {};
+    $('#stInfo').innerHTML = '<span>정산기간 <b>' + esc(s.period.from) + ' ~ ' + esc(s.period.to) + '</b></span>' +
+      '<span>' + (s.round ? '쿠팡 정산서 <b>' + s.round + '차</b> 반영' + (s.roundAt ? ' (' + esc(String(s.roundAt).slice(0, 16)) + ')' : '') : '<b style="color:var(--danger)">쿠팡 정산서 없음</b>') + '</span>' +
+      '<span>쿠팡 입금예정 <b>' + esc(d.coupang || '') + '</b></span><span>기사 지급일 <b>' + esc(d.pay || '') + '</b></span><span>계산서 발행기한 <b>' + esc(d.invoice || '') + '</b></span>' +
+      (s.closed ? '<span class="closed">마감 ' + esc(String(s.closed.at).slice(0, 16)) + ' · ' + esc(s.closed.admin) + '</span>' : '<span>계산 ' + esc(String(s.computedAt || '').slice(11, 16)) + '</span>');
+    $('#stCloseBtn').textContent = s.closed ? '마감 해제' : '이 달 마감';
+    $('#stCloseBtn').classList.toggle('danger-t', !!s.closed);
+  }
+  function renderStList() {
+    const s = STX.sum; if (!s) return;
+    const t = s.total, c = s.company;
+    const k = (lab, v, sub) => '<div class="kpi"><small>' + lab + '</small><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
+    $('#stKpi').innerHTML = k('쿠팡 매출 (VAT포함)', wn(c.sales), '공급가 ' + wn(c.supplyCp) + (c.lossCp ? ' · 분실차감 ' + wn(c.lossCp) : '')) +
+      k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax)) +
+      k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 입금차감 ' + wn(t.depDed)) +
+      k('회사이익 (공급가)', wn(t.profit), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
+      k('러너 잉여 (프백 차감 + 보험 차액)', wn(t.fbCut + t.insGain), '프백 ' + wn(t.fbCut) + ' · 보험 ' + wn(t.insGain)) +
+      k('러너 보험 실부담', wn(t.runnerIns), '공단 실납부 − 기사 공제') +
+      k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
+    $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count + '</summary><ul>' +
+      w.items.map((x) => '<li>' + esc(x) + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
+    const q = $('#stQ').value.trim().toLowerCase();
+    const list = s.drivers.filter((d) => !q || d.name.toLowerCase().includes(q) || d.cids.some((x) => x.toLowerCase().includes(q)));
+    STX.slipIds = list.map((d) => d.id);
+    const H = ['이름', '쿠팡ID', '근무일', '배송건수', '지급 합계', '계산서 차감', '세금계산서', '공급가', '세액', '산재', '고용', '입금차감', '실입금', '회사이익', '입금'];
+    const num = (v, neg) => '<td class="n' + (neg && v < 0 ? ' neg' : '') + '">' + wnz(v) + '</td>';
+    const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
+      '<td class="sub">' + esc(d.cids.map((x) => x.replace(/@.*/, '')).join(', ')) + '</td>' +
+      '<td class="n">' + (d.workDays || '-') + '</td>' + num(d.qty) + num(d.pay) + num(d.taxDed) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
+      '<td>' + (d.checked ? '<span style="color:var(--ok);font-weight:700">✓ ' + esc(mdTxt(d.payDate)) + '</span>' : '') + '</td></tr>';
+    const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + '<td></td>' + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';
+    $('#stTable').innerHTML = '<thead><tr>' + H.map((h, i) => '<th' + (i > 2 && i < 14 ? ' class="n"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + totRow + list.map(tr).join('') + '</tbody>';
+    $('#stCnt').textContent = list.length + '명';
+    $('#stEmpty').classList.toggle('hidden', !!s.drivers.length);
+    $('#stEmpty').textContent = s.round ? '정산할 기사가 없습니다.' : '이 달 쿠팡 정산서가 아직 없습니다. 오른쪽 위 [쿠팡 정산서 올리기]로 엑셀을 넣어 주세요.';
+  }
+  function stShowTab(tab, keep) {
+    if (STX.tab !== tab && STX.edDirty && !confirm('저장하지 않은 변경이 있습니다. 버리고 넘어갈까요?')) return;
+    STX.tab = tab; STX.edDirty = false;
+    $$('#stTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.st === tab));
+    $('#stp-list').classList.toggle('hidden', tab !== 'list');
+    $('#stp-edit').classList.toggle('hidden', !['adjust', 'advance', 'yongcha', 'cfg'].includes(tab));
+    $('#stp-pay').classList.toggle('hidden', tab !== 'pay');
+    $('#stp-drv').classList.toggle('hidden', tab !== 'drv');
+    $('#stCfgTabs').classList.toggle('hidden', tab !== 'cfg');
+    if (tab === 'list') { if (STX.sum) renderStList(); else loadSettle(STX.month); }
+    else if (tab === 'pay') loadPay();
+    else if (tab === 'drv') loadStDrivers();
+    else if (tab === 'cfg') stCfgTab(STX.cfg);
+    else loadEditor(tab);
+  }
+  function stCfgTab(name) {
+    if (STX.cfg !== name && STX.edDirty && !confirm('저장하지 않은 변경이 있습니다. 버리고 넘어갈까요?')) return;
+    STX.cfg = name; STX.edDirty = false;
+    $$('#stCfgTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.cfg === name));
+    $('#stMigrate').classList.toggle('hidden', name !== 'migrate');
+    $('#stEditor').classList.toggle('hidden', name === 'migrate');
+    $('#stEditHelp').textContent = name === 'migrate' ? '' : ST_HELP[name] || '';
+    if (name !== 'migrate') loadEditor(name);
+  }
+  // ── 표 편집 ──
+  function loadEditor(name) {
+    $('#stEditHelp').textContent = ST_HELP[name] || '';
+    $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    return api('adm_stlTable', name, STX.month).then((r) => {
+      if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
+      STX.table = r; STX.edRows = r.rows.map((x) => Object.assign({}, x)); STX.edDirty = false;
+      renderEditor();
+    }).catch(() => {});
+  }
+  function ownerLabel(o, all) { return all.filter((x) => x.name === o.name).length > 1 ? o.name + ' (' + (o.loginId || o.id) + ')' : o.name; }
+  function renderEditor() {
+    const T = STX.table, rows = STX.edRows, ro = T.closed;
+    const dl = '<datalist id="stOwnersDL">' + T.owners.map((o) => '<option value="' + esc(ownerLabel(o, T.owners)) + '">' + esc(o.status !== '승인' ? o.status : '') + '</option>').join('') + '</datalist>';
+    const calcH = T.name === 'yongcha' ? ['자동건수', '지급액', '쿠팡매출', '기존지급', '추가지급', '부담 차감'] : T.name === 'advance' ? ['잔여'] : [];
+    const cell = (r, i, c) => {
+      const v = r[c.k] == null ? '' : String(r[c.k]);
+      const at = ' data-r="' + i + '" data-k="' + c.k + '"' + (ro ? ' disabled' : '');
+      if (c.type === 'readonly') return '<td>' + esc(v) + '</td>';
+      if (c.type === 'select' || c.type === 'item' || c.type === 'camp') {
+        let opts = c.type === 'item' ? [''].concat(T.items) : c.type === 'camp' ? [''].concat(T.camps) : c.opts;
+        if (v && !opts.includes(v)) opts = opts.concat([v]);
+        return '<td><select class="inp"' + at + '>' + opts.map((o) => '<option' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select></td>';
+      }
+      const type = c.type === 'date' ? 'date' : c.type === 'month' ? 'month' : 'text';
+      const extra = c.type === 'driver' || c.type === 'driverOrText' ? ' list="stOwnersDL"' : c.type === 'money' ? ' inputmode="decimal" style="text-align:right;width:110px"' : '';
+      return '<td><input class="inp" type="' + type + '"' + at + extra + ' value="' + esc(c.type === 'money' && v ? wn(v) : v) + '"></td>';
+    };
+    const calc = (r) => {
+      if (T.name === 'yongcha') {
+        const x = r._calc; if (!x) return '<td class="calc" colspan="6">저장하면 계산</td>';
+        return '<td class="calc">' + (x.autoQty === '' ? '-' : wn(x.autoQty)) + '</td><td class="calc">' + wn(x.payAmt) + '</td><td class="calc">' + wnz(x.sales) + '</td><td class="calc">' + wnz(x.existing) + '</td><td class="calc">' + wnz(x.extra) + '</td><td class="calc">' + wnz(x.cut) + '</td>';
+      }
+      if (T.name === 'advance') { const left = (Number(String(r.amt).replace(/,/g, '')) || 0) - (Number(String(r.paid).replace(/,/g, '')) || 0); return '<td class="calc"' + (left > 0 ? ' style="color:var(--danger);font-weight:700"' : '') + '>' + wnz(left) + '</td>'; }
+      return '';
+    };
+    const head = '<thead><tr>' + T.cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + calcH.map((h) => '<th class="n">' + h + '</th>').join('') + (T.fixed ? '' : '<th></th>') + '</tr></thead>';
+    const body = rows.map((r, i) => '<tr>' + T.cols.map((c) => cell(r, i, c)).join('') + calc(r) + (T.fixed || ro ? '' : '<td><button class="ed-del" data-del="' + i + '" title="줄 지우기">×</button></td>') + '</tr>').join('');
+    const scope = T.name === 'adjust' || T.name === 'yongcha' ? ymTitle(STX.month) + ' 정산 · ' : '';
+    $('#stEditor').innerHTML = dl + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : (T.fixed ? '' : '<button class="btn ghost sm" id="edAdd">+ 줄 추가</button>') +
+      '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button>') +
+      '<span class="sub">' + scope + rows.length + '줄 · 정산 DB "' + esc({ adjust: 'stl_adjust', advance: 'stl_advance', yongcha: 'stl_yongcha', config: 'stl_config', items: 'stl_items', camps: 'stl_camps', regular: 'stl_regular', target: 'stl_target', split: 'stl_split', leave: 'stl_leave', kinds: 'stl_kinds' }[T.name] || '') + '" 탭에서도 직접 고칠 수 있습니다</span></div>' +
+      '<div class="table-wrap"><table class="sttbl ed">' + head + '<tbody>' + body + '</tbody></table>' + (rows.length ? '' : '<div class="empty">기록이 없습니다.</div>') + '</div>';
+  }
+  function edMark() { STX.edDirty = true; const s = $('#edSave'), u = $('#edUndo'); if (s) s.disabled = false; if (u) u.disabled = false; }
+  $('#stEditor').addEventListener('input', (e) => {
+    const el = e.target.closest('[data-k]'); if (!el) return;
+    const r = STX.edRows[+el.dataset.r], k = el.dataset.k;
+    r[k] = el.value;
+    if (ST_DRV_ID[k] && ST_DRV_ID[k] in r) r[ST_DRV_ID[k]] = '';
+    el.classList.add('dirty'); edMark();
+  });
+  $('#stEditor').addEventListener('change', (e) => { const el = e.target.closest('select[data-k]'); if (el) { STX.edRows[+el.dataset.r][el.dataset.k] = el.value; el.classList.add('dirty'); edMark(); } });
+  $('#stEditor').addEventListener('click', (e) => {
+    if (e.target.id === 'edAdd') {
+      const o = {}; STX.table.cols.forEach((c) => { o[c.k] = ''; });
+      if (STX.table.name === 'yongcha') { o.mode = '건당'; o.date = STX.sum ? STX.sum.period.from : ''; }
+      if (STX.table.name === 'split') o.repeat = 'Y';
+      STX.edRows.push(o); edMark(); renderEditor();
+      const last = $$('#stEditor tbody tr'); if (last.length) { const f = last[last.length - 1].querySelector('.inp'); if (f) f.focus(); }
+      return;
+    }
+    const del = e.target.closest('[data-del]');
+    if (del) { STX.edRows.splice(+del.dataset.del, 1); edMark(); renderEditor(); return; }
+    if (e.target.id === 'edUndo') { STX.edRows = STX.table.rows.map((x) => Object.assign({}, x)); STX.edDirty = false; renderEditor(); return; }
+    if (e.target.id === 'edSave') {
+      const b = e.target; b.disabled = true;
+      const rows = STX.edRows.map((r) => { const o = {}; STX.table.cols.forEach((c) => { o[c.k] = r[c.k] == null ? '' : String(r[c.k]).replace(/^(\d{1,3}(,\d{3})+)$/, (m) => m.replace(/,/g, '')); }); Object.keys(ST_DRV_ID).forEach((k) => { if (r[ST_DRV_ID[k]]) o[ST_DRV_ID[k]] = r[ST_DRV_ID[k]]; }); return o; });
+      api('adm_stlTableSave', STX.table.name, STX.month, rows, STX.table.seen).then((r) => {
+        if (!r.ok) { b.disabled = false; return toast(r.msg); }
+        toast('저장했습니다 (' + r.rows + '줄). 정산에 바로 반영됩니다.');
+        STX.edDirty = false; STX.sum = null;
+        loadEditor(STX.table.name);
+        api('adm_stlMonth', STX.month, false).then((x) => { if (x.ok) { STX.sum = x.summary; paintStInfo(); } }).catch(() => {});
+      }).catch(() => { b.disabled = false; });
+    }
+  });
+  // ── 명세서 ──
+  function openSlip(id) {
+    STX.slipAt = STX.slipIds.indexOf(id);
+    $('#stSlipModal').classList.remove('hidden');
+    $('#stSlip').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
+    api('adm_stlSlip', STX.month, id).then((r) => {
+      if (!r.ok) { $('#stSlipModal').classList.add('hidden'); return toast(r.msg); }
+      $('#stSlip').innerHTML = slipHtml(r);
+      $('#stSlipTitle').textContent = r.slip.row.name + ' · ' + ymTitle(r.month) + ' 정산서';
+      $('#stSlipPrev').disabled = STX.slipAt <= 0; $('#stSlipNext').disabled = STX.slipAt < 0 || STX.slipAt >= STX.slipIds.length - 1;
+    }).catch(() => {});
+  }
+  function slipHtml(r) {
+    const s = r.slip, d = s.row, co = r.company, P = r.period, D = r.dates;
+    const pays = s.lines.filter((l) => l.side === '지급' && l.method !== '입금가산'), deds = s.lines.filter((l) => l.side === '차감'), adds = s.lines.filter((l) => l.method === '입금가산');
+    const li = (l, sign) => '<tr><td>' + esc(l.name) + (l.memo ? '<div class="smemo">' + esc(l.memo) + '</div>' : '') + '</td><td class="n">' + (l.amt ? sign + wn(l.amt) : '-') + '</td></tr>';
+    const n = Math.max(pays.length + adds.length, deds.length);
+    const dedSum = deds.reduce((a, l) => a + l.amt, 0);
+    const days = Object.keys(s.daily).concat(Object.keys(s.sched || {})).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
+    const work = Object.keys(s.sched || {}).filter((x) => x >= P.from && x <= P.to).length;
+    const dow = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayRows = days.map((x) => { const dd = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)); const v = s.daily[x] || {}; return '<tr><td>' + mdTxt(x) + ' (' + dow[dd.getDay()] + ')</td><td>' + esc((s.sched || {})[x] || '') + '</td><td class="n">' + wnz(v.qty) + '</td><td class="n">' + wnz(v.amt) + '</td></tr>'; });
+    const half = Math.ceil(dayRows.length / 2);
+    const dayTbl = (rows) => '<table><thead><tr><th>날짜</th><th>스케줄</th><th>건수</th><th>금액</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+    const routes = s.routes.map((x) => '<tr><td>' + esc(x.camp) + '</td><td>' + esc(x.route) + '</td><td>' + esc(x.how || '') + '</td><td class="n">' + wn(x.qty) + '</td><td class="n">' + wn(x.unit) + '</td><td class="n">' + wnz(x.inc) + '</td><td class="n">' + wn(x.unit + x.inc) + '</td><td class="n">' + wn(x.amt) + '</td></tr>').join('');
+    const rq = s.routes.reduce((a, x) => a + x.qty, 0), ra = s.routes.reduce((a, x) => a + x.amt, 0);
+    const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>용차 · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담)') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? '+' + wn(y.extra) : '−' + wn(y.cut)) + '</td></tr>').join('');
+    const loss = (s.loss || []).map((x) => '<tr><td>' + mdTxt(x.date) + '</td><td>분실 · ' + esc(x.item || x.detail || x.type || '') + (x.waybill ? '<div class="smemo">' + esc(x.waybill) + '</div>' : '') + '</td><td class="n">−' + wn(x.amt) + '</td></tr>').join('');
+    return '<h2>' + ymTitle(r.month) + ' ' + esc(co.name || '러너') + ' 정산서 (급여내역서) — ' + esc(d.name) + '</h2>' +
+      '<div class="cols"><div><h4>① 기본 정보 · 정산 요약 (부가세 포함)</h4><table><tbody>' +
+      '<tr><th>기사명</th><td>' + esc(d.name) + '</td><th>정산월</th><td>' + esc(r.month) + '</td></tr>' +
+      '<tr><th>사용 ID</th><td>' + esc(d.cids.map((x) => x.replace(/@.*/, '')).join(', ')) + '</td><th>정산기간</th><td>' + mdTxt(P.from) + ' ~ ' + mdTxt(P.to) + '</td></tr>' +
+      '<tr><th>총 배송수량</th><td>' + wn(d.qty) + '건</td><th>근무일수</th><td>' + (d.workDays || 0) + '일 <small class="sub">(기사스케줄)</small></td></tr>' +
+      '<tr><th>일평균 수량</th><td>' + (d.workDays ? (Math.round(d.qty / d.workDays * 10) / 10) + '건' : Object.keys(s.daily).length ? (Math.round(d.qty / Object.keys(s.daily).length * 10) / 10) + '건 <small class="sub">(배송일 ' + Object.keys(s.daily).length + '일 기준)</small>' : '-') + '</td><th>계산서 발행기한</th><td>' + esc(D.invoice || '') + ' 까지</td></tr>' +
+      '<tr><th>지급일</th><td>' + esc(D.pay || '') + '</td><th>사업자번호</th><td>' + esc(d.bizNo || '-') + '</td></tr></tbody></table>' +
+      '<table style="margin-top:8px"><thead><tr><th colspan="2">지급 내역</th><th colspan="2">차감 · 공제</th></tr></thead><tbody>' +
+      Array.from({ length: n }, (_, i) => { const p = pays.concat(adds)[i], q = deds[i]; return '<tr>' + (p ? li(p, '+').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + (q ? li(q, '−').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + '</tr>'; }).join('') +
+      '<tr class="big"><td>지급 합계</td><td class="n">+' + wn(d.pay + d.depAdd) + '</td><td>공제 합계</td><td class="n">−' + wn(dedSum) + '</td></tr></tbody></table>' +
+      '<table style="margin-top:8px"><thead><tr><th>세금계산서 (기사 → ' + esc(co.name || '러너') + ')</th><th>공급가액</th><th>세액</th><th>합계</th></tr></thead><tbody><tr><td>발행 금액</td><td class="n">' + wn(d.supply) + '</td><td class="n">' + wn(d.tax) + '</td><td class="n">' + wn(d.invoice) + '</td></tr>' +
+      '<tr class="big"><td>실 입금액</td><td colspan="3" class="n">' + wn(d.net) + '원</td></tr></tbody></table>' +
+      '<div class="foot">입금계좌: ' + esc(d.bank || '') + ' ' + esc(d.account || '') + ' (' + esc(d.holder || d.name) + ')' + (s.ins && !s.ins.excluded && s.ins.bosu ? ' · 산재·고용 보수액 ' + wn(s.ins.bosu) + ' (경비율 ' + (Math.round(s.ins.exp * 1000) / 10) + '%)' : '') + '</div></div>' +
+      '<div><h4>② 노선별 내역 (단가·금액 부가세 포함)</h4><table><thead><tr><th>캠프</th><th>라우트</th><th>단가 기준</th><th>건수</th><th>기본단가</th><th>프백가중</th><th>합계단가</th><th>금액</th></tr></thead><tbody>' + routes +
+      '<tr class="big"><td colspan="3">합계</td><td class="n">' + wn(rq) + '</td><td colspan="3"></td><td class="n">' + wn(ra) + '</td></tr></tbody></table></div></div>' +
+      '<h4>③ 일자별 내역 (기사스케줄 · 쿠팡 배송)</h4><div class="cols"><div>' + dayTbl(dayRows.slice(0, half)) + '</div><div>' + dayTbl(dayRows.slice(half)) + '</div></div>' +
+      '<div class="foot">스케줄 출근 ' + (d.workDays || 0) + '일 · 스케줄 기록 ' + work + '일 · 쿠팡 배송 ' + Object.keys(s.daily).length + '일. 기간 밖 날짜의 수기반영(소급분)은 일자별에서 빠지고 합계에는 포함됩니다.</div>' +
+      '<h4>④ 용차 · 분실파손 내역 · 세금계산서 안내</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong + loss || '<tr><td colspan="3" class="sub">용차·분실 없음</td></tr>') + '</tbody></table>' +
+      '<table style="margin-top:8px"><tbody><tr><th>공급받는자</th><td>' + esc(co.name) + ' / 대표 ' + esc(co.ceo) + '</td></tr><tr><th>사업자번호</th><td>' + esc(co.bizNo) + (co.email ? ' / ' + esc(co.email) : '') + '</td></tr>' +
+      '<tr><th>작성일자 / 품목</th><td>' + esc(D.writeDate || '') + ' / 배송(' + esc(r.month) + ')</td></tr><tr><th>발행 금액</th><td>공급가 ' + wn(d.supply) + ' + 세액 ' + wn(d.tax) + ' = ' + wn(d.invoice) + '원</td></tr>' +
+      '<tr><th>발행기한</th><td>' + esc(D.invoice || '') + ' 이내 — 지연 시 가산세</td></tr></tbody></table><div class="foot">※ 위 금액 그대로 세금계산서를 발행해 주세요.</div>';
+  }
+  $('#stTable').addEventListener('click', (e) => { const tr = e.target.closest('[data-slip]'); if (tr) openSlip(tr.dataset.slip); });
+  $('#stSlipClose').addEventListener('click', () => $('#stSlipModal').classList.add('hidden'));
+  $('#stSlipPrint').addEventListener('click', () => window.print());
+  $('#stSlipPrev').addEventListener('click', () => { if (STX.slipAt > 0) openSlip(STX.slipIds[STX.slipAt - 1]); });
+  $('#stSlipNext').addEventListener('click', () => { if (STX.slipAt >= 0 && STX.slipAt < STX.slipIds.length - 1) openSlip(STX.slipIds[STX.slipAt + 1]); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#stSlipModal').classList.contains('hidden')) $('#stSlipModal').classList.add('hidden'); });
+  // ── 입금목록 ──
+  function loadPay() {
+    $('#payTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
+    return api('adm_stlPayList', STX.month).then((r) => { if (!r.ok) return toast(r.msg); STX.pay = r; renderPay(); }).catch(() => {});
+  }
+  function renderPay() {
+    const P = STX.pay; if (!P) return;
+    const only = $('#payOnlyLeft').checked;
+    const list = P.list.filter((x) => !only || !x.checked);
+    const total = P.list.reduce((a, x) => a + x.net, 0), done = P.list.filter((x) => x.checked).reduce((a, x) => a + x.net, 0);
+    $('#payInfo').innerHTML = '총 입금액 <b>' + wn(total) + '</b> · 입금 완료 <b>' + wn(done) + '</b> · 남은 금액 <b style="color:var(--danger)">' + wn(total - done) + '</b> · 미입금 <b>' + P.list.filter((x) => !x.checked).length + '명</b> · 지급일 ' + esc((P.dates || {}).pay || '');
+    $('#payTable').innerHTML = '<thead><tr><th>입금</th><th>이름</th><th>은행</th><th>계좌번호</th><th>예금주</th><th class="n">지급총액</th><th class="n">공제</th><th class="n">입금액</th><th>입금일</th><th>메모</th><th class="n">계산서 공급가</th><th class="n">세액</th><th>사업자번호</th></tr></thead><tbody>' +
+      list.map((x) => '<tr><td><input type="checkbox" data-pay="' + esc(x.id) + '"' + (x.checked ? ' checked' : '') + '></td><td><b>' + esc(x.name) + '</b></td><td>' + esc(x.bank) + '</td><td>' + (x.account ? esc(x.account) : '<span style="color:var(--danger)">미입력</span>') + '</td><td>' + esc(x.holder) + '</td>' +
+        '<td class="n">' + wn(x.pay) + '</td><td class="n">' + wnz(x.ded) + '</td><td class="n' + (x.net < 0 ? ' neg' : '') + '"><b>' + wn(x.net) + '</b></td><td>' + esc(x.payDate || '') + '</td>' +
+        '<td><input class="inp" style="height:30px;min-width:120px" data-pmemo="' + esc(x.id) + '" value="' + esc(x.memo || '') + '"></td><td class="n">' + wn(x.supply) + '</td><td class="n">' + wn(x.tax) + '</td><td class="sub">' + esc(x.bizNo || '') + '</td></tr>').join('') + '</tbody>';
+  }
+  $('#payOnlyLeft').addEventListener('change', renderPay);
+  $('#payReload').addEventListener('click', loadPay);
+  $('#payTable').addEventListener('change', (e) => {
+    const c = e.target.closest('[data-pay]'), m = e.target.closest('[data-pmemo]');
+    const x = c || m; if (!x) return;
+    const id = c ? c.dataset.pay : m.dataset.pmemo;
+    const body = c ? { id, checked: c.checked } : { id, memo: m.value };
+    api('adm_stlPaySet', STX.month, [body]).then((r) => {
+      if (!r.ok) { toast(r.msg); return loadPay(); }
+      const it = STX.pay.list.find((y) => y.id === id);
+      if (it && c) { it.checked = c.checked; it.payDate = c.checked ? (it.payDate || new Date().toISOString().slice(0, 10)) : ''; }
+      if (it && m) it.memo = m.value;
+      if (STX.sum) { const d = STX.sum.drivers.find((y) => y.id === id); if (d && c) { d.checked = c.checked; d.payDate = it ? it.payDate : ''; } }
+      renderPay();
+    }).catch(() => {});
+  });
+  $('#payCopy').addEventListener('click', () => {
+    const P = STX.pay; if (!P) return;
+    const list = P.list.filter((x) => !x.checked && x.net > 0);
+    const tsv = list.map((x) => [x.bank, x.account, x.holder, x.net].join('\t')).join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(tsv) : Promise.reject()).then(() => toast(list.length + '명 복사했습니다 (은행, 계좌번호, 예금주, 금액).')).catch(() => toast('복사하지 못했습니다.'));
+  });
+  // ── 기사 정산정보 ──
+  const SD_COLS = [['stlOwner', '정산 대상 (서브 ID → 메인 기사)', 'owner'], ['stlMode', '정산 방식', 'mode'], ['insEx', '산재·고용 제외', 'check'], ['fbCut', '프레시백 차감', 'text'],
+    ['tmpPrice', '기사 일시단가', 'text'], ['tmpRoutes', '일시단가 노선 (비우면 전체)', 'text'], ['tmpFrom', '시작일', 'date'], ['tmpTo', '종료일', 'date'], ['bizNo', '사업자등록번호', 'text'], ['bizName', '상호', 'text'], ['bizEmail', '계산서 이메일', 'text']];
+  function loadStDrivers() {
+    $('#sdTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
+    return api('adm_stlDrivers').then((r) => { if (!r.ok) return toast(r.msg); STX.drv = r; STX.drvDirty = {}; renderStDrivers(); }).catch(() => {});
+  }
+  function renderStDrivers() {
+    const R = STX.drv; if (!R) return;
+    const q = $('#sdQ2').value.trim().toLowerCase(), act = $('#sdActive').checked;
+    const byId = {}; R.drivers.forEach((d) => { byId[d.id] = d; });
+    const lab = (d) => d.name + ' (' + (d.loginId || d.id) + ')';
+    const list = R.drivers.filter((d) => (!act || d.status === '승인' || d.stlOwner) && (!q || [d.name, d.loginId].some((x) => String(x || '').toLowerCase().includes(q))));
+    const val = (d, k) => (STX.drvDirty[d.id] && k in STX.drvDirty[d.id] ? STX.drvDirty[d.id][k] : d[k]);
+    const cell = (d, c) => {
+      const v = val(d, c[0]) || '', at = ' data-sd="' + esc(d.id) + '" data-k="' + c[0] + '"', dirty = STX.drvDirty[d.id] && c[0] in STX.drvDirty[d.id] ? ' dirty' : '';
+      if (c[2] === 'owner') return '<td><input class="inp' + dirty + '" list="sdOwnDL"' + at + ' value="' + esc(byId[v] ? lab(byId[v]) : v) + '" placeholder="(본인)" style="min-width:150px"></td>';
+      if (c[2] === 'mode') return '<td><select class="inp' + dirty + '"' + at + '>' + R.modes.map((m) => '<option value="' + m + '"' + (m === v ? ' selected' : '') + '>' + (m || '구분별 단가') + '</option>').join('') + '</select></td>';
+      if (c[2] === 'check') return '<td style="text-align:center"><input type="checkbox"' + at + (v === 'Y' ? ' checked' : '') + '></td>';
+      return '<td><input class="inp' + dirty + '" type="' + (c[2] === 'date' ? 'date' : 'text') + '"' + at + ' value="' + esc(v) + '"' + (c[0] === 'fbCut' ? ' placeholder="13% 또는 금액" style="width:110px"' : c[0] === 'tmpPrice' ? ' style="width:90px"' : '') + '></td>';
+    };
+    $('#sdTable').innerHTML = '<datalist id="sdOwnDL">' + R.drivers.filter((d) => !d.stlOwner).map((d) => '<option value="' + esc(lab(d)) + '">').join('') + '</datalist>' +
+      '<thead><tr><th>이름</th><th>쿠팡ID</th><th>상태</th><th>구분</th>' + SD_COLS.map((c) => '<th>' + c[1] + '</th>').join('') + '<th>은행 · 계좌 · 예금주</th></tr></thead><tbody>' +
+      list.map((d) => '<tr><td><b>' + esc(d.name) + '</b></td><td class="sub">' + esc(d.loginId) + '</td><td>' + esc(d.status) + '</td><td>' + esc(d.type || '고정') + '</td>' + SD_COLS.map((c) => cell(d, c)).join('') +
+        '<td class="sub">' + esc([d.bank, d.account, d.holder].filter(Boolean).join(' · ') || '-') + '</td></tr>').join('') + '</tbody>';
+    const n = Object.keys(STX.drvDirty).length;
+    $('#sdDirty').textContent = n ? n + '명 바뀜' : ''; $('#sdSave2').disabled = !n;
+  }
+  const sdSet = (el) => {
+    const id = el.dataset.sd, k = el.dataset.k, d = STX.drv.drivers.find((x) => x.id === id);
+    let v = el.type === 'checkbox' ? (el.checked ? 'Y' : '') : el.value.trim();
+    if (k === 'stlOwner') { const m = v.match(/\(([^)]+)\)\s*$/); const hit = STX.drv.drivers.find((x) => v && (x.name + ' (' + (x.loginId || x.id) + ')' === v || x.id === v)); v = hit ? hit.id : v; if (m && !hit) v = el.value.trim(); }
+    const ch = STX.drvDirty[id] || (STX.drvDirty[id] = {});
+    if (String(d[k] || '') === v) delete ch[k]; else ch[k] = v;
+    if (!Object.keys(ch).length) delete STX.drvDirty[id];
+    el.classList.toggle('dirty', !!(STX.drvDirty[id] && k in STX.drvDirty[id]));
+    const n = Object.keys(STX.drvDirty).length; $('#sdDirty').textContent = n ? n + '명 바뀜' : ''; $('#sdSave2').disabled = !n;
+  };
+  $('#sdTable').addEventListener('change', (e) => { const el = e.target.closest('[data-sd]'); if (el) sdSet(el); });
+  onSearch($('#sdQ2'), renderStDrivers);
+  $('#sdActive').addEventListener('change', renderStDrivers);
+  $('#sdSave2').addEventListener('click', () => {
+    const changes = Object.keys(STX.drvDirty).map((id) => ({ id, f: STX.drvDirty[id] }));
+    if (!changes.length) return;
+    $('#sdSave2').disabled = true;
+    api('adm_stlDriverSave', changes).then((r) => {
+      if (!r.ok) { $('#sdSave2').disabled = false; return toast(r.msg); }
+      toast(r.saved + '명 저장했습니다.'); STX.sum = null; loadStDrivers();
+    }).catch(() => { $('#sdSave2').disabled = false; });
+  });
+  // ── 기존 시트 가져오기 ──
+  function mgRun(dry) {
+    const url = $('#mgUrl').value.trim();
+    if (!url) return toast('기존 정산 시트 주소를 넣어 주세요.');
+    if (!dry && !confirm('기존 정산 시트의 기록을 정산 DB 로 가져오고, 기사 정보·노선 단가의 빈 칸을 채웁니다. 진행할까요?')) return;
+    $('#mgOut').innerHTML = '<div style="padding:30px"><div class="spin"></div> 읽는 중… (1~2분 걸릴 수 있습니다)</div>';
+    $('#mgDry').disabled = $('#mgRun').disabled = true;
+    api('adm_stlMigrate', url, { dry, replace: $('#mgReplace').checked, overwritePrices: $('#mgPrices').checked }).then((r) => {
+      if (!r.ok) { $('#mgOut').innerHTML = ''; return toast(r.msg); }
+      $('#mgOut').innerHTML = mgHtml(r.report);
+      if (!dry) { toast('가져왔습니다.'); STX.sum = null; loadSettle(r.report.compare && r.report.compare.month || STX.month); }
+    }).catch(() => { $('#mgOut').innerHTML = ''; }).finally(() => { $('#mgDry').disabled = $('#mgRun').disabled = false; });
+  }
+  function mgHtml(R) {
+    const ul = (a) => (a && a.length ? '<ul>' + a.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '<p class="sub">없음</p>');
+    const rd = R.read, dv = R.drivers, pr = R.prices;
+    let h = '<div class="mg-sec"><h4>' + (R.dry ? '미리보기 (아직 아무것도 바꾸지 않았습니다)' : '가져오기 완료') + '</h4>' +
+      '쿠팡 원천 ' + wn(rd.raw) + '줄 (' + esc(rd.months.join(', ')) + ') · 분실 ' + wn(rd.loss) + '줄 · 차수이력 ' + wn(rd.rounds) + ' · 공제·가감 ' + rd.adjust + ' · 가불 ' + rd.advance + ' · 용차 ' + rd.yongcha +
+      '<br>설정: 명세서 항목 ' + rd.items + ' · 값 ' + rd.config + ' · 캠프 산식 ' + rd.camps + ' · 정기 ' + rd.regular + ' · 목표 ' + rd.target + ' · 분할 ' + rd.split + ' · 퇴사보류 ' + rd.leave +
+      (R.existing && R.existing.length ? '<br><b style="color:var(--danger)">정산 DB 에 이미 기록 있음: ' + esc(R.existing.join(', ')) + ' → "지우고 다시" 체크 필요</b>' : '') + '</div>';
+    h += '<div class="mg-sec"><h4>기사 정보 (기사마스터 ' + rd.master + '줄 → 빈 칸만 채움)</h4>새로 만들 기사 줄 (상태 정지) ' + dv.created.length + ' · 채울 기사 ' + dv.filled + '명 · ' +
+      Object.keys(dv.fields).map((k) => esc(k) + ' ' + dv.fields[k]).join(' · ') + ul(dv.created) + '<b>서브 ID 묶기</b>' + ul(dv.linked) + '<b>값이 달라 그대로 둔 칸</b>' + ul(dv.conflicts) + '</div>';
+    h += '<div class="mg-sec"><h4>노선관리 단가 (노선단가 ' + rd.prices + '줄)</h4>새 단가 줄 ' + pr.added + ' · 빈 칸 채울 줄 ' + pr.filled +
+      '<b><br>노선관리에 없는 캠프</b>' + ul(pr.noCamp) + '<b>노선관리에 없는 노선 (먼저 노선을 등록해야 단가가 들어갑니다)</b>' + ul(pr.noRoute) + '<b>단가가 다른 곳' + ($('#mgPrices').checked ? ' (기존 값으로 바꿈)' : ' (러너 값 유지)') + '</b>' + ul(pr.conflicts) + '</div>';
+    if (R.unresolved && R.unresolved.length) h += '<div class="mg-sec"><h4>기사를 찾지 못한 이름 (기록은 이름으로 남김)</h4>' + ul(R.unresolved) + '</div>';
+    const C = R.compare;
+    if (C && C.rows) {
+      h += '<div class="mg-sec"><h4>' + esc(C.month) + ' 비교 — 기존 시트 vs 새 계산 (실입금 같은 기사 ' + C.same + ' / ' + C.total + ')</h4><div class="table-wrap"><table class="sttbl"><thead><tr><th>기존 이름</th><th>러너 이름</th><th class="n">건수 기존</th><th class="n">새</th><th class="n">계산서 기존</th><th class="n">새</th><th class="n">실입금 기존</th><th class="n">새</th><th class="n">차이</th></tr></thead><tbody>' +
+        C.rows.map((x) => '<tr><td>' + esc(x.name) + '</td><td>' + esc(x.newName) + '</td><td class="n">' + wnz(x.oldQty) + '</td><td class="n">' + wnz(x.newQty) + '</td><td class="n">' + wnz(x.oldInvoice) + '</td><td class="n">' + wnz(x.newInvoice) + '</td><td class="n">' + wnz(x.oldNet) + '</td><td class="n">' + wnz(x.newNet) + '</td><td class="n' + (Math.abs(x.diff) >= 1 ? ' neg' : '') + '">' + (Math.abs(x.diff) >= 1 ? wn(x.diff) : '같음') + '</td></tr>').join('') + '</tbody></table></div>' +
+        '<p class="sub" style="margin:6px 0 0">차이가 나면 대부분 노선관리 단가가 기존 노선단가와 다르거나, 단가·노선이 아직 없어서입니다. 기사별 정산 화면의 "확인 필요"를 보세요.</p></div>';
+    } else if (C && C.error) h += '<div class="mg-sec">비교 실패: ' + esc(C.error) + '</div>';
+    return h;
+  }
+  $('#mgDry').addEventListener('click', () => mgRun(true));
+  $('#mgRun').addEventListener('click', () => mgRun(false));
+  // ── 쿠팡 정산 엑셀 읽기 (외부 프로그램 없이 브라우저에서 .xlsx 압축을 풀어 읽는다) ──
+  async function readXlsx(buf) {
+    const u8 = new Uint8Array(buf), dv = new DataView(buf);
+    let eocd = -1;
+    for (let i = u8.length - 22; i >= Math.max(0, u8.length - 70000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) throw new Error('엑셀(.xlsx) 파일이 아닙니다');
+    const count = dv.getUint16(eocd + 10, true);
+    let p = dv.getUint32(eocd + 16, true);
+    const files = {};
+    const dec = new TextDecoder('utf-8');
+    for (let n = 0; n < count; n++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+      const name = dec.decode(u8.subarray(p + 46, p + 46 + nlen));
+      files[name.replace(/^\//, '')] = { method, csize, off };
+      p += 46 + nlen + elen + clen;
+    }
+    const text = async (name) => {
+      const f = files[name]; if (!f) return '';
+      const ln = dv.getUint16(f.off + 26, true), le = dv.getUint16(f.off + 28, true);
+      const data = u8.subarray(f.off + 30 + ln + le, f.off + 30 + ln + le + f.csize);
+      if (f.method === 0) return dec.decode(data);
+      if (typeof DecompressionStream === 'undefined') throw new Error('이 브라우저는 엑셀 읽기를 지원하지 않습니다. 크롬·엣지 최신 버전을 써 주세요');
+      const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+      return dec.decode(out);
+    };
+    const xml = (s) => new DOMParser().parseFromString(s, 'application/xml');
+    const tx = (el) => Array.from(el.getElementsByTagName('t')).map((t) => t.textContent).join('');
+    const sst = Array.from(xml(await text('xl/sharedStrings.xml')).getElementsByTagName('si')).map(tx);
+    const wb = xml(await text('xl/workbook.xml')), rels = xml(await text('xl/_rels/workbook.xml.rels'));
+    const target = {};
+    Array.from(rels.getElementsByTagName('Relationship')).forEach((r) => { target[r.getAttribute('Id')] = r.getAttribute('Target'); });
+    const colNum = (ref) => { let c = 0; for (const ch of ref) { const k = ch.charCodeAt(0); if (k < 65 || k > 90) break; c = c * 26 + (k - 64); } return c - 1; };
+    const sheets = [];
+    for (const sh of Array.from(wb.getElementsByTagName('sheet'))) {
+      const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+      let t = target[rid] || ''; t = t.replace(/^\/?xl\//, '').replace(/^\//, '');
+      const doc = xml(await text('xl/' + t));
+      const rows = [];
+      Array.from(doc.getElementsByTagName('row')).forEach((row, ri) => {
+        const rn = (+row.getAttribute('r') || ri + 1) - 1, arr = rows[rn] = [];
+        let auto = 0;
+        Array.from(row.getElementsByTagName('c')).forEach((c) => {
+          const ref = c.getAttribute('r'), ci = ref ? colNum(ref) : auto; auto = ci + 1;
+          const typ = c.getAttribute('t'), vEl = c.getElementsByTagName('v')[0], v = vEl ? vEl.textContent : '';
+          let val = '';
+          if (typ === 's') val = sst[+v] || '';
+          else if (typ === 'inlineStr') { const is = c.getElementsByTagName('is')[0]; val = is ? tx(is) : ''; }
+          else if (typ === 'str' || typ === 'e') val = typ === 'e' ? '' : v;
+          else if (typ === 'b') val = v === '1';
+          else val = v === '' ? '' : Number(v);
+          arr[ci] = val;
+        });
+      });
+      for (let i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
+      sheets.push({ name: sh.getAttribute('name'), rows });
+    }
+    return sheets;
+  }
+  function readCsv(buf) {
+    let s = new TextDecoder('utf-8').decode(buf);
+    if ((s.match(/�/g) || []).length > 5) { try { s = new TextDecoder('euc-kr').decode(buf); } catch (e) { /* 그대로 */ } }
+    s = s.replace(/^﻿/, '');
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (q) { if (ch === '"') { if (s[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === ',') { row.push(cur); cur = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && s[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+      else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return [{ name: 'csv', rows }];
+  }
+  const ST_RAW_MAP = { kind: ['구분'], cid: ['ID 및 영업점 수수료', 'ID', '아이디', '배송원ID'], route: ['라우트', '노선', 'route'], date: ['배송일자', '일자', '날짜', '배송일'], camp: ['캠프명', '캠프'],
+    dtype: ['배송유형(주간/심야)', '배송유형'], vendor: ['업체명', '업체'], qty: ['배송건수', '배송수량'], ret: ['반품건수', '반품수량'], price: ['단가(반품동일)', '단가', '기본단가'],
+    inc: ['추가 인센티브', '추가인센티브', '추가인센티브(건당)', '인센티브단가'], base: ['기본 배송단가 금액', '기본배송금액', '기본금액'], incAmt: ['추가 인센티브 가중요인 금액', '추가인센티브금액', '인센티브금액'],
+    total: ['총금액', '합계금액'], fresh: ['프레시백 회수 인센티브', '프레쉬백 회수 인센티브', '재사용포장재 회수 인센티브', '프레시백'] };
+  const ST_RAW_KEYS = ['kind', 'cid', 'route', 'date', 'camp', 'dtype', 'vendor', 'qty', 'ret', 'price', 'inc', 'base', 'incAmt', 'total', 'fresh'];
+  const ST_LOSS_MAP = { date: ['날짜', '일자'], camp: ['캠프', '캠프명'], cid: ['ID', '아이디'], type: ['유형'], detail: ['상세', '사유'], cnt: ['개수', '수량'], amt: ['차감금액', '금액'],
+    vendor: ['업체명'], waybill: ['운송장번호', '운송장'], item: ['상품명(상세)', '상품명'] };
+  const ST_LOSS_KEYS = ['date', 'camp', 'cid', 'type', 'detail', 'cnt', 'amt', 'vendor', 'waybill', 'item'];
+  const hk = (v) => String(v == null ? '' : v).replace(/\s+/g, '').toLowerCase();
+  function mapHeader(row, MAP) {
+    const h = row.map(hk), out = {};
+    Object.keys(MAP).forEach((k) => { for (const cand of MAP[k]) { const i = h.indexOf(hk(cand)); if (i >= 0 && !Object.values(out).includes(i)) { out[k] = i; break; } } });
+    return out;
+  }
+  const xlDate = (v) => {
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    if (typeof v === 'number' && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10);
+    const m = String(v || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    return m ? m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) : String(v || '').trim();
+  };
+  function findTable(sheets, MAP, need, names) {
+    const order = sheets.slice().sort((a, b) => (names.some((n) => hk(n) === hk(b.name)) ? 1 : 0) - (names.some((n) => hk(n) === hk(a.name)) ? 1 : 0));
+    for (const sh of order) {
+      for (let r = 0; r < Math.min(20, sh.rows.length); r++) {
+        const m = mapHeader(sh.rows[r] || [], MAP);
+        if (need.every((k) => m[k] != null)) return { sheet: sh.name, head: r, map: m, rows: sh.rows.slice(r + 1) };
+      }
+    }
+    return null;
+  }
+  function parseCoupang(sheets) {
+    const raw = findTable(sheets, ST_RAW_MAP, ['cid', 'qty', 'total'], ['정산원천데이터', '원천데이터', '정산 원천 데이터']);
+    if (!raw) throw new Error('ID · 배송건수 · 총금액 열이 있는 시트를 찾지 못했습니다');
+    const loss = findTable(sheets.filter((s) => s.name !== raw.sheet), ST_LOSS_MAP, ['cid', 'amt'], ['분실및파손', '분실 및 파손', '분실파손']);
+    const pick = (T, KEYS) => T ? T.rows.map((r) => KEYS.map((k) => { const v = T.map[k] != null ? r[T.map[k]] : ''; return k === 'date' ? xlDate(v) : v === undefined || v === null ? '' : typeof v === 'number' ? v : String(v).trim(); }))
+      .filter((a) => { const cid = String(a[KEYS.indexOf('cid')] || ''); return cid && !/합계|총계/.test(cid) && !/합계|총계/.test(String(a[0] || '')); }) : [];
+    const rawRows = pick(raw, ST_RAW_KEYS), lossRows = pick(loss, ST_LOSS_KEYS);
+    const dates = rawRows.map((a) => a[3]).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const num = (v) => Number(String(v).replace(/[,\s원]/g, '')) || 0;
+    const monthOf = (d) => { if (!d) return ''; const y = +d.slice(0, 4), m = +d.slice(5, 7), dd = +d.slice(8, 10); const x = dd >= 26 ? new Date(y, m, 1) : new Date(y, m - 1, 1); return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2); };
+    const ids = new Set(rawRows.map((a) => a[1]));
+    return { raw: rawRows, loss: lossRows, rawSheet: raw.sheet, lossSheet: loss ? loss.sheet : '', from: dates[0] || '', to: dates[dates.length - 1] || '', month: monthOf(dates[dates.length - 1]),
+      ids: ids.size, total: rawRows.reduce((s, a) => s + num(a[13]) + num(a[14]), 0), lossAmt: lossRows.reduce((s, a) => s + num(a[6]), 0), qty: rawRows.reduce((s, a) => s + num(a[7]) + num(a[8]), 0) };
+  }
+  function b64(buf) { const u8 = new Uint8Array(buf); let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+  $('#stUpBtn').addEventListener('click', () => $('#stFile').click());
+  $('#stFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    if (f.size > 20 * 1024 * 1024) return toast('파일이 너무 큽니다 (20MB 까지).');
+    toast('파일 읽는 중…');
+    try {
+      const buf = await f.arrayBuffer();
+      const sheets = /\.csv$/i.test(f.name) ? readCsv(buf) : await readXlsx(buf);
+      const P = parseCoupang(sheets);
+      STX.up = { file: f, buf, P };
+      $('#stUpInfo').innerHTML = '<b>' + esc(f.name) + '</b><br>원천 시트 "' + esc(P.rawSheet) + '" ' + wn(P.raw.length) + '줄 · 쿠팡 ID ' + P.ids + '개 · 배송 ' + wn(P.qty) + '건 · 금액(공급가) ' + wn(P.total) +
+        '<br>배송일 ' + esc(P.from) + ' ~ ' + esc(P.to) + '<br>' + (P.lossSheet ? '분실파손 시트 "' + esc(P.lossSheet) + '" ' + P.loss.length + '줄 · ' + wn(P.lossAmt) + '원' : '분실파손 시트 없음');
+      $('#stUpMonth').value = P.month || STX.month;
+      upRound();
+      $('#stUpModal').classList.remove('hidden');
+    } catch (err) { toast('파일을 읽지 못했습니다: ' + (err && err.message || err)); }
+  });
+  function upRound() {
+    const m = $('#stUpMonth').value; if (!m) return;
+    $('#stUpNote').textContent = '확인 중…';
+    api('adm_stlRoundInfo', m).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      $('#stUpRound').value = String(Math.min(5, (r.latest || 0) + 1));
+      const P = STX.up.P, out = P.raw.filter((a) => a[3] && (a[3] < r.period.from || a[3] > r.period.to)).length;
+      $('#stUpNote').innerHTML = (r.closed ? '<b style="color:var(--danger)">' + m + ' 정산은 마감되어 올릴 수 없습니다.</b> ' : '') +
+        (r.latest ? '이미 ' + r.latest + '차가 있습니다. 반영하면 이 파일 내용으로 바뀌고, ID별 변동은 차수이력에 남습니다. ' : '') +
+        '정산기간 ' + r.period.from + ' ~ ' + r.period.to + (out ? ' · 기간 밖 배송일 ' + out + '줄 (소급분이면 그대로 두세요)' : '');
+      $('#stUpOk').disabled = !!r.closed;
+    }).catch(() => {});
+  }
+  $('#stUpMonth').addEventListener('change', upRound);
+  $('#stUpCancel').addEventListener('click', () => { $('#stUpModal').classList.add('hidden'); STX.up = null; });
+  $('#stUpOk').addEventListener('click', () => {
+    const U = STX.up; if (!U) return;
+    const month = $('#stUpMonth').value, round = +$('#stUpRound').value;
+    const b = $('#stUpOk'); b.disabled = true; b.textContent = '올리는 중…';
+    api('adm_stlSaveFile', month, round, U.file.name, b64(U.buf)).then((s) => {
+      if (!s.ok) throw new Error(s.msg);
+      return api('adm_stlImport', { month, round, file: s.name, url: s.url, raw: U.P.raw, loss: U.P.loss });
+    }).then((r) => {
+      if (!r.ok) throw new Error(r.msg);
+      $('#stUpModal').classList.add('hidden'); STX.up = null;
+      toast(month + ' ' + round + '차 반영: ' + wn(r.rows) + '줄 · ID ' + r.ids + '개' + (r.changed ? ' · 변동 ID ' + r.changed : ''));
+      STX.sum = null; loadSettle(month, true);
+    }).catch((err) => { if (err && err.message && err.message !== 'EXPIRED') toast(err.message); })
+      .finally(() => { b.disabled = false; b.textContent = '반영'; });
+  });
+  // ── 상단 ──
+  $('#stMonth').addEventListener('change', () => { STX.sum = null; loadSettle($('#stMonth').value); });
+  const stStep = (n) => { const i = STX.months.indexOf(STX.month) + n; if (i >= 0 && i < STX.months.length) { STX.sum = null; loadSettle(STX.months[i]); } };
+  $('#stPrev').addEventListener('click', () => stStep(-1));
+  $('#stNext').addEventListener('click', () => stStep(1));
+  $('#stRecalc').addEventListener('click', () => loadSettle(STX.month, true));
+  $('#stCloseBtn').addEventListener('click', () => {
+    const s = STX.sum; if (!s) { loadSettle(STX.month); return toast('정산을 다시 불러왔습니다. 한 번 더 눌러 주세요.'); }
+    const close = !s.closed;
+    if (!confirm(close ? ymTitle(STX.month) + ' 정산을 마감할까요?\n지금 계산 결과가 고정되고, 이 달의 쿠팡 정산서·공제·용차는 고칠 수 없게 됩니다 (입금체크는 계속 가능).' : ymTitle(STX.month) + ' 마감을 풀까요?\n다시 지금 데이터로 계산됩니다.')) return;
+    api('adm_stlClose', STX.month, close).then((r) => { if (!r.ok) return toast(r.msg); toast(close ? '마감했습니다.' : '마감을 풀었습니다.'); STX.sum = null; loadSettle(STX.month, true); }).catch(() => {});
+  });
+  $$('#stTabs .tab').forEach((b) => b.addEventListener('click', () => stShowTab(b.dataset.st)));
+  $$('#stCfgTabs .tab').forEach((b) => b.addEventListener('click', () => stCfgTab(b.dataset.cfg)));
+  onSearch($('#stQ'), renderStList);
 
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
   (function boot() {
