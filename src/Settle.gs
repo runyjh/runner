@@ -133,7 +133,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261104e';
+const STL_CALC_VER = '20261104f';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -912,7 +912,7 @@ function stlCompute_(month) {
       const base = stlR0_(qty * u.u), inc = stlR0_(qty * incU);
       s.base += base; s.inc += inc; s.qty += qty; pay = base + inc;
       wk.qty += qty; wk.amt += pay; wk.dates[r.date] = 1; wk.cids[r.cid] = 1;
-      if (qty && r.date >= P.from && r.date <= P.to) ((s.cidDays[r.cid] = s.cidDays[r.cid] || {}))[r.date] = 1;
+      if (qty && r.date >= P.from && r.date <= P.to) ((s.cidDays[login] = s.cidDays[login] || {}))[r.date] = 1;
       const rk = camp + '|' + normCode_(r.route) + '|' + u.u + '|' + incU;
       const rl = s.routes[rk] || (s.routes[rk] = { camp: camp, route: normCode_(r.route), how: u.how, unit: u.u, inc: incU, qty: 0, amt: 0 });
       rl.qty += qty; rl.amt += pay;
@@ -1251,7 +1251,7 @@ function stlGroupSched_(ctx, g, sched, P, cidDays) {
   g.cids.forEach(function (c, i) {
     const ws = Object.keys(cidW[c] || {}), shared = ws.some(function (w) { return seenW[w]; });
     ws.forEach(function (w) { seenW[w] = 1; });
-    const cp = Object.keys((cidDays || {})[c] || {}).length;
+    const cp = Object.keys((cidDays || {})[stlLogin_(c)] || {}).length;
     let n = per[c] || 0;
     if ((i > 0 && shared) || !n) n = cp;
     byCid.push({ cid: String(c).replace(/@.*$/, ''), days: n });
@@ -1263,6 +1263,8 @@ function stlGroupSched_(ctx, g, sched, P, cidDays) {
     Object.keys(cidDays || {}).forEach(function (c) { Object.keys(cidDays[c]).forEach(function (d) { all[d] = 1; }); });
     if (Object.keys(all).length) { days = Object.keys(all).length; src = 'coupang'; }
   }
+  // 아이디가 여럿이면 근무일수 = 아이디별 근무일의 합 (한 기사가 여러 아이디를 써도 합쳐서)
+  if (byCid.length > 1) { const sumD = byCid.reduce(function (a, x) { return a + x.days; }, 0); if (sumD) { days = sumD; if (src !== 'coupang') src = 'sum'; } }
   return { days: days, cells: cells, byCid: byCid, src: src };
 }
 

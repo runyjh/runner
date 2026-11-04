@@ -4584,7 +4584,7 @@
   /** 근무일수: 아이디가 하나면 '26일', 여럿이면 'dykimboho/26일, eeiei7llss/2일' */
   function wdTxt(d) {
     const by = (d.workDaysBy || []).filter((x) => x.days || (d.workDaysBy || []).length === 1);
-    if ((d.workDaysBy || []).length > 1 && by.length) return by.map((x) => esc(x.cid) + '/' + x.days + '일').join(', ');
+    if ((d.workDaysBy || []).length > 1 && by.length) return (d.workDays || 0) + '일 <small class="sub">(' + by.map((x) => esc(x.cid) + ' ' + x.days + '일').join(' + ') + ')</small>';
     return (d.workDays || 0) + '일 <small class="sub">(' + (d.workDaysSrc === 'coupang' ? '기사스케줄 기록 없음 → 쿠팡 배송일' : '기사스케줄') + ')</small>';
   }
   function slipHtml(r) {
