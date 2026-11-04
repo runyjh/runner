@@ -434,7 +434,7 @@ function api_myInfo(token) {
     };
   });
 }
-/** 내 스케줄에 붙일 품앗이: { 날짜: [{ role: '수행'|'지원', text, status }] } (내가 뛰는 확정 일감 + 지원·협의 중인 일감. 내가 올린 일감은 빼기) */
+/** 내 스케줄에 붙일 품앗이: { 날짜: [{ role: '수행'|'맡김'|'지원', text, status }] } (내가 뛰는 확정 일감 + 모집 중인 내 일감 + 지원·협의 중인 일감. 내 일감이 배차 확정되면 빼기) */
 function pmScheduleOf_(me, dates) {
   const out = {};
   if (!dates.length) return out;
@@ -446,7 +446,8 @@ function pmScheduleOf_(me, dates) {
     if (!set[j.date] || j.status === PST.CANCEL) return;
     const base = (j.camp ? j.camp.replace(/\s*캠프$/, '') + ' ' : '') + (j.route || j.area) + ' · ' + j.time;
     if (j.status === PST.DONE && j.acceptedId === me) (out[j.date] = out[j.date] || []).push({ role: '수행', id: j.id, text: base + ' (' + j.poster + ' 기사님 일)', status: '확정' });
-    // 내가 올린(맡긴) 일감은 내 스케줄에 넣지 않는다
+    // 내가 올린(맡긴) 일감: 모집 중·협의 중일 때만 보이고, 배차가 확정되면 내 스케줄에서 뺀다
+    else if (j.posterId === me && (j.status === PST.OPEN || j.status === PST.TALK)) (out[j.date] = out[j.date] || []).push({ role: '맡김', id: j.id, text: base, status: j.status });
   });
   d.apps.forEach(function (a) {
     if (a.driverId !== me || !set[a.date] || (a.status !== PAST.APPLY && a.status !== PAST.TALK)) return;
