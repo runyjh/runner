@@ -55,7 +55,7 @@ const STL_TABS = {
   stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' }
 };
 const STL_TAB_NOTES = {
-  stl_ids: '정산의 기준. 쿠팡 아이디 한 줄 = 하나. 구분: 메인 / 서브(메인 아이디 칸에 메인 쿠팡ID). 명의자 = 정산금·세금계산서를 받는 기사(이름). 단가 구분: 고정 / 백업 / 품앗이 / 외부용차. 정산 방식: 비우면 구분별 단가 / 원청단가 / 용차내역. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
+  stl_ids: '정산의 기준. 쿠팡 아이디 한 줄 = 하나. 구분: 메인 / 서브(메인 아이디 칸에 메인 쿠팡ID). 명의자 = 정산금·세금계산서를 받는 기사(이름). 단가 구분: 고정 / 백업 / 품앗이 / 외부용차 (메인 아이디는 기사 정보관리의 기사구분이 우선, 서브 아이디는 이 칸이 우선). 정산 방식: 비우면 구분별 단가 / 원청단가 / 용차내역. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
   stl_usage: '한 아이디로 여러 기사가 일할 때, 그 아이디로 일한 기사와 기간. 비우면 명의자가 일한 것으로 봅니다. 정산금은 항상 명의자에게 갑니다.',
   stl_tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.',
   stl_raw: '쿠팡 정산 엑셀을 [정산관리 → 쿠팡 정산서 올리기]로 넣으면 자동으로 채워집니다. 한 정산월에는 마지막으로 올린 차수만 남습니다.',
@@ -774,7 +774,9 @@ function stlPriceIndex_() {
  * 1) 정산 방식 용차내역 → 0 (용차 표 금액으로 지급)
  * 2) 그 날 그 아이디로 일한 기사의 일시단가 (기간·노선이 맞을 때)
  * 3) 원청단가 → 쿠팡 단가 × 1.1 (10원 반올림)
- * 4) 노선관리 구분별 단가: 아이디의 단가 구분 (고정 = 기사단가, 백업 = 백업단가, 품앗이 = 품앗이단가, 외부용차 = 외부단가)
+ * 4) 노선관리 구분별 단가 (고정 = 기사단가, 백업 = 백업단가, 품앗이 = 품앗이단가, 외부용차 = 외부단가). 구분은
+ *    메인 아이디: 기사 정보관리의 명의자 기사구분이 최우선 → 비어 있으면 아이디 관리의 단가 구분 → 고정
+ *    서브 아이디: 아이디 관리의 단가 구분 → 비어 있으면 메인과 같은 규칙
  */
 function stlUnit_(ctx, idx, r, worker) {
   const main = ctx.ids.by[idx.mainKey] || idx;
@@ -785,7 +787,8 @@ function stlUnit_(ctx, idx, r, worker) {
   if (mode === '원청단가') return { u: stlR10_(stlNum_(r.price) * (1 + ctx.cfg.vat)), how: '원청' };
   const f = ctx.price.find(r.camp, r.route);
   const ow = ctx.D.byId[main.ownerId];
-  const type = idx.type || main.type || (ow && STL_TYPES.indexOf(ow.driverType) >= 0 ? ow.driverType : '') || '고정';
+  const drvType = ow && STL_TYPES.indexOf(ow.driverType) >= 0 ? ow.driverType : '';
+  const type = (idx.role === '서브' && idx.type) || drvType || main.type || idx.type || '고정';
   if (!f.row) return { u: 0, missing: true, how: type, f: f };
   const v = stlNum_(f.row[STL_TYPE_KEY[type] || 'p2']);
   if (!v) return { u: 0, missing: true, how: type, f: f };
