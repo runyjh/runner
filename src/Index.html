@@ -712,7 +712,7 @@
     }).finally(() => clearTimeout(timer));
   }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  const API_BG = ['api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -745,6 +745,22 @@
     window.scrollTo(0, 0);
     curView = name;
     syncBack();
+    if (!BASE_VIEWS.includes(name) || name === 'home') ssSet('runner.view', name);
+  }
+  // 새로고침해도 보던 화면 그대로 (이 창·앱을 닫으면 잊음)
+  function ssSet(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) {} }
+  function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  let viewRestored = false;
+  function restoreView(v) {
+    if (!v || v === 'home') return false;
+    const open = {
+      notice: () => openNotices(''), sched: () => openSched(), pumasi: () => openPumasi('home'), pmform: () => openPumasi('home'),
+      pmdetail: () => { const id = ssGet('runner.pmId'); if (id) openPmDetail(id, 'pumasi'); else openPumasi('home'); },
+      mypage: () => openMyPage(), myinfo: () => { openMyPage(); show('myinfo'); }, pmalerts: () => openPmAlerts(), settle: () => openSettle(),
+      pmmine: () => { pmMineKind = ssGet('runner.pmKind') || 'posted'; show('pmmine'); loadPmMine(); }
+    }[v];
+    if (!open) return false;
+    try { open(); return true; } catch (e) { return false; }
   }
   // ───── 휴대폰 뒤로가기 = 이전 화면 (홈·로그인 화면에서만 앱 종료) ─────
   const BASE_VIEWS = ['home', 'login', 'splash', 'pending'];
@@ -830,8 +846,12 @@
   // ───── 시작: 자동 로그인 ─────
   // 저장된 사용자 정보가 있으면 홈을 먼저 보여주고(체감 속도), 서버 확인은 뒤에서 한다.
   function goHome(user) {
-    $('#homeName').textContent = (user && user.name ? user.name + ' 기사님' : '기사님') + ', 안녕하세요'; show('home'); setTimeout(() => loadNotices(), 0);
+    $('#homeName').textContent = (user && user.name ? user.name + ' 기사님' : '기사님') + ', 안녕하세요';
+    const saved = viewRestored ? null : ssGet('runner.view');
+    viewRestored = true;
+    show('home'); setTimeout(() => loadNotices(), 0);
     if (window.pmAlertStart) setTimeout(() => window.pmAlertStart(), 0);
+    if (saved) setTimeout(() => restoreView(saved), 0);
   }
   function goLogin() {
     const last = store.get(LAST_ID);
@@ -851,7 +871,9 @@
         let persist = false;
         try { persist = !!localStorage.getItem(TOKEN); } catch (e) {}
         store.set(USER, JSON.stringify(r.user), persist);
-        if (r.mustChange) openChangePw(true, ''); else goHome(r.user);
+        if (r.mustChange) openChangePw(true, '');
+        else if (cached && curView !== 'splash' && curView !== 'login') $('#homeName').textContent = (r.user && r.user.name ? r.user.name + ' 기사님' : '기사님') + ', 안녕하세요'; // 이미 홈(또는 새로고침 전 화면)을 보여 주는 중
+        else goHome(r.user);
       }
       else { clearSession(); goLogin(); if (cached) toast('다시 로그인해 주세요.'); }
     }).catch(() => { if (!cached) { goLogin(); netErr(); } });
@@ -877,6 +899,7 @@
   $('#logoutBtn').addEventListener('click', () => {
     const token = store.get(TOKEN);
     if (window.pmAlertStop) window.pmAlertStop(token);
+    ssSet('runner.view', null);
     clearSession(); goLogin();
     if (token) api('api_logout', token).catch(() => {});
   });
@@ -1322,7 +1345,7 @@
   $('#pmList').addEventListener('click', (e) => { const c = e.target.closest('[data-pj]'); if (c) openPmDetail(c.dataset.pj, 'pumasi'); });
 
   // 상세
-  function openPmDetail(id, from) { pmCurId = id; pmDetFrom = from || 'pumasi'; show('pmdetail'); loadPmDetail(); }
+  function openPmDetail(id, from) { pmCurId = id; pmDetFrom = from || 'pumasi'; ssSet('runner.pmId', id); show('pmdetail'); loadPmDetail(); }
   function pmBackFromDetail() {
     if (pmDetFrom === 'sched') { show('sched'); loadSched(); }
     else if (pmDetFrom === 'mine') { show('pmmine'); loadPmMine(); }
@@ -1537,7 +1560,7 @@
     if (k === 'push') return pushToggle();
     if (k === 'pw') return openChangePw(false, '');
     if (k === 'logout') return $('#logoutBtn').click();
-    pmMineKind = k; show('pmmine'); loadPmMine();
+    pmMineKind = k; ssSet('runner.pmKind', k); show('pmmine'); loadPmMine();
   });
   const PM_MINE = {
     posted: ['품앗이 관리', '내가 올린 일감입니다. 눌러서 지원자를 보고 전화·협의·확정하세요.', '올린 일감이 없습니다.'],

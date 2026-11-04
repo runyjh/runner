@@ -1217,6 +1217,8 @@
     $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
     driversLoaded = false;
+    // 새로고침하면 보던 메뉴 그대로 (이 창을 닫으면 잊음)
+    try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv; } catch (e) {}
     switchView(currentView);
   }
   $('#loginForm').addEventListener('submit', (e) => {
@@ -1844,6 +1846,7 @@
   function switchView(v) {
     if (v !== currentView && !viewRestoring) { viewHist.push(currentView); if (viewHist.length > 30) viewHist.shift(); }
     currentView = v;
+    try { sessionStorage.setItem('runner.admView', v); } catch (e) {}
     setTimeout(admSyncBack, 0);
     $$('.nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === v));
     $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
