@@ -4034,9 +4034,7 @@ function schSheet_() {
     if (sh.getMaxColumns() < head.length) sh.insertColumnsAfter(sh.getMaxColumns(), head.length - sh.getMaxColumns());
     sh.getRange(1, 1, Math.min(sh.getMaxRows(), 300), head.length).setNumberFormat('@');
     sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#f1f3f4');
-    sh.getRange(2, 1, 3, 5).setValues([
-      ['NOTE1', SCH.KIND_NOTE, '', '업무 관련', ''], ['NOTE2', SCH.KIND_NOTE, '', '비고 2', ''], ['NOTE3', SCH.KIND_NOTE, '', '비고 3', '']
-    ]);
+    sh.getRange(2, 1, 1, 5).setValues([['NOTE1', SCH.KIND_NOTE, '', '업무 관련', '']]);
     sh.setFrozenRows(1); sh.setFrozenColumns(5);
     sh.getRange(1, 1).setNote('행ID = 기사ID(drivers 탭) 또는 비고ID. 이 열과 1행 날짜는 바꾸지 마세요. 날짜 칸은 자유롭게 고쳐도 됩니다.');
     cache_().remove('sch:h');
@@ -4181,6 +4179,25 @@ function schRead_(sun, end) {
       if (kind === SCH.KIND_NOTE) notes.push({ id: id, label: str_(f[h.fixed['이름']]) || id, cells: row });
       else if (!rowIds[id]) { rowIds[id] = 1; cells[id] = row; }
     });
+  }
+  // 비고 줄은 첫 줄(업무 관련) 하나만 쓴다: 예전에 만든 둘째·셋째 비고 줄은 한 번만 지우고, 그 줄의 메모는 첫 줄로 옮긴다
+  if (!props_().SCH_NOTE_TRIM) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      if (notes.length > 1) {
+      const all = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      const extra = notes.slice(1).map(function (n) { return n; });
+      const rows = [];
+      all.forEach(function (f, i) { if (extra.some(function (n) { return n.id === str_(f[h.fixed['행ID']]); }) && str_(f[h.fixed['구분']]) === SCH.KIND_NOTE) rows.push(i + 2); });
+      rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sh.deleteRow(r); });
+      extra.forEach(function (n) { if (n.label) schNoteRelabel_(n.label, ''); });
+      notes.splice(1);
+      }
+      // 한 번만: 이후 '+ 비고 줄'로 새로 만든 줄은 지우지 않는다
+      PropertiesService.getScriptProperties().setProperty('SCH_NOTE_TRIM', '1');
+      _props = null;
+    } finally { lock.releaseLock(); }
   }
   // 비고 줄은 업무스케줄(work_memo)과 연동: 시트에 남아 있는 예전 비고 글은 업무스케줄로 옮기고, 칸 내용은 메모에서 만든다
   if (notes.length && (!cache_().get('sch:nmig') || notes.some(function (n) { return Object.keys(n.cells).length; }))) {
@@ -5034,12 +5051,12 @@ function adm_reset(token, section, confirm) {
       } else if (section === 'sched') {
         const sh = schSheet_(), h = schHeader_(true);
         rows = clearData_(sh);
-        const notes = [['NOTE1', '업무 관련'], ['NOTE2', '비고 2'], ['NOTE3', '비고 3']].map(function (x) {
+        const notes = [['NOTE1', '업무 관련']].map(function (x) {
           const line = new Array(5).fill('');
           line[h.fixed['행ID']] = x[0]; line[h.fixed['구분']] = SCH.KIND_NOTE; line[h.fixed['이름']] = x[1];
           return line;
         });
-        sh.getRange(2, 1, 3, 5).setNumberFormat('@').setValues(notes);
+        sh.getRange(2, 1, 1, 5).setNumberFormat('@').setValues(notes);
       } else if (section === 'route') {
         readAll_(SH.CIMG).forEach(function (x) { const f = fileIdOf_(x.file); if (f) files.push(f); });
         sec.sheets.forEach(function (n) { rows += clearData_(sheet_(n)); });

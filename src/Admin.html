@@ -496,7 +496,8 @@
   .sg tr.note td.lab, .sg tr.calc td.lab { color: var(--sub); font-weight: 700; background: #f7f8fa; }
   .nlab { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--sub); cursor: pointer; }
   .nlab:hover { color: var(--brand); text-decoration: underline; }
-  .sg tr.note td.c { font-weight: 500; text-align: left; background: #fffdf5; }
+  .sg tr.note td.c { font-weight: 500; text-align: left; background: #fffdf5; color: #000 !important; }
+  .sg tr.note td.lab, .sg tr.note .nlab { color: #000; }
   .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
   .sg tr.pmr td.c { background: #fffbef; }
   .sg td.c.pmk { box-shadow: inset 0 -3px 0 #12a150; }
@@ -4314,7 +4315,7 @@
   const RESET_PHRASE = '모조리 없앤다';
   const RESET_INFO = {
     drivers: { label: '기사 정보관리', items: ['모든 기사 정보 (drivers 탭)', '기사 앱 로그인 (관리자 로그인은 그대로)', '가입 서류 폴더 → 드라이브 휴지통'], keep: '스케줄·배번호 신청서 기록은 남습니다.' },
-    sched: { label: '기사스케줄', items: ['스케줄 DB 파일의 모든 날짜 기록 (비고 줄 이름은 기본 3개로 다시 만듦)'], keep: '기사 정보와 기사별 스케줄 설정(소속캠프·기본노선 등), 비고 줄의 글(업무스케줄 메모)은 남습니다.' },
+    sched: { label: '기사스케줄', items: ['스케줄 DB 파일의 모든 날짜 기록 (비고 줄은 \'업무 관련\' 1줄로 다시 만듦)'], keep: '기사 정보와 기사별 스케줄 설정(소속캠프·기본노선 등), 비고 줄의 글(업무스케줄 메모)은 남습니다.' },
     route: { label: '노선관리', items: ['모든 캠프·노선·상차지 주소·구분별 단가', '캠프 참고 이미지 (사진 파일 → 드라이브 휴지통)', '기사의 소속캠프 칸'], keep: '기사 정보와 스케줄 기록은 남습니다.' },
     notice: { label: '공지사항', items: ['모든 공지 (notices 탭)'], keep: '' },
     accounts: { label: '계정관리', items: ['모든 서비스 계정·비밀번호 (accounts 탭)'], keep: '복사본에는 비밀번호가 암호화된 채로 들어갑니다.' },
