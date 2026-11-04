@@ -4583,7 +4583,9 @@
   function slipHtml(r) {
     const s = r.slip, d = s.row, co = r.company, P = r.period, D = r.dates;
     const pays = s.lines.filter((l) => l.side === '지급' && l.method !== '입금가산'), deds = s.lines.filter((l) => l.side === '차감'), adds = s.lines.filter((l) => l.method === '입금가산');
-    const li = (l, sign) => '<tr><td>' + esc(l.name) + (l.memo ? '<div class="smemo">' + esc(l.memo) + '</div>' : '') + '</td><td class="n">' + (l.amt ? sign + wn(l.amt) : '-') + '</td></tr>';
+    // 고용보험 0원: 월 보수액이 기준(설정 '고용보험 적용 최저 월 보수액') 미만이라 제외된 경우 이유를 적어 준다
+    const goyNote = (l) => l.method === '고용보험' && !l.amt && s.ins && !s.ins.excluded && s.ins.bosu > 0 ? '월 보수액 ' + wn(Math.round(s.ins.bosu)) + '원 → 기준 미만이라 적용 제외' : '';
+    const li = (l, sign) => { const note = l.memo || goyNote(l); return '<tr><td>' + esc(l.name) + (note ? '<div class="smemo">' + esc(note) + '</div>' : '') + '</td><td class="n">' + (l.amt ? sign + wn(l.amt) : (goyNote(l) ? '0' : '-')) + '</td></tr>'; };
     const n = Math.max(pays.length + adds.length, deds.length);
     const dedSum = deds.reduce((a, l) => a + l.amt, 0);
     const days = Object.keys(s.daily).concat(Object.keys(s.sched || {})).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
