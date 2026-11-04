@@ -407,7 +407,7 @@ PC 크롬·엣지는 누르면 설치 창이 떠서 바탕화면·시작 메뉴�
 3. ⚙️ **프로젝트 설정 → 클라우드 메시징** → 아래 **웹 푸시 인증서 → 키 쌍 생성** → 나온 키를 적어 둡니다 (vapidKey).
 4. ⚙️ **프로젝트 설정 → 서비스 계정** → **새 비공개 키 생성** → JSON 파일이 내려받아집니다.
 5. Apps Script 편집기 → ⚙️ **프로젝트 설정 → 스크립트 속성** 에 두 개 추가:
-   - `FCM_WEB` = `{"apiKey":"…","authDomain":"…","projectId":"…","messagingSenderId":"…","appId":"…","vapidKey":"3번 키"}`
+   - `FCM_WEB` = (runner-push 프로젝트는 코드에 이미 들어 있어 넣지 않아도 됩니다. 다른 프로젝트일 때만) `{"apiKey":"…","authDomain":"…","projectId":"…","messagingSenderId":"…","appId":"…","vapidKey":"3번 키"}`
      (파이어베이스 화면의 `const firebaseConfig = { … };` 를 그대로 붙여 넣어도 됩니다. 그때는 3번 키를 스크립트 속성 `FCM_VAPID` 로 따로 넣으세요)
    - `FCM_SA` = 4번 JSON 파일 내용 전체를 그대로 붙여 넣기
 6. 편집기에서 `Pumasi.gs` → 함수 `pmPushSetupCheck` 고르고 **▶ 실행** → 권한 허용(외부 서비스 연결). 실행 로그에 `푸시 준비 완료` 가 나오면 끝.

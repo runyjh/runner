@@ -563,11 +563,18 @@ function api_pmAlertsRead(token, ids) {
 }
 
 // ───── 휴대폰 푸시 (Firebase Cloud Messaging) ─────
-// 스크립트 속성 FCM_WEB = 파이어베이스 웹앱 설정 JSON (+ "vapidKey"), FCM_SA = 서비스 계정 키 JSON. 둘 다 있어야 켜진다.
+// 파이어베이스 웹앱 설정(공개값: 앱 화면에 원래 들어가는 값, 비밀 아님) — runner-push 프로젝트.
+// 다른 프로젝트로 바꾸려면 스크립트 속성 FCM_WEB 에 넣으면 그 값이 우선한다.
+// 비밀 키인 서비스 계정 키는 코드에 두지 않는다 → 스크립트 속성 FCM_SA 에만 넣는다.
+const PM_FCM_WEB = {
+  apiKey: 'AIzaSyAvYgRGBZeHffy8XBq-zMQcAUpAEpyLmEg', authDomain: 'runner-push.firebaseapp.com', projectId: 'runner-push',
+  messagingSenderId: '791109376001', appId: '1:791109376001:web:654ebd0dc879c096938800',
+  vapidKey: 'BFY-VooGixSu0dK_ETxSNzvHJpjqW7JNImRah1wdXS7RBgxkjSmvKbMTmuBtdRBwDhW50vjBuwEhT8W_pm2AvS8'
+};
 function pmPushCfg_() {
   const p = props_();
   let web = null, sa = null;
-  web = p.FCM_WEB ? pmLooseObj_(p.FCM_WEB) : null;
+  web = p.FCM_WEB ? pmLooseObj_(p.FCM_WEB) : JSON.parse(JSON.stringify(PM_FCM_WEB));
   if (web && !web.vapidKey && p.FCM_VAPID) web.vapidKey = String(p.FCM_VAPID).trim();
   try { sa = p.FCM_SA ? JSON.parse(p.FCM_SA) : null; } catch (e) { sa = null; }
   if (web && !(web.apiKey && web.projectId && web.messagingSenderId && web.appId && web.vapidKey)) web = null;
