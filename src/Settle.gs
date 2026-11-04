@@ -99,7 +99,7 @@ const STL_METHODS = ['배송기본', '프레시백', '미계약', '기타프로�
 const STL_CFG = [
   ['vat', '부가세율', '10%', '쿠팡 정산서 금액(공급가) → 부가세 포함 환산'],
   ['incRate', '프백 가중치(추가인센티브) 기사 지급률', '100%', ''],
-  ['freshRate', '프레시백 회수 인센티브 기사 지급률', '100%', '100% = 전액 기사. 나머지는 러너 프백 잉여'],
+  ['freshRate', '프레시백 회수 인센티브 기사 지급률', '100%', '100% = 전액 기사. 나머지는 러너 프백 잉여. 기사 지급액은 100원 단위 올림'],
   ['uncFee', '미계약 라우트 업체 수수료율', '10%', '기사 지급 = 미계약 금액 × (1 − 수수료율)'],
   ['etcRate', '기타(프로모션·소급) 기사 지급률', '0%', ''],
   ['lossRate', '분실파손 기사 부담률', '100%', ''],
@@ -133,7 +133,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261104f';
+const STL_CALC_VER = '20261104g';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -948,6 +948,13 @@ function stlCompute_(month) {
     const n = stlNum_(t);
     const cut = /%$/.test(t.replace(/\s/g, '')) || (n > 0 && n < 1) ? stlR100_(s.fresh * stlRate_(t, 0)) : Math.round(n);
     s.fbCut = Math.max(0, Math.min(cut, s.fresh)); s.fresh -= s.fbCut;
+  });
+  // 프레시백 기사 지급액은 지급률·차감을 적용한 뒤 항상 100원 단위로 올림 (97,811 → 97,900). 올린 만큼 러너 프백 잉여에서 뺀다
+  Object.keys(S).forEach(function (id) {
+    const s = S[id];
+    if (s.fresh <= 0) return;
+    const up = Math.ceil(s.fresh / 100 - 1e-9) * 100;
+    s.fbKeep -= up - s.fresh; s.fresh = up;
   });
 
   // 분실파손
