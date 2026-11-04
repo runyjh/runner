@@ -93,6 +93,39 @@
   .hello h2 { margin: 0; font-size: 22px; }
   .hello p { margin: 4px 0 0; color: var(--sub); }
   .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .menu .tile.wide { grid-column: 1 / -1; min-height: 72px; position: relative; }
+  /* ───── 자유게시판 ───── */
+  .bdcats { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 10px; scrollbar-width: none; } .bdcats::-webkit-scrollbar { display: none; }
+  .bdcats button { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 700; color: var(--sub); }
+  .bdcats button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .bdi { display: block; width: 100%; text-align: left; background: #fff; border: 0; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px; font: inherit; color: var(--ink); cursor: pointer; }
+  .bdi .t { font-size: 16px; font-weight: 800; line-height: 1.4; word-break: break-all; }
+  .bdi .s { font-size: 13.5px; color: #4e5968; margin-top: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  .bdi .m { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--sub); margin-top: 6px; flex-wrap: wrap; }
+  .bdi .m .r { margin-left: auto; display: flex; gap: 8px; }
+  .bdc { display: inline-block; font-size: 11.5px; font-weight: 800; border-radius: 6px; padding: 1px 7px; margin-right: 6px; vertical-align: 2px; background: #f2f4f6; color: #4e5968; }
+  .bdc.c-정보 { background: #e6f4ff; color: #0958d9; } .bdc.c-질문 { background: #fff4d6; color: #b7791f; } .bdc.c-중고·나눔 { background: #e8f7ee; color: #11734b; }
+  .bdhid { display: inline-block; font-size: 11.5px; font-weight: 800; border-radius: 6px; padding: 1px 7px; background: #fff0f0; color: var(--danger); margin-right: 6px; }
+  .bdp .tt { font-size: 19px; font-weight: 800; margin: 4px 0 6px; line-height: 1.4; word-break: break-all; }
+  .bdp .mt { font-size: 13px; color: var(--sub); }
+  .bdp .bd { font-size: 15.5px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; margin: 14px 0 6px; }
+  .bdp .att { width: 100%; border-radius: 10px; margin-top: 8px; }
+  .bdbar { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .bdbar button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); }
+  .bdbar button.on { border-color: #ff6b81; color: #e03150; background: #fff0f3; }
+  .bdbar .sp { margin-left: auto; }
+  .bdcm { padding: 12px 0; border-top: 1px solid var(--line); }
+  .bdcm:first-child { border-top: 0; }
+  .bdcm.re { padding-left: 22px; position: relative; } .bdcm.re::before { content: '↳'; position: absolute; left: 4px; top: 12px; color: var(--sub); }
+  .bdcm .h { display: flex; gap: 8px; align-items: center; font-size: 13px; } .bdcm .h b { font-size: 14px; } .bdcm .h small { color: var(--sub); }
+  .bdcm .b { font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; margin-top: 3px; }
+  .bdcm .b.hid { color: #b0b8c1; }
+  .bdcm .a { display: flex; gap: 12px; margin-top: 4px; } .bdcm .a button { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--sub); font-weight: 600; }
+  .bdin { position: sticky; bottom: 0; background: #fff; border-radius: var(--radius); padding: 10px; margin-top: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,.05); }
+  .bdin .to { font-size: 12.5px; color: var(--brand); font-weight: 700; margin: 0 2px 6px; display: flex; justify-content: space-between; }
+  .bdin .row2 { display: flex; gap: 8px; } .bdin textarea { min-height: 44px; height: 44px; padding: 10px 12px; resize: none; }
+  .bdin .btn { width: auto; padding: 0 16px; height: 44px; flex: none; }
+  .bdwarn { font-size: 12.5px; color: #8a5a00; background: #fff8e6; border-radius: 10px; padding: 10px 12px; line-height: 1.6; margin-bottom: 12px; }
   .menu div { background: #fff; border-radius: var(--radius); padding: 18px 16px; min-height: 96px; }
   .menu b { display: block; font-size: 16px; }
   .menu span { font-size: 12px; color: var(--sub); }
@@ -570,6 +603,7 @@
       <button class="tile" id="mSettle" type="button"><b>정산서 보기</b><span>월별 정산서·세금계산서 →</span></button>
       <button class="tile" id="mPm" type="button"><b>품앗이</b><span>품앗이 일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
+      <button class="tile wide" id="mBoard" type="button"><b>💬 자유게시판</b><span>기사님끼리 정보·질문·나눔 →</span></button>
     </div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
@@ -677,6 +711,7 @@
       <button type="button" data-my="posted">품앗이 관리 (지원자 보기)<em id="myNew"></em></button>
       <button type="button" data-my="applied">지원한 품앗이</button>
       <button type="button" data-my="done">완료한 품앗이</button>
+      <button type="button" data-my="board">💬 내가 쓴 게시글</button>
     </div>
     <div class="mylist">
       <button type="button" data-my="info">내 정보</button>
@@ -698,6 +733,35 @@
     <p class="hint" style="text-align:center">최근 30일 알림입니다. 누르면 그 일감으로 갑니다.</p>
   </section>
   <div class="pmbanner" id="pmBanner" role="status" aria-live="polite"><div><b id="pbT"></b><span id="pbB"></span></div><i id="pbX" aria-label="닫기">×</i></div>
+
+  <!-- ───────────── 자유게시판 ───────────── -->
+  <section id="v-board" class="view">
+    <div class="topbar"><button class="back" id="bdBack" aria-label="뒤로">←</button><h2>자유게시판</h2>
+      <button class="btn sm" id="bdNew" type="button" style="margin-left:auto;height:38px;padding:0 12px">✏️ 글쓰기</button></div>
+    <div class="bdcats" id="bdCats"></div>
+    <div class="pmfil"><input type="search" id="bdQ" placeholder="제목·내용·작성자 검색" enterkeyhint="search" autocomplete="off"><button class="btn sm" id="bdGo" type="button" style="height:44px">검색</button></div>
+    <label class="pmchk"><input type="checkbox" id="bdMine"> 내 글만 보기</label>
+    <div id="bdBan"></div>
+    <div id="bdList"></div>
+    <button class="btn ghost hidden" id="bdMore" type="button" style="margin:4px 0 20px">더 보기</button>
+  </section>
+  <section id="v-bdpost" class="view">
+    <div class="topbar"><button class="back" id="bpBack" aria-label="뒤로">←</button><h2>게시글</h2></div>
+    <div id="bpBody"></div>
+  </section>
+  <section id="v-bdform" class="view">
+    <div class="topbar"><button class="back" id="bfBack" aria-label="뒤로">←</button><h2 id="bfTitle">글쓰기</h2></div>
+    <div class="bdwarn">🙏 서로 존중해 주세요. <b>전화번호 · 배송지 코드 · 고객 정보</b> 같은 개인정보·내부 정보는 올리지 마세요. 욕설·비방 글은 신고되면 가려지고 글쓰기가 정지될 수 있습니다.</div>
+    <div class="card">
+      <div class="field"><label class="lb">말머리<span class="req">*</span></label><div class="segk" id="bfCat"></div></div>
+      <div class="field"><label class="lb" for="bfT">제목<span class="req">*</span></label><input type="text" id="bfT" maxlength="60" placeholder="제목 (60자까지)"></div>
+      <div class="field"><label class="lb" for="bfB">내용<span class="req">*</span></label><textarea id="bfB" rows="10" maxlength="3000" placeholder="내용을 입력해 주세요."></textarea></div>
+      <div class="field"><label class="lb">사진 (1장)</label>
+        <div class="row"><label class="btn ghost sm" style="display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto">사진 고르기<input type="file" id="bfFile" accept="image/*" hidden></label><span class="hint" id="bfFileHint" style="align-self:center;margin:0">없음</span><button type="button" class="btn sm gray hidden" id="bfFileDel" style="height:40px">사진 빼기</button></div>
+        <img id="bfPrev" class="hidden" style="width:100%;border-radius:10px;margin-top:10px" alt=""></div>
+    </div>
+    <button class="btn" id="bfBtn" type="button">올리기</button>
+  </section>
 
   <section id="v-settle" class="view">
     <div class="topbar"><button class="back" id="slBack" aria-label="뒤로">←</button><h2>정산서</h2></div>
@@ -812,6 +876,7 @@
     if (!v || v === 'home') return false;
     const open = {
       notice: () => openNotices(''), sched: () => openSched(), pumasi: () => openPumasi('home'), pmform: () => openPumasi('home'), pmgive: () => openGive(ssGet('runner.gvMode') || 'me'),
+      board: () => openBoard(), bdform: () => openBoard(), bdpost: () => { const id = ssGet('runner.bdId'); if (id) openBdPost(id, 'board'); else openBoard(); },
       pmdetail: () => { const id = ssGet('runner.pmId'); if (id) openPmDetail(id, 'pumasi'); else openPumasi('home'); },
       mypage: () => openMyPage(), myinfo: () => { openMyPage(); show('myinfo'); }, pmalerts: () => openPmAlerts(), settle: () => openSettle(),
       pmmine: () => { pmMineKind = ssGet('runner.pmKind') || 'posted'; show('pmmine'); loadPmMine(); }
@@ -823,7 +888,7 @@
   const BASE_VIEWS = ['home', 'login', 'splash', 'pending'];
   const BACK_BTN = {
     signup: '#v-signup .back', reset: '#v-reset .back', notice: '#ntBack', sched: '#scBack', changepw: '#cpBack', pumasi: '#pmBack', pmdetail: '#pdBack',
-    pmform: '#pfBack', pmgive: '#gvBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack'
+    pmform: '#pfBack', pmgive: '#gvBack', board: '#bdBack', bdpost: '#bpBack', bdform: '#bfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack'
   };
   const OVERLAYS = ['#pmAsk', '#instHelp', '#ntPop'];
   let backGuard = false, backSkip = false;
@@ -1853,6 +1918,7 @@
     const k = b.dataset.my;
     if (k === 'new') return openPmForm('', 'mypage');
     if (k === 'give') return openGive('me', 'mypage');
+    if (k === 'board') { $('#bdMine').checked = true; bdCat = '전체'; return openBoard('mypage'); }
     if (k === 'find') return openGive('find', 'mypage');
     if (k === 'info') return show('myinfo');
     if (k === 'alerts') return openPmAlerts();
@@ -1993,7 +2059,7 @@
     if (e.target.closest('#pbX') || !bannerJob) return;
     const a = paList.find((x) => x.jobId === bannerJob && !x.read);
     if (a) markAlerts([a.id]);
-    openPmDetail(bannerJob, 'pumasi');
+    openAlertTarget(bannerJob, 'pumasi');
   });
   /** 새 알림이 오면: 배너, 배지, 보고 있는 화면 새로고침 */
   function onNewAlerts(fresh) {
@@ -2062,7 +2128,7 @@
   $('#paList').addEventListener('click', (e) => {
     const b = e.target.closest('[data-al]'); if (!b) return;
     markAlerts([b.dataset.al]);
-    if (b.dataset.pj) openPmDetail(b.dataset.pj, 'alerts');
+    if (b.dataset.pj) openAlertTarget(b.dataset.pj, 'alerts');
   });
 
   // ── 휴대폰 푸시 (깃허브 페이지에서 연 앱 + 알림 허용한 기기만) ──
@@ -2145,8 +2211,148 @@
   // 알림을 눌러 앱이 열렸을 때 (?pm=일감ID) / 앱이 열려 있을 때 서비스 워커가 보낸 소식
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => {
     const d = e.data || {};
-    if (d.type === 'pm-open' && d.jobId && store.get(TOKEN)) openPmDetail(d.jobId, 'alerts');
+    if (d.type === 'pm-open' && d.jobId && store.get(TOKEN)) openAlertTarget(d.jobId, 'alerts');
     else if (d.type === 'pm-push') pollAlerts(true);
+  });
+  // ───── 자유게시판 ─────
+  /** 알림 대상 열기: 'BD-글ID' 는 게시판 글, 나머지는 품앗이 일감 */
+  function openAlertTarget(id, from) { if (String(id).indexOf('BD-') === 0) return openBdPost(String(id).slice(3), from === 'alerts' ? 'alerts' : 'board'); openPmDetail(id, from); }
+  let bdCat = '전체', bdPage = 0, bdPosts = [], bdCats = ['자유', '정보', '질문', '중고·나눔'], bdCurId = '', bdFrom = 'board', bdEditId = '', bdAttach = null, bdRemoveAttach = false, bdReply = null, bdFromHome = 'home';
+  const bdAgo = (at) => { try { return agoText(at); } catch (e) { return String(at || '').slice(5, 16); } };
+  function openBoard(from) {
+    if (from) bdFromHome = from;
+    if (from === 'home') $('#bdMine').checked = false;
+    show('board'); bdPage = 0; loadBoard();
+  }
+  function paintBdCats() {
+    $('#bdCats').innerHTML = ['전체'].concat(bdCats).map((c) => '<button type="button" data-bc="' + escH(c) + '"' + (c === bdCat ? ' class="on"' : '') + '>' + escH(c) + '</button>').join('');
+  }
+  function loadBoard(append) {
+    const token = pmTok(); if (!token) return;
+    paintBdCats();
+    if (!append) $('#bdList').innerHTML = '<div class="pmempty">불러오는 중…</div>';
+    api('api_bdList', token, { cat: bdCat, q: $('#bdQ').value.trim(), page: bdPage, mine: $('#bdMine').checked }).then((r) => {
+      if (!pmOk(r, '게시판을 불러오지 못했습니다.')) { if (!append) $('#bdList').innerHTML = ''; return; }
+      bdCats = r.cats || bdCats; paintBdCats();
+      bdPosts = append ? bdPosts.concat(r.posts) : r.posts;
+      $('#bdBan').innerHTML = r.banned ? '<div class="pmofr">게시판 글쓰기가 정지되었습니다 (' + escH(r.banned) + '). 읽기만 할 수 있습니다.</div>' : '';
+      $('#bdList').innerHTML = bdPosts.length ? bdPosts.map((p) => '<button type="button" class="bdi" data-bp="' + escH(p.id) + '">' +
+        '<div class="t">' + (p.status === '숨김' ? '<span class="bdhid">가려짐</span>' : '') + '<span class="bdc c-' + escH(p.cat) + '">' + escH(p.cat) + '</span>' + escH(p.title) + (p.hasAttach ? ' 📷' : '') + '</div>' +
+        (p.snippet ? '<div class="s">' + escH(p.snippet) + '</div>' : '') +
+        '<div class="m"><span>' + escH(p.author) + (p.mine ? ' (나)' : '') + '</span><span>' + escH(bdAgo(p.at)) + '</span><span class="r"><span>' + (p.liked ? '❤️' : '🤍') + ' ' + p.likes + '</span><span>💬 ' + p.cmts + '</span></span></div></button>').join('')
+        : '<div class="pmempty">' + ($('#bdQ').value.trim() || bdCat !== '전체' || $('#bdMine').checked ? '조건에 맞는 글이 없습니다.' : '아직 글이 없습니다.<br>오른쪽 위 <b>✏️ 글쓰기</b>로 첫 글을 남겨 보세요.') + '</div>';
+      $('#bdMore').classList.toggle('hidden', !r.more);
+    }).catch(() => { if (!append) $('#bdList').innerHTML = ''; netErr(); });
+  }
+  $('#mBoard').addEventListener('click', () => openBoard('home'));
+  $('#bdBack').addEventListener('click', () => { if (bdFromHome === 'mypage') return openMyPage(); let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
+  $('#bdCats').addEventListener('click', (e) => { const b = e.target.closest('[data-bc]'); if (!b || b.dataset.bc === bdCat) return; bdCat = b.dataset.bc; bdPage = 0; loadBoard(); });
+  $('#bdGo').addEventListener('click', () => { bdPage = 0; loadBoard(); });
+  $('#bdQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); bdPage = 0; loadBoard(); } });
+  $('#bdQ').addEventListener('search', () => { bdPage = 0; loadBoard(); });
+  $('#bdMine').addEventListener('change', () => { bdPage = 0; loadBoard(); });
+  $('#bdMore').addEventListener('click', () => { bdPage++; loadBoard(true); });
+  $('#bdList').addEventListener('click', (e) => { const b = e.target.closest('[data-bp]'); if (b) openBdPost(b.dataset.bp, 'board'); });
+  $('#bdNew').addEventListener('click', () => openBdForm(null));
+
+  // 글 보기
+  function openBdPost(id, from) { bdCurId = id; bdFrom = from || 'board'; bdReply = null; ssSet('runner.bdId', id); show('bdpost'); loadBdPost(); }
+  $('#bpBack').addEventListener('click', () => { if (bdFrom === 'alerts') return openPmAlerts(); show('board'); loadBoard(); });
+  function loadBdPost(keep) {
+    const token = pmTok(); if (!token) return;
+    if (!keep) $('#bpBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
+    api('api_bdPost', token, bdCurId).then((r) => {
+      if (!pmOk(r, '글을 불러오지 못했습니다.')) { $('#bpBody').innerHTML = '<div class="pmempty">글을 볼 수 없습니다.</div>'; return; }
+      renderBdPost(r.post);
+    }).catch(() => { $('#bpBody').innerHTML = ''; netErr(); });
+  }
+  let bdCur = null;
+  function renderBdPost(p) {
+    bdCur = p;
+    const cms = p.comments || [], roots = cms.filter((c) => !c.parentId || !cms.some((x) => x.id === c.parentId));
+    const cm = (c, re) => '<div class="bdcm' + (re ? ' re' : '') + '"><div class="h"><b>' + escH(c.author) + (c.mine ? ' (나)' : '') + '</b><small>' + escH(bdAgo(c.at)) + '</small></div>' +
+      '<div class="b' + (c.hidden ? ' hid' : '') + '">' + (c.hidden ? (c.mine ? '🙈 신고로 가려진 댓글입니다: ' + escH(c.body) : '🙈 신고로 가려진 댓글입니다.') : escH(c.body)) + '</div>' +
+      '<div class="a">' + (c.hidden ? '' : '<button type="button" data-rp="' + escH(c.id) + '" data-rn="' + escH(c.author) + '">답글</button>') + (c.mine ? '<button type="button" data-cdel="' + escH(c.id) + '">삭제</button>' : (c.hidden || c.reported ? '' : '<button type="button" data-crep="' + escH(c.id) + '">신고</button>')) + '</div></div>';
+    const tree = roots.map((c) => cm(c, false) + cms.filter((x) => x.parentId === c.id).map((x) => cm(x, true)).join('')).join('');
+    $('#bpBody').innerHTML = '<div class="pmd bdp">' + (p.status === '숨김' ? '<div class="pmofr">신고가 쌓여 다른 기사님께는 가려진 글입니다. 사무실에서 확인 후 다시 보이게 할 수 있습니다.</div>' : '') +
+      '<span class="bdc c-' + escH(p.cat) + '">' + escH(p.cat) + '</span><div class="tt">' + escH(p.title) + '</div>' +
+      '<div class="mt">' + escH(p.author) + (p.mine ? ' (나)' : '') + ' · ' + escH(String(p.at || '').slice(0, 16)) + (p.edited ? ' · 수정됨' : '') + '</div>' +
+      '<div class="bd">' + escH(p.body) + '</div>' +
+      (p.hasAttach ? '<div id="bpAtt"><button class="btn ghost" type="button" data-bact="att" style="height:44px">📷 사진 보기</button></div>' : '') +
+      '<div class="bdbar"><button type="button" data-bact="like"' + (p.liked ? ' class="on"' : '') + '>' + (p.liked ? '❤️' : '🤍') + ' 좋아요 ' + p.likes + '</button>' +
+        (p.mine ? '<button type="button" class="sp" data-bact="edit">수정</button><button type="button" data-bact="del">삭제</button>' : (p.reported ? '<span class="sp" style="color:var(--sub);font-size:13px;align-self:center">신고함</span>' : '<button type="button" class="sp" data-bact="rep">🚩 신고</button>')) + '</div></div>' +
+      '<div class="pmd"><h3>댓글 ' + cms.filter((c) => !c.hidden || c.mine).length + '</h3>' + (tree || '<div style="color:var(--sub);font-size:14px">첫 댓글을 남겨 보세요.</div>') + '</div>' +
+      (p.status === '공개' ? '<div class="bdin"><div class="to' + (bdReply ? '' : ' hidden') + '" id="bpTo"><span>↳ ' + escH(bdReply ? bdReply.name : '') + ' 님께 답글</span><a id="bpToX">취소</a></div>' +
+        '<div class="row2"><textarea id="bpIn" maxlength="500" placeholder="댓글을 입력하세요"></textarea><button class="btn" type="button" id="bpSend">등록</button></div></div>' : '');
+  }
+  function bdRun(fn, args, okMsg, after) {
+    const token = pmTok(); if (!token) return Promise.resolve();
+    return api(fn, token, ...args).then((r) => { if (pmOk(r)) { if (okMsg) toast(okMsg); (after || (() => loadBdPost(true)))(r); } }).catch(netErr);
+  }
+  $('#bpBody').addEventListener('click', (e) => {
+    const t = e.target;
+    const rp = t.closest('[data-rp]');
+    if (rp) { bdReply = { id: rp.dataset.rp, name: rp.dataset.rn }; const to = $('#bpTo'); if (to) { to.classList.remove('hidden'); to.firstChild.textContent = '↳ ' + bdReply.name + ' 님께 답글'; } const i = $('#bpIn'); if (i) i.focus(); return; }
+    if (t.id === 'bpToX') { bdReply = null; $('#bpTo').classList.add('hidden'); return; }
+    if (t.id === 'bpSend') {
+      const v = $('#bpIn').value.trim(); if (!v) return toast('댓글을 입력해 주세요.');
+      if (/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/.test(v) && !confirm('전화번호처럼 보이는 내용이 있습니다. 그래도 올릴까요?')) return;
+      t.disabled = true;
+      return bdRun('api_bdComment', [bdCurId, v, bdReply ? bdReply.id : ''], '', () => { bdReply = null; loadBdPost(true); }).finally(() => { t.disabled = false; });
+    }
+    const cd = t.closest('[data-cdel]');
+    if (cd) return pmAsk('댓글을 지울까요?', '', '삭제').then((v) => { if (v !== null) bdRun('api_bdCommentDel', [cd.dataset.cdel], '댓글을 지웠습니다.'); });
+    const cr = t.closest('[data-crep]');
+    if (cr) return pmAsk('이 댓글을 신고할까요?', '신고가 ' + 3 + '건 쌓이면 자동으로 가려지고, 사무실에서 확인합니다.', '신고', '사유 (선택) 예: 욕설, 비방').then((v) => { if (v !== null) bdRun('api_bdReport', ['댓글', cr.dataset.crep, v], '신고했습니다.'); });
+    const b = t.closest('[data-bact]'); if (!b) return;
+    const act = b.dataset.bact;
+    if (act === 'like') return bdRun('api_bdLike', [bdCurId], '', (r) => { bdCur.liked = r.liked; bdCur.likes = r.likes; b.classList.toggle('on', r.liked); b.textContent = (r.liked ? '❤️' : '🤍') + ' 좋아요 ' + r.likes; });
+    if (act === 'rep') return pmAsk('이 글을 신고할까요?', '신고가 3건 쌓이면 자동으로 가려지고, 사무실에서 확인합니다.', '신고', '사유 (선택) 예: 욕설, 비방, 개인정보').then((v) => { if (v !== null) bdRun('api_bdReport', ['글', bdCurId, v], '신고했습니다.'); });
+    if (act === 'del') return pmAsk('글을 지울까요?', '지운 글은 되돌릴 수 없습니다.', '삭제').then((v) => { if (v !== null) bdRun('api_bdDelete', [bdCurId], '글을 지웠습니다.', () => { show('board'); loadBoard(); }); });
+    if (act === 'edit') return openBdForm(bdCur);
+    if (act === 'att') {
+      b.disabled = true; b.textContent = '불러오는 중…';
+      return api('api_bdAttach', pmTok(), bdCurId).then((r) => {
+        if (!pmOk(r)) { b.disabled = false; b.textContent = '📷 사진 보기'; return; }
+        $('#bpAtt').innerHTML = '<img class="att" alt="첨부 사진" src="data:' + escH(r.mime) + ';base64,' + r.data + '">';
+      }).catch(() => { b.disabled = false; b.textContent = '📷 사진 보기'; netErr(); });
+    }
+  });
+
+  // 글쓰기 · 수정
+  function openBdForm(p) {
+    bdEditId = p ? p.id : ''; bdAttach = null; bdRemoveAttach = false;
+    $('#bfTitle').textContent = p ? '글 수정' : '글쓰기'; $('#bfBtn').textContent = p ? '저장' : '올리기';
+    $('#bfCat').innerHTML = bdCats.map((c) => '<button type="button" data-k="' + escH(c) + '">' + escH(c) + '</button>').join('');
+    const cat = p ? p.cat : (bdCat !== '전체' ? bdCat : '자유');
+    $$('#bfCat button').forEach((x) => x.classList.toggle('on', x.dataset.k === cat));
+    $('#bfT').value = p ? p.title : ''; $('#bfB').value = p ? p.body : '';
+    $('#bfFile').value = ''; $('#bfPrev').classList.add('hidden');
+    $('#bfFileHint').textContent = p && p.hasAttach ? '올린 사진 있음 (바꾸지 않음)' : '없음';
+    $('#bfFileDel').classList.toggle('hidden', !(p && p.hasAttach));
+    show('bdform');
+  }
+  $('#bfBack').addEventListener('click', () => { if (bdEditId) { show('bdpost'); return loadBdPost(); } show('board'); loadBoard(); });
+  $('#bfCat').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) $$('#bfCat button').forEach((x) => x.classList.toggle('on', x === b)); });
+  $('#bfFile').addEventListener('change', () => {
+    const file = $('#bfFile').files && $('#bfFile').files[0]; if (!file) return;
+    if (!/^image\//.test(file.type)) { toast('사진(이미지)만 올릴 수 있습니다.'); $('#bfFile').value = ''; return; }
+    compressImage(file).then((r) => { bdAttach = { data: r.data, mime: r.mime }; bdRemoveAttach = false; $('#bfPrev').src = r.preview; $('#bfPrev').classList.remove('hidden'); $('#bfFileHint').textContent = file.name; $('#bfFileDel').classList.remove('hidden'); })
+      .catch((err) => toast(err.message));
+  });
+  $('#bfFileDel').addEventListener('click', () => { bdAttach = null; bdRemoveAttach = true; $('#bfFile').value = ''; $('#bfPrev').classList.add('hidden'); $('#bfFileHint').textContent = '없음'; $('#bfFileDel').classList.add('hidden'); });
+  $('#bfBtn').addEventListener('click', () => {
+    const cb = $('#bfCat button.on'), post = { id: bdEditId, cat: cb ? cb.dataset.k : '', title: $('#bfT').value.trim(), body: $('#bfB').value.trim(), attach: bdAttach, removeAttach: bdRemoveAttach };
+    if (!post.cat) return toast('말머리를 골라 주세요.');
+    if (!post.title) return toast('제목을 입력해 주세요.');
+    if (!post.body) return toast('내용을 입력해 주세요.');
+    if (/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/.test(post.title + ' ' + post.body) && !confirm('전화번호처럼 보이는 내용이 있습니다. 개인정보가 아니라면 그대로 올릴까요?')) return;
+    const btn = $('#bfBtn'); btn.disabled = true; loading(true, bdAttach ? '사진 올리는 중…' : '저장하는 중…');
+    api('api_bdSave', pmTok(), post).then((r) => {
+      if (!pmOk(r)) return;
+      toast(bdEditId ? '저장했습니다.' : '글을 올렸습니다.');
+      bdCat = '전체'; openBdPost(r.id, 'board');
+    }).catch(netErr).finally(() => { btn.disabled = false; loading(false); });
   });
   (function openFromLink() {
     const m = location.search.match(/[?&]pm=([\w-]+)/);
@@ -2154,7 +2360,7 @@
     try { history.replaceState(null, '', location.pathname); } catch (e) {}
     const wait = setInterval(() => {
       if (!store.get(TOKEN)) return;
-      if ($('#v-home').classList.contains('on')) { clearInterval(wait); openPmDetail(m[1], 'alerts'); }
+      if ($('#v-home').classList.contains('on')) { clearInterval(wait); openAlertTarget(m[1], 'alerts'); }
     }, 300);
     setTimeout(() => clearInterval(wait), 20000);
   })();

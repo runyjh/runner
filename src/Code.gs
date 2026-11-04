@@ -41,7 +41,8 @@ const CFG = {
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
-  PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail' };
+  PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -275,10 +276,17 @@ const PV = { id: '가능일ID', driverId: '기사ID', name: '기사', date: '근
 const PN = { id: '알림ID', driverId: '받는 기사ID', name: '받는 기사', jobId: '일감ID', kind: '종류', text: '내용', createdAt: '보낸일시', readAt: '읽은일시' };
 // 휴대폰 푸시 받는 기기: 기사가 '휴대폰 알림 받기'를 켠 기기 1대 = 1줄. 지우면 그 기기로는 안 감
 const PT = { token: '기기 토큰', driverId: '기사ID', name: '기사', device: '기기', createdAt: '등록일시', lastOk: '마지막 전송' };
+// 자유게시판 (Board.gs): 글 · 댓글 · 신고 · 글쓰기 정지 · 금칙어. 시트에서 직접 고쳐도 된다
+const BP = { id: '글ID', cat: '말머리', title: '제목', body: '내용', authorId: '작성 기사ID', author: '작성자', attach: '첨부', status: '상태',
+  likes: '좋아요 기사ID', cmts: '댓글 수', reports: '신고 수', createdAt: '작성일시', updatedAt: '수정일시' };
+const BC = { id: '댓글ID', postId: '글ID', parentId: '답글 대상 댓글ID', authorId: '작성 기사ID', author: '작성자', body: '내용', status: '상태', reports: '신고 수', createdAt: '작성일시', updatedAt: '수정일시' };
+const BRP = { id: '신고ID', kind: '대상', targetId: '대상ID', postId: '글ID', reporterId: '신고 기사ID', reporter: '신고자', reason: '사유', status: '처리', createdAt: '신고일시' };
+const BBN = { driverId: '기사ID', name: '기사', until: '정지 끝 (비우면 계속)', memo: '사유', admin: '처리 관리자', createdAt: '등록일시' };
+const BWD = { word: '금칙어', memo: '메모' };
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -300,6 +308,11 @@ SCHEMA[SH.PAPP] = PA;
 SCHEMA[SH.PALERT] = PN;
 SCHEMA[SH.PPUSH] = PT;
 SCHEMA[SH.PAVAIL] = PV;
+SCHEMA[SH.BPOST] = BP;
+SCHEMA[SH.BCMT] = BC;
+SCHEMA[SH.BREP] = BRP;
+SCHEMA[SH.BBAN] = BBN;
+SCHEMA[SH.BWORD] = BWD;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -1249,6 +1262,7 @@ function onSheetEdit(e) {
       else if (name === SH.PRICES) fixPriceRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
       else if (name === SH.PJOB || name === SH.PAPP || name === SH.PAVAIL) pmTouch_();
+      else if ([SH.BPOST, SH.BCMT, SH.BREP, SH.BBAN, SH.BWORD].indexOf(name) >= 0) bdTouch_();
       else if (name === SH.PALERT) pmAlertBump_(o.driverId);
     });
     if (campRenamed) syncCampNames_();

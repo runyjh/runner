@@ -177,6 +177,12 @@
   .stw.bad { background: var(--danger-weak); color: #a1262b; }
   .stw.info { background: var(--gray-weak); color: var(--sub); }
   .stw summary { cursor: pointer; font-weight: 700; }
+  .bm-ban { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .bm-ban .inp { height: 36px; }
+  .bmp .bd { white-space: pre-wrap; word-break: break-all; line-height: 1.7; background: #fafbfc; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 8px 0; }
+  .bmc { border-top: 1px solid var(--line); padding: 8px 0; font-size: 13.5px; } .bmc.re { padding-left: 20px; }
+  .bmc .h { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .bmc .h .grow { margin-left: auto; display: flex; gap: 4px; }
+  .bmc .b { white-space: pre-wrap; word-break: break-all; margin-top: 3px; } .bmc.off .b { color: var(--faint); text-decoration: line-through; }
   .advsum { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: #fff7e6; border: 1px solid #ffd591; color: #7a4f00; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
   .advsum b { width: 100%; } .advsum span { background: #fff; border-radius: 8px; padding: 3px 8px; border: 1px solid #ffe7ba; } .advsum em { font-style: normal; font-weight: 800; color: var(--danger); }
   .stw .vset { display: inline-block; width: auto; height: 26px; padding: 0 6px; font-size: 12px; margin-left: 6px; vertical-align: middle; font-weight: 600; }
@@ -642,6 +648,7 @@
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a data-view="bib">배번호 관리</a>
       <a data-view="notice">공지사항</a>
+      <a data-view="board">게시판 관리</a>
       <a data-view="acc">계정관리</a>
     </nav>
     <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a></div>
@@ -690,6 +697,30 @@
         <tbody id="acRows"></tbody>
       </table>
       <div class="empty hidden" id="acEmpty"></div>
+    </div>
+   </section>
+   <section id="view-board" class="hidden">
+    <div class="head">
+      <h2>게시판 관리 <small id="bmCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools">
+        <input class="inp search" id="bmQ" placeholder="제목·내용·작성자 검색" style="width:220px">
+        <button class="btn ghost" id="bmReload">새로고침</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사 앱 자유게시판 글입니다. 신고가 3건 쌓이면 자동으로 <b>숨김</b>이 됩니다. 줄을 누르면 내용·댓글·신고를 보고 <b>숨김 · 다시 공개 · 삭제</b>할 수 있습니다. 금칙어는 러너 올인원 DB 의 <b>board_words</b> 탭에 추가하세요.</p>
+    <div class="tabs" id="bmTabs"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>상태</th><th>말머리</th><th>제목</th><th>작성자</th><th>댓글</th><th>좋아요</th><th>신고</th><th>작성일시</th></tr></thead>
+        <tbody id="bmRows"></tbody>
+      </table>
+      <div class="empty hidden" id="bmEmpty"></div>
+    </div>
+    <div class="sec" style="margin-top:16px"><div class="sec-h"><h4>글쓰기 정지 <small id="bmBanCnt"></small></h4></div>
+      <div class="bm-ban"><select class="inp" id="bmBanDrv" style="width:auto"></select>
+        <select class="inp" id="bmBanDays" style="width:auto"><option value="7">7일</option><option value="30">30일</option><option value="0">해제할 때까지</option></select>
+        <input class="inp" id="bmBanMemo" placeholder="사유" style="width:200px"><button class="btn sm" id="bmBanBtn">정지</button></div>
+      <div id="bmBans"></div>
     </div>
    </section>
    <section id="view-notice" class="hidden">
@@ -965,6 +996,12 @@
 </div>
 
 <!-- ───────────── 품앗이 일감 상세 ───────────── -->
+<div class="modal hidden" id="bmModal">
+  <div class="m-box" style="width:min(860px,100%);max-height:90vh;overflow:auto;padding:0">
+    <div class="m-top"><b id="bmTitle">게시글</b><button class="btn sm ghost" id="bmClose">닫기</button></div>
+    <div id="bmBody" style="padding:14px 18px 18px"></div>
+  </div>
+</div>
 <div class="modal hidden" id="paModal">
   <div class="m-box" style="width:min(940px,100%);max-height:90vh;overflow:auto;padding:0">
     <div class="m-top"><b id="paTitle">품앗이 일감</b><button class="btn sm ghost" id="paClose">닫기</button></div>
@@ -1930,6 +1967,8 @@
     $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
     $('#view-memo').classList.toggle('hidden', v !== 'memo');
     $('#view-notice').classList.toggle('hidden', v !== 'notice');
+    $('#view-board').classList.toggle('hidden', v !== 'board');
+    if (v === 'board') loadBoardAdm();
     $('#view-acc').classList.toggle('hidden', v !== 'acc');
     if (v === 'acc') loadAccounts();
     if (v === 'notice') loadNotices();
@@ -5533,6 +5572,77 @@
     }).catch(() => {});
   });
 
+
+  // ───── 게시판 관리 ─────
+  const BM = { status: '전체', posts: [], count: {}, cur: '' };
+  const bmBadge = (st) => '<span class="badge ' + (st === '공개' ? 'b-승인' : st === '숨김' ? 'b-승인대기' : 'b-정지') + '">' + esc(st) + '</span>';
+  function loadBoardAdm() {
+    $('#bmRows').innerHTML = '<tr><td colspan="8" class="sub">불러오는 중…</td></tr>';
+    api('adm_bdList', { status: BM.status, q: $('#bmQ').value.trim() }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      BM.posts = r.posts; BM.count = r.count; renderBoardAdm(r);
+    }).catch(() => {});
+  }
+  function renderBoardAdm(r) {
+    $('#bmTabs').innerHTML = ['전체', '공개', '숨김', '삭제', '신고'].map((st) => '<button class="tab' + (BM.status === st ? ' on' : '') + (st === '신고' && BM.count[st] ? ' alert' : '') + '" data-bms="' + st + '">' + (st === '신고' ? '처리 안 한 신고' : st) + ' <b>' + (BM.count[st] || 0) + '</b></button>').join('');
+    $('#bmCount').textContent = BM.posts.length + '건';
+    $('#bmRows').innerHTML = BM.posts.map((p) => '<tr data-bm="' + esc(p.id) + '"><td>' + bmBadge(p.status) + '</td><td>' + esc(p.cat) + '</td><td><b>' + esc(p.title) + '</b>' + (p.hasAttach ? ' 📷' : '') + '</td><td>' + esc(p.author) + '</td>' +
+      '<td class="n">' + p.cmts + '</td><td class="n">' + p.likes + '</td><td>' + (p.reports ? p.reports + '건' : '<span class="sub">-</span>') + (p.wait ? ' <span class="badge b-반려">대기 ' + p.wait + '</span>' : '') + '</td><td class="sub">' + esc(String(p.at || '').slice(0, 16)) + '</td></tr>').join('');
+    const em = $('#bmEmpty'); em.classList.toggle('hidden', !!BM.posts.length); em.textContent = '글이 없습니다.';
+    if (r) {
+      $('#bmBanDrv').innerHTML = '<option value="">기사 선택</option>' + r.drivers.map((d) => '<option value="' + esc(d.id) + '">' + esc(d.name) + '</option>').join('');
+      $('#bmBanCnt').textContent = r.bans.length ? r.bans.length + '명' : '';
+      $('#bmBans').innerHTML = r.bans.length ? '<div class="table-wrap"><table><thead><tr><th>기사</th><th>정지 끝</th><th>사유</th><th>등록</th><th></th></tr></thead><tbody>' +
+        r.bans.map((b) => '<tr><td><b>' + esc(b.name) + '</b></td><td>' + esc(b.until || '해제할 때까지') + '</td><td>' + esc(b.memo || '') + '</td><td class="sub">' + esc(String(b.at || '').slice(0, 16)) + '</td><td><button class="btn sm ghost" data-unban="' + esc(b.driverId) + '">해제</button></td></tr>').join('') + '</tbody></table></div>'
+        : '<div class="sub" style="font-size:13px">글쓰기 정지된 기사가 없습니다.</div>';
+    }
+  }
+  $('#bmTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-bms]'); if (b) { BM.status = b.dataset.bms; loadBoardAdm(); } });
+  $('#bmReload').addEventListener('click', loadBoardAdm);
+  let bmQT = 0; $('#bmQ').addEventListener('input', () => { clearTimeout(bmQT); bmQT = setTimeout(loadBoardAdm, 400); });
+  $('#bmRows').addEventListener('click', (e) => { const tr = e.target.closest('[data-bm]'); if (tr) openBoardAdm(tr.dataset.bm); });
+  $('#bmClose').addEventListener('click', () => $('#bmModal').classList.add('hidden'));
+  $('#bmBanBtn').addEventListener('click', () => {
+    const id = $('#bmBanDrv').value; if (!id) return toast('정지할 기사를 골라 주세요.');
+    const days = $('#bmBanDays').value, name = $('#bmBanDrv').selectedOptions[0].textContent;
+    if (!confirm(name + ' 기사님의 게시판 글쓰기를 ' + (+days ? days + '일' : '해제할 때까지') + ' 정지할까요?\n(읽기는 할 수 있습니다)')) return;
+    api('adm_bdBan', id, days, $('#bmBanMemo').value.trim(), false).then((r) => { if (!r.ok) return toast(r.msg); toast('글쓰기를 정지했습니다.'); $('#bmBanMemo').value = ''; loadBoardAdm(); }).catch(() => {});
+  });
+  $('#bmBans').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-unban]'); if (!b) return;
+    api('adm_bdBan', b.dataset.unban, 0, '', true).then((r) => { if (!r.ok) return toast(r.msg); toast('정지를 풀었습니다.'); loadBoardAdm(); }).catch(() => {});
+  });
+  function openBoardAdm(id) {
+    BM.cur = id;
+    $('#bmBody').innerHTML = '<div class="sub">불러오는 중…</div>'; $('#bmModal').classList.remove('hidden');
+    api('adm_bdPost', id).then((r) => {
+      if (!r.ok) { $('#bmBody').innerHTML = ''; return toast(r.msg); }
+      const p = r.post, cms = r.comments, reps = r.reports;
+      $('#bmTitle').textContent = '[' + p.cat + '] ' + p.title;
+      const acts = (kind, id2, st) => (st !== '숨김' && st !== '삭제' ? '<button class="btn sm ghost" data-bma="hide" data-k="' + kind + '" data-i="' + esc(id2) + '">숨김</button>' : '') +
+        (st !== '공개' ? '<button class="btn sm ghost" data-bma="show" data-k="' + kind + '" data-i="' + esc(id2) + '">다시 공개</button>' : '') +
+        (st !== '삭제' ? '<button class="btn sm ghost danger-t" data-bma="delete" data-k="' + kind + '" data-i="' + esc(id2) + '">삭제</button>' : '');
+      const roots = cms.filter((c) => !c.parentId || !cms.some((x) => x.id === c.parentId));
+      const cm = (c, re) => '<div class="bmc' + (re ? ' re' : '') + (c.status !== '공개' ? ' off' : '') + '"><div class="h"><b>' + esc(c.author) + '</b><span class="sub">' + esc(String(c.at || '').slice(0, 16)) + '</span>' + bmBadge(c.status) + (c.reports ? '<span class="badge b-반려">신고 ' + c.reports + '</span>' : '') +
+        '<span class="grow">' + acts('댓글', c.id, c.status) + '</span></div><div class="b">' + esc(c.body) + '</div></div>';
+      $('#bmBody').innerHTML = '<div class="bmp"><div class="kv2"><span>상태</span><span>' + bmBadge(p.status) + (Number(p.reports) ? ' 신고 ' + p.reports + '건' : '') + '</span><span>작성자</span><span>' + esc(p.author) + '</span><span>작성일시</span><span>' + esc(p.createdAt) + (p.updatedAt && p.updatedAt !== p.createdAt ? ' (수정 ' + esc(p.updatedAt) + ')' : '') + '</span>' +
+        '<span>좋아요 · 댓글</span><span>' + p.likes + ' · ' + cms.filter((c) => c.status !== '삭제').length + '</span>' + (p.attach ? '<span>사진</span><span><a href="' + esc(p.attach) + '" target="_blank" rel="noopener">드라이브에서 보기</a></span>' : '') + '</div>' +
+        '<div class="bd">' + esc(p.body) + '</div><div class="bm-ban">' + acts('글', p.id, p.status) + '<button class="btn sm ghost" data-bmban="' + esc(p.authorId) + '" data-n="' + esc(p.author) + '">작성자 글쓰기 정지</button></div>' +
+        (reps.length ? '<h4 style="margin:14px 0 6px">신고 ' + reps.length + '건</h4><div class="table-wrap"><table><thead><tr><th>대상</th><th>신고자</th><th>사유</th><th>처리</th><th>일시</th></tr></thead><tbody>' +
+          reps.map((x) => '<tr><td>' + esc(x.kind) + (x.kind === '댓글' ? ' <span class="sub">' + esc((cms.find((c) => c.id === x.targetId) || {}).author || '') + '</span>' : '') + '</td><td>' + esc(x.reporter) + '</td><td>' + esc(x.reason || '-') + '</td><td>' + esc(x.status) + '</td><td class="sub">' + esc(String(x.at || '').slice(0, 16)) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
+        '<h4 style="margin:14px 0 6px">댓글 ' + cms.length + '</h4>' + (roots.map((c) => cm(c, false) + cms.filter((x) => x.parentId === c.id).map((x) => cm(x, true)).join('')).join('') || '<div class="sub">댓글이 없습니다.</div>') + '</div>';
+    }).catch(() => {});
+  }
+  $('#bmBody').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-bma]');
+    if (b) {
+      const lab = { hide: '숨김', show: '다시 공개', delete: '삭제' }[b.dataset.bma];
+      if (b.dataset.bma === 'delete' && !confirm(b.dataset.k + '을(를) 삭제할까요? 기사 앱에서 보이지 않게 됩니다 (시트에는 남음).')) return;
+      return api('adm_bdAction', b.dataset.k, b.dataset.i, b.dataset.bma).then((r) => { if (!r.ok) return toast(r.msg); toast(b.dataset.k + ' ' + lab + ' 처리했습니다.'); openBoardAdm(BM.cur); loadBoardAdm(); }).catch(() => {});
+    }
+    const bn = e.target.closest('[data-bmban]');
+    if (bn) { $('#bmModal').classList.add('hidden'); $('#bmBanDrv').value = bn.dataset.bmban; $('#bmBanMemo').focus(); toast(bn.dataset.n + ' 기사님: 기간·사유를 정하고 [정지]를 누르세요.'); }
+  });
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
   (function boot() {
     const t = store.get();
