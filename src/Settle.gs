@@ -912,6 +912,7 @@ function stlCompute_(month) {
       rl.qty += qty; rl.amt += pay;
       const dl = s.daily[r.date] || (s.daily[r.date] = { qty: 0, amt: 0 });
       dl.qty += qty; dl.amt += pay;
+      if (r.route) (dl.rt = dl.rt || {})[stlShort_(camp) + '|' + normCode_(r.route)] = 1;
       const dk = r.date + '|' + login;
       (byDateLogin[dk] = byDateLogin[dk] || []).push({ route: normCode_(r.route), qty: qty, sales: sales, unit: u.u, camp: camp, cid: r.cid });
     } else if (kind === '프레시백') {
@@ -1065,6 +1066,11 @@ function stlCompute_(month) {
   stlRead_('stl_pay').filter(function (p) { return p.month === month; }).forEach(function (p) { payRows[stlLogin_(p.acct)] = p; });
   const rounds = stlRounds_(month);
 
+  // 일자별 '그날 노선' (쿠팡 정산서 기준): 인천8 103AB 처럼 캠프·번호별로 묶음
+  Object.keys(S).forEach(function (id) {
+    const dd = S[id].daily;
+    Object.keys(dd).forEach(function (d) { dd[d].route = stlRouteLabel_(dd[d].rt); delete dd[d].rt; });
+  });
   const drivers = [], slips = {};
   const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, profit: 0, runnerIns: 0, fbCut: 0, insGain: 0, sales: 0 };
   Object.keys(S).forEach(function (id) {
@@ -1136,6 +1142,23 @@ function stlCompute_(month) {
     dates: stlDates_(month, cfg), warnings: warnings, yong: yongOut
   };
   return { summary: summary, slips: slips };
+}
+/** { '인천8|103A': 1, '인천8|103B': 1 } → '인천8 103AB' (캠프가 여럿이면 ' / ', 번호가 여럿이면 ', ') */
+function stlRouteLabel_(rt) {
+  if (!rt) return '';
+  const camps = {};
+  Object.keys(rt).forEach(function (k) {
+    const i = k.indexOf('|'), c = k.slice(0, i), route = k.slice(i + 1), m = route.match(/^(\d+)-?([A-Z가-힣]*)$/);
+    const nums = camps[c] || (camps[c] = {});
+    if (!m) { nums[route] = nums[route] || ''; return; }
+    nums[m[1]] = (nums[m[1]] || '') + m[2];
+  });
+  return Object.keys(camps).sort().map(function (c) {
+    const nums = camps[c];
+    const list = Object.keys(nums).sort(function (a, b) { return (Number(a) || 0) - (Number(b) || 0) || a.localeCompare(b); })
+      .map(function (n) { return n + nums[n].split('').filter(function (x, i, a) { return a.indexOf(x) === i; }).sort().join(''); });
+    return (c ? c + ' ' : '') + list.join(', ');
+  }).join(' / ');
 }
 function stlYongCamp_(ctx, route) { return route ? ctx.price.campOf(route) : ''; }
 /** 기사(사람) → 그 기사 본인 정산 묶음(메인 아이디키). 본인 쿠팡플렉스 아이디의 묶음 → 없으면 명의자로 된 첫 묶음 */

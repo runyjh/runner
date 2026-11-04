@@ -4570,9 +4570,9 @@
     const days = Object.keys(s.daily).concat(Object.keys(s.sched || {})).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
     const work = Object.keys(s.sched || {}).filter((x) => x >= P.from && x <= P.to).length;
     const dow = ['일', '월', '화', '수', '목', '금', '토'];
-    const dayRows = days.map((x) => { const dd = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)); const v = s.daily[x] || {}; return '<tr><td>' + mdTxt(x) + ' (' + dow[dd.getDay()] + ')</td><td>' + esc((s.sched || {})[x] || '') + '</td><td class="n">' + wnz(v.qty) + '</td><td class="n">' + wnz(v.amt) + '</td></tr>'; });
+    const dayRows = days.map((x) => { const dd = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)); const v = s.daily[x] || {}; return '<tr><td>' + mdTxt(x) + ' (' + dow[dd.getDay()] + ')</td><td>' + esc(v.route || (s.sched || {})[x] || '') + '</td><td class="n">' + wnz(v.qty) + '</td><td class="n">' + wnz(v.amt) + '</td></tr>'; });
     const half = Math.ceil(dayRows.length / 2);
-    const dayTbl = (rows) => '<table><thead><tr><th>날짜</th><th>스케줄</th><th>건수</th><th>금액</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+    const dayTbl = (rows) => '<table><thead><tr><th>날짜</th><th>노선 · 스케줄</th><th>건수</th><th>금액</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
     const routes = s.routes.map((x) => '<tr><td>' + esc(x.camp) + '</td><td>' + esc(x.route) + '</td><td>' + esc(x.how || '') + '</td><td class="n">' + wn(x.qty) + '</td><td class="n">' + wn(x.unit) + '</td><td class="n">' + wnz(x.inc) + '</td><td class="n">' + wn(x.unit + x.inc) + '</td><td class="n">' + wn(x.amt) + '</td></tr>').join('');
     const rq = s.routes.reduce((a, x) => a + x.qty, 0), ra = s.routes.reduce((a, x) => a + x.amt, 0);
     const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>용차 · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담)') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? '+' + wn(y.extra) : '−' + wn(y.cut)) + '</td></tr>').join('');
@@ -4589,7 +4589,7 @@
       '<tr class="big"><td>지급 합계</td><td class="n">+' + wn(d.pay + d.depAdd) + '</td><td>공제 합계</td><td class="n">−' + wn(dedSum) + '</td></tr></tbody></table>' +
       '<table style="margin-top:8px"><thead><tr><th>세금계산서 (기사 → ' + esc(co.name || '러너') + ')</th><th>공급가액</th><th>세액</th><th>합계</th></tr></thead><tbody><tr><td>발행 금액</td><td class="n">' + wn(d.supply) + '</td><td class="n">' + wn(d.tax) + '</td><td class="n">' + wn(d.invoice) + '</td></tr>' +
       '<tr class="big"><td>실 입금액</td><td colspan="3" class="n">' + wn(d.net) + '원</td></tr></tbody></table>' +
-      '<div class="foot">입금계좌: ' + esc(d.bank || '') + ' ' + esc(d.account || '') + ' (' + esc(d.holder || d.name) + ')' + (s.ins && !s.ins.excluded && s.ins.bosu ? ' · 산재·고용 보수액 ' + wn(s.ins.bosu) + ' (경비율 ' + (Math.round(s.ins.exp * 1000) / 10) + '%)' : '') + '</div></div>' +
+      '<div class="foot">입금계좌: ' + esc(d.bank || '') + ' ' + esc(d.account || '') + ' (' + esc(d.holder || d.name) + ')' + '</div></div>' +
       '<div><h4>② 노선별 내역 (단가·금액 부가세 포함)</h4><table><thead><tr><th>캠프</th><th>라우트</th><th>단가 기준</th><th>건수</th><th>기본단가</th><th>프백가중</th><th>합계단가</th><th>금액</th></tr></thead><tbody>' + routes +
       '<tr class="big"><td colspan="3">합계</td><td class="n">' + wn(rq) + '</td><td colspan="3"></td><td class="n">' + wn(ra) + '</td></tr></tbody></table></div></div>' +
       ((s.workers || []).some((w) => !w.owner) ? '<h4>일한 기사 (아이디 사용 기록 기준 · 정산금은 명의자 ' + esc(d.name) + ' 에게)</h4><table><thead><tr><th>기사</th><th>아이디</th><th>일한 날</th><th>건수</th><th>금액</th></tr></thead><tbody>' +
@@ -4598,7 +4598,7 @@
         s.movedIn.map((m) => '<tr><td>' + esc(m.label) + '</td><td>' + esc(mdTxt(m.from)) + (m.to && m.to !== m.from ? ' ~ ' + esc(mdTxt(m.to)) : '') + '</td><td class="n">' + m.days + '일</td><td class="n">' + wn(m.qty) + '</td><td class="n">' + wn(m.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
       ((s.movedOut || []).length ? '<h4>다른 기사 사용분 이전 (아이디 사용 기록 → 그 기사 정산으로 · 이 명세서 금액에는 없음)</h4><table><thead><tr><th>내용</th><th>아이디</th><th>기간</th><th>일한 날</th><th>건수</th><th>금액</th></tr></thead><tbody>' +
         s.movedOut.map((m) => '<tr><td>' + esc(m.label) + '</td><td>' + esc(m.cid) + '</td><td>' + esc(mdTxt(m.from)) + (m.to && m.to !== m.from ? ' ~ ' + esc(mdTxt(m.to)) : '') + '</td><td class="n">' + m.days + '일</td><td class="n">' + wn(m.qty) + '</td><td class="n">' + wn(m.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
-      '<h4>③ 일자별 내역 (기사스케줄 · 쿠팡 배송)</h4><div class="cols"><div>' + dayTbl(dayRows.slice(0, half)) + '</div><div>' + dayTbl(dayRows.slice(half)) + '</div></div>' +
+      '<h4>③ 일자별 내역 (쿠팡 정산서 노선 · 없는 날은 기사스케줄)</h4><div class="cols"><div>' + dayTbl(dayRows.slice(0, half)) + '</div><div>' + dayTbl(dayRows.slice(half)) + '</div></div>' +
       '<div class="foot">스케줄 출근 ' + (d.workDays || 0) + '일 · 스케줄 기록 ' + work + '일 · 쿠팡 배송 ' + Object.keys(s.daily).length + '일. 기간 밖 날짜의 수기반영(소급분)은 일자별에서 빠지고 합계에는 포함됩니다.</div>' +
       '<h4>④ 용차 · 분실파손 내역 · 세금계산서 안내</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong + loss || '<tr><td colspan="3" class="sub">용차·분실 없음</td></tr>') + '</tbody></table>' +
       '<table style="margin-top:8px"><tbody><tr><th>공급받는자</th><td>' + esc(co.name) + ' / 대표 ' + esc(co.ceo) + '</td></tr><tr><th>사업자번호</th><td>' + esc(co.bizNo) + (co.email ? ' / ' + esc(co.email) : '') + '</td></tr>' +
