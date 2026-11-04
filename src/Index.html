@@ -94,6 +94,16 @@
   .hello p { margin: 4px 0 0; color: var(--sub); }
   .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .menu .tile.wide { grid-column: 1 / -1; min-height: 72px; position: relative; }
+  .menu .bdtile { background: #fff; border-radius: var(--radius); padding: 18px 16px 10px; cursor: pointer; color: var(--ink); }
+  .menu .bdtile > .sub2 { color: var(--brand); font-weight: 600; }
+  .menu .bdrecent { margin-top: 10px; border-top: 1px solid var(--line); padding: 0; min-height: 0; background: none; border-radius: 0; }
+  .menu .bdrecent .ntrow { padding: 9px 0; }
+  .menu .bdrecent .ntrow:first-child { border-top: 0; }
+  .menu .bdrecent span { font-size: inherit; color: inherit; }
+  .menu .bdrecent .tt { font-size: 14px; }
+  .menu .bdrecent .dd { font-size: 12px; color: var(--sub); }
+  .menu .bdrecent .bdc { font-size: 11.5px; color: #4e5968; }
+  .menu .bdrecent .bdc.c-정보 { color: #0958d9; } .menu .bdrecent .bdc.c-질문 { color: #b7791f; } .menu .bdrecent .bdc.c-중고·나눔 { color: #11734b; }
   /* ───── 자유게시판 ───── */
   .bdcats { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 10px; scrollbar-width: none; } .bdcats::-webkit-scrollbar { display: none; }
   .bdcats button { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 700; color: var(--sub); }
@@ -604,9 +614,8 @@
       <button class="tile" id="mSettle" type="button"><b>정산서 보기</b><span>월별 정산서·세금계산서 →</span></button>
       <button class="tile" id="mPm" type="button"><b>품앗이</b><span>품앗이 일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
-      <button class="tile wide" id="mBoard" type="button"><b>💬 자유게시판</b><span>기사님끼리 정보·질문·나눔 →</span></button>
+      <div class="tile wide bdtile" id="mBoard" role="button" tabindex="0"><b>💬 자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
     </div>
-    <div class="ntcard hidden" id="bdCard" style="margin-top:12px"></div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
   </section>
@@ -2278,15 +2287,15 @@
     api('api_bdRecent', token).then((r) => {
       const box = $('#bdCard');
       if (!r || !r.ok || !r.posts.length) { box.classList.add('hidden'); return; }
-      box.innerHTML = '<h3><span>💬 자유게시판 최근 글</span><a id="bdAll">전체 보기 ›</a></h3>' + r.posts.map((p) => '<button type="button" class="ntrow" data-bp="' + escH(p.id) + '">' +
+      box.innerHTML = r.posts.map((p) => '<button type="button" class="ntrow" data-bp="' + escH(p.id) + '">' +
         '<span class="bdc c-' + escH(p.cat) + '">' + escH(p.cat) + '</span><span class="tt">' + escH(p.title) + '</span>' + (p.cmts ? '<span class="dd" style="color:var(--brand);font-weight:700">💬 ' + p.cmts + '</span>' : '') + '<span class="dd">' + escH(bdAgo(p.at)) + '</span></button>').join('');
       box.classList.remove('hidden');
     }).catch(() => {});
   };
   $('#bdCard').addEventListener('click', (e) => {
-    if (e.target.closest('#bdAll')) return openBoard('home');
-    const b = e.target.closest('[data-bp]'); if (b) openBdPost(b.dataset.bp, 'home');
+    const b = e.target.closest('[data-bp]'); if (b) { e.stopPropagation(); openBdPost(b.dataset.bp, 'home'); }
   });
+  $('#mBoard').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.id === 'mBoard') { e.preventDefault(); openBoard('home'); } });
   $('#bdBack').addEventListener('click', () => { if (bdFromHome === 'mypage') return openMyPage(); let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
   $('#bdCats').addEventListener('click', (e) => { const b = e.target.closest('[data-bc]'); if (!b || b.dataset.bc === bdCat) return; bdCat = b.dataset.bc; bdPage = 0; loadBoard(); });
   $('#bdGo').addEventListener('click', () => { bdPage = 0; loadBoard(); });
