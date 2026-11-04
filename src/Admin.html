@@ -4450,8 +4450,8 @@
     const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
       '<td class="sub">' + d.cids.map((x, i) => (i ? '<span style="opacity:.7">' : '<b style="color:var(--ink)">') + esc(x.replace(/@.*/, '')) + (i ? '</span>' : '</b>')).join(', ') +
         (d.workers && d.workers.length ? '<br><small>일한 기사: ' + esc(d.workers.join(', ')) + '</small>' : '') +
-        (d.movedIn && d.movedIn.length ? '<br><small style="color:var(--ok)">＋ ' + esc(d.movedIn.join(', ')) + '</small>' : '') +
-        (d.movedOut && d.movedOut.length ? '<br><small style="color:#b45309">→ ' + esc(d.movedOut.join(', ')) + '</small>' : '') + '</td>' +
+        (d.movedIn && d.movedIn.length ? '<br><small style="color:var(--ok)">' + esc(d.movedIn.join(', ')) + '</small>' : '') +
+        (d.movedOut && d.movedOut.length ? '<br><small style="color:#b45309">' + esc(d.movedOut.join(', ')) + '</small>' : '') + '</td>' +
       '<td class="n">' + (d.workDays || '-') + '</td>' + num(d.qty) + num(d.pay) + num(d.taxDed) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
       '<td>' + (d.checked ? '<span style="color:var(--ok);font-weight:700">✓ ' + esc(mdTxt(d.payDate)) + '</span>' : '') + '</td></tr>';
     const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + '<td></td>' + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';

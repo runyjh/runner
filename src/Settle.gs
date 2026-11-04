@@ -912,7 +912,11 @@ function stlCompute_(month) {
       rl.qty += qty; rl.amt += pay;
       const dl = s.daily[r.date] || (s.daily[r.date] = { qty: 0, amt: 0 });
       dl.qty += qty; dl.amt += pay;
-      if (r.route) (dl.rt = dl.rt || {})[stlShort_(camp) + '|' + normCode_(r.route)] = 1;
+      // 그날 노선 (메인 아이디가 아닌 서브·다른 아이디로 잡힌 줄은 뒤에 (아이디) 를 붙여 따로)
+      if (r.route) {
+        const sub = login === s.id ? '' : String(r.cid).replace(/@.*$/, '');
+        ((dl.rt = dl.rt || {})[sub] = dl.rt[sub] || {})[stlShort_(camp) + '|' + normCode_(r.route)] = 1;
+      }
       const dk = r.date + '|' + login;
       (byDateLogin[dk] = byDateLogin[dk] || []).push({ route: normCode_(r.route), qty: qty, sales: sales, unit: u.u, camp: camp, cid: r.cid });
     } else if (kind === '프레시백') {
@@ -1069,7 +1073,11 @@ function stlCompute_(month) {
   // 일자별 '그날 노선' (쿠팡 정산서 기준): 인천8 103AB 처럼 캠프·번호별로 묶음
   Object.keys(S).forEach(function (id) {
     const dd = S[id].daily;
-    Object.keys(dd).forEach(function (d) { dd[d].route = stlRouteLabel_(dd[d].rt); delete dd[d].rt; });
+    Object.keys(dd).forEach(function (d) {
+      const rt = dd[d].rt || {};
+      dd[d].route = Object.keys(rt).sort().map(function (sub) { return stlRouteLabel_(rt[sub]) + (sub ? ' (' + sub + ')' : ''); }).join(' / ');
+      delete dd[d].rt;
+    });
   });
   const drivers = [], slips = {};
   const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, profit: 0, runnerIns: 0, fbCut: 0, insGain: 0, sales: 0 };
@@ -1188,8 +1196,8 @@ function stlMoveOf_(ctx, idx, worker, r, warn) {
 function stlMoveNote_(sIn, sOut, r, worker, X, D, idx, amt, qty) {
   const cid = String(r.cid).replace(/@.*$/, ''), ownerName = X.groups[idx.mainKey].ownerId && D.byId[X.groups[idx.mainKey].ownerId] ? D.byId[X.groups[idx.mainKey].ownerId].name : '명의자 없음';
   const wName = D.byId[worker] ? D.byId[worker].name : worker;
-  const a = sIn.movedIn[cid] || (sIn.movedIn[cid] = { label: cid + ' (' + ownerName + ' 아이디) 사용분', cid: cid, who: ownerName, qty: 0, amt: 0, dates: {} });
-  const b = sOut.movedOut[worker + '|' + cid] || (sOut.movedOut[worker + '|' + cid] = { label: wName + ' 사용분 이전', cid: cid, who: wName, qty: 0, amt: 0, dates: {} });
+  const a = sIn.movedIn[cid] || (sIn.movedIn[cid] = { label: '사용분 + ' + cid + ' ' + ownerName + ' 사용', cid: cid, who: ownerName, qty: 0, amt: 0, dates: {} });
+  const b = sOut.movedOut[worker + '|' + cid] || (sOut.movedOut[worker + '|' + cid] = { label: '사용분 - ' + cid + ' ' + wName + ' 사용', cid: cid, who: wName, qty: 0, amt: 0, dates: {} });
   [a, b].forEach(function (x) { x.qty += qty; x.amt += amt; if (qty) x.dates[r.date] = 1; });
 }
 function stlMoveList_(m) {
