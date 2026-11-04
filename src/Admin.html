@@ -177,6 +177,8 @@
   .stw.bad { background: var(--danger-weak); color: #a1262b; }
   .stw.info { background: var(--gray-weak); color: var(--sub); }
   .stw summary { cursor: pointer; font-weight: 700; }
+  .btn.pmsw { background: #f2f4f6; color: var(--sub); } .btn.pmsw b { color: var(--danger); margin-left: 4px; }
+  .btn.pmsw.on { background: #e6f7ee; color: #11734b; } .btn.pmsw.on b { color: #0b6b3a; }
   .bm-ban { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
   .bm-ban .inp { height: 36px; }
   .bmp .bd { white-space: pre-wrap; word-break: break-all; line-height: 1.7; background: #fafbfc; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 8px 0; }
@@ -749,6 +751,8 @@
         <input class="inp" type="date" id="paFrom" title="배차일 시작"><input class="inp" type="date" id="paTo" title="배차일 끝">
         <input class="inp search" id="paQ" placeholder="기사·배송지·센터·라우트 검색" style="width:220px">
         <button class="btn ghost" id="paReload">새로고침</button>
+        <button class="btn pmsw" id="paPostSw" type="button" title="기사 앱의 품앗이 일감 올리기(제안 포함)를 켜고 끕니다">일감 올리기 <b>…</b></button>
+        <button class="btn ghost danger-t" type="button" data-reset="pumasi">데이터 초기화</button>
       </div>
     </div>
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사 앱 품앗이에 올라온 일감입니다. 줄을 누르면 지원자·연락처를 보고 사무실에서 <b>배차 확정 · 확정 풀기 · 마감 · 취소</b>를 할 수 있습니다 (처리하면 기사님께 알림이 갑니다). 데이터는 러너 올인원 DB 의 <b>pumasi_jobs · pumasi_apps</b> 탭.</p>
@@ -2014,7 +2018,7 @@
     $('#paRows').innerHTML = '<tr><td colspan="14" class="sub">불러오는 중…</td></tr>';
     api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
       if (!r.ok) return toast(r.msg);
-      PA.jobs = r.jobs; PA.count = r.count; renderPumasi();
+      PA.jobs = r.jobs; PA.count = r.count; paintPostSw(r.postOn !== false); renderPumasi();
     }).catch(() => {});
   }
   function renderPumasi() {
@@ -2059,6 +2063,13 @@
   });
   $('#paTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-pst]'); if (b) { PA.status = b.dataset.pst; renderPumasi(); } });
   $('#paReload').addEventListener('click', loadPumasi);
+  // 일감 올리기 ON/OFF
+  function paintPostSw(on) { const b = $('#paPostSw'); b.dataset.on = on ? '1' : ''; b.classList.toggle('on', on); b.innerHTML = '일감 올리기 <b>' + (on ? 'ON' : 'OFF') + '</b>'; }
+  $('#paPostSw').addEventListener('click', () => {
+    const on = !$('#paPostSw').dataset.on;
+    if (!on && !confirm('기사 앱의 품앗이 일감 올리기를 끌까요?\n끄면 기사님들은 새 일감 올리기·품앗이 제안을 누를 수 없습니다. (이미 올라온 일감 보기·지원·확정은 그대로)')) return;
+    api('adm_pmPostSet', on).then((r) => { if (!r.ok) return toast(r.msg); paintPostSw(r.postOn); toast('일감 올리기를 ' + (r.postOn ? '켰습니다.' : '껐습니다. 기사 앱에서 누를 수 없습니다.')); }).catch(() => {});
+  });
   $('#paFrom').addEventListener('change', loadPumasi); $('#paTo').addEventListener('change', loadPumasi);
   let paQT = 0; $('#paQ').addEventListener('input', () => { clearTimeout(paQT); paQT = setTimeout(loadPumasi, 400); });
   $('#paRows').addEventListener('click', (e) => {
@@ -4874,7 +4885,8 @@
     notice: { label: '공지사항', items: ['모든 공지 (notices 탭)'], keep: '' },
     accounts: { label: '계정관리', items: ['모든 서비스 계정·비밀번호 (accounts 탭)'], keep: '복사본에는 비밀번호가 암호화된 채로 들어갑니다.' },
     memo: { label: '업무스케줄', items: ['모든 날짜별 메모'], keep: '' },
-    bib: { label: '배번호 관리', items: ['모든 배번호 신청서'], keep: '회사 정보(서류 고정 항목)는 남습니다.' }
+    bib: { label: '배번호 관리', items: ['모든 배번호 신청서'], keep: '회사 정보(서류 고정 항목)는 남습니다.' },
+    pumasi: { label: '품앗이', items: ['모든 품앗이 일감 (pumasi_jobs 탭)', '모든 지원·제안 기록 (pumasi_apps 탭)', '모든 근무 가능일·기사 기본 정보 (pumasi_avail 탭)', '품앗이 알림 (게시판 알림은 남김)'], keep: '기사스케줄의 품앗이 줄 기록과 정산 DB 의 아이디 사용 기록은 남습니다.' }
   };
   let rzSection = '', rzDone = false;
   document.addEventListener('click', (e) => {

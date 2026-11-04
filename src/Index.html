@@ -180,6 +180,7 @@
   .bdg.k-주간 { background: #fff4d6; color: #b7791f; } .bdg.k-야간 { background: #e6e9ff; color: #3b4cc0; } .bdg.k-일택 { background: #e5f6ec; color: #11734b; }
   .bdg.pay { background: #fff0f0; color: #d63b3b; } .bdg.pay.m { background: #f2f4f6; color: #4e5968; }
   .bdg.of { background: #ffe8f3; color: #c2185b; }
+  .btn.off, button.off { opacity: .45; pointer-events: none; filter: grayscale(1); }
   .bdg.pdd { background: var(--brand); color: #fff; font-size: 11px; padding: 1px 7px; margin-left: 4px; }
   .bdg.gv { background: #e8f7ee; color: #11734b; }
   .pmseg { margin: 0 0 10px; } .pmseg button { flex: 1; padding: 9px 4px; white-space: nowrap; font-size: 13.5px; }
@@ -636,6 +637,7 @@
       <button class="btn sm ghost" id="pmGive" type="button" style="margin-left:auto;height:38px;padding:0 10px">🙋 품앗이 주세요</button>
       <button class="btn sm" id="pmNew" type="button" style="margin-left:6px;height:38px;padding:0 10px">+ 일감 올리기</button></div>
     <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.<small>기사님끼리 품앗이 일감을 맡기고 대신 뛰어 주세요.</small></div>
+    <div class="pmofr hidden" id="pmOffNote">지금은 사무실에서 <b>품앗이 일감 올리기</b>를 잠시 멈춰 두었습니다. 올라온 일감 보기·지원은 그대로 할 수 있습니다.</div>
     <div class="pmfil"><input type="search" id="pmQ" placeholder="배송지·센터 검색 (예: 화곡동, 강서1)" enterkeyhint="search" autocomplete="off"><button class="btn sm" id="pmGo" type="button" style="height:44px">검색</button></div>
     <div class="segm pmseg" id="pmShow"><button type="button" data-s="all" class="on">전체</button><button type="button" data-s="jobs">맡길 일감</button><button type="button" data-s="gives">품앗이 주세요</button></div>
     <label class="pmchk"><input type="checkbox" id="pmAvail"> 지원 가능 오더만 보기</label>
@@ -679,6 +681,7 @@
           <div class="field"><label class="lb" for="pfPrice">건당 단가 (VAT포함)<span class="req">*</span></label><div class="suffix"><input type="number" id="pfPrice" inputmode="numeric" min="0"><span>원</span></div><div class="hint" id="pfPriceHint"></div></div>
           <div class="field"><label class="lb" for="pfPay">지급방법<span class="req">*</span></label><select id="pfPay"></select></div>
         </div>
+        <div class="field"><label class="lb" for="pfUse">배송 아이디 <small style="font-weight:500;color:var(--sub)">누구 쿠팡 아이디로 배송할지 (정산에 자동 반영)</small></label><select id="pfUse"></select></div>
       </div>
       <div class="card">
         <h3>상세 설명 <small style="font-weight:500;color:var(--sub);font-size:12px">모든 기사에게 보임</small></h3>
@@ -1471,6 +1474,9 @@
   const PM_HIDE_KINDS = ['일택']; // 숨긴 구분: 올리기 화면에서 고를 수 없고 목록에도 안 보임 (다시 쓰려면 여기서 빼면 됨)
   const pmShown = (list) => (list || []).filter((j) => !PM_HIDE_KINDS.includes(j.kind));
   const PM_KIND = { '주간': '품앗이☀️ 주간', '야간': '품앗이🌙 야간', '일택': '일택📦' };
+  // 배송 아이디 (일감 올리는 기사 기준 문구) / 근무 가능일 올리는 기사 기준 문구
+  const PM_USE_LABEL = { '받는 기사 아이디': '받는 기사님 아이디로 배송', '주는 기사 아이디': '내(일감 주는 기사) 아이디로 배송', '협의': '협의해서 정함' };
+  const PM_USE_GV = { '받는 기사 아이디': '내 아이디로 배송', '주는 기사 아이디': '일감 주는 기사님 아이디로 배송', '협의': '상관없음 (협의)' };
   const PM_ST = { '모집 중': 'open', '배차 협의중': 'talk', '배차 확정': 'done', '모집 마감': 'closed', '취소': 'cancel', '완료': 'end' };
   const PM_STL = { '모집 마감': '모집 마감', '취소': '취소된 일감', '완료': '완료', '배차 확정': '배차 확정', '배차 협의중': '배차 협의중' };
   let pmFrom = 'home', pmDetFrom = 'pumasi', pmCurId = '', pmMineKind = 'posted', pmFormData = null, pmEditId = '', pmAttach = null, pmRemoveAttach = false;
@@ -1532,6 +1538,7 @@
     api('api_pmList', token, { onlyAvail: $('#pmAvail').checked, q: $('#pmQ').value.trim() }).then((r) => {
       if (!pmOk(r, '품앗이 목록을 불러오지 못했습니다.')) { $('#pmList').innerHTML = ''; return; }
       r.jobs = pmShown(r.jobs);
+      pmPostOn = r.postOn !== false; paintPostOn();
       const gives = $('#pmAvail').checked ? [] : (r.gives || []);
       pmGives = gives;
       const bits = ['일감 ' + r.jobs.length + '건'];
@@ -1542,6 +1549,7 @@
       const items = (pmShowMode === 'gives' ? [] : r.jobs.map((j) => ({ d: j.date + ' ' + (j.time || ''), h: pmCardHtml(j) })))
         .concat(pmShowMode === 'jobs' ? [] : gives.map((g) => ({ d: g.date + ' ~', h: pmGiveHtml(g) })))
         .sort((a, b) => a.d.localeCompare(b.d));
+      setTimeout(paintPostOn, 0);
       $('#pmList').innerHTML = items.length ? items.map((x) => x.h).join('')
         : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 일감 올리기</b>로 첫 일감을 올려 보세요.') + '</div>';
     }).catch(() => { $('#pmList').innerHTML = ''; netErr(); });
@@ -1553,7 +1561,15 @@
   $('#pmQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loadPmList(); } });
   $('#pmQ').addEventListener('search', loadPmList);
   $('#pmNew').addEventListener('click', () => openPmForm('', 'pumasi'));
-  let pmShowMode = 'all', pmGives = [];
+  let pmShowMode = 'all', pmGives = [], pmPostOn = true;
+  /** 사무실에서 일감 올리기를 끄면: 일감 올리기·제안 버튼을 누를 수 없게 */
+  function paintPostOn() {
+    $('#pmNew').disabled = !pmPostOn; $('#pmNew').classList.toggle('off', !pmPostOn);
+    $('#pmNew').textContent = pmPostOn ? '+ 일감 올리기' : '일감 올리기 중지';
+    const nb = $('#pmOffNote'); if (nb) nb.classList.toggle('hidden', pmPostOn);
+    $$('[data-my="new"]').forEach((b) => { b.disabled = !pmPostOn; b.classList.toggle('off', !pmPostOn); });
+    $$('#pmList [data-gvact], #gvBody [data-offer]').forEach((b) => { if (!b.closest('.pmc') || !b.closest('.pmc').querySelector('.bdg.me')) { b.disabled = !pmPostOn; b.classList.toggle('off', !pmPostOn); } });
+  }
   $('#pmShow').addEventListener('click', (e) => { const b = e.target.closest('[data-s]'); if (!b || b.dataset.s === pmShowMode) return; pmShowMode = b.dataset.s; $$('#pmShow button').forEach((x) => x.classList.toggle('on', x === b)); loadPmList(); });
   $('#pmList').addEventListener('click', (e) => {
     const g = e.target.closest('[data-gv]');
@@ -1588,7 +1604,8 @@
       '<span class="bdg pay' + (j.pay === '당일지급' ? '' : ' m') + '">' + (j.pay === '당일지급' ? '⭐ ' : '') + escH(j.pay) + '</span>' + (j.mine ? '<span class="bdg me">내 일감</span>' : '') + '</h3><dl>' +
       '<dt>배차일</dt><dd>' + pmDay(j.date) + pddTag(j.kind) + '</dd><dt>입차시간</dt><dd>' + escH(j.time) + '</dd><dt>배송지</dt><dd>' + escH(j.area) + '</dd>' +
       '<dt>센터</dt><dd>' + escH(j.camp) + (j.route ? ' · ' + escH(j.route) : '') + '</dd><dt>평균 물량</dt><dd>' + escH(j.qty) + '</dd><dt>탑 종류</dt><dd>' + escH(j.top || '-') + '</dd>' +
-      '<dt>건당 단가</dt><dd style="color:var(--brand)">' + won(j.price) + ' <small style="color:var(--sub);font-weight:500">VAT포함</small></dd><dt>올린 기사</dt><dd>' + escH(j.poster) + '</dd></dl>' +
+      '<dt>건당 단가</dt><dd style="color:var(--brand)">' + won(j.price) + ' <small style="color:var(--sub);font-weight:500">VAT포함</small></dd><dt>올린 기사</dt><dd>' + escH(j.poster) + '</dd>' +
+      (j.useId ? '<dt>배송 아이디</dt><dd>' + escH(j.useId === '주는 기사 아이디' ? escH(j.poster) + ' 기사님 아이디로 배송' + (j.useLogin ? ' (' + j.useLogin + ')' : '') : j.useId === '받는 기사 아이디' ? '받는(수행) 기사님 본인 아이디로 배송' : '협의해서 정함') + '</dd>' : '') + '</dl>' +
       (j.open ? '' : '<div class="note">🔒 배송지코드, 첨부파일 및 담당자 연락처는 배차 확정된 기사에게만 보여집니다.</div>') + '</div>';
     // 행동 버튼
     if (!j.mine && j.offerToMe) {
@@ -1671,6 +1688,7 @@
     $('#pfKind').innerHTML = f.kinds.filter((k) => !PM_HIDE_KINDS.includes(k)).map((k) => '<button type="button" data-k="' + escH(k) + '">' + escH(PM_KIND[k] || k) + '</button>').join('');
     $('#pfTop').innerHTML = '<option value="">선택 안 함</option>' + f.tops.map((k) => '<option>' + escH(k) + '</option>').join('');
     $('#pfPay').innerHTML = f.pays.map((k) => '<option>' + escH(k) + '</option>').join('');
+    $('#pfUse').innerHTML = (f.useIds || ['받는 기사 아이디', '주는 기사 아이디', '협의']).map((k) => '<option value="' + escH(k) + '">' + escH(PM_USE_LABEL[k] || k) + '</option>').join('');
     $('#pfCamp').innerHTML = '<option value="">선택</option>' + f.camps.map((c) => '<option value="' + escH(c.id) + '">' + escH(c.name) + '</option>').join('');
     const v = raw || {};
     pmSetKind(v.kind || '주간');
@@ -1678,7 +1696,7 @@
     $('#pfTime').value = v.time || ''; $('#pfArea').value = v.area || ''; $('#pfQty').value = v.qty || '';
     $('#pfCamp').value = v.campId || f.myCampId || ''; pmRoutes();
     pmSetRoute(raw ? (v.route || '') : (f.myRoute || ''));
-    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || '당일지급'; $('#pfPrice').value = v.price || '';
+    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || '당일지급'; $('#pfPrice').value = v.price || ''; $('#pfUse').value = v.useId || '협의';
     $('#pfDesc').value = raw ? (v.desc || '') : f.descTemplate; $('#pfSecret').value = raw ? (v.secret || '') : f.secretTemplate;
     pmAttach = null; pmRemoveAttach = false; $('#pfFile').value = ''; $('#pfPrev').classList.add('hidden'); $('#pfFileHint').textContent = raw ? '바꾸지 않음' : '없음';
     $('#pfPriceHint').textContent = '';
@@ -1713,11 +1731,13 @@
   }
   let pmOffer = null; // { id, name, date, kind } 품앗이 주세요 → 이 기사에게 제안
   function openPmForm(id, from, raw, offer) {
+    if (!id && !pmPostOn) return toast('지금은 사무실에서 품앗이 일감 올리기를 잠시 멈춰 두었습니다.');
     pmEditId = id || ''; pmFormFrom = from || 'pumasi'; pmOffer = id ? null : (offer || null);
     $('#pfTitle').textContent = id ? '품앗이 일감 수정' : '품앗이 일감 올리기';
     $('#pfBtn').textContent = id ? '저장' : '올리기';
     const token = pmTok(); if (!token) return;
     const go = (f) => {
+      if (!id && f.postOn === false) { pmPostOn = false; return toast('지금은 사무실에서 품앗이 일감 올리기를 잠시 멈춰 두었습니다.'); }
       pmFormData = f; pmFillForm(f, id ? raw : null);
       const ob = $('#pfOffer');
       if (pmOffer) {
@@ -1728,6 +1748,7 @@
         if (oi.qty && !$('#pfQty').value) $('#pfQty').value = oi.qty;
         if (oi.top) $('#pfTop').value = oi.top;
         if (oi.pay) $('#pfPay').value = oi.pay;
+        if (oi.useId) $('#pfUse').value = oi.useId;
         if (oi.price) { $('#pfPrice').value = oi.price; $('#pfPriceHint').textContent = '희망 단가 ' + won(oi.price) + (oi.crew ? ' · ' + oi.crew : ''); }
         ob.innerHTML = '💌 <b>' + escH(pmOffer.name) + '</b> 기사님에게 ' + pmDay(pmOffer.date) + ' 일감을 제안합니다. 이 기사님에게만 보이고, 수락하면 바로 배차 확정됩니다.';
         $('#pfTitle').textContent = '품앗이 제안하기'; $('#pfBtn').textContent = '제안 보내기';
@@ -1735,7 +1756,7 @@
       ob.classList.toggle('hidden', !pmOffer);
       show('pmform');
     };
-    if (pmFormData) return go(pmFormData);
+    if (pmFormData && id) return go(pmFormData);
     loading(true, '불러오는 중…');
     api('api_pmForm', token).then((r) => { if (pmOk(r)) go(r); }).catch(netErr).finally(() => loading(false));
   }
@@ -1767,7 +1788,7 @@
       id: pmEditId, kind: kb ? kb.dataset.k : '', date: $('#pfDate').value, time: $('#pfTime').value, area: $('#pfArea').value.trim(), campId: $('#pfCamp').value,
       route: $('#pfRoute').value.trim(), qty: $('#pfQty').value.trim(), top: $('#pfTop').value, price: $('#pfPrice').value, pay: $('#pfPay').value,
       desc: $('#pfDesc').value, secret: $('#pfSecret').value, attach: pmAttach, removeAttach: pmRemoveAttach,
-      offerToId: pmOffer ? pmOffer.id : ''
+      offerToId: pmOffer ? pmOffer.id : '', useId: $('#pfUse').value
     };
     if (pmOffer && job.date !== pmOffer.date && !confirm(pmOffer.name + ' 기사님의 근무 가능일(' + pmDay(pmOffer.date) + ')과 배차일이 다릅니다. 그래도 보낼까요?')) return;
     const need = [['date', '배차일자'], ['time', '입차시간'], ['campId', '센터'], ['area', '배송지'], ['qty', '평균 물량'], ['price', '건당 단가']].find((x) => !job[x[0]]);
@@ -1785,7 +1806,7 @@
   // ───── 품앗이 주세요 ─────
   let gvMode = 'me', gvMine = null, gvSel = {}, gvMemo = '', gvInfo = {}, gvFind = null, gvDay = '', gvDirty = false;
   /** 기본 정보 한 줄: 강서구 · 강서1캠프 · 1인 · 250개 · 하이탑 · 희망 1,100원 · 당일지급 */
-  const gvInfoTxt = (i) => !i ? '' : [i.area, i.camp ? String(i.camp).replace(/\s*캠프$/, '') + ' 캠프' : '', i.crew, i.qty ? '수량 ' + i.qty : '', i.top, i.price ? '희망 ' + won(i.price) : '', i.pay].filter(Boolean).join(' · ');
+  const gvInfoTxt = (i) => !i ? '' : [i.area, i.camp ? String(i.camp).replace(/\s*캠프$/, '') + ' 캠프' : '', i.crew, i.qty ? '수량 ' + i.qty : '', i.top, i.price ? '희망 ' + won(i.price) : '', i.pay, i.useId && i.useId !== '협의' ? (i.useId === '받는 기사 아이디' ? '본인 아이디로 배송' : '주는 기사님 아이디로 배송') : ''].filter(Boolean).join(' · ');
   const GV_CYCLE = ['', '무관', '주간', '야간'];
   /** 오늘 ~ until 달력 (월별). cell(ymd) → { cls, sub, disabled } */
   function gvCal(today, until, cell) {
@@ -1840,14 +1861,17 @@
   }
   function gvInfoCard(r) {
     const i = gvInfo, opt = (list, cur, empty) => (empty ? '<option value="">' + empty + '</option>' : '') + list.map((x) => { const v = typeof x === 'object' ? x.id : x, t = typeof x === 'object' ? x.name : x; return '<option value="' + escH(v) + '"' + (String(cur || '') === String(v) ? ' selected' : '') + '>' + escH(t) + '</option>'; }).join('');
-    return '<div class="card gvinfo"><h3>기사 기본 정보 <small style="font-weight:500;color:var(--sub);font-size:12px">맡길 기사님께 보입니다</small></h3>' +
+    return '<div class="card gvinfo"><h3>기사 기본 정보 <small style="font-weight:500;color:var(--sub);font-size:12px">일감을 주실 기사님께 보입니다</small></h3>' +
       '<div class="row"><div class="field"><label class="lb" for="gvArea">원하는 지역</label><input type="text" id="gvArea" data-gi="area" maxlength="40" placeholder="예: 강서구·양천구" value="' + escH(i.area || '') + '"></div>' +
       '<div class="field"><label class="lb" for="gvCamp">캠프</label><select id="gvCamp" data-gi="campId">' + opt(r.camps || [], i.campId, '상관없음') + '</select></div></div>' +
       '<div class="field"><label class="lb">배송 인원</label><div class="segk" id="gvCrew">' + (r.crews || []).map((c) => '<button type="button" data-crew="' + escH(c) + '"' + (i.crew === c ? ' class="on"' : '') + '>' + escH(c) + '</button>').join('') + '</div></div>' +
       '<div class="row"><div class="field"><label class="lb" for="gvQty">원하는 수량</label><input type="text" id="gvQty" data-gi="qty" maxlength="20" placeholder="예: 250개" value="' + escH(i.qty || '') + '"></div>' +
       '<div class="field"><label class="lb" for="gvTop">탑 종류</label><select id="gvTop" data-gi="top">' + opt(r.tops || [], i.top, '선택 안 함') + '</select></div></div>' +
       '<div class="row"><div class="field"><label class="lb" for="gvPrice">희망 단가 (VAT포함)</label><div class="suffix"><input type="number" id="gvPrice" data-gi="price" inputmode="numeric" min="0" placeholder="' + (r.defPrice || 1100) + '" value="' + escH(i.price || '') + '"><span>원</span></div></div>' +
-      '<div class="field"><label class="lb" for="gvPay">지급방법</label><select id="gvPay" data-gi="pay">' + opt(r.pays || [], i.pay, '선택 안 함') + '</select></div></div></div>';
+      '<div class="field"><label class="lb" for="gvPay">지급방법</label><select id="gvPay" data-gi="pay">' + opt(r.pays || [], i.pay, '선택 안 함') + '</select></div></div>' +
+      '<div class="field" style="margin-bottom:0"><label class="lb" for="gvUse">배송 아이디 <small style="font-weight:500;color:var(--sub)">누구 쿠팡 아이디로 배송할지</small></label><select id="gvUse" data-gi="useId">' +
+        (r.useIds || []).map((k) => '<option value="' + escH(k) + '"' + (i.useId === k ? ' selected' : '') + '>' + escH(PM_USE_GV[k] || k) + (k === '받는 기사 아이디' && r.myLogin ? ' (' + escH(r.myLogin) + ')' : '') + '</option>').join('') + '</select>' +
+        '<p class="hint" style="margin:6px 0 0">러너 기사님끼리라 정산은 자동으로 맞춥니다. 일감 주는 기사님 아이디로 배송하면 그날 매출이 기사님 정산으로 옮겨집니다.</p></div></div>';
   }
   function renderGiveFind() {
     const r = gvFind, cnt = {};
@@ -1904,6 +1928,7 @@
       $('#myCard').innerHTML = '<div class="myhd"><div class="av">' + escH(String(i.name || '?').slice(0, 1)) + '</div><div><b>' + escH(i.name) + ' 기사님</b><small>' +
         escH([i.type, i.camp].filter(Boolean).join(' · ') || '러너 기사') + '</small></div></div>' +
         '<div class="mystat"><div><b>' + r.stats.posted + '</b>올린 품앗이</div><div><b>' + r.stats.helped + '</b>도와준 품앗이</div></div>';
+      pmPostOn = r.postOn !== false; paintPostOn();
       const gv = $('#myGive'); if (gv) gv.textContent = [r.stats.giveDays ? r.stats.giveDays + '일' : '', r.stats.offers ? '제안 ' + r.stats.offers : ''].filter(Boolean).join(' · ');
       $('#miBody').innerHTML = '<dl>' + [['이름', i.name], ['쿠팡 아이디', i.loginId], ['연락처', i.phone], ['기사구분', i.type], ['소속 캠프', i.camp], ['기본노선', i.baseRoute], ['차량번호', i.carNo],
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';

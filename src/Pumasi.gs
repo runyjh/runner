@@ -24,6 +24,25 @@ const PM_DESC_TEMPLATE = [
 ].join('\n');
 const PM_SECRET_TEMPLATE = ['현장 담당자 연락처 : ', '배송지 코드 : ', '공동현관 비번 등 참고사항 : '].join('\n');
 
+// ───────────────────────── 앱 설정 (app_settings 탭) ─────────────────────────
+function appSet_() {
+  const c = cache_(), hit = c.get('appset');
+  if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 */ } }
+  const m = {};
+  try { readAll_(SH.APPSET).forEach(function (o) { if (o.key) m[o.key] = str_(o.value); }); } catch (e) { /* 탭 없음 */ }
+  c.put('appset', JSON.stringify(m), 300);
+  return m;
+}
+function appSetPut_(key, value, memo) {
+  const row = findRow_(SH.APPSET, 'key', key);
+  if (row) writeFields_(SH.APPSET, row, { value: value }); else appendObj_(SH.APPSET, { key: key, value: value, memo: memo || '' });
+  cache_().remove('appset');
+}
+/** 품앗이 일감 올리기 켜짐? (관리자 품앗이 관리에서 ON/OFF, 기본 ON) */
+function pmPostOn_() { return !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(appSet_().pmPostOn)); }
+/** 배송 아이디: 일감을 받은 기사 아이디로 / 일감을 준 기사 아이디로 / 협의 */
+const PM_USE_IDS = ['받는 기사 아이디', '주는 기사 아이디', '협의'];
+
 // ───────────────────────── 공용 ─────────────────────────
 /** 기사 로그인 확인 → { id, info } */
 function pmUser_(token) {
@@ -123,7 +142,7 @@ function api_pmList(token, f) {
         });
       });
     } catch (e) { gives = []; }
-    return { ok: true, today: today, jobs: list, waiting: waiting, confirmed: confirmed, gives: gives };
+    return { ok: true, today: today, jobs: list, waiting: waiting, confirmed: confirmed, gives: gives, postOn: pmPostOn_() };
   });
 }
 /** 상세: 공개 항목 + (등록 기사·확정 기사에게만) 비공개 항목 + (등록 기사에게) 지원자 목록 */
@@ -136,6 +155,8 @@ function api_pmJob(token, id) {
     const mine = j.posterId === u.id, accepted = j.acceptedId === u.id && j.status === PST.DONE;
     const out = pmCard_(j, u.id, d.apps, today);
     out.desc = j.desc;
+    out.useId = j.useId || '';
+    if (j.useId === '주는 기사 아이디') { const pd = driverById_(j.posterId); out.useLogin = pd && (j.posterId === u.id || j.acceptedId === u.id) ? pd.loginId || '' : ''; }
     out.canApply = pmCanApply_(j, u.id, d.apps, today);
     out.open = mine || accepted;
     if (out.open) {
@@ -147,7 +168,7 @@ function api_pmJob(token, id) {
       if (mine && j.acceptedId) { const a = driverById_(j.acceptedId); out.acceptedName = j.accepted; out.acceptedPhone = a ? a.phone : ''; }
     }
     if (mine) {
-      out.raw = { kind: j.kind, date: j.date, time: j.time, area: j.area, campId: j.campId, camp: j.camp, route: j.route, qty: j.qty, top: j.top, price: j.price, pay: j.pay, desc: j.desc, secret: j.secret };
+      out.raw = { kind: j.kind, date: j.date, time: j.time, area: j.area, campId: j.campId, camp: j.camp, route: j.route, qty: j.qty, top: j.top, price: j.price, pay: j.pay, useId: j.useId || '', desc: j.desc, secret: j.secret };
       out.rawStatus = j.status;
       out.apps = d.apps.filter(function (a) { return a.jobId === j.id && a.status !== PAST.CANCEL; }).map(function (a) {
         const o = driverById_(a.driverId) || {};
@@ -189,7 +210,7 @@ function api_pmForm(token) {
     const myCamp = m.camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
     return {
       ok: true, camps: camps, myCampId: myCamp ? myCamp.id : '', myRoute: String(me.baseRoute || '').replace(/\(.*?\)|\[.*?\]/g, '').trim().split(/[\s,]+/)[0] || '',
-      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_()
+      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_()
     };
   });
 }
@@ -244,6 +265,8 @@ function api_pmSave(token, job) {
     f.price = price;
     f.pay = t(job.pay, 10, '지급방법', true);
     if (PM_PAYS.indexOf(f.pay) < 0) fail_('지급방법을 골라 주세요.');
+    f.useId = PM_USE_IDS.indexOf(str_(job.useId)) >= 0 ? str_(job.useId) : '';
+    if (!job.id && !pmPostOn_()) fail_('지금은 사무실에서 품앗이 일감 올리기를 잠시 막아 두었습니다. 사무실에 문의해 주세요.');
     f.desc = t(job.desc, 3000, '상세 설명');
     f.secret = t(job.secret, 1500, '비공개 정보');
     // 첨부 (이미지 1장) — 잠금 밖에서 올린다
@@ -502,7 +525,7 @@ function api_myInfo(token) {
         helped: d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date < today; }).length,
         giveDays: (d.avail || []).filter(function (a) { return a.driverId === u.id && a.date >= today; }).length,
         offers: d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OFFER && a.date >= today; }).length
-      }
+      }, postOn: pmPostOn_()
     };
   });
 }
@@ -535,7 +558,7 @@ const PM_AVAIL_DAYS = 62;              // 오늘부터 며칠 앞까지 고를 �
 const PM_AVAIL_KINDS = ['무관', '주간', '야간'];
 const PM_CREWS = ['1인', '2인1조'];
 const PM_GIVE_PRICE = 1100; // 희망 단가 기본값
-const PM_INFO_KEYS = ['area', 'campId', 'camp', 'crew', 'qty', 'top', 'price', 'pay'];
+const PM_INFO_KEYS = ['area', 'campId', 'camp', 'crew', 'qty', 'top', 'price', 'pay', 'useId'];
 /** 근무 가능일 줄에서 기사 기본 정보 꺼내기 */
 function pmInfoOf_(a) { const o = {}; PM_INFO_KEYS.forEach(function (k) { o[k] = a ? str_(a[k]) : ''; }); return o; }
 /** 내 근무 가능일 (오늘 이후) + 이미 확정된 날 */
@@ -552,10 +575,10 @@ function api_pmAvailMine(token) {
     // 기본 정보: 마지막으로 저장한 값 → 없으면 내 소속 캠프 · 희망 단가 1,100원 · 당일지급
     const info = pmInfoOf_(mine[0]);
     const myCamp = master_().camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
-    if (!mine.length) { info.campId = myCamp ? myCamp.id : ''; info.camp = myCamp ? myCamp.name : ''; info.crew = '1인'; info.price = String(PM_GIVE_PRICE); info.pay = '당일지급'; }
+    if (!mine.length) { info.campId = myCamp ? myCamp.id : ''; info.camp = myCamp ? myCamp.name : ''; info.crew = '1인'; info.price = String(PM_GIVE_PRICE); info.pay = '당일지급'; info.useId = '받는 기사 아이디'; }
     const camps = master_().camps.map(function (c) { return { id: c.id, name: c.name }; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
     return { ok: true, today: today, until: ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS)), list: list, memo: memo, info: info, booked: booked, kinds: PM_AVAIL_KINDS, qual: !!me.docQual,
-      camps: camps, crews: PM_CREWS, tops: PM_TOPS, pays: PM_PAYS, defPrice: PM_GIVE_PRICE };
+      camps: camps, crews: PM_CREWS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE, myLogin: me.loginId || '' };
   });
 }
 /** 내 근무 가능일 저장: list = [{ date, kind }] (오늘 이후 것을 통째로 바꾼다), memo = 한마디 */
@@ -570,7 +593,8 @@ function api_pmAvailSave(token, list, memo, info) {
     // 기본 정보 (원하는 지역 · 캠프 · 배송 인원 · 원하는 수량 · 탑 종류 · 희망 단가 · 지급방법)
     info = info || {};
     const inf = { area: str_(info.area).slice(0, 40), crew: PM_CREWS.indexOf(str_(info.crew)) >= 0 ? str_(info.crew) : '', qty: str_(info.qty).slice(0, 20),
-      top: PM_TOPS.indexOf(str_(info.top)) >= 0 ? str_(info.top) : '', pay: PM_PAYS.indexOf(str_(info.pay)) >= 0 ? str_(info.pay) : '' };
+      top: PM_TOPS.indexOf(str_(info.top)) >= 0 ? str_(info.top) : '', pay: PM_PAYS.indexOf(str_(info.pay)) >= 0 ? str_(info.pay) : '',
+      useId: PM_USE_IDS.indexOf(str_(info.useId)) >= 0 ? str_(info.useId) : '' };
     const camp = master_().camps.filter(function (c) { return c.id === str_(info.campId); })[0];
     inf.campId = camp ? camp.id : ''; inf.camp = camp ? camp.name : '';
     const pr = str_(info.price) === '' ? null : pmMoney_(info.price);
@@ -965,7 +989,35 @@ function pmDoneOf_(me, cells, myCamp) {
 /** 처리 뒤 (잠금을 푼 다음): 휴대폰 푸시 + 기사스케줄 품앗이 줄 반영 */
 function pmAfter_(out) {
   pmPushSend_(out);
-  if (out && out.sch && out.sch.length) pmSchApply_(out.sch);
+  if (out && out.sch && out.sch.length) { pmSchApply_(out.sch); pmStlUsageApply_(out.sch); }
+}
+/**
+ * 정산 연동 (모두 러너 소속 기사): 배송 아이디가 '주는 기사 아이디'인 품앗이가 배차 확정되면
+ * 정산 DB '아이디 사용 기록'에 (일감 준 기사 쿠팡ID · 받은 기사 · 그 날짜) 를 자동으로 넣는다 → 그날 매출이 받은 기사 정산으로 옮겨감.
+ * 확정이 풀리거나 취소되면 그 줄을 지운다. '받는 기사 아이디'면 받은 기사 본인 아이디 매출이라 따로 할 일 없음.
+ */
+function pmStlUsageApply_(ops) {
+  try {
+    if (typeof stlRead_ !== 'function') return;
+    const list = ops.filter(function (o) { return o.jobId && (o.op === 'clear' || o.useId === '주는 기사 아이디'); });
+    if (!list.length) return;
+    const tag = function (o) { return '품앗이 자동 ' + o.jobId; };
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      let rows = stlRead_('stl_usage'), changed = false;
+      list.forEach(function (o) {
+        const keep = rows.filter(function (r) { return !(str_(r.memo).indexOf(tag(o)) >= 0 && r.driverId === o.driverId); });
+        if (keep.length !== rows.length) { rows = keep; changed = true; }
+        if (o.op !== 'set') return;
+        const poster = driverById_(o.posterId), doer = driverById_(o.driverId);
+        if (!poster || !poster.loginId || !doer) return;
+        rows.push({ cid: poster.loginId, name: doer.name, driverId: doer.id, from: o.date, to: o.date, memo: tag(o) + ' (' + poster.name + ' 아이디로 배송)' });
+        changed = true;
+      });
+      if (changed) { stlWriteAll_('stl_usage', rows.map(function (r) { const x = Object.assign({}, r); delete x._row; return x; })); stlBump_(); }
+    } finally { lock.releaseLock(); }
+  } catch (e) { console.error('정산 아이디 사용 기록 연동 실패: ' + (e && e.message)); }
 }
 /** 기사스케줄 품앗이 줄 칸에 적을 글자: '강서1 527B' (라우트가 없으면 배송지) */
 function pmSchText_(j) {
@@ -973,7 +1025,7 @@ function pmSchText_(j) {
 }
 function pmSchOp_(out, op, driverId, j) {
   if (!driverId || !j || !j.date) return;
-  (out.sch = out.sch || []).push({ op: op, driverId: String(driverId), date: j.date, value: pmSchText_(j) });
+  (out.sch = out.sch || []).push({ op: op, driverId: String(driverId), date: j.date, value: pmSchText_(j), jobId: j.id || '', posterId: j.posterId || '', useId: j.useId || '' });
 }
 /**
  * 스케줄 DB 의 품앗이 줄에 쓰기. set = 칸에 그 글자를 넣음(이미 다른 글이 있으면 줄을 바꿔 덧붙임), clear = 그 글자만 지움.
@@ -1071,7 +1123,7 @@ function adm_pmList(token, f) {
       if (q && (j.poster + j.accepted + j.area + j.camp + j.route).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return false;
       return true;
     }).sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time); });
-    return { ok: true, today: today, from: from, to: to, jobs: rows, count: count, total: all.length };
+    return { ok: true, today: today, from: from, to: to, jobs: rows, count: count, total: all.length, postOn: pmPostOn_() };
   });
 }
 /** 관리자 상세: 모든 칸 + 지원자(연락처·자격증) + 첨부 링크 */
@@ -1133,5 +1185,17 @@ function adm_pmDelete(token, ids) {
       pmAfter_(out);
     }
     return { ok: true, deleted: n };
+  });
+}
+
+/** 관리자: 기사 앱 품앗이 일감 올리기 켜기/끄기 (끄면 새 일감·제안을 못 올림, 이미 올린 일감은 그대로) */
+function adm_pmPostSet(token, on) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try { appSetPut_('pmPostOn', on ? 'ON' : 'OFF', '품앗이 일감 올리기 (ON/OFF) — 관리자 품앗이 관리에서 바꿈'); } finally { lock.releaseLock(); }
+    logAdmin_(a, '품앗이 일감 올리기 ' + (on ? '켜기' : '끄기'), '', '');
+    return { ok: true, postOn: !!on };
   });
 }

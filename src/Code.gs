@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -260,7 +260,7 @@ const PJ = {
   id: '일감ID', status: '상태', posterId: '등록 기사ID', poster: '등록 기사', kind: '구분', date: '배차일자', time: '입차시간',
   area: '배송지', campId: '센터ID', camp: '센터', route: '라우트', qty: '평균 물량', top: '탑 종류', price: '건당 단가(VAT포함)', pay: '지급방법',
   desc: '상세 설명', secret: '배차 확정 기사에게만 (배송지코드·연락처 등)', attach: '첨부파일', acceptedId: '확정 기사ID', accepted: '확정 기사',
-  createdAt: '등록일시', updatedAt: '수정일시', offerToId: '제안 기사ID', offerTo: '제안 기사'
+  createdAt: '등록일시', updatedAt: '수정일시', offerToId: '제안 기사ID', offerTo: '제안 기사', useId: '배송 아이디'
 };
 const PJ_NOTES = {
   status: '모집 중 / 배차 협의중 / 배차 확정 / 모집 마감 / 취소',
@@ -271,7 +271,7 @@ const PA = { id: '지원ID', jobId: '일감ID', driverId: '지원 기사ID', nam
 const PA_NOTES = { status: '지원 / 협의 중 / 확정 / 미선정 / 지원 취소 / 제안' };
 // 품앗이 주세요: 일감을 원하는 기사의 근무 가능일 (기사 1명 · 날짜 1개 = 1줄). 품앗이 맡길 기사가 보고 일감을 제안
 const PV = { id: '가능일ID', driverId: '기사ID', name: '기사', date: '근무 가능일', kind: '구분', memo: '한마디', createdAt: '등록일시',
-  area: '원하는 지역', campId: '희망 캠프ID', camp: '희망 캠프', crew: '배송 인원', qty: '원하는 수량', top: '탑 종류', price: '희망 단가', pay: '지급방법' };
+  area: '원하는 지역', campId: '희망 캠프ID', camp: '희망 캠프', crew: '배송 인원', qty: '원하는 수량', top: '탑 종류', price: '희망 단가', pay: '지급방법', useId: '배송 아이디' };
 // 품앗이 알림: 기사 1명에게 가는 알림 1건 = 1줄 (앱 안 알림 + 휴대폰 푸시)
 const PN = { id: '알림ID', driverId: '받는 기사ID', name: '받는 기사', jobId: '일감ID', kind: '종류', text: '내용', createdAt: '보낸일시', readAt: '읽은일시' };
 // 휴대폰 푸시 받는 기기: 기사가 '휴대폰 알림 받기'를 켠 기기 1대 = 1줄. 지우면 그 기기로는 안 감
@@ -283,10 +283,12 @@ const BC = { id: '댓글ID', postId: '글ID', parentId: '답글 대상 댓글ID'
 const BRP = { id: '신고ID', kind: '대상', targetId: '대상ID', postId: '글ID', reporterId: '신고 기사ID', reporter: '신고자', reason: '사유', status: '처리', createdAt: '신고일시' };
 const BBN = { driverId: '기사ID', name: '기사', until: '정지 끝 (비우면 계속)', memo: '사유', admin: '처리 관리자', createdAt: '등록일시' };
 const BWD = { word: '금칙어', memo: '메모' };
+// 앱 설정 (키 | 값 | 설명): 품앗이 일감 올리기 ON/OFF 등. 시트에서 값만 고쳐도 됨
+const APS = { key: '키', value: '값', memo: '설명' };
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -313,6 +315,7 @@ SCHEMA[SH.BCMT] = BC;
 SCHEMA[SH.BREP] = BRP;
 SCHEMA[SH.BBAN] = BBN;
 SCHEMA[SH.BWORD] = BWD;
+SCHEMA[SH.APPSET] = APS;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -1263,6 +1266,7 @@ function onSheetEdit(e) {
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
       else if (name === SH.PJOB || name === SH.PAPP || name === SH.PAVAIL) pmTouch_();
       else if ([SH.BPOST, SH.BCMT, SH.BREP, SH.BBAN, SH.BWORD].indexOf(name) >= 0) bdTouch_();
+      else if (name === SH.APPSET) cache_().remove('appset');
       else if (name === SH.PALERT) pmAlertBump_(o.driverId);
     });
     if (campRenamed) syncCampNames_();
@@ -5073,7 +5077,8 @@ const RESET_SECTIONS = {
   memo: { label: '업무스케줄', sheets: [SH.MEMO] },
   notice: { label: '공지사항', sheets: [SH.NOTICE] },
   accounts: { label: '계정관리', sheets: [SH.ACC] }, // 분류 목록(account_categories)은 남긴다
-  bib: { label: '배번호 관리', sheets: [SH.BIB] }
+  bib: { label: '배번호 관리', sheets: [SH.BIB] },
+  pumasi: { label: '품앗이', sheets: [SH.PJOB, SH.PAPP, SH.PAVAIL, SH.PALERT] } // 알림은 품앗이 알림만 (게시판 알림은 남김)
 };
 function resetFolder_() {
   const root = DriveApp.getFolderById(props_().ROOT_FOLDER_ID), it = root.getFoldersByName('초기화 백업');
@@ -5145,6 +5150,14 @@ function adm_reset(token, section, confirm) {
         const dsh = sheet_(SH.DRIVERS), dc = cols_(SH.DRIVERS, true), dl = dsh.getLastRow();
         if (dl >= 2) { dsh.getRange(2, dc.schCampId + 1, dl - 1, 1).clearContent(); dsh.getRange(2, dc.schCamp + 1, dl - 1, 1).clearContent(); extra = '기사 소속캠프 비움'; }
         bumpMaster_();
+      } else if (section === 'pumasi') {
+        [SH.PJOB, SH.PAPP, SH.PAVAIL].forEach(function (n) { rows += clearData_(sheet_(n)); });
+        const al = readAll_(SH.PALERT).filter(function (x) { return x.id && x.kind !== 'board'; }).map(function (x) { return x._row; }).sort(function (p, q) { return q - p; });
+        al.forEach(function (r) { sheet_(SH.PALERT).deleteRow(r); });
+        rows += al.length;
+        pmTouch_();
+        try { readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) pmAlertBump_(o.id); }); } catch (e) { /* 무시 */ }
+        extra = '기사스케줄의 품앗이 줄 기록은 남김';
       } else {
         rows = clearData_(sheet_(sec.sheets[0]));
         if (section === 'notice') cache_().remove('nt:all');
