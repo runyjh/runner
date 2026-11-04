@@ -4452,7 +4452,7 @@
         (d.workers && d.workers.length ? '<br><small>일한 기사: ' + esc(d.workers.join(', ')) + '</small>' : '') +
         (d.movedIn && d.movedIn.length ? '<br><small style="color:var(--ok)">' + esc(d.movedIn.join(', ')) + '</small>' : '') +
         (d.movedOut && d.movedOut.length ? '<br><small style="color:#b45309">' + esc(d.movedOut.join(', ')) + '</small>' : '') + '</td>' +
-      '<td class="n">' + ((d.workDaysBy || []).length > 1 ? '<span style="white-space:nowrap">' + wdTxt(d) + '</span>' : (d.workDays || '-')) + '</td>' + num(d.qty) + num(d.pay) + num(d.taxDed) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
+      '<td class="n">' + (d.workDays || '-') + '</td>' + num(d.qty) + num(d.pay) + num(d.taxDed) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
       '<td>' + (d.checked ? '<span style="color:var(--ok);font-weight:700">✓ ' + esc(mdTxt(d.payDate)) + '</span>' : '') + '</td></tr>';
     const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + '<td></td>' + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';
     $('#stTable').innerHTML = '<thead><tr>' + H.map((h, i) => '<th' + (i > 2 && i < 14 ? ' class="n"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + totRow + list.map(tr).join('') + '</tbody>';
@@ -4584,7 +4584,7 @@
   /** 근무일수: 아이디가 하나면 '26일', 여럿이면 'dykimboho/26일, eeiei7llss/2일' */
   function wdTxt(d) {
     const by = (d.workDaysBy || []).filter((x) => x.days || (d.workDaysBy || []).length === 1);
-    if ((d.workDaysBy || []).length > 1 && by.length) return (d.workDays || 0) + '일 <small class="sub">(' + by.map((x) => esc(x.cid) + ' ' + x.days + '일').join(' + ') + ')</small>';
+    if ((d.workDaysBy || []).length > 1 && by.length) return (d.workDays || 0) + '일'; // 아이디가 여럿이면 합친 근무일만
     return (d.workDays || 0) + '일 <small class="sub">(' + (d.workDaysSrc === 'coupang' ? '기사스케줄 기록 없음 → 쿠팡 배송일' : '기사스케줄') + ')</small>';
   }
   function slipHtml(r) {
