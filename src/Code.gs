@@ -40,7 +40,7 @@ const CFG = {
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
-  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices' };
+  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -113,6 +113,21 @@ const M_NOTES = {
   time: '선택. 09:30 형식 (24시간)',
   done: '완료하면 Y',
   content: '새 줄에 날짜와 내용을 입력하면 메모ID와 작성일시가 자동으로 채워집니다.'
+};
+
+// notices 시트 (기사 앱 공지사항). 시트에서 직접 줄을 추가·수정해도 된다.
+const NST = { ON: '게시', OFF: '숨김' };
+const N = {
+  id: '공지ID', title: '제목', body: '내용', important: '중요', target: '대상 캠프', start: '게시 시작일', end: '게시 종료일',
+  status: '상태', author: '작성자', createdAt: '작성일시', updatedAt: '수정일시'
+};
+const N_NOTES = {
+  title: '새 줄에 제목·내용을 입력하면 공지ID·작성일시가 자동으로 채워지고 기사 앱에 바로 보입니다.',
+  important: 'Y 이면 기사 앱 맨 위에 고정되고, 처음 열 때 팝업으로 한 번 보여 줍니다.',
+  target: '비우면 전체 기사. 캠프명을 쓰면 그 캠프 소속 기사에게만 (여러 캠프는 쉼표로). 예: 강서1, 서초1',
+  start: '2026-11-04 형식. 비우면 바로 게시',
+  end: '2026-11-30 형식. 비우면 계속 게시 (그날까지 보임)',
+  status: '게시 / 숨김. 숨김으로 바꾸면 기사 앱에서 바로 사라집니다.'
 };
 
 // bib_applications 시트 (배번호 신청: '배' 번호판 허가 신청 서류 4종)
@@ -215,6 +230,8 @@ const RP_NOTES = {
 };
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
+// 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -228,6 +245,7 @@ SCHEMA[SH.CIMG] = CI;
 SCHEMA[SH.CADDR] = CAD;
 SCHEMA[SH.PRICES] = RP;
 SCHEMA[SH.ROUTES] = R;
+SCHEMA[SH.NOTICE] = N;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -271,7 +289,7 @@ function doGet(e) {
   if (prm.ping) return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
   // 깃허브 페이지로 옮긴 뒤: 스크립트 속성 PAGES_URL 이 있으면 예전 주소는 새 주소 안내 화면을 보여 준다 (?stay=1 이면 예전 화면)
   const pages = str_(props_().PAGES_URL).replace(/\/+$/, '');
-  if (pages && !prm.stay) return movePage_(pages + '/' + (prm.page === 'admin' ? 'admin.html' : ''), prm.page === 'admin');
+  if (pages && !prm.stay) return movePage_(pages + '/' + (prm.page === 'admin' ? 'admin/' : ''), prm.page === 'admin');
   // 템플릿 평가 없이 파일을 그대로 내보내 첫 화면 응답을 빠르게 한다.
   // 웹앱 주소 뒤에 ?page=admin 을 붙이면 관리자 화면
   if (prm.page === 'admin') {
@@ -397,6 +415,11 @@ function ensureColumns_(only) {
       const mm = SpreadsheetApp.newDataValidation().requireValueInList(MANAGE, true).setAllowInvalid(true).build();
       sh.getRange(2, c.manageMethod + 1, sh.getMaxRows() - 1, 1).setDataValidation(mm);
       Object.keys(B_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(B_NOTES[k]); });
+    } else if (name === SH.NOTICE) {
+      sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList([NST.ON, NST.OFF], true).build());
+      sh.getRange(2, c.important + 1, sh.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Y'], true).setAllowInvalid(true).build());
+      Object.keys(N_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(N_NOTES[k]); });
+      sh.setColumnWidth(c.body + 1, 420);
     } else if (name === SH.MEMO) {
       const rule = SpreadsheetApp.newDataValidation().requireValueInList(['Y'], true).setAllowInvalid(true).build();
       sh.getRange(2, c.done + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
@@ -451,7 +474,7 @@ function ss_() {
 function sheet_(name) {
   if (_sheets[name]) return _sheets[name];
   let sh = ss_().getSheetByName(name);
-  if (!sh && AUTO_SHEETS.indexOf(name) >= 0) {
+  if (!sh && AUTO_CREATE.indexOf(name) >= 0) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try { if (!ss_().getSheetByName(name)) ensureColumns_([name]); } finally { lock.releaseLock(); }
@@ -481,7 +504,7 @@ function cols_(name, fresh) {
     const i = head.indexOf(def[k]);
     if (i < 0) missing.push(def[k]); else c[k] = i;
   });
-  const autoable = missing.length && (AUTO_SHEETS.indexOf(name) >= 0 || (name === SH.DRIVERS &&
+  const autoable = missing.length && (AUTO_CREATE.indexOf(name) >= 0 || (name === SH.DRIVERS &&
     missing.every(function (label) { return D_AUTO_ADD.some(function (k) { return D[k] === label; }); })));
   if (autoable) {
     addHeaders_(name, missing);
@@ -681,7 +704,7 @@ function driverInfo_(id) {
   if (!o) return null;
   const info = {
     name: o.name, loginId: o.loginId.toLowerCase(), status: o.status,
-    pwChangedAt: toMs_(o.pwChangedAt), mustChange: mustChange_(o)
+    pwChangedAt: toMs_(o.pwChangedAt), mustChange: mustChange_(o), campId: o.schCampId, camp: o.schCamp
   };
   cache_().put(key, JSON.stringify(info), 600);
   return info;
@@ -1151,6 +1174,7 @@ function onSheetEdit(e) {
       if (name === SH.DRIVERS) fixDriverRow_(sh, c, o);
       else if (name === SH.ADMINS) fixAdminRow_(sh, c, o);
       else if (name === SH.MEMO) fixMemoRow_(sh, c, o);
+      else if (name === SH.NOTICE) fixNoticeRow_(sh, c, o);
       else if (name === SH.BIB) fixBibRow_(sh, c, o);
       else if (name === SH.CAMPS) { fixCampRow_(sh, c, o); campRenamed = true; }
       else if (name === SH.ROUTES) fixRouteRow_(sh, c, o);
@@ -1331,6 +1355,45 @@ function adm_check(token) {
   });
 }
 function adm_logout(token) { return api_logout(token); }
+
+/**
+ * 관리자 본인 비밀번호 변경 (현재 비밀번호 확인 후).
+ * 다른 PC·휴대폰의 관리자 로그인은 모두 끊기고, 지금 화면은 새 로그인으로 계속 쓴다.
+ */
+function adm_changePassword(token, currentPassword, newPassword) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const s = getSession_(token);
+    const pw = checkPw_(newPassword);
+    const row = findRow_(SH.ADMINS, 'id', a.id);
+    const o = row ? readObj_(SH.ADMINS, row) : null;
+    if (!o) expired_();
+    const fk = 'acf:' + o.id;
+    const fails = Number(cache_().get(fk) || 0);
+    if (fails >= CFG.LOGIN_MAX_FAIL) fail_('비밀번호 확인 실패가 반복되어 15분간 잠겼습니다. 잠시 후 다시 시도해 주세요.');
+    if (!checkPassword_(String(currentPassword || ''), o)) {
+      cache_().put(fk, String(fails + 1), 900);
+      fail_('현재 비밀번호가 맞지 않습니다.');
+    }
+    cache_().remove(fk);
+    if (pw === String(currentPassword)) fail_('새 비밀번호는 현재 비밀번호와 다르게 정해 주세요.');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    let ns;
+    try {
+      writeFields_(SH.ADMINS, o._row, passwordFields_(pw)); // 비밀번호 변경일시가 바뀌어 그 전 로그인은 모두 만료
+      cache_().remove('av:' + o.id);
+      cache_().remove('ss:' + s.th);
+      const oldRow = findRow_(SH.SESSIONS, 'tokenHash', s.th);
+      if (oldRow) writeFields_(SH.SESSIONS, oldRow, { expiresAt: msText_(Date.now() - 1000) });
+      ns = createSession_(ADMIN_SESSION + o.id, !!s.a);
+    } finally {
+      lock.releaseLock();
+    }
+    logAdmin_(a, '관리자 비밀번호 변경', a.name + ' (' + a.loginId + ')', '다른 기기 로그인 해제');
+    return { ok: true, token: ns.token, msg: '비밀번호를 바꿨습니다. 다른 PC·휴대폰은 새 비밀번호로 다시 로그인해야 합니다.' };
+  });
+}
 
 /** admins 시트를 직접 고쳤을 때: 아이디 정리, 관리자ID·생성일시 자동, 비밀번호 적용 */
 function fixAdminRow_(sh, c, o) {
@@ -2004,6 +2067,155 @@ function fixMemoRow_(sh, c, o) {
   });
 }
 
+// ───────────────────────── 공지사항 (관리자 작성 → 기사 앱 표시) ─────────────────────────
+/*
+ * notices 시트 한 장. 기사 앱은 캐시된 '게시 중' 목록만 읽는다 (저장·시트 수정 시 캐시 삭제).
+ * 대상 캠프를 비우면 전체, 캠프명을 쓰면 그 캠프 소속 기사에게만 보인다.
+ */
+function newNoticeId_() { return uniqId_('N'); }
+function noticeView_(o) {
+  return {
+    id: o.id, title: o.title, body: o.body, important: String(o.important).toUpperCase() === 'Y', target: o.target,
+    start: normDate_(o.start) || '', end: normDate_(o.end) || '', status: o.status === NST.OFF ? NST.OFF : NST.ON,
+    author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt
+  };
+}
+function noticeSort_(a, b) {
+  if (a.important !== b.important) return a.important ? -1 : 1;
+  const x = a.start || a.createdAt, y = b.start || b.createdAt;
+  return x < y ? 1 : x > y ? -1 : (a.createdAt < b.createdAt ? 1 : -1);
+}
+/** 모든 공지 (10분 캐시) */
+function noticeAll_() {
+  const hit = cache_().get('nt:all');
+  if (hit) return JSON.parse(hit);
+  const list = readAll_(SH.NOTICE).filter(function (o) { return o.id && (o.title || o.body); }).map(noticeView_);
+  try { cache_().put('nt:all', JSON.stringify(list), 600); } catch (e) { /* 너무 크면 캐시 없이 */ }
+  return list;
+}
+function noticeLive_(n, today) {
+  return n.status === NST.ON && (!n.start || n.start <= today) && (!n.end || n.end >= today);
+}
+/** 대상 캠프 글자 → 캠프명 목록 ('캠프' 글자·띄어쓰기 무시) */
+function noticeTargets_(t) {
+  return str_(t).split(/[,，、\/]/).map(function (x) { return x.replace(/\s+/g, '').replace(/캠프$/, ''); }).filter(Boolean);
+}
+function noticeFor_(n, campName) {
+  const t = noticeTargets_(n.target);
+  if (!t.length) return true;
+  const mine = str_(campName).replace(/\s+/g, '').replace(/캠프$/, '');
+  return !!mine && t.indexOf(mine) >= 0;
+}
+
+/** 기사 앱: 나에게 보이는 공지 (중요 먼저, 최신순) */
+function api_notices(token) {
+  return run_(function () {
+    const s = getSession_(token);
+    const info = s ? driverInfo_(s.d) : null;
+    if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
+    const today = todayText_();
+    let camp = info.camp || '';
+    if (info.campId) { const c = master_().camps.filter(function (x) { return x.id === info.campId; })[0]; if (c) camp = c.name; }
+    const list = noticeAll_().filter(function (n) { return noticeLive_(n, today) && noticeFor_(n, camp); }).sort(noticeSort_).slice(0, 50)
+      .map(function (n) { return { id: n.id, title: n.title, body: n.body, important: n.important, date: n.start || n.createdAt.slice(0, 10), updatedAt: n.updatedAt }; });
+    return { ok: true, notices: list, today: today };
+  });
+}
+
+/** 관리자: 공지 전체 + 캠프 목록(대상 고르기용) */
+function adm_noticeList(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const today = todayText_();
+    const list = noticeAll_().map(function (n) { n.live = noticeLive_(n, today); return n; }).sort(function (a, b) {
+      if (a.live !== b.live) return a.live ? -1 : 1;
+      return noticeSort_(a, b);
+    });
+    return { ok: true, notices: list, today: today, camps: master_().camps.map(function (c) { return c.name; }) };
+  });
+}
+
+/** 공지 추가(id 없음)·수정 */
+function adm_noticeSave(token, n) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    n = n || {};
+    const f = {
+      title: str_(n.title), body: String(n.body == null ? '' : n.body).replace(/\r\n?/g, '\n').trim(),
+      important: n.important ? 'Y' : '', target: noticeTargets_(n.target).join(', '),
+      start: n.start ? normDate_(n.start) : '', end: n.end ? normDate_(n.end) : '', status: n.status === NST.OFF ? NST.OFF : NST.ON
+    };
+    if (!f.title) fail_('제목을 입력해 주세요.');
+    if (f.title.length > 100) fail_('제목은 100자까지 쓸 수 있습니다.');
+    if (f.body.length > 5000) fail_('내용은 5000자까지 쓸 수 있습니다.');
+    if (n.start && !f.start) fail_('게시 시작일을 확인해 주세요.');
+    if (n.end && !f.end) fail_('게시 종료일을 확인해 주세요.');
+    if (f.start && f.end && f.end < f.start) fail_('게시 종료일이 시작일보다 빠릅니다.');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const now = nowText_();
+      let row;
+      if (!n.id) {
+        row = appendObj_(SH.NOTICE, Object.assign({ id: newNoticeId_(), author: a.name, createdAt: now, updatedAt: now }, f));
+        logAdmin_(a, '공지 등록', f.title, f.target || '전체');
+      } else {
+        row = findRow_(SH.NOTICE, 'id', String(n.id));
+        if (!row) fail_('공지를 찾을 수 없습니다. 시트에서 지워졌을 수 있습니다. 새로고침해 주세요.');
+        f.updatedAt = now;
+        writeFields_(SH.NOTICE, row, f);
+      }
+      cache_().remove('nt:all');
+      return { ok: true, notice: noticeView_(readObj_(SH.NOTICE, row)) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+function adm_noticeDelete(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.NOTICE, 'id', String(id || ''));
+      if (!row) return { ok: true };
+      const o = readObj_(SH.NOTICE, row);
+      sheet_(SH.NOTICE).deleteRow(row);
+      cache_().remove('nt:all');
+      logAdmin_(a, '공지 삭제', o.title, o.id);
+      return { ok: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** notices 시트를 직접 고쳤을 때: 공지ID·작성일시 자동, 날짜·중요·상태 정리, 캐시 삭제 */
+function fixNoticeRow_(sh, c, o) {
+  cache_().remove('nt:all');
+  if (!o.id && !o.title && !o.body) return;
+  const upd = {};
+  const set = function (k, v) { if (o[k] !== v) upd[k] = v; };
+  if (!o.id) { set('id', newNoticeId_()); if (!o.createdAt) set('createdAt', nowText_()); }
+  if (!o.status) set('status', NST.ON);
+  else if (/^(숨김|숨기기|off|n|no|x|중지)$/i.test(o.status)) set('status', NST.OFF);
+  else if (o.status !== NST.OFF) set('status', NST.ON);
+  if (o.important) set('important', /^(y|yes|o|v|중요|true|1)$/i.test(o.important) ? 'Y' : '');
+  ['start', 'end'].forEach(function (k) {
+    if (!o[k]) return;
+    const d = normDate_(o[k]);
+    const cell = sh.getRange(o._row, c[k] + 1);
+    if (d) { set(k, d); cell.clearNote(); } else cell.setNote('날짜 형식을 확인해 주세요. (예: 2026-11-04)');
+  });
+  if (o.target) set('target', noticeTargets_(o.target).join(', '));
+  if (Object.keys(upd).length) {
+    upd.updatedAt = nowText_();
+    Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(safeText_(upd[k])); });
+  }
+}
+
 // ───────────────────────── 관리자 : 배번호 관리 ─────────────────────────
 /** company 시트 만들기 (항목 | 값). 이미 있으면 빠진 항목만 추가 */
 function ensureCompany_() {
@@ -2558,6 +2770,7 @@ function writeDocResult_(logs, summary) {
 
 /** 열 추가·삭제·이동 같은 구조 변경 시 머리글 위치 캐시를 지운다 */
 function onSheetChange() {
+  cache_().remove('nt:all');
   Object.keys(SCHEMA).forEach(clearHeadCache_);
   cache_().remove('sch:h');
   bumpMaster_(); // 행 삭제·추가 등 구조 변경 → 노선 기준 데이터 캐시 버림
@@ -4284,6 +4497,7 @@ const RESET_SECTIONS = {
   sched: { label: '스케줄관리', sheets: [] },        // 스케줄 DB 파일의 schedule 탭
   route: { label: '노선관리', sheets: [SH.CAMPS, SH.ROUTES, SH.CIMG, SH.CADDR, SH.PRICES] },
   memo: { label: '업무스케줄', sheets: [SH.MEMO] },
+  notice: { label: '공지사항', sheets: [SH.NOTICE] },
   bib: { label: '배번호 관리', sheets: [SH.BIB] }
 };
 function resetFolder_() {
@@ -4358,6 +4572,7 @@ function adm_reset(token, section, confirm) {
         bumpMaster_();
       } else {
         rows = clearData_(sheet_(sec.sheets[0]));
+        if (section === 'notice') cache_().remove('nt:all');
       }
       logAdmin_(a, '데이터 초기화', sec.label, rows + '줄 삭제' + (extra ? ', ' + extra : '') + ' · 백업: ' + backupUrl);
     } finally {
