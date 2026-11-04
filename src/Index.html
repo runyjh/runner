@@ -1582,7 +1582,8 @@
   }
   function getPushCfg() {
     if (pushCfg) return Promise.resolve(pushCfg);
-    return api('api_pmPushConfig', store.get(TOKEN)).then((r) => { if (r && r.ok) pushCfg = r; return pushCfg || { on: false }; });
+    // 준비 안 됨(on:false)은 기억하지 않는다 → 사무실에서 설정하면 바로 켤 수 있게
+    return api('api_pmPushConfig', store.get(TOKEN)).then((r) => { if (r && r.ok && r.on) pushCfg = r; return (r && r.ok) ? r : { on: false, err: true }; });
   }
   async function fbToken(cfg) {
     if (!window.firebase) {
@@ -1603,6 +1604,8 @@
     if (Notification.permission === 'denied') { el.textContent = '차단됨'; return; }
     if (lsGet(PUSH_TOK) && Notification.permission === 'granted') { el.textContent = '켜짐'; el.classList.add('on'); return; }
     el.textContent = '꺼짐';
+    // 서버 설정을 미리 받아 둔다 (누른 순간 바로 '허용' 창을 띄우기 위해 — 아이폰은 누른 직후에만 창을 띄울 수 있음)
+    getPushCfg().then((c) => { if (!c.on && el.textContent === '꺼짐') el.textContent = '준비 안 됨'; }).catch(() => {});
   }
   /** 앱을 열 때: 이미 켠 기기면 토큰을 새로 받아 서버와 맞춘다 (바뀌었을 수 있음) */
   function pushRefresh() {
@@ -1623,19 +1626,26 @@
       try { if (fbMsg) await fbMsg.deleteToken(); } catch (e) {}
       api('api_pmPushDel', token, cur).catch(() => {}); lsSet(PUSH_TOK, null); paintPushState(); return toast('휴대폰 알림을 껐습니다.');
     }
+    if (Notification.permission === 'denied') return toast('이 기기에서 알림이 차단되어 있습니다. 휴대폰 설정 → 앱(브라우저) → 알림에서 러너를 허용한 뒤 다시 눌러 주세요.');
+    // '허용' 창은 누른 직후 바로 띄워야 한다 (서버를 먼저 기다리면 아이폰·일부 크롬에서 창이 안 뜸)
+    const permP = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
     loading(true, '알림 켜는 중…');
     try {
-      const cfg = await getPushCfg();
-      if (!cfg.on) { loading(false); return toast('아직 휴대폰 알림이 준비되지 않았습니다. 사무실에 문의해 주세요.'); }
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') { loading(false); paintPushState(); return toast(perm === 'denied' ? '알림이 차단되어 있습니다. 휴대폰 설정 → 앱(브라우저) → 알림에서 허용해 주세요.' : '알림을 허용해야 받을 수 있습니다.'); }
+      const [perm, cfg] = await Promise.all([permP, getPushCfg()]);
+      if (!cfg.on) { loading(false); paintPushState(); return toast(cfg.err ? '서버에 연결하지 못했습니다. 잠시 후 다시 눌러 주세요.' : '아직 휴대폰 알림 설정이 안 되어 있습니다. 사무실(관리자)에서 파이어베이스 설정을 마치면 켤 수 있습니다.'); }
+      if (perm !== 'granted') { loading(false); paintPushState(); return toast(perm === 'denied' ? '알림을 차단하셨습니다. 휴대폰 설정 → 앱(브라우저) → 알림에서 허용해 주세요.' : '알림 허용 창에서 "허용"을 눌러야 받을 수 있습니다.'); }
       const t = await fbToken(cfg);
       if (!t) throw new Error('기기 등록에 실패했습니다.');
       const r = await api('api_pmPushSave', token, t, deviceName());
       if (!pmOk(r)) return;
       lsSet(PUSH_TOK, t); paintPushState(); toast('휴대폰 알림을 켰습니다. 앱을 닫아도 배차 소식이 옵니다.');
     } catch (e) {
-      toast((e && e.message) || '알림을 켜지 못했습니다.');
+      const code = String((e && e.code) || ''), msg = String((e && e.message) || '');
+      console.error('푸시 켜기 실패', code, msg);
+      toast(/permission-blocked|permission-default/.test(code) ? '알림 허용이 필요합니다. 휴대폰 설정에서 러너 알림을 허용해 주세요.'
+        : /token-subscribe-failed|invalid-vapid|bad-sender|api-key|installations/.test(code + msg) ? '알림 서버 설정이 맞지 않습니다 (' + (code || msg).slice(0, 60) + '). 사무실에 알려 주세요.'
+        : /unsupported|not supported/i.test(code + msg) ? '이 브라우저는 휴대폰 알림을 지원하지 않습니다. 크롬(안드로이드)이나 홈 화면에 설치한 앱(아이폰)에서 켜 주세요.'
+        : '알림을 켜지 못했습니다: ' + (msg || code || '알 수 없는 오류').slice(0, 80));
     } finally { loading(false); }
   }
   // 알림을 눌러 앱이 열렸을 때 (?pm=일감ID) / 앱이 열려 있을 때 서비스 워커가 보낸 소식

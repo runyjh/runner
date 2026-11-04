@@ -567,11 +567,24 @@ function api_pmAlertsRead(token, ids) {
 function pmPushCfg_() {
   const p = props_();
   let web = null, sa = null;
-  try { web = p.FCM_WEB ? JSON.parse(p.FCM_WEB) : null; } catch (e) { web = null; }
+  web = p.FCM_WEB ? pmLooseObj_(p.FCM_WEB) : null;
+  if (web && !web.vapidKey && p.FCM_VAPID) web.vapidKey = String(p.FCM_VAPID).trim();
   try { sa = p.FCM_SA ? JSON.parse(p.FCM_SA) : null; } catch (e) { sa = null; }
   if (web && !(web.apiKey && web.projectId && web.messagingSenderId && web.appId && web.vapidKey)) web = null;
   if (sa && !(sa.client_email && sa.private_key)) sa = null;
   return { web: web, sa: sa };
+}
+/**
+ * 파이어베이스 화면에서 복사한 설정을 그대로 붙여 넣어도 읽는다:
+ * JSON {"apiKey":"…"} 도, 자바스크립트 모양 const firebaseConfig = { apiKey: "…", … }; 도 된다.
+ */
+function pmLooseObj_(txt) {
+  txt = String(txt || '');
+  try { const o = JSON.parse(txt); if (o && typeof o === 'object') return o; } catch (e) { /* 아래에서 */ }
+  const o = {}, re = /["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g;
+  let m;
+  while ((m = re.exec(txt))) o[m[1]] = m[2].trim();
+  return Object.keys(o).length ? o : null;
 }
 /** 앱: 푸시를 켤 수 있는지 + 파이어베이스 웹 설정 */
 function api_pmPushConfig(token) {
@@ -691,7 +704,12 @@ function pmPushSend_(list) {
  */
 function pmPushSetupCheck() {
   const c = pmPushCfg_();
-  if (!c.web) { console.log('스크립트 속성 FCM_WEB 이 없거나 형식이 틀립니다 (apiKey, projectId, messagingSenderId, appId, vapidKey 필요).'); return; }
+  if (!c.web) {
+    const w = props_().FCM_WEB ? pmLooseObj_(props_().FCM_WEB) || {} : null;
+    console.log(!w ? '스크립트 속성 FCM_WEB 이 없습니다.' : 'FCM_WEB 에 빠진 값: ' + ['apiKey', 'projectId', 'messagingSenderId', 'appId', 'vapidKey'].filter(function (k) { return !w[k]; }).join(', ') +
+      ' (vapidKey 는 클라우드 메시징 → 웹 푸시 인증서 키. FCM_WEB 안에 넣거나 스크립트 속성 FCM_VAPID 로 따로 넣어도 됩니다)');
+    return;
+  }
   if (!c.sa) { console.log('스크립트 속성 FCM_SA 가 없거나 형식이 틀립니다 (서비스 계정 키 JSON 전체를 붙여 넣어 주세요).'); return; }
   cache_().remove('fcm:at');
   pmFcmToken_(c.sa);
