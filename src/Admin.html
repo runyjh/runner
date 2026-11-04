@@ -167,6 +167,13 @@
   table.up tr.key td { background: #e3f2fd; } table.up tr.mi td { background: #ffebee; } table.up tr.dup td { background: #fff8e1; }
   table.up tr.sep td { background: #000; padding: 2px; }
   table.up td.n { color: var(--sub); text-align: right; }
+  .actbl td { vertical-align: middle; } .actbl tr.off td { color: var(--faint); }
+  .actbl .cp { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 2px 7px; font-size: 12px; color: var(--sub); cursor: pointer; margin-left: 4px; }
+  .actbl .cp:hover { border-color: var(--brand); color: var(--brand); }
+  .actbl .pw { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .5px; }
+  .actbl .pw.show { color: var(--danger); font-weight: 700; }
+  .actbl td.mm { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--sub); }
+  .actbl .cat { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--brand-weak); color: var(--brand); font-size: 12px; font-weight: 700; }
   .nt-imp { color: var(--danger); font-weight: 800; margin-right: 4px; }
   .b-게시 { background: var(--ok-weak); color: var(--ok); } .b-숨김 { background: var(--gray-weak); color: var(--sub); }
   .b-예약 { background: var(--warn-weak); color: var(--warn); } .b-종료 { background: var(--gray-weak); color: var(--sub); }
@@ -490,6 +497,7 @@
       <a data-view="memo">업무스케줄</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a data-view="bib">배번호 관리</a>
+      <a data-view="acc">계정관리</a>
       <a data-view="notice">공지사항</a>
     </nav>
     <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a></div>
@@ -518,6 +526,27 @@
     </div>
    </section>
 
+   <section id="view-acc" class="hidden">
+    <div class="head">
+      <h2>계정관리 <small id="acCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools">
+        <input class="inp search" id="acQ" placeholder="서비스명, 아이디, 담당자, 메모 검색" autocomplete="off">
+        <select class="inp" id="acCamp" aria-label="캠프"></select>
+        <button class="btn ghost danger-t" type="button" data-reset="accounts">데이터 초기화</button>
+        <button class="btn ghost" id="acReload" title="시트의 최신 내용 불러오기">새로고침</button>
+        <button class="btn" id="acNew">+ 새 계정</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">쿠팡 어드민·팀즈·메일·홈택스 등 회사가 쓰는 다른 서비스 계정을 모아 둡니다 (기사 계정 아님). 비밀번호는 암호화해 저장하고, <b>보기·복사</b>할 때마다 관리자 기록에 남습니다.</p>
+    <div class="tabs" id="acTabs"></div>
+    <div class="table-wrap">
+      <table class="actbl">
+        <thead><tr><th>분류</th><th>서비스명</th><th>캠프</th><th>아이디</th><th>비밀번호</th><th>사용자·담당자</th><th>접속</th><th>메모</th><th>비번 변경일</th></tr></thead>
+        <tbody id="acRows"></tbody>
+      </table>
+      <div class="empty hidden" id="acEmpty"></div>
+    </div>
+   </section>
    <section id="view-notice" class="hidden">
     <div class="head">
       <h2>공지사항 <small id="ntCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
@@ -704,6 +733,28 @@
     <p style="margin:0 0 12px;color:var(--sub);font-size:13px">기사님은 이 비밀번호로 로그인한 뒤 새 비밀번호를 직접 정하게 됩니다. 기존 로그인은 모두 해제됩니다.</p>
     <div class="field"><label class="lb" for="pwNew">임시 비밀번호 (영문+숫자 8자 이상)</label><input class="inp" id="pwNew" autocomplete="off"></div>
     <div class="m-actions"><button type="button" class="btn ghost" id="pwCancel">취소</button><button class="btn" id="pwOk">지정</button></div>
+  </form>
+</div>
+
+<!-- ───────────── 계정 추가·수정 ───────────── -->
+<div class="modal hidden" id="acModal">
+  <form class="m-box" id="acForm" novalidate autocomplete="off" style="width:min(600px,100%);max-height:92vh;overflow:auto">
+    <h3 id="acTitleH">새 계정</h3>
+    <div class="grid2">
+      <div class="field"><label class="lb" for="acCat">분류</label><input class="inp" id="acCat" list="acCats" maxlength="30" placeholder="예: 쿠팡"><datalist id="acCats"></datalist></div>
+      <div class="field"><label class="lb" for="acSvc">서비스명</label><input class="inp" id="acSvc" maxlength="60" placeholder="예: 쿠팡 어드민 / 팀즈 / 홈택스"></div>
+      <div class="field"><label class="lb" for="acCampSel">캠프 (캠프별 계정일 때)</label><select class="inp" id="acCampSel"></select></div>
+      <div class="field"><label class="lb" for="acOwner">사용자·담당자</label><input class="inp" id="acOwner" maxlength="60" placeholder="예: 유정훈 / 러너 공용"></div>
+      <div class="field full"><label class="lb" for="acId">아이디</label><input class="inp" id="acId" maxlength="200" autocomplete="off" spellcheck="false" autocapitalize="off"></div>
+      <div class="field full"><label class="lb" for="acPw">비밀번호 <small id="acPwHint" class="sub" style="font-weight:500"></small></label>
+        <div style="display:flex;gap:6px"><input class="inp" id="acPw" type="password" autocomplete="new-password" spellcheck="false" style="flex:1">
+          <button type="button" class="btn ghost" id="acPwShow">보기</button><button type="button" class="btn ghost" id="acPwGen" title="영문 대소문자·숫자·기호 14자">자동 생성</button></div></div>
+      <div class="field full"><label class="lb" for="acUrl">접속 주소</label><input class="inp" id="acUrl" maxlength="500" placeholder="예: https://wing.coupang.com" spellcheck="false"></div>
+      <div class="field full"><label class="lb" for="acMemo">메모 (2단계 인증 휴대폰, 결제일 등)</label><textarea class="inp" id="acMemo" maxlength="2000" style="height:70px"></textarea></div>
+    </div>
+    <div class="field"><span class="lb">상태</span><div class="seg" id="acStatus"><button type="button" data-st="사용" class="on">사용</button><button type="button" data-st="중지">중지</button></div></div>
+    <label class="check hidden" id="acPwClearWrap"><input type="checkbox" id="acPwClear"> 저장된 비밀번호 지우기</label>
+    <div class="m-actions"><button type="button" class="btn ghost danger-t" id="acDel" style="margin-right:auto">삭제</button><button type="button" class="btn ghost" id="acCancel">닫기</button><button class="btn" id="acSave">저장</button></div>
   </form>
 </div>
 
@@ -1525,6 +1576,8 @@
     $('#view-drivers').classList.toggle('hidden', v !== 'drivers');
     $('#view-memo').classList.toggle('hidden', v !== 'memo');
     $('#view-notice').classList.toggle('hidden', v !== 'notice');
+    $('#view-acc').classList.toggle('hidden', v !== 'acc');
+    if (v === 'acc') loadAccounts();
     if (v === 'notice') loadNotices();
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
     $('#view-route').classList.toggle('hidden', v !== 'route');
@@ -1545,6 +1598,132 @@
     if (!$('#bdrawer').classList.contains('hidden')) return;
     switchView(a.dataset.view);
   }));
+
+  // ───── 계정관리 (다른 서비스 계정) ─────
+  let AC = { accounts: [], categories: [], camps: [] }, acCat = '전체', acEdit = null;
+  const acShown = {}; // id → 보이는 동안의 비밀번호 (20초 뒤 다시 가림)
+  function loadAccounts() {
+    api('adm_accList').then((r) => { if (!r.ok) return toast(r.msg); AC = r; acFill(); renderAccounts(); }).catch(() => {});
+  }
+  function acFill() {
+    const cur = $('#acCamp').value;
+    const camps = [...new Set(AC.camps.concat(AC.accounts.map((x) => x.camp).filter(Boolean)))].sort(koSort);
+    $('#acCamp').innerHTML = '<option value="">캠프 전체</option><option value="-">공통 (캠프 없음)</option>' + camps.map((c) => '<option>' + esc(c) + '</option>').join('');
+    $('#acCamp').value = cur; if ($('#acCamp').value !== cur) $('#acCamp').value = '';
+    $('#acCats').innerHTML = AC.categories.map((c) => '<option value="' + esc(c) + '">').join('');
+  }
+  function acVisible() {
+    const q = nfc($('#acQ').value.trim()), camp = $('#acCamp').value;
+    return AC.accounts.filter((x) => (acCat === '전체' || (x.category || '기타') === acCat) &&
+      (!camp || (camp === '-' ? !x.camp : x.camp === camp)) &&
+      (!q || [x.category, x.service, x.camp, x.loginId, x.owner, x.url, x.memo].some((v) => nfc(v).indexOf(q) >= 0)))
+      .sort((a, b) => (a.status !== b.status ? (a.status === '사용' ? -1 : 1) : 0) || koSort(a.category, b.category) || koSort(a.service, b.service) || koSort(a.camp, b.camp));
+  }
+  function renderAccounts() {
+    const cnt = { '전체': AC.accounts.length };
+    AC.accounts.forEach((x) => { const k = x.category || '기타'; cnt[k] = (cnt[k] || 0) + 1; });
+    $('#acTabs').innerHTML = Object.keys(cnt).map((k) => '<button class="tab' + (k === acCat ? ' on' : '') + '" data-ac="' + esc(k) + '">' + esc(k) + '<b>' + cnt[k] + '</b></button>').join('');
+    const list = acVisible();
+    $('#acCount').textContent = AC.accounts.length + '개';
+    $('#acEmpty').classList.toggle('hidden', list.length > 0);
+    $('#acEmpty').textContent = AC.accounts.length ? '조건에 맞는 계정이 없습니다.' : '아직 등록된 계정이 없습니다. 오른쪽 위 "+ 새 계정"으로 추가하세요.';
+    $('#acRows').innerHTML = list.map((x) => '<tr data-ac-id="' + esc(x.id) + '"' + (x.status === '중지' ? ' class="off"' : '') + '>' +
+      '<td><span class="cat">' + esc(x.category || '기타') + '</span></td><td><b>' + esc(x.service) + '</b>' + (x.status === '중지' ? ' <span class="badge b-정지">중지</span>' : '') + '</td>' +
+      '<td>' + (x.camp ? esc(x.camp) : '<span class="sub">공통</span>') + '</td>' +
+      '<td>' + esc(x.loginId) + (x.loginId ? '<button type="button" class="cp" data-cp-id="' + esc(x.id) + '">복사</button>' : '') + '</td>' +
+      '<td>' + (x.hasPw ? '<span class="pw' + (acShown[x.id] ? ' show' : '') + '">' + (acShown[x.id] ? esc(acShown[x.id]) : '●●●●●●') + '</span>' +
+        '<button type="button" class="cp" data-pw-show="' + esc(x.id) + '">' + (acShown[x.id] ? '가리기' : '보기') + '</button><button type="button" class="cp" data-pw-cp="' + esc(x.id) + '">복사</button>' : '<span class="sub">-</span>') + '</td>' +
+      '<td>' + esc(x.owner) + '</td><td>' + (/^https?:\/\//.test(x.url || '') ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener noreferrer" class="cp" style="text-decoration:none">열기 ↗</a>' : esc(x.url || '')) + '</td>' +
+      '<td class="mm" title="' + esc(x.memo) + '">' + esc(x.memo) + '</td><td class="sub">' + esc(String(x.pwChangedAt || '').slice(0, 10)) + '</td></tr>').join('');
+  }
+  const acCopy = (text, label) => {
+    const done = () => toast(label + '를 복사했습니다.');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => upCopyFallback(text, done));
+    else upCopyFallback(text, done);
+  };
+  $('#acTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-ac]'); if (!b) return; acCat = b.dataset.ac; renderAccounts(); });
+  onSearch($('#acQ'), renderAccounts);
+  $('#acCamp').addEventListener('change', renderAccounts);
+  $('#acReload').addEventListener('click', loadAccounts);
+  $('#acRows').addEventListener('click', (e) => {
+    const cpId = e.target.closest('[data-cp-id]');
+    if (cpId) { const x = AC.accounts.find((a) => a.id === cpId.dataset.cpId); if (x) acCopy(x.loginId, '아이디'); return; }
+    const sh = e.target.closest('[data-pw-show]');
+    if (sh) {
+      const id = sh.dataset.pwShow;
+      if (acShown[id]) { delete acShown[id]; renderAccounts(); return; }
+      api('adm_accReveal', id, 'view').then((r) => {
+        if (!r.ok) return toast(r.msg);
+        acShown[id] = r.password; renderAccounts();
+        setTimeout(() => { if (acShown[id]) { delete acShown[id]; renderAccounts(); } }, 20000);
+      }).catch(() => {});
+      return;
+    }
+    const cp = e.target.closest('[data-pw-cp]');
+    if (cp) {
+      const id = cp.dataset.pwCp;
+      // 클립보드 쓰기는 클릭 직후여야 하는 브라우저가 있어, 이미 보이는 값이면 바로 복사
+      if (acShown[id]) return acCopy(acShown[id], '비밀번호');
+      api('adm_accReveal', id, 'copy').then((r) => { if (!r.ok) return toast(r.msg); acCopy(r.password, '비밀번호'); }).catch(() => {});
+      return;
+    }
+    if (e.target.closest('a')) return;
+    const tr = e.target.closest('tr[data-ac-id]'); if (!tr) return;
+    const x = AC.accounts.find((a) => a.id === tr.dataset.acId); if (x) openAccount(x);
+  });
+  function openAccount(x) {
+    acEdit = x || null;
+    $('#acTitleH').textContent = x ? '계정 수정' : '새 계정';
+    $('#acCat').value = x ? x.category : (acCat !== '전체' ? acCat : '');
+    $('#acSvc').value = x ? x.service : ''; $('#acOwner').value = x ? x.owner : ''; $('#acId').value = x ? x.loginId : '';
+    $('#acUrl').value = x ? x.url : ''; $('#acMemo').value = x ? x.memo : '';
+    const camps = [...new Set(AC.camps.concat(x && x.camp ? [x.camp] : []))].sort(koSort);
+    $('#acCampSel').innerHTML = '<option value="">공통 (캠프 없음)</option>' + camps.map((c) => '<option>' + esc(c) + '</option>').join('');
+    $('#acCampSel').value = x ? (x.camp || '') : ($('#acCamp').value && $('#acCamp').value !== '-' ? $('#acCamp').value : '');
+    $('#acPw').value = ''; $('#acPw').type = 'password'; $('#acPwShow').textContent = '보기';
+    $('#acPwHint').textContent = x && x.hasPw ? '— 저장되어 있음. 바꿀 때만 입력하세요' : '';
+    $('#acPw').placeholder = x && x.hasPw ? '●●●●●● (그대로 두면 바뀌지 않음)' : '';
+    $('#acPwClear').checked = false; $('#acPwClearWrap').classList.toggle('hidden', !(x && x.hasPw));
+    $$('#acStatus [data-st]').forEach((b) => b.classList.toggle('on', b.dataset.st === (x ? x.status : '사용')));
+    $('#acDel').classList.toggle('hidden', !x);
+    $('#acModal').classList.remove('hidden'); (x ? $('#acId') : $('#acCat')).focus();
+  }
+  $('#acNew').addEventListener('click', () => openAccount(null));
+  $('#acStatus').addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) $$('#acStatus [data-st]').forEach((x) => x.classList.toggle('on', x === b)); });
+  $('#acPwShow').addEventListener('click', () => { const v = $('#acPw').type === 'password'; $('#acPw').type = v ? 'text' : 'password'; $('#acPwShow').textContent = v ? '가리기' : '보기'; });
+  $('#acPwGen').addEventListener('click', () => {
+    const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789', '!@#$%^&*'], all = sets.join('');
+    const rnd = (n) => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+    const out = sets.map((x) => x[rnd(x.length)]);
+    while (out.length < 14) out.push(all[rnd(all.length)]);
+    for (let i = out.length - 1; i > 0; i--) { const j = rnd(i + 1); [out[i], out[j]] = [out[j], out[i]]; }
+    $('#acPw').value = out.join(''); $('#acPw').type = 'text'; $('#acPwShow').textContent = '가리기';
+    toast('새 비밀번호를 만들었습니다. 그 서비스에서도 같은 비밀번호로 바꾼 뒤 저장하세요.');
+  });
+  const acClose = () => { $('#acModal').classList.add('hidden'); $('#acPw').value = ''; };
+  $('#acCancel').addEventListener('click', acClose);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#acModal').classList.contains('hidden')) acClose(); });
+  $('#acForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const x = {
+      id: acEdit ? acEdit.id : '', category: $('#acCat').value.trim(), service: $('#acSvc').value.trim(), camp: $('#acCampSel').value,
+      loginId: $('#acId').value.trim(), owner: $('#acOwner').value.trim(), url: $('#acUrl').value.trim(), memo: $('#acMemo').value,
+      status: $('#acStatus [data-st].on').dataset.st
+    };
+    const pw = $('#acPw').value;
+    if (pw) x.password = pw; else if ($('#acPwClear').checked) x.password = '';
+    if (!x.service) return toast('서비스명을 입력해 주세요.');
+    const btn = $('#acSave'); btn.disabled = true;
+    api('adm_accSave', x).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      if (acEdit) delete acShown[acEdit.id];
+      acClose(); toast(acEdit ? '계정을 고쳤습니다.' : '계정을 추가했습니다.'); loadAccounts();
+    }).catch(() => {}).finally(() => { btn.disabled = false; });
+  });
+  $('#acDel').addEventListener('click', () => {
+    if (!acEdit || !confirm('"' + acEdit.service + (acEdit.camp ? ' (' + acEdit.camp + ')' : '') + '" 계정을 삭제할까요?\n\n저장된 비밀번호도 함께 지워집니다. 잠시 안 쓰는 계정이면 상태를 "중지"로 바꾸세요.')) return;
+    api('adm_accDelete', acEdit.id).then((r) => { if (!r.ok) return toast(r.msg); acClose(); toast('계정을 삭제했습니다.'); loadAccounts(); }).catch(() => {});
+  });
 
   // ───── 공지사항 ─────
   let NT = { notices: [], camps: [], today: '' }, ntFilter = '전체', ntEdit = null;
@@ -3838,6 +4017,7 @@
     sched: { label: '스케줄관리', items: ['스케줄 DB 파일의 모든 날짜 기록', '비고 줄 (빈 비고 줄 3개는 다시 만듦)'], keep: '기사 정보와 기사별 스케줄 설정(소속캠프·기본노선 등)은 남습니다.' },
     route: { label: '노선관리', items: ['모든 캠프·노선·상차지 주소·구분별 단가', '캠프 참고 이미지 (사진 파일 → 드라이브 휴지통)', '기사의 소속캠프 칸'], keep: '기사 정보와 스케줄 기록은 남습니다.' },
     notice: { label: '공지사항', items: ['모든 공지 (notices 탭)'], keep: '' },
+    accounts: { label: '계정관리', items: ['모든 서비스 계정·비밀번호 (accounts 탭)'], keep: '복사본에는 비밀번호가 암호화된 채로 들어갑니다.' },
     memo: { label: '업무스케줄', items: ['모든 날짜별 메모'], keep: '' },
     bib: { label: '배번호 관리', items: ['모든 배번호 신청서'], keep: '회사 정보(서류 고정 항목)는 남습니다.' }
   };

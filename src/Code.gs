@@ -40,7 +40,7 @@ const CFG = {
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
-  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices' };
+  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -128,6 +128,24 @@ const N_NOTES = {
   start: '2026-11-04 형식. 비우면 바로 게시',
   end: '2026-11-30 형식. 비우면 계속 게시 (그날까지 보임)',
   status: '게시 / 숨김. 숨김으로 바꾸면 기사 앱에서 바로 사라집니다.'
+};
+
+// accounts 시트 (회사가 쓰는 다른 프로그램·서비스 계정: 쿠팡 어드민, 팀즈, 메일, 홈택스 등. 기사 계정 아님)
+const ACC_MASK = '●●●●●●●●';
+const ACST = { ON: '사용', OFF: '중지' };
+const ACC_CATS = ['쿠팡', '팀즈', '메일', '홈택스·세무', '은행·카드', '통신·인터넷', '기타'];
+const AC = {
+  id: '계정ID', category: '분류', service: '서비스명', camp: '캠프', loginId: '아이디', password: '비밀번호',
+  owner: '사용자·담당자', url: '접속 주소', memo: '메모', status: '상태', pwChangedAt: '비밀번호 변경일',
+  author: '등록자', createdAt: '등록일시', updatedAt: '수정일시', pwEnc: '비밀번호(암호화)'
+};
+const AC_NOTES = {
+  password: '새 비밀번호를 그대로 입력하면 자동 암호화되고 ●●●● 로 바뀝니다. 지우면 저장된 비밀번호도 지워집니다.\n' +
+    '※ 시트에 직접 입력한 원래 값은 구글 시트 "버전 기록"에 남습니다. 가능하면 관리자 화면 > 계정관리에서 입력하세요.',
+  category: '예: 쿠팡 / 팀즈 / 메일 / 홈택스·세무 / 은행·카드 / 통신·인터넷 / 기타 (자유롭게 써도 됨)',
+  camp: '캠프별 계정이면 캠프명 (비우면 공통)',
+  status: '사용 / 중지',
+  loginId: '새 줄에 서비스명·아이디를 입력하면 계정ID·등록일시가 자동으로 채워집니다.'
 };
 
 // bib_applications 시트 (배번호 신청: '배' 번호판 허가 신청 서류 4종)
@@ -231,7 +249,7 @@ const RP_NOTES = {
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -246,10 +264,12 @@ SCHEMA[SH.CADDR] = CAD;
 SCHEMA[SH.PRICES] = RP;
 SCHEMA[SH.ROUTES] = R;
 SCHEMA[SH.NOTICE] = N;
+SCHEMA[SH.ACC] = AC;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
 HIDDEN[SH.BIB] = ['snapshotEnc'];
+HIDDEN[SH.ACC] = ['pwEnc'];
 
 const DOCS = {
   qual: { col: 'docQual', label: '화물운송종사자격증' },
@@ -415,6 +435,12 @@ function ensureColumns_(only) {
       const mm = SpreadsheetApp.newDataValidation().requireValueInList(MANAGE, true).setAllowInvalid(true).build();
       sh.getRange(2, c.manageMethod + 1, sh.getMaxRows() - 1, 1).setDataValidation(mm);
       Object.keys(B_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(B_NOTES[k]); });
+    } else if (name === SH.ACC) {
+      sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList([ACST.ON, ACST.OFF], true).build());
+      sh.getRange(2, c.category + 1, sh.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(ACC_CATS, true).setAllowInvalid(true).build());
+      Object.keys(AC_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(AC_NOTES[k]); });
+      sh.getRange(1, c.password + 1).setBackground('#fff4e5');
+      sh.setFrozenColumns(Math.min(c.service + 1, 3));
     } else if (name === SH.NOTICE) {
       sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList([NST.ON, NST.OFF], true).build());
       sh.getRange(2, c.important + 1, sh.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Y'], true).setAllowInvalid(true).build());
@@ -1175,6 +1201,7 @@ function onSheetEdit(e) {
       else if (name === SH.ADMINS) fixAdminRow_(sh, c, o);
       else if (name === SH.MEMO) fixMemoRow_(sh, c, o);
       else if (name === SH.NOTICE) fixNoticeRow_(sh, c, o);
+      else if (name === SH.ACC) fixAccountRow_(sh, c, o);
       else if (name === SH.BIB) fixBibRow_(sh, c, o);
       else if (name === SH.CAMPS) { fixCampRow_(sh, c, o); campRenamed = true; }
       else if (name === SH.ROUTES) fixRouteRow_(sh, c, o);
@@ -2210,6 +2237,136 @@ function fixNoticeRow_(sh, c, o) {
     if (d) { set(k, d); cell.clearNote(); } else cell.setNote('날짜 형식을 확인해 주세요. (예: 2026-11-04)');
   });
   if (o.target) set('target', noticeTargets_(o.target).join(', '));
+  if (Object.keys(upd).length) {
+    upd.updatedAt = nowText_();
+    Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(safeText_(upd[k])); });
+  }
+}
+
+// ───────────────────────── 계정관리 (다른 프로그램·서비스 계정 보관) ─────────────────────────
+/*
+ * accounts 시트 한 장. 비밀번호는 암호화 칸(숨김)에만 저장하고, 보이는 칸에는 ●●●● 만 둔다.
+ * 비밀번호 보기·복사는 서버에서 풀어 주며 매번 관리자 기록(admin_log)에 남긴다.
+ */
+function newAccId_() { return uniqId_('AC'); }
+function accView_(o) {
+  return {
+    id: o.id, category: o.category, service: o.service, camp: o.camp, loginId: o.loginId, hasPw: !!o.pwEnc,
+    owner: o.owner, url: o.url, memo: o.memo, status: o.status === ACST.OFF ? ACST.OFF : ACST.ON,
+    pwChangedAt: o.pwChangedAt, author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt
+  };
+}
+function accUrl_(v) {
+  const s = str_(v);
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^[\w.-]+\.[a-z]{2,}([\/:?#].*)?$/i.test(s)) return 'https://' + s;
+  return s;
+}
+
+function adm_accList(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const list = readAll_(SH.ACC).filter(function (o) { return o.id && (o.service || o.loginId); }).map(accView_);
+    const cats = ACC_CATS.slice();
+    list.forEach(function (x) { if (x.category && cats.indexOf(x.category) < 0) cats.push(x.category); });
+    return { ok: true, accounts: list, categories: cats, camps: master_().camps.map(function (c) { return c.name; }) };
+  });
+}
+
+/** 추가(id 없음)·수정. password 가 undefined 면 비밀번호는 그대로, '' 이면 지움 */
+function adm_accSave(token, x) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    x = x || {};
+    const f = {
+      category: str_(x.category).slice(0, 30), service: str_(x.service).slice(0, 60), camp: str_(x.camp).slice(0, 30),
+      loginId: str_(x.loginId).slice(0, 200), owner: str_(x.owner).slice(0, 60), url: accUrl_(x.url).slice(0, 500),
+      memo: String(x.memo == null ? '' : x.memo).replace(/\r\n?/g, '\n').trim().slice(0, 2000),
+      status: x.status === ACST.OFF ? ACST.OFF : ACST.ON
+    };
+    if (!f.service) fail_('서비스명을 입력해 주세요. (예: 쿠팡 어드민, 팀즈, 홈택스)');
+    let pwChanged = false;
+    if (x.password !== undefined && x.password !== null) {
+      const pw = String(x.password);
+      if (pw.length > 200) fail_('비밀번호가 너무 깁니다.');
+      f.pwEnc = pw ? encrypt_(pw) : '';
+      f.password = pw ? ACC_MASK : '';
+      f.pwChangedAt = pw ? todayText_() : '';
+      pwChanged = true;
+    }
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const now = nowText_();
+      let row;
+      if (!x.id) {
+        row = appendObj_(SH.ACC, Object.assign({ id: newAccId_(), author: a.name, createdAt: now, updatedAt: now }, f));
+        logAdmin_(a, '계정 등록', f.service + (f.camp ? ' (' + f.camp + ')' : ''), f.loginId);
+      } else {
+        row = findRow_(SH.ACC, 'id', String(x.id));
+        if (!row) fail_('계정을 찾을 수 없습니다. 시트에서 지워졌을 수 있습니다. 새로고침해 주세요.');
+        f.updatedAt = now;
+        writeFields_(SH.ACC, row, f);
+        if (pwChanged) logAdmin_(a, '계정 비밀번호 변경', f.service + (f.camp ? ' (' + f.camp + ')' : ''), f.loginId);
+      }
+      return { ok: true, account: accView_(readObj_(SH.ACC, row)) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** 비밀번호 보기 (복사 포함). 매번 기록 */
+function adm_accReveal(token, id, why) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const row = findRow_(SH.ACC, 'id', String(id || ''));
+    if (!row) fail_('계정을 찾을 수 없습니다. 새로고침해 주세요.');
+    const o = readObj_(SH.ACC, row);
+    if (!o.pwEnc) fail_('저장된 비밀번호가 없습니다.');
+    let pw;
+    try { pw = decrypt_(o.pwEnc); } catch (e) { fail_('비밀번호를 풀 수 없습니다. 시트에서 암호화 칸이 바뀌었는지 확인해 주세요.'); }
+    logAdmin_(a, why === 'copy' ? '계정 비밀번호 복사' : '계정 비밀번호 열람', o.service + (o.camp ? ' (' + o.camp + ')' : ''), o.loginId);
+    return { ok: true, password: pw };
+  });
+}
+
+function adm_accDelete(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.ACC, 'id', String(id || ''));
+      if (!row) return { ok: true };
+      const o = readObj_(SH.ACC, row);
+      sheet_(SH.ACC).deleteRow(row);
+      logAdmin_(a, '계정 삭제', o.service + (o.camp ? ' (' + o.camp + ')' : ''), o.loginId);
+      return { ok: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** accounts 시트를 직접 고쳤을 때: 계정ID 자동, 비밀번호 칸 → 암호화 후 ●●●● */
+function fixAccountRow_(sh, c, o) {
+  if (!o.id && !o.service && !o.loginId && !o.password) return;
+  const upd = {};
+  const set = function (k, v) { if (o[k] !== v) upd[k] = v; };
+  if (!o.id) { set('id', newAccId_()); if (!o.createdAt) set('createdAt', nowText_()); }
+  if (!o.status) set('status', ACST.ON);
+  else if (/^(중지|정지|off|n|no|x)$/i.test(o.status)) set('status', ACST.OFF);
+  else if (o.status !== ACST.OFF) set('status', ACST.ON);
+  if (o.password && o.password !== ACC_MASK) {
+    set('pwEnc', encrypt_(o.password)); set('password', ACC_MASK); set('pwChangedAt', todayText_());
+  } else if (!o.password && o.pwEnc) {
+    set('pwEnc', ''); set('pwChangedAt', '');
+  } else if (o.password === ACC_MASK && !o.pwEnc) {
+    set('password', ''); // 암호문 없이 ●만 있는 경우
+  }
+  if (o.url) set('url', accUrl_(o.url));
   if (Object.keys(upd).length) {
     upd.updatedAt = nowText_();
     Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(safeText_(upd[k])); });
@@ -4498,6 +4655,7 @@ const RESET_SECTIONS = {
   route: { label: '노선관리', sheets: [SH.CAMPS, SH.ROUTES, SH.CIMG, SH.CADDR, SH.PRICES] },
   memo: { label: '업무스케줄', sheets: [SH.MEMO] },
   notice: { label: '공지사항', sheets: [SH.NOTICE] },
+  accounts: { label: '계정관리', sheets: [SH.ACC] },
   bib: { label: '배번호 관리', sheets: [SH.BIB] }
 };
 function resetFolder_() {
