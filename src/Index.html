@@ -1440,6 +1440,7 @@
       '<div class="top"><span>' + pmDay(g.date) + pddTag(g.kind) + '</span><span class="bdg ' + (g.kind === '무관' ? 'gv' : 'k-' + escH(g.kind)) + '">' + escH(g.kind === '무관' ? '🙋 주간·야간 무관' : '🙋 ' + (PM_KIND[g.kind] || g.kind)) + '</span></div>' +
       '<div class="ar">' + escH(g.name) + ' 기사님<small>품앗이 주세요</small></div>' +
       '<div class="ln">' + (g.me ? '<span class="bdg me">내 근무 가능일</span> ' : '') + escH([g.type, g.camp].filter(Boolean).join(' · ') || '러너 기사') + '</div>' +
+      (gvInfoTxt(g.info) ? '<div class="ln">📋 ' + escH(gvInfoTxt(g.info)) + '</div>' : '') +
       (g.memo ? '<div class="ln">💬 ' + escH(g.memo) + '</div>' : '') +
       '<div class="bot"><div>' + (g.offered ? '<span class="bdg of">받은 제안 ' + g.offered + '건</span>' : '<span style="color:var(--sub);font-size:13px">이 날 일할 수 있어요</span>') + '</div>' +
       '<button type="button" class="more" data-gvact="1">' + (g.me ? '수정' : '💌 일감 제안') + '</button></div></div>';
@@ -1494,7 +1495,7 @@
     if (g) {
       const x = pmGives.find((v) => v.id === g.dataset.gv && v.date === g.dataset.gvd); if (!x) return;
       if (x.me) return openGive('me', 'pumasi');
-      return openPmForm('', 'pumasi', null, { id: x.id, name: x.name, date: x.date, kind: x.kind });
+      return openPmForm('', 'pumasi', null, { id: x.id, name: x.name, date: x.date, kind: x.kind, info: x.info });
     }
     const c = e.target.closest('[data-pj]'); if (c) openPmDetail(c.dataset.pj, 'pumasi');
   });
@@ -1641,7 +1642,7 @@
     if (!camp || !route) return;
     api('api_pmPrice', pmTok(), camp, route).then((r) => {
       if (seq !== pmPriceSeq || !r || !r.ok || !r.price) return;
-      $('#pfPriceHint').textContent = '노선관리 품앗이단가 ' + won(r.price);
+      $('#pfPriceHint').textContent = (pmOffer && pmOffer.info && pmOffer.info.price ? '희망 단가 ' + won(pmOffer.info.price) + (pmOffer.info.crew ? ' · ' + pmOffer.info.crew : '') + ' · ' : '') + '노선관리 품앗이단가 ' + won(r.price);
       if (!$('#pfPrice').value) $('#pfPrice').value = r.price;
     }).catch(() => {});
   }
@@ -1656,6 +1657,13 @@
       const ob = $('#pfOffer');
       if (pmOffer) {
         $('#pfDate').value = pmOffer.date; if (pmOffer.kind === '주간' || pmOffer.kind === '야간') pmSetKind(pmOffer.kind);
+        const oi = pmOffer.info || {};
+        if (oi.campId && Array.from($('#pfCamp').options).some((o) => o.value === oi.campId)) { $('#pfCamp').value = oi.campId; pmRoutes(); }
+        if (oi.area && !$('#pfArea').value) $('#pfArea').value = oi.area;
+        if (oi.qty && !$('#pfQty').value) $('#pfQty').value = oi.qty;
+        if (oi.top) $('#pfTop').value = oi.top;
+        if (oi.pay) $('#pfPay').value = oi.pay;
+        if (oi.price) { $('#pfPrice').value = oi.price; $('#pfPriceHint').textContent = '희망 단가 ' + won(oi.price) + (oi.crew ? ' · ' + oi.crew : ''); }
         ob.innerHTML = '💌 <b>' + escH(pmOffer.name) + '</b> 기사님에게 ' + pmDay(pmOffer.date) + ' 일감을 제안합니다. 이 기사님에게만 보이고, 수락하면 바로 배차 확정됩니다.';
         $('#pfTitle').textContent = '품앗이 제안하기'; $('#pfBtn').textContent = '제안 보내기';
       }
@@ -1710,7 +1718,9 @@
   });
 
   // ───── 품앗이 주세요 ─────
-  let gvMode = 'me', gvMine = null, gvSel = {}, gvMemo = '', gvFind = null, gvDay = '', gvDirty = false;
+  let gvMode = 'me', gvMine = null, gvSel = {}, gvMemo = '', gvInfo = {}, gvFind = null, gvDay = '', gvDirty = false;
+  /** 기본 정보 한 줄: 강서구 · 강서1캠프 · 1인 · 250개 · 하이탑 · 희망 1,100원 · 당일지급 */
+  const gvInfoTxt = (i) => !i ? '' : [i.area, i.camp ? String(i.camp).replace(/\s*캠프$/, '') + ' 캠프' : '', i.crew, i.qty ? '수량 ' + i.qty : '', i.top, i.price ? '희망 ' + won(i.price) : '', i.pay].filter(Boolean).join(' · ');
   const GV_CYCLE = ['', '무관', '주간', '야간'];
   /** 오늘 ~ until 달력 (월별). cell(ymd) → { cls, sub, disabled } */
   function gvCal(today, until, cell) {
@@ -1742,7 +1752,7 @@
     if (gvMode === 'me') {
       api('api_pmAvailMine', token).then((r) => {
         if (!pmOk(r)) { $('#gvBody').innerHTML = ''; return; }
-        gvMine = r; gvSel = {}; r.list.forEach((x) => { gvSel[x.date] = x.kind; }); gvMemo = r.memo || ''; gvDirty = false;
+        gvMine = r; gvSel = {}; r.list.forEach((x) => { gvSel[x.date] = x.kind; }); gvMemo = r.memo || ''; gvInfo = Object.assign({}, r.info || {}); gvDirty = false;
         renderGiveMe();
       }).catch(() => { $('#gvBody').innerHTML = ''; netErr(); });
     } else {
@@ -1759,8 +1769,20 @@
       (r.qual ? '' : '<div class="pmofr">화물운송 종사자격증을 등록한 기사만 품앗이를 받을 수 있습니다. 사무실에 자격증 등록을 요청해 주세요.</div>') +
       '<div class="gvleg"><span><i style="background:#e8f1ff;border-color:var(--brand)"></i>무관</span><span><i style="background:#fff4d6;border-color:#f0b429"></i>주간</span><span><i style="background:#e6e9ff;border-color:#5c6bd6"></i>야간</span><span><i style="background:#e5f6ec;border-color:#8fd3ad"></i>품앗이 확정</span></div>' +
       gvCal(r.today, r.until, (d) => bk.has(d) ? { cls: 'bk', sub: '확정', disabled: true } : gvSel[d] ? { cls: 'on k-' + gvSel[d], sub: gvSel[d] } : {}) +
+      gvInfoCard(r) +
       '<div class="card"><div class="field" style="margin:0"><label class="lb" for="gvMemo">한마디 (선택)</label><input type="text" id="gvMemo" maxlength="100" placeholder="예: 강서·양천 가능, 하이탑 있음" value="' + escH(gvMemo) + '"></div></div>' +
       '<button class="btn" type="button" id="gvSave"' + (r.qual ? '' : ' disabled') + '>근무 가능일 저장 (' + n + '일)</button><p class="hint" style="text-align:center">저장하면 다른 기사님에게 보입니다. 제안이 오면 알림으로 알려 드립니다.</p>';
+  }
+  function gvInfoCard(r) {
+    const i = gvInfo, opt = (list, cur, empty) => (empty ? '<option value="">' + empty + '</option>' : '') + list.map((x) => { const v = typeof x === 'object' ? x.id : x, t = typeof x === 'object' ? x.name : x; return '<option value="' + escH(v) + '"' + (String(cur || '') === String(v) ? ' selected' : '') + '>' + escH(t) + '</option>'; }).join('');
+    return '<div class="card gvinfo"><h3>기사 기본 정보 <small style="font-weight:500;color:var(--sub);font-size:12px">맡길 기사님께 보입니다</small></h3>' +
+      '<div class="row"><div class="field"><label class="lb" for="gvArea">원하는 지역</label><input type="text" id="gvArea" data-gi="area" maxlength="40" placeholder="예: 강서구·양천구" value="' + escH(i.area || '') + '"></div>' +
+      '<div class="field"><label class="lb" for="gvCamp">캠프</label><select id="gvCamp" data-gi="campId">' + opt(r.camps || [], i.campId, '상관없음') + '</select></div></div>' +
+      '<div class="field"><label class="lb">배송 인원</label><div class="segk" id="gvCrew">' + (r.crews || []).map((c) => '<button type="button" data-crew="' + escH(c) + '"' + (i.crew === c ? ' class="on"' : '') + '>' + escH(c) + '</button>').join('') + '</div></div>' +
+      '<div class="row"><div class="field"><label class="lb" for="gvQty">원하는 수량</label><input type="text" id="gvQty" data-gi="qty" maxlength="20" placeholder="예: 250개" value="' + escH(i.qty || '') + '"></div>' +
+      '<div class="field"><label class="lb" for="gvTop">탑 종류</label><select id="gvTop" data-gi="top">' + opt(r.tops || [], i.top, '선택 안 함') + '</select></div></div>' +
+      '<div class="row"><div class="field"><label class="lb" for="gvPrice">희망 단가 (VAT포함)</label><div class="suffix"><input type="number" id="gvPrice" data-gi="price" inputmode="numeric" min="0" placeholder="' + (r.defPrice || 1100) + '" value="' + escH(i.price || '') + '"><span>원</span></div></div>' +
+      '<div class="field"><label class="lb" for="gvPay">지급방법</label><select id="gvPay" data-gi="pay">' + opt(r.pays || [], i.pay, '선택 안 함') + '</select></div></div></div>';
   }
   function renderGiveFind() {
     const r = gvFind, cnt = {};
@@ -1771,7 +1793,7 @@
       gvCal(r.today, r.until, (d) => cnt[d] ? { cls: 'has' + (d === gvDay ? ' sel' : ''), sub: cnt[d] + '명' } : { cls: d === gvDay ? 'sel' : '' }) +
       (gvDay ? '<h3 style="margin:14px 4px 8px;font-size:16px">' + pmDay(gvDay) + ' 일할 수 있는 기사 ' + list.length + '명</h3>' + (list.length ? list.map((o) =>
         '<div class="gvdrv"><div class="nm"><span>' + escH(o.x.name) + ' 기사님</span><span class="bdg ' + (o.d.kind === '무관' ? 'ap' : 'k-' + escH(o.d.kind)) + '">' + escH(o.d.kind === '무관' ? '주간·야간 무관' : o.d.kind) + '</span></div>' +
-        '<div class="mt">' + escH([o.x.type, o.x.camp].filter(Boolean).join(' · ') || '러너 기사') + (o.x.memo ? '<br>💬 ' + escH(o.x.memo) : '') + (o.d.offered ? '<br><small>이 날 받은 제안 ' + o.d.offered + '건</small>' : '') + '</div>' +
+        '<div class="mt">' + escH([o.x.type, o.x.camp].filter(Boolean).join(' · ') || '러너 기사') + (gvInfoTxt(o.x.info) ? '<br>📋 ' + escH(gvInfoTxt(o.x.info)) : '') + (o.x.memo ? '<br>💬 ' + escH(o.x.memo) : '') + (o.d.offered ? '<br><small>이 날 받은 제안 ' + o.d.offered + '건</small>' : '') + '</div>' +
         '<button class="btn" type="button" data-offer="' + escH(o.x.id) + '" style="height:44px">💌 일감 제안하기</button></div>').join('') : '<div class="pmempty">이 날 일할 수 있는 기사님이 없습니다.</div>') : '');
   }
   $('#pmGive').addEventListener('click', () => openGive('me', 'pumasi'));
@@ -1781,8 +1803,14 @@
     if (gvMode === 'me' && gvDirty && !confirm('저장하지 않은 근무 가능일이 있습니다. 그냥 넘어갈까요?')) return;
     gvDirty = false; openGive(b.dataset.g);
   });
-  $('#gvBody').addEventListener('input', (e) => { if (e.target.id === 'gvMemo') { gvMemo = e.target.value; gvDirty = true; } });
+  $('#gvBody').addEventListener('input', (e) => {
+    if (e.target.id === 'gvMemo') { gvMemo = e.target.value; gvDirty = true; }
+    const k = e.target.dataset && e.target.dataset.gi; if (k) { gvInfo[k] = e.target.value; gvDirty = true; }
+  });
+  $('#gvBody').addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.gi; if (k) { gvInfo[k] = e.target.value; gvDirty = true; } });
   $('#gvBody').addEventListener('click', (e) => {
+    const cr = e.target.closest('[data-crew]');
+    if (cr) { gvInfo.crew = gvInfo.crew === cr.dataset.crew ? '' : cr.dataset.crew; gvDirty = true; $$('#gvCrew button').forEach((b) => b.classList.toggle('on', b.dataset.crew === gvInfo.crew)); return; }
     const d = e.target.closest('[data-gd]');
     if (d && !d.disabled) {
       const k = d.dataset.gd;
@@ -1792,12 +1820,12 @@
     }
     if (e.target.id === 'gvSave') {
       const list = Object.keys(gvSel).filter((k) => gvSel[k]).sort().map((k) => ({ date: k, kind: gvSel[k] }));
-      return api('api_pmAvailSave', pmTok(), list, gvMemo).then((r) => { if (pmOk(r)) { gvDirty = false; toast(r.count ? '근무 가능일 ' + r.count + '일을 저장했습니다.' : '근무 가능일을 모두 지웠습니다.'); openGive('me'); } }).catch(netErr);
+      return api('api_pmAvailSave', pmTok(), list, gvMemo, gvInfo).then((r) => { if (pmOk(r)) { gvDirty = false; toast(r.count ? '근무 가능일 ' + r.count + '일을 저장했습니다.' : '근무 가능일을 모두 지웠습니다.'); openGive('me'); } }).catch(netErr);
     }
     const o = e.target.closest('[data-offer]');
     if (o) {
       const x = gvFind.drivers.find((v) => v.id === o.dataset.offer), dd = x && x.dates.find((v) => v.date === gvDay);
-      if (x && dd) openPmForm('', 'give', null, { id: x.id, name: x.name, date: gvDay, kind: dd.kind });
+      if (x && dd) openPmForm('', 'give', null, { id: x.id, name: x.name, date: gvDay, kind: dd.kind, info: x.info });
     }
   });
 

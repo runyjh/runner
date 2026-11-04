@@ -118,8 +118,8 @@ function api_pmList(token, f) {
     try {
       pmAvailDrivers_(u.id, d, today, true).forEach(function (x) {
         x.dates.forEach(function (dt) {
-          if (q && (str_(x.name) + str_(x.camp) + str_(x.memo)).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return;
-          gives.push({ id: x.id, name: x.name, camp: x.camp, type: x.type, memo: x.memo, me: x.me, date: dt.date, kind: dt.kind, offered: dt.offered });
+          if (q && (str_(x.name) + str_(x.camp) + str_(x.memo) + str_(x.info && x.info.area) + str_(x.info && x.info.camp)).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return;
+          gives.push({ id: x.id, name: x.name, camp: x.camp, type: x.type, memo: x.memo, me: x.me, date: dt.date, kind: dt.kind, offered: dt.offered, info: x.info });
         });
       });
     } catch (e) { gives = []; }
@@ -533,6 +533,11 @@ function pmScheduleOf_(me, dates) {
 // ───────────────────────── 품앗이 주세요 (근무 가능일 · 제안) ─────────────────────────
 const PM_AVAIL_DAYS = 62;              // 오늘부터 며칠 앞까지 고를 수 있나
 const PM_AVAIL_KINDS = ['무관', '주간', '야간'];
+const PM_CREWS = ['1인', '2인1조'];
+const PM_GIVE_PRICE = 1100; // 희망 단가 기본값
+const PM_INFO_KEYS = ['area', 'campId', 'camp', 'crew', 'qty', 'top', 'price', 'pay'];
+/** 근무 가능일 줄에서 기사 기본 정보 꺼내기 */
+function pmInfoOf_(a) { const o = {}; PM_INFO_KEYS.forEach(function (k) { o[k] = a ? str_(a[k]) : ''; }); return o; }
 /** 내 근무 가능일 (오늘 이후) + 이미 확정된 날 */
 function api_pmAvailMine(token) {
   return run_(function () {
@@ -541,13 +546,20 @@ function api_pmAvailMine(token) {
     const list = d.avail.filter(function (a) { return a.driverId === u.id && a.date >= today; })
       .map(function (a) { return { date: a.date, kind: PM_AVAIL_KINDS.indexOf(a.kind) >= 0 ? a.kind : '무관' }; })
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
-    const memo = (d.avail.filter(function (a) { return a.driverId === u.id && a.date >= today && a.memo; })[0] || {}).memo || '';
+    const mine = d.avail.filter(function (a) { return a.driverId === u.id; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    const memo = (mine.filter(function (a) { return a.date >= today && a.memo; })[0] || {}).memo || '';
     const booked = d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date >= today; }).map(function (j) { return j.date; });
-    return { ok: true, today: today, until: ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS)), list: list, memo: memo, booked: booked, kinds: PM_AVAIL_KINDS, qual: !!me.docQual };
+    // 기본 정보: 마지막으로 저장한 값 → 없으면 내 소속 캠프 · 희망 단가 1,100원 · 당일지급
+    const info = pmInfoOf_(mine[0]);
+    const myCamp = master_().camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
+    if (!mine.length) { info.campId = myCamp ? myCamp.id : ''; info.camp = myCamp ? myCamp.name : ''; info.crew = '1인'; info.price = String(PM_GIVE_PRICE); info.pay = '당일지급'; }
+    const camps = master_().camps.map(function (c) { return { id: c.id, name: c.name }; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+    return { ok: true, today: today, until: ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS)), list: list, memo: memo, info: info, booked: booked, kinds: PM_AVAIL_KINDS, qual: !!me.docQual,
+      camps: camps, crews: PM_CREWS, tops: PM_TOPS, pays: PM_PAYS, defPrice: PM_GIVE_PRICE };
   });
 }
 /** 내 근무 가능일 저장: list = [{ date, kind }] (오늘 이후 것을 통째로 바꾼다), memo = 한마디 */
-function api_pmAvailSave(token, list, memo) {
+function api_pmAvailSave(token, list, memo, info) {
   return run_(function () {
     const u = pmUser_(token);
     const me = driverById_(u.id) || {};
@@ -555,11 +567,20 @@ function api_pmAvailSave(token, list, memo) {
     const today = todayText_(), until = ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS));
     if (!Array.isArray(list) || list.length > 100) fail_('날짜를 확인해 주세요.');
     const seen = {}, rows = [], now = nowText_(), m = str_(memo).slice(0, 100);
+    // 기본 정보 (원하는 지역 · 캠프 · 배송 인원 · 원하는 수량 · 탑 종류 · 희망 단가 · 지급방법)
+    info = info || {};
+    const inf = { area: str_(info.area).slice(0, 40), crew: PM_CREWS.indexOf(str_(info.crew)) >= 0 ? str_(info.crew) : '', qty: str_(info.qty).slice(0, 20),
+      top: PM_TOPS.indexOf(str_(info.top)) >= 0 ? str_(info.top) : '', pay: PM_PAYS.indexOf(str_(info.pay)) >= 0 ? str_(info.pay) : '' };
+    const camp = master_().camps.filter(function (c) { return c.id === str_(info.campId); })[0];
+    inf.campId = camp ? camp.id : ''; inf.camp = camp ? camp.name : '';
+    const pr = str_(info.price) === '' ? null : pmMoney_(info.price);
+    if (str_(info.price) !== '' && (pr === null || pr <= 0)) fail_('희망 단가는 숫자로 입력해 주세요.');
+    inf.price = pr ? String(pr) : '';
     list.forEach(function (x) {
       const dt = pmDate_(x && x.date);
       if (!dt || dt < today || dt > until || seen[dt]) return;
       seen[dt] = 1;
-      rows.push({ id: uniqId_('V'), driverId: u.id, name: u.info.name, date: dt, kind: PM_AVAIL_KINDS.indexOf(x.kind) >= 0 ? x.kind : '무관', memo: m, createdAt: now });
+      rows.push(Object.assign({ id: uniqId_('V'), driverId: u.id, name: u.info.name, date: dt, kind: PM_AVAIL_KINDS.indexOf(x.kind) >= 0 ? x.kind : '무관', memo: m, createdAt: now }, inf));
     });
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
@@ -592,7 +613,7 @@ function pmAvailDrivers_(me, d, today, withMe) {
     const by = {};
     d.avail.forEach(function (a) {
       if ((!withMe && a.driverId === me) || a.date < today || booked[a.driverId + '|' + a.date]) return;
-      const x = by[a.driverId] || (by[a.driverId] = { id: a.driverId, name: a.name, memo: '', dates: [] });
+      const x = by[a.driverId] || (by[a.driverId] = { id: a.driverId, name: a.name, memo: '', dates: [], info: pmInfoOf_(a) });
       if (a.memo) x.memo = a.memo;
       x.dates.push({ date: a.date, kind: PM_AVAIL_KINDS.indexOf(a.kind) >= 0 ? a.kind : '무관', offered: offered[a.driverId + '|' + a.date] || 0 });
     });

@@ -269,7 +269,8 @@ const PJ_NOTES = {
 const PA = { id: '지원ID', jobId: '일감ID', driverId: '지원 기사ID', name: '지원 기사', date: '배차일자', status: '상태', memo: '한마디', createdAt: '지원일시', updatedAt: '수정일시' };
 const PA_NOTES = { status: '지원 / 협의 중 / 확정 / 미선정 / 지원 취소 / 제안' };
 // 품앗이 주세요: 일감을 원하는 기사의 근무 가능일 (기사 1명 · 날짜 1개 = 1줄). 품앗이 맡길 기사가 보고 일감을 제안
-const PV = { id: '가능일ID', driverId: '기사ID', name: '기사', date: '근무 가능일', kind: '구분', memo: '한마디', createdAt: '등록일시' };
+const PV = { id: '가능일ID', driverId: '기사ID', name: '기사', date: '근무 가능일', kind: '구분', memo: '한마디', createdAt: '등록일시',
+  area: '원하는 지역', campId: '희망 캠프ID', camp: '희망 캠프', crew: '배송 인원', qty: '원하는 수량', top: '탑 종류', price: '희망 단가', pay: '지급방법' };
 // 품앗이 알림: 기사 1명에게 가는 알림 1건 = 1줄 (앱 안 알림 + 휴대폰 푸시)
 const PN = { id: '알림ID', driverId: '받는 기사ID', name: '받는 기사', jobId: '일감ID', kind: '종류', text: '내용', createdAt: '보낸일시', readAt: '읽은일시' };
 // 휴대폰 푸시 받는 기기: 기사가 '휴대폰 알림 받기'를 켠 기기 1대 = 1줄. 지우면 그 기기로는 안 감
