@@ -590,8 +590,15 @@
     .side .me { position: static; border: 0; padding: 0 0 0 8px; white-space: nowrap; }
     main { padding: 16px 12px; }
     .search { width: 100%; }
-    .tools { width: 100%; }
+    .tools { width: 100%; flex-wrap: wrap; }
+    /* 모바일: 위쪽 도구(검색·버튼)가 화면 밖으로 나가지 않게 줄바꿈 */
+    .tools > * { min-width: 0; max-width: 100%; }
+    .tools .inp.search, .tools input.search { flex: 1 1 100%; width: 100% !important; }
+    .tools .inp[type="date"] { flex: 1 1 140px; width: auto; }
+    .tools .btn { flex: 0 1 auto; }
     .grid2 { grid-template-columns: 1fr; }
+    main { min-width: 0; }
+    section > .table-wrap, .table-wrap { max-width: 100%; }
   }
 </style>
 </head>

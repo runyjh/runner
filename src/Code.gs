@@ -41,7 +41,7 @@ const CFG = {
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
-  PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens' };
+  PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -254,12 +254,12 @@ const RP_NOTES = {
 };
 // ── 품앗이 (기사끼리 용차 일감 주고받기 · Pumasi.gs) ──
 const PST = { OPEN: '모집 중', TALK: '배차 협의중', DONE: '배차 확정', CLOSED: '모집 마감', CANCEL: '취소' };
-const PAST = { APPLY: '지원', TALK: '협의 중', OK: '확정', NO: '미선정', CANCEL: '지원 취소' };
+const PAST = { APPLY: '지원', TALK: '협의 중', OK: '확정', NO: '미선정', CANCEL: '지원 취소', OFFER: '제안' };
 const PJ = {
   id: '일감ID', status: '상태', posterId: '등록 기사ID', poster: '등록 기사', kind: '구분', date: '배차일자', time: '입차시간',
   area: '배송지', campId: '센터ID', camp: '센터', route: '라우트', qty: '평균 물량', top: '탑 종류', price: '건당 단가(VAT포함)', pay: '지급방법',
   desc: '상세 설명', secret: '배차 확정 기사에게만 (배송지코드·연락처 등)', attach: '첨부파일', acceptedId: '확정 기사ID', accepted: '확정 기사',
-  createdAt: '등록일시', updatedAt: '수정일시'
+  createdAt: '등록일시', updatedAt: '수정일시', offerToId: '제안 기사ID', offerTo: '제안 기사'
 };
 const PJ_NOTES = {
   status: '모집 중 / 배차 협의중 / 배차 확정 / 모집 마감 / 취소',
@@ -267,7 +267,9 @@ const PJ_NOTES = {
   secret: '배차가 확정된 기사와 등록한 기사에게만 보입니다.'
 };
 const PA = { id: '지원ID', jobId: '일감ID', driverId: '지원 기사ID', name: '지원 기사', date: '배차일자', status: '상태', memo: '한마디', createdAt: '지원일시', updatedAt: '수정일시' };
-const PA_NOTES = { status: '지원 / 협의 중 / 확정 / 미선정 / 지원 취소' };
+const PA_NOTES = { status: '지원 / 협의 중 / 확정 / 미선정 / 지원 취소 / 제안' };
+// 품앗이 주세요: 일감을 원하는 기사의 근무 가능일 (기사 1명 · 날짜 1개 = 1줄). 품앗이 맡길 기사가 보고 일감을 제안
+const PV = { id: '가능일ID', driverId: '기사ID', name: '기사', date: '근무 가능일', kind: '구분', memo: '한마디', createdAt: '등록일시' };
 // 품앗이 알림: 기사 1명에게 가는 알림 1건 = 1줄 (앱 안 알림 + 휴대폰 푸시)
 const PN = { id: '알림ID', driverId: '받는 기사ID', name: '받는 기사', jobId: '일감ID', kind: '종류', text: '내용', createdAt: '보낸일시', readAt: '읽은일시' };
 // 휴대폰 푸시 받는 기기: 기사가 '휴대폰 알림 받기'를 켠 기기 1대 = 1줄. 지우면 그 기기로는 안 감
@@ -275,7 +277,7 @@ const PT = { token: '기기 토큰', driverId: '기사ID', name: '기사', devic
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -296,6 +298,7 @@ SCHEMA[SH.PJOB] = PJ;
 SCHEMA[SH.PAPP] = PA;
 SCHEMA[SH.PALERT] = PN;
 SCHEMA[SH.PPUSH] = PT;
+SCHEMA[SH.PAVAIL] = PV;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -1244,7 +1247,7 @@ function onSheetEdit(e) {
       else if (name === SH.CADDR) fixCampAddrRow_(sh, c, o);
       else if (name === SH.PRICES) fixPriceRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
-      else if (name === SH.PJOB || name === SH.PAPP) pmTouch_();
+      else if (name === SH.PJOB || name === SH.PAPP || name === SH.PAVAIL) pmTouch_();
       else if (name === SH.PALERT) pmAlertBump_(o.driverId);
     });
     if (campRenamed) syncCampNames_();
