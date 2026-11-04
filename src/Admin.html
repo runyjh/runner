@@ -4807,7 +4807,7 @@
   
   const ST_HELP = {
     adjust: '이 정산월에 기사별로 더 주거나 빼는 돈. 항목에 따라 세금계산서에 반영(지급·계산서 차감)되거나 입금액에서만 빠집니다(가불금 상환·기타 공제). 차감도 양수로 입력. 배송 기본 같은 자동 항목을 고르면 그 금액에 ± 조정됩니다.',
-    advance: '기사에게 내준 가불금. 상환하면 상환금 칸에 입력하세요. 그 달 정산에서 빼려면 [공제·가감]에 "가불금 상환" 줄을 넣습니다. 상계 예정일이 지났는데 남은 금액이 있으면 기사별 정산 화면에 경고가 뜹니다.',
+    advance: '기사에게 내준 가불금. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제됩니다 (예: 지급일 20일 → 상환일 11/20 은 10월 정산, 11/21 은 11월 정산). 그 달을 마감하면 상환금 칸에 자동으로 적히고, 마감을 풀면 되돌립니다. 정산 밖에서 현금으로 받았으면 상환금에 직접 적으세요. 그 달 [공제·가감]에 "가불금 상환"을 손으로 넣으면 자동 공제는 하지 않습니다.',
     yongcha: '이 정산기간 날짜의 용차 기록. 우리 기사가 대신 뛰면 수행자에 그 기사 → 노선 단가와의 차액만 추가 지급. 용차업체(정산 방식 "용차내역" 기사)는 이 금액으로 지급. 차액부담 기사를 넣으면 (용차 금액 − 그 기사 단가×건수)를 그 기사 계산서에서 뺍니다.',
     config: '세부정산서: 지급률·보험·일정 기본값. 바꾸면 마감하지 않은 달 전체가 다시 계산됩니다.',
     items: '명세서에 나오는 줄 이름표. 계산 방식이 "직접입력"인 항목은 [공제·가감]에서 금액을 넣습니다. "입금가산" = 계산서에는 빼고 실입금에만 더함. 자동 항목(배송기본·분실파손 등)의 계산 방식은 바꾸지 마세요.',
@@ -4922,7 +4922,7 @@
     const T = STX.table, rows = STX.edRows, ro = T.closed;
     const dl = '<datalist id="stAcctDL">' + (T.accts || []).map((o) => '<option value="' + esc(o.label) + '">' + (o.stopped ? '정지' : '') + '</option>').join('') + '</datalist>' +
       '<datalist id="stPersonDL">' + (T.persons || []).map((o) => '<option value="' + esc(o.label) + '">' + esc(o.status !== '승인' ? o.status : '') + '</option>').join('') + '</datalist>';
-    const calcH = T.name === 'yongcha' ? ['자동건수', '지급액', '쿠팡매출', '기존지급', '추가지급', '부담 차감'] : T.name === 'advance' ? ['잔여'] : [];
+    const calcH = T.name === 'yongcha' ? ['자동건수', '지급액', '쿠팡매출', '기존지급', '추가지급', '부담 차감'] : T.name === 'advance' ? ['잔여', '자동 공제 정산월'] : [];
     const cell = (r, i, c) => {
       const v = r[c.k] == null ? '' : String(r[c.k]);
       const at = ' data-r="' + i + '" data-k="' + c.k + '"' + (ro ? ' disabled' : '');
@@ -4941,7 +4941,11 @@
         const x = r._calc; if (!x) return '<td class="calc" colspan="6">저장하면 계산</td>';
         return '<td class="calc">' + (x.autoQty === '' ? '-' : wn(x.autoQty)) + '</td><td class="calc">' + wn(x.payAmt) + '</td><td class="calc">' + wnz(x.sales) + '</td><td class="calc">' + wnz(x.existing) + '</td><td class="calc">' + wnz(x.extra) + '</td><td class="calc">' + wnz(x.cut) + '</td>';
       }
-      if (T.name === 'advance') { const left = (Number(String(r.amt).replace(/,/g, '')) || 0) - (Number(String(r.paid).replace(/,/g, '')) || 0); return '<td class="calc"' + (left > 0 ? ' style="color:var(--danger);font-weight:700"' : '') + '>' + wnz(left) + '</td>'; }
+      if (T.name === 'advance') {
+        const left = (Number(String(r.amt).replace(/,/g, '')) || 0) - (Number(String(r.paid).replace(/,/g, '')) || 0), x = r._calc || {};
+        const mTxt = !r.due ? '<span class="sub">상환일 없음</span>' : !x.month ? '<span class="sub">저장하면 계산</span>' : left <= 0 ? '<span class="sub">상환 완료</span>' : esc(ymTitle(x.month)) + ' 정산' + (x.closed ? ' <span class="sub">(마감)</span>' : '');
+        return '<td class="calc"' + (left > 0 ? ' style="color:var(--danger);font-weight:700"' : '') + '>' + wnz(left) + '</td><td class="calc">' + mTxt + '</td>';
+      }
       return '';
     };
     // 정렬: 제목을 누르면 오름차순 → 내림차순 → 원래 순서 (화면 순서만 바뀌고 저장 순서는 그대로)

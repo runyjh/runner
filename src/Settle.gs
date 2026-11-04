@@ -66,7 +66,7 @@ const STL_TAB_NOTES = {
   stl_tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.',
   stl_raw: '쿠팡 정산 엑셀을 [정산관리 → 쿠팡 정산서 올리기]로 넣으면 자동으로 채워집니다. 한 정산월에는 마지막으로 올린 차수만 남습니다.',
   stl_adjust: '기사별 월 추가지급·차감. 항목은 stl_items 의 "항목 이름". 금액은 차감도 양수로.',
-  stl_advance: '가불금 원장. 상환하면 상환금 칸에 금액. 그 달 정산에서 빼려면 stl_adjust 에 "가불금 상환" 줄을 넣으세요.',
+  stl_advance: '가불금 원장. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제되고, 그 달을 마감하면 상환금에 자동 기록됩니다. 정산 밖에서 현금으로 받으면 상환금 칸에 직접 적으세요.',
   stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 설정의 "용차 수행단가". 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
   stl_config: '값만 고치세요. % 는 10% 처럼 써도 됩니다.',
   stl_closed: '마감할 때 프로그램이 기록합니다. 손으로 고치지 마세요.'
@@ -1081,11 +1081,21 @@ function stlCompute_(month) {
     sum(ownerId);
     (adj[ownerId] = adj[ownerId] || []).push({ item: item, amt: amt, memo: memo || '', auto: !!auto });
   };
-  const adjBad = [];
+  const adjBad = [], manualRepay = {};
   stlRead_('stl_adjust').filter(function (a) { return a.month === month; }).forEach(function (a) {
     const id = stlAcct_(X, D, a.name, a.acct);
     if (!id) { adjBad.push(a.name || a.acct); return; }
+    if (a.item === STL_ADV_ITEM) manualRepay[id] = 1;
     addAdj(id, a.item, stlNum_(a.amt), a.memo, false);
+  });
+  // 가불금: 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액을 '가불금 상환'으로 자동 공제
+  //  (그 달 공제·가감에 '가불금 상환'을 손으로 넣었으면 자동은 건너뜀). 마감하면 가불금 표의 상환금에 자동 기록
+  const advAuto = [];
+  stlRead_('stl_advance').forEach(function (a) {
+    const id = stlAcct_(X, D, a.name, a.acct), left = stlNum_(a.amt) - stlNum_(a.paid);
+    if (!id || left <= 0 || !a.due || stlAdvMonth_(a.due, cfg) !== month || manualRepay[id]) return;
+    addAdj(id, STL_ADV_ITEM, left, (a.date ? stlYmd_(a.date).slice(5).replace('-', '/') + ' 가불 ' : '가불 ') + won_(stlNum_(a.amt)) + '원 · 상환일 ' + stlYmd_(a.due) + ' (자동)', true);
+    advAuto.push({ row: a._row, id: id, amt: left });
   });
   stlRead_('stl_regular').forEach(function (a) {
     if (a.from && month < a.from.slice(0, 7)) return;
@@ -1222,7 +1232,7 @@ function stlCompute_(month) {
       sales: company.sales, supplyCp: company.supplyCp, lossCp: company.lossCp, unregSales: company.unregSales, vendorCut: company.vendorCut,
       coupangNet: company.supplyCp - company.lossCp - company.vendorCut
     },
-    dates: stlDates_(month, cfg), warnings: warnings, yong: yongOut, vendors: X.vendors.list.map(function (v) { return v.name; })
+    dates: stlDates_(month, cfg), warnings: warnings, yong: yongOut, advAuto: advAuto, vendors: X.vendors.list.map(function (v) { return v.name; })
   };
   return { summary: summary, slips: slips };
 }
@@ -1412,15 +1422,24 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
   return { lines: list, pay: pay, taxDed: taxDed, invoice: invoice, supply: supply, tax: tax, san: san, goy: goy, depDed: depDed, depAdd: depAdd, net: net, ins: ins, runnerIns: runnerIns, insGain: insGain };
 }
 
+const STL_ADV_ITEM = '가불금 상환';
+/** 상환일 → 그 날짜 이후(같은 날 포함) 첫 기사 지급이 있는 정산월. 예: 지급일 20일이면 11-20 → 2026-10 정산, 11-21 → 2026-11 정산 */
+function stlAdvMonth_(due, cfg) {
+  const d = stlYmd_(due);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '';
+  const m = stlMonthOfDate_(d), prev = stlAddMonth_(m, -1);
+  return stlDates_(prev, cfg).pay >= d ? prev : m;
+}
 function stlAdvances_(X, D) {
-  const out = {}, today = todayText_();
+  const out = {}, today = todayText_(), cfg = stlCfg_();
   stlRead_('stl_advance').forEach(function (a) {
     const id = stlAcct_(X, D, a.name, a.acct);
     if (!id) return;
     const o = out[id] || (out[id] = { name: stlAcctLabel_(X, D, id), total: 0, paid: 0, left: 0, overdue: 0 });
     const amt = stlNum_(a.amt), paid = stlNum_(a.paid), left = Math.max(0, amt - paid);
     o.total += amt; o.paid += paid; o.left += left;
-    if (left > 0 && a.due && stlYmd_(a.due) < today) o.overdue += left;
+    // 상계 정산월이 아직 마감 전이면 그 달 정산에서 자동 공제되므로 미상계로 보지 않는다
+    if (left > 0 && a.due && stlYmd_(a.due) < today) { const am = stlAdvMonth_(a.due, cfg); if (!am || stlClosedInfo_(am)) o.overdue += left; }
   });
   return out;
 }
@@ -1654,10 +1673,12 @@ function adm_stlClose(token, month, close) {
         if (snap.some(function (s) { return s.data.length > 49000; })) fail_('결과가 너무 커서 마감 기록을 저장할 수 없습니다.');
         stlReplaceMonth_('stl_closed', month, snap);
         stlWriteAll_('stl_close', others.concat([{ month: month, at: nowText_(), admin: a.name }]));
+        stlAdvMark_(month, res.summary.advAuto || [], true);
         logAdmin_(a, '정산 마감', month, res.summary.drivers.length + '명');
       } else {
         stlWriteAll_('stl_close', others);
         stlReplaceMonth_('stl_closed', month, []);
+        stlAdvMark_(month, [], false);
         logAdmin_(a, '정산 마감 해제', month, '');
       }
       stlBump_();
@@ -1668,6 +1689,25 @@ function adm_stlClose(token, month, close) {
   });
 }
 
+/** 마감: 자동 상계한 가불금을 상환금에 더하고 메모에 [2026-10 정산 상계 300,000] 표시 / 마감 해제: 그 표시만큼 되돌림 */
+function stlAdvMark_(month, list, close) {
+  const tagRe = new RegExp('\\s*\\[' + month + ' 정산 상계 ([\\d,]+)\\]');
+  if (close) {
+    const rows = {};
+    stlRead_('stl_advance').forEach(function (r) { rows[r._row] = r; });
+    list.forEach(function (x) {
+      const r = rows[x.row];
+      if (!r || tagRe.test(r.memo)) return;
+      stlSetRow_('stl_advance', x.row, { paid: String(stlNum_(r.paid) + x.amt), memo: (str_(r.memo) + ' [' + month + ' 정산 상계 ' + won_(x.amt) + ']').trim() });
+    });
+  } else {
+    stlRead_('stl_advance').forEach(function (r) {
+      const m = str_(r.memo).match(tagRe);
+      if (!m) return;
+      stlSetRow_('stl_advance', r._row, { paid: (function (v) { return v > 0 ? String(v) : ''; })(Math.max(0, stlNum_(r.paid) - stlNum_(m[1]))), memo: str_(r.memo).replace(tagRe, '').trim() });
+    });
+  }
+}
 /** 입금체크 · 입금일 · 메모 (마감 뒤에도 가능) */
 function adm_stlPaySet(token, month, list) {
   return run_(function () {
@@ -1813,7 +1853,10 @@ function stlTableView_(name, month) {
     let calc = null;
     if (name === 'yongcha' || name === 'advance') {
       if (name === 'yongcha') { const r = stlResult_(month, false); calc = {}; (r.summary.yong || []).forEach(function (y) { calc[y._row] = y; }); }
-      else calc = null;
+      else {
+        const cfg = stlCfg_(); calc = {};
+        rows.forEach(function (r) { const am = r.due ? stlAdvMonth_(r.due, cfg) : ''; calc[r._row] = { left: stlNum_(r.amt) - stlNum_(r.paid), month: am, closed: am ? !!stlClosedInfo_(am) : false }; });
+      }
     }
     return {
       ok: true, name: name, month: month, cols: E.cols.map(function (c) {
