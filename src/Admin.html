@@ -167,6 +167,8 @@
   table.up tr.key td { background: #e3f2fd; } table.up tr.mi td { background: #ffebee; } table.up tr.dup td { background: #fff8e1; }
   table.up tr.sep td { background: #000; padding: 2px; }
   table.up td.n { color: var(--sub); text-align: right; }
+  .nlink { display: inline-block; font-size: 10px; font-weight: 700; color: var(--brand); background: var(--brand-weak); border-radius: 4px; padding: 0 4px; margin-left: 2px; }
+  .memo .cat { display: inline-block; font-size: 11px; font-weight: 700; color: var(--brand); background: var(--brand-weak); border-radius: 4px; padding: 0 5px; margin-right: 4px; }
   .catlist .crow { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); }
   .catlist .crow:first-child { border-top: 0; }
   .catlist .crow .inp { flex: 1; height: 34px; }
@@ -218,6 +220,8 @@
   .day-panel { background: #fff; border-radius: var(--radius); padding: 16px; position: sticky; top: 16px; }
   .day-panel h3 { margin: 0 0 12px; font-size: 16px; }
   .add-row { display: grid; grid-template-columns: 104px 1fr; gap: 6px; }
+  .add-row #memoCat { grid-column: 1 / -1; }
+  .add-row #memoCat.hidden { display: none; }
   .add-row textarea { grid-column: 1 / -1; height: 64px; }
   .add-row .btn { grid-column: 1 / -1; }
   .memos { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -232,6 +236,7 @@
   .memo .acts button:hover { color: var(--ink); text-decoration: underline; }
   .memo .edit { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 104px; gap: 6px; }
   .memo .edit textarea { grid-column: 1 / -1; height: 72px; }
+  .memo .edit select[data-f="cat"] { grid-column: 1 / -1; }
   .memo .edit .row-btns { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 6px; }
   .late-bar { background: var(--danger-weak); color: var(--danger); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .late-bar button { border: 0; background: none; color: var(--danger); font-weight: 700; text-decoration: underline; }
@@ -365,7 +370,7 @@
     .rfilters input.inp { width: 100%; }
   }
 
-  /* 스케줄관리 */
+  /* 기사스케줄 */
   #view-sched .head { margin-bottom: 10px; }
   .stools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
   .stools .inp { height: 36px; width: auto; }
@@ -498,14 +503,14 @@
     <div class="logo"><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><b>러너 <span>올인원</span></b></div>
     <nav class="nav">
       <a class="on" data-view="drivers">기사 정보관리</a>
-      <a data-view="sched">스케줄관리</a>
+      <a data-view="sched">기사스케줄</a>
       <a data-view="route">노선관리</a>
       <a class="off">정산관리 <small>준비 중</small></a>
       <a data-view="memo">업무스케줄</a>
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a data-view="bib">배번호 관리</a>
-      <a data-view="acc">계정관리</a>
       <a data-view="notice">공지사항</a>
+      <a data-view="acc">계정관리</a>
     </nav>
     <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a></div>
   </aside>
@@ -595,6 +600,7 @@
         <form class="add-row" id="memoAdd" novalidate>
           <input class="inp" type="time" id="memoTime" title="시간 (선택)">
           <input class="inp" id="memoDate" type="date" title="날짜">
+          <select class="inp" id="memoCat" title="기사스케줄의 어느 비고 줄에 보일지"></select>
           <textarea class="inp" id="memoText" placeholder="할 일, 메모를 입력하세요. (Ctrl+Enter 로 추가)"></textarea>
           <button class="btn" id="memoAddBtn">추가</button>
         </form>
@@ -625,7 +631,7 @@
    </section>
    <section id="view-sched" class="hidden">
     <div class="head">
-      <h2>스케줄관리 <small id="sCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <h2>기사스케줄 <small id="sCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
       <div class="tools"><span class="ssave ok" id="sSave">모두 저장됨</span></div>
     </div>
     <div class="stools">
@@ -1880,7 +1886,9 @@
 
   // ───── 업무스케줄 ─────
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
-  let memoMonth = '', memoToday = '', memos = [], selDate = '';
+  let memoMonth = '', memoToday = '', memos = [], selDate = '', noteLabels = [];
+  const catOf = (x) => (x.cat && noteLabels.includes(x.cat) ? x.cat : (noteLabels[0] || ''));
+  function fillCats(sel, cur) { sel.innerHTML = noteLabels.map((l) => '<option' + (l === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join(''); sel.classList.toggle('hidden', !noteLabels.length); }
   const pad2 = (n) => ('0' + n).slice(-2);
   const ymOf = (d) => d.slice(0, 7);
   function localToday() { const n = new Date(); return n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate()); }
@@ -1898,6 +1906,7 @@
       if (asked !== memoMonth) return; // 그 사이 다른 달로 이동함
       if (!r.ok) return toast(r.msg);
       memos = r.memos.slice().sort(memoSort); memoToday = r.today || memoToday;
+      noteLabels = r.noteLabels || []; fillCats($('#memoCat'), $('#memoCat').value || noteLabels[0]);
       $('#lateBar').classList.toggle('hidden', !r.pastUndone);
       $('#lateText').textContent = '지난 날짜에 완료 안 된 메모가 ' + r.pastUndone + '건 있습니다.';
       renderCal(); renderDay();
@@ -1917,7 +1926,7 @@
     for (let i = 0; i < first; i++) html += '<div class="cal-day blank"></div>';
     for (let d = 1; d <= days; d++) {
       const ds = memoMonth + '-' + pad2(d), dow = (first + d - 1) % 7, list = byDate[ds] || [];
-      const items = list.slice(0, 3).map((x) => '<div class="mi' + (x.done ? ' done' : (ds < memoToday ? ' late' : '')) + '">' +
+      const items = list.slice(0, 3).map((x) => '<div class="mi' + (x.done ? ' done' : (ds < memoToday && !x.note ? ' late' : '')) + '">' +
         (x.time ? x.time + ' ' : '') + esc(x.content.split('\n')[0]) + '</div>').join('');
       const more = list.length > 3 ? '<div class="more">+' + (list.length - 3) + '건</div>' : '';
       html += '<div class="cal-day' + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '') + (ds === memoToday ? ' today' : '') + (ds === selDate ? ' sel' : '') +
@@ -1942,7 +1951,7 @@
   function memoHtml(x) {
     return '<div class="memo' + (x.done ? ' done' : '') + '" data-id="' + esc(x.id) + '">' +
       '<input type="checkbox" data-act="done"' + (x.done ? ' checked' : '') + ' title="완료">' +
-      '<div class="txt">' + (x.time ? '<b>' + esc(x.time) + '</b>' : '') + esc(x.content) + '</div>' +
+      '<div class="txt">' + (noteLabels.length ? '<span class="cat" title="기사스케줄 비고 줄">' + esc(catOf(x)) + '</span>' : '') + (x.time ? '<b>' + esc(x.time) + '</b>' : '') + esc(x.content) + '</div>' +
       '<div class="acts"><button type="button" data-act="edit">수정</button><button type="button" data-act="del">삭제</button></div>' +
       '<div class="by">' + esc(x.author || '') + (x.updatedAt ? ' · ' + esc(String(x.updatedAt).slice(5, 16)) : '') + '</div></div>';
   }
@@ -1954,7 +1963,8 @@
     const content = $('#memoText').value.trim(), date = $('#memoDate').value || selDate, time = $('#memoTime').value;
     if (!content) return toast('내용을 입력해 주세요.');
     const b = $('#memoAddBtn'); b.disabled = true;
-    api('adm_memoSave', { date: date, time: time, content: content }).then((r) => {
+    const cat = $('#memoCat').value && $('#memoCat').value !== noteLabels[0] ? $('#memoCat').value : '';
+    api('adm_memoSave', { date: date, time: time, content: content, cat: cat }).then((r) => {
       if (!r.ok) return toast(r.msg);
       $('#memoText').value = ''; $('#memoTime').value = '';
       upsertMemo(r.memo);
@@ -1992,8 +2002,10 @@
       box.innerHTML = '<div class="edit">' +
         '<input class="inp" type="date" data-f="date" value="' + esc(m.date) + '">' +
         '<input class="inp" type="time" data-f="time" value="' + esc(m.time) + '">' +
+        (noteLabels.length ? '<select class="inp" data-f="cat" title="기사스케줄 비고 줄"></select>' : '') +
         '<textarea class="inp" data-f="content">' + esc(m.content) + '</textarea>' +
         '<div class="row-btns"><button type="button" class="btn sm ghost" data-act="cancel">취소</button><button type="button" class="btn sm" data-act="save">저장</button></div></div>';
+      if ($('[data-f="cat"]', box)) fillCats($('[data-f="cat"]', box), catOf(m));
       $('textarea', box).focus();
     } else if (act === 'cancel') {
       renderDay();
@@ -2001,7 +2013,8 @@
       const date = $('[data-f="date"]', box).value, time = $('[data-f="time"]', box).value, content = $('[data-f="content"]', box).value.trim();
       if (!content) return toast('내용을 입력해 주세요.');
       e.target.disabled = true;
-      api('adm_memoSave', { id: id, date: date, time: time, content: content }).then((r) => {
+      const cs = $('[data-f="cat"]', box), cat = cs && cs.value !== noteLabels[0] ? cs.value : '';
+      api('adm_memoSave', { id: id, date: date, time: time, content: content, cat: cat }).then((r) => {
         if (!r.ok) { toast(r.msg); e.target.disabled = false; return; }
         if (r.memo.date !== m.date) toast(dateLabel(r.memo.date) + '(으)로 옮겼습니다.');
         upsertMemo(r.memo); refreshLate();
@@ -2011,7 +2024,7 @@
 
   // 지난 미완료 메모
   function refreshLate() {
-    const lateHere = memos.filter((x) => !x.done && x.date < memoToday).length;
+    const lateHere = memos.filter((x) => !x.done && !x.note && x.date < memoToday).length;
     if (lateHere === 0 && ymOf(memoToday) === memoMonth) $('#lateBar').classList.add('hidden');
   }
   $('#lateShow').addEventListener('click', () => {
@@ -3413,7 +3426,7 @@
     return { compute, routeExpand, isWorkDay };
   })();
 
-  // ───── 스케줄관리 (2주 표) ─────
+  // ───── 기사스케줄 (2주 표) ─────
   const SOPTS = ['출근', '휴무', '고정휴무', '계획된휴무', '병가', '휴가', '미입차', '용차', '노선변경', '라우트변경'];
   const TYPE_ORDER = { '고정': 0, '품앗이': 1, '백업': 2, '외부용차': 3 };
   const SD = { start: '', today: '', dates: [], holidays: {}, camps: [], routes: {}, drivers: [], cells: {}, notes: [] };
@@ -3568,7 +3581,7 @@
     let prevCamp = null;
     const body = srows.map((r, ri) => {
       if (r.kind === 'n') {
-        return '<tr class="note' + (ri && srows[ri - 1].kind === 'd' ? ' gtop' : '') + '"><td class="fx f1 lab">비고</td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
+        return '<tr class="note' + (ri && srows[ri - 1].kind === 'd' ? ' gtop' : '') + '"><td class="fx f1 lab" title="이 줄의 글은 업무스케줄과 연동됩니다">비고 <span class="nlink">↔ 업무</span></td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="5"></td></tr>';
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp;
@@ -4095,7 +4108,7 @@
   const RESET_PHRASE = '모조리 없앤다';
   const RESET_INFO = {
     drivers: { label: '기사 정보관리', items: ['모든 기사 정보 (drivers 탭)', '기사 앱 로그인 (관리자 로그인은 그대로)', '가입 서류 폴더 → 드라이브 휴지통'], keep: '스케줄·배번호 신청서 기록은 남습니다.' },
-    sched: { label: '스케줄관리', items: ['스케줄 DB 파일의 모든 날짜 기록', '비고 줄 (빈 비고 줄 3개는 다시 만듦)'], keep: '기사 정보와 기사별 스케줄 설정(소속캠프·기본노선 등)은 남습니다.' },
+    sched: { label: '기사스케줄', items: ['스케줄 DB 파일의 모든 날짜 기록 (비고 줄 이름은 기본 3개로 다시 만듦)'], keep: '기사 정보와 기사별 스케줄 설정(소속캠프·기본노선 등), 비고 줄의 글(업무스케줄 메모)은 남습니다.' },
     route: { label: '노선관리', items: ['모든 캠프·노선·상차지 주소·구분별 단가', '캠프 참고 이미지 (사진 파일 → 드라이브 휴지통)', '기사의 소속캠프 칸'], keep: '기사 정보와 스케줄 기록은 남습니다.' },
     notice: { label: '공지사항', items: ['모든 공지 (notices 탭)'], keep: '' },
     accounts: { label: '계정관리', items: ['모든 서비스 계정·비밀번호 (accounts 탭)'], keep: '복사본에는 비밀번호가 암호화된 채로 들어갑니다.' },

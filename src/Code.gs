@@ -106,12 +106,15 @@ const L = { at: '시각', admin: '관리자', action: '작업', target: '대상'
 // work_memo 시트 (업무스케줄: 관리자 전용 날짜별 메모). 시트에서 직접 줄을 추가해도 된다.
 const M = {
   id: '메모ID', date: '날짜', time: '시간', content: '내용', done: '완료',
-  author: '작성자', createdAt: '작성일시', updatedAt: '수정일시'
+  author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', cat: '비고 줄'
 };
+// 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전해서 자동으로 추가하는 열 (시트별)
+const AUTO_ADD_COLS = { work_memo: ['cat'] };
 const M_NOTES = {
   date: '2026-11-03 형식. 2026.11.3, 2026/11/3 처럼 입력해도 자동으로 맞춰집니다.',
   time: '선택. 09:30 형식 (24시간)',
   done: '완료하면 Y',
+  cat: '기사스케줄의 어느 비고 줄에 보일지 (비고 줄 이름). 비우면 첫 번째 비고 줄(업무 관련)에 보입니다.',
   content: '새 줄에 날짜와 내용을 입력하면 메모ID와 작성일시가 자동으로 채워집니다.'
 };
 
@@ -251,7 +254,7 @@ const RP_NOTES = {
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -534,7 +537,8 @@ function cols_(name, fresh) {
     if (i < 0) missing.push(def[k]); else c[k] = i;
   });
   const autoable = missing.length && (AUTO_CREATE.indexOf(name) >= 0 || (name === SH.DRIVERS &&
-    missing.every(function (label) { return D_AUTO_ADD.some(function (k) { return D[k] === label; }); })));
+    missing.every(function (label) { return D_AUTO_ADD.some(function (k) { return D[k] === label; }); })) ||
+    (AUTO_ADD_COLS[name] && missing.every(function (label) { return AUTO_ADD_COLS[name].some(function (k) { return def[k] === label; }); })));
   if (autoable) {
     addHeaders_(name, missing);
     return cols_(name, true);
@@ -1930,9 +1934,7 @@ function adm_getDoc(token, id, kind) {
 }
 
 // ───────────────────────── 관리자 : 업무스케줄 (날짜별 메모) ─────────────────────────
-function newMemoId_() {
-  return 'M' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
-}
+function newMemoId_() { return uniqId_('M'); }
 /** 날짜 글자 → yyyy-MM-dd. 2026.11.3 / 2026/11/3 / 2026-11-03 / 시트의 날짜값 모두 허용. 잘못되면 '' */
 function normDate_(v) {
   const s = str_(v);
@@ -1953,7 +1955,8 @@ function normTime_(v) {
 function memoView_(o) {
   return {
     id: o.id, date: o.date, time: o.time, content: o.content, done: String(o.done).toUpperCase() === 'Y',
-    author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt
+    author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt, cat: o.cat || '',
+    note: o.author === SCH_NOTE_AUTHOR // 기사스케줄 비고에서 옮겨 온 글 (할 일이 아니므로 '미완료' 로 세지 않음)
   };
 }
 function memoSort_(a, b) {
@@ -1979,10 +1982,12 @@ function adm_memoMonth(token, ym) {
       if (!o.id || !o.date) return;
       const m = memoView_(o);
       if (o.date.indexOf(ym) === 0) list.push(m);
-      if (!m.done && o.date < today) pastUndone++;
+      if (!m.done && !m.note && o.date < today) pastUndone++;
     });
     list.sort(memoSort_);
-    return { ok: true, memos: list, pastUndone: pastUndone, today: today };
+    let noteLabels = [];
+    try { noteLabels = schNotes_().map(function (n) { return n.label; }); } catch (e) { /* 스케줄 DB 가 없으면 비움 */ }
+    return { ok: true, memos: list, pastUndone: pastUndone, today: today, noteLabels: noteLabels };
   });
 }
 
@@ -2000,7 +2005,7 @@ function adm_memoPastUndone(token) {
       o.date = normDate_(o.date) || o.date;
       if (!o.id || !o.date) return;
       const m = memoView_(o);
-      if (!m.done && o.date < today) list.push(m);
+      if (!m.done && !m.note && o.date < today) list.push(m);
     });
     list.sort(memoSort_);
     return { ok: true, memos: list };
@@ -2027,6 +2032,7 @@ function adm_memoSave(token, memo) {
       if (f.content.length > 2000) fail_('내용이 너무 깁니다. (2000자 이내)');
     }
     if (memo.done !== undefined) f.done = memo.done ? 'Y' : '';
+    if (memo.cat !== undefined) f.cat = str_(memo.cat).slice(0, 30);
 
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
@@ -2036,7 +2042,7 @@ function adm_memoSave(token, memo) {
         if (!f.date || !f.content) fail_('날짜와 내용을 입력해 주세요.');
         const id = newMemoId_();
         const row = appendObj_(SH.MEMO, {
-          id: id, date: f.date, time: f.time || '', content: f.content, done: f.done || '',
+          id: id, date: f.date, time: f.time || '', content: f.content, done: f.done || '', cat: f.cat || '',
           author: a.name, createdAt: now, updatedAt: now
         });
         return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
@@ -4154,6 +4160,17 @@ function schRead_(sun, end) {
       else if (!rowIds[id]) { rowIds[id] = 1; cells[id] = row; }
     });
   }
+  // 비고 줄은 업무스케줄(work_memo)과 연동: 시트에 남아 있는 예전 비고 글은 업무스케줄로 옮기고, 칸 내용은 메모에서 만든다
+  if (notes.length && (!cache_().get('sch:nmig') || notes.some(function (n) { return Object.keys(n.cells).length; }))) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try { schMigrateNotes_(sh, schHeader_(true)); cache_().put('sch:nmig', '1', 600); } finally { lock.releaseLock(); }
+  }
+  const nm = schNoteMemos_(notes, dates[0], dates[dates.length - 1]);
+  notes.forEach(function (n) {
+    n.cells = {};
+    Object.keys(nm[n.id] || {}).forEach(function (d) { n.cells[d] = schNoteText_(nm[n.id][d]); });
+  });
   const m = master_();
   const routes = {};
   m.routes.forEach(function (r) { if (r.status !== RST.OFF) (routes[r.campId] = routes[r.campId] || []).push(r.code); });
@@ -4198,6 +4215,17 @@ function adm_schSave(token, changes) {
     lock.waitLock(20000);
     try {
       const sh = schSheet_();
+      // 비고 줄은 업무스케줄 메모로 저장
+      const noteCh = changes.filter(function (x) { return /^NOTE\d+$/.test(x.row); });
+      let noteRes = { saved: 0, conflicts: [] };
+      if (noteCh.length) {
+        noteRes = schNoteSave_(a, noteCh);
+        changes = changes.filter(function (x) { return !/^NOTE\d+$/.test(x.row); });
+        if (!changes.length) {
+          if (noteRes.saved) logAdmin_(a, '기사스케줄 비고 수정', noteRes.saved + '칸', '업무스케줄에 저장');
+          return { ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts };
+        }
+      }
       // 행 찾기 (없는 기사는 새 줄)
       const last = sh.getLastRow();
       const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
@@ -4227,7 +4255,7 @@ function adm_schSave(token, changes) {
       // 지금 값 읽어서 충돌 확인 (바뀌는 칸을 감싸는 범위를 한 번에)
       const ok = changes.filter(function (x) { return rowOf[x.row]; });
       const conflicts = [];
-      if (!ok.length) return { ok: true, saved: 0, conflicts: conflicts };
+      if (!ok.length) return { ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts };
       const r0 = Math.min.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
       const r1 = Math.max.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
       const cs = ok.map(function (x) { return h.dates[x.date] + 1; });
@@ -4244,11 +4272,121 @@ function adm_schSave(token, changes) {
         saved++;
       });
       if (saved) logSchChange_(a, ok, saved);
-      return { ok: true, saved: saved, conflicts: conflicts };
+      return { ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts) };
     } finally {
       lock.releaseLock();
     }
   });
+}
+// ───── 기사스케줄 비고 줄 ↔ 업무스케줄(work_memo) 연동 ─────
+const SCH_NOTE_AUTHOR = '기사스케줄 비고';
+/*
+ * 비고 줄의 글은 업무스케줄 메모로 저장한다 (한 곳에만 저장 → 양쪽 화면에 똑같이 보임).
+ * 메모의 '비고 줄' 칸 = 비고 줄 이름. 비어 있으면 첫 번째 비고 줄(보통 '업무 관련')에 보인다.
+ * 한 칸에 메모가 여러 개면 시간순으로 줄바꿈해 보여 준다. 시간이 있으면 '09:30 내용' 모양.
+ */
+/** 비고 줄 목록 [{id, label, row}] (시트 순서) */
+function schNotes_() {
+  const sh = schSheet_(), h = schHeader_(), last = sh.getLastRow();
+  if (last < 2) return [];
+  const out = [];
+  sh.getRange(2, 1, last - 1, 5).getValues().forEach(function (f, i) {
+    const id = str_(f[h.fixed['행ID']]);
+    if (/^NOTE\d+$/.test(id) && str_(f[h.fixed['구분']]) === SCH.KIND_NOTE) out.push({ id: id, label: str_(f[h.fixed['이름']]) || id, row: i + 2 });
+  });
+  return out;
+}
+/** 메모 → 비고 줄 id (이름이 같은 줄, 없으면 첫 줄) */
+function schNoteOf_(notes, cat) {
+  if (!notes.length) return '';
+  const c = str_(cat);
+  for (let i = 0; i < notes.length; i++) if (c && notes[i].label === c) return notes[i].id;
+  return notes[0].id;
+}
+/** { 비고줄id: { 날짜: [메모…] } } (from~to) */
+function schNoteMemos_(notes, from, to) {
+  const out = {};
+  if (!notes.length) return out;
+  readAll_(SH.MEMO).forEach(function (o) {
+    o.date = normDate_(o.date) || o.date;
+    if (!o.id || !o.date || o.date < from || o.date > to) return;
+    const nid = schNoteOf_(notes, o.cat);
+    ((out[nid] = out[nid] || {})[o.date] = out[nid][o.date] || []).push(memoView_(o));
+  });
+  Object.keys(out).forEach(function (k) { Object.keys(out[k]).forEach(function (d) { out[k][d].sort(memoSort_); }); });
+  return out;
+}
+function schNoteText_(list) {
+  return list.map(function (m) { return (m.time ? m.time + ' ' : '') + m.content + (m.done ? ' ✓' : ''); }).join('\n');
+}
+/** 시트의 비고 줄 칸에 남은 글 → 업무스케줄 메모로 옮기고 칸은 비운다. 잠금은 부르는 쪽에서 */
+function schMigrateNotes_(sh, h) {
+  const last = sh.getLastRow(), w = sh.getLastColumn();
+  if (last < 2) return 0;
+  const fixed = sh.getRange(2, 1, last - 1, 5).getValues();
+  const head = sh.getRange(1, 1, 1, w).getValues()[0].map(function (v) { return v instanceof Date ? ymd_(v) : str_(v); });
+  const now = nowText_(), add = [];
+  fixed.forEach(function (f, i) {
+    const id = str_(f[h.fixed['행ID']]);
+    if (!/^NOTE\d+$/.test(id)) return;
+    const label = str_(f[h.fixed['이름']]) || id;
+    const rng = sh.getRange(i + 2, 6, 1, w - 5), vals = rng.getValues()[0];
+    let any = false;
+    vals.forEach(function (v, j) {
+      const t = str_(v).replace(/\r\n?/g, '\n'), d = head[5 + j];
+      if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      add.push({ id: newMemoId_(), date: d, time: '', content: t.slice(0, 2000), done: '', cat: label, author: SCH_NOTE_AUTHOR, createdAt: now, updatedAt: now });
+      any = true;
+    });
+    if (any) rng.clearContent();
+  });
+  if (add.length) appendObjs_(SH.MEMO, add);
+  return add.length;
+}
+/** 비고 칸 저장 (기사스케줄 화면) → 메모 추가·수정·삭제. 반환 { saved, conflicts } */
+function schNoteSave_(a, changes) {
+  const notes = schNotes_(), byId = {};
+  notes.forEach(function (n) { byId[n.id] = n; });
+  const all = readAll_(SH.MEMO);
+  const now = nowText_(), conflicts = [], dels = [];
+  let saved = 0;
+  changes.forEach(function (x) {
+    const n = byId[x.row];
+    if (!n) return;
+    const list = all.filter(function (o) { return (normDate_(o.date) || o.date) === x.date && schNoteOf_(notes, o.cat) === n.id && !o._gone; });
+    list.sort(function (p, q) { return memoSort_(memoView_(p), memoView_(q)); });
+    const cur = schNoteText_(list.map(memoView_));
+    if (cur === x.value) return;
+    if (cur !== x.old) { conflicts.push({ row: x.row, date: x.date, current: cur }); return; }
+    if (!x.value) { list.forEach(function (o) { o._gone = 1; dels.push(o._row); }); saved++; return; }
+    let time = '', content = x.value.replace(/ ✓$/, '');
+    const done = / ✓$/.test(x.value) ? 'Y' : '';
+    const m = content.match(/^(\d{1,2}:\d{2})\s+([\s\S]+)$/);
+    if (m && content.indexOf('\n') < 0) { time = normTime_(m[1]) || ''; if (time) content = m[2]; }
+    const cat = n === notes[0] ? (list[0] ? list[0].cat : '') : n.label;
+    if (!list.length) {
+      const o = { id: newMemoId_(), date: x.date, time: time, content: content.slice(0, 2000), done: done, cat: cat, author: a.name, createdAt: now, updatedAt: now };
+      o._row = appendObj_(SH.MEMO, o); all.push(o);
+    } else {
+      // 메모가 여러 개였던 칸을 고치면 하나로 합친다 (첫 메모를 고치고 나머지는 지움)
+      const f = { time: list.length > 1 ? '' : time, content: content.slice(0, 2000), done: done, updatedAt: now };
+      writeFields_(SH.MEMO, list[0]._row, f);
+      list.slice(1).forEach(function (o) { o._gone = 1; dels.push(o._row); });
+    }
+    saved++;
+  });
+  dels.sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.MEMO).deleteRow(r); });
+  return { saved: saved, conflicts: conflicts };
+}
+/** 비고 줄 이름이 바뀌면 메모의 '비고 줄' 칸도 바꾼다 / 지우면 첫 줄로 돌린다 */
+function schNoteRelabel_(from, to) {
+  const sh = sheet_(SH.MEMO), c = cols_(SH.MEMO, true), last = sh.getLastRow();
+  if (last < 2 || !from) return 0;
+  const rng = sh.getRange(2, c.cat + 1, last - 1, 1), vals = rng.getValues();
+  let n = 0;
+  vals.forEach(function (r) { if (str_(r[0]) === from) { r[0] = to; n++; } });
+  if (n) rng.setNumberFormat('@').setValues(vals);
+  return n;
 }
 /** 스케줄 변경 기록: 관리자 작업 기록에 요약만 (칸이 많으면 개수만) */
 function logSchChange_(a, list, saved) {
@@ -4285,10 +4423,17 @@ function adm_schNote(token, action, id, label) {
       if (!row) fail_('비고 줄을 찾을 수 없습니다. 새로고침해 주세요.');
       if (action === 'rename') {
         if (!label) fail_('이름을 입력해 주세요.');
+        const old = str_(fixed[row - 2][h.fixed['이름']]);
         sh.getRange(row, h.fixed['이름'] + 1).setNumberFormat('@').setValue(safeText_(label));
+        if (old && old !== label) schNoteRelabel_(old, label); // 업무스케줄 메모도 새 이름으로
         return { ok: true, id: id, label: label };
       }
-      if (action === 'delete') { sh.deleteRow(row); return { ok: true }; }
+      if (action === 'delete') {
+        const old = str_(fixed[row - 2][h.fixed['이름']]);
+        sh.deleteRow(row);
+        if (old) schNoteRelabel_(old, ''); // 그 줄의 메모는 지우지 않고 첫 비고 줄로
+        return { ok: true };
+      }
       fail_('알 수 없는 작업입니다.');
     } finally {
       lock.releaseLock();
@@ -4335,7 +4480,7 @@ function api_mySchedule(token, month) {
       const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
       dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
     }
-    // 내 캠프에 들어오는 백업 (스케줄관리 '백업 명단' 과 같은 규칙)
+    // 내 캠프에 들어오는 백업 (기사스케줄 '백업 명단' 과 같은 규칙)
     try {
       const bk = schMyCampBackup_(s.d, dates, h, c0, c1);
       out.camp = bk.camp; out.backup = bk.list;
@@ -4702,7 +4847,7 @@ function schWriteUpload_(res) {
     up.getRange(2, UPLOAD.RIGHT_COL, 1, W).setValues([UPLOAD.HEAD]);
     up.getRange(1, 1, 2, UPLOAD.RIGHT_COL + W).setFontWeight('bold');
     up.setFrozenRows(2);
-    up.getRange(1, UPLOAD.LEFT_COL).setNote('러너 올인원 스케줄관리 > "어드민 업로드 테이블" 을 누를 때마다 3행부터 새로 만들어집니다.');
+    up.getRange(1, UPLOAD.LEFT_COL).setNote('러너 올인원 기사스케줄 > "어드민 업로드 테이블" 을 누를 때마다 3행부터 새로 만들어집니다.');
   }
   const need = UPLOAD.START_ROW + res.weeks[0].length + res.weeks[1].length + res.missing.length + UPLOAD.GAP * 3 + 2;
   const needR = UPLOAD.START_ROW + res.dups.length + res.missing.length + 4;
@@ -4748,7 +4893,7 @@ function schWriteUpload_(res) {
 const RESET_PHRASE = '모조리 없앤다';
 const RESET_SECTIONS = {
   drivers: { label: '기사 정보관리', sheets: [SH.DRIVERS] },
-  sched: { label: '스케줄관리', sheets: [] },        // 스케줄 DB 파일의 schedule 탭
+  sched: { label: '기사스케줄', sheets: [] },        // 스케줄 DB 파일의 schedule 탭
   route: { label: '노선관리', sheets: [SH.CAMPS, SH.ROUTES, SH.CIMG, SH.CADDR, SH.PRICES] },
   memo: { label: '업무스케줄', sheets: [SH.MEMO] },
   notice: { label: '공지사항', sheets: [SH.NOTICE] },
@@ -4885,10 +5030,11 @@ function onSchEdit_(e, sh) {
     const key = function (v) { return str_(v).replace(/\s+/g, '').toUpperCase(); };
     const campMatch = function (txt, c) { return c && (key(c.name) === key(txt) || key(c.name).replace(/캠프$/, '') === key(txt).replace(/캠프$/, '')); };
     const cell = function (r, k) { return sh.getRange(r, F[k] + 1); };
+    let noteEdited = false;
     for (let r = start; r <= end; r++) {
       const v = all[r - 2] || [];
       const id = str_(v[F['행ID']]), kind = str_(v[F['구분']]), camp = str_(v[F['캠프']]), name = str_(v[F['이름']]);
-      if (/^NOTE/.test(id)) { if (kind !== SCH.KIND_NOTE) cell(r, '구분').setValue(SCH.KIND_NOTE); continue; }
+      if (/^NOTE/.test(id)) { if (kind !== SCH.KIND_NOTE) cell(r, '구분').setValue(SCH.KIND_NOTE); noteEdited = true; continue; }
       if (id) {
         const o = byId[id];
         if (o) {
@@ -4926,6 +5072,8 @@ function onSchEdit_(e, sh) {
       cell(r, '이름').clearNote();
       rowOfId[o.id] = r;
     }
+    // 시트에서 비고 줄 칸을 직접 고치면 업무스케줄 메모로 옮긴다
+    if (noteEdited) { try { schMigrateNotes_(sh, h); } catch (err) { console.error(err); } }
   } finally {
     lock.releaseLock();
   }
