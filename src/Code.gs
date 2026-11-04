@@ -4442,6 +4442,47 @@ function adm_schNote(token, action, id, label) {
 }
 
 /**
+ * 기사스케줄 표 순서 저장 (▲▼ 로 옮긴 결과). list = [{ id: 기사ID, order: 숫자 }]
+ * drivers 탭 '스케줄 순서' 열만 한 번 읽고 한 번에 다시 쓴다 (다른 칸은 그대로).
+ */
+function adm_schOrder(token, list) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!Array.isArray(list) || !list.length) return { ok: true, saved: 0 };
+    if (list.length > 1000) fail_('한 번에 너무 많습니다.');
+    const want = {};
+    list.forEach(function (x) {
+      const id = str_(x && x.id), n = Number(x && x.order);
+      if (!id || !(n >= 1 && n <= 99999) || Math.floor(n) !== n) fail_('순서 값이 올바르지 않습니다.');
+      want[id] = String(n);
+    });
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const c = cols_(SH.DRIVERS, true), sh = sheet_(SH.DRIVERS), last = sh.getLastRow();
+      if (last < 2) fail_('기사를 찾을 수 없습니다.');
+      const ids = sh.getRange(2, c.id + 1, last - 1, 1).getValues();
+      const rng = sh.getRange(2, c.schOrder + 1, last - 1, 1);
+      const cur = rng.getValues();
+      let saved = 0;
+      const gone = [];
+      ids.forEach(function (r, i) {
+        const id = str_(r[0]);
+        if (want[id] !== undefined && str_(cur[i][0]) !== want[id]) { cur[i][0] = want[id]; saved++; gone.push('dv:' + id, 'ir:' + id); }
+      });
+      if (saved) {
+        rng.setNumberFormat('@').setValues(cur);
+        cache_().removeAll(gone);
+        logAdmin_(a, '기사스케줄 순서 변경', saved + '명', '');
+      }
+      return { ok: true, saved: saved };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/**
  * 기사 앱: 내 스케줄
  * month 없음 → 이번 주 일요일부터 2주 / month = 'yyyy-MM' → 그 달 1일~말일 (앞뒤 12개월까지)
  */

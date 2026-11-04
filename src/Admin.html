@@ -411,6 +411,11 @@
   .sg tr.dim td { opacity: .55; }
   .dname { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; max-width: 70px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
   .dname:hover { color: var(--brand); text-decoration: underline; }
+  .sg .mv { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; gap: 1px; background: #fff; }
+  .sg tr.drv:hover .mv, .sg tr.drv.moved .mv { display: flex; }
+  .sg .mv button { border: 1px solid var(--line); background: #fff; color: var(--sub); border-radius: 3px; width: 18px; height: 13px; padding: 0; font-size: 8px; line-height: 11px; cursor: pointer; }
+  .sg .mv button:hover { background: var(--brand-weak); color: var(--brand); border-color: var(--brand); }
+  .sg tr.drv.moved td.fx { background: #f2f7ff; }
   .tbad { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 3px; margin-left: 3px; vertical-align: middle; }
   .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; cursor: cell; user-select: none; text-align: center; font-weight: 600; white-space: pre; line-height: 1.25; }
   .sg td.wk2, .sg th.wk2 { border-left: 2px solid #c9d1da; }
@@ -878,7 +883,7 @@
       <div class="field"><label class="lb" for="sdExtra">추가휴무</label><input class="inp" id="sdExtra" placeholder="예: 월,수요일 / 조정 백업에 맞춰서"></div>
       <div class="field"><label class="lb" for="sdPat">근무형태</label><input class="inp" id="sdPat" list="sdPats" placeholder="예: 5일, 격주"><datalist id="sdPats"><option value="5일"><option value="5.5일"><option value="6일"><option value="격주"><option value="5일 및 격주가능"><option value="3일"></datalist></div>
       <div class="field full"><label class="lb" for="sdMemo">스케줄 메모 (서브 아이디, 요청사항 등)</label><textarea class="inp" id="sdMemo" style="height:60px"></textarea></div>
-      <div class="field"><label class="lb" for="sdOrder">표 순서 (같은 캠프 안, 작은 숫자가 위)</label><input class="inp" id="sdOrder" inputmode="numeric"></div>
+      <div class="field"><label class="lb" for="sdOrder">표 순서 (같은 캠프 안, 작은 숫자가 위 · 표에서 ▲▼ 로도 바꿈)</label><input class="inp" id="sdOrder" inputmode="numeric"></div>
     </div>
     <div class="m-actions"><button type="button" class="btn ghost" id="sdOpen" style="margin-right:auto">기사 정보 열기</button><button type="button" class="btn ghost" id="sdCancel">닫기</button><button class="btn" id="sdSave">저장</button></div>
   </form>
@@ -3503,12 +3508,15 @@
     const dt = SD.dates[ci]; if (!dt || ci === 0) return false;
     const p = dt.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getDay() === 0;
   }
+  const sOrderPend = {}; // 기사 줄 ▲▼ 로 바꾼, 아직 저장 전인 순서 {기사ID: 순서}
+  let sOrderTimer = 0, sMoved = '';
   function loadSched(start) {
     if (!SD.dates.length) $('#sWrap').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     paintModeUi();
     return fetchSched(start).then((r) => {
       if (!r.ok) return toast(r.msg);
       Object.assign(SD, r);
+      SD.drivers.forEach((d) => { if (d.id in sOrderPend) d.order = String(sOrderPend[d.id]); }); // 아직 저장 전인 순서
       Object.keys(sBase).forEach((k) => delete sBase[k]);
       Object.keys(SD.cells).forEach((row) => Object.keys(SD.cells[row]).forEach((d) => { sBase[row + '|' + d] = SD.cells[row][d]; }));
       SD.notes.forEach((n) => { SD.cells[n.id] = n.cells; Object.keys(n.cells).forEach((d) => { sBase[n.id + '|' + d] = n.cells[d]; }); });
@@ -3524,6 +3532,35 @@
     sel.innerHTML = '<option value="">캠프 전체</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
       .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === v ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
   }
+  /** 같은 캠프 안 순서: 스케줄 순서(▲▼ 로 정한 것) → 구분 → 이름 */
+  function drvCmp(a, b) {
+    return (Number(a.order) || 9999) - (Number(b.order) || 9999) || (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) || koSort(a.name, b.name);
+  }
+  /**
+   * 기사 줄 위·아래로 옮기기. 화면에 보이는 같은 캠프의 바로 위(아래) 기사와 자리를 바꾸고,
+   * 그 캠프 기사 전체(숨겨진 기사 포함)에 1,2,3… 순서를 다시 매겨 잠시 뒤 한 번에 저장한다.
+   */
+  function moveDriver(id, dir) {
+    const i = srows.findIndex((r) => r.kind === 'd' && r.row === id); if (i < 0) return;
+    const me = srows[i];
+    let j = i + dir;
+    while (j >= 0 && j < srows.length && srows[j].kind === 'd' && srows[j].d.campId !== me.d.campId) j += dir;
+    const nb = srows[j];
+    if (!nb || nb.kind !== 'd' || nb.d.campId !== me.d.campId) return toast(dir < 0 ? '캠프 안에서 맨 위입니다.' : '캠프 안에서 맨 아래입니다.');
+    const all = SD.drivers.filter((d) => d.campId === me.d.campId).sort(drvCmp);
+    const from = all.indexOf(me.d); all.splice(from, 1);
+    const at = all.indexOf(nb.d); all.splice(dir < 0 ? at : at + 1, 0, me.d);
+    all.forEach((d, k) => { if (String(d.order || '') !== String(k + 1)) { d.order = String(k + 1); sOrderPend[d.id] = k + 1; } });
+    sMoved = id; renderSched();
+    clearTimeout(sOrderTimer); sOrderTimer = setTimeout(saveOrder, 700);
+  }
+  function saveOrder() {
+    const list = Object.keys(sOrderPend).map((id) => ({ id, order: sOrderPend[id] }));
+    if (!list.length) return;
+    list.forEach((x) => { delete sOrderPend[x.id]; });
+    api('adm_schOrder', list).then((r) => { if (!r.ok) { toast(r.msg); loadSched(SD.start); } })
+      .catch(() => { list.forEach((x) => { if (!(x.id in sOrderPend)) sOrderPend[x.id] = x.order; }); });
+  }
   /** 표에 나올 줄: 승인된 기사 (+ 이 2주에 기록이 있는 다른 기사) → 캠프·구분·순서·이름 순 */
   function buildRows() {
     const q = sf.q.trim().toLowerCase();
@@ -3537,8 +3574,7 @@
       return true;
     }).sort((a, b) => {
       const ca = camps[a.campId] ? camps[a.campId].name : '￿', cb = camps[b.campId] ? camps[b.campId].name : '￿';
-      return koSort(ca, cb) || (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) ||
-        (Number(a.order) || 9999) - (Number(b.order) || 9999) || koSort(a.name, b.name);
+      return koSort(ca, cb) || drvCmp(a, b);
     });
     const rows = list.map((d) => ({ kind: 'd', row: d.id, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
     SD.notes.forEach((n) => rows.push({ kind: 'n', row: n.id, note: n }));
@@ -3586,9 +3622,10 @@
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp;
       prevCamp = r.camp;
-      return '<tr class="drv' + (gtop ? ' gtop' : '') + (d.status !== '승인' ? ' dim' : '') + '">' +
+      return '<tr class="drv' + (gtop ? ' gtop' : '') + (d.status !== '승인' ? ' dim' : '') + (d.id === sMoved ? ' moved' : '') + '">' +
         '<td class="fx f1">' + esc(shortCamp(r.camp) || '-') + '</td>' +
-        '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') + '</td>' +
+        '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
+        '<span class="mv"><button data-mv="-1" data-mid="' + esc(d.id) + '" title="위로">▲</button><button data-mv="1" data-mid="' + esc(d.id) + '" title="아래로">▼</button></span></td>' +
         '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
         '<td class="ex num" data-cnt="' + esc(d.id) + '">' + (scalc.counts[d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
@@ -3747,6 +3784,7 @@
   $('#sWrap').addEventListener('dblclick', (e) => { const td = e.target.closest('td.c'); if (td) openEdit(); });
   $('#sWrap').addEventListener('click', (e) => {
     const nb = e.target.closest('[data-note]'); if (nb) return noteMenu(nb.dataset.note);
+    const mb = e.target.closest('[data-mv]'); if (mb) return moveDriver(mb.dataset.mid, +mb.dataset.mv);
     const db = e.target.closest('[data-drv]'); if (db) return openSchDriver(db.dataset.drv);
     // 휴대폰: 칸을 한 번 누르면 바로 입력
     const td = e.target.closest('td.c');
