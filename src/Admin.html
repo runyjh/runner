@@ -4752,7 +4752,7 @@
     const pays = s.lines.filter((l) => l.side === '지급' && l.method !== '입금가산'), deds = s.lines.filter((l) => l.side === '차감'), adds = s.lines.filter((l) => l.method === '입금가산');
     // 고용보험 0원: 월 보수액이 기준(설정 '고용보험 적용 최저 월 보수액') 미만이라 제외된 경우 이유를 적어 준다
     const goyNote = (l) => l.method === '고용보험' && !l.amt && s.ins && !s.ins.excluded && s.ins.bosu > 0 ? '월 보수액 ' + wn(Math.round(s.ins.bosu)) + '원 → 기준 미만이라 적용 제외' : '';
-    const li = (l, sign) => { const note = l.memo || goyNote(l); return '<tr><td>' + esc(l.name) + (note ? '<div class="smemo">' + esc(note) + '</div>' : '') + '</td><td class="n">' + (l.amt ? sign + wn(l.amt) : (goyNote(l) ? '0' : '-')) + '</td></tr>'; };
+    const li = (l, sign) => { const note = l.memo || goyNote(l); return '<tr><td>' + esc(lname(l)) + (note ? '<div class="smemo">' + esc(note) + '</div>' : '') + '</td><td class="n">' + (l.amt ? sign + wn(l.amt) : (goyNote(l) ? '0' : '-')) + '</td></tr>'; };
     const n = Math.max(pays.length + adds.length, deds.length);
     const dedSum = deds.reduce((a, l) => a + l.amt, 0);
     const days = Object.keys(s.daily).concat(Object.keys(s.sched || {})).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
@@ -4763,8 +4763,12 @@
     const dayTbl = (rows) => '<table><thead><tr><th>날짜</th><th>노선 · 스케줄</th><th>건수</th><th>금액</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
     const routes = s.routes.map((x) => '<tr><td>' + esc(x.camp) + '</td><td>' + esc(x.route) + '</td><td>' + esc(x.how || '') + '</td><td class="n">' + wn(x.qty) + '</td><td class="n">' + wn(x.unit) + '</td><td class="n">' + wnz(x.inc) + '</td><td class="n">' + wn(x.unit + x.inc) + '</td><td class="n">' + wn(x.amt) + '</td></tr>').join('');
     const rq = s.routes.reduce((a, x) => a + x.qty, 0), ra = s.routes.reduce((a, x) => a + x.amt, 0);
-    const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>용차 · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담)') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? '+' + wn(y.extra) : '−' + wn(y.cut)) + '</td></tr>').join('');
-    const loss = (s.loss || []).map((x) => '<tr><td>' + mdTxt(x.date) + '</td><td>분실 · ' + esc(x.item || x.detail || x.type || '') + (x.waybill ? '<div class="smemo">' + esc(x.waybill) + '</div>' : '') + '</td><td class="n">−' + wn(x.amt) + '</td></tr>').join('');
+    // 우리 소속 기사(정산 아이디가 있는 수행자)가 대신 뛴 건 = 품앗이, 외부 용차업체 = 용차
+    const ykind = (y) => (y.whoId ? '품앗이' : '용차');
+    const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>' + ykind(y) + ' · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담' + (y.who ? ' · 수행 ' + esc(String(y.who).replace(/\s*\(.*\)$/, '')) : '') + ')') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? wn(y.extra) : '−' + wn(y.cut)) + '</td></tr>').join('');
+    const loss = (s.loss || []).map((x) => '<tr><td>' + mdTxt(x.date) + '</td><td>' + esc(x.item || x.detail || x.type || '분실') + (x.waybill ? '<div class="smemo">' + esc(x.waybill) + '</div>' : '') + '</td><td class="n">−' + wn(x.amt) + '</td></tr>').join('');
+    const yongAllOurs = (s.yong || []).filter((y) => y.whoId !== d.id).every((y) => y.whoId);
+    const lname = (l) => (l.method === '용차수행' || (l.method === '용차지출' && yongAllOurs) ? String(l.name).replace(/용차/g, '품앗이') : l.name);
     return '<h2>' + ymTitle(r.month) + ' ' + esc(co.name || '러너') + ' 정산서 (급여내역서) — ' + esc(d.name) + '</h2>' +
       '<div class="cols"><div><h4>① 기본 정보 · 정산 요약 (부가세 포함)</h4><table><tbody>' +
       '<tr><th>기사명</th><td>' + esc(d.name) + '</td><th>정산월</th><td>' + esc(r.month) + '</td></tr>' +
@@ -4773,8 +4777,8 @@
       '<tr><th>일평균 수량</th><td>' + (d.workDays ? (Math.round(d.qty / d.workDays * 10) / 10) + '건' : Object.keys(s.daily).length ? (Math.round(d.qty / Object.keys(s.daily).length * 10) / 10) + '건 <small class="sub">(배송일 ' + Object.keys(s.daily).length + '일 기준)</small>' : '-') + '</td><th>계산서 발행기한</th><td>' + esc(D.invoice || '') + ' 까지</td></tr>' +
       '<tr><th>지급일</th><td>' + esc(D.pay || '') + '</td><th>사업자번호</th><td>' + esc(d.bizNo || '-') + '</td></tr></tbody></table>' +
       '<table style="margin-top:8px"><thead><tr><th colspan="2">지급 내역</th><th colspan="2">차감 · 공제</th></tr></thead><tbody>' +
-      Array.from({ length: n }, (_, i) => { const p = pays.concat(adds)[i], q = deds[i]; return '<tr>' + (p ? li(p, '+').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + (q ? li(q, '−').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + '</tr>'; }).join('') +
-      '<tr class="big"><td>지급 합계</td><td class="n">+' + wn(d.pay + d.depAdd) + '</td><td>공제 합계</td><td class="n">−' + wn(dedSum) + '</td></tr></tbody></table>' +
+      Array.from({ length: n }, (_, i) => { const p = pays.concat(adds)[i], q = deds[i]; return '<tr>' + (p ? li(p, '').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + (q ? li(q, '−').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + '</tr>'; }).join('') +
+      '<tr class="big"><td>지급 합계</td><td class="n">' + wn(d.pay + d.depAdd) + '</td><td>공제 합계</td><td class="n">−' + wn(dedSum) + '</td></tr></tbody></table>' +
       // 세금계산서 발행 안내 (기사가 이 칸만 보고 바로 발행할 수 있게) + 실 입금액
       '<div class="invbox"><div class="ihd">📄 세금계산서 발행 <small>기사님 → ' + esc(co.name || '러너') + '</small></div>' +
       '<div class="iamt"><span>발행 금액 (합계)</span><b>' + wn(d.invoice) + '원</b></div>' +
@@ -4788,15 +4792,16 @@
       '<div class="foot">입금계좌: ' + esc(d.bank || '') + ' ' + esc(d.account || '') + ' (' + esc(d.holder || d.name) + ')' + '</div></div>' +
       '<div><h4>② 노선별 내역 (단가·금액 부가세 포함)</h4><table><thead><tr><th>캠프</th><th>라우트</th><th>단가 기준</th><th>건수</th><th>기본단가</th><th>프백가중</th><th>합계단가</th><th>금액</th></tr></thead><tbody>' + routes +
       '<tr class="big"><td colspan="3">합계</td><td class="n">' + wn(rq) + '</td><td colspan="3"></td><td class="n">' + wn(ra) + '</td></tr></tbody></table></div></div>' +
-      ((s.workers || []).some((w) => !w.owner) ? '<h4>일한 기사 (아이디 사용 기록 기준 · 정산금은 명의자 ' + esc(d.name) + ' 에게)</h4><table><thead><tr><th>기사</th><th>아이디</th><th>일한 날</th><th>건수</th><th>금액</th></tr></thead><tbody>' +
-        s.workers.map((w) => '<tr><td>' + esc(w.name) + (w.owner ? ' <small class="sub">(명의자)</small>' : '') + '</td><td>' + esc(w.cids.map((x) => x.replace(/@.*/, '')).join(', ')) + '</td><td class="n">' + w.days + '일</td><td class="n">' + wn(w.qty) + '</td><td class="n">' + wn(w.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
+      ((s.workers || []).some((w) => !w.owner) ? '<h4>일한 기사 (아이디 사용 기록 기준 · 정산은 메인 아이디 ' + esc(String(d.cid || '').replace(/@.*/, '')) + ' 으로)</h4><table><thead><tr><th>기사</th><th>아이디</th><th>일한 날</th><th>건수</th><th>금액</th></tr></thead><tbody>' +
+        s.workers.map((w) => '<tr><td>' + esc(w.name) + ' <small class="sub">(' + (w.cids.some((x) => String(x).replace(/@.*/, '').toLowerCase() === String(d.cid || '').replace(/@.*/, '').toLowerCase()) ? '메인' : '서브') + ')</small></td><td>' + esc(w.cids.map((x) => x.replace(/@.*/, '')).join(', ')) + '</td><td class="n">' + w.days + '일</td><td class="n">' + wn(w.qty) + '</td><td class="n">' + wn(w.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
       ((s.movedIn || []).length ? '<h4>＋ 다른 아이디로 일한 내역 (아이디 사용 기록 → 이 기사 정산에 포함 · 단가는 이 기사 기준)</h4><table><thead><tr><th>내용</th><th>기간</th><th>일한 날</th><th>건수</th><th>금액</th></tr></thead><tbody>' +
         s.movedIn.map((m) => '<tr><td>' + esc(m.label) + '</td><td>' + esc(mdTxt(m.from)) + (m.to && m.to !== m.from ? ' ~ ' + esc(mdTxt(m.to)) : '') + '</td><td class="n">' + m.days + '일</td><td class="n">' + wn(m.qty) + '</td><td class="n">' + wn(m.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
       ((s.movedOut || []).length ? '<h4>－ 이 아이디로 다른 기사가 일한 내역 (아이디 사용 기록 → 그 기사 정산으로 · 이 명세서 금액에는 없음)</h4><table><thead><tr><th>내용</th><th>아이디</th><th>기간</th><th>일한 날</th><th>건수</th><th>금액</th></tr></thead><tbody>' +
         s.movedOut.map((m) => '<tr><td>' + esc(m.label) + '</td><td>' + esc(m.cid) + '</td><td>' + esc(mdTxt(m.from)) + (m.to && m.to !== m.from ? ' ~ ' + esc(mdTxt(m.to)) : '') + '</td><td class="n">' + m.days + '일</td><td class="n">' + wn(m.qty) + '</td><td class="n">' + wn(m.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
       '<h4>③ 일자별 내역 (쿠팡 정산서 노선 · 없는 날은 기사스케줄)</h4><div class="cols"><div>' + dayTbl(dayRows.slice(0, half)) + '</div><div>' + dayTbl(dayRows.slice(half)) + '</div></div>' +
       '<div class="foot">스케줄 출근 ' + (d.workDays || 0) + '일 · 스케줄 기록 ' + work + '일 · 쿠팡 배송 ' + Object.keys(s.daily).length + '일. 기간 밖 날짜의 수기반영(소급분)은 일자별에서 빠지고 합계에는 포함됩니다.</div>' +
-      '<h4>④ 용차 · 분실파손 내역</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong + loss || '<tr><td colspan="3" class="sub">용차·분실 없음</td></tr>') + '</tbody></table>';
+      '<h4>④ 품앗이 · 용차 내역</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong || '<tr><td colspan="3" class="sub">품앗이·용차 없음</td></tr>') + '</tbody></table>' +
+      '<h4>⑤ 분실파손 내역</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (loss || '<tr><td colspan="3" class="sub">분실파손 없음</td></tr>') + '</tbody></table>';
   }
   $('#stTable').addEventListener('click', (e) => { const tr = e.target.closest('[data-slip]'); if (tr) openSlip(tr.dataset.slip); });
   $('#stSlipClose').addEventListener('click', () => $('#stSlipModal').classList.add('hidden'));

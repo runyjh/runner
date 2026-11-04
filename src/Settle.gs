@@ -2062,7 +2062,7 @@ function api_mySlip(token, month) {
           san: d.san, goy: d.goy, depDed: d.depDed, depAdd: d.depAdd, net: d.net, bank: d.bank, holder: d.holder, account: d.account, bizNo: d.bizNo, movedIn: d.movedIn, movedOut: d.movedOut
         },
         lines: sl.lines, routes: sl.routes, daily: sl.daily, sched: sl.sched, loss: sl.loss,
-        yong: (sl.yong || []).map(function (y) { return { date: y.date, route: y.route, camp: y.camp, qty: y.qty, extra: y.extra, cut: y.cut, mine: y.whoId === d.id, memo: y.memo }; }),
+        yong: (sl.yong || []).map(function (y) { return { date: y.date, route: y.route, camp: y.camp, qty: y.qty, extra: y.extra, cut: y.cut, mine: y.whoId === d.id, ours: !!y.whoId, memo: y.memo }; }),
         movedIn: sl.movedIn, movedOut: sl.movedOut, ins: sl.ins ? { excluded: sl.ins.excluded, bosu: sl.ins.bosu } : null
       };
     });
