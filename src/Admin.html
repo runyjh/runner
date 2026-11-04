@@ -4435,8 +4435,8 @@
     const k = (lab, v, sub) => '<div class="kpi"><small>' + lab + '</small><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
     $('#stKpi').innerHTML = k('쿠팡 매출 (VAT포함)', wn(c.sales), '공급가 ' + wn(c.supplyCp) + (c.lossCp ? ' · 분실차감 ' + wn(c.lossCp) : '')) +
       k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax)) +
-      k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 입금차감 ' + wn(t.depDed)) +
-      k('회사이익 (공급가)', wn(t.profit), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
+      k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 공제금액 ' + wn(t.depDed)) +
+      k('회사이익금 (공급가)', wn(t.profit), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
       k('러너 잉여 (프백 잉여 + 보험 차액)', wn((t.fbKeep || 0) + t.fbCut + t.insGain), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 보험 ' + wn(t.insGain)) +
       k('러너 보험 실부담', wn(t.runnerIns), '공단 실납부 − 기사 공제') +
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
@@ -4445,7 +4445,7 @@
     const q = $('#stQ').value.trim().toLowerCase();
     const list = s.drivers.filter((d) => !q || d.name.toLowerCase().includes(q) || d.cids.some((x) => x.toLowerCase().includes(q)) || (d.workers || []).some((x) => x.toLowerCase().includes(q)));
     STX.slipIds = list.map((d) => d.id);
-    const H = ['명의자', '정산 아이디 (메인 · 서브)', '근무일', '배송건수', '지급 합계', '계산서 차감', '세금계산서', '공급가', '세액', '산재', '고용', '입금차감', '실입금', '회사이익', '입금'];
+    const H = ['명의자', '정산 아이디 (메인 · 서브)', '근무일', '배송건수', '지급 합계', '분실파손금액', '세금계산서', '공급가', '세액', '산재', '고용', '공제금액', '실입금', '회사이익금', '입금'];
     const num = (v, neg) => '<td class="n' + (neg && v < 0 ? ' neg' : '') + '">' + wnz(v) + '</td>';
     const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
       '<td class="sub">' + d.cids.map((x, i) => (i ? '<span style="opacity:.7">' : '<b style="color:var(--ink)">') + esc(x.replace(/@.*/, '')) + (i ? '</span>' : '</b>')).join(', ') +
