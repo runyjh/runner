@@ -308,14 +308,7 @@
   .mc.sel { box-shadow: 0 0 0 2px var(--ink); }
   #scMode button { padding: 7px 10px; }
   /* 캠프전체: 날짜 고르기 + 그날 우리 캠프 기사 · 백업 */
-  .cdays { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 -2px 6px; scrollbar-width: none; }
-  .cdays::-webkit-scrollbar { display: none; }
-  .cdays button { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 6px 0; width: 50px; font: inherit; font-size: 12px; color: var(--sub); display: flex; flex-direction: column; align-items: center; gap: 1px; }
-  .cdays button b { font-size: 16px; color: var(--ink); }
-  .cdays button.sun b { color: var(--danger); } .cdays button.sat b { color: var(--brand); }
-  .cdays button.on { background: var(--ink); border-color: var(--ink); color: #fff; } .cdays button.on b { color: #fff; }
-  .cdays button.pdd { border-color: var(--brand); }
-  .cdays .wsep { flex: none; width: 1px; background: var(--line); margin: 4px 2px; }
+  .mc .cwk { font-size: 9.5px; color: #0a53a8; font-weight: 700; }
   .cmate .dt b { display: block; font-size: 15px; } .cmate .dt small.rt { color: var(--brand); font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .cbk { font-size: 14px; line-height: 1.7; color: #5a3286; }
@@ -1162,7 +1155,7 @@
   }
   function paintScMode() {
     $$('#scMode button').forEach((b) => b.classList.toggle('on', b.dataset.m === scMode));
-    $('#scHint').textContent = scMode === 'camp' ? '우리 캠프 기사님들과 백업 일정입니다. 이번 주는 확정, 다음 주는 바뀔 수 있습니다.' : scMode === '2w' ? '이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.'
+    $('#scHint').textContent = scMode === 'camp' ? '날짜를 누르면 그날 우리 캠프 기사님들과 백업 일정이 보입니다. 다음 주 이후는 바뀔 수 있습니다.' : scMode === '2w' ? '이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.'
       : '날짜를 누르면 그날 일정과 우리 캠프 백업이 보입니다. 다음 주 이후는 바뀔 수 있습니다.';
   }
   $('#scMode').addEventListener('click', (e) => {
@@ -1171,13 +1164,14 @@
     if (scMode === 'month' && !scMonth) { const t = new Date(); scMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // PDD(내일)가 있는 달
     paintScMode(); loadSched();
   });
-  let scCamp = null, scCampDay = '';
+  let scCamp = null, scCampDay = '', scCampMonth = '';
   function loadSched() {
     const token = store.get(TOKEN);
     if (!token) { clearSession(); goLogin(); return; }
     $('#scBody').innerHTML = '<div class="card" style="text-align:center;color:var(--sub)">불러오는 중…</div>';
     if (scMode === 'camp') {
-      return api('api_campSchedule', token).then((r) => {
+      if (!scCampMonth) { const t = new Date(); scCampMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // PDD(내일)가 있는 달
+      return api('api_campSchedule', token, scCampMonth).then((r) => {
         if (!r.ok) {
           toast(r.msg || '스케줄을 불러오지 못했습니다.');
           if (r.code === 'EXPIRED') { clearSession(); goLogin(); } else if (r.code === 'MUST_CHANGE') openChangePw(true, '');
@@ -1204,12 +1198,25 @@
   function renderCampSched() {
     const r = scCamp, pdd = pddOf(r.today);
     if (r.noCamp) { $('#scBody').innerHTML = '<div class="card" style="text-align:center;color:var(--sub)">소속 캠프가 정해지지 않았습니다. 사무실에 문의해 주세요.</div>'; return; }
-    const chips = r.dates.map((d, i) => {
-      const p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
-      return (i === 7 ? '<span class="wsep"></span>' : '') + '<button type="button" data-cd="' + d + '" class="' + (d === scCampDay ? 'on ' : '') + (d === pdd ? 'pdd ' : '') + (dow === 0 || r.holidays[d] ? 'sun' : dow === 6 ? 'sat' : '') + '">' +
-        '<span>' + DOWK[dow] + '</span><b>' + (+p[2]) + '</b><span>' + (d === pdd ? 'PDD' : (+p[1]) + '월') + '</span></button>';
-    }).join('');
-    const d = scCampDay, p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay(), est = r.dates.indexOf(d) >= 7;
+    // 한 달 달력: 날마다 근무 인원 · 백업 인원 · 내 칸
+    const [yy, mo] = (r.month || r.dates[0].slice(0, 7)).split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
+    const isWork = (v) => v && !/휴무|휴가|병가|퇴사/.test(v);
+    const me = r.drivers.find((x) => x.me);
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
+    r.dates.forEach((dd) => {
+      const day = +dd.slice(8), dow = (lead + day - 1) % 7, w = r.drivers.filter((x) => isWork(x.cells[dd])).length, nb = ((r.backup || {})[dd] || []).length, mv = me ? me.cells[dd] || '' : '';
+      cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[dd] ? ' sun' : dow === 6 ? ' sat' : '') + (dd === pdd ? ' pdd' : '') + (dd === scCampDay ? ' sel' : '') + '" data-cd="' + dd + '">' +
+        '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + '</span>' + (dd === pdd ? '<em class="pddt">PDD</em>' : '') +
+        (mv ? '<span class="v ' + schKind(mv) + '">' + escH(mv) + '</span>' : '') +
+        (r.drivers.length ? '<span class="cwk">근무 ' + w + '/' + r.drivers.length + '</span>' : '') + (nb ? '<span class="bkdot">백업 ' + nb + '</span>' : '') + '</button>');
+    });
+    const chips = '<div class="mcal"><div class="mnav"><button type="button" data-cmv="-1" aria-label="이전 달">◀</button><b>' + yy + '년 ' + mo + '월 · ' + escH(r.camp) + '</b><button type="button" data-cmv="1" aria-label="다음 달">▶</button></div>' +
+      '<div class="msum">기사 ' + r.drivers.length + '명 · 칸: 내 스케줄 / 근무 인원 / 백업 인원</div>' +
+      '<div class="mgrid">' + DOWK.map((wd, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + wd + '</div>').join('') + cells.join('') + '</div></div>';
+    const d = scCampDay, p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+    const sunThis = (() => { const t = new Date(+r.today.slice(0, 4), +r.today.slice(5, 7) - 1, +r.today.slice(8, 10)); t.setDate(t.getDate() - t.getDay() + 6); return ymdOf(t); })();
+    const est = d > sunThis; // 이번 주(토요일)까지는 확정, 그 뒤는 예상
     const work = r.drivers.filter((x) => { const v = x.cells[d] || ''; return v && !/휴무|휴가|병가|퇴사/.test(v); }).length;
     const rows = r.drivers.map((x) => {
       const v = x.cells[d] || '';
@@ -1218,14 +1225,13 @@
         '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div></div></div>';
     }).join('');
     const bk = (r.backup || {})[d] || [];
-    $('#scBody').innerHTML = '<div class="cdays" id="scDays">' + chips + '</div>' +
+    $('#scBody').innerHTML = chips +
       '<div class="wk"><h3>' + escH(r.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
         '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
         '<p class="hint" style="margin:-2px 0 6px">기사 ' + r.drivers.length + '명 · 근무 ' + work + '명</p>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(r.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>';
-    const on = $('#scDays button.on'), cw = $('#scDays'); if (on && cw) cw.scrollLeft = on.offsetLeft - cw.clientWidth / 2 + on.clientWidth / 2;
   }
   /** 하루 상세 줄 (2주 보기와 같은 모양) */
   function dayRow(r, d) {
@@ -1272,8 +1278,14 @@
   $('#scBody').addEventListener('click', (e) => {
     const px = e.target.closest('[data-pm]');
     if (px) return openPmDetail(px.dataset.pm, 'sched');
+    const cmv = e.target.closest('[data-cmv]');
+    if (cmv && scMode === 'camp') { const [y, m] = scCampMonth.split('-').map(Number); scCampMonth = ymdOf(new Date(y, m - 1 + +cmv.dataset.cmv, 1)).slice(0, 7); scCampDay = ''; return loadSched(); }
     const cd = e.target.closest('[data-cd]');
-    if (cd && scCamp) { scCampDay = cd.dataset.cd; const y = window.scrollY; renderCampSched(); window.scrollTo(0, y); return; }
+    if (cd && scCamp) {
+      scCampDay = cd.dataset.cd; const y = window.scrollY; renderCampSched(); window.scrollTo(0, y);
+      const det = $('#scBody .mcal + .wk'); if (det) det.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     if (scMode !== 'month') return;
     const mv = e.target.closest('[data-mv]');
     if (mv) {

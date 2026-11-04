@@ -4597,14 +4597,26 @@ function api_mySchedule(token, month) {
  * 기사 앱 '캠프전체': 내 소속 캠프 기사들의 2주 스케줄 + 내 캠프에 들어오는 백업 명단.
  * 기사 순서는 기사스케줄(관리자) 줄 순서. 연락처 등 개인정보는 보내지 않는다.
  */
-function api_campSchedule(token) {
+function api_campSchedule(token, month) {
   return run_(function () {
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
     if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
-    const sun = sundayOf_(new Date()), dates = schDateRange_(sun, addDays_(sun, SCH_DAYS - 1));
-    const out = { ok: true, today: todayText_(), dates: dates, holidays: {}, camp: '', drivers: [], backup: {} };
+    // month = 'yyyy-MM' 이면 그 달 전체, 없으면 2주
+    let dates, ym = '';
+    const mm = str_(month).match(/^(\d{4})-(\d{2})$/);
+    if (mm) {
+      const first = new Date(+mm[1], +mm[2] - 1, 1), now = new Date();
+      const diff = (first.getFullYear() - now.getFullYear()) * 12 + first.getMonth() - now.getMonth();
+      if (Math.abs(diff) > 12) fail_('앞뒤 12개월까지 볼 수 있습니다.');
+      dates = schDateRange_(first, new Date(+mm[1], +mm[2], 0));
+      ym = mm[1] + '-' + mm[2];
+    } else {
+      const sun = sundayOf_(new Date());
+      dates = schDateRange_(sun, addDays_(sun, SCH_DAYS - 1));
+    }
+    const out = { ok: true, today: todayText_(), month: ym, dates: dates, holidays: {}, camp: '', drivers: [], backup: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
     const all = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
     const me = all.filter(function (o) { return o.id === String(s.d); })[0];
