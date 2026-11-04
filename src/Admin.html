@@ -550,7 +550,11 @@
   .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
   .sg tr.pmr td.c { background: #fffbef; }
   .sg td.c.pmk { box-shadow: inset 0 -3px 0 #12a150; }
-  .sg td.c.pmk::after { content: attr(data-pm); display: block; font-size: 10px; font-weight: 800; color: #0b6b3a; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sg td.c { position: relative; }
+  .pmb { position: absolute; top: 1px; right: 1px; display: inline-flex; align-items: center; gap: 1px; font-size: 10px; font-weight: 800; color: #0b6b3a; background: #e3f7ea; border-radius: 8px; padding: 0 3px 0 4px; line-height: 14px; pointer-events: none; }
+  .pmb i { font-style: normal; display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; border-radius: 50%; border: 1.3px solid currentColor; font-size: 7px; line-height: 1; }
+  .pmb.in { color: #1d4ed8; background: #e6efff; }
+  .pmb + .pmb { right: auto; left: 1px; }
   .sg tr.calc td.cc { white-space: nowrap; vertical-align: top; padding: 4px 6px; font-size: 11px; line-height: 1.45; width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; }
   .sg tr.calc.mi td.cc { color: #e00; font-weight: 700; background: #fff6f6; }
   .sg tr.calc.du td.cc { color: #b45309; background: #fffaf0; }
@@ -4303,8 +4307,15 @@
     if (sepCol(ci)) cls.push('wk2');
     const pm = pmMark(r.row, dt);
     if (pm) cls.push('pmk');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm ? ' title="' + esc(v + (pm ? '\n' + pm : '')) + '"' : '') + '>' + esc(v) + '</td>';
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm ? ' title="' + esc(v + (pm ? '\n' + pmTip(pm) : '')) + '"' : '') + '>' + esc(v) + pmBadge(pm) + '</td>';
   }
+  /** '▶ 이지원, ◀ 김등록' → 품▶ (일을 줌) / 품◀ (일을 받음) 작은 표시 */
+  function pmBadge(pm) {
+    if (!pm) return '';
+    const give = pm.includes('▶'), take = pm.includes('◀');
+    return (give ? '<span class="pmb">품<i>▶</i></span>' : '') + (take ? '<span class="pmb in">품<i>◀</i></span>' : '');
+  }
+  function pmTip(pm) { return String(pm).split(', ').map((x) => x[0] === '▶' ? '품앗이 줌 → ' + x.slice(2) : x[0] === '◀' ? '품앗이 받음 ← ' + x.slice(2) : x).join('\n'); }
   /** 이 기사가 품앗이로 맡겨 배차 확정된 날 (칸의 캠프·라우트가 일감과 같을 때) */
   function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || '';
   }
@@ -4344,8 +4355,9 @@
       const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
-      if (td.textContent !== v) td.textContent = v;
-      if (v.length > 14) td.title = v; else td.removeAttribute('title');
+      const pmv = pmMark(r.row, dt), html = esc(v) + pmBadge(pmv);
+      if (td.innerHTML !== html) td.innerHTML = html;
+      if (v.length > 14 || pmv) td.title = v + (pmv ? '\n' + pmTip(pmv) : ''); else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
     $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });

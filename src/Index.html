@@ -27,8 +27,10 @@
   .brand p { margin: 0; color: var(--sub); font-size: 14px; }
 
   .topbar { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
-  .topbar h2 { margin: 0; font-size: 20px; }
-  .back { border: 0; background: none; font-size: 22px; padding: 4px 8px 4px 0; cursor: pointer; color: var(--ink); }
+  .topbar h2 { margin: 0; font-size: 20px; white-space: nowrap; }
+  #v-pumasi .topbar .btn { font-size: 13px; white-space: nowrap; }
+  .back { flex: none; border: 1px solid var(--line); background: #fff; width: 52px; height: 36px; border-radius: 999px; font-size: 19px; line-height: 1; padding: 0 0 2px; cursor: pointer; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .back:active { background: #f2f4f6; }
 
   .card { background: var(--card); border-radius: var(--radius); padding: 20px 16px; margin-bottom: 12px; }
   .card h3 { margin: 0 0 14px; font-size: 16px; }
@@ -145,6 +147,11 @@
   .bdg.k-주간 { background: #fff4d6; color: #b7791f; } .bdg.k-야간 { background: #e6e9ff; color: #3b4cc0; } .bdg.k-일택 { background: #e5f6ec; color: #11734b; }
   .bdg.pay { background: #fff0f0; color: #d63b3b; } .bdg.pay.m { background: #f2f4f6; color: #4e5968; }
   .bdg.of { background: #ffe8f3; color: #c2185b; }
+  .bdg.pdd { background: var(--brand); color: #fff; font-size: 11px; padding: 1px 7px; margin-left: 4px; }
+  .bdg.gv { background: #e8f7ee; color: #11734b; }
+  .pmseg { margin: 0 0 10px; } .pmseg button { flex: 1; padding: 9px 4px; white-space: nowrap; font-size: 13.5px; }
+  .pmc.give { border: 1.5px dashed #8fd3ad; }
+  .pmc.give .ar small { font-size: 13px; color: var(--sub); font-weight: 600; margin-left: 6px; }
   /* 품앗이 주세요: 근무 가능일 달력 */
   .gvseg { margin: 0 0 12px; } .gvseg button { flex: 1; padding: 10px 6px; }
   .gvcal { background: #fff; border-radius: var(--radius); padding: 12px 10px 10px; margin-bottom: 10px; }
@@ -596,6 +603,7 @@
       <button class="btn sm" id="pmNew" type="button" style="margin-left:6px;height:38px;padding:0 10px">+ 일감 올리기</button></div>
     <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.<small>기사님끼리 품앗이 일감을 맡기고 대신 뛰어 주세요.</small></div>
     <div class="pmfil"><input type="search" id="pmQ" placeholder="배송지·센터 검색 (예: 화곡동, 강서1)" enterkeyhint="search" autocomplete="off"><button class="btn sm" id="pmGo" type="button" style="height:44px">검색</button></div>
+    <div class="segm pmseg" id="pmShow"><button type="button" data-s="all" class="on">전체</button><button type="button" data-s="jobs">맡길 일감</button><button type="button" data-s="gives">품앗이 주세요</button></div>
     <label class="pmchk"><input type="checkbox" id="pmAvail"> 지원 가능 오더만 보기</label>
     <div class="pmsum" id="pmSum"></div>
     <div id="pmList"></div>
@@ -664,6 +672,8 @@
     </div>
     <div class="mylist">
       <button type="button" data-my="new">품앗이 일감 올리기</button>
+      <button type="button" data-my="give">🙋 품앗이 주세요 (내 근무 가능일)<em id="myGive"></em></button>
+      <button type="button" data-my="find">🔎 일할 기사 찾기 (품앗이 주세요)</button>
       <button type="button" data-my="posted">품앗이 관리 (지원자 보기)<em id="myNew"></em></button>
       <button type="button" data-my="applied">지원한 품앗이</button>
       <button type="button" data-my="done">완료한 품앗이</button>
@@ -1423,13 +1433,24 @@
       $('#pmAskNo').onclick = () => done(null);
     });
   }
+  const pddTag = (kind) => kind === '야간' ? '<span class="bdg pdd">PDD</span>' : '';
+  /** 품앗이 주세요 카드 (일감 카드와 같은 모양) */
+  function pmGiveHtml(g) {
+    return '<div class="pmc give" data-gv="' + escH(g.id) + '" data-gvd="' + escH(g.date) + '">' +
+      '<div class="top"><span>' + pmDay(g.date) + pddTag(g.kind) + '</span><span class="bdg ' + (g.kind === '무관' ? 'gv' : 'k-' + escH(g.kind)) + '">' + escH(g.kind === '무관' ? '🙋 주간·야간 무관' : '🙋 ' + (PM_KIND[g.kind] || g.kind)) + '</span></div>' +
+      '<div class="ar">' + escH(g.name) + ' 기사님<small>품앗이 주세요</small></div>' +
+      '<div class="ln">' + (g.me ? '<span class="bdg me">내 근무 가능일</span> ' : '') + escH([g.type, g.camp].filter(Boolean).join(' · ') || '러너 기사') + '</div>' +
+      (g.memo ? '<div class="ln">💬 ' + escH(g.memo) + '</div>' : '') +
+      '<div class="bot"><div>' + (g.offered ? '<span class="bdg of">받은 제안 ' + g.offered + '건</span>' : '<span style="color:var(--sub);font-size:13px">이 날 일할 수 있어요</span>') + '</div>' +
+      '<button type="button" class="more" data-gvact="1">' + (g.me ? '수정' : '💌 일감 제안') + '</button></div></div>';
+  }
   function pmCardHtml(j, extra) {
     const sk = PM_ST[j.status] || 'open';
     const tags = (j.offerToMe ? '<span class="bdg of">💌 나에게 온 제안</span> ' : '') + (j.offerTo ? '<span class="bdg of">💌 ' + escH(j.offerTo) + ' 기사님께 제안</span> ' : '') + (j.mine ? '<span class="bdg me">내 일감</span> ' : '') + (j.myApp && j.myApp !== '지원 취소' && j.myApp !== '제안' ? '<span class="bdg ap">' + (j.myApp === '지원' ? '지원함' : escH(j.myApp)) + '</span> ' : '') +
       (j.newApps ? '<span class="bdg nw">새 지원 ' + j.newApps + '</span> ' : '');
     const over = sk === 'open' ? '' : '<div class="pmst"><span>' + escH(PM_STL[j.status] || j.status) + '</span></div>';
     return '<div class="pmc s-' + sk + '" data-pj="' + escH(j.id) + '">' +
-      '<div class="top"><span>' + pmDay(j.date) + ' · 입차 ' + escH(j.time) + '</span><span class="bdg k-' + escH(j.kind) + '">' + escH(PM_KIND[j.kind] || j.kind) + '</span></div>' +
+      '<div class="top"><span>' + pmDay(j.date) + pddTag(j.kind) + ' · 입차 ' + escH(j.time) + '</span><span class="bdg k-' + escH(j.kind) + '">' + escH(PM_KIND[j.kind] || j.kind) + '</span></div>' +
       '<div class="ar">' + escH(j.area) + '</div>' +
       '<div class="ln">' + tags + '<b>' + escH(j.camp) + '</b>' + (j.route ? ' · ' + escH(j.route) : '') + '</div>' +
       '<div class="ln">평균 물량 <b>' + escH(j.qty) + '</b>' + (j.top ? ' · ' + escH(j.top) : '') + '</div>' +
@@ -1445,11 +1466,17 @@
     api('api_pmList', token, { onlyAvail: $('#pmAvail').checked, q: $('#pmQ').value.trim() }).then((r) => {
       if (!pmOk(r, '품앗이 목록을 불러오지 못했습니다.')) { $('#pmList').innerHTML = ''; return; }
       r.jobs = pmShown(r.jobs);
+      const gives = $('#pmAvail').checked ? [] : (r.gives || []);
+      pmGives = gives;
       const bits = ['일감 ' + r.jobs.length + '건'];
+      if (gives.length) bits.push('품앗이 주세요 ' + gives.length + '건');
       if (r.waiting) bits.push('내 일감에 새 지원 ' + r.waiting + '명');
       if (r.confirmed) bits.push('확정된 내 품앗이 ' + r.confirmed + '건');
       $('#pmSum').textContent = bits.join(' · ');
-      $('#pmList').innerHTML = r.jobs.length ? r.jobs.map((j) => pmCardHtml(j)).join('')
+      const items = (pmShowMode === 'gives' ? [] : r.jobs.map((j) => ({ d: j.date + ' ' + (j.time || ''), h: pmCardHtml(j) })))
+        .concat(pmShowMode === 'jobs' ? [] : gives.map((g) => ({ d: g.date + ' ~', h: pmGiveHtml(g) })))
+        .sort((a, b) => a.d.localeCompare(b.d));
+      $('#pmList').innerHTML = items.length ? items.map((x) => x.h).join('')
         : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 일감 올리기</b>로 첫 일감을 올려 보세요.') + '</div>';
     }).catch(() => { $('#pmList').innerHTML = ''; netErr(); });
   }
@@ -1460,7 +1487,17 @@
   $('#pmQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loadPmList(); } });
   $('#pmQ').addEventListener('search', loadPmList);
   $('#pmNew').addEventListener('click', () => openPmForm('', 'pumasi'));
-  $('#pmList').addEventListener('click', (e) => { const c = e.target.closest('[data-pj]'); if (c) openPmDetail(c.dataset.pj, 'pumasi'); });
+  let pmShowMode = 'all', pmGives = [];
+  $('#pmShow').addEventListener('click', (e) => { const b = e.target.closest('[data-s]'); if (!b || b.dataset.s === pmShowMode) return; pmShowMode = b.dataset.s; $$('#pmShow button').forEach((x) => x.classList.toggle('on', x === b)); loadPmList(); });
+  $('#pmList').addEventListener('click', (e) => {
+    const g = e.target.closest('[data-gv]');
+    if (g) {
+      const x = pmGives.find((v) => v.id === g.dataset.gv && v.date === g.dataset.gvd); if (!x) return;
+      if (x.me) return openGive('me', 'pumasi');
+      return openPmForm('', 'pumasi', null, { id: x.id, name: x.name, date: x.date, kind: x.kind });
+    }
+    const c = e.target.closest('[data-pj]'); if (c) openPmDetail(c.dataset.pj, 'pumasi');
+  });
 
   // 상세
   function openPmDetail(id, from) { pmCurId = id; pmDetFrom = from || 'pumasi'; ssSet('runner.pmId', id); show('pmdetail'); loadPmDetail(); }
@@ -1483,7 +1520,7 @@
     const sk = PM_ST[j.status] || 'open';
     let h = '<div class="pmd"><h3><span class="pmstat s-' + sk + '">' + escH(j.status) + '</span><span class="bdg k-' + escH(j.kind) + '">' + escH(PM_KIND[j.kind] || j.kind) + '</span>' +
       '<span class="bdg pay' + (j.pay === '당일지급' ? '' : ' m') + '">' + (j.pay === '당일지급' ? '⭐ ' : '') + escH(j.pay) + '</span>' + (j.mine ? '<span class="bdg me">내 일감</span>' : '') + '</h3><dl>' +
-      '<dt>배차일</dt><dd>' + pmDay(j.date) + '</dd><dt>입차시간</dt><dd>' + escH(j.time) + '</dd><dt>배송지</dt><dd>' + escH(j.area) + '</dd>' +
+      '<dt>배차일</dt><dd>' + pmDay(j.date) + pddTag(j.kind) + '</dd><dt>입차시간</dt><dd>' + escH(j.time) + '</dd><dt>배송지</dt><dd>' + escH(j.area) + '</dd>' +
       '<dt>센터</dt><dd>' + escH(j.camp) + (j.route ? ' · ' + escH(j.route) : '') + '</dd><dt>평균 물량</dt><dd>' + escH(j.qty) + '</dd><dt>탑 종류</dt><dd>' + escH(j.top || '-') + '</dd>' +
       '<dt>건당 단가</dt><dd style="color:var(--brand)">' + won(j.price) + ' <small style="color:var(--sub);font-weight:500">VAT포함</small></dd><dt>올린 기사</dt><dd>' + escH(j.poster) + '</dd></dl>' +
       (j.open ? '' : '<div class="note">🔒 배송지코드, 첨부파일 및 담당자 연락처는 배차 확정된 기사에게만 보여집니다.</div>') + '</div>';
@@ -1693,7 +1730,9 @@
     }
     return h;
   }
-  function openGive(mode) {
+  let gvFrom = 'pumasi';
+  function openGive(mode, from) {
+    if (from) gvFrom = from;
     if (mode) gvMode = mode;
     ssSet('runner.gvMode', gvMode);
     $$('#gvMode button').forEach((b) => b.classList.toggle('on', b.dataset.g === gvMode));
@@ -1735,8 +1774,8 @@
         '<div class="mt">' + escH([o.x.type, o.x.camp].filter(Boolean).join(' · ') || '러너 기사') + (o.x.memo ? '<br>💬 ' + escH(o.x.memo) : '') + (o.d.offered ? '<br><small>이 날 받은 제안 ' + o.d.offered + '건</small>' : '') + '</div>' +
         '<button class="btn" type="button" data-offer="' + escH(o.x.id) + '" style="height:44px">💌 일감 제안하기</button></div>').join('') : '<div class="pmempty">이 날 일할 수 있는 기사님이 없습니다.</div>') : '');
   }
-  $('#pmGive').addEventListener('click', () => openGive('me'));
-  $('#gvBack').addEventListener('click', () => { if (gvMode === 'me' && gvDirty && !confirm('저장하지 않은 근무 가능일이 있습니다. 그냥 나갈까요?')) return; gvDirty = false; show('pumasi'); loadPmList(); });
+  $('#pmGive').addEventListener('click', () => openGive('me', 'pumasi'));
+  $('#gvBack').addEventListener('click', () => { if (gvMode === 'me' && gvDirty && !confirm('저장하지 않은 근무 가능일이 있습니다. 그냥 나갈까요?')) return; gvDirty = false; if (gvFrom === 'mypage') return openMyPage(); show('pumasi'); loadPmList(); });
   $('#gvMode').addEventListener('click', (e) => {
     const b = e.target.closest('[data-g]'); if (!b || b.dataset.g === gvMode) return;
     if (gvMode === 'me' && gvDirty && !confirm('저장하지 않은 근무 가능일이 있습니다. 그냥 넘어갈까요?')) return;
@@ -1772,6 +1811,7 @@
       $('#myCard').innerHTML = '<div class="myhd"><div class="av">' + escH(String(i.name || '?').slice(0, 1)) + '</div><div><b>' + escH(i.name) + ' 기사님</b><small>' +
         escH([i.type, i.camp].filter(Boolean).join(' · ') || '러너 기사') + '</small></div></div>' +
         '<div class="mystat"><div><b>' + r.stats.posted + '</b>올린 품앗이</div><div><b>' + r.stats.helped + '</b>도와준 품앗이</div></div>';
+      const gv = $('#myGive'); if (gv) gv.textContent = [r.stats.giveDays ? r.stats.giveDays + '일' : '', r.stats.offers ? '제안 ' + r.stats.offers : ''].filter(Boolean).join(' · ');
       $('#miBody').innerHTML = '<dl>' + [['이름', i.name], ['쿠팡 아이디', i.loginId], ['연락처', i.phone], ['기사구분', i.type], ['소속 캠프', i.camp], ['기본노선', i.baseRoute], ['차량번호', i.carNo],
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';
     }).catch(netErr);
@@ -1784,6 +1824,8 @@
     const b = e.target.closest('[data-my]'); if (!b) return;
     const k = b.dataset.my;
     if (k === 'new') return openPmForm('', 'mypage');
+    if (k === 'give') return openGive('me', 'mypage');
+    if (k === 'find') return openGive('find', 'mypage');
     if (k === 'info') return show('myinfo');
     if (k === 'alerts') return openPmAlerts();
     if (k === 'push') return pushToggle();

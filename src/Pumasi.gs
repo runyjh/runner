@@ -113,7 +113,17 @@ function api_pmList(token, f) {
     const waiting = d.jobs.filter(function (j) { return j.posterId === u.id && (j.status === PST.OPEN || j.status === PST.TALK) && j.date >= today; })
       .reduce(function (n, j) { return n + d.apps.filter(function (a) { return a.jobId === j.id && a.status === PAST.APPLY; }).length; }, 0);
     const confirmed = d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OK && a.date >= today; }).length;
-    return { ok: true, today: today, jobs: list, waiting: waiting, confirmed: confirmed };
+    // 품앗이 주세요: 근무 가능일 카드 (기사 · 날짜마다 1장)
+    let gives = [];
+    try {
+      pmAvailDrivers_(u.id, d, today, true).forEach(function (x) {
+        x.dates.forEach(function (dt) {
+          if (q && (str_(x.name) + str_(x.camp) + str_(x.memo)).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return;
+          gives.push({ id: x.id, name: x.name, camp: x.camp, type: x.type, memo: x.memo, me: x.me, date: dt.date, kind: dt.kind, offered: dt.offered });
+        });
+      });
+    } catch (e) { gives = []; }
+    return { ok: true, today: today, jobs: list, waiting: waiting, confirmed: confirmed, gives: gives };
   });
 }
 /** 상세: 공개 항목 + (등록 기사·확정 기사에게만) 비공개 항목 + (등록 기사에게) 지원자 목록 */
@@ -489,7 +499,9 @@ function api_myInfo(token) {
       },
       stats: {
         posted: d.jobs.filter(function (j) { return j.posterId === u.id && j.status !== PST.CANCEL; }).length,
-        helped: d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date < today; }).length
+        helped: d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date < today; }).length,
+        giveDays: (d.avail || []).filter(function (a) { return a.driverId === u.id && a.date >= today; }).length,
+        offers: d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OFFER && a.date >= today; }).length
       }
     };
   });
@@ -567,13 +579,19 @@ function api_pmAvailList(token) {
   return run_(function () {
     const u = pmUser_(token);
     const d = pmData_(), today = todayText_();
+    return { ok: true, today: today, until: ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS)), drivers: pmAvailDrivers_(u.id, d, today, false) };
+  });
+}
+/** 근무 가능일을 올린 기사 목록 (확정된 날 빼고). withMe = 내 것도 포함 */
+function pmAvailDrivers_(me, d, today, withMe) {
+  {
     const booked = {};
     d.jobs.forEach(function (j) { if (j.status === PST.DONE && j.acceptedId) booked[j.acceptedId + '|' + j.date] = 1; });
     const offered = {};
     d.apps.forEach(function (a) { if (a.status === PAST.OFFER) offered[a.driverId + '|' + a.date] = (offered[a.driverId + '|' + a.date] || 0) + 1; });
     const by = {};
     d.avail.forEach(function (a) {
-      if (a.driverId === u.id || a.date < today || booked[a.driverId + '|' + a.date]) return;
+      if ((!withMe && a.driverId === me) || a.date < today || booked[a.driverId + '|' + a.date]) return;
       const x = by[a.driverId] || (by[a.driverId] = { id: a.driverId, name: a.name, memo: '', dates: [] });
       if (a.memo) x.memo = a.memo;
       x.dates.push({ date: a.date, kind: PM_AVAIL_KINDS.indexOf(a.kind) >= 0 ? a.kind : '무관', offered: offered[a.driverId + '|' + a.date] || 0 });
@@ -581,12 +599,12 @@ function api_pmAvailList(token) {
     const list = Object.keys(by).map(function (id) {
       const x = by[id], o = driverById_(id) || {};
       if (o.status && o.status !== ST.ACTIVE) return null;
-      x.name = o.name || x.name; x.camp = o.schCamp || ''; x.type = o.driverType || '';
+      x.name = o.name || x.name; x.camp = o.schCamp || ''; x.type = o.driverType || ''; x.me = id === me;
       x.dates.sort(function (a, b) { return a.date.localeCompare(b.date); });
       return x;
     }).filter(Boolean).sort(function (a, b) { return a.dates[0].date.localeCompare(b.dates[0].date) || a.name.localeCompare(b.name, 'ko'); });
-    return { ok: true, today: today, until: ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS)), drivers: list };
-  });
+    return list;
+  }
 }
 /** 제안받은 기사: 수락(yes = true → 바로 배차 확정) / 거절 (→ 일감 모집 마감, 등록 기사에게 알림) */
 function api_pmOfferReply(token, jobId, yes) {
@@ -991,14 +1009,17 @@ function pmSchApply_(ops) {
  * 그날 그 기사 칸의 캠프·라우트가 일감과 같을 때만 (기사 앱 '배차확정 완료' 와 같은 규칙)
  */
 function pmAdminMarks_(cells, dates, byDrv) {
+  // 품앗이 배차 확정: 일을 준 기사 칸 = '▶ 받은 기사', 받은 기사(본인 줄) 칸 = '◀ 준 기사' (화면에는 품▶ / 품◀ 로 짧게)
   const out = {}, set = {};
   dates.forEach(function (d) { set[d] = 1; });
+  const add = function (id, date, txt) { const m = out[id] || (out[id] = {}); m[date] = (m[date] ? m[date] + ', ' : '') + txt; };
   pmData_().jobs.forEach(function (j) {
-    if (j.status !== PST.DONE || !set[j.date] || !j.route) return;
-    const row = cells[j.posterId] || {}, d = byDrv[j.posterId] || {};
-    if (!pmCellMatch_(row[j.date], j, d.camp || '')) return;
-    const m = out[j.posterId] || (out[j.posterId] = {});
-    m[j.date] = (m[j.date] ? m[j.date] + ', ' : '') + '품앗이 → ' + (j.accepted || '');
+    if (j.status !== PST.DONE || !set[j.date]) return;
+    if (j.posterId) {
+      const row = cells[j.posterId] || {}, d = byDrv[j.posterId] || {};
+      if (!j.route || pmCellMatch_(row[j.date], j, d.camp || '') || !row[j.date]) add(j.posterId, j.date, '▶ ' + (j.accepted || ''));
+    }
+    if (j.acceptedId) add(j.acceptedId, j.date, '◀ ' + (j.poster || ''));
   });
   return out;
 }
