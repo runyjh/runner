@@ -1088,10 +1088,8 @@ function pmAdminMarks_(cells, dates, byDrv) {
   const add = function (id, date, txt) { const m = out[id] || (out[id] = {}); m[date] = (m[date] ? m[date] + ', ' : '') + txt; };
   pmData_().jobs.forEach(function (j) {
     if (j.status !== PST.DONE || !set[j.date]) return;
-    if (j.posterId) {
-      const row = cells[j.posterId] || {}, d = byDrv[j.posterId] || {};
-      if (!j.route || pmCellMatch_(row[j.date], j, d.camp || '') || !row[j.date]) add(j.posterId, j.date, '▶ ' + (j.accepted || ''));
-    }
+    // 일을 준 기사: 그날 칸 글자(출근·휴무·라우트 등)와 상관없이 늘 표시
+    if (j.posterId) add(j.posterId, j.date, '▶ ' + (j.accepted || ''));
     if (j.acceptedId) add(j.acceptedId, j.date, '◀ ' + (j.poster || ''));
   });
   return out;
