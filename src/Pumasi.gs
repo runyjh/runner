@@ -703,3 +703,41 @@ function pmAlertCleanup_() {
   try { rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet_(SH.PALERT).deleteRow(r); }); }
   finally { lock.releaseLock(); }
 }
+
+/**
+ * 스케줄 칸 글자(예: '527B', '강서1 527AB', '530AB (F3)')가 품앗이 일감의 캠프·라우트와 같은지.
+ * 라우트: 칸에 같은 번호가 있고 그 뒤 글자에 일감 라우트 글자가 들어 있으면 같음 (527AB ⊃ 527B).
+ * 캠프: 칸에 캠프명이 적혀 있으면 그 캠프, 없으면 기사 소속 캠프로 본다.
+ */
+function pmCellMatch_(cell, job, myCamp) {
+  const short = function (v) { return String(v || '').replace(/\s+/g, '').replace(/캠프$/, '').toUpperCase(); };
+  const txt = String(cell || '').toUpperCase().replace(/\(.*?\)|\[.*?\]/g, ' ');
+  const jr = normCode_(job.route).replace(/-/g, ''), m = jr.match(/^(\d+)([A-Z가-힣]*)$/);
+  if (!m) return false;
+  const re = /(\d+)\s*-?\s*([A-Z]*)/g;
+  let hit = false, g;
+  while ((g = re.exec(txt))) {
+    if (g[1] !== m[1]) continue;
+    const letters = g[2] || '';
+    if (!m[2] || !letters || m[2].split('').every(function (L) { return letters.indexOf(L) >= 0; })) { hit = true; break; }
+  }
+  if (!hit) return false;
+  const jc = short(job.camp);
+  const named = master_().camps.map(function (c) { return short(c.name); }).filter(function (n) { return n && txt.replace(/\s+/g, '').indexOf(n) >= 0; });
+  if (named.length) return named.indexOf(jc) >= 0;
+  return !myCamp || short(myCamp) === jc;
+}
+/** { 날짜: [{ id, camp, route, accepted }] } — 내가 올린 일감 중 배차 확정 + 그날 내 칸과 캠프·라우트가 같은 것 */
+function pmDoneOf_(me, cells, myCamp) {
+  const out = {};
+  const dates = Object.keys(cells || {});
+  if (!dates.length) return out;
+  const set = {};
+  dates.forEach(function (d) { set[d] = 1; });
+  pmData_().jobs.forEach(function (j) {
+    if (j.posterId !== me || j.status !== PST.DONE || !set[j.date] || !j.route) return;
+    if (!pmCellMatch_(cells[j.date], j, myCamp)) return;
+    (out[j.date] = out[j.date] || []).push({ id: j.id, camp: j.camp, route: j.route, accepted: j.accepted });
+  });
+  return out;
+}

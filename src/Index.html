@@ -206,6 +206,8 @@
   .pmal.unread b { justify-content: flex-start; } .pmal.unread b small { margin-left: auto; }
   .pushst { font-style: normal; font-size: 13px; font-weight: 700; margin-left: auto; margin-right: 8px; color: var(--sub); }
   .pushst.on { color: var(--ok); }
+  .day .pmx.r-done { background: #e5f6ec; color: #0b6b3a; }
+  .mc .pmok { font-size: 9.5px; color: #0b6b3a; font-weight: 800; }
   .mc .pmdot { font-size: 9.5px; color: #8a5a00; font-weight: 700; }
   .ntcard { background: #fff; border-radius: var(--radius); padding: 14px 16px 6px; margin: 0 0 12px; }
   .ntcard h3 { margin: 0 0 6px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
@@ -1022,7 +1024,12 @@
     const pm = ((r.pumasi || {})[d] || []).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : '') + '</b>' + escH(x.text) + '</button>').join('');
     return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
       '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +
-      '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' + pm + bk + '</div></div>';
+      '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' + pmDoneRow(r, d) + pm + bk + '</div></div>';
+  }
+  /** 내가 올린 품앗이가 배차 확정 + 그날 내 칸과 캠프·라우트가 같을 때 */
+  function pmDoneRow(r, d) {
+    return ((r.pmDone || {})[d] || []).map((x) => '<button type="button" class="pmx r-done" data-pm="' + escH(x.id) + '"><b>✅ 배차확정 완료</b>' +
+      escH(String(x.camp || '').replace(/\s*캠프$/, '') + ' ' + x.route) + (x.accepted ? ' → ' + escH(x.accepted) + ' 기사님' : '') + '</button>').join('');
   }
   let scLast = null;
   function renderMonth(r) {
@@ -1040,6 +1047,7 @@
         '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + '</span>' +
         (d === pdd ? '<em class="pddt">PDD</em>' : '') +
         (v ? '<span class="v ' + schKind(v) + '">' + escH(v) + '</span>' : '') +
+        (((r.pmDone || {})[d] || []).length ? '<span class="pmok">✅ 확정완료</span>' : '') +
         (np.length ? '<span class="pmdot">🤝 ' + escH(np.some((x) => x.role === '수행') ? '수행' : np[0].role) + '</span>' : '') +
         (nb ? '<span class="bkdot">백업 ' + nb + '</span>' : '') + '</button>');
     });

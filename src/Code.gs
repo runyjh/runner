@@ -4548,6 +4548,8 @@ function api_mySchedule(token, month) {
       const bk = schMyCampBackup_(s.d, dates, h, c0, c1);
       out.camp = bk.camp; out.backup = bk.list;
     } catch (e) { out.backup = {}; }
+    // 내가 올린 품앗이가 배차 확정되고, 그날 내 스케줄 칸의 캠프·라우트와 같으면 '배차확정 완료' 표시
+    try { out.pmDone = pmDoneOf_(String(s.d), out.cells, info.camp || out.camp || ''); } catch (e) { out.pmDone = {}; }
     return out;
   });
 }
