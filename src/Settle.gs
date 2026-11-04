@@ -857,10 +857,11 @@ function stlCompute_(month) {
     const pid = stlPerson_(D, t.name, t.driverId);
     if (pid && stlNum_(t.price) > 0) (ctx.tmp[pid] = ctx.tmp[pid] || []).push(t);
   });
+  ctx.groupOf = stlGroupOfPerson_(X, D);
   const raw = stlReadMonth_('stl_raw', month);
   const loss = stlReadMonth_('stl_loss', month);
   const sched = stlSchedule_(P.from, P.to);
-  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {} };
+  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {}, moveNo: {} };
   const S = {};
   /** 정산 묶음(메인 아이디) 하나의 합계. 정산금은 메인 아이디 명의자에게 */
   const sum = function (gkey) {
@@ -870,7 +871,7 @@ function stlCompute_(month) {
       id: gkey, cid: g.cid, name: o.name || '(명의자 없음) ' + String(g.cid).replace(/@.*$/, ''), owner: o, ownerId: g.ownerId || '',
       type: main.type, mode: main.mode, insEx: main.insEx, fbCutTxt: main.fbCut, workers: {}, ids: {}, qty: 0, base: 0, inc: 0, freshRaw: 0, fresh: 0, fbCut: 0, unc: 0, etc: 0,
       loss: 0, lossCp: 0, sales: 0, supplyCp: 0, campPay: {}, routes: {}, daily: {}, lossLines: [], yong: [], yongPay: 0, yongCut: 0, yongLines: [],
-      noPriceQty: 0, rows: 0
+      noPriceQty: 0, rows: 0, movedIn: {}, movedOut: {}
     });
   };
   const company = { sales: 0, supplyCp: 0, lossCp: 0, unregSales: 0, vendorCut: 0 };
@@ -886,14 +887,16 @@ function stlCompute_(month) {
     const idx = X.by[login];
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.sales += sales; u.qty += qty; company.unregSales += sales; return; }
     if (idx.stopped) warn.stopped[r.cid] = 1;
-    const s = sum(idx.mainKey);
     const worker = stlWorkerOf_(ctx, login, r.date);
+    // 아이디 사용 기록: 그 날 다른 기사가 이 아이디로 일했으면 그 줄은 일한 기사 본인 정산으로 (단가도 그 기사 아이디 기준)
+    const mv = stlMoveOf_(ctx, idx, worker, r, warn);
+    const s = sum(mv ? mv.key : idx.mainKey), uIdx = mv ? X.groups[mv.key].main : idx;
     s.ids[r.cid] = 1; s.sales += sales; s.supplyCp += total + fresh; s.rows++;
     const camp = r.camp;
     if (camp && !ctx.price.campByShort[stlShort_(camp)]) warn.noCamp[camp] = 1;
     let pay = 0;
     if (kind === '배송' || kind === '수기반영') {
-      const u = stlUnit_(ctx, idx, r, worker);
+      const u = stlUnit_(ctx, uIdx, r, worker);
       const wk = s.workers[worker || '_'] || (s.workers[worker || '_'] = { qty: 0, amt: 0, dates: {}, cids: {} });
       if (u.missing && r.route) {
         const k = camp + '|' + r.route;
@@ -923,6 +926,7 @@ function stlCompute_(month) {
       warn.kind[r.kind || '(빈칸)'] = (warn.kind[r.kind || '(빈칸)'] || 0) + 1;
     }
     if (pay) s.campPay[stlShort_(camp)] = (s.campPay[stlShort_(camp)] || 0) + pay;
+    if (mv) stlMoveNote_(s, sum(idx.mainKey), r, worker, X, D, idx, pay, (kind === '배송' || kind === '수기반영') ? qty : 0);
   });
 
   // 프레시백 차감 (메인 아이디의 '프레시백 차감': 13% 처럼 비율 → 100원 반올림 / 금액 → 그대로) → 러너 몫
@@ -940,9 +944,12 @@ function stlCompute_(month) {
     company.lossCp += amt;
     const idx = X.by[stlLogin_(r.cid)];
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.loss = (u.loss || 0) + amt; return; }
-    const s = sum(idx.mainKey);
+    const lr = { date: stlYmd_(r.date), cid: r.cid };
+    const mv = stlMoveOf_(ctx, idx, stlWorkerOf_(ctx, stlLogin_(r.cid), lr.date), lr, warn);
+    const s = sum(mv ? mv.key : idx.mainKey);
     const share = stlR10_(amt * (cfg.lossVat ? 1 + cfg.vat : 1) * cfg.lossRate);
     s.loss += share; s.lossCp += amt;
+    if (mv) stlMoveNote_(s, sum(idx.mainKey), lr, mv.worker, X, D, idx, -share, 0);
     s.lossLines.push({ date: stlYmd_(r.date), cid: r.cid, camp: r.camp, type: r.type, detail: r.detail, item: r.item, waybill: r.waybill, amt: share });
   });
 
@@ -1077,11 +1084,13 @@ function stlCompute_(month) {
       profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!o.accountEnc, bizNo: o.bizNo || '',
       checked: stlYes_(p.checked), payDate: p.date || '', payMemo: p.memo || '',
-      advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty
+      advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty,
+      movedIn: Object.keys(s.movedIn).map(function (k) { return s.movedIn[k].label; }), movedOut: Object.keys(s.movedOut).map(function (k) { return s.movedOut[k].label; })
     };
     drivers.push(row);
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
-      daily: s.daily, sched: s.sched.cells, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers };
+      daily: s.daily, sched: s.sched.cells, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers,
+      movedIn: stlMoveList_(s.movedIn), movedOut: stlMoveList_(s.movedOut) };
     ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'profit', 'runnerIns', 'fbCut', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
   });
   drivers.sort(function (a, b) { return b.sales - a.sales || koCmp_(a.name, b.name); });
@@ -1101,6 +1110,7 @@ function stlCompute_(month) {
     Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return cidNm(u.cid) + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad');
   W('noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정)', drivers.filter(function (d) { return !d.ownerId; }).map(function (d) { return d.cids.map(cidNm).join(', ') + ' · ' + won_(d.sales) + '원'; }), 'bad');
   W('badSub', '서브인데 메인 아이디를 찾을 수 없음 (따로 정산됨)', X.badSub.map(cidNm));
+  W('moveNo', '아이디 사용 기록의 기사에게 본인 정산 아이디가 없음 (명의자 정산에 남김 — 아이디 관리에 그 기사 아이디 추가)', Object.keys(warn.moveNo).map(function (k) { const w = warn.moveNo[k]; return w.name + ' · ' + cidNm(w.cid) + ' ' + w.dates.length + '일'; }));
   W('stopped', '중지된 아이디에 배송 기록', Object.keys(warn.stopped).map(cidNm), 'info');
   W('noCamp', '노선관리에 없는 캠프', Object.keys(warn.noCamp), 'bad');
   W('noPrice', '단가 미입력 (노선관리 → 구분별 단가)', Object.keys(warn.noPrice).map(function (k) {
@@ -1128,6 +1138,40 @@ function stlCompute_(month) {
   return { summary: summary, slips: slips };
 }
 function stlYongCamp_(ctx, route) { return route ? ctx.price.campOf(route) : ''; }
+/** 기사(사람) → 그 기사 본인 정산 묶음(메인 아이디키). 본인 쿠팡플렉스 아이디의 묶음 → 없으면 명의자로 된 첫 묶음 */
+function stlGroupOfPerson_(X, D) {
+  const out = {};
+  Object.keys(X.groups).sort().forEach(function (k) {
+    const g = X.groups[k];
+    if (!g.ownerId) return;
+    const own = D.byId[g.ownerId] && D.byId[g.ownerId].loginId ? stlLogin_(D.byId[g.ownerId].loginId) : '';
+    if (!out[g.ownerId] || own === k) out[g.ownerId] = k;
+  });
+  return out;
+}
+/** 이 줄을 일한 기사 정산으로 옮길지: { key: 일한 기사 묶음, worker } 또는 null (본인 아이디가 없으면 경고만) */
+function stlMoveOf_(ctx, idx, worker, r, warn) {
+  const g = ctx.ids.groups[idx.mainKey];
+  if (!worker || !g || worker === g.ownerId) return null;
+  const key = ctx.groupOf[worker];
+  if (key && key !== idx.mainKey) return { key: key, worker: worker };
+  if (!key) {
+    const w = warn.moveNo[worker + '|' + r.cid] || (warn.moveNo[worker + '|' + r.cid] = { name: ctx.D.byId[worker] ? ctx.D.byId[worker].name : worker, cid: r.cid, dates: [] });
+    if (w.dates.indexOf(r.date) < 0) w.dates.push(r.date);
+  }
+  return null;
+}
+/** 옮긴 줄 기록: 일한 기사 명세서 '○○ (명의자 아이디) 사용분' / 명의자 명세서 '○○ 사용분 이전' */
+function stlMoveNote_(sIn, sOut, r, worker, X, D, idx, amt, qty) {
+  const cid = String(r.cid).replace(/@.*$/, ''), ownerName = X.groups[idx.mainKey].ownerId && D.byId[X.groups[idx.mainKey].ownerId] ? D.byId[X.groups[idx.mainKey].ownerId].name : '명의자 없음';
+  const wName = D.byId[worker] ? D.byId[worker].name : worker;
+  const a = sIn.movedIn[cid] || (sIn.movedIn[cid] = { label: cid + ' (' + ownerName + ' 아이디) 사용분', cid: cid, who: ownerName, qty: 0, amt: 0, dates: {} });
+  const b = sOut.movedOut[worker + '|' + cid] || (sOut.movedOut[worker + '|' + cid] = { label: wName + ' 사용분 이전', cid: cid, who: wName, qty: 0, amt: 0, dates: {} });
+  [a, b].forEach(function (x) { x.qty += qty; x.amt += amt; if (qty) x.dates[r.date] = 1; });
+}
+function stlMoveList_(m) {
+  return Object.keys(m).map(function (k) { const x = m[k], ds = Object.keys(x.dates).sort(); return { label: x.label, cid: x.cid, who: x.who, qty: x.qty, amt: x.amt, days: ds.length, from: ds[0] || '', to: ds[ds.length - 1] || '' }; });
+}
 function koCmp_(a, b) { return String(a || '').localeCompare(String(b || ''), 'ko'); }
 function won_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
@@ -1137,7 +1181,13 @@ function stlGroupSched_(ctx, g, sched, P) {
   let days = 0;
   schDateRange_(parseYmd_(P.from), parseYmd_(P.to)).forEach(function (d) {
     const ws = {};
-    g.cids.forEach(function (c) { const w = stlWorkerOf_(ctx, stlLogin_(c), d); if (w) ws[w] = 1; });
+    g.cids.forEach(function (c) {
+      const w = stlWorkerOf_(ctx, stlLogin_(c), d);
+      if (!w) return;
+      // 다른 기사가 이 아이디를 쓴 날은 그 기사 본인 정산으로 가므로 이 묶음 근무일에서 뺀다
+      if (w !== g.ownerId && ctx.groupOf && ctx.groupOf[w] && ctx.groupOf[w] !== g.key) return;
+      ws[w] = 1;
+    });
     let cell = '', work = false;
     Object.keys(ws).forEach(function (w) {
       const v = (sched[w] || {})[d];
