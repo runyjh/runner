@@ -133,7 +133,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261104c';
+const STL_CALC_VER = '20261104d';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -876,7 +876,7 @@ function stlCompute_(month) {
       id: gkey, cid: g.cid, name: o.name || '(명의자 없음) ' + String(g.cid).replace(/@.*$/, ''), owner: o, ownerId: g.ownerId || '',
       type: main.type, mode: main.mode, insEx: main.insEx, fbCutTxt: main.fbCut, workers: {}, ids: {}, qty: 0, base: 0, inc: 0, freshRaw: 0, fresh: 0, fbCut: 0, fbKeep: 0, unc: 0, etc: 0,
       loss: 0, lossCp: 0, sales: 0, supplyCp: 0, campPay: {}, routes: {}, daily: {}, lossLines: [], yong: [], yongPay: 0, yongCut: 0, yongLines: [],
-      noPriceQty: 0, rows: 0, movedIn: {}, movedOut: {}
+      noPriceQty: 0, rows: 0, movedIn: {}, movedOut: {}, cidDays: {}
     });
   };
   const company = { sales: 0, supplyCp: 0, lossCp: 0, unregSales: 0, vendorCut: 0 };
@@ -912,6 +912,7 @@ function stlCompute_(month) {
       const base = stlR0_(qty * u.u), inc = stlR0_(qty * incU);
       s.base += base; s.inc += inc; s.qty += qty; pay = base + inc;
       wk.qty += qty; wk.amt += pay; wk.dates[r.date] = 1; wk.cids[r.cid] = 1;
+      if (qty && r.date >= P.from && r.date <= P.to) ((s.cidDays[r.cid] = s.cidDays[r.cid] || {}))[r.date] = 1;
       const rk = camp + '|' + normCode_(r.route) + '|' + u.u + '|' + incU;
       const rl = s.routes[rk] || (s.routes[rk] = { camp: camp, route: normCode_(r.route), how: u.how, unit: u.u, inc: incU, qty: 0, amt: 0 });
       rl.qty += qty; rl.amt += pay;
@@ -1035,7 +1036,7 @@ function stlCompute_(month) {
   });
 
   // 기사별 마무리 계산
-  Object.keys(S).forEach(function (id) { S[id].sched = stlGroupSched_(ctx, X.groups[id], sched, P); });
+  Object.keys(S).forEach(function (id) { S[id].sched = stlGroupSched_(ctx, X.groups[id], sched, P, S[id].cidDays); });
   const fin = function (id, extra) { return stlFinish_(S[id], (adj[id] || []).concat(extra || []), items, cfg, campIns); };
 
   // 동일인 매출 분할 → 목표 매출 자동 수당
@@ -1098,7 +1099,7 @@ function stlCompute_(month) {
     const row = {
       id: id, cid: s.cid, name: s.name, ownerId: s.ownerId, ids: X.groups[id].cids.length, cids: X.groups[id].cids.slice(), usedCids: Object.keys(s.ids), type: s.type || '', mode: s.mode || '',
       workers: workers.filter(function (w) { return !w.owner; }).map(function (w) { return w.name; }),
-      workDays: s.sched.days, qty: s.qty, sales: s.sales,
+      workDays: s.sched.days, workDaysBy: s.sched.byCid, qty: s.qty, sales: s.sales,
       base: s.base, inc: s.inc, fresh: s.fresh, fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
       profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
@@ -1220,8 +1221,8 @@ function koCmp_(a, b) { return String(a || '').localeCompare(String(b || ''), 'k
 function won_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
 /** 근무일: 날짜마다 그 묶음 아이디로 일한 기사(사용 기록 → 명의자)의 기사스케줄 칸이 출근이면 1일 */
-function stlGroupSched_(ctx, g, sched, P) {
-  const cells = {};
+function stlGroupSched_(ctx, g, sched, P, cidDays) {
+  const cells = {}, per = {}, cidW = {};
   let days = 0;
   schDateRange_(parseYmd_(P.from), parseYmd_(P.to)).forEach(function (d) {
     const ws = {};
@@ -1231,6 +1232,9 @@ function stlGroupSched_(ctx, g, sched, P) {
       // 다른 기사가 이 아이디를 쓴 날은 그 기사 본인 정산으로 가므로 이 묶음 근무일에서 뺀다
       if (w !== g.ownerId && ctx.groupOf && ctx.groupOf[w] && ctx.groupOf[w] !== g.key) return;
       ws[w] = 1;
+      (cidW[c] = cidW[c] || {})[w] = 1;
+      const v = (sched[w] || {})[d];
+      if (v && stlIsWorkDay_(v)) per[c] = (per[c] || 0) + 1;
     });
     let cell = '', work = false;
     Object.keys(ws).forEach(function (w) {
@@ -1241,7 +1245,18 @@ function stlGroupSched_(ctx, g, sched, P) {
     if (cell) cells[d] = cell;
     if (work) days++;
   });
-  return { days: days, cells: cells };
+  // 아이디별 근무일: 그 아이디로 일한 기사의 스케줄 출근일. 같은 기사가 여러 아이디를 쓰면(스케줄로는 못 나눔)
+  // 메인 아이디가 아닌 아이디는 쿠팡 배송이 있는 날 수, 스케줄 기록이 없는 아이디도 쿠팡 배송일 수
+  const byCid = [], seenW = {};
+  g.cids.forEach(function (c, i) {
+    const ws = Object.keys(cidW[c] || {}), shared = ws.some(function (w) { return seenW[w]; });
+    ws.forEach(function (w) { seenW[w] = 1; });
+    const cp = Object.keys((cidDays || {})[c] || {}).length;
+    let n = per[c] || 0;
+    if ((i > 0 && shared) || !n) n = cp;
+    byCid.push({ cid: String(c).replace(/@.*$/, ''), days: n });
+  });
+  return { days: days, cells: cells, byCid: byCid };
 }
 
 /**
