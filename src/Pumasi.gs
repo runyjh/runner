@@ -330,13 +330,16 @@ function api_pmCancelApply(token, id) {
  * 확정하면 나머지 지원자는 미선정, 일감은 배차 확정.
  */
 function api_pmDecide(token, jobId, appId, action) {
-  return run_(function () {
-    const u = pmUser_(token);
+  return run_(function () { return pmDecide_(pmUser_(token).id, jobId, appId, action); });
+}
+/** posterId 가 비어 있으면 관리자 (아무 일감이나) */
+function pmDecide_(posterId, jobId, appId, action) {
+  {
     const lock = LockService.getScriptLock(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(jobId), jr = findRow_(SH.PJOB, 'id', j.id);
-      if (j.posterId !== u.id) fail_('내가 올린 일감만 정할 수 있습니다.');
+      if (posterId && j.posterId !== posterId) fail_('내가 올린 일감만 정할 수 있습니다.');
       if (j.status === PST.CANCEL || j.status === PST.CLOSED) fail_('마감되었거나 취소된 일감입니다. 다시 열어 주세요.');
       const apps = readAll_(SH.PAPP).filter(function (a) { return a.jobId === j.id; });
       const a = apps.filter(function (x) { return x.id === appId; })[0];
@@ -371,6 +374,7 @@ function api_pmDecide(token, jobId, appId, action) {
           writeFields_(SH.PJOB, jr, { status: PST.OPEN, acceptedId: '', accepted: '', updatedAt: now });
         }
       } else fail_('알 수 없는 작업입니다.');
+      if (!posterId) out.push(pmA_(j.posterId, j.poster, j, 'admin', action));
       pmAlertAdd_(out);
       pmTouch_();
       return { ok: true };
@@ -378,17 +382,19 @@ function api_pmDecide(token, jobId, appId, action) {
       lock.releaseLock();
       pmAfter_(out);
     }
-  });
+  }
 }
 /** action: 'close'(모집 마감) / 'reopen'(다시 모집) / 'cancel'(일감 취소) */
 function api_pmClose(token, id, action) {
-  return run_(function () {
-    const u = pmUser_(token);
+  return run_(function () { return pmClose_(pmUser_(token).id, id, action); });
+}
+function pmClose_(posterId, id, action) {
+  {
     const lock = LockService.getScriptLock(), out = [];
     lock.waitLock(20000);
     try {
       const j = pmJobById_(id), jr = findRow_(SH.PJOB, 'id', j.id), now = nowText_();
-      if (j.posterId !== u.id) fail_('내가 올린 일감만 바꿀 수 있습니다.');
+      if (posterId && j.posterId !== posterId) fail_('내가 올린 일감만 바꿀 수 있습니다.');
       if (action === 'close') {
         if (j.status === PST.DONE) fail_('배차가 확정된 일감입니다.');
         writeFields_(SH.PJOB, jr, { status: PST.CLOSED, updatedAt: now });
@@ -401,6 +407,7 @@ function api_pmClose(token, id, action) {
         if (j.status === PST.DONE && j.acceptedId) pmSchOp_(out, 'clear', j.acceptedId, j);
         readAll_(SH.PAPP).forEach(function (x) { if (x.jobId === j.id && pmActiveApp_(x)) { writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'canceled')); } });
       } else fail_('알 수 없는 작업입니다.');
+      if (!posterId) out.push(pmA_(j.posterId, j.poster, j, 'admin', action));
       pmAlertAdd_(out);
       pmTouch_();
       return { ok: true };
@@ -408,7 +415,7 @@ function api_pmClose(token, id, action) {
       lock.releaseLock();
       pmAfter_(out);
     }
-  });
+  }
 }
 
 // ───────────────────────── 마이페이지 ─────────────────────────
@@ -498,7 +505,8 @@ const PM_ALERT_TEXT = {
   unaccept: function (j) { return ['⚠️ 배차 확정 취소', pmJobLabel_(j) + ' 일감의 배차 확정이 풀렸습니다.']; },
   closed: function (j) { return ['모집 마감', pmJobLabel_(j) + ' 일감의 모집이 마감되었습니다.']; },
   canceled: function (j) { return ['⚠️ 일감 취소', pmJobLabel_(j) + ' 일감이 취소되었습니다.']; },
-  edit: function (j) { return ['✏️ 일감 내용 변경', pmJobLabel_(j) + ' 일감 내용이 바뀌었습니다. 확인해 주세요.']; }
+  edit: function (j) { return ['✏️ 일감 내용 변경', pmJobLabel_(j) + ' 일감 내용이 바뀌었습니다. 확인해 주세요.']; },
+  admin: function (j, act) { return ['🛠 사무실 처리', pmJobLabel_(j) + ' 일감을 사무실에서 ' + ({ talk: '협의 중으로', accept: '배차 확정으로', reject: '지원자 거절로', back: '지원 상태로 되돌림으로', close: '모집 마감으로', reopen: '다시 모집으로', cancel: '취소로' }[act] || '변경') + ' 처리했습니다.']; }
 };
 /** 알림 1건 만들기 (아직 저장 전) */
 function pmA_(driverId, name, j, kind, who) {
@@ -851,4 +859,58 @@ function pmAdminMarks_(cells, dates, byDrv) {
     m[j.date] = (m[j.date] ? m[j.date] + ', ' : '') + '품앗이 → ' + (j.accepted || '');
   });
   return out;
+}
+
+// ───────────────────────── 관리자: 품앗이 관리 ─────────────────────────
+/** 관리자 목록. f = { from, to, status, q } (배차일 기간, 상태, 기사·배송지·센터·라우트 검색) */
+function adm_pmList(token, f) {
+  return run_(function () {
+    requireAdmin_(token);
+    f = f || {};
+    const today = todayText_(), d = pmData_();
+    const from = pmDate_(f.from) || ymd_(addDays_(new Date(), -14)), to = pmDate_(f.to) || ymd_(addDays_(new Date(), 30));
+    const q = str_(f.q).replace(/\s+/g, '').toLowerCase();
+    const apps = {};
+    d.apps.forEach(function (a) { (apps[a.jobId] = apps[a.jobId] || []).push(a); });
+    const all = d.jobs.filter(function (j) { return j.date >= from && j.date <= to; });
+    const count = {};
+    const rows = all.map(function (j) {
+      const st = pmView_(j, today), list = apps[j.id] || [];
+      count[st] = (count[st] || 0) + 1;
+      return {
+        id: j.id, status: st, kind: j.kind, date: j.date, time: j.time, area: j.area, camp: j.camp, route: j.route, qty: j.qty, top: j.top, price: j.price, pay: j.pay,
+        poster: j.poster, posterId: j.posterId, accepted: j.accepted || '', apps: list.filter(pmActiveApp_).length, newApps: list.filter(function (a) { return a.status === PAST.APPLY; }).length,
+        createdAt: j.createdAt, updatedAt: j.updatedAt, hasAttach: !!j.attach
+      };
+    }).filter(function (j) {
+      if (f.status && f.status !== '전체' && j.status !== f.status) return false;
+      if (q && (j.poster + j.accepted + j.area + j.camp + j.route).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    }).sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time); });
+    return { ok: true, today: today, from: from, to: to, jobs: rows, count: count, total: all.length };
+  });
+}
+/** 관리자 상세: 모든 칸 + 지원자(연락처·자격증) + 첨부 링크 */
+function adm_pmJob(token, id) {
+  return run_(function () {
+    requireAdmin_(token);
+    const d = pmData_(), today = todayText_();
+    const j = d.jobs.filter(function (x) { return x.id === id; })[0];
+    if (!j) fail_('일감을 찾을 수 없습니다. 새로고침해 주세요.');
+    const ph = function (id2) { const o = driverById_(id2); return o ? o.phone : ''; };
+    const apps = d.apps.filter(function (a) { return a.jobId === j.id; }).map(function (a) {
+      const o = driverById_(a.driverId) || {};
+      return { id: a.id, name: a.name, status: a.status, memo: a.memo, at: a.createdAt, phone: o.phone || '', type: o.driverType || '', camp: o.schCamp || '', car: o.carNo || '', qual: !!o.docQual };
+    }).sort(function (x, y) { return String(x.at).localeCompare(String(y.at)); });
+    return { ok: true, job: Object.assign({}, j, { view: pmView_(j, today), posterPhone: ph(j.posterId), acceptedPhone: j.acceptedId ? ph(j.acceptedId) : '' }), apps: apps };
+  });
+}
+/** 관리자 처리: action = talk / accept / reject / back (지원자) · close / reopen / cancel (일감) */
+function adm_pmAction(token, jobId, action, appId) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const r = ['close', 'reopen', 'cancel'].indexOf(action) >= 0 ? pmClose_('', jobId, action) : pmDecide_('', jobId, appId, action);
+    logAdmin_(a, '품앗이 ' + action, jobId, appId || '');
+    return r;
+  });
 }

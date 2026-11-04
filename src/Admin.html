@@ -84,6 +84,16 @@
   .b-승인 { background: var(--ok-weak); color: var(--ok); }
   .b-반려 { background: var(--danger-weak); color: var(--danger); }
   .b-정지 { background: var(--gray-weak); color: var(--sub); }
+  .p-모집중 { background: var(--brand-weak); color: var(--brand); } .p-배차협의중 { background: var(--ok-weak); color: var(--ok); }
+  .p-배차확정 { background: #e6f4ea; color: #0b6b3a; } .p-완료 { background: var(--gray-weak); color: var(--sub); }
+  .p-모집마감, .p-취소 { background: var(--gray-weak); color: var(--faint); }
+  .pa-d { display: grid; grid-template-columns: 110px 1fr 110px 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13px; }
+  .pa-d > div { padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  .pa-d > div:nth-child(odd) { background: #fafbfc; color: var(--sub); font-weight: 600; }
+  .pa-txt { white-space: pre-wrap; background: #fafbfc; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.6; margin-top: 6px; }
+  .pa-h { font-size: 13.5px; font-weight: 700; margin: 14px 0 6px; }
+  .pa-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  table.pa-ap { min-width: 0; } table.pa-ap td, table.pa-ap th { padding: 7px 9px; font-size: 12.5px; } table.pa-ap tbody tr { cursor: default; }
   .t-고정 { background: var(--brand-weak); color: var(--brand); }
   .t-백업 { background: var(--warn-weak); color: var(--warn); }
   .t-품앗이 { background: var(--ok-weak); color: var(--ok); }
@@ -582,6 +592,7 @@
     <nav class="nav">
       <a class="on" data-view="drivers">기사 정보관리</a>
       <a data-view="sched">기사스케줄</a>
+      <a data-view="pumasi">품앗이 관리</a>
       <a data-view="route">노선관리</a>
       <a data-view="settle">정산관리</a>
       <a data-view="memo">업무스케줄</a>
@@ -655,6 +666,25 @@
         <tbody id="ntRows"></tbody>
       </table>
       <div class="empty hidden" id="ntEmpty"></div>
+    </div>
+   </section>
+   <section id="view-pumasi" class="hidden">
+    <div class="head">
+      <h2>품앗이 관리 <small id="paCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools">
+        <input class="inp" type="date" id="paFrom" title="배차일 시작"><input class="inp" type="date" id="paTo" title="배차일 끝">
+        <input class="inp search" id="paQ" placeholder="기사·배송지·센터·라우트 검색" style="width:220px">
+        <button class="btn ghost" id="paReload">새로고침</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사 앱 품앗이에 올라온 일감입니다. 줄을 누르면 지원자·연락처를 보고 사무실에서 <b>배차 확정 · 확정 풀기 · 마감 · 취소</b>를 할 수 있습니다 (처리하면 기사님께 알림이 갑니다). 데이터는 러너 올인원 DB 의 <b>pumasi_jobs · pumasi_apps</b> 탭.</p>
+    <div class="tabs" id="paTabs"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>상태</th><th>배차일</th><th>입차</th><th>구분</th><th>센터 · 라우트</th><th>배송지</th><th>물량</th><th>건당 단가</th><th>지급</th><th>올린 기사</th><th>지원</th><th>확정 기사</th><th>등록</th></tr></thead>
+        <tbody id="paRows"></tbody>
+      </table>
+      <div class="empty hidden" id="paEmpty"></div>
     </div>
    </section>
    <section id="view-memo" class="hidden">
@@ -884,6 +914,14 @@
     <input class="inp" id="askInput" autocomplete="off">
     <div class="m-actions"><button type="button" class="btn ghost" id="askCancel">취소</button><button class="btn" id="askOk">확인</button></div>
   </form>
+</div>
+
+<!-- ───────────── 품앗이 일감 상세 ───────────── -->
+<div class="modal hidden" id="paModal">
+  <div class="m-box" style="width:min(940px,100%);max-height:90vh;overflow:auto;padding:0">
+    <div class="m-top"><b id="paTitle">품앗이 일감</b><button class="btn sm ghost" id="paClose">닫기</button></div>
+    <div id="paBody" style="padding:14px 18px 18px"></div>
+  </div>
 </div>
 
 <!-- ───────────── 서류 보기 ───────────── -->
@@ -1782,6 +1820,8 @@
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
     $('#view-route').classList.toggle('hidden', v !== 'route');
     $('#view-sched').classList.toggle('hidden', v !== 'sched');
+    $('#view-pumasi').classList.toggle('hidden', v !== 'pumasi');
+    if (v === 'pumasi') loadPumasi();
     $('#view-settle').classList.toggle('hidden', v !== 'settle');
     if (v === 'settle') loadSettle();
     if (v === 'sched') loadSched();
@@ -1800,6 +1840,91 @@
     if (!$('#bdrawer').classList.contains('hidden')) return;
     switchView(a.dataset.view);
   }));
+
+
+  // ───── 품앗이 관리 (기사 앱 품앗이 일감) ─────
+  const PA = { jobs: [], count: {}, status: '전체', cur: '' };
+  const PA_ST = ['전체', '모집 중', '배차 협의중', '배차 확정', '완료', '모집 마감', '취소'];
+  const paKind = { '주간': '주간 ☀️', '야간': '야간 🌙', '일택': '일택 📦' };
+  const paBadge = (st) => '<span class="badge p-' + esc(String(st).replace(/\s/g, '')) + '">' + esc(st) + '</span>';
+  const paDay = (d) => { const p = String(d || '').split('-'); if (p.length !== 3) return esc(d || ''); return +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
+  function paDefaultRange() {
+    const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 14), b = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30);
+    const f = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (!$('#paFrom').value) $('#paFrom').value = f(a);
+    if (!$('#paTo').value) $('#paTo').value = f(b);
+  }
+  function loadPumasi() {
+    paDefaultRange();
+    $('#paRows').innerHTML = '<tr><td colspan="13" class="sub">불러오는 중…</td></tr>';
+    api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      PA.jobs = r.jobs; PA.count = r.count; renderPumasi();
+    }).catch(() => {});
+  }
+  function renderPumasi() {
+    $('#paTabs').innerHTML = PA_ST.map((st) => '<button class="tab' + (PA.status === st ? ' on' : '') + '" data-pst="' + esc(st) + '">' + esc(st) + ' <b>' + (st === '전체' ? PA.jobs.length : (PA.jobs.filter((j) => j.status === st).length)) + '</b></button>').join('');
+    const list = PA.jobs.filter((j) => PA.status === '전체' || j.status === PA.status);
+    $('#paCount').textContent = list.length + '건';
+    $('#paRows').innerHTML = list.map((j) => '<tr data-pa="' + esc(j.id) + '"><td>' + paBadge(j.status) + '</td><td><b>' + paDay(j.date) + '</b></td><td>' + esc(j.time) + '</td><td>' + esc(paKind[j.kind] || j.kind) + '</td>' +
+      '<td>' + esc(String(j.camp || '').replace(/\s*캠프$/, '')) + (j.route ? ' <b>' + esc(j.route) + '</b>' : '') + '</td><td>' + esc(j.area) + '</td><td>' + esc(j.qty) + (j.top ? ' · ' + esc(j.top) : '') + '</td>' +
+      '<td class="n">' + wn(j.price) + '원</td><td>' + esc(j.pay) + '</td><td>' + esc(j.poster) + '</td>' +
+      '<td>' + (j.apps ? j.apps + '명' + (j.newApps ? ' <span class="badge b-반려">새 ' + j.newApps + '</span>' : '') : '<span class="sub">-</span>') + '</td><td>' + (j.accepted ? '<b>' + esc(j.accepted) + '</b>' : '<span class="sub">-</span>') + '</td>' +
+      '<td class="sub">' + esc(String(j.createdAt || '').slice(5, 16)) + '</td></tr>').join('');
+    const em = $('#paEmpty'); em.classList.toggle('hidden', !!list.length); em.textContent = '이 기간에 ' + (PA.status === '전체' ? '' : PA.status + ' ') + '품앗이 일감이 없습니다.';
+  }
+  $('#paTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-pst]'); if (b) { PA.status = b.dataset.pst; renderPumasi(); } });
+  $('#paReload').addEventListener('click', loadPumasi);
+  $('#paFrom').addEventListener('change', loadPumasi); $('#paTo').addEventListener('change', loadPumasi);
+  let paQT = 0; $('#paQ').addEventListener('input', () => { clearTimeout(paQT); paQT = setTimeout(loadPumasi, 400); });
+  $('#paRows').addEventListener('click', (e) => { const tr = e.target.closest('[data-pa]'); if (tr) openPumasi(tr.dataset.pa); });
+  $('#paClose').addEventListener('click', () => $('#paModal').classList.add('hidden'));
+  function openPumasi(id) {
+    PA.cur = id;
+    $('#paBody').innerHTML = '<div class="sub">불러오는 중…</div>'; $('#paModal').classList.remove('hidden');
+    api('adm_pmJob', id).then((r) => {
+      if (!r.ok) { $('#paModal').classList.add('hidden'); return toast(r.msg); }
+      const j = r.job, raw = j.status, live = raw === '모집 중' || raw === '배차 협의중';
+      $('#paTitle').innerHTML = paBadge(j.view) + ' ' + paDay(j.date) + ' ' + esc(String(j.camp || '').replace(/\s*캠프$/, '')) + ' ' + esc(j.route || j.area);
+      const cell = (k, v) => '<div>' + k + '</div><div>' + v + '</div>';
+      const tel = (p) => p ? '<a href="tel:' + esc(String(p).replace(/[^\d+]/g, '')) + '">' + esc(p) + '</a>' : '-';
+      const apps = r.apps.map((a) => {
+        const b = [];
+        if (live && a.status === '지원') b.push('<button class="btn sm ghost" data-paact="talk" data-ap="' + esc(a.id) + '">협의 중</button>');
+        if (raw !== '취소' && raw !== '모집 마감' && (a.status === '지원' || a.status === '협의 중')) b.push('<button class="btn sm" data-paact="accept" data-ap="' + esc(a.id) + '">배차 확정</button>', '<button class="btn sm ghost" data-paact="reject" data-ap="' + esc(a.id) + '">거절</button>');
+        if (a.status === '확정') b.push('<button class="btn sm ghost" data-paact="back" data-ap="' + esc(a.id) + '">확정 풀기</button>');
+        if (a.status === '미선정' && raw !== '배차 확정' && raw !== '취소') b.push('<button class="btn sm ghost" data-paact="back" data-ap="' + esc(a.id) + '">되돌리기</button>');
+        return '<tr><td><b>' + esc(a.name) + '</b>' + (a.type ? ' <span class="badge t-' + esc(a.type) + '">' + esc(a.type) + '</span>' : '') + '</td><td>' + paBadge(a.status === '확정' ? '배차 확정' : a.status === '협의 중' ? '배차 협의중' : a.status) + '</td><td>' + tel(a.phone) + '</td>' +
+          '<td>' + esc([a.camp, a.car].filter(Boolean).join(' · ')) + '</td><td>' + (a.qual ? '✓' : '<span style="color:var(--danger)">없음</span>') + '</td><td class="sub" style="white-space:normal">' + esc(a.memo || '') + '</td><td class="sub">' + esc(String(a.at || '').slice(5, 16)) + '</td><td>' + b.join(' ') + '</td></tr>';
+      }).join('');
+      const acts = [];
+      if (live) acts.push('<button class="btn ghost" data-paact="close">모집 마감</button>');
+      if (raw === '모집 마감' || raw === '취소') acts.push('<button class="btn ghost" data-paact="reopen">다시 모집</button>');
+      if (raw !== '취소') acts.push('<button class="btn ghost danger-t" data-paact="cancel">일감 취소</button>');
+      $('#paBody').innerHTML = '<div class="pa-d">' +
+        cell('배차일', paDay(j.date)) + cell('입차시간', esc(j.time)) + cell('구분', esc(paKind[j.kind] || j.kind)) + cell('지급방법', esc(j.pay)) +
+        cell('센터', esc(j.camp)) + cell('라우트', esc(j.route || '-')) + cell('배송지', esc(j.area)) + cell('평균 물량', esc(j.qty) + (j.top ? ' · ' + esc(j.top) : '')) +
+        cell('건당 단가', '<b>' + wn(j.price) + '원</b> <small class="sub">VAT포함</small>') + cell('상태', paBadge(j.view)) +
+        cell('올린 기사', esc(j.poster) + ' · ' + tel(j.posterPhone)) + cell('확정 기사', j.accepted ? esc(j.accepted) + ' · ' + tel(j.acceptedPhone) : '-') +
+        cell('등록', esc(j.createdAt || '')) + cell('수정', esc(j.updatedAt || '')) + '</div>' +
+        (j.desc ? '<div class="pa-h">상세 설명</div><div class="pa-txt">' + esc(j.desc) + '</div>' : '') +
+        '<div class="pa-h">배차 확정 기사에게만 (배송지코드·연락처 등)</div><div class="pa-txt">' + (j.secret ? esc(j.secret) : '<span class="sub">없음</span>') + '</div>' +
+        (j.attach ? '<div style="margin-top:6px"><a class="btn sm ghost" href="' + esc(j.attach) + '" target="_blank" rel="noopener">📎 첨부 이미지 (드라이브)</a></div>' : '') +
+        '<div class="pa-h">지원자 ' + r.apps.length + '명</div>' +
+        (r.apps.length ? '<div class="table-wrap"><table class="pa-ap"><thead><tr><th>기사</th><th>상태</th><th>연락처</th><th>캠프 · 차량</th><th>화물자격증</th><th>한마디</th><th>지원</th><th></th></tr></thead><tbody>' + apps + '</tbody></table></div>' : '<div class="sub" style="font-size:13px">아직 지원자가 없습니다.</div>') +
+        '<div class="pa-acts">' + acts.join('') + '<span class="sub" style="font-size:12px;align-self:center;margin-left:auto">처리하면 올린 기사·지원 기사에게 알림이 갑니다.</span></div>';
+    }).catch(() => {});
+  }
+  $('#paBody').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-paact]'); if (!b) return;
+    const act = b.dataset.paact, label = { talk: '협의 중으로 표시', accept: '이 기사로 배차 확정', reject: '이 지원자 거절', back: '지원 상태로 되돌리기', close: '모집 마감', reopen: '다시 모집', cancel: '일감 취소' }[act];
+    if (!confirm(label + ' 할까요?' + (act === 'accept' ? '\n다른 지원자는 미선정이 되고, 확정 기사에게만 배송지코드·연락처가 보입니다.' : act === 'cancel' ? '\n지원자는 모두 미선정이 됩니다.' : ''))) return;
+    b.disabled = true;
+    api('adm_pmAction', PA.cur, act, b.dataset.ap || '').then((r) => {
+      if (!r.ok) { b.disabled = false; return toast(r.msg); }
+      toast(label + ' 했습니다.'); openPumasi(PA.cur); loadPumasi();
+    }).catch(() => { b.disabled = false; });
+  });
 
   // ───── 계정관리 (다른 서비스 계정) ─────
   let AC = { accounts: [], categories: [], camps: [] }, acCat = '전체', acEdit = null;
