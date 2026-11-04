@@ -198,6 +198,16 @@
   .slip .big td { font-size: 14px; font-weight: 700; }
   .slip .smemo { color: var(--faint); font-size: 11px; white-space: normal; }
   .slip .foot { color: var(--sub); font-size: 11.5px; margin-top: 6px; }
+  .slip .invbox { margin-top: 10px; border: 2px solid #1b64da; border-radius: 8px; background: #f3f7ff; padding: 8px 10px 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slip .invbox .ihd { font-size: 14px; font-weight: 800; color: #1b64da; margin-bottom: 6px; }
+  .slip .invbox .ihd small { font-size: 11.5px; font-weight: 600; color: var(--sub); margin-left: 6px; }
+  .slip .invbox .iamt { display: flex; justify-content: space-between; align-items: baseline; background: #1b64da; color: #fff; border-radius: 6px; padding: 7px 10px; margin-bottom: 6px; }
+  .slip .invbox .iamt span { font-size: 12.5px; font-weight: 700; } .slip .invbox .iamt b { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .slip .invbox table { background: #fff; } .slip .invbox th { background: #e8f0fd; text-align: left; width: 88px; }
+  .slip .invbox tr.due td, .slip .invbox tr.due th { color: #d63b3b; font-weight: 700; }
+  .slip .invbox .inote { font-size: 11.5px; color: #1b64da; font-weight: 700; margin-top: 5px; }
+  .slip .netbox { display: flex; align-items: baseline; gap: 10px; margin-top: 8px; border: 1px solid #e3e6ea; border-radius: 8px; padding: 8px 10px; }
+  .slip .netbox span { font-weight: 700; } .slip .netbox b { margin-left: auto; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; } .slip .netbox small { color: var(--sub); }
   @media print {
     body * { visibility: hidden; }
     #stSlipBox, #stSlipBox * { visibility: visible; }
@@ -4580,15 +4590,23 @@
     return '<h2>' + ymTitle(r.month) + ' ' + esc(co.name || '러너') + ' 정산서 (급여내역서) — ' + esc(d.name) + '</h2>' +
       '<div class="cols"><div><h4>① 기본 정보 · 정산 요약 (부가세 포함)</h4><table><tbody>' +
       '<tr><th>기사명</th><td>' + esc(d.name) + '</td><th>정산월</th><td>' + esc(r.month) + '</td></tr>' +
-      '<tr><th>정산 아이디</th><td>' + esc(d.cids.map((x, i) => x.replace(/@.*/, '') + (i ? ' (서브)' : ' (메인)')).join(', ')) + '</td><th>정산기간</th><td>' + mdTxt(P.from) + ' ~ ' + mdTxt(P.to) + '</td></tr>' +
+      '<tr><th>정산 아이디</th><td>' + esc(d.cids.map((x) => x.replace(/@.*/, '')).join(', ')) + '</td><th>정산기간</th><td>' + mdTxt(P.from) + ' ~ ' + mdTxt(P.to) + '</td></tr>' +
       '<tr><th>총 배송수량</th><td>' + wn(d.qty) + '건</td><th>근무일수</th><td>' + (d.workDays || 0) + '일 <small class="sub">(기사스케줄)</small></td></tr>' +
       '<tr><th>일평균 수량</th><td>' + (d.workDays ? (Math.round(d.qty / d.workDays * 10) / 10) + '건' : Object.keys(s.daily).length ? (Math.round(d.qty / Object.keys(s.daily).length * 10) / 10) + '건 <small class="sub">(배송일 ' + Object.keys(s.daily).length + '일 기준)</small>' : '-') + '</td><th>계산서 발행기한</th><td>' + esc(D.invoice || '') + ' 까지</td></tr>' +
       '<tr><th>지급일</th><td>' + esc(D.pay || '') + '</td><th>사업자번호</th><td>' + esc(d.bizNo || '-') + '</td></tr></tbody></table>' +
       '<table style="margin-top:8px"><thead><tr><th colspan="2">지급 내역</th><th colspan="2">차감 · 공제</th></tr></thead><tbody>' +
       Array.from({ length: n }, (_, i) => { const p = pays.concat(adds)[i], q = deds[i]; return '<tr>' + (p ? li(p, '+').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + (q ? li(q, '−').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + '</tr>'; }).join('') +
       '<tr class="big"><td>지급 합계</td><td class="n">+' + wn(d.pay + d.depAdd) + '</td><td>공제 합계</td><td class="n">−' + wn(dedSum) + '</td></tr></tbody></table>' +
-      '<table style="margin-top:8px"><thead><tr><th>세금계산서 (기사 → ' + esc(co.name || '러너') + ')</th><th>공급가액</th><th>세액</th><th>합계</th></tr></thead><tbody><tr><td>발행 금액</td><td class="n">' + wn(d.supply) + '</td><td class="n">' + wn(d.tax) + '</td><td class="n">' + wn(d.invoice) + '</td></tr>' +
-      '<tr class="big"><td>실 입금액</td><td colspan="3" class="n">' + wn(d.net) + '원</td></tr></tbody></table>' +
+      // 세금계산서 발행 안내 (기사가 이 칸만 보고 바로 발행할 수 있게) + 실 입금액
+      '<div class="invbox"><div class="ihd">📄 세금계산서 발행 <small>기사님 → ' + esc(co.name || '러너') + '</small></div>' +
+      '<div class="iamt"><span>발행 금액 (합계)</span><b>' + wn(d.invoice) + '원</b></div>' +
+      '<table><tbody><tr><th>공급가액</th><td class="n">' + wn(d.supply) + '</td><th>세액</th><td class="n">' + wn(d.tax) + '</td></tr>' +
+      '<tr><th>공급받는자</th><td colspan="3">' + esc(co.name || '') + (co.ceo ? ' / 대표 ' + esc(co.ceo) : '') + '</td></tr>' +
+      '<tr><th>사업자번호</th><td colspan="3">' + esc(co.bizNo || '') + (co.email ? ' / ' + esc(co.email) : '') + '</td></tr>' +
+      '<tr><th>작성일자 · 품목</th><td colspan="3">' + esc(D.writeDate || '') + ' · 배송(' + esc(r.month) + ')</td></tr>' +
+      '<tr class="due"><th>발행기한</th><td colspan="3">' + esc(D.invoice || '') + ' 까지 — 지연 시 가산세</td></tr></tbody></table>' +
+      '<div class="inote">※ 위 금액 그대로 세금계산서를 발행해 주세요.</div></div>' +
+      '<div class="netbox"><span>실 입금액</span><b>' + wn(d.net) + '원</b><small>' + esc(D.pay ? '지급일 ' + D.pay : '') + '</small></div>' +
       '<div class="foot">입금계좌: ' + esc(d.bank || '') + ' ' + esc(d.account || '') + ' (' + esc(d.holder || d.name) + ')' + '</div></div>' +
       '<div><h4>② 노선별 내역 (단가·금액 부가세 포함)</h4><table><thead><tr><th>캠프</th><th>라우트</th><th>단가 기준</th><th>건수</th><th>기본단가</th><th>프백가중</th><th>합계단가</th><th>금액</th></tr></thead><tbody>' + routes +
       '<tr class="big"><td colspan="3">합계</td><td class="n">' + wn(rq) + '</td><td colspan="3"></td><td class="n">' + wn(ra) + '</td></tr></tbody></table></div></div>' +
@@ -4600,10 +4618,7 @@
         s.movedOut.map((m) => '<tr><td>' + esc(m.label) + '</td><td>' + esc(m.cid) + '</td><td>' + esc(mdTxt(m.from)) + (m.to && m.to !== m.from ? ' ~ ' + esc(mdTxt(m.to)) : '') + '</td><td class="n">' + m.days + '일</td><td class="n">' + wn(m.qty) + '</td><td class="n">' + wn(m.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
       '<h4>③ 일자별 내역 (쿠팡 정산서 노선 · 없는 날은 기사스케줄)</h4><div class="cols"><div>' + dayTbl(dayRows.slice(0, half)) + '</div><div>' + dayTbl(dayRows.slice(half)) + '</div></div>' +
       '<div class="foot">스케줄 출근 ' + (d.workDays || 0) + '일 · 스케줄 기록 ' + work + '일 · 쿠팡 배송 ' + Object.keys(s.daily).length + '일. 기간 밖 날짜의 수기반영(소급분)은 일자별에서 빠지고 합계에는 포함됩니다.</div>' +
-      '<h4>④ 용차 · 분실파손 내역 · 세금계산서 안내</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong + loss || '<tr><td colspan="3" class="sub">용차·분실 없음</td></tr>') + '</tbody></table>' +
-      '<table style="margin-top:8px"><tbody><tr><th>공급받는자</th><td>' + esc(co.name) + ' / 대표 ' + esc(co.ceo) + '</td></tr><tr><th>사업자번호</th><td>' + esc(co.bizNo) + (co.email ? ' / ' + esc(co.email) : '') + '</td></tr>' +
-      '<tr><th>작성일자 / 품목</th><td>' + esc(D.writeDate || '') + ' / 배송(' + esc(r.month) + ')</td></tr><tr><th>발행 금액</th><td>공급가 ' + wn(d.supply) + ' + 세액 ' + wn(d.tax) + ' = ' + wn(d.invoice) + '원</td></tr>' +
-      '<tr><th>발행기한</th><td>' + esc(D.invoice || '') + ' 이내 — 지연 시 가산세</td></tr></tbody></table><div class="foot">※ 위 금액 그대로 세금계산서를 발행해 주세요.</div>';
+      '<h4>④ 용차 · 분실파손 내역</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong + loss || '<tr><td colspan="3" class="sub">용차·분실 없음</td></tr>') + '</tbody></table>';
   }
   $('#stTable').addEventListener('click', (e) => { const tr = e.target.closest('[data-slip]'); if (tr) openSlip(tr.dataset.slip); });
   $('#stSlipClose').addEventListener('click', () => $('#stSlipModal').classList.add('hidden'));
