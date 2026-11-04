@@ -177,6 +177,8 @@
   .stw.bad { background: var(--danger-weak); color: #a1262b; }
   .stw.info { background: var(--gray-weak); color: var(--sub); }
   .stw summary { cursor: pointer; font-weight: 700; }
+  .advsum { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: #fff7e6; border: 1px solid #ffd591; color: #7a4f00; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
+  .advsum b { width: 100%; } .advsum span { background: #fff; border-radius: 8px; padding: 3px 8px; border: 1px solid #ffe7ba; } .advsum em { font-style: normal; font-weight: 800; color: var(--danger); }
   .stw .vset { display: inline-block; width: auto; height: 26px; padding: 0 6px; font-size: 12px; margin-left: 6px; vertical-align: middle; font-weight: 600; }
   .vtag { display: inline-block; padding: 1px 6px; border-radius: 8px; background: #eef4ff; color: #1d4ed8; font-size: 11px; font-weight: 700; vertical-align: middle; }
   .stw ul { margin: 6px 0 0; padding-left: 18px; columns: 2; }
@@ -839,13 +841,13 @@
     </div>
     <div class="st-info" id="stInfo"></div>
     <div class="tabs" id="stTabs">
-      <button class="tab on" data-st="list">아이디별 정산</button>
-      <button class="tab" data-st="adjust">공제·가감</button>
-      <button class="tab" data-st="advance">가불금</button>
-      <button class="tab" data-st="yongcha">용차</button>
-      <button class="tab" data-st="tmp">일시단가</button>
-      <button class="tab" data-st="pay">입금목록</button>
       <button class="tab" data-st="ids">아이디 관리</button>
+      <button class="tab on" data-st="list">정산서</button>
+      <button class="tab" data-st="pay">입금확인</button>
+      <button class="tab" data-st="yongcha">품앗이/용차 지정</button>
+      <button class="tab" data-st="advance">가불금 목록</button>
+      <button class="tab" data-st="adjust">공제·가감</button>
+      <button class="tab" data-st="tmp">기사별 일시단가</button>
       <button class="tab" data-st="cfg">정산 설정</button>
     </div>
     <div id="stp-list">
@@ -862,14 +864,14 @@
         <button class="tab" data-idt="drv">명의자 사업자 정보</button>
       </div>
       <div class="tabs sub2 hidden" id="stCfgTabs">
-        <button class="tab on" data-cfg="config">세부정산서</button>
-        <button class="tab" data-cfg="items">명세서 항목</button>
+        <button class="tab on" data-cfg="config">세부정산 설정</button>
+        <button class="tab" data-cfg="items">정산서 항목설정</button>
         <button class="tab" data-cfg="camps">캠프별 산재·고용</button>
-        <button class="tab" data-cfg="regular">정기 수당·공제</button>
-        <button class="tab" data-cfg="target">목표 매출 수당</button>
-        <button class="tab" data-cfg="split">동일인 매출 분할</button>
-        <button class="tab" data-cfg="leave">퇴사 보류금</button>
-        <button class="tab" data-cfg="kinds">쿠팡 구분값</button>
+        <button class="tab" data-cfg="regular">고정수당 및 공제설정</button>
+        <button class="tab" data-cfg="target">자동 매출 분배설정</button>
+        <button class="tab" data-cfg="split">사업자 매출분할 설정</button>
+        <button class="tab" data-cfg="leave">퇴사자 보류금 설정</button>
+        <button class="tab" data-cfg="kinds">쿠팡 구분항목설정</button>
         <button class="tab" data-cfg="migrate">기존 정산 시트 가져오기</button>
       </div>
       <p class="sub st-help" id="stEditHelp"></p>
@@ -4875,7 +4877,7 @@
   const ST_HELP = {
     adjust: '이 정산월에 기사별로 더 주거나 빼는 돈. 항목에 따라 세금계산서에 반영(지급·계산서 차감)되거나 입금액에서만 빠집니다(가불금 상환·기타 공제). 차감도 양수로 입력. 배송 기본 같은 자동 항목을 고르면 그 금액에 ± 조정됩니다.',
     advance: '기사에게 내준 가불금. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제됩니다 (예: 지급일 20일 → 상환일 11/20 은 10월 정산, 11/21 은 11월 정산). 그 달을 마감하면 상환금 칸에 자동으로 적히고, 마감을 풀면 되돌립니다. 정산 밖에서 현금으로 받았으면 상환금에 직접 적으세요. 그 달 [공제·가감]에 "가불금 상환"을 손으로 넣으면 자동 공제는 하지 않습니다.',
-    yongcha: '이 정산기간 날짜의 용차 기록. 우리 기사가 대신 뛰면 수행자에 그 기사 → 노선 단가와의 차액만 추가 지급. 용차업체(정산 방식 "용차내역" 기사)는 이 금액으로 지급. 차액부담 기사를 넣으면 (용차 금액 − 그 기사 단가×건수)를 그 기사 계산서에서 뺍니다.',
+    yongcha: '이 정산기간 날짜의 품앗이·용차 지정. 우리 기사가 대신 뛰면(품앗이) 수행자에 그 기사 → 수행자 단가코드(고정/백업/품앗이 …)의 노선 단가와의 차액만 추가 지급. 용차업체는 외부용차로 이 금액을 지급. 차액부담 기사를 넣으면 부담 기준단가(비우면 수행자 단가코드 기준 단가)와의 차액 (지급 단가 − 부담 기준단가) × 건수를 그 기사 계산서에서 뺍니다.',
     config: '세부정산서: 지급률·보험·일정 기본값. 바꾸면 마감하지 않은 달 전체가 다시 계산됩니다.',
     items: '명세서에 나오는 줄 이름표. 계산 방식이 "직접입력"인 항목은 [공제·가감]에서 금액을 넣습니다. "입금가산" = 계산서에는 빼고 실입금에만 더함. 자동 항목(배송기본·분실파손 등)의 계산 방식은 바꾸지 마세요.',
     camps: '캠프마다 기사에게 공제할 산재·고용 산식. 빈 칸은 기본값(지급률·보험 탭). 기사가 여러 캠프를 뛰면 지급액 비중대로 나눕니다. 공단 실제 납부는 항상 기본값으로 계산하고, 차이는 러너 몫으로 잡힙니다.',
@@ -4884,7 +4886,7 @@
     split: '한 사람이 두 이름으로 계산서를 나눌 때: 원 기사 실수령이 목표 이상이 되는 범위에서 나머지를 받는 기사로 넘깁니다 (세무사 확인 필수).',
     leave: '퇴사월 명세서에 "퇴사 보류금"(입금 차감) → 다음 달에 "보류금 반환"(입금 가산). 다음 달 분실파손은 계산서에서 그대로 빠집니다.',
     kinds: '쿠팡 정산서 "구분" 값을 계산 분류로 바꾸는 표. 새 구분값이 나오면 여기에 추가하세요.',
-    vendors: '용차업체가 등록한 쿠팡 아이디를 업체 단위로 정산합니다. 건당 단가 = 업체에 주는 단가(VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부단가). 산재·고용 공제 Y = 기사처럼 공제. 아이디 목록의 [용차업체] 칸에서 업체를 고르거나, 아이디별 정산 경고창의 [용차업체로 지정]으로 한 번에 넣을 수 있습니다. 업체 아이디는 기사 정보관리에 등록되지 않습니다.',
+    vendors: '용차업체가 등록한 쿠팡 아이디를 업체 단위로 정산합니다. 건당 단가 = 업체에 주는 단가(VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부단가). 산재·고용 공제 Y = 기사처럼 공제. 아이디 목록의 [용차업체] 칸에서 업체를 고르거나, 정산서 탭 경고창의 [용차업체로 지정]으로 한 번에 넣을 수 있습니다. 업체 아이디는 기사 정보관리에 등록되지 않습니다.',
     ids: '정산의 기준은 쿠팡 아이디입니다. 용차업체 아이디는 명의자를 비우고 [용차업체] 칸에서 업체를 고르세요 (업체별 정산서 1장). 메인 아이디 + 서브 아이디(메인 아이디 칸에 메인 쿠팡ID)가 정산서 하나로 합쳐지고, 정산금·세금계산서·입금은 메인 아이디의 명의자에게 갑니다. 단가 구분(고정/백업/품앗이/외부용차)은 메인 아이디는 기사 정보관리의 기사구분이 최우선이고(기사구분이 비어 있을 때만 이 칸), 서브 아이디는 이 칸에 적은 값이 우선입니다. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
     usage: '한 아이디로 여러 기사가 일할 때 기록합니다 (기간을 비우면 계속). 기록이 없는 날은 명의자가 일한 것으로 봅니다. 기록한 기간에 그 아이디로 잡힌 매출(배송·프레시백·미계약·프로모션·분실파손)은 일한 기사 본인 정산으로 자동으로 옮겨지고, 단가도 그 기사 아이디 기준으로 계산됩니다. 일한 기사에게 본인 정산 아이디가 없으면 명의자에게 남기고 "확인 필요"에 띄웁니다.',
     tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 그 기사가 일한 날(아이디 사용 기록 기준, 기록이 없으면 명의자)의 배송에만 적용됩니다. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.'
@@ -4919,7 +4921,7 @@
     $('#stKpi').innerHTML = k('쿠팡 매출 (VAT포함)', wn(c.sales), '공급가 ' + wn(c.supplyCp) + (c.lossCp ? ' · 분실차감 ' + wn(c.lossCp) : '')) +
       k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax)) +
       k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 공제금액 ' + wn(t.depDed)) +
-      k('회사이익금 (공급가)', wn(t.profit), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
+      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0)), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
       k('러너 잉여 (프백 잉여 + 보험 차액)', wn((t.fbKeep || 0) + t.fbCut + t.insGain), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 보험 ' + wn(t.insGain)) +
       k('러너 보험 실부담', wn(t.runnerIns), '공단 실납부 − 기사 공제') +
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
@@ -5031,7 +5033,15 @@
     const head = '<thead><tr>' + T.cols.map((c) => '<th class="srt" data-sort="' + esc(c.k) + '" title="눌러서 정렬">' + esc(c.label) + (so && so.k === c.k ? '<i>' + (so.dir === 'desc' ? '▼' : '▲') + '</i>' : '') + '</th>').join('') + calcH.map((h) => '<th class="n">' + h + '</th>').join('') + (T.fixed ? '' : '<th></th>') + '</tr></thead>';
     const body = order.map((i) => { const r = rows[i]; return '<tr data-ri="' + i + '">' + T.cols.map((c) => cell(r, i, c)).join('') + calc(r) + (T.fixed || ro ? '' : '<td><button class="ed-del" data-del="' + i + '" title="줄 지우기">×</button></td>') + '</tr>'; }).join('');
     const scope = T.name === 'adjust' || T.name === 'yongcha' ? ymTitle(STX.month) + ' 정산 · ' : '';
-    $('#stEditor').innerHTML = dl + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : (T.fixed ? '' : '<button class="btn ghost sm" id="edAdd">+ 줄 추가</button>') +
+    // 가불금 목록: 남은 가불금이 있는 사람만 요약 (예: 김대현 · 잔여 가불금 4,000,000원)
+    let advSum = '';
+    if (T.name === 'advance') {
+      const by = {};
+      rows.forEach((r) => { const nm = String(r.name || '').replace(/\s*\(.*\)\s*$/, '').trim(); if (!nm) return; const left = (Number(String(r.amt).replace(/[^\d.-]/g, '')) || 0) - (Number(String(r.paid).replace(/[^\d.-]/g, '')) || 0); by[nm] = (by[nm] || 0) + left; });
+      const left = Object.keys(by).filter((k) => by[k] > 0).sort((a, b) => by[b] - by[a] || koSort(a, b));
+      advSum = '<div class="advsum">' + (left.length ? '<b>잔여 가불금 ' + left.length + '명 · 합계 ' + wn(left.reduce((x, k) => x + by[k], 0)) + '원</b>' + left.map((k) => '<span>' + esc(k) + ' · 잔여 가불금 <em>' + wn(by[k]) + '원</em></span>').join('') : '<b>남은 가불금이 없습니다.</b>') + '</div>';
+    }
+    $('#stEditor').innerHTML = dl + advSum + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : (T.fixed ? '' : '<button class="btn ghost sm" id="edAdd">+ 줄 추가</button>') +
       '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button>') +
       '<input class="inp edq" id="edQ" type="search" placeholder="검색 (이름·아이디 등)" value="' + esc(STX.edQ || '') + '"><span class="sub" id="edCnt">' + scope + rows.length + '줄 · 정산 DB "stl_' + esc(T.name) + '" 탭에서도 직접 고칠 수 있습니다</span></div>' +
       '<div class="table-wrap"><table class="sttbl ed">' + head + '<tbody>' + body + '</tbody></table>' + (rows.length ? '' : '<div class="empty">기록이 없습니다.</div>') + '</div>';
@@ -5126,12 +5136,14 @@
     const dayTbl = (rows) => '<table><thead><tr><th>날짜</th><th>노선 · 스케줄</th><th>건수</th><th>금액</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
     const routes = s.routes.map((x) => '<tr><td>' + esc(x.camp) + '</td><td>' + esc(x.route) + '</td><td>' + esc(x.how || '') + '</td><td class="n">' + wn(x.qty) + '</td><td class="n">' + wn(x.unit) + '</td><td class="n">' + wnz(x.inc) + '</td><td class="n">' + wn(x.unit + x.inc) + '</td><td class="n">' + wn(x.amt) + '</td></tr>').join('');
     const rq = s.routes.reduce((a, x) => a + x.qty, 0), ra = s.routes.reduce((a, x) => a + x.amt, 0);
-    // 우리 소속 기사(정산 아이디가 있는 수행자)가 대신 뛴 건 = 품앗이, 외부 용차업체 = 용차
-    const ykind = (y) => (y.whoId ? '품앗이' : '용차');
-    const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>' + ykind(y) + ' · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담' + (y.who ? ' · 수행 ' + esc(String(y.who).replace(/\s*\(.*\)$/, '')) : '') + ')') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? wn(y.extra) : '−' + wn(y.cut)) + '</td></tr>').join('');
+    // 우리 기사(정산 아이디)가 대신 뛴 건 = 품앗이, 용차업체·외부 = 외부용차. 용차업체 정산서는 전부 '용차업체'
+    const isOurs = (y) => !!y.whoId && String(y.whoId).indexOf('v:') !== 0;
+    const ykind = (y) => (d.vendor ? '용차업체' : isOurs(y) ? '품앗이' : '외부용차');
+    const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>' + ykind(y) + ' · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담' + (y.who ? ' · 수행 ' + esc(String(y.who).replace(/\s*\(.*\)$/, '')) : '') + ')') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? wn(y.extra) : y.cut < 0 ? '+' + wn(-y.cut) : '−' + wn(y.cut)) + '</td></tr>').join('');
     const loss = (s.loss || []).map((x) => '<tr><td>' + mdTxt(x.date) + '</td><td>' + esc(x.item || x.detail || x.type || '분실') + (x.waybill ? '<div class="smemo">' + esc(x.waybill) + '</div>' : '') + '</td><td class="n">−' + wn(x.amt) + '</td></tr>').join('');
-    const yongAllOurs = (s.yong || []).filter((y) => y.whoId !== d.id).every((y) => y.whoId);
-    const lname = (l) => (l.method === '용차수행' || (l.method === '용차지출' && yongAllOurs) ? String(l.name).replace(/용차/g, '품앗이') : l.name);
+    const yongAllOurs = (s.yong || []).filter((y) => y.whoId !== d.id).every(isOurs);
+    const lname = (l) => d.vendor ? String(l.name).replace(/품앗이|외부용차|용차/g, '용차업체')
+      : (l.method === '용차수행' || (l.method === '용차지출' && yongAllOurs) ? String(l.name).replace(/용차/g, '품앗이') : l.method === '용차지출' ? String(l.name).replace(/^용차/, '외부용차') : l.name);
     return '<h2>' + ymTitle(r.month) + ' ' + esc(co.name || '러너') + ' 정산서 (급여내역서) — ' + esc(d.name) + '</h2>' +
       '<div class="cols"><div><h4>① 기본 정보 · 정산 요약 (부가세 포함)</h4><table><tbody>' +
       '<tr><th>' + (d.vendor ? '업체명' : '기사명') + '</th><td>' + esc(d.name) + '</td><th>정산월</th><td>' + esc(r.month) + '</td></tr>' +
@@ -5163,7 +5175,7 @@
         s.movedOut.map((m) => '<tr><td>' + esc(m.label) + '</td><td>' + esc(m.cid) + '</td><td>' + esc(mdTxt(m.from)) + (m.to && m.to !== m.from ? ' ~ ' + esc(mdTxt(m.to)) : '') + '</td><td class="n">' + m.days + '일</td><td class="n">' + wn(m.qty) + '</td><td class="n">' + wn(m.amt) + '</td></tr>').join('') + '</tbody></table>' : '') +
       '<h4>③ 일자별 내역 (쿠팡 정산서 노선 · 없는 날은 기사스케줄)</h4><div class="cols"><div>' + dayTbl(dayRows.slice(0, half)) + '</div><div>' + dayTbl(dayRows.slice(half)) + '</div></div>' +
       '<div class="foot">스케줄 출근 ' + (d.workDays || 0) + '일 · 스케줄 기록 ' + work + '일 · 쿠팡 배송 ' + Object.keys(s.daily).length + '일. 기간 밖 날짜의 수기반영(소급분)은 일자별에서 빠지고 합계에는 포함됩니다.</div>' +
-      '<h4>④ 품앗이 · 용차 내역</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong || '<tr><td colspan="3" class="sub">품앗이·용차 없음</td></tr>') + '</tbody></table>' +
+      '<h4>④ ' + (d.vendor ? '용차업체 내역' : '품앗이 · 외부용차 내역') + '</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (yong || '<tr><td colspan="3" class="sub">' + (d.vendor ? '용차업체 내역 없음' : '품앗이·외부용차 없음') + '</td></tr>') + '</tbody></table>' +
       '<h4>⑤ 분실파손 내역</h4><table><thead><tr><th>날짜</th><th>내용</th><th>금액</th></tr></thead><tbody>' + (loss || '<tr><td colspan="3" class="sub">분실파손 없음</td></tr>') + '</tbody></table>';
   }
   $('#stTable').addEventListener('click', (e) => { const tr = e.target.closest('[data-slip]'); if (tr) openSlip(tr.dataset.slip); });

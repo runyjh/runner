@@ -1853,7 +1853,7 @@
     const days = Object.keys(sl.daily || {}).filter((x) => x >= P.from && x <= P.to).sort();
     const dayRows = days.map((x) => { const v = sl.daily[x]; return '<tr><td>' + slMd(x) + '</td><td>' + escH(v.route || (sl.sched || {})[x] || '') + '</td><td class="n">' + slWon(v.qty) + '</td><td class="n">' + slWon(v.amt) + '</td></tr>'; }).join('');
     const routes = (sl.routes || []).map((x) => '<tr><td>' + escH(x.camp) + ' ' + escH(x.route) + '</td><td class="n">' + slWon(x.qty) + '</td><td class="n">' + slWon(x.unit + x.inc) + '</td><td class="n">' + slWon(x.amt) + '</td></tr>').join('');
-    const yongRows = (sl.yong || []).map((y) => '<tr><td>' + slMd(y.date) + '</td><td>' + (y.ours ? '품앗이 ' : '용차 ') + escH((y.camp || '') + ' ' + (y.route || '')) + (y.mine ? ' (수행)' : ' (차액 부담)') + '</td><td class="n">' + (y.mine ? slWon(y.extra) : '−' + slWon(y.cut)) + '</td></tr>').join('');
+    const yongRows = (sl.yong || []).map((y) => '<tr><td>' + slMd(y.date) + '</td><td>' + (y.ours ? '품앗이 ' : '외부용차 ') + escH((y.camp || '') + ' ' + (y.route || '')) + (y.mine ? ' (수행)' : ' (차액 부담)') + '</td><td class="n">' + (y.mine ? slWon(y.extra) : '−' + slWon(y.cut)) + '</td></tr>').join('');
     const lossRows = (sl.loss || []).map((x) => '<tr><td>' + slMd(x.date) + '</td><td>' + escH(x.item || x.detail || x.type || '분실') + '</td><td class="n">−' + slWon(x.amt) + '</td></tr>').join('');
     const moved = (sl.movedIn || []).concat(sl.movedOut || []);
     return '<div class="sl-card"><h3>' + escH(slMonthTxt(r.month)) + '<small>' + slMd(P.from) + ' ~ ' + slMd(P.to) + '</small></h3><div class="sl-kv">' +
