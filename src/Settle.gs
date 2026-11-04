@@ -1645,7 +1645,7 @@ function fmtAccount_(d, bank) { return String(d || ''); }
 // 열: [키, 제목, 종류, (찾은 ID 를 넣을 키)]
 //  acct = 정산 묶음(명의자 또는 쿠팡ID) / acctOrText = 정산 묶음 또는 용차업체 이름 / person = 기사(사람)
 const STL_EDIT = {
-  ids: { sheet: 'stl_ids', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['role', '구분', STL_ROLES], ['main', '메인 아이디 (서브일 때)', 'text'], ['owner', '명의자 (정산금 받는 기사)', 'person', 'ownerId'],
+  ids: { sheet: 'stl_ids', scope: 'all', cols: [['owner', '명의자 (정산금 받는 기사)', 'person', 'ownerId'], ['cid', '쿠팡ID', 'cid'], ['role', '구분', STL_ROLES], ['main', '메인 아이디 (서브일 때)', 'text'],
     ['type', '단가 구분', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=구분별 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text']] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
@@ -1742,7 +1742,9 @@ function adm_stlTableSave(token, name, month, rows, seen) {
         } else if (t === 'acct' || t === 'acctOrText') o[c[3]] = '';
         if (t === 'person') {
           const pid = v ? stlPerson_(D, v, str_(r[c[3]])) : '';
-          if (v && !pid) fail_((i + 1) + '번째 줄: 기사 "' + v + '"를 찾을 수 없습니다 (같은 이름이 여럿이면 "이름 (아이디)").');
+          // 아이디 관리의 명의자는 기사 정보에 없으면 저장한 뒤 기사로 자동 등록 (같은 이름이 여럿일 때만 막음)
+          const many = (D.byName[v] || []).length > 1;
+          if (v && !pid && (name !== 'ids' || many)) fail_((i + 1) + '번째 줄: 기사 "' + v + '"를 찾을 수 없습니다 (같은 이름이 여럿이면 "이름 (아이디)").');
           o[c[3]] = pid;
           if (pid) v = D.byId[pid].name;
         }
@@ -1791,10 +1793,13 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     } finally {
       lock.releaseLock();
     }
+    // 아이디 관리 → 기사 정보관리 연동 (없는 명의자는 기사로 등록, 메인 아이디는 쿠팡플렉스 아이디·기사구분 맞춤)
+    let sync = null;
+    if (name === 'ids') { try { sync = stlIdsToDrivers_(token); } catch (e) { console.error('기사 정보 연동 실패: ' + (e && e.message)); } }
     // 저장 직후 화면에 쓸 표 (다시 부르지 않아도 되게)
     let table = null;
     try { table = stlTableView_(name, month); } catch (e) { table = null; }
-    return { ok: true, rows: clean.length, table: table };
+    return { ok: true, rows: clean.length, table: table, sync: sync };
   });
 }
 
@@ -1884,4 +1889,76 @@ function stlSyncIdType_(driverId, loginId, oldType, newType) {
     if (n) stlBump_();
     return n;
   } catch (e) { console.error('아이디 단가 구분 맞추기 실패: ' + (e && e.message)); return 0; }
+}
+
+// ───────────────────────── 아이디 관리 ↔ 기사 정보관리 연동 ─────────────────────────
+/**
+ * 기사 정보관리 → 아이디 관리: 기사의 쿠팡플렉스 아이디가 아이디 관리에 없으면 메인 아이디로 추가.
+ * 있으면 명의자가 비었을 때 채우고, 이 기사가 명의자인 줄의 명의자 이름을 기사 정보의 이름에 맞춘다.
+ */
+function stlEnsureIdFor_(o) {
+  try {
+    if (!o || !o.id || !props_().STL_DB_ID) return;
+    const rows = stlRead_('stl_ids');
+    const k = o.loginId ? stlLogin_(o.loginId) : '';
+    let hit = null;
+    rows.forEach(function (r) {
+      if (k && stlLogin_(r.cid) === k) hit = r;
+      if (r.ownerId === o.id && o.name && r.owner !== o.name) stlSetRow_('stl_ids', r._row, { owner: o.name });
+    });
+    if (!k) return;
+    if (hit) {
+      if (!hit.ownerId && (!hit.owner || stlPerson_(stlDrivers_(), hit.owner, '') === o.id || hit.owner === o.name)) stlSetRow_('stl_ids', hit._row, { owner: o.name, ownerId: o.id });
+      return;
+    }
+    stlAppend_('stl_ids', [{
+      cid: o.loginId, role: '메인', main: '', owner: o.name, ownerId: o.id, type: STL_TYPES.indexOf(o.driverType) >= 0 ? o.driverType : '',
+      mode: '', insEx: '', fbCut: '', status: o.status === ST.STOPPED ? '중지' : '사용', memo: '기사 정보관리에서 자동 추가'
+    }]);
+    stlBump_();
+  } catch (e) { console.error('아이디 관리 연동 실패: ' + (e && e.message)); }
+}
+/**
+ * 아이디 관리 → 기사 정보관리: 저장한 뒤 한 번.
+ *  - 명의자가 기사 정보에 없으면 기사로 등록 (이름·쿠팡플렉스 아이디(메인일 때)·기사구분·상태)
+ *  - 명의자가 있고 메인 아이디인데 기사의 쿠팡플렉스 아이디가 비어 있으면 채운다
+ *  - 메인 아이디의 단가 구분을 바꾸면 그 기사의 기사구분도 바꾼다 (본인 쿠팡플렉스 아이디인 줄만)
+ */
+function stlIdsToDrivers_(token) {
+  const out = { created: [], updated: [] };
+  let D = stlDrivers_();
+  const usedLogin = {};
+  D.all.forEach(function (d) { if (d.loginId) usedLogin[stlLogin_(d.loginId)] = d.id; });
+
+  stlRead_('stl_ids').forEach(function (r) {
+    const owner = str_(r.owner), k = stlLogin_(r.cid), main = r.role !== '서브';
+    if (!owner || !k) return;
+    const pid = stlPerson_(D, owner, r.ownerId);
+    const type = STL_TYPES.indexOf(r.type) >= 0 ? r.type : '';
+    if (!pid) {
+      const f = { name: owner, driverType: type || '고정', status: r.status === '중지' ? ST.STOPPED : ST.ACTIVE, memo: '정산관리 아이디 관리에서 자동 등록' };
+      if (main && !usedLogin[k]) f.loginId = String(r.cid).replace(/@.*$/, '');
+      let res = adm_createDriver(token, f);
+      if (!res.ok && f.loginId) { delete f.loginId; res = adm_createDriver(token, f); }
+      if (res.ok) {
+        out.created.push(owner);
+        if (f.loginId) usedLogin[k] = res.driver.id;
+        if (r.ownerId !== res.driver.id) stlSetRow_('stl_ids', r._row, { ownerId: res.driver.id });
+        D = stlDrivers_();
+      }
+      return;
+    }
+    const d = D.byId[pid], upd = {};
+    if (main && !d.loginId && !usedLogin[k]) { upd.loginId = String(r.cid).replace(/@.*$/, ''); usedLogin[k] = pid; }
+    const own = (upd.loginId || d.loginId) && stlLogin_(upd.loginId || d.loginId) === k;
+    if (main && own && type && d.driverType !== type) upd.driverType = type;
+    if (r.ownerId !== pid) stlSetRow_('stl_ids', r._row, { ownerId: pid });
+    if (Object.keys(upd).length) {
+      upd.updatedAt = nowText_();
+      writeFields_(SH.DRIVERS, d._row, upd);
+      forgetDriver_(d);
+      out.updated.push(d.name + ' (' + Object.keys(upd).filter(function (x) { return x !== 'updatedAt'; }).map(function (x) { return x === 'loginId' ? '쿠팡플렉스 아이디' : '기사구분'; }).join('·') + ')');
+    }
+  });
+  return out;
 }

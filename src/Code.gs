@@ -1232,7 +1232,7 @@ function onSheetEdit(e) {
     block.forEach(function (v, i) {
       const o = { _row: start + i };
       Object.keys(SCHEMA[name]).forEach(function (k) { o[k] = str_(v[c[k]]); });
-      if (name === SH.DRIVERS) fixDriverRow_(sh, c, o);
+      if (name === SH.DRIVERS) { fixDriverRow_(sh, c, o); if (o.id && o.loginId && typeof stlEnsureIdFor_ === 'function') stlEnsureIdFor_(o); }
       else if (name === SH.ADMINS) fixAdminRow_(sh, c, o);
       else if (name === SH.MEMO) fixMemoRow_(sh, c, o);
       else if (name === SH.NOTICE) fixNoticeRow_(sh, c, o);
@@ -1672,6 +1672,7 @@ function adm_updateDriver(token, id, changes, seenRev) {
       logAdmin_(a, '기사 정보 수정', o.name + ' (' + o.id + ')', changed.join(', ') +
         (f.status ? ' → ' + f.status : ''));
       const fresh = readObj_(SH.DRIVERS, o._row);
+      if (typeof stlEnsureIdFor_ === 'function' && (f.loginId !== undefined || f.name !== undefined)) stlEnsureIdFor_(fresh); // 아이디 관리 연동
       return { ok: true, driver: detailOf_(fresh) };
     } finally {
       lock.releaseLock();
@@ -1829,7 +1830,9 @@ function adm_createDriver(token, fields, tempPw) {
       const at = appendObj_(SH.DRIVERS, row);
       if (row.loginId) forgetDriver_({ loginId: row.loginId });
       logAdmin_(a, '기사 등록', row.name + ' (' + row.id + ')', [row.driverType, row.driverCode].filter(String).join(' ') + (pw ? ', 임시 비밀번호 지정' : ''));
-      return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, at)) };
+      const made = readObj_(SH.DRIVERS, at);
+      if (typeof stlEnsureIdFor_ === 'function') stlEnsureIdFor_(made); // 정산관리 아이디 관리에도 추가
+      return { ok: true, driver: detailOf_(made) };
     } finally {
       lock.releaseLock();
     }
