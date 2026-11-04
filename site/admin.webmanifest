@@ -1,0 +1,30 @@
+{
+  "id": "./admin.html",
+  "name": "러너 올인원 관리자",
+  "short_name": "러너 관리자",
+  "description": "러너 올인원 관리자 — 기사·스케줄·노선·배번호 관리",
+  "lang": "ko",
+  "start_url": "admin.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#1b64da",
+  "icons": [
+    {
+      "src": "icons/admin-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/admin-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/admin-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

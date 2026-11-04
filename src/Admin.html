@@ -54,6 +54,8 @@
   .side .me { position: absolute; left: 12px; right: 12px; bottom: 16px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
   .side .me b { color: var(--ink); display: block; font-size: 13px; }
   .side .me a { color: var(--sub); cursor: pointer; text-decoration: underline; }
+  .side .ainst { display: block; width: 100%; margin: 0 0 10px; height: 34px; border: 1px solid var(--brand); background: var(--brand-weak); color: var(--brand); border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .side .ainst.hidden { display: none; }
   main { padding: 24px 28px; min-width: 0; }
   .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
   .head h2 { margin: 0; font-size: 20px; }
@@ -485,7 +487,7 @@
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a data-view="bib">배번호 관리</a>
     </nav>
-    <div class="me"><b id="meName">관리자</b><a id="logoutBtn">로그아웃</a></div>
+    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="logoutBtn">로그아웃</a></div>
   </aside>
 
   <main>
@@ -766,6 +768,12 @@
   </div>
 </div>
 
+<!-- ───────────── 관리자 앱 설치 안내 ───────────── -->
+<div class="modal hidden" id="aInstModal">
+  <div class="m-box"><h3>관리자 앱 설치</h3><ol id="aInstSteps" style="padding-left:20px;line-height:1.8;margin:0"></ol>
+    <div class="m-actions"><button type="button" class="btn" id="aInstClose">확인</button></div></div>
+</div>
+
 <!-- ───────────── 데이터 초기화 (확인 문구 입력) ───────────── -->
 <div class="modal hidden" id="rzModal">
   <form class="m-box" id="rzForm" novalidate style="width:min(540px,100%)">
@@ -831,6 +839,28 @@
     if (r && r.code === 'EXPIRED') { store.del(); showLogin(); toast(r.msg); throw new Error('EXPIRED'); }
     return r;
   }
+
+  // ───── 관리자 앱 설치 (깃허브 페이지에서 열렸을 때만) ─────
+  // PC 크롬·엣지 / 안드로이드: 설치 창 / 아이폰·아이패드: 사파리 '공유 → 홈 화면에 추가' 안내
+  (function adminInstaller() {
+    const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    if (standalone || !window.RUNNER_CONFIG) return;
+    const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
+    const inApp = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(ua);
+    const btn = $('#aInst'); let deferred = null;
+    const help = (steps) => { $('#aInstSteps').innerHTML = steps.map((x) => '<li>' + x + '</li>').join(''); $('#aInstModal').classList.remove('hidden'); };
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; btn.classList.remove('hidden'); });
+    window.addEventListener('appinstalled', () => { btn.classList.add('hidden'); deferred = null; toast('관리자 앱을 설치했습니다.'); });
+    // 설치 창을 못 띄우는 브라우저(사파리·파이어폭스·카톡 등)에서도 안내는 볼 수 있게 버튼을 보인다
+    setTimeout(() => { if (!deferred) btn.classList.remove('hidden'); }, 2500);
+    btn.addEventListener('click', () => {
+      if (deferred) { deferred.prompt(); deferred.userChoice.finally(() => { deferred = null; }); return; }
+      if (inApp) return help(['오른쪽 위(또는 아래) <b>⋮</b> / <b>공유</b> 버튼을 누릅니다', '<b>다른 브라우저로 열기</b>(크롬·사파리)를 누릅니다', '열린 화면에서 이 버튼을 다시 누릅니다']);
+      if (ios) return help(['사파리 주소창 옆(아래) <b>공유 버튼(□↑)</b>을 누릅니다', '<b>홈 화면에 추가</b>를 누릅니다', '오른쪽 위 <b>추가</b>를 누르면 끝']);
+      help(['<b>크롬</b> 또는 <b>엣지</b>로 이 주소를 엽니다', '주소창 오른쪽의 <b>설치 아이콘(⊕ 또는 모니터 모양)</b>을 누르거나, 메뉴 <b>⋮ → 저장 및 공유 → 페이지를 앱으로 설치</b>(엣지: <b>… → 앱 → 이 사이트를 앱으로 설치</b>)', '<b>설치</b>를 누르면 바탕화면과 시작 메뉴에 <b>러너 관리자</b> 아이콘이 생깁니다']);
+    });
+    $('#aInstClose').addEventListener('click', () => $('#aInstModal').classList.add('hidden'));
+  })();
 
   // ───── 로그인 ─────
   function showLogin() { $('#app').classList.add('hidden'); closeDrawer(true); $('#login').classList.remove('hidden'); $('#lgId').focus(); }

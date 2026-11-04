@@ -36,32 +36,39 @@ const common = [
   '<link rel="preconnect" href="https://script.google.com">',
   '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',
   '<link rel="icon" type="image/png" href="icons/favicon-48.png">',
-  '<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">',
   '<meta name="theme-color" content="#1b64da">',
   '<meta name="referrer" content="no-referrer">'
 ];
+const SW = '<script>if (\'serviceWorker\' in navigator) addEventListener(\'load\', function () { navigator.serviceWorker.register(\'sw.js\').catch(function () {}); });</script>';
 const pages = [
   {
     src: 'Index.html', out: 'index.html', title: '러너 올인원',
     head: common.concat([
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
       '<link rel="manifest" href="manifest.webmanifest">',
+      '<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">',
       '<meta name="apple-mobile-web-app-capable" content="yes">',
       '<meta name="mobile-web-app-capable" content="yes">',
       '<meta name="apple-mobile-web-app-title" content="러너">',
       '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
-      '<script>if (\'serviceWorker\' in navigator) addEventListener(\'load\', function () { navigator.serviceWorker.register(\'sw.js\').catch(function () {}); });</script>'
+      SW
     ])
   },
   {
     src: 'Admin.html', out: 'admin.html', title: '러너 올인원 관리자',
     head: common.concat([
       '<meta name="viewport" content="width=device-width, initial-scale=1">', '<meta name="robots" content="noindex">',
+      '<link rel="manifest" href="admin.webmanifest">',
+      '<link rel="apple-touch-icon" href="icons/admin-apple-touch-icon.png">',
+      '<meta name="apple-mobile-web-app-capable" content="yes">',
+      '<meta name="mobile-web-app-capable" content="yes">',
+      '<meta name="apple-mobile-web-app-title" content="러너 관리자">',
+      SW,
       // 관리자 화면 보안 정책: 서버(구글 웹앱) 외의 곳으로는 데이터를 보낼 수 없고, 다른 곳의 스크립트도 실행되지 않는다
       '<meta http-equiv="Content-Security-Policy" content="' + [
         "default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-        "font-src 'self' https://cdn.jsdelivr.net data:", "img-src 'self' data: blob:",
-        'connect-src https://script.google.com https://script.googleusercontent.com',
+        "font-src 'self' https://cdn.jsdelivr.net data:", "img-src 'self' data: blob:", "manifest-src 'self'",
+        "connect-src 'self' https://script.google.com https://script.googleusercontent.com",
         "frame-src 'self' blob: data:", "worker-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"
       ].join('; ') + '">'
     ])
