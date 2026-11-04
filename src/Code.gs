@@ -40,7 +40,8 @@ const CFG = {
 
 const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOPPED: '정지' };
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
-  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories' };
+  CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
+  PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -251,10 +252,26 @@ const RP_NOTES = {
   value: '그 구분 자리의 글자. 예: 110ABCD 의 구분3 은 B',
   p1: '숫자만 (원). 1,200 처럼 써도 됩니다.',
 };
+// ── 품앗이 (기사끼리 용차 일감 주고받기 · Pumasi.gs) ──
+const PST = { OPEN: '모집 중', TALK: '배차 협의중', DONE: '배차 확정', CLOSED: '모집 마감', CANCEL: '취소' };
+const PAST = { APPLY: '지원', TALK: '협의 중', OK: '확정', NO: '미선정', CANCEL: '지원 취소' };
+const PJ = {
+  id: '일감ID', status: '상태', posterId: '등록 기사ID', poster: '등록 기사', kind: '구분', date: '배차일자', time: '입차시간',
+  area: '배송지', campId: '센터ID', camp: '센터', route: '라우트', qty: '평균 물량', top: '탑 종류', price: '건당 단가(VAT포함)', pay: '지급방법',
+  desc: '상세 설명', secret: '배차 확정 기사에게만 (배송지코드·연락처 등)', attach: '첨부파일', acceptedId: '확정 기사ID', accepted: '확정 기사',
+  createdAt: '등록일시', updatedAt: '수정일시'
+};
+const PJ_NOTES = {
+  status: '모집 중 / 배차 협의중 / 배차 확정 / 모집 마감 / 취소',
+  kind: '주간 / 야간 / 일택',
+  secret: '배차가 확정된 기사와 등록한 기사에게만 보입니다.'
+};
+const PA = { id: '지원ID', jobId: '일감ID', driverId: '지원 기사ID', name: '지원 기사', date: '배차일자', status: '상태', memo: '한마디', createdAt: '지원일시', updatedAt: '수정일시' };
+const PA_NOTES = { status: '지원 / 협의 중 / 확정 / 미선정 / 지원 취소' };
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -271,6 +288,8 @@ SCHEMA[SH.ROUTES] = R;
 SCHEMA[SH.NOTICE] = N;
 SCHEMA[SH.ACC] = AC;
 SCHEMA[SH.ACAT] = ACAT;
+SCHEMA[SH.PJOB] = PJ;
+SCHEMA[SH.PAPP] = PA;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -1219,6 +1238,7 @@ function onSheetEdit(e) {
       else if (name === SH.CADDR) fixCampAddrRow_(sh, c, o);
       else if (name === SH.PRICES) fixPriceRow_(sh, c, o);
       else if (name === SH.SESSIONS) cache_().remove('ss:' + o.tokenHash);
+      else if (name === SH.PJOB || name === SH.PAPP) pmTouch_();
     });
     if (campRenamed) syncCampNames_();
   } finally {
@@ -4498,6 +4518,8 @@ function api_mySchedule(token, month) {
     }
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
+    // 품앗이: 내가 뛰는 일감(수행)·맡긴 일감(맡김)·지원 중인 일감
+    try { out.pumasi = pmScheduleOf_(String(s.d), dates); } catch (e) { out.pumasi = {}; }
     if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
     const h = schHeader_();
     const row = (function () {
