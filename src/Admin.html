@@ -487,7 +487,7 @@
       <a class="off">러너 매출·매입 <small>준비 중</small></a>
       <a data-view="bib">배번호 관리</a>
     </nav>
-    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="logoutBtn">로그아웃</a></div>
+    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a></div>
   </aside>
 
   <main>
@@ -683,6 +683,20 @@
   </form>
 </div>
 
+<!-- ───────────── 관리자 본인 비밀번호 변경 ───────────── -->
+<div class="modal hidden" id="apModal">
+  <form class="m-box" id="apForm" novalidate>
+    <h3>내 비밀번호 변경</h3>
+    <p style="margin:0 0 12px;color:var(--sub);font-size:13px">바꾸면 다른 PC·휴대폰의 관리자 로그인은 모두 해제됩니다. 지금 화면은 그대로 쓸 수 있습니다.</p>
+    <input type="text" id="apUser" autocomplete="username" hidden>
+    <div class="field"><label class="lb" for="apCur">현재 비밀번호</label><input class="inp" id="apCur" type="password" autocomplete="current-password"></div>
+    <div class="field"><label class="lb" for="apNew">새 비밀번호 (영문+숫자 8~30자)</label><input class="inp" id="apNew" type="password" autocomplete="new-password"></div>
+    <div class="field"><label class="lb" for="apNew2">새 비밀번호 확인</label><input class="inp" id="apNew2" type="password" autocomplete="new-password"></div>
+    <label class="check"><input type="checkbox" id="apShow"> 비밀번호 보기</label>
+    <div class="m-actions"><button type="button" class="btn ghost" id="apCancel">취소</button><button class="btn" id="apOk">변경</button></div>
+  </form>
+</div>
+
 <!-- ───────────── 노선관리: 캠프 추가·수정 ───────────── -->
 <div class="modal hidden" id="campModal">
   <form class="m-box" id="campForm" novalidate style="width:min(520px,100%)">
@@ -864,7 +878,9 @@
 
   // ───── 로그인 ─────
   function showLogin() { $('#app').classList.add('hidden'); closeDrawer(true); $('#login').classList.remove('hidden'); $('#lgId').focus(); }
+  let me = null;
   function showApp(admin) {
+    me = admin;
     $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
     driversLoaded = false;
@@ -880,6 +896,31 @@
       store.set(r.token, auto); $('#lgPw').value = '';
       showApp(r.admin);
     }).catch(() => toast('연결이 원활하지 않습니다.')).finally(() => { b.disabled = false; });
+  });
+  // ───── 관리자 본인 비밀번호 변경 ─────
+  const apClose = () => { $('#apModal').classList.add('hidden'); $('#apForm').reset(); ['apCur', 'apNew', 'apNew2'].forEach((id) => { $('#' + id).type = 'password'; }); };
+  $('#apOpen').addEventListener('click', () => {
+    $('#apForm').reset(); $('#apUser').value = (me && me.loginId) || '';
+    $('#apModal').classList.remove('hidden'); $('#apCur').focus();
+  });
+  $('#apCancel').addEventListener('click', apClose);
+  $('#apShow').addEventListener('change', (e) => { ['apCur', 'apNew', 'apNew2'].forEach((id) => { $('#' + id).type = e.target.checked ? 'text' : 'password'; }); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#apModal').classList.contains('hidden')) apClose(); });
+  $('#apForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const cur = $('#apCur').value, a = $('#apNew').value, b = $('#apNew2').value;
+    if (!cur) return toast('현재 비밀번호를 입력해 주세요.');
+    if (!(a.length >= 8 && a.length <= 30 && /[A-Za-z]/.test(a) && /\d/.test(a))) return toast('새 비밀번호는 영문과 숫자를 포함해 8~30자로 입력해 주세요.');
+    if (a !== b) return toast('새 비밀번호 확인이 다릅니다.');
+    if (a === cur) return toast('새 비밀번호는 현재 비밀번호와 다르게 정해 주세요.');
+    const btn = $('#apOk'); btn.disabled = true; btn.textContent = '바꾸는 중…';
+    api('adm_changePassword', cur, a).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      let persist = false;
+      try { persist = !!localStorage.getItem(TOKEN); } catch (err) {}
+      store.set(r.token, persist);
+      apClose(); toast(r.msg);
+    }).catch(() => {}).finally(() => { btn.disabled = false; btn.textContent = '변경'; });
   });
   $('#logoutBtn').addEventListener('click', () => {
     const t = store.get(); store.del(); showLogin();
