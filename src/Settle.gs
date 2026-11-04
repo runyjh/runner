@@ -133,7 +133,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261104d';
+const STL_CALC_VER = '20261104e';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1099,7 +1099,7 @@ function stlCompute_(month) {
     const row = {
       id: id, cid: s.cid, name: s.name, ownerId: s.ownerId, ids: X.groups[id].cids.length, cids: X.groups[id].cids.slice(), usedCids: Object.keys(s.ids), type: s.type || '', mode: s.mode || '',
       workers: workers.filter(function (w) { return !w.owner; }).map(function (w) { return w.name; }),
-      workDays: s.sched.days, workDaysBy: s.sched.byCid, qty: s.qty, sales: s.sales,
+      workDays: s.sched.days, workDaysBy: s.sched.byCid, workDaysSrc: s.sched.src, qty: s.qty, sales: s.sales,
       base: s.base, inc: s.inc, fresh: s.fresh, fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
       profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
@@ -1256,7 +1256,14 @@ function stlGroupSched_(ctx, g, sched, P, cidDays) {
     if ((i > 0 && shared) || !n) n = cp;
     byCid.push({ cid: String(c).replace(/@.*$/, ''), days: n });
   });
-  return { days: days, cells: cells, byCid: byCid };
+  // 기사스케줄에 이 기간 기록이 하나도 없으면(새로 등록한 기사 등) 쿠팡 배송이 잡힌 날 수로 센다
+  let src = 'sched';
+  if (!days && !Object.keys(cells).length) {
+    const all = {};
+    Object.keys(cidDays || {}).forEach(function (c) { Object.keys(cidDays[c]).forEach(function (d) { all[d] = 1; }); });
+    if (Object.keys(all).length) { days = Object.keys(all).length; src = 'coupang'; }
+  }
+  return { days: days, cells: cells, byCid: byCid, src: src };
 }
 
 /**

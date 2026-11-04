@@ -4585,7 +4585,7 @@
   function wdTxt(d) {
     const by = (d.workDaysBy || []).filter((x) => x.days || (d.workDaysBy || []).length === 1);
     if ((d.workDaysBy || []).length > 1 && by.length) return by.map((x) => esc(x.cid) + '/' + x.days + '일').join(', ');
-    return (d.workDays || 0) + '일 <small class="sub">(기사스케줄)</small>';
+    return (d.workDays || 0) + '일 <small class="sub">(' + (d.workDaysSrc === 'coupang' ? '기사스케줄 기록 없음 → 쿠팡 배송일' : '기사스케줄') + ')</small>';
   }
   function slipHtml(r) {
     const s = r.slip, d = s.row, co = r.company, P = r.period, D = r.dates;
