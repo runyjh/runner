@@ -93,6 +93,18 @@ function api_bdList(token, f) {
     };
   });
 }
+/** 홈 화면: 최근 글 3개 (공개 글만) */
+function api_bdRecent(token) {
+  return run_(function () {
+    const u = pmUser_(token);
+    const d = bdData_(), order = {};
+    d.posts.forEach(function (p, i) { order[p.id] = i; });
+    const list = d.posts.filter(function (p) { return bdStatus_(p) === BD_ST.OPEN; })
+      .sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)) || order[b.id] - order[a.id]; })
+      .slice(0, 3).map(function (p) { return bdCard_(p, u.id); });
+    return { ok: true, posts: list };
+  });
+}
 /** 글 하나 + 댓글 */
 function api_bdPost(token, id) {
   return run_(function () {

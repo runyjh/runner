@@ -606,6 +606,7 @@
       <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
       <button class="tile wide" id="mBoard" type="button"><b>💬 자유게시판</b><span>기사님끼리 정보·질문·나눔 →</span></button>
     </div>
+    <div class="ntcard hidden" id="bdCard" style="margin-top:12px"></div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
   </section>
@@ -836,7 +837,7 @@
     }).finally(() => clearTimeout(timer));
   }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  const API_BG = ['api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -985,7 +986,8 @@
     const saved = viewRestored ? null : ssGet('runner.view');
     viewRestored = true;
     show('home');
-    homeGate([new Promise((res) => setTimeout(() => res(loadNotices()), 0)), sessP]); // (공지 함수는 뒤에서 선언되므로 한 박자 뒤에)
+    homeGate([new Promise((res) => setTimeout(() => res(loadNotices()), 0)), sessP]);
+    setTimeout(() => { if (window.bdRecent) window.bdRecent(); }, 0); // (공지 함수는 뒤에서 선언되므로 한 박자 뒤에)
     if (window.pmAlertStart) setTimeout(() => window.pmAlertStart(), 0);
     if (saved) setTimeout(() => restoreView(saved), 0);
   }
@@ -2270,6 +2272,21 @@
     }).catch(() => { if (!append) $('#bdList').innerHTML = ''; netErr(); });
   }
   $('#mBoard').addEventListener('click', () => openBoard('home'));
+  // 홈: 게시판 최근 글 3개
+  window.bdRecent = function () {
+    const token = store.get(TOKEN); if (!token) return;
+    api('api_bdRecent', token).then((r) => {
+      const box = $('#bdCard');
+      if (!r || !r.ok || !r.posts.length) { box.classList.add('hidden'); return; }
+      box.innerHTML = '<h3><span>💬 자유게시판 최근 글</span><a id="bdAll">전체 보기 ›</a></h3>' + r.posts.map((p) => '<button type="button" class="ntrow" data-bp="' + escH(p.id) + '">' +
+        '<span class="bdc c-' + escH(p.cat) + '">' + escH(p.cat) + '</span><span class="tt">' + escH(p.title) + '</span>' + (p.cmts ? '<span class="dd" style="color:var(--brand);font-weight:700">💬 ' + p.cmts + '</span>' : '') + '<span class="dd">' + escH(bdAgo(p.at)) + '</span></button>').join('');
+      box.classList.remove('hidden');
+    }).catch(() => {});
+  };
+  $('#bdCard').addEventListener('click', (e) => {
+    if (e.target.closest('#bdAll')) return openBoard('home');
+    const b = e.target.closest('[data-bp]'); if (b) openBdPost(b.dataset.bp, 'home');
+  });
   $('#bdBack').addEventListener('click', () => { if (bdFromHome === 'mypage') return openMyPage(); let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
   $('#bdCats').addEventListener('click', (e) => { const b = e.target.closest('[data-bc]'); if (!b || b.dataset.bc === bdCat) return; bdCat = b.dataset.bc; bdPage = 0; loadBoard(); });
   $('#bdGo').addEventListener('click', () => { bdPage = 0; loadBoard(); });
@@ -2282,7 +2299,11 @@
 
   // 글 보기
   function openBdPost(id, from) { bdCurId = id; bdFrom = from || 'board'; bdReply = null; ssSet('runner.bdId', id); show('bdpost'); loadBdPost(); }
-  $('#bpBack').addEventListener('click', () => { if (bdFrom === 'alerts') return openPmAlerts(); show('board'); loadBoard(); });
+  $('#bpBack').addEventListener('click', () => {
+    if (bdFrom === 'alerts') return openPmAlerts();
+    if (bdFrom === 'home') { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} return goHome(user); }
+    show('board'); loadBoard();
+  });
   function loadBdPost(keep) {
     const token = pmTok(); if (!token) return;
     if (!keep) $('#bpBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
