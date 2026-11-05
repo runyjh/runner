@@ -5445,7 +5445,8 @@ function schBuildUpload_(data, opt) {
 /** 아이디 확인: 출근 줄의 아이디가 정산관리 아이디 관리에 없거나(벤더 미등록) 정지면 막는다 */
 function schCheckIds_(res) {
   let X;
-  try { X = stlIds_(stlDrivers_()); } catch (e) { res.idCheckError = String(e && e.message || e); return res; }
+  try { X = stlIds_(stlDrivers_()); } catch (e) { res.idCheckError = String(e && e.message || e); X = null; }
+  if (!X) { res.level = (res.dups.length || res.over7.length) ? 'red' : res.missing.length ? 'orange' : 'green'; return res; }
   const seen = {};
   [].concat.apply([], res.weeks).filter(function (r) { return !res.weekEnd || String(r[0]) <= res.weekEnd; }).forEach(function (r) {
     const id = String(r[4] || ''), k = stlLogin_(id);

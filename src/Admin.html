@@ -68,6 +68,18 @@
   .up-sig { margin: 8px 0; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
   .up-sig.red { background: var(--danger-weak); color: #8a1f1f; } .up-sig.orange { background: var(--warn-weak); color: #7a4b05; } .up-sig.green { background: var(--ok-weak); color: #0b5c31; }
   .seg button.bad { color: var(--danger); font-weight: 700; }
+  .upsteps { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fafbfc; }
+  .upstep { display: flex; gap: 10px; align-items: flex-start; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .upstep > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+  .upstep .no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .upstep small { color: var(--faint); font-size: 11px; line-height: 1.4; }
+  .upstep .up-sig { margin: 0; padding: 8px 10px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .upacts { display: flex; flex-direction: column; gap: 6px; } .upacts .btn { width: 100%; }
+  .upacts .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .sigc { border: 0; border-radius: 999px; padding: 2px 10px; font-weight: 700; font-size: 12px; cursor: pointer; }
+  .sigc.red { background: #e5484d; color: #fff; } .sigc.orange { background: #f59e0b; color: #fff; }
+  .upcopy { margin-left: auto; display: flex; gap: 6px; align-items: center; } .upcopy .check { margin: 0; font-size: 12px; }
+  @media (max-width: 820px) { .upsteps { grid-template-columns: 1fr; } }
   .wkc { font-size: 10px; color: var(--faint); line-height: 1; margin-top: 2px; }
   .wkc .over { color: var(--danger); font-weight: 800; }
   .wkc .six { color: var(--warn); font-weight: 800; }
@@ -579,6 +591,18 @@
   .stools .btn { height: 36px; }
   .stools .check { margin: 0; font-size: 13px; }
   .stools .grow { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .shead { gap: 16px; } .shead .sview { margin-right: auto; }
+  .sview button { font-size: 14px; padding: 0 16px; height: 36px; font-weight: 700; }
+  .snav { display: flex; align-items: center; gap: 4px; padding-right: 6px; border-right: 1px solid var(--line); margin-right: 2px; }
+  .snav .ic { width: 36px; padding: 0; } .stitle { font-size: 15px; white-space: nowrap; margin: 0 6px; min-width: 96px; text-align: center; }
+  .stools .sdate { width: 36px !important; padding: 0 6px; color: transparent; cursor: pointer; } .stools .sdate::-webkit-datetime-edit { display: none; }
+  .smore { position: relative; }
+  .smenu { position: absolute; right: 0; top: 40px; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px; min-width: 240px; display: flex; flex-direction: column; }
+  .smenu > button, .smenu > label { text-align: left; background: none; border: 0; padding: 9px 10px; border-radius: 6px; font-size: 14px; cursor: pointer; color: var(--ink); margin: 0; }
+  .smenu > button:hover, .smenu > label:hover { background: var(--gray-weak); }
+  .smenu small { display: block; color: var(--faint); font-size: 11px; }
+  .smenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  .slegend .k-iss { background: #fdecec; color: #e5484d; font-weight: 800; }
   .seg { display: inline-flex; background: var(--gray-weak); border-radius: 8px; padding: 3px; }
   .seg button { border: 0; background: none; height: 30px; padding: 0 14px; border-radius: 6px; font-weight: 700; color: var(--sub); }
   .seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -969,37 +993,45 @@
     </div>
    </section>
    <section id="view-sched" class="hidden">
-    <div class="head">
+    <div class="head shead">
       <h2>기사스케줄 <small id="sCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="seg sview" id="sView"><button type="button" data-sv="drv" class="on" title="기사 × 날짜 — 칸을 눌러 입력">기사별</button><button type="button" data-sv="route" title="노선 × 날짜 — 빈 노선을 누르면 넣을 사람 추천">노선별</button></div>
       <div class="tools"><span class="ssave ok" id="sSave">모두 저장됨</span></div>
     </div>
     <div class="stools">
-      <div class="seg" id="sView"><button type="button" data-sv="drv" class="on" title="기사 × 날짜 (입력)">기사 보기</button><button type="button" data-sv="route" title="노선 × 날짜 — 빈 노선을 누르면 넣을 사람 추천">노선 보기</button></div>
+      <div class="snav">
+        <button class="btn ghost ic" id="sPrev" title="이전">◀</button><button class="btn ghost" id="sToday">이번 주</button><button class="btn ghost ic" id="sNext" title="다음">▶</button>
+        <b id="sTitle" class="stitle"></b>
+        <input class="inp sdate" type="date" id="sDate" title="날짜로 이동">
+      </div>
       <div class="seg" id="sMode"><button type="button" data-mode="2w" class="on">2주</button><button type="button" data-mode="month">한 달</button></div>
       <select class="inp hidden" id="sBasis" aria-label="한 달 기준"><option value="cal">달력 (1일~말일)</option><option value="settle">정산 (전월 26일~25일)</option></select>
-      <button class="btn ghost" id="sPrev">◀ 이전주</button><button class="btn ghost" id="sToday">이번 주</button><button class="btn ghost" id="sNext">다음주 ▶</button>
-      <b id="sTitle" style="font-size:14px;white-space:nowrap"></b>
-      <input class="inp" type="date" id="sDate" title="날짜 검색 (그 주 일요일부터 2주)">
       <select class="inp" id="sCamp" aria-label="캠프"></select>
-      <input class="inp" id="sQ" placeholder="이름·아이디·노선 검색" style="width:160px">
-      <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
+      <input class="inp" id="sQ" placeholder="🔍 이름·아이디·노선" style="width:150px">
       <div class="grow">
-        <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
-        <button class="btn ghost" id="sIssue" title="이 기간 이슈 목록 · 기록은 칸에서 오른쪽 클릭 (또는 칸을 고르고 목록의 [+ 이슈 기록])">⚠ 이슈 <b id="sIssueN"></b></button>
-        <button class="btn ghost" id="sYear" title="기사별 명절·공휴일 휴무 횟수, 이슈 수 (년 단위)">연간 현황</button>
-        <button class="btn ghost" data-rcopen="list" title="날짜부터 바뀌는 캠프·노선 (스케줄 칸에 '노선변경 군포1 212AB' 라고 써도 예약됩니다)">노선 변경 예약</button>
-        <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
-        <button class="btn ghost" id="sFill" title="고정·품앗이 기사의 오늘 이후 빈칸을 출근/고정휴무로">빈칸 자동 채우기</button>
-        <button class="btn ghost" id="sReload">새로고침</button>
-        <button class="btn ghost danger-t" type="button" data-reset="sched">데이터 초기화</button>
+        <button class="btn ghost" id="sIssue" title="이 기간 이슈 목록 · 기록은 칸에서 오른쪽 클릭">⚠ 이슈 <b id="sIssueN"></b></button>
+        <button class="btn ghost" id="sYear" title="기사별 명절·공휴일 휴무 횟수, 이슈 수 (년 단위)">📅 연간 현황</button>
+        <div class="smore">
+          <button class="btn ghost" type="button" id="sMoreBtn" aria-haspopup="true">⋯ 더보기</button>
+          <div class="smenu hidden" id="sMenu">
+            <button type="button" id="sFill">빈칸 자동 채우기 <small>고정·품앗이 → 출근/고정휴무</small></button>
+            <button type="button" id="sNoteAdd">비고 줄 추가</button>
+            <button type="button" data-rcopen="list">노선 변경 예약</button>
+            <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
+            <button type="button" id="sReload">새로고침</button>
+            <hr>
+            <button type="button" class="danger-t" data-reset="sched">데이터 초기화</button>
+          </div>
+        </div>
+        <button class="btn" id="sUpload" title="쿠팡 어드민에 올릴 양식 만들기 · 검사 · 내려받기 · 입차 확인">⬆ 쿠팡 업로드</button>
       </div>
     </div>
     <div class="swrap" id="sWrap" tabindex="0"></div>
     <div class="swrap hidden" id="sBoard"></div>
     <div class="slegend">
       <span class="k-work">출근</span><span class="k-off">휴무</span><span class="k-sick">병가</span><span class="k-mi">미입차</span><span class="k-yong">용차</span>
-      <span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other">다른 캠프</span><span style="box-shadow:inset 0 0 0 2px #f59e0b">중복</span>
-      <em style="font-style:normal">· 칸을 누르고 입력 (Enter 저장, Alt+Enter 줄바꿈) · 드래그로 여러 칸 선택 · Ctrl+C / Ctrl+V 로 엑셀·구글시트와 복사 · Delete 지우기 · Ctrl+Z 되돌리기 · 고치면 자동 저장</em>
+      <span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other">다른 캠프</span><span style="box-shadow:inset 0 0 0 2px #f59e0b">중복</span><span class="k-iss">! 이슈</span>
+      <em style="font-style:normal">칸 누르고 입력 · <b>오른쪽 클릭 = 이슈</b> · 드래그로 여러 칸 · Ctrl+C/V 엑셀 · Ctrl+Z 되돌리기 · 자동 저장</em>
     </div>
    </section>
 
@@ -1405,23 +1437,25 @@
 <!-- ───────────── 어드민 업로드 테이블 ───────────── -->
 <div class="modal hidden" id="upModal">
   <div class="m-box wide" style="width:min(1180px,100%)">
-    <div class="m-top"><b id="upTitle">어드민 업로드 테이블</b>
-      <a class="btn ghost" id="upSheet" target="_blank" rel="noopener">시트에서 열기</a>
-      <button type="button" class="btn ghost" id="upRegen">다시 만들기</button>
+    <div class="m-top"><b id="upTitle">쿠팡 업로드</b>
+      <a class="btn ghost" id="upSheet" target="_blank" rel="noopener">시트</a>
+      <button type="button" class="btn ghost" id="upRegen" title="스케줄을 고쳤으면 다시 만들기">↻ 다시 만들기</button>
       <button type="button" class="btn ghost" id="upClose">닫기</button></div>
-    <div class="up-bar">
-      <div class="seg" id="upScope"><button type="button" data-scope="nextweek">다음 주 (일~토)</button><button type="button" data-scope="thisweek">이번 주 내일부터</button><button type="button" data-scope="month" title="내일부터 5주 뒤 토요일까지. 미리 올려도 되고, 고치면 다시 만들어 올리면 됩니다">한 달치 (내일부터)</button><button type="button" data-scope="tomorrow" class="on">보고 있는 2주 · 내일부터</button></div>
-      <span class="up-info">쿠팡 어드민은 전날 W1 10시 · W2 15시까지</span>
+    <div class="upsteps">
+      <div class="upstep"><span class="no">1</span><div><b>범위</b>
+        <div class="seg" id="upScope"><button type="button" data-scope="nextweek">다음 주</button><button type="button" data-scope="thisweek">이번 주 (내일부터)</button><button type="button" data-scope="month">한 달치</button></div>
+        <small>전날 W1 10시 · W2 15시 마감 · 미리 올려도 되고, 고치면 다시 만들어 올리기</small></div></div>
+      <div class="upstep"><span class="no">2</span><div><b>검사</b><div class="up-sig hidden" id="upSig"></div></div></div>
+      <div class="upstep"><span class="no">3</span><div><b>올리기</b>
+        <div class="upacts"><button type="button" class="btn" id="upXlsx" title="쿠팡 어드민 업로드 양식 그대로 .xlsx">⬇ 쿠팡 양식 내려받기</button>
+        <button type="button" class="btn ghost" id="upCmp" title="쿠팡 어드민 [엑셀 다운로드] 파일을 올리면 우리 표와 맞춰 봅니다">🔎 쿠팡 파일로 입차 확인</button>
+        <input type="file" id="upCmpFile" accept=".xlsx" class="hidden"></div>
+        <small>내려받은 파일 → 쿠팡 어드민 [업로드] → 쿠팡 [엑셀 다운로드] 파일을 다시 넣어 확인</small></div></div>
     </div>
-    <div class="up-sig hidden" id="upSig"></div>
     <div class="up-bar">
       <div class="seg" id="upTabs"></div>
       <span class="up-info" id="upInfo"></span>
-      <label class="check"><input type="checkbox" id="upWithName"> 명단 열 포함</label>
-      <button type="button" class="btn ghost" id="upCopy">이 표 복사</button>
-      <button type="button" class="btn" id="upXlsx" title="쿠팡 어드민 업로드 양식(업무일·사업자번호·캠프·웨이브·아이디·출근·회전·라우트) 그대로 .xlsx">쿠팡 양식 내려받기</button>
-      <button type="button" class="btn ghost" id="upCmp" title="쿠팡 어드민 [엑셀 다운로드] 파일을 올리면 우리 표와 줄 단위로 맞춰 봅니다">쿠팡 다운로드 대조</button>
-      <input type="file" id="upCmpFile" accept=".xlsx" class="hidden">
+      <span class="upcopy"><label class="check"><input type="checkbox" id="upWithName"> 명단 열</label><button type="button" class="btn ghost" id="upCopy">이 표 복사</button></span>
     </div>
     <div class="up-wrap" id="upWrap"></div>
   </div>
@@ -4540,13 +4574,12 @@
     $$('#sMode button').forEach((b) => b.classList.toggle('on', b.dataset.mode === sMode));
     $('#sBasis').classList.toggle('hidden', sMode !== 'month');
     $('#sBasis').value = sBasis;
-    $('#sPrev').textContent = sMode === 'month' ? '◀ 이전달' : '◀ 이전주';
-    $('#sNext').textContent = sMode === 'month' ? '다음달 ▶' : '다음주 ▶';
+    $('#sPrev').title = sMode === 'month' ? '이전 달' : '이전 주'; $('#sNext').title = sMode === 'month' ? '다음 달' : '다음 주';
     $('#sToday').textContent = sMode === 'month' ? '이번 달' : '이번 주';
     if (sMode === 'month' && sMonth) {
       const [y, m] = sMonth.split('-').map(Number), r = monthRange(sMonth), f = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
       $('#sTitle').textContent = sBasis === 'settle' ? y + '년 ' + m + '월분 정산 (' + f(r.from) + ' ~ ' + f(r.to) + ')' : y + '년 ' + m + '월';
-    } else $('#sTitle').textContent = '';
+    } else $('#sTitle').textContent = SD.dates.length ? (+SD.dates[0].slice(5, 7)) + '/' + (+SD.dates[0].slice(8)) + ' ~ ' + (+SD.dates[SD.dates.length - 1].slice(5, 7)) + '/' + (+SD.dates[SD.dates.length - 1].slice(8)) : '';
   }
   /** 굵은 세로선을 넣을 칸: 2주는 둘째 주 시작, 한 달은 매주 일요일 */
   function sepCol(ci) {
@@ -5131,6 +5164,7 @@
   // ───── 어드민 업로드 테이블 (운영시트 '어드민: 업로드 테이블 생성'과 같은 결과) ─────
   let upRes = null, upTab = 'w1', upScope = 'nextweek', upCmpRes = null;
   try { upScope = localStorage.getItem('runner.sch.upScope') || 'nextweek'; } catch (e) {}
+  if (!['nextweek', 'thisweek', 'month'].includes(upScope)) upScope = 'nextweek';
   const UP_HEAD = ['업무일', '사업자등록번호', '캠프명', '웨이브', '아이디', '업무상태', '회전', '업무라우트', '비고', '', '명단'];
   const md = (d) => String(d || '').slice(5).replace('-', '/');
   function upMake() {
@@ -5144,11 +5178,11 @@
       if (!r.ok) { $('#upWrap').innerHTML = ''; return toast(r.msg); }
       upRes = r;
       const d0 = r.dates[0], d1 = r.dates[r.dates.length - 1];
-      $('#upTitle').textContent = '어드민 업로드 테이블 · ' + (r.weekEnd ? md(r.target) + ' ~ ' + md(r.weekEnd) + (r.scope === 'month' ? ' (한 달치)' : ' (일~토 한 주)') : md(d0) + ' ~ ' + md(d1) + ' (PDD ' + md(r.target) + '부터)');
+      $('#upTitle').textContent = '쿠팡 업로드 · ' + (r.weekEnd ? md(r.target) + ' ~ ' + md(r.weekEnd) : md(d0) + ' ~ ' + md(d1));
       $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
       if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
       if (r.idCheckError) toast('아이디 확인을 못 했습니다: ' + r.idCheckError);
-      upTab = r.level === 'red' ? (r.dups.length ? 'dup' : r.over7.length ? 'over' : 'bad') : 'all';
+      upTab = r.level === 'red' ? (r.dups.length ? 'dup' : r.over7.length ? 'over' : 'bad') : 'up';
       upSigRender(); upTabsRender(); upRender();
     }).catch(() => { $('#upWrap').innerHTML = ''; });
   }
@@ -5162,6 +5196,7 @@
     if (!upRes) return [];
     if (/^w\d+$/.test(tab)) return upRes.weeks[+tab.slice(1)] || [];
     if (tab === 'all') return [].concat(...upRes.weeks, upRes.missing);
+    if (tab === 'up') return upWeekRows();
     if (tab === 'mi') return upRes.missing;
     if (tab === 'over') return upRes.over7 || [];
     if (tab === 'bad') return upRes.badId || [];
@@ -5171,16 +5206,20 @@
   function upSigRender() {
     const r = upRes, el = $('#upSig');
     const n = upWeekRows().length;
-    const bad = [r.dups.length ? '중복 ' + r.dups.length : '', (r.over7 || []).length ? '주7일 ' + r.over7.length : '', (r.badId || []).length ? '아이디 ' + r.badId.length : ''].filter(Boolean).join(' · ');
+    const chip = (tab, label, cnt, cls) => cnt ? '<button type="button" class="sigc ' + cls + '" data-up="' + tab + '">' + label + ' ' + cnt + '</button>' : '';
+    const probs = chip('dup', '중복', r.dups.length, 'red') + chip('over', '주7일', (r.over7 || []).length, 'red') + chip('bad', '아이디', (r.badId || []).length, 'red') + chip('mi', '미입차', r.missing.length, 'orange');
     el.className = 'up-sig ' + r.level;
-    el.innerHTML = r.level === 'red' ? '<b>🔴 올리기 전에 고쳐야 합니다</b> — ' + bad + (r.missing.length ? ' (미입차 ' + r.missing.length + '건은 경고만)' : '') + '. 고치고 [다시 만들기]'
-      : r.level === 'orange' ? '<b>🟠 미입차 ' + r.missing.length + '건</b> — 비워 둔 채 올릴 수 있습니다. 출근 ' + n + '줄'
-      : '<b>🟢 이상 없음</b> — 출근 ' + n + '줄, 바로 내려받아 올리면 됩니다';
+    el.innerHTML = (r.level === 'red' ? '<b>🔴 고쳐야 내려받을 수 있어요</b>' : r.level === 'orange' ? '<b>🟠 올려도 됩니다</b> <span>미입차는 비워 둔 채 올라가요</span>' : '<b>🟢 이상 없음</b>') +
+      ' <span class="sub">출근 ' + n + '줄</span> ' + probs;
     el.classList.remove('hidden');
+    $('#upXlsx').disabled = r.level === 'red';
   }
   function upTabsRender() {
-    const t = [['all', '전체 (출근+미입차)']].concat(upRes.weeks.map((w, i) => ['w' + i, md(upRes.dates[i * 7]) + '주 출근']).filter((x, i) => upRes.weeks[i].length || i < 2),
-      [['mi', '미입차'], ['dup', '중복'], ['over', '주7일'], ['bad', '아이디 확인']]);
+    // 올릴 줄 + (범위 안의 주가 여럿이면) 주별 + 문제가 있는 것만
+    const inScope = upRes.weeks.map((w, i) => i).filter((i) => upRes.weeks[i].some((r) => r[0] >= upRes.target && (!upRes.weekEnd || r[0] <= upRes.weekEnd)));
+    const t = [['up', '올릴 줄']];
+    if (inScope.length > 1) inScope.forEach((i) => t.push(['w' + i, md(upRes.dates[i * 7]) + '주']));
+    [['mi', '미입차'], ['dup', '중복'], ['over', '주7일'], ['bad', '아이디']].forEach((x) => { if (upRows(x[0]).length || upTab === x[0]) t.push(x); });
     if (upCmpRes) t.push(['cmp', '쿠팡 대조']);
     const red = { dup: 1, over: 1, bad: 1 };
     $('#upTabs').innerHTML = t.map(([k, l]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + (red[k] && upRows(k).length ? ' bad' : '') + (k === 'cmp' && upCmpRes && upCmpRes.rows.length ? ' bad' : '') + '">' + l + ' ' + upRows(k).length + '</button>').join('');
@@ -5198,11 +5237,12 @@
     // 전체 보기: 주가 바뀌는 자리에 굵은 줄
     const seps = new Set();
     if (upTab === 'all') { let acc = 0; upRes.weeks.forEach((w, wi) => { if (wi && w.length && acc) seps.add(acc); acc += w.length; }); }
+    if (upTab === 'up') rows.forEach((r, i) => { if (i && new Date(r[0] + 'T00:00:00').getDay() === 0 && rows[i - 1][0] !== r[0]) seps.add(i); });
     $('#upInfo').textContent = upTab === 'dup' ? '같은 날 같은 캠프·노선·회전 칸에 2명 — 노선별 회전이 다르면 205C(D1),205D 처럼 노선 뒤 괄호로 나누세요 (쿠팡엔 합쳐서 올라감).'
       : upTab === 'mi' ? '기사가 없는 노선·회전 (캠프·회전별로 묶음)'
       : upTab === 'over' ? '아이디 하나가 일~토 한 주에 출근 ' + ((SD.maxDays || 6) + 1) + '일 이상 — 쿠팡이 받지 않습니다. 하루는 서브 아이디로 바꾸거나 휴무.'
       : upTab === 'bad' ? '정산관리 아이디 관리에 없거나(미등록) 정지된 아이디 — 쿠팡 업로드가 거절됩니다.'
-      : upTab === 'cmp' ? (upCmpRes ? upCmpRes.info : '') : '파란 줄 = 업무등록·업무·선탑·신규 등 확인이 필요한 줄';
+      : upTab === 'cmp' ? (upCmpRes ? upCmpRes.info : '') : '파란 줄 = 업무등록·선탑·신규 등 한 번 더 볼 줄';
     if (!rows.length) { $('#upWrap').innerHTML = '<div class="empty">' + (upTab === 'dup' ? '중복이 없습니다.' : upTab === 'mi' ? '미입차가 없습니다.' : upTab === 'over' ? '주 7일 아이디가 없습니다.' : upTab === 'bad' ? '아이디 문제가 없습니다.' : upTab === 'cmp' ? '우리 표와 쿠팡이 모두 같습니다.' : '해당하는 줄이 없습니다.') + '</div>'; return; }
     $('#upWrap').innerHTML = '<table class="up"><thead><tr><th></th>' + UP_HEAD.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
       rows.map((r, i) => (seps.has(i) ? '<tr class="sep"><td colspan="12"></td></tr>' : '') +
@@ -5212,6 +5252,7 @@
   $('#upRegen').addEventListener('click', upMake);
   $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
   $('#upTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-up]'); if (!b) return; upTab = b.dataset.up; upTabsRender(); upRender(); });
+  $('#upSig').addEventListener('click', (e) => { const b = e.target.closest('[data-up]'); if (!b) return; upTab = b.dataset.up; upTabsRender(); upRender(); });
   $('#upScope').addEventListener('click', (e) => { const b = e.target.closest('[data-scope]'); if (!b) return; upScope = b.dataset.scope; try { localStorage.setItem('runner.sch.upScope', upScope); } catch (err) {} upMake(); });
   // 쿠팡 어드민 업로드 양식 .xlsx (8칸, 업무일은 날짜 칸). 빨강이면 막는다 (중복·주7일·아이디)
   $('#upXlsx').addEventListener('click', () => {
@@ -5381,6 +5422,11 @@
       });
     }).catch(() => {}).finally(() => { b.disabled = false; });
   });
+
+  // ── 더보기 메뉴 ──
+  $('#sMoreBtn').addEventListener('click', (e) => { e.stopPropagation(); $('#sMenu').classList.toggle('hidden'); });
+  $('#sMenu').addEventListener('click', (e) => { if (e.target.closest('button')) $('#sMenu').classList.add('hidden'); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.smore')) $('#sMenu').classList.add('hidden'); });
 
   // ── 스케줄 이슈 (칸별 사유: 부상·병가·차량 등) ──
   function issueAt(row, dt) { return (SD.issues || []).find((x) => x.driverId === row && x.date === dt) || null; }
