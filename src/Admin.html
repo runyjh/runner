@@ -234,6 +234,7 @@
   .inssum b { width: 100%; } .inssum span { background: #fff; border-radius: 8px; padding: 3px 8px; border: 1px solid #dbe7f8; } .inssum em { font-style: normal; font-weight: 800; }
   .inssum .pos em { color: #0a7a3d; } .inssum .neg em { color: var(--danger); }
   #stPnlTabs .tsep { display: inline-block; width: 1px; height: 22px; background: var(--line); margin: 0 4px; vertical-align: middle; }
+  .pay-prog { margin-top: 4px; font-size: 12.5px; color: var(--ink); } .pay-prog a { color: var(--brand); cursor: pointer; font-weight: 700; margin-left: 4px; }
   .fund-dep { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #f0f6ff; border: 1px solid #c9dbf7; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
   .fund-dep.ok { background: var(--ok-weak); border-color: #bfe6cf; } .fund-dep small { color: var(--sub); margin-left: 6px; }
   .fund-ctl { display: flex; gap: 8px; align-items: center; } .fund-ctl .inp { height: 34px; width: 150px; } .fund-ctl .check { margin: 0; white-space: nowrap; }
@@ -967,7 +968,7 @@
    </section>
    <section id="view-settle" class="hidden">
     <div class="head">
-      <h2>정산관리</h2>
+      <h2 id="stTitle">정산관리</h2>
       <div class="tools">
         <button class="btn ghost sm" id="stPrev" aria-label="이전 달">◀</button>
         <select class="inp" id="stMonth" aria-label="정산월" style="width:auto"></select>
@@ -982,15 +983,28 @@
     <div class="tabs" id="stTabs">
       <button class="tab" data-st="ids">아이디 관리</button>
       <button class="tab on" data-st="list">정산서</button>
-      <button class="tab" data-st="pay">입금확인</button>
       <button class="tab" data-st="vendors">용차업체</button>
       <button class="tab" data-st="yongcha">품앗이/용차 지정</button>
       <button class="tab" data-st="advance">가불금 목록</button>
       <button class="tab" data-st="adjust">공제·가감</button>
       <button class="tab" data-st="tmp">기사별 일시단가</button>
       <button class="tab" data-st="cfg">정산 설정</button>
-      <button class="tab" data-st="pnl">손익·통장</button>
     </div>
+    <div class="tabs hidden" id="stPnlTabs">
+        <button class="tab on" data-pnl="pnl">월별 손익</button>
+        <button class="tab" data-pnl="fund">자금배분</button>
+        <button class="tab" data-pnl="pay">입금확인</button>
+        <button class="tab" data-pnl="bal">통장 잔액</button>
+        <button class="tab" data-pnl="tax">세금 일정</button>
+        <button class="tab" data-pnl="banktx">입·출금 기록</button>
+        <i class="tsep"></i>
+        <button class="tab" data-pnl="cost">고정 운영비</button>
+        <button class="tab" data-pnl="staff">직원 (원천세)</button>
+        <button class="tab" data-pnl="expense">지출 기록</button>
+        <i class="tsep"></i>
+        <button class="tab" data-pnl="banks">통장 목록</button>
+        <button class="tab" data-pnl="alloc">배분 설정</button>
+      </div>
     <div id="stp-list">
       <div class="kpis" id="stKpi"></div>
       <div id="stWarn"></div>
@@ -1013,20 +1027,6 @@
         <button class="tab" data-cfg="leave">퇴사자 보류금 설정</button>
         <button class="tab" data-cfg="kinds">쿠팡 구분항목설정</button>
         <button class="tab" data-cfg="migrate">기존 정산 시트 가져오기</button>
-      </div>
-      <div class="tabs sub2 hidden" id="stPnlTabs">
-        <button class="tab on" data-pnl="pnl">월별 손익</button>
-        <button class="tab" data-pnl="fund">자금배분</button>
-        <button class="tab" data-pnl="bal">통장 잔액</button>
-        <button class="tab" data-pnl="tax">세금 일정</button>
-        <button class="tab" data-pnl="banktx">입·출금 기록</button>
-        <i class="tsep"></i>
-        <button class="tab" data-pnl="cost">고정 운영비</button>
-        <button class="tab" data-pnl="staff">직원 (원천세)</button>
-        <button class="tab" data-pnl="expense">지출 기록</button>
-        <i class="tsep"></i>
-        <button class="tab" data-pnl="banks">통장 목록</button>
-        <button class="tab" data-pnl="alloc">배분 설정</button>
       </div>
       <div class="sub st-help" id="stEditHelp"></div>
       <div id="stPnl" class="hidden"></div>
@@ -5387,7 +5387,8 @@
     ],
     leave: [
       ['하는 일', '퇴사월 정산서 <span class="gm">퇴사 보류금</span>(입금액에서 차감) → 다음 달 <span class="gp">보류금 반환</span>(입금 가산)'],
-      ['빈칸', '보류금 빈칸 = [세부정산 설정] <b>퇴사 보류금 기본 금액</b>'],
+      ['빈칸', '보류금 빈칸 = [세부정산 설정] <b>퇴사 보류금 기본 금액</b> · 메모 빈칸 = 기본 안내 (익월·익익월 분실파손·미차감분 정산용 · 없으면 반환일에 지급)'],
+      ['정산서 메모', '메모는 기사 정산서의 퇴사 보류금 줄 밑에 그대로 보임'],
       ['참고', '다음 달에 잡힌 분실파손은 계산서에서 그대로 빠짐']
     ],
     yongcha: [
@@ -5472,7 +5473,7 @@
       ['주의', '있는 줄의 분류를 바꾸면 마감 안 한 달 계산이 바뀜']
     ]
   };
-  const ST_GTAG = { '예상 금액': 'empty', '낸 금액': 'where', '순서': 'order', '자동': 'empty', '직접': 'where', '맞추기': 'diff', '구분': 'empty', '기초잔액': 'empty', '금액 규칙': 'empty', '예시': 'info', '계산': 'order', '금액': 'empty', '원천세': 'diff', '귀속월': 'where', '매달 같으면': 'where', '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
+  const ST_GTAG = { '정산서 메모': 'where', '예상 금액': 'empty', '낸 금액': 'where', '순서': 'order', '자동': 'empty', '직접': 'where', '맞추기': 'diff', '구분': 'empty', '기초잔액': 'empty', '금액 규칙': 'empty', '예시': 'info', '계산': 'order', '금액': 'empty', '원천세': 'diff', '귀속월': 'where', '매달 같으면': 'where', '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
   function paintHelp(name) {
     const el = $('#stEditHelp'), g = ST_GUIDE[name];
     if (!g) { el.className = 'sub st-help'; el.textContent = name === 'migrate' ? '' : ST_HELP[name] || ''; return; }
@@ -5565,6 +5566,7 @@
     const mon = Number(String(STX.month).slice(5));
     const WACT = {
       stopped: { head: '🚪 처리…', all: '🚪 전부…', opts: [['leave', '퇴사 처리 · ' + mon + '월 퇴사 (보류금 기본)'], ['leaveAmt', '퇴사 처리 · 보류금 금액 입력…'], ['unstop', '정지 풀기 (다시 사용)'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['leave', 'ack'] },
+      idle: { head: '⏸ 처리…', all: '⏸ 전부…', opts: [['stop', '정지 (아이디 관리 상태 → 정지)'], ['leaveStop', '퇴사 처리 + 정지 · ' + mon + '월 퇴사 (보류금 기본)'], ['leaveStopAmt', '퇴사 처리 + 정지 · 보류금 금액 입력…'], ['ack', '확인함 · 이 달은 숨김 (휴무·예비 아이디)']], allOpts: ['stop', 'ack'] },
       moveNo: { head: '👥 처리…', all: '👥 전부…', opts: [['sub', '서브 인원 · 명의자 정산에 그대로 포함'], ['ownId', '본인 정산 아이디 만들기 · 그 기사 정산서로 옮김'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['sub', 'ack'] }
     };
     const wsel = (w, i) => {
@@ -5572,7 +5574,7 @@
       const all = i === 'all', opts = all ? d.opts.filter((o) => d.allOpts.includes(o[0])) : d.opts;
       const a = all ? null : w.acts[i];
       return '<select class="inp vset wact" data-wk="' + esc(w.key) + '" data-wi="' + i + '" aria-label="처리"><option value="">' + (all ? d.all : d.head) + '</option>' +
-        opts.map((o) => '<option value="' + o[0] + '">' + esc(o[0] === 'sub' && a && a.owner ? '서브 인원 · 명의자(' + a.owner + ') 정산에 그대로 포함' : o[0] === 'ownId' && a ? '본인 정산 아이디 만들기 · ' + a.name + ' 정산서로 옮김' : o[1]) + '</option>').join('') + '</select>';
+        opts.filter((o) => !(a && a.leave && /^leave/.test(o[0]))).map((o) => '<option value="' + o[0] + '">' + esc(o[0] === 'sub' && a && a.owner ? '서브 인원 · 명의자(' + a.owner + ') 정산에 그대로 포함' : o[0] === 'ownId' && a ? '본인 정산 아이디 만들기 · ' + a.name + ' 정산서로 옮김' : o[1]) + '</option>').join('') + '</select>';
     };
     const asel = (w, i) => (WACT[w.key] ? wsel(w, i) : vsel(w.key, i));
     $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count +
@@ -5610,7 +5612,7 @@
     $('#stp-list').classList.toggle('hidden', tab !== 'list');
     const idSub = tab === 'ids' ? (STX.idt || 'ids') : '';
     $('#stp-edit').classList.toggle('hidden', !(['adjust', 'advance', 'yongcha', 'vendors', 'tmp', 'cfg', 'pnl'].includes(tab) || (tab === 'ids' && idSub !== 'drv')));
-    $('#stPnlTabs').classList.toggle('hidden', tab !== 'pnl');
+    setFin(tab === 'pnl');
     if (tab !== 'pnl') $('#stPnl').classList.add('hidden');
     navMark();
     $('#stIdTabs').classList.toggle('hidden', tab !== 'ids' || idSub === 'drv');
@@ -5625,7 +5627,15 @@
     else if (tab === 'pnl') stPnlTab(STX.pnlT || 'pnl');
     else { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.remove('hidden'); loadEditor(tab); }
   }
-  /** 사이드바: 정산관리 / 러너 손익·운영비 중 지금 보는 쪽 표시 */
+  /** 러너 손익·통장 = 정산관리와 같은 정산월을 쓰는 별도 화면 (정산관리 탭·버튼은 숨김) */
+  function setFin(on) {
+    STX.fin = on;
+    $('#stTitle').textContent = on ? '러너 손익·통장' : '정산관리';
+    $('#stTabs').classList.toggle('hidden', on);
+    ['#stRecalc', '#stCloseBtn', '#stUpBtn'].forEach((id) => $(id).classList.toggle('hidden', on));
+    $('#stPnlTabs').classList.toggle('hidden', !on);
+  }
+  /** 사이드바: 정산관리 / 러너 손익·통장 중 지금 보는 쪽 표시 */
   function navMark() {
     if (currentView !== 'settle') return;
     $$('.nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === 'settle' && (STX.tab === 'pnl' ? a.dataset.stGo === 'pnl' : !a.dataset.stGo)));
@@ -5636,6 +5646,10 @@
     STX.pnlT = name; STX.edDirty = false;
     $$('#stPnlTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.pnl === name));
     $('#stMigrate').classList.add('hidden');
+    // 입금확인: 정산관리에서 옮겨 온 기사 입금 체크 목록
+    $('#stp-pay').classList.toggle('hidden', name !== 'pay');
+    $('#stp-edit').classList.toggle('hidden', name === 'pay');
+    if (name === 'pay') return loadPay();
     const pane = ['pnl', 'fund', 'bal', 'tax'].includes(name);
     $('#stPnl').classList.toggle('hidden', !pane);
     $('#stEditor').classList.toggle('hidden', pane);
@@ -5710,7 +5724,10 @@
     const dep = '<div class="fund-dep' + (d.done ? ' ok' : '') + '"><div><b>쿠팡 입금</b> <small>' + esc(mt) + ' 정산 · 입금 예정 ' + esc(mdTxt(d.due)) + ' · 받는 통장 ' + esc(d.bank || '(통장 목록에 \'쿠팡 입금\' 용도 통장 없음)') + '</small>' +
       '<div class="sub" style="font-size:12px">계산 금액 ' + wn(d.plan) + ' = (쿠팡 공급가 − 분실) × 1.1 · 실제로 들어온 금액이 다르면 넣어 주세요</div></div>' +
       '<div class="fund-ctl">' + amtIn('deposit', d.amt || '', d.plan, d.done) + '<input class="inp" type="date" data-fk="deposit" data-ff="date" value="' + esc(d.date || '') + '"><label class="check"><input type="checkbox" data-fk="deposit" data-ff="done"' + (d.done ? ' checked' : '') + '> 받음</label></div></div>';
-    const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '') + '</div></td>' +
+    // 기사정산금: 입금확인 진행 (정산서 목록의 입금 체크)
+    const dl = ((STX.sum && STX.sum.drivers) || []).filter((v) => v.net), dDone = dl.filter((v) => v.checked);
+    const payProg = '<div class="pay-prog">입금확인 <b>' + dDone.length + ' / ' + dl.length + '명</b> · 남은 <b>' + wn(dl.reduce((a, v) => a + v.net, 0) - dDone.reduce((a, v) => a + v.net, 0)) + '원</b> <a data-go-pay>입금확인 열기 →</a></div>';
+    const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '') + '</div>' + (x.key === 'driver' ? payProg : '') + '</td>' +
       '<td>' + (x.bank ? esc(x.bank) + (bal[x.bank] != null ? '<div class="smemo">잔액 ' + wn(bal[x.bank]) + '</div>' : '') : '<span style="color:var(--danger)">통장 없음</span>') + '</td>' +
       '<td class="n">' + wn(x.plan) + '</td><td class="n">' + amtIn(x.key, x.adj ? x.amt : '', x.plan, x.done) + '</td>' +
       '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? ' title="받는 통장과 같아 이체할 필요 없음"' : '') + '></td>' +
@@ -5757,6 +5774,7 @@
     $('#stPnl').innerHTML = cards + tb;
   }
   $('#stPnl').addEventListener('click', (e) => {
+    if (e.target.closest('[data-go-pay]')) return stPnlTab('pay');
     const c = e.target.closest('[data-bsel]'); if (!c || !STX.bank) return;
     STX.balSel = STX.balSel === c.dataset.bsel ? '' : c.dataset.bsel; renderBal();
   });
@@ -5832,7 +5850,7 @@
     const mon = ymTitle(T.month || STX.month).replace(/^\d+년\s*/, '');
     const calcH = T.name === 'yongcha' ? ['자동건수', '지급액', '쿠팡매출', '기존지급', '추가지급', '부담 차감', '러너 몫'] : T.name === 'advance' ? ['잔여', '자동 공제 정산월']
       : T.name === 'camps' ? [mon + ' 인원', mon + ' 기사 공제<br><small>산재+고용</small>', '기본값이면', '차액<br><small>+러너 몫 / −러너 부담</small>']
-      : T.name === 'cost' ? ['공급가', '부가세<br><small>매입세액 공제</small>', mon + ' 반영'] : T.name === 'staff' ? ['원천세', '실지급', mon + ' 반영'] : T.name === 'expense' ? ['공급가', '부가세<br><small>매입세액 공제</small>'] : [];
+      : T.name === 'leave' ? ['쿠팡ID (이름)', '반환 정산월 · 지급일'] : T.name === 'cost' ? ['공급가', '부가세<br><small>매입세액 공제</small>', mon + ' 반영'] : T.name === 'staff' ? ['원천세', '실지급', mon + ' 반영'] : T.name === 'expense' ? ['공급가', '부가세<br><small>매입세액 공제</small>'] : [];
     const kindOf = (r) => r.kind || (r.name && !r.camp ? '기사' : '캠프');
     const cell = (r, i, c) => {
       const v = r[c.k] == null ? '' : String(r[c.k]);
@@ -5855,11 +5873,17 @@
       }
       const type = c.type === 'date' ? 'date' : c.type === 'month' ? 'month' : 'text';
       const extra = c.type === 'acct' || c.type === 'acctOrText' ? ' list="stAcctDL" style="min-width:170px"' : c.type === 'person' ? ' list="stPersonDL" style="min-width:120px"' : c.type === 'cid' ? ' style="min-width:150px" spellcheck="false" autocapitalize="off"' : c.type === 'money' ? ' inputmode="decimal" style="text-align:right;width:110px"' : '';
-      const ph = T.name === 'yongcha' && c.k === 'price' ? (r._calc && r._calc.defUnit && r.mode !== '금액' ? '기본 ' + wn(r._calc.defUnit) : '비우면 기본값')
+      const ph = T.name === 'leave' && c.k === 'memo' ? (r._calc && r._calc.memo ? '기본: ' + r._calc.memo : '비우면 기본 안내')
+        : T.name === 'yongcha' && c.k === 'price' ? (r._calc && r._calc.defUnit && r.mode !== '금액' ? '기본 ' + wn(r._calc.defUnit) : '비우면 기본값')
         : T.name === 'yongcha' && c.k === 'vendorPay' ? (r._calc && r._calc.vendor ? '기본 ' + wn(r._calc.existing) : '용차업체만') : c.ph;
-      return '<td><input class="inp" type="' + type + '"' + at + extra + (ph ? ' placeholder="' + esc(ph) + '"' : '') + ' value="' + esc(c.type === 'money' && v ? wn(v) : v) + '"></td>';
+      const wide = T.name === 'leave' && c.k === 'memo' ? ' style="min-width:380px" title="' + esc(ph || '') + '"' : '';
+      return '<td><input class="inp" type="' + type + '"' + at + extra + wide + (ph ? ' placeholder="' + esc(ph) + '"' : '') + ' value="' + esc(c.type === 'money' && v ? wn(v) : v) + '"></td>';
     };
     const calc = (r) => {
+      if (T.name === 'leave') {
+        const x = r._calc || {};
+        return '<td class="calc">' + (x.cidName ? '<b style="color:var(--ink)">' + esc(x.cidName) + '</b>' : '<span class="sub">저장하면 표시</span>') + '</td><td class="calc">' + (x.back ? esc(ymTitle(x.back)) + ' 정산 · ' + esc(mdTxt(x.pay)) + ' 지급' : '-') + '</td>';
+      }
       if (T.name === 'cost' || T.name === 'expense') {
         const [sp, vt] = pnlSplit(r.amt, r.proof);
         return '<td class="calc">' + wnz(sp) + '</td><td class="calc">' + wnz(vt) + '</td>' + (T.name === 'cost' ? '<td class="calc">' + (pnlActive(r, T.month || STX.month) ? '✓' : '<span class="sub">기간 밖</span>') + '</td>' : '');
@@ -6449,20 +6473,24 @@
       const list = t0.dataset.wi === 'all' ? w.acts.filter(Boolean) : [w.acts[+t0.dataset.wi]].filter(Boolean);
       if (!list.length) return;
       const names = list.map((x) => x.label).join('\n'), m = ymTitle(STX.month), opt = {};
-      if (act === 'leaveAmt') {
+      if (act === 'leaveAmt' || act === 'leaveStopAmt') {
         const v = prompt('퇴사 보류금 금액 (원)을 넣어 주세요.\n' + names); if (v == null) return;
         opt.amt = String(v).replace(/[^\d]/g, ''); if (!opt.amt) return toast('금액을 숫자로 넣어 주세요.');
+        if (act === 'leaveStopAmt') opt.stop = true;
         act = 'leave';
+      } else if (act === 'leaveStop') {
+        if (!confirm(names + '\n\n' + m + ' 퇴사로 처리하고 아이디를 정지할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환)')) return;
+        opt.stop = true; act = 'leave';
       } else if (act === 'ownId') {
         const v = prompt(list[0].name + ' 기사님의 쿠팡 ID (본인 정산 아이디)\n비우면 기사 정보의 쿠팡플렉스 아이디를 씁니다.', ''); if (v == null) return;
         opt.cid = v.trim();
       } else {
-        const msg = { leave: m + ' 퇴사로 처리할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환 · 퇴사자 보류금 설정에 기록)', unstop: '아이디 관리에서 정지를 풀까요? (상태 → 사용)', sub: '서브 인원으로 처리할까요?\n(아이디 사용 기록의 정산 칸 = 명의자 → 매출은 명의자 정산에 그대로)', ack: m + ' 정산에서 이 경고를 숨길까요?' }[act];
+        const msg = { leave: m + ' 퇴사로 처리할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환 · 퇴사자 보류금 설정에 기록)', unstop: '아이디 관리에서 정지를 풀까요? (상태 → 사용)', stop: '아이디 관리에서 정지할까요? (상태 → 정지 · 다시 일하면 정지 풀기)', sub: '서브 인원으로 처리할까요?\n(아이디 사용 기록의 정산 칸 = 명의자 → 매출은 명의자 정산에 그대로)', ack: m + ' 정산에서 이 경고를 숨길까요?' }[act];
         if (!confirm(names + '\n\n' + msg)) return;
       }
       api('adm_stlWarnAct', STX.month, act, list, opt).then((r) => {
         if (!r.ok) return toast(r.msg);
-        const msg = (r.done && r.done.length ? r.done.join(', ') + ' — ' : '') + ({ leave: '퇴사 처리했습니다', unstop: '정지를 풀었습니다', sub: '서브 인원으로 처리했습니다', ownId: '본인 정산 아이디를 만들었습니다', ack: '이 달 경고에서 숨겼습니다' }[act]) + ' (다시 계산함)';
+        const msg = (r.done && r.done.length ? r.done.join(', ') + ' — ' : '') + ({ leave: opt.stop ? '퇴사 처리하고 정지했습니다' : '퇴사 처리했습니다', unstop: '정지를 풀었습니다', stop: '정지했습니다', sub: '서브 인원으로 처리했습니다', ownId: '본인 정산 아이디를 만들었습니다', ack: '이 달 경고에서 숨겼습니다' }[act]) + ' (다시 계산함)';
         toast(msg); STX.sum = null;
         loadSettle(STX.month, true).then(() => toast(msg));
       }).catch(() => {});
