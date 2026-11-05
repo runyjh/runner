@@ -86,6 +86,18 @@
   .nav a.off { color: #b0b8c1; cursor: default; }
   .nav a small { font-size: 11px; }
   .navbtn { display: none; }
+  .gsbtn { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; margin: 0 0 12px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--gray-weak); color: var(--sub); font-size: 13px; cursor: pointer; text-align: left; }
+  .gsbtn:hover { border-color: var(--brand); color: var(--ink); } .gsbtn .gst { flex: 1; } .gsbtn kbd { font: 600 10.5px/1 inherit; border: 1px solid var(--line); background: #fff; border-radius: 4px; padding: 3px 5px; color: var(--faint); }
+  #gsModal { align-items: flex-start; padding-top: 8vh; } .gs-box { width: min(620px, 100%); padding: 0; overflow: hidden; display: flex; flex-direction: column; max-height: 80vh; }
+  .gs-top { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); } .gs-top input { flex: 1; border: 0; outline: none; font-size: 16px; height: 34px; min-width: 0; }
+  .gs-list { overflow-y: auto; padding: 6px; flex: 1; }
+  .gs-h { font-size: 11.5px; font-weight: 700; color: var(--c, var(--sub)); padding: 10px 10px 4px; display: flex; gap: 6px; align-items: center; } .gs-h::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .gs-i { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  .gs-i .gp { color: var(--faint); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .gs-i .gl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .gs-i .gt { margin-left: auto; font-size: 11px; color: var(--faint); white-space: nowrap; }
+  .gs-i.d1 { padding-left: 26px; } .gs-i.d2 { padding-left: 42px; } .gs-i .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--brand)); flex: none; opacity: .7; }
+  .gs-i.on { background: var(--brand-weak); } .gs-i mark { background: #fff3bf; color: inherit; border-radius: 2px; }
+  .gs-foot { font-size: 11.5px; color: var(--faint); padding: 8px 14px; border-top: 1px solid var(--line); }
+  .gs-flash { animation: gsflash 1.6s ease-out; } @keyframes gsflash { 0%, 40% { box-shadow: 0 0 0 4px rgba(27,100,218,.45); } 100% { box-shadow: 0 0 0 0 rgba(27,100,218,0); } }
   .side .me { flex: none; margin-top: 10px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
   .side .me b { color: var(--ink); display: block; font-size: 13px; }
   .side .me a { color: var(--sub); cursor: pointer; text-decoration: underline; }
@@ -827,7 +839,9 @@
     /* 모바일: 위 막대(로고 · 지금 메뉴 ☰) → 누르면 묶음별 메뉴 */
     .side { position: sticky; top: 0; z-index: 15; height: auto; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
     .side .logo { padding: 0; white-space: nowrap; font-size: 15px; } .side .logo .rlogo { width: 26px; }
-    .navbtn { display: flex; margin-left: auto; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 14px; font-weight: 700; color: var(--ink); max-width: 62%; }
+    .gsbtn { order: 2; width: 38px; height: 38px; margin: 0 0 0 auto; padding: 0; justify-content: center; background: #fff; font-size: 16px; } .gsbtn .gst, .gsbtn kbd { display: none; }
+    #gsModal { padding: 0; } .gs-box { max-height: 100vh; height: 100vh; border-radius: 0; } .gs-foot { display: none; }
+    .navbtn { order: 3; display: flex; margin-left: 0; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 14px; font-weight: 700; color: var(--ink); max-width: 55%; }
     .navbtn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .navbtn i { font-style: normal; font-size: 16px; color: var(--sub); }
     .side.open .navbtn { background: var(--ink); color: #fff; border-color: var(--ink); } .side.open .navbtn i { color: #fff; }
     .nav, .side .me { display: none; }
@@ -839,6 +853,7 @@
     .nav a small { display: none; }
     .side.open .me { display: block; width: 100%; margin: 0; padding: 10px 2px 2px; font-size: 13px; }
     .side.open { z-index: 45; }
+    .side.open .nav { order: 10; } .side.open .me { order: 11; }
     .side.open::after { content: ''; position: fixed; inset: 0; z-index: -1; background: rgba(0,0,0,.25); }
     main { padding: 16px 12px; }
     .search { width: 100%; }
@@ -875,6 +890,7 @@
 <div id="app" class="hidden">
   <aside class="side">
     <div class="logo"><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><b>러너 <span>올인원</span></b></div>
+    <button type="button" class="gsbtn" id="gsBtn" title="메뉴 · 탭 · 기사 바로 찾기 (Ctrl+K)"><span class="gsi">🔍</span><span class="gst">찾기 · 목차</span><kbd>Ctrl K</kbd></button>
     <button type="button" class="navbtn" id="navBtn" aria-label="메뉴 열기" aria-expanded="false"><span id="navCur">기사 정보관리</span><i>☰</i></button>
     <nav class="nav">
       <div class="ng g-drv"><p class="ngt">기사</p>
@@ -1609,6 +1625,13 @@
   </div>
 </div>
 <!-- ───────────── 정산: 명세서 ───────────── -->
+<div class="modal hidden" id="gsModal" role="dialog" aria-label="찾기 · 목차">
+  <div class="m-box gs-box">
+    <div class="gs-top"><span>🔍</span><input id="gsQ" type="search" autocomplete="off" spellcheck="false" placeholder="메뉴 · 탭 · 기사 이름 · 아이디 (예: 산재, 보류금, ㅅㅈ, 배만호)"><button type="button" class="btn ghost sm" id="gsClose">닫기</button></div>
+    <div class="gs-list" id="gsList"></div>
+    <div class="gs-foot">↑↓ 고르기 · Enter 이동 · Esc 닫기 · 초성(ㅈㅅㄱㄹ)도 됩니다</div>
+  </div>
+</div>
 <div class="modal hidden" id="stSlipModal">
   <div class="m-box slip-box" id="stSlipBox">
     <div class="m-top noprint"><b id="stSlipTitle">정산서</b><button class="btn ghost sm" id="stSlipPrev">◀ 이전 기사</button><button class="btn ghost sm" id="stSlipNext">다음 기사 ▶</button><button class="btn sm" id="stSlipPrint">인쇄 · PDF</button><button class="btn ghost sm" id="stSlipClose">닫기</button></div>
@@ -7844,6 +7867,109 @@
     if (!t) return showLogin();
     call('adm_check', t).then((r) => { if (r.ok) showApp(r.admin); else { store.del(); showLogin(); } })
       .catch(() => { showLogin(); toast('연결이 원활하지 않습니다.'); });
+  })();
+
+  // ───────────── 찾기 · 목차 (Ctrl+K) ─────────────
+  // 메뉴 → 탭 → 하위 탭 · 자주 쓰는 버튼 · 기사(이름·아이디·연락처·차량)를 한 곳에서 찾아 바로 이동. 빈칸이면 전체 목차.
+  (function () {
+    const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+    const cho = (t) => String(t).replace(/[가-힣]/g, (c) => CHO[Math.floor((c.charCodeAt(0) - 0xac00) / 588)]);
+    const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, '');
+    const tx = (el) => String(el ? el.textContent : '').replace(/\s+/g, ' ').trim();
+    const navA = (view, go) => $$('.nav a[data-view="' + view + '"]').find((a) => (a.dataset.stGo || '') === (go || ''));
+    let TOC = null, items = [], cur = 0;
+    // 메뉴 아래에 붙일 탭 · 버튼 (화면에 있는 버튼 글자를 그대로 씀)
+    const SUB = [
+      ['drivers', '', [['#drvNew', '버튼']]],
+      ['sched', '', [['#sView button', '보기'], ['#sUpload', '버튼'], ['#sYear', '버튼'], ['#sIssue', '버튼'], ['#sRuleBtn', '버튼'], ['#sFill', '더보기'], ['#sNoteAdd', '더보기']]],
+      ['pumasi', '', [['#paPostSw', '버튼']]],
+      ['bib', '', [['#bibNew', '버튼'], ['#coBtn', '버튼']]],
+      ['route', '', [['#xpOpen', '버튼'], ['[data-rcopen="move"]', '버튼'], ['#campNew', '버튼']]],
+      ['settle', '', [['#stTabs .tab', '탭', { ids: '#stIdTabs .tab', cfg: '#stCfgTabs .tab' }], ['#stUpBtn', '버튼'], ['#stRecalc', '버튼'], ['#stCloseBtn', '버튼']]],
+      ['settle', 'pnl', [['#stPnlTabs .tab', '탭']]],
+      ['taxinv', '', [['#tiTabs .tab', '탭'], ['#tiFromStl', '버튼'], ['#tiNew', '버튼']]],
+      ['notice', '', [['#ntNew', '버튼']]],
+      ['acc', '', [['#acNew', '버튼'], ['#acCatEdit', '버튼']]]
+    ];
+    function build() {
+      const out = [];
+      $$('.nav .ng').forEach((g) => {
+        const gname = tx(g.querySelector('.ngt')), col = getComputedStyle(g).getPropertyValue('--c').trim();
+        $$('a[data-view]', g).forEach((a) => {
+          const view = a.dataset.view, go = a.dataset.stGo || '', label = tx(a).replace(/\d+$/, '').trim();
+          out.push({ kind: 'menu', d: 0, group: gname, col, label, path: label, steps: [a] });
+          SUB.filter((x) => x[0] === view && x[1] === go).forEach((x) => x[2].forEach(([sel, tag, kids]) => {
+            $$(sel).forEach((b) => {
+              const bl = tx(b).replace(/^[⬆📅⚠📖+\s]+/, '').replace(/\s*\d+$/, '').trim(); if (!bl) return;
+              const steps = [a].concat(tag === '더보기' ? [$('#sMoreBtn'), b] : [b]);
+              out.push({ kind: 'sub', d: 1, group: gname, col, label: bl, path: label + ' › ' + bl, tag: tag === '탭' || tag === '보기' ? '' : tag, steps, kw: b.title || '' });
+              const k = kids && kids[b.dataset.st];
+              if (k) $$(k).forEach((c) => out.push({ kind: 'sub', d: 2, group: gname, col, label: tx(c), path: label + ' › ' + bl + ' › ' + tx(c), steps: steps.concat([c]), kw: c.title || '' }));
+            });
+          }));
+        });
+      });
+      return out;
+    }
+    function people(q) {
+      if (!q) return [];
+      const list = (typeof all !== 'undefined' && all) || [];
+      const n = norm(q), c = /^[ㄱ-ㅎ]+$/.test(q.replace(/\s/g, ''));
+      return list.filter((d) => {
+        const hay = [d.name, d.loginId, d.subId1, d.subId2, d.phone, d.carNo, d.vehicleNo].filter(Boolean).join(' ');
+        return c ? cho(norm(d.name)).includes(n) : norm(hay).includes(n);
+      }).slice(0, 8).map((d) => ({ kind: 'drv', d: 0, group: '기사', col: '#1b64da', label: d.name, path: d.name, tag: [d.loginId, d.workStatus || '', d.status].filter(Boolean).join(' · '), drv: d }));
+    }
+    function match(e, q) {
+      const n = norm(q); if (!n) return 1;
+      const hay = norm(e.path + ' ' + (e.kw || ''));
+      if (/^[ㄱ-ㅎ]+$/.test(n)) return cho(norm(e.label)).startsWith(n) ? 3 : cho(hay).includes(n) ? 2 : 0;
+      return norm(e.label).startsWith(n) ? 4 : norm(e.label).includes(n) ? 3 : hay.includes(n) ? 2 : 0;
+    }
+    const hl = (t, q) => { const n = String(q || '').trim(); if (!n || /^[ㄱ-ㅎ\s]+$/.test(n)) return esc(t); const i = String(t).toLowerCase().indexOf(n.toLowerCase()); return i < 0 ? esc(t) : esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + n.length)) + '</mark>' + esc(t.slice(i + n.length)); };
+    function render() {
+      const q = $('#gsQ').value.trim();
+      if (!TOC) TOC = build();
+      let list;
+      if (!q) list = TOC.slice();
+      else {
+        list = TOC.map((e) => [e, match(e, q)]).filter((x) => x[1]).sort((a, b) => b[1] - a[1] || a[0].d - b[0].d).map((x) => x[0]);
+        list = people(q).concat(list);
+      }
+      items = list; cur = Math.min(cur, Math.max(0, list.length - 1));
+      let html = '', last = '';
+      list.forEach((e, i) => {
+        if (!q && e.group !== last) { html += '<div class="gs-h" style="--c:' + esc(e.col) + '">' + esc(e.group) + '</div>'; last = e.group; }
+        const lab = q ? (e.kind === 'drv' ? hl(e.label, q) : '<span class="gp">' + esc(e.path.split(' › ').slice(0, -1).join(' › ')) + (e.d ? ' › ' : '') + '</span>' + hl(e.label, q)) : esc(e.label);
+        html += '<div class="gs-i' + (q ? '' : ' d' + e.d) + (i === cur ? ' on' : '') + '" data-gi="' + i + '" style="--c:' + esc(e.col) + '"><i class="dot"></i><span class="gl">' + (e.kind === 'drv' ? '👤 ' : '') + lab + '</span>' + (e.tag ? '<span class="gt">' + esc(e.tag) + '</span>' : '') + '</div>';
+      });
+      $('#gsList').innerHTML = html || '<p class="sub" style="padding:20px;text-align:center">"' + esc(q) + '" 에 맞는 메뉴·기사가 없습니다.</p>';
+      const on = $('#gsList .gs-i.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+    }
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function go(e) {
+      close();
+      if (e.kind === 'drv') { navA('drivers').click(); await wait(150); openDrawer(e.drv.id); return; }
+      for (const el of e.steps) { if (!el) continue; if (el.classList.contains('on') && el.closest('.nav') === null && el !== e.steps[e.steps.length - 1]) continue; el.click(); await wait(220); }
+      const t = e.steps[e.steps.length - 1];
+      if (t && t.offsetParent) { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); t.classList.remove('gs-flash'); void t.offsetWidth; t.classList.add('gs-flash'); }
+    }
+    function open() { TOC = null; cur = 0; $('#gsQ').value = ''; $('#gsModal').classList.remove('hidden'); render(); setTimeout(() => $('#gsQ').focus(), 30); }
+    function close() { $('#gsModal').classList.add('hidden'); }
+    $('#gsBtn').addEventListener('click', (e) => { e.stopPropagation(); $('.side').classList.remove('open'); open(); });
+    $('#gsClose').addEventListener('click', close);
+    $('#gsModal').addEventListener('click', (e) => { if (e.target.id === 'gsModal') close(); const it = e.target.closest('[data-gi]'); if (it) go(items[+it.dataset.gi]); });
+    $('#gsQ').addEventListener('input', () => { cur = 0; render(); });
+    $('#gsQ').addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); cur = Math.max(0, Math.min(items.length - 1, cur + (e.key === 'ArrowDown' ? 1 : -1))); render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (items[cur]) go(items[cur]); }
+      else if (e.key === 'Escape') close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if ($('#app').classList.contains('hidden')) return;
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName || '')) || e.target.isContentEditable;
+      if (((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) || (e.key === '/' && !typing)) { e.preventDefault(); if ($('#gsModal').classList.contains('hidden')) open(); else close(); }
+    });
   })();
 
   // ───────────── 표 도구 (모든 목록 표 공통) ─────────────
