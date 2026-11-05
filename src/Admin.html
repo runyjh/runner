@@ -187,6 +187,7 @@
   .stw { border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; background: var(--warn-weak); color: #7a4f00; }
   .stw.bad { background: var(--danger-weak); color: #a1262b; }
   .stw.info { background: var(--gray-weak); color: var(--sub); }
+  .stw.sub { background: #eef3fb; color: #2b5797; }
   .stw summary { cursor: pointer; font-weight: 700; }
   .ti-ed { display: grid; grid-template-columns: 380px 1fr; gap: 16px; padding: 14px 16px 18px; }
   @media (max-width: 980px) { .ti-ed { grid-template-columns: 1fr; } }
@@ -237,6 +238,8 @@
   .ed-bar .edq { width: 220px; height: 32px; }
   th.dsrt { cursor: pointer; user-select: none; white-space: nowrap; } th.dsrt:hover { color: var(--brand); } th.dsrt i { font-style: normal; color: var(--brand); margin-left: 3px; }
   table.ed th.srt { cursor: pointer; user-select: none; white-space: nowrap; }
+  table th.tsrt { cursor: pointer; user-select: none; } table th.tsrt:hover { color: var(--brand); }
+  table th.tsrt i.tsi { font-style: normal; color: var(--brand); margin-left: 3px; }
   table.ed th.srt:hover { color: var(--brand); }
   table.ed th.srt i { font-style: normal; color: var(--brand); margin-left: 3px; }
   #lbar { position: fixed; left: 0; top: 0; height: 3px; width: 0; background: var(--brand); z-index: 9999; opacity: 0; pointer-events: none; box-shadow: 0 0 6px rgba(27,100,218,.5); }
@@ -5390,6 +5393,51 @@
     $('#stCloseBtn').textContent = s.closed ? '마감 해제' : '이 달 마감';
     $('#stCloseBtn').classList.toggle('danger-t', !!s.closed);
   }
+  // ── 정산관리 표 정렬 (정산서 목록 · 입금확인 · 명의자 사업자 정보): 제목을 누르면 오름차순 → 내림차순 → 원래 순서 ──
+  //  합계 줄(tr.tot)은 맨 위에 고정. 숫자·금액·날짜는 숫자로, 글자는 가나다순. 빈 칸·'-' 는 맨 아래
+  const TSORT = {};
+  const tsVal = (td) => {
+    if (!td) return '';
+    const ck = td.querySelector('input[type=checkbox]'); if (ck) return ck.checked ? '1' : '0';
+    const inp = td.querySelector('input,select'), t = String(inp ? inp.value : td.innerText).trim();
+    return t === '-' && td.classList.contains('n') ? '0' : t; // 금액 칸의 '-' 는 0
+  };
+  const tsNum = (t) => { const x = t.replace(/[−–]/g, '-').replace(/[,\s원건일명%✓]/g, ''); return /^-?\d+(\.\d+)?$/.test(x) ? Number(x) : null; };
+  function tsApply(tb) {
+    const body = tb && tb.tBodies[0], head = tb && tb.tHead; if (!body || !head) return;
+    const st = TSORT[tb.id], rows = [...body.rows];
+    rows.forEach((r, i) => { if (r.dataset.tso == null) r.dataset.tso = i; });
+    const fixed = rows.filter((r) => r.classList.contains('tot')), rest = rows.filter((r) => !r.classList.contains('tot'));
+    rest.sort((a, b) => {
+      if (!st) return a.dataset.tso - b.dataset.tso;
+      const x = tsVal(a.cells[st.i]), y = tsVal(b.cells[st.i]);
+      const ex = !x || x === '-', ey = !y || y === '-';
+      if (ex !== ey) return ex ? 1 : -1;
+      const nx = tsNum(x), ny = tsNum(y);
+      const c = nx !== null && ny !== null ? nx - ny : x.localeCompare(y, 'ko', { numeric: true });
+      return (st.dir === 'desc' ? -c : c) || a.dataset.tso - b.dataset.tso;
+    });
+    fixed.concat(rest).forEach((r) => body.appendChild(r));
+    [...head.rows[0].cells].forEach((th, i) => {
+      if (th.querySelector('input')) return;
+      th.classList.add('tsrt'); th.title = '눌러서 정렬';
+      const o = th.querySelector('i.tsi'); if (o) o.remove();
+      if (st && st.i === i) th.insertAdjacentHTML('beforeend', '<i class="tsi">' + (st.dir === 'desc' ? '▼' : '▲') + '</i>');
+    });
+    if (tb.id === 'stTable') STX.slipIds = [...body.querySelectorAll('tr[data-slip]')].map((r) => r.dataset.slip); // 정산서 이전·다음도 보이는 순서대로
+  }
+  function tsBind(id) {
+    const tb = document.getElementById(id); if (!tb || tb.dataset.tsb) return;
+    tb.dataset.tsb = '1';
+    tb.addEventListener('click', (e) => {
+      const th = e.target.closest('thead th'); if (!th || e.target.closest('input,select,button')) return;
+      e.stopPropagation();
+      const i = th.cellIndex, cur = TSORT[id];
+      TSORT[id] = !cur || cur.i !== i ? { i, dir: 'asc' } : cur.dir === 'asc' ? { i, dir: 'desc' } : null;
+      tsApply(tb);
+    });
+  }
+  ['stTable', 'payTable', 'sdTable'].forEach(tsBind);
   function renderStList() {
     const s = STX.sum; if (!s) return;
     const t = s.total, c = s.company;
@@ -5421,6 +5469,7 @@
     const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + '<td></td>' + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';
     $('#stTable').innerHTML = '<thead><tr>' + H.map((h, i) => '<th' + (i > 2 && i < 14 ? ' class="n"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + totRow + list.map(tr).join('') + '</tbody>';
     $('#stCnt').textContent = list.length + '명';
+    tsApply($('#stTable'));
     $('#stEmpty').classList.toggle('hidden', !!s.drivers.length);
     $('#stEmpty').textContent = s.round ? '정산할 기사가 없습니다.' : '이 달 쿠팡 정산서가 아직 없습니다. 오른쪽 위 [쿠팡 정산서 올리기]로 엑셀을 넣어 주세요.';
   }
@@ -5755,6 +5804,7 @@
       list.map((x) => '<tr><td><input type="checkbox" data-pay="' + esc(x.id) + '"' + (x.checked ? ' checked' : '') + '></td><td><b>' + esc(x.name) + '</b><br><small class="sub">' + esc((x.cids || []).map((c) => c.replace(/@.*/, '')).join(', ')) + '</small></td><td>' + esc(x.bank) + '</td><td>' + (x.account ? esc(x.account) : '<span style="color:var(--danger)">미입력</span>') + '</td><td>' + esc(x.holder) + '</td>' +
         '<td class="n">' + wn(x.pay) + '</td><td class="n">' + wnz(x.ded) + '</td><td class="n' + (x.net < 0 ? ' neg' : '') + '"><b>' + wn(x.net) + '</b></td><td>' + esc(x.payDate || '') + '</td>' +
         '<td><input class="inp" style="height:30px;min-width:120px" data-pmemo="' + esc(x.id) + '" value="' + esc(x.memo || '') + '"></td><td class="n">' + wn(x.supply) + '</td><td class="n">' + wn(x.tax) + '</td><td class="sub">' + esc(x.bizNo || '') + '</td></tr>').join('') + '</tbody>';
+    tsApply($('#payTable'));
   }
   $('#payOnlyLeft').addEventListener('change', renderPay);
   $('#payReload').addEventListener('click', loadPay);
@@ -5807,6 +5857,7 @@
       '<thead><tr><th>이름</th><th>쿠팡플렉스 아이디</th><th>상태</th><th>기사구분</th>' + SD_COLS.map((c) => '<th>' + c[1] + '</th>').join('') + '<th>은행 · 계좌 · 예금주</th></tr></thead><tbody>' +
       list.map((d) => '<tr><td><b>' + esc(d.name) + '</b></td><td class="sub">' + esc(d.loginId) + '</td><td>' + esc(d.status) + '</td><td>' + esc(d.type || '고정') + '</td>' + SD_COLS.map((c) => cell(d, c)).join('') +
         '<td class="sub">' + esc([d.bank, d.account, d.holder].filter(Boolean).join(' · ') || '-') + '</td></tr>').join('') + '</tbody>';
+    tsApply($('#sdTable'));
     const n = Object.keys(STX.drvDirty).length;
     $('#sdDirty').textContent = n ? n + '명 바뀜' : ''; $('#sdSave2').disabled = !n;
   }

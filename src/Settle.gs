@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zF';
+const STL_CALC_VER = '20261105zG';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -957,7 +957,7 @@ function stlCompute_(month) {
   const raw = stlReadMonth_('stl_raw', month);
   const loss = stlReadMonth_('stl_loss', month);
   const sched = stlSchedule_(P.from, P.to);
-  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {}, moveNo: {} };
+  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {}, stoppedSub: {}, moveNo: {} };
   const S = {};
   /** 정산 묶음(메인 아이디) 하나의 합계. 정산금은 메인 아이디 명의자에게 */
   const sum = function (gkey) {
@@ -984,7 +984,8 @@ function stlCompute_(month) {
     const login = stlLogin_(r.cid);
     const idx = X.by[login];
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.sales += sales; u.qty += qty; company.unregSales += sales; return; }
-    if (idx.stopped) warn.stopped[r.cid] = 1;
+    // 정지된 아이디: 서브로 등록된 아이디(메인 정산에 합산)는 따로, 메인(실제 정지)은 그대로
+    if (idx.stopped) { if (idx.role === '서브' && idx.mainKey && idx.mainKey !== idx.key) warn.stoppedSub[r.cid] = idx.mainKey; else warn.stopped[r.cid] = 1; }
     const worker = stlWorkerOf_(ctx, login, r.date);
     // 아이디 사용 기록: 그 날 다른 기사가 이 아이디로 일했으면 그 줄은 일한 기사 본인 정산으로 (단가도 그 기사 아이디 기준)
     const mv = stlMoveOf_(ctx, idx, worker, r, warn);
@@ -1354,6 +1355,10 @@ function stlCompute_(month) {
   W('badSub', '서브인데 메인 아이디를 찾을 수 없음 (따로 정산됨)', X.badSub.map(cidNm));
   W('moveNo', '아이디 사용 기록의 기사에게 본인 정산 아이디가 없음 (명의자 정산에 남김 — 아이디 관리에 그 기사 아이디 추가)', Object.keys(warn.moveNo).map(function (k) { const w = warn.moveNo[k]; return w.name + ' · ' + cidNm(w.cid) + ' ' + w.dates.length + '일'; }));
   W('stopped', '정지된 아이디에 배송 기록', Object.keys(warn.stopped).map(cidNm), 'info');
+  W('stoppedSub', '정지 상태인 서브 아이디에 배송 기록 (메인 아이디 정산에 합산됨 · 확인만)', Object.keys(warn.stoppedSub).map(function (c) {
+    const g = X.groups[warn.stoppedSub[c]];
+    return cidNm(c) + ' → 메인 ' + (g ? String(g.cid).replace(/@.*$/, '') + (g.ownerId && D.byId[g.ownerId] ? ' (' + D.byId[g.ownerId].name + ')' : '') : '');
+  }), 'sub');
   W('noCamp', '노선관리에 없는 캠프', Object.keys(warn.noCamp), 'bad');
   W('noPrice', '단가 미입력 (노선관리 → 구분별 단가)', Object.keys(warn.noPrice).map(function (k) {
     const w = warn.noPrice[k]; return w.camp + ' ' + w.route + (w.type ? ' · ' + w.type + '단가' : '') + ' · ' + won_(w.qty) + '건' + (w.routeKnown ? '' : ' (노선 미등록)');
