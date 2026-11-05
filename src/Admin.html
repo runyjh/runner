@@ -240,6 +240,10 @@
   table.fund-tbl .inp { height: 32px; } table.fund-tbl .fnum { text-align: right; width: 130px; }
   table.fund-tbl tr.done td { background: #f3fbf6; } table.fund-tbl tr.rest td { border-top: 2px solid var(--line); }
   table.fund-tbl tfoot td { font-weight: 700; background: var(--gray-weak); }
+  .prior-in { display: flex; gap: 6px; } .prior-in .inp { height: 32px; font-weight: 500; } .prior-in .fnum { width: 150px; text-align: right; }
+  table.tax-tbl tr.tx-paid td { background: #f3fbf6; color: var(--sub); } table.tax-tbl tr.tx-past td { color: var(--sub); } table.tax-tbl tr.tx-late td:first-child b { color: var(--danger); }
+  table.tax-tbl tr.tx-late td:first-child .smemo { color: var(--danger); font-weight: 700; } table.tax-tbl tr.tx-soon td:first-child .smemo { color: var(--warn); font-weight: 700; }
+  .tax-tbl + .pnl-box { margin-top: 12px; }
   .bank-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 8px; }
   .bank-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
   .bank-card.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); } .bank-card small { color: var(--sub); font-size: 11.5px; }
@@ -1014,6 +1018,7 @@
         <button class="tab on" data-pnl="pnl">월별 손익</button>
         <button class="tab" data-pnl="fund">자금배분</button>
         <button class="tab" data-pnl="bal">통장 잔액</button>
+        <button class="tab" data-pnl="tax">세금 일정</button>
         <button class="tab" data-pnl="banktx">입·출금 기록</button>
         <i class="tsep"></i>
         <button class="tab" data-pnl="cost">고정 운영비</button>
@@ -5409,6 +5414,12 @@
       ['주의', '러너 잉여(프백·보험 차액·용차)는 회사이익금 안에 이미 있어 <b>더하지 않음</b> · 대표 급여(인출)는 개인사업자 비용이 아니라 <b>빼지 않음</b>'],
       ['바꾸는 곳', '[고정 운영비] 매달 같은 돈 · [직원] 급여·원천세 · [지출 기록] 그 달 실제 지출 — 저장하면 바로 반영 (기사 정산은 다시 계산 안 함)']
     ],
+    tax: [
+      ['하는 일', '올해 낼 세금을 <b>납부기한 순</b>으로 — 부가세 · 원천세 · 산재고용 · 종합소득세 · 지방소득세 (주말·공휴일이면 다음 영업일)'],
+      ['예상 금액', '손익·통장 숫자로 자동 · <b>고지서</b>라고 나온 건 예정고지·중간예납처럼 고지서 금액을 넣기'],
+      ['낸 금액', '내면 <b>낸 금액 · 납부일</b>을 넣기 → ✓ 납부, 출금 통장 잔액에서 자동으로 빠짐 · 예정고지·중간예납 낸 금액은 확정 금액에서 자동으로 뺌'],
+      ['주의', '원천세·산재고용은 정산월 다음 달에 지급한 것으로 보고 그 다음 달 10일 · 종합소득세는 연환산 추정이라 <b>세무사 확인</b>']
+    ],
     fund: [
       ['하는 일', '쿠팡 입금을 <b>통장별로 나눠 보내기</b> — 항목마다 보낼 통장과 계산 금액이 자동'],
       ['순서', '① 쿠팡 입금이 들어오면 실제 금액 확인 후 <b>받음</b> ② 항목별로 보내고 <b>이체</b> 체크 → 통장 잔액에 바로 반영'],
@@ -5461,7 +5472,7 @@
       ['주의', '있는 줄의 분류를 바꾸면 마감 안 한 달 계산이 바뀜']
     ]
   };
-  const ST_GTAG = { '순서': 'order', '자동': 'empty', '직접': 'where', '맞추기': 'diff', '구분': 'empty', '기초잔액': 'empty', '금액 규칙': 'empty', '예시': 'info', '계산': 'order', '금액': 'empty', '원천세': 'diff', '귀속월': 'where', '매달 같으면': 'where', '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
+  const ST_GTAG = { '예상 금액': 'empty', '낸 금액': 'where', '순서': 'order', '자동': 'empty', '직접': 'where', '맞추기': 'diff', '구분': 'empty', '기초잔액': 'empty', '금액 규칙': 'empty', '예시': 'info', '계산': 'order', '금액': 'empty', '원천세': 'diff', '귀속월': 'where', '매달 같으면': 'where', '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
   function paintHelp(name) {
     const el = $('#stEditHelp'), g = ST_GUIDE[name];
     if (!g) { el.className = 'sub st-help'; el.textContent = name === 'migrate' ? '' : ST_HELP[name] || ''; return; }
@@ -5625,12 +5636,60 @@
     STX.pnlT = name; STX.edDirty = false;
     $$('#stPnlTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.pnl === name));
     $('#stMigrate').classList.add('hidden');
-    const pane = ['pnl', 'fund', 'bal'].includes(name);
+    const pane = ['pnl', 'fund', 'bal', 'tax'].includes(name);
     $('#stPnl').classList.toggle('hidden', !pane);
     $('#stEditor').classList.toggle('hidden', pane);
     paintHelp(name === 'pnl' ? 'pnlSum' : name);
-    if (name === 'pnl') loadPnl(); else if (name === 'fund') loadFund(); else if (name === 'bal') loadBal(); else loadEditor(name);
+    if (name === 'pnl') loadPnl(); else if (name === 'fund') loadFund(); else if (name === 'bal') loadBal(); else if (name === 'tax') loadTaxPlan(); else loadEditor(name);
   }
+  // 세금 일정 (부가세 · 원천세 · 산재고용 · 종합소득세)
+  function loadTaxPlan() {
+    const el = $('#stPnl');
+    el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    const seq = STX.taxSeq = (STX.taxSeq || 0) + 1;
+    api('adm_stlTax', STX.month).then((r) => {
+      if (seq !== STX.taxSeq) return;
+      if (!r.ok) { el.innerHTML = ''; return toast(r.msg); }
+      STX.taxp = r; renderTaxPlan();
+    }).catch(() => {});
+  }
+  function renderTaxPlan() {
+    const T = STX.taxp; if (!T) return;
+    const today = T.today, dd = (d) => Math.round((new Date(d + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+    // 지난 일정: 낼 돈이 계산된 것만 빨간색, 고지서·0원·시스템 쓰기 전 일정은 회색
+    const st = (x) => (x.amt != null && x.date ? 'paid' : dd(x.due) < 0 ? (x.est > 0 ? 'late' : 'past') : dd(x.due) <= 14 ? 'soon' : '');
+    const stTxt = (x) => { const k = st(x), n = dd(x.due); return k === 'paid' ? '✓ 납부' : k === 'late' ? '기한 지남 ' + (-n) + '일' : k === 'past' ? '지난 일정 · 냈으면 기록' : n === 0 ? '오늘' : 'D-' + n; };
+    const bankSel = (x) => '<select class="inp" data-tk="' + esc(x.key) + '" data-tf="bank" style="min-width:130px">' + [''].concat(T.banks).map((b) => '<option value="' + esc(b) + '"' + (b === x.bank ? ' selected' : '') + '>' + esc(b || '-') + '</option>').join('') + '</select>';
+    const rows = T.items.map((x) => '<tr class="tx-' + (st(x) || 'none') + '"><td><b>' + esc(x.due) + '</b><div class="smemo">' + stTxt(x) + '</div></td><td><span class="badge">' + esc(x.kind) + '</span></td><td>' + esc(x.period) + '</td>' +
+      '<td class="n">' + (x.est == null ? '<span class="sub">고지서</span>' : wn(x.est)) + (x.note ? '<div class="smemo">' + esc(x.note) + '</div>' : '') + '</td>' +
+      '<td class="n"><input class="inp fnum" data-tk="' + esc(x.key) + '" data-tf="amt" inputmode="numeric" value="' + (x.amt != null ? wn(x.amt) : '') + '" placeholder="' + (x.est != null ? esc(wn(x.est)) : '금액') + '"></td>' +
+      '<td><input class="inp" type="date" data-tk="' + esc(x.key) + '" data-tf="date" value="' + esc(x.date || '') + '" style="width:140px"></td><td>' + bankSel(x) + '</td>' +
+      '<td><input class="inp" data-tk="' + esc(x.key) + '" data-tf="memo" value="' + esc(x.memo || '') + '" style="min-width:120px"></td></tr>').join('');
+    const I = T.income, pct = (v) => (Math.round(v * 1000) / 10) + '%';
+    const line = (lab, v, sub, cls) => '<div class="pnl-step' + (cls ? ' ' + cls : '') + '"><span>' + lab + (sub ? '<small>' + sub + '</small>' : '') + '</span><b>' + v + '</b></div>';
+    const inc = '<div class="pnl-box"><h4>' + esc(T.year) + '년 종합소득세 예상 <small>개인사업자 · 사업소득만 · 세액공제·감면·다른 소득 미반영 → 신고 전 세무사 확인</small></h4>' +
+      line('올해 당기순이익', wn(I.netSum), '올인원 ' + I.sysMonths + '개월 ' + wn(I.sysNet) + (I.priorMonths || I.priorAmt ? ' + 쓰기 전 ' + I.priorMonths + '개월 ' + wn(I.priorAmt) : '')) +
+      '<div class="pnl-step"><span>올인원 쓰기 전 올해 실적<small>1~9월처럼 이 프로그램에 없는 달의 당기순이익 합계 · 개월 수 (넣으면 연환산이 정확해짐)</small></span><b class="prior-in"><input class="inp fnum" data-tk="prior|' + esc(T.year) + '" data-tf="amt" inputmode="numeric" value="' + (I.priorAmt ? wn(I.priorAmt) : '') + '" placeholder="당기순이익 합계"> <input class="inp" data-tk="prior|' + esc(T.year) + '" data-tf="months" inputmode="numeric" value="' + (I.priorMonths || '') + '" placeholder="개월" style="width:70px"></b></div>' +
+      line('연환산', wn(I.annual), I.months ? '÷ ' + I.months + '개월 × 12' : '실적 없음') +
+      line('과세표준', wn(I.base), '연환산 − 기본공제 ' + wn(I.deduction)) +
+      line('종합소득세', wn(I.tax), '세율 ' + pct(I.rate) + ' (누진공제 반영)') +
+      line('지방소득세', wn(I.local), '종합소득세의 10%') +
+      line('낼 세금 예상', wn(I.due), '종합소득세 + 지방소득세 − 중간예납 낸 금액 ' + wn(I.mid), 'net') +
+      line('종합소득세 적립 (자금배분)', wn(I.reserve), '올해 자금배분에서 이체 완료한 적립액') +
+      line(I.short > 0 ? '더 모아야 할 돈' : '여유', wn(Math.abs(I.short)), I.short > 0 ? '배분 설정의 종합소득세 적립률을 올리거나 유보금에서' : '적립액이 예상보다 많음', I.short > 0 ? 'net neg' : 'net') + '</div>';
+    $('#stPnl').innerHTML = '<div class="table-wrap"><table class="sttbl fund-tbl tax-tbl"><thead><tr><th>납부기한</th><th>세금</th><th>기간</th><th class="n">예상 금액</th><th class="n">낸 금액</th><th>납부일</th><th>출금 통장</th><th>메모</th></tr></thead><tbody>' + rows + '</tbody></table></div>' + inc;
+  }
+  $('#stPnl').addEventListener('change', (e) => {
+    const el = e.target.closest('[data-tk]'); if (!el || !STX.taxp) return;
+    const f = {}; f[el.dataset.tf] = el.dataset.tf === 'amt' ? el.value.replace(/[^\d-]/g, '') : el.dataset.tf === 'months' ? el.value.replace(/[^\d]/g, '') : el.value;
+    el.disabled = true;
+    api('adm_stlTaxSave', STX.month, el.dataset.tk, f).then((r) => {
+      if (!r.ok) { el.disabled = false; return toast(r.msg); }
+      if (/^prior\|/.test(el.dataset.tk)) toast('쓰기 전 실적을 반영했습니다.');
+      else if (el.dataset.tf === 'amt') toast(f.amt ? '납부를 기록했습니다 (출금 통장 잔액에서 빠짐).' : '납부 기록을 지웠습니다.');
+      loadTaxPlan();
+    }).catch(() => { el.disabled = false; });
+  });
   // 자금배분: 쿠팡 입금 → 통장별
   function loadFund() {
     const el = $('#stPnl');

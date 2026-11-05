@@ -68,6 +68,8 @@ const STL_TABS = {
   stl_alloc: { label: '항목', bank: '보낼 통장', rule: '금액 규칙', desc: '설명' },
   stl_fund: { month: '정산월', item: '항목', bank: '통장', plan: '계산 금액', amt: '금액', done: '완료', date: '날짜', memo: '메모' },
   stl_banktx: { date: '날짜', kind: '구분', from: '출금 통장', to: '입금 통장', amt: '금액', memo: '내용', month: '정산월' },
+  // 세금 일정: 세금마다 낸 금액 · 납부일 · 출금 통장 (키 = 세목|기간)
+  stl_taxpay: { key: '키', kind: '세금', period: '기간', due: '납부기한', amt: '낸 금액', date: '납부일', bank: '출금 통장', memo: '메모' },
   stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' }
 };
 const STL_TAB_NOTES = {
@@ -156,9 +158,9 @@ const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
 const STL_CALC_VER = '20261105zI';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
-const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx'];
+const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
-const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1, stl_bank: 1, stl_alloc: 1, stl_fund: 1, stl_banktx: 1 };
+const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1, stl_bank: 1, stl_alloc: 1, stl_fund: 1, stl_banktx: 1, stl_taxpay: 1 };
 // 통장 용도 · 기본 통장 (기존 운영시트 통장 8개)
 const STL_BANK_ROLES = ['쿠팡 입금', '기사정산', '부가세', '산재고용', '운영비', '인건비', '대표', '유보금', '기타'];
 const STL_BANK_DEFAULT = [['운영 통장', '쿠팡 입금'], ['기사정산 통장', '기사정산'], ['부가세 통장', '부가세'], ['산재고용 통장', '산재고용'], ['운영고정비 통장', '운영비'], ['인건비 통장', '인건비'], ['대표 통장', '대표'], ['유보금 통장', '유보금']];
@@ -1916,6 +1918,8 @@ function stlBankMoves_() {
     add(r.date, src, -a, mt + r.item + ' → ' + r.bank, '자금배분', r.month);
     add(r.date, r.bank, a, mt + r.item + ' ← ' + src, '자금배분', r.month);
   });
+  // 세금 일정에서 '낸 금액·납부일'을 넣은 세금 (출금 통장에서 빠짐)
+  stlRead_('stl_taxpay').forEach(function (x) { if (x.date && stlNum_(x.amt) && !/^prior\|/.test(x.key)) add(x.date, x.bank, -stlNum_(x.amt), '세금 · ' + x.kind + ' ' + x.period, '세금', ''); });
   // 입금확인에서 체크한 기사 지급 (기사정산 통장에서 빠짐)
   const drvBank = (banks.filter(function (x) { return x.role === '기사정산'; })[0] || {}).name || src;
   const payByMonth = {};
@@ -1936,6 +1940,121 @@ function stlBankMoves_() {
   banks.forEach(function (b) { bal[b.name] = { name: b.name, role: b.role, bankName: b.bankName, account: b.account, opening: stlNum_(b.opening), openDate: b.openDate || '', balance: stlNum_(b.opening), inSum: 0, outSum: 0 }; });
   moves.forEach(function (m) { const x = bal[m.bank]; x.balance += m.amt; if (m.amt > 0) x.inSum += m.amt; else x.outSum -= m.amt; m.after = x.balance; });
   return { banks: banks.map(function (b) { return bal[b.name]; }), moves: moves };
+}
+// ───────────────────────── 세금 일정 ─────────────────────────
+// 종합소득세 세율 (2023년 귀속부터): [과세표준 상한, 세율, 누진공제]
+const STL_INCOME_TAX = [[14000000, 0.06, 0], [50000000, 0.15, 1260000], [88000000, 0.24, 5760000], [150000000, 0.35, 15440000],
+  [300000000, 0.38, 19940000], [500000000, 0.40, 25940000], [1000000000, 0.42, 35940000], [Infinity, 0.45, 65940000]];
+function stlIncomeTax_(base) {
+  if (base <= 0) return { rate: 0, tax: 0 };
+  const b = STL_INCOME_TAX.filter(function (x) { return base <= x[0]; })[0];
+  return { rate: b[1], tax: Math.max(0, Math.floor((base * b[1] - b[2]) / 10) * 10) };
+}
+/** 그 날이 주말·공휴일이면 다음 영업일 */
+function stlBizDay_(ymd) {
+  let d = parseYmd_(ymd);
+  if (!d) return ymd;
+  while (d.getDay() === 0 || d.getDay() === 6 || HOLIDAYS[ymd_(d)]) d = addDays_(d, 1);
+  return ymd_(d);
+}
+const STL_TAX_BANK_ROLE = { '부가세': '부가세', '원천세': '인건비', '산재·고용': '산재고용', '종합소득세': '유보금', '지방소득세': '유보금' };
+/** 조회월이 속한 해의 세금 일정 · 종합소득세 예상 */
+function stlTax_(month) {
+  const Y = month.slice(0, 4), Y1 = String(Number(Y) + 1);
+  const ms = stlMonths_().withData.filter(function (m) { return m.slice(0, 4) === Y; });
+  const per = {};
+  ms.forEach(function (m) {
+    let sum = null;
+    try { sum = stlResult_(m, false).summary; } catch (e) { sum = null; }
+    if (!sum) return;
+    const t = sum.total || {}, p = stlPnl_(m, sum);
+    per[m] = { wht: p.staffWht, ins: (t.san || 0) + (t.goy || 0) + (t.runnerIns || 0), vat: p.vatDue, net: p.net, payMonth: String(sum.dates && sum.dates.pay || stlAddMonth_(m, 1)).slice(0, 7) };
+  });
+  const paid = {};
+  stlRead_('stl_taxpay').forEach(function (r) { if (r.key) paid[r.key] = r; });
+  const banks = stlBanks_(), roleBank = function (role) { const b = banks.filter(function (x) { return x.role === role; })[0]; return b ? b.name : ''; };
+  const items = [];
+  const push = function (key, kind, period, due, est, note) {
+    const r = paid[key] || {};
+    items.push({ key: key, kind: kind, period: period, due: stlBizDay_(due), est: est == null ? null : Math.max(0, Math.round(est)), note: note || '',
+      amt: str_(r.amt) !== '' ? stlNum_(r.amt) : null, date: r.date || '', bank: r.bank || roleBank(STL_TAX_BANK_ROLE[kind] || ''), memo: r.memo || '' });
+  };
+  const paidAmt = function (key) { return paid[key] && str_(paid[key].amt) !== '' ? stlNum_(paid[key].amt) : 0; };
+  // 원천세 · 산재고용: 지급한 달의 다음 달 10일 (기사 지급월 = 직원 급여 지급월로 봄)
+  Object.keys(per).sort().forEach(function (m) {
+    const x = per[m], due = stlAddMonth_(x.payMonth, 1) + '-10', lab = Number(m.slice(5)) + '월 정산분';
+    if (x.wht || paid['wht|' + m]) push('wht|' + m, '원천세', lab + ' (직원 급여)', due, x.wht, '소득세 3% + 지방소득세 0.3% · 홈택스·위택스');
+    if (x.ins || paid['ins|' + m]) push('ins|' + m, '산재·고용', lab + ' (기사 보수)', due, x.ins, '기사 공제분 + 러너 부담분 · 근로복지공단 고지서');
+  });
+  // 부가세 (개인 일반과세자): 예정고지 4/25 · 10/25 (고지서 금액), 확정 7/25 · 다음 해 1/25 = 그 기 부가세 예상 − 예정고지 낸 금액
+  const vatOf = function (a, b) { return Object.keys(per).filter(function (m) { const n = Number(m.slice(5)); return n >= a && n <= b; }).reduce(function (s0, m) { return s0 + per[m].vat; }, 0); };
+  const v1 = vatOf(1, 6), v2 = vatOf(7, 12);
+  push('vat1p|' + Y, '부가세', Y + '년 1기 예정고지', Y + '-04-25', null, '고지서 금액 (직전 기 납부세액의 1/2)');
+  push('vat1|' + Y, '부가세', Y + '년 1기 확정 (1~6월)', Y + '-07-25', v1 - paidAmt('vat1p|' + Y), '1~6월 부가세 예상 ' + won_(v1) + ' − 예정고지 낸 금액');
+  push('vat2p|' + Y, '부가세', Y + '년 2기 예정고지', Y + '-10-25', null, '고지서 금액 (직전 기 납부세액의 1/2)');
+  push('vat2|' + Y, '부가세', Y + '년 2기 확정 (7~12월)', Y1 + '-01-25', v2 - paidAmt('vat2p|' + Y), '7~12월 부가세 예상 ' + won_(v2) + ' − 예정고지 낸 금액');
+  // 종합소득세: 올해 당기순이익 → 연환산 → 기본공제 150만 → 과세표준 → 세율
+  // 러너 올인원을 쓰기 전 올해 실적 (직접 입력: 당기순이익 합계 · 개월 수)
+  const pr = paid['prior|' + Y] || {}, priorAmt = stlNum_(pr.amt), priorN = Math.max(0, Math.min(12, parseInt(str_(pr.period), 10) || 0));
+  const sysN = Object.keys(per).length, sysNet = Object.keys(per).reduce(function (s0, m) { return s0 + per[m].net; }, 0);
+  const n = sysN + priorN, netSum = sysNet + priorAmt;
+  const annual = n ? Math.round(netSum / n * 12) : 0, ded = 1500000, base = Math.max(0, annual - ded), it = stlIncomeTax_(base);
+  const local = Math.floor(it.tax * 0.1 / 10) * 10, mid = paidAmt('incm|' + Y);
+  let reserve = 0;
+  stlRead_('stl_fund').forEach(function (r) { if (String(r.month).slice(0, 4) === Y && r.item === '종합소득세 적립' && stlYes_(r.done)) reserve += stlNum_(r.amt); });
+  push('incm|' + Y, '종합소득세', Y + '년 중간예납', Y + '-11-30', null, '고지서 금액 (작년 종합소득세의 1/2)');
+  push('inc|' + Y, '종합소득세', Y + '년 귀속 확정신고', Y1 + '-05-31', it.tax - mid, '예상 세액 − 중간예납 낸 금액');
+  push('loc|' + Y, '지방소득세', Y + '년 귀속', Y1 + '-05-31', local, '종합소득세의 10% · 위택스');
+  items.sort(function (a, b) { return a.due < b.due ? -1 : a.due > b.due ? 1 : 0; });
+  return {
+    year: Y, items: items,
+    income: { months: n, sysMonths: sysN, sysNet: sysNet, priorAmt: priorAmt, priorMonths: priorN, netSum: netSum, annual: annual, deduction: ded, base: base, rate: it.rate, tax: it.tax, local: local, total: it.tax + local, mid: mid, due: Math.max(0, it.tax - mid) + local, reserve: reserve, short: Math.max(0, it.tax - mid) + local - reserve }
+  };
+}
+function adm_stlTax(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    return Object.assign({ ok: true, today: todayText_(), banks: stlBanks_().map(function (b) { return b.name; }) }, stlTax_(month));
+  });
+}
+/** 세금 한 줄 저장: f = { amt, date, bank, memo } (amt '' = 지움) */
+function adm_stlTaxSave(token, month, key, f) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!stlMonthOk_(month) || !/^(wht|ins|vat1p|vat1|vat2p|vat2|incm|inc|loc|prior)\|\d{4}(-\d{2})?$/.test(str_(key))) fail_('세금 항목을 확인해 주세요.');
+    f = f || {};
+    if (/^prior\|/.test(key)) { // 올인원 쓰기 전 올해 실적
+      const lock0 = scriptLock_();
+      lock0.waitLock(20000);
+      try {
+        const hit0 = stlRead_('stl_taxpay').filter(function (r) { return r.key === key; })[0], o0 = hit0 ? Object.assign({}, hit0) : { key: key, kind: '이전 실적', due: '' };
+        if (f.amt !== undefined) { const v = str_(f.amt).replace(/[\s,원]/g, ''); if (v && !/^-?\d+$/.test(v)) fail_('금액은 숫자로 넣어 주세요.'); o0.amt = v; }
+        if (f.months !== undefined) { const n0 = parseInt(str_(f.months), 10) || 0; if (n0 < 0 || n0 > 11) fail_('개월 수는 0~11'); o0.period = n0 ? n0 + '개월' : ''; }
+        o0.memo = '러너 올인원 쓰기 전 올해 당기순이익 (종합소득세 예상용)';
+        if (hit0) stlSetRow_('stl_taxpay', hit0._row, o0); else stlAppend_('stl_taxpay', [o0]);
+      } finally { lock0.releaseLock(); }
+      return { ok: true };
+    }
+    const it = stlTax_(month).items.filter(function (x) { return x.key === key; })[0];
+    if (!it) fail_('이 해의 세금 일정에 없는 항목입니다.');
+    if (f.bank && stlBanks_().map(function (b) { return b.name; }).indexOf(f.bank) < 0) fail_('통장 목록에 없는 통장입니다.');
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const hit = stlRead_('stl_taxpay').filter(function (r) { return r.key === key; })[0];
+      const o = hit ? Object.assign({}, hit) : { key: key };
+      o.kind = it.kind; o.period = it.period; o.due = it.due;
+      if (f.amt !== undefined) { const v = str_(f.amt).replace(/[\s,원]/g, ''); if (v && !/^\d+$/.test(v)) fail_('금액은 숫자로 넣어 주세요.'); o.amt = v; if (v && !o.date && f.date === undefined) o.date = todayText_(); if (!v) o.date = ''; }
+      if (f.date !== undefined) o.date = f.date ? stlYmd_(f.date) : '';
+      if (f.bank !== undefined) o.bank = str_(f.bank);
+      if (!o.bank) o.bank = it.bank;
+      if (f.memo !== undefined) o.memo = str_(f.memo).slice(0, 200);
+      if (hit) stlSetRow_('stl_taxpay', hit._row, o); else stlAppend_('stl_taxpay', [o]);
+      if (f.amt !== undefined) logAdmin_(a, '세금 납부 기록', it.kind + ' ' + it.period, o.amt ? won_(stlNum_(o.amt)) + '원 · ' + o.date + ' · ' + o.bank : '지움');
+    } finally { lock.releaseLock(); }
+    return { ok: true };
+  });
 }
 function adm_stlFund(token, month) {
   return run_(function () {
