@@ -85,6 +85,7 @@
   .wkc .six { color: var(--warn); font-weight: 800; }
   .nav a.off { color: #b0b8c1; cursor: default; }
   .nav a small { font-size: 11px; }
+  .navbtn { display: none; }
   .side .me { flex: none; margin-top: 10px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
   .side .me b { color: var(--ink); display: block; font-size: 13px; }
   .side .me a { color: var(--sub); cursor: pointer; text-decoration: underline; }
@@ -127,6 +128,27 @@
   .tk-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px; border-radius: 6px; } .tk-row:hover { background: var(--gray-weak); }
   .tk-row label { flex: 1; display: flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   table.tk th.tsrt { cursor: pointer; user-select: none; } table.tk th.tsrt:hover { color: var(--brand); }
+  .tk-card-b { display: none; }
+  @media (max-width: 640px) {
+    .tk-card-b { display: inline-block; } .tk-card-b.hidden { display: none; }
+    .tkbar .tk-q { flex: 1 1 100%; width: 100%; order: -1; }
+    .table-wrap.tk-cardwrap { max-height: none; overflow: visible; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
+    table.tk-card, table.tk-card > tbody { display: block; width: 100%; min-width: 0 !important; }
+    table.tk-card > thead { display: none; }
+    table.tk-card > tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+    table.tk-card > tbody > tr.tk-1 { display: block; text-align: center; }
+    table.tk-card > tbody > tr > td { display: block; border: 0 !important; padding: 0 !important; min-width: 0; max-width: none; position: static !important; box-shadow: none !important; background: none !important; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; text-align: left !important; font-size: 13.5px; }
+    table.tk-card > tbody > tr > td::before { content: attr(data-l); display: block; font-size: 11px; font-weight: 600; color: var(--faint); margin-bottom: 1px; }
+    table.tk-card > tbody > tr > td.tk-t { grid-column: 1 / -1; font-size: 16px; font-weight: 700; padding-right: 34px !important; }
+    table.tk-card > tbody > tr > td.tk-t::before, table.tk-card > tbody > tr > td.tk-k::before, table.tk-card > tbody > tr.tk-1 > td::before { display: none; }
+    table.tk-card > tbody > tr > td.tk-k { position: absolute !important; right: 12px; top: 12px; }
+    table.tk-card > tbody > tr > td.tk-k input { width: 22px; height: 22px; }
+    table.tk-card > tbody > tr > td.tk-e { display: none; }
+    table.tk-card > tbody > tr > td .inp, table.tk-card > tbody > tr > td select, table.tk-card > tbody > tr > td input:not([type=checkbox]) { width: 100% !important; min-width: 0 !important; }
+    table.tk-card > tbody > tr.tot, table.tk-card > tbody > tr.tot td { background: #f5f8ff !important; }
+    table.tk-card > tbody > tr.sel { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); }
+    table.tk-card > tbody > tr:hover > td { background: none !important; }
+  }
   table.tk-stick thead th:first-child { left: 0; z-index: 3; }
   table.tk-stick tbody td:first-child { position: sticky; left: 0; z-index: 1; background: #fff; box-shadow: 1px 0 0 var(--line); }
   table.tk-stick tbody tr:hover td:first-child { background: #f9fafb; } table.tk-stick tbody tr.sel td:first-child { background: var(--brand-weak); }
@@ -802,14 +824,22 @@
 
   @media (max-width: 820px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
-    .side { position: static; height: auto; display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; overflow-x: auto; }
-    .side .logo { padding: 0 8px 0 0; white-space: nowrap; }
-    .nav { display: flex; gap: 4px; overflow: visible; margin: 0; padding: 0; flex: none; }
-    .ng { display: contents; }
-    .ngt { display: none; }
-    .nav a { white-space: nowrap; }
+    /* 모바일: 위 막대(로고 · 지금 메뉴 ☰) → 누르면 묶음별 메뉴 */
+    .side { position: sticky; top: 0; z-index: 15; height: auto; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+    .side .logo { padding: 0; white-space: nowrap; font-size: 15px; } .side .logo .rlogo { width: 26px; }
+    .navbtn { display: flex; margin-left: auto; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 14px; font-weight: 700; color: var(--ink); max-width: 62%; }
+    .navbtn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .navbtn i { font-style: normal; font-size: 16px; color: var(--sub); }
+    .side.open .navbtn { background: var(--ink); color: #fff; border-color: var(--ink); } .side.open .navbtn i { color: #fff; }
+    .nav, .side .me { display: none; }
+    .side.open .nav { display: block; width: 100%; max-height: calc(100vh - 120px); overflow-y: auto; margin: 4px 0 0; padding: 4px 0; flex: none; }
+    .side.open .ng { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 12px; }
+    .side.open .ngt { grid-column: 1 / -1; font-size: 12px; margin-bottom: 2px; }
+    .side.open .nav a { padding: 11px 10px; font-size: 14.5px; border: 1px solid var(--line); margin: 0; background: #fff; }
+    .side.open .nav a.on { border-color: var(--c); }
     .nav a small { display: none; }
-    .side .me { position: static; border: 0; margin: 0; padding: 0 0 0 8px; white-space: nowrap; }
+    .side.open .me { display: block; width: 100%; margin: 0; padding: 10px 2px 2px; font-size: 13px; }
+    .side.open { z-index: 45; }
+    .side.open::after { content: ''; position: fixed; inset: 0; z-index: -1; background: rgba(0,0,0,.25); }
     main { padding: 16px 12px; }
     .search { width: 100%; }
     .tools { width: 100%; flex-wrap: wrap; }
@@ -822,6 +852,8 @@
     main { min-width: 0; }
     section > .table-wrap, .table-wrap { max-width: 100%; }
   }
+  /* 휴대폰: 입력칸 글자 16px (아이폰이 화면을 확대하지 않게) */
+  @media (max-width: 640px) { input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px !important; } }
 </style>
 </head>
 <body>
@@ -843,6 +875,7 @@
 <div id="app" class="hidden">
   <aside class="side">
     <div class="logo"><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><b>러너 <span>올인원</span></b></div>
+    <button type="button" class="navbtn" id="navBtn" aria-label="메뉴 열기" aria-expanded="false"><span id="navCur">기사 정보관리</span><i>☰</i></button>
     <nav class="nav">
       <div class="ng g-drv"><p class="ngt">기사</p>
         <a class="on" data-view="drivers">기사 정보관리</a>
@@ -1181,7 +1214,7 @@
       <div class="kpis" id="stKpi"></div>
       <div id="stWarn"></div>
       <div class="st-tools"><input class="inp search" id="stQ" placeholder="이름·쿠팡ID 검색" autocomplete="off"><span class="sub" id="stCnt"></span></div>
-      <div class="table-wrap"><table class="sttbl" id="stTable"></table><div class="empty hidden" id="stEmpty"></div></div>
+      <div class="table-wrap"><table class="sttbl" id="stTable" data-tk-nocard></table><div class="empty hidden" id="stEmpty"></div></div>
       <div class="st-cards" id="stCards"></div>
     </div>
     <div id="stp-edit" class="hidden">
@@ -2454,6 +2487,12 @@
   // ───── 화면 전환 (기사 정보관리 / 업무스케줄) ─────
   let currentView = 'drivers';
   let driversLoaded = false;
+  // 모바일 메뉴: ☰ 열고 닫기 · 지금 메뉴 이름
+  $('#navBtn').addEventListener('click', () => { const sd = $('.side'); sd.classList.toggle('open'); $('#navBtn').setAttribute('aria-expanded', sd.classList.contains('open')); });
+  $('.nav').addEventListener('click', (e) => { if (e.target.closest('a')) { $('.side').classList.remove('open'); $('#navBtn').setAttribute('aria-expanded', 'false'); } });
+  document.addEventListener('click', (e) => { const sd = $('.side'); if (sd.classList.contains('open') && (!e.target.closest('.side') || e.target === sd)) sd.classList.remove('open'); });
+  function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; }
+  new MutationObserver(navCur).observe($('.nav'), { subtree: true, attributes: true, attributeFilter: ['class'] });
   function switchView(v) {
     if (v !== currentView && !viewRestoring) { viewHist.push(currentView); if (viewHist.length > 30) viewHist.shift(); }
     currentView = v;
@@ -7881,6 +7920,7 @@
         b = document.createElement('div'); b.className = 'tkbar';
         b.innerHTML = '<input class="tk-q" type="search" placeholder="🔍 표 안에서 찾기" aria-label="표 안에서 찾기"><span class="tk-n"></span>' +
           '<span class="tk-sp"></span><div class="tk-cw"><button type="button" class="tk-b tk-cols" title="열 숨기기 · 좌우 순서">☰ 열</button><div class="tk-panel hidden"></div></div>' +
+          '<button type="button" class="tk-b tk-card-b" title="휴대폰: 카드로 보기 ↔ 표로 보기">▦ 표로</button>' +
           '<button type="button" class="tk-b tk-copy" title="보이는 줄을 엑셀에 붙여넣을 수 있게 복사">⧉ 복사</button><button type="button" class="tk-b tk-csv" title="보이는 줄을 엑셀 파일(CSV)로">⬇ 엑셀</button>';
         box.parentNode.insertBefore(b, box);
       }
@@ -7906,11 +7946,41 @@
             '<button type="button" data-tkm="' + i + '" data-d="-1" title="왼쪽으로"' + (first ? ' disabled' : '') + '>◀</button><button type="button" data-tkm="' + i + '" data-d="1" title="오른쪽으로"' + (i < cur.length - 1 ? '' : ' disabled') + '>▶</button></div>';
         }).join('');
     }
+    // 휴대폰(폭 640 이하): 줄 = 카드 (제목 칸 크게 + 나머지 '열 이름: 값'). 표마다 [▦ 표로] / [▤ 카드로] 로 바꿈 (기억)
+    const MOB = window.matchMedia ? window.matchMedia('(max-width: 640px)') : { matches: false };
+    const cardable = (tb) => !!tb.closest('.table-wrap') && !tb.closest('.modal') && !tb.classList.contains('up') && tb.dataset.tkNocard == null;
+    function applyCard(tb, k) {
+      const on = cardable(tb) && pref(k).card !== false;
+      tb.classList.toggle('tk-card', on);
+      const wrap = tb.closest('.table-wrap'); if (wrap) wrap.classList.toggle('tk-cardwrap', on);
+      const b = tb._tkBar && tb._tkBar.querySelector('.tk-card-b');
+      if (b) { b.classList.toggle('hidden', !cardable(tb)); b.textContent = on ? '▦ 표로' : '▤ 카드로'; }
+      if (!on || !MOB.matches) return;
+      const hs = headOf(tb); if (!hs) return;
+      const lab = {}; hs.forEach((c) => { lab[c.dataset.tkc] = txt(c); });
+      const isCk = (c) => !!c.querySelector('input[type=checkbox]') && !txt(c);
+      let title = null;
+      [...hs].sort((a, b) => a.dataset.tkc - b.dataset.tkc).some((c) => { if (c.style.display !== 'none' && !c.querySelector('input[type=checkbox]') && txt(c)) { title = c.dataset.tkc; return true; } return false; });
+      [...tb.tBodies].forEach((bd) => [...bd.rows].forEach((r) => {
+        const one = r.cells.length === 1 || [...r.cells].some((c) => c.colSpan > 2);
+        r.classList.toggle('tk-1', one);
+        if (one) return;
+        [...r.cells].forEach((c) => {
+          const t = c.dataset.tkc;
+          if (c.dataset.l !== lab[t]) c.dataset.l = lab[t] || '';
+          c.classList.toggle('tk-t', t === title);
+          c.classList.toggle('tk-k', isCk(c));
+          c.classList.toggle('tk-e', !isCk(c) && !txt(c) && !c.querySelector('input,select,textarea,button,img,svg,a'));
+        });
+      }));
+    }
+    if (MOB.addEventListener) MOB.addEventListener('change', () => document.querySelectorAll('table.tk').forEach((tb) => tb._tkKey && applyCard(tb, tb._tkKey)));
     function refresh(tb) {
       const hs = headOf(tb); if (!hs) return;
       const k = tb._tkKey;
       applyCols(tb, k);
       applyQ(tb, k, tb._tkBar);
+      applyCard(tb, k);
     }
     function enhance(tb) {
       const hs = headOf(tb); if (!hs) return;
@@ -7940,6 +8010,7 @@
       if (!b) return;
       const tb = b._tb, k = b._k;
       if (e.target.closest('.tk-cols')) { const pn = b.querySelector('.tk-panel'); panel(b); pn.classList.toggle('hidden'); return; }
+      if (e.target.closest('.tk-card-b')) { const p = pref(k); p.card = p.card === false; savePref(k, p); applyCard(tb, k); return; }
       const mv = e.target.closest('[data-tkm]'), act = e.target.closest('[data-tka]');
       if (mv || act) {
         const hs = headOf(tb), names = [...hs].sort((a, c) => a.dataset.tkc - c.dataset.tkc).map(txt), p = pref(k);

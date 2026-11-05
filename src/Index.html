@@ -137,13 +137,14 @@
   .bdin .btn { width: auto; padding: 0 16px; height: 44px; flex: none; }
   .bdwarn { font-size: 12.5px; color: #8a5a00; background: #fff8e6; border-radius: 10px; padding: 10px 12px; line-height: 1.6; margin-bottom: 12px; }
   .menu div { background: #fff; border-radius: var(--radius); padding: 18px 16px; min-height: 96px; }
-  .menu b { display: block; font-size: 16px; }
-  .menu span { font-size: 12px; color: var(--sub); }
+  .menu b { display: block; font-size: 17.5px; }
+  .menu span { font-size: 13px; color: var(--sub); }
+  .menu .ti { display: block; font-style: normal; font-size: 26px; line-height: 1; margin-bottom: 10px; } .menu .bdtile .ti { display: inline; font-size: 20px; margin: 0 6px 0 0; }
   .menu button.tile { background: #fff; border: 0; border-radius: var(--radius); padding: 18px 16px; min-height: 96px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
   .menu button.tile span { color: var(--brand); font-weight: 600; }
   /* 카드 제목 앞 파란 세로 막대 */
-  .menu .tile > b { position: relative; padding-left: 10px; margin-bottom: 4px; }
-  .menu .tile > b::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 4px; height: 1.05em; border-radius: 2px; background: var(--brand); }
+  .menu .tile > b { margin-bottom: 4px; }
+  .menu button.tile { min-height: 118px; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start; }
   .wk { background: #fff; border-radius: var(--radius); padding: 14px 14px 6px; margin-bottom: 12px; }
   .wk h3 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
   .wk h3 small { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
@@ -418,6 +419,7 @@
   .layer .head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 700; }
   .layer .head button { border: 0; background: none; font-size: 22px; cursor: pointer; }
   .layer #postcodeWrap { flex: 1; }
+  @media (max-width: 640px) { input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px !important; } }
 </style>
 </head>
 <body>
@@ -631,11 +633,11 @@
     <div class="hello"><h2><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><span id="homeName">기사님, 안녕하세요</span></h2><p>오늘도 안전 운행하세요.</p></div>
     <div class="ntcard hidden" id="ntCard"></div>
     <div class="menu">
-      <button class="tile" id="mSched" type="button"><b>스케줄</b><span>2주·한 달 일정 보기 →</span></button>
-      <button class="tile" id="mSettle" type="button"><b>정산서 보기</b><span>월별 정산서·세금계산서 →</span></button>
-      <button class="tile" id="mPm" type="button"><b>품앗이</b><span>품앗이 일감 찾기·맡기기 →</span></button>
-      <button class="tile" id="mMy" type="button"><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
-      <div class="tile wide bdtile" id="mBoard" role="button" tabindex="0"><b>자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
+      <button class="tile" id="mSched" type="button"><i class="ti">📅</i><b>스케줄</b><span>2주·한 달 일정 보기 →</span></button>
+      <button class="tile" id="mSettle" type="button"><i class="ti">💰</i><b>정산서 보기</b><span>월별 정산서·계산서 →</span></button>
+      <button class="tile" id="mPm" type="button"><i class="ti">🤝</i><b>품앗이</b><span>일감 찾기·맡기기 →</span></button>
+      <button class="tile" id="mMy" type="button"><i class="ti">👤</i><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
+      <div class="tile wide bdtile" id="mBoard" role="button" tabindex="0"><b><i class="ti">💬</i>자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
     </div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
