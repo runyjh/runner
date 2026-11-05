@@ -5520,15 +5520,14 @@
     const yTag = (x) => { const o = ydays[x]; return o ? o.kinds.map((k) => '<b class="ytag' + (k === '품앗이' ? ' p' : '') + '">[' + k + (o.did && !o.rts.length ? ' 수행' : '') + ']</b>').join(' ') + (o.rts.length ? ' ' + esc(o.rts.join(',')) : '') : ''; };
     // 다른 명의자 아이디로 뛴 날 (스케줄 칸 '(dasom1125) 업무등록'): 그 아이디 배송을 참고로 (금액은 그 명의자 정산서에)
     const idUse = s.idUse || {};
-    const useTag = (x) => (idUse[x] || []).map((u) => '<b class="ytag u">[' + esc(u.owner || '다른 명의') + ' 아이디]</b> ' + esc(u.cid) + (u.routes.length ? ' · ' + esc(u.routes.join(',')) : '')).join(' / ');
-    const useNum = (x, k) => { const l = idUse[x] || []; const n = l.reduce((a, u) => a + (u[k] || 0), 0); return n ? '<span class="ref" title="' + esc(l.map((u) => u.owner).join(', ')) + ' 정산서에 들어가는 금액 (이 정산서 합계에는 안 들어감)">(' + wn(n) + ')</span>' : ''; };
+    const useTag = (x) => (idUse[x] || []).map((u) => '<b class="ytag u" title="' + esc((u.owner || '다른') + ' 명의 아이디 · 매출은 그 명의자 정산서에') + '">[' + esc(u.cid) + ']</b>' + (u.routes.length ? ' ' + esc(u.routes.join(',')) : '')).join(' / ');
     const days = Object.keys(s.daily).concat(Object.keys(s.sched || {}), Object.keys(ydays), Object.keys(idUse)).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
     const work = Object.keys(s.sched || {}).filter((x) => x >= P.from && x <= P.to).length;
     const dow = ['일', '월', '화', '수', '목', '금', '토'];
     const dayRows = days.map((x) => {
       const dd = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)), v = s.daily[x] || {}, yt = yTag(x), ut = useTag(x);
       const txt = yt || ut ? [yt + (yt && v.route ? ' · ' + esc(v.route) : ''), !yt && v.route ? esc(v.route) : '', ut].filter(Boolean).join(' / ') : esc(v.route || (s.sched || {})[x] || '');
-      return '<tr><td>' + mdTxt(x) + ' (' + dow[dd.getDay()] + ')</td><td>' + txt + '</td><td class="n">' + (v.qty ? wnz(v.qty) : useNum(x, 'qty') || '-') + '</td><td class="n">' + (v.amt ? wnz(v.amt) : useNum(x, 'amt') || '-') + '</td></tr>';
+      return '<tr><td>' + mdTxt(x) + ' (' + dow[dd.getDay()] + ')</td><td>' + txt + '</td><td class="n">' + wnz(v.qty) + '</td><td class="n">' + wnz(v.amt) + '</td></tr>';
     });
     const half = Math.ceil(dayRows.length / 2);
     const dayTbl = (rows) => '<table><thead><tr><th>날짜</th><th>노선 · 스케줄</th><th>건수</th><th>금액</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
