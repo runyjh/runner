@@ -156,7 +156,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zJ';
+const STL_CALC_VER = '20261105zK';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -1014,7 +1014,7 @@ function stlCompute_(month) {
     });
   };
   const company = { sales: 0, supplyCp: 0, lossCp: 0, unregSales: 0, vendorCut: 0, progFee: 0, yongGain: 0 };
-  const byDateLogin = {}, lastDel = {}; // lastDel[로그인] = 이 정산기간 마지막 배송일
+  const byDateLogin = {}, lastDel = {}, cutIds = {}; // lastDel[로그인] = 이 정산기간 마지막 배송일 · cutIds = 업체차감 줄의 쿠팡ID 칸(영업점 수수료 등, 아이디 아님)
 
   raw.forEach(function (r) {
     r.date = stlYmd_(r.date);
@@ -1023,7 +1023,7 @@ function stlCompute_(month) {
     company.sales += sales; company.supplyCp += total + fresh;
     const kind = kinds[r.kind] || '미분류';
     // 업체차감(시설 및 장비 사용료 = 영업점 수수료 = 러너 벤더의 쿠팡 프로그램 사용료): 기사·아이디와 무관한 회사 비용
-    if (kind === '업체차감') { company.vendorCut += total; company.progFee += stlR0_(total * (1 + cfg.vat)); return; }
+    if (kind === '업체차감') { cutIds[stlLogin_(r.cid)] = 1; company.vendorCut += total; company.progFee += stlR0_(total * (1 + cfg.vat)); return; }
     const login = stlLogin_(r.cid);
     const idx = X.by[login];
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.sales += sales; u.qty += qty; company.unregSales += sales; return; }
@@ -1429,7 +1429,7 @@ function stlCompute_(month) {
   const dayGap = function (a, b) { return Math.round((parseYmd_(b) - parseYmd_(a)) / 86400000); };
   if (dataEnd) Object.keys(X.by).forEach(function (k) {
     const b = X.by[k], g = X.groups[b.mainKey];
-    if (b.stopped || b.role === '서브' || b.vendor || !g || g.vendor || (g.main && g.main.mode === '용차내역') || acked['idle|' + k]) return;
+    if (b.stopped || b.role === '서브' || b.vendor || !g || g.vendor || (g.main && g.main.mode === '용차내역') || cutIds[k] || acked['idle|' + k]) return;
     const last = lastDel[k], gap = last ? dayGap(last, idleRef) : dayGap(P.from, idleRef) + 1;
     if (gap < 10) return;
     idle.push({ k: k, cid: b.cid, last: last || '', gap: gap });
