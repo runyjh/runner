@@ -83,6 +83,7 @@ function adm_fsToken(token) {
 function fsPut_(docs, atMs) {
   const cfg = fsCfg_();
   if (!cfg || !docs || !docs.length) return 0;
+  if (cache_().get('fs:down')) return 0; // 최근에 실패 → 10분 동안 쉬었다가 (저장이 느려지지 않게)
   try {
     const at = fsAccess_(cfg), base = 'projects/' + cfg.pid + '/databases/(default)/documents/';
     let n = 0;
@@ -103,6 +104,7 @@ function fsPut_(docs, atMs) {
   } catch (e) {
     console.error('Firestore 복사 실패 (시트는 저장됨): ' + (e && e.message));
     try { cache_().put('fs:err', nowText_() + ' ' + String(e && e.message).slice(0, 300), 21600); } catch (x) { /* 무시 */ }
+    try { cache_().put('fs:down', '1', 600); } catch (x) { /* 무시 */ }
     return 0;
   }
 }
@@ -206,6 +208,7 @@ function adm_fsRebuild(token) {
   return run_(function () {
     requireAdmin_(token);
     if (!fsCfg_()) fail_('스크립트 속성에 FIREBASE_SA(또는 FCM_SA) 서비스 계정 키가 없습니다.');
+    cache_().remove('fs:down');
     fsEnsureTrigger_();
     const t = Date.now(), n = fsBuildSched_();
     cache_().put('fs:built', String(t), 21600); cache_().put('fs:day', todayText_(), 21600);
