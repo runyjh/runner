@@ -47,11 +47,27 @@
   .side .logo .rlogo { width: 30px; height: auto; color: var(--brand); flex: none; }
   .login-card .rlogo { display: block; width: 72px; height: auto; color: var(--brand); margin: 0 0 12px; }
   .side .logo span { color: var(--brand); }
-  .nav a { display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-radius: 8px; color: var(--sub); text-decoration: none; margin-bottom: 2px; }
-  .nav a.on { background: var(--brand-weak); color: var(--brand); font-weight: 700; }
+  .side { display: flex; flex-direction: column; }
+  .nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+  /* 메뉴 묶음: 기사(파랑) · 운영(청록) · 정산·회계(주황) · 소통(보라) · 설정(회색) */
+  .ng { --c: var(--brand); --cw: var(--brand-weak); margin-bottom: 10px; }
+  .ng.g-drv { --c: #1b64da; --cw: #e8f0fd; }
+  .ng.g-ops { --c: #0b8a78; --cw: #e3f5f1; }
+  .ng.g-fin { --c: #c45d0a; --cw: #fdf0e3; }
+  .ng.g-com { --c: #7048d0; --cw: #f0ebfb; }
+  .ng.g-set { --c: #6b7684; --cw: #eef0f3; }
+  .ngt { margin: 0 0 3px; padding: 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .02em; color: var(--c); display: flex; align-items: center; gap: 6px; }
+  .ngt::after { content: ''; flex: 1; height: 1px; background: var(--cw); }
+  .nav a { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; color: #4e5968; text-decoration: none; margin-bottom: 1px; font-size: 14px; }
+  .nav a::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--c); opacity: .45; flex: none; }
+  .nav a:hover { background: var(--gray-weak); color: var(--ink); }
+  .nav a:hover::before { opacity: .8; }
+  .nav a.on { background: var(--cw); color: var(--c); font-weight: 700; box-shadow: inset 3px 0 0 var(--c); }
+  .nav a.on::before { opacity: 1; }
+  .nav a small { margin-left: auto; }
   .nav a.off { color: #b0b8c1; cursor: default; }
   .nav a small { font-size: 11px; }
-  .side .me { position: absolute; left: 12px; right: 12px; bottom: 16px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
+  .side .me { flex: none; margin-top: 10px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
   .side .me b { color: var(--ink); display: block; font-size: 13px; }
   .side .me a { color: var(--sub); cursor: pointer; text-decoration: underline; }
   .side .ainst { display: block; width: 100%; margin: 0 0 10px; height: 34px; border: 1px solid var(--brand); background: var(--brand-weak); color: var(--brand); border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }
@@ -670,12 +686,14 @@
 
   @media (max-width: 820px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
-    .side { position: static; height: auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px; overflow-x: auto; }
+    .side { position: static; height: auto; display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; overflow-x: auto; }
     .side .logo { padding: 0 8px 0 0; white-space: nowrap; }
-    .nav { display: flex; gap: 4px; }
+    .nav { display: flex; gap: 4px; overflow: visible; margin: 0; padding: 0; flex: none; }
+    .ng { display: contents; }
+    .ngt { display: none; }
     .nav a { white-space: nowrap; }
     .nav a small { display: none; }
-    .side .me { position: static; border: 0; padding: 0 0 0 8px; white-space: nowrap; }
+    .side .me { position: static; border: 0; margin: 0; padding: 0 0 0 8px; white-space: nowrap; }
     main { padding: 16px 12px; }
     .search { width: 100%; }
     .tools { width: 100%; flex-wrap: wrap; }
@@ -710,18 +728,28 @@
   <aside class="side">
     <div class="logo"><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><b>러너 <span>올인원</span></b></div>
     <nav class="nav">
-      <a class="on" data-view="drivers">기사 정보관리</a>
-      <a data-view="sched">기사스케줄</a>
-      <a data-view="pumasi">품앗이 관리</a>
-      <a data-view="route">노선관리</a>
-      <a data-view="settle">정산관리</a>
-      <a data-view="memo">업무스케줄</a>
-      <a data-view="settle" data-st-go="pnl">러너 손익·통장</a>
-      <a data-view="taxinv">세금계산서 역발행</a>
-      <a data-view="bib">배번호 관리</a>
-      <a data-view="notice">공지사항</a>
-      <a data-view="board">게시판 관리</a>
-      <a data-view="acc">계정관리</a>
+      <div class="ng g-drv"><p class="ngt">기사</p>
+        <a class="on" data-view="drivers">기사 정보관리</a>
+        <a data-view="sched">기사스케줄</a>
+        <a data-view="pumasi">품앗이 관리</a>
+        <a data-view="bib">배번호 관리</a>
+      </div>
+      <div class="ng g-ops"><p class="ngt">운영</p>
+        <a data-view="route">노선관리</a>
+        <a data-view="memo">업무스케줄</a>
+      </div>
+      <div class="ng g-fin"><p class="ngt">정산 · 회계</p>
+        <a data-view="settle">정산관리</a>
+        <a data-view="settle" data-st-go="pnl">러너 손익·통장</a>
+        <a data-view="taxinv">세금계산서 역발행</a>
+      </div>
+      <div class="ng g-com"><p class="ngt">소통</p>
+        <a data-view="notice">공지사항</a>
+        <a data-view="board">게시판 관리</a>
+      </div>
+      <div class="ng g-set"><p class="ngt">설정</p>
+        <a data-view="acc">계정관리</a>
+      </div>
     </nav>
     <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a></div>
   </aside>
