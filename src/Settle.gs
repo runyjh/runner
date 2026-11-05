@@ -67,7 +67,7 @@ const STL_TAB_NOTES = {
   stl_raw: '쿠팡 정산 엑셀을 [정산관리 → 쿠팡 정산서 올리기]로 넣으면 자동으로 채워집니다. 한 정산월에는 마지막으로 올린 차수만 남습니다.',
   stl_adjust: '기사별 월 추가지급·차감. 항목은 stl_items 의 "항목 이름". 금액은 차감도 양수로.',
   stl_advance: '가불금 원장. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제되고, 그 달을 마감하면 상환금에 자동 기록됩니다. 정산 밖에서 현금으로 받으면 상환금 칸에 직접 적으세요.',
-  stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 설정의 "용차 수행단가". 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
+  stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 품앗이 = 노선관리의 그 노선 품앗이단가, 용차업체 = 업체 단가. 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
   stl_config: '값만 고치세요. % 는 10% 처럼 써도 됩니다.',
   stl_closed: '마감할 때 프로그램이 기록합니다. 손으로 고치지 마세요.'
 };
@@ -101,30 +101,29 @@ const STL_ITEM_DEFAULT = [
 ];
 const STL_METHODS = ['배송기본', '프레시백', '미계약', '기타프로모션', '분실파손', '용차지출', '용차수행', '산재보험', '고용보험', '직접입력', '입금가산'];
 
-// 설정 (키, 항목 이름, 기본값, 설명)
+// 설정 (키, 항목 이름, 기본값, 설명, 묶음)
 const STL_CFG = [
-  ['vat', '부가세율', '10%', '쿠팡 정산서 금액(공급가) → 부가세 포함 환산'],
-  ['incRate', '프백 가중치(추가인센티브) 기사 지급률', '100%', ''],
-  ['freshRate', '프레시백 회수 인센티브 기사 지급률', '100%', '100% = 전액 기사. 나머지는 러너 프백 잉여. 기사 지급액은 100원 단위 올림'],
-  ['uncFee', '미계약 라우트 업체 수수료율', '10%', '기사 지급 = 미계약 금액 × (1 − 수수료율), 10원 단위 반올림'],
-  ['etcRate', '기타(프로모션·소급) 기사 지급률', '0%', ''],
-  ['lossRate', '분실파손 기사 부담률', '100%', ''],
-  ['lossVat', '분실파손 부가세 포함 환산 (Y/N)', 'Y', 'Y = 차감금액 × 1.1 을 기사 부담'],
-  ['yongPrice', '휴무 대신 용차 수행단가 (건당, VAT포함)', '1100', '용차표 단가를 비우면 이 단가'],
-  ['expense', '필요경비 공제율 (경비율, 공단 기준)', '34.6%', '보수액 = 기준금액 × (1 − 경비율)'],
-  ['san', '산재보험료율 (기사 부담분)', '1.76%', '10원 미만 버림'],
-  ['commute', '출퇴근재해 요율 (기사 부담분)', '0%', ''],
-  ['goy', '고용보험료율 (기사 부담분)', '1.6%', '10원 미만 버림'],
-  ['goyMin', '고용보험 적용 최저 월 보수액', '800000', '미만이면 고용보험 제외'],
-  ['runner', '러너 부담률 기본값', '50%', '50% = 러너가 기사와 같은 금액 부담'],
-  ['insBasis', '보험 계산 기준 (공급가/부가세포함)', '공급가', ''],
-  ['payDay', '기사 지급일 (익월, 일)', '20', ''],
-  ['cpDay', '쿠팡 입금일 (익월, 일)', '15', '공휴일·주말이면 다음 영업일'],
-  ['payShift', '기사 지급일이 휴일이면 다음 영업일 (Y/N)', 'N', ''],
-  ['invDay', '세금계산서 발행기한 (익월, 일)', '10', ''],
-  ['leaveAmt', '퇴사 보류금 기본 금액', '100000', ''],
-  ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일'],
-  ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임']
+  ['vat', '부가세율', '10%', '쿠팡 정산서 금액(공급가) → 부가세 포함 환산', '금액 환산 · 기사 지급률'],
+  ['incRate', '프백 가중치(추가인센티브) 기사 지급률', '100%', '', '금액 환산 · 기사 지급률'],
+  ['freshRate', '프레시백 회수 인센티브 기사 지급률', '100%', '100% = 전액 기사. 나머지는 러너 프백 잉여. 기사 지급액은 100원 단위 올림', '금액 환산 · 기사 지급률'],
+  ['uncFee', '미계약 라우트 업체 수수료율', '10%', '기사 지급 = 미계약 금액 × (1 − 수수료율), 10원 단위 반올림', '금액 환산 · 기사 지급률'],
+  ['etcRate', '기타(프로모션·소급) 기사 지급률', '0%', '', '금액 환산 · 기사 지급률'],
+  ['lossRate', '분실파손 기사 부담률', '100%', '', '분실파손'],
+  ['lossVat', '분실파손 부가세 포함 환산 (Y/N)', 'Y', 'Y = 차감금액 × 1.1 을 기사 부담', '분실파손'],
+  ['expense', '필요경비 공제율 (경비율, 공단 기준)', '34.6%', '보수액 = 기준금액 × (1 − 경비율)', '산재 · 고용보험'],
+  ['san', '산재보험료율 (기사 부담분)', '1.76%', '10원 미만 버림', '산재 · 고용보험'],
+  ['commute', '출퇴근재해 요율 (기사 부담분)', '0%', '', '산재 · 고용보험'],
+  ['goy', '고용보험료율 (기사 부담분)', '1.6%', '10원 미만 버림', '산재 · 고용보험'],
+  ['goyMin', '고용보험 적용 최저 월 보수액', '800000', '미만이면 고용보험 제외', '산재 · 고용보험'],
+  ['runner', '러너 부담률 기본값', '50%', '50% = 러너가 기사와 같은 금액 부담', '산재 · 고용보험'],
+  ['insBasis', '보험 계산 기준 (공급가/부가세포함)', '공급가', '', '산재 · 고용보험'],
+  ['payDay', '기사 지급일 (익월, 일)', '20', '', '지급일 · 입금일 · 세금계산서'],
+  ['cpDay', '쿠팡 입금일 (익월, 일)', '15', '공휴일·주말이면 다음 영업일', '지급일 · 입금일 · 세금계산서'],
+  ['payShift', '기사 지급일이 휴일이면 다음 영업일 (Y/N)', 'N', '', '지급일 · 입금일 · 세금계산서'],
+  ['invDay', '세금계산서 발행기한 (익월, 일)', '10', '', '지급일 · 입금일 · 세금계산서'],
+  ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일', '지급일 · 입금일 · 세금계산서'],
+  ['leaveAmt', '퇴사 보류금 기본 금액', '100000', '', '퇴사 보류금'],
+  ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임', '기사 앱']
 ];
 
 const STL_DRIVER_FIELDS = ['bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem']; // 기사(사람) 정보: 명의자의 세금계산서용
@@ -140,7 +139,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105z9';
+const STL_CALC_VER = '20261105zA';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -581,7 +580,7 @@ function stlCfg_() {
   const rate = function (k) { return stlRate_(g[k], stlRate_(STL_CFG.filter(function (d) { return d[0] === k; })[0][2], 0)); };
   return {
     vat: rate('vat'), incRate: rate('incRate'), freshRate: rate('freshRate'), uncFee: rate('uncFee'), etcRate: rate('etcRate'),
-    lossRate: rate('lossRate'), lossVat: !/^n/i.test(str_(g.lossVat)), yongPrice: stlNum_(g.yongPrice) || 1100,
+    lossRate: rate('lossRate'), lossVat: !/^n/i.test(str_(g.lossVat)),
     expense: rate('expense'), san: rate('san'), commute: rate('commute'), goy: rate('goy'), goyMin: stlNum_(g.goyMin),
     runner: rate('runner'), insBasis: str_(g.insBasis) === '부가세포함' ? '부가세포함' : '공급가',
     payDay: stlNum_(g.payDay) || 20, cpDay: stlNum_(g.cpDay) || 15, payShift: stlYes_(g.payShift), invDay: stlNum_(g.invDay) || 10,
@@ -1053,16 +1052,18 @@ function stlCompute_(month) {
 
   // 용차
   const yong = stlRead_('stl_yongcha').filter(function (y) { return y.date && stlMonthOfDate_(y.date) === month; });
-  const yongOut = [];
+  const yongOut = [], yongNoP = [];
   yong.forEach(function (y) {
     const date = stlYmd_(y.date), route = normCode_(y.route);
     const whoKey = stlAcct_(X, D, y.who, y.whoId);
     const wg = whoKey ? X.groups[whoKey] : null;
     let autoQty = 0, sales = 0, camp = '', perfUnitSum = 0, found = false;
+    const hits = [];
     if (wg) {
       wg.cids.forEach(function (c) {
         (byDateLogin[date + '|' + stlLogin_(c)] || []).forEach(function (x) {
           if (route && x.route !== route) return;
+          hits.push(x);
           // 기존지급 = 그날 실제로 받은 단가 (기본단가 + 프백 가중치) → 용차 단가(예 1,100)가 프백 가중치까지 포함한 건당 금액이 된다
           found = true; autoQty += x.qty; sales += x.sales; camp = camp || x.camp; perfUnitSum += x.qty * (x.unit + (x.inc || 0));
         });
@@ -1070,7 +1071,6 @@ function stlCompute_(month) {
     }
     const qty = stlNum_(y.qty) || autoQty;
     const isAmt = str_(y.mode) === '금액';
-    const payAmt = isAmt ? stlR0_(stlNum_(y.price)) : stlR0_((stlNum_(y.price) || cfg.yongPrice) * qty);
     let existing = 0;
     if (wg && wg.main.mode !== '용차내역') {
       // 쿠팡 정산서에 그날 수행 배송이 있으면 실제로 잡힌 단가 그대로 (원청단가·일시단가 기사도 정확하게)
@@ -1080,9 +1080,29 @@ function stlCompute_(month) {
         existing = stlR0_(u.u * qty);
       } else existing = stlR0_(perfUnitSum);
     }
+    // 단가 칸을 비우면: 우리 기사(품앗이) = 노선관리의 그 노선 '품앗이단가' (건당 · 프백 가중치까지 포함한 금액), 용차업체 = 업체 단가
+    //  품앗이단가가 비어 있으면 원래 단가 그대로 (추가지급 없음)
+    let payAmt;
+    if (isAmt) payAmt = stlR0_(stlNum_(y.price));
+    else if (stlNum_(y.price)) payAmt = stlR0_(stlNum_(y.price) * qty);
+    else if (wg && wg.vendor) payAmt = existing;
+    else {
+      const pmU = function (cp, rt) { const f = ctx.price.find(cp, rt); return f.row ? stlNum_(f.row.p4) : 0; };
+      let miss = false;
+      if (hits.length) {
+        let sp = 0, sq = 0;
+        hits.forEach(function (x) { const pu = pmU(x.camp, x.route); if (!pu) miss = true; sp += x.qty * (pu || (x.unit + (x.inc || 0))); sq += x.qty; });
+        payAmt = sq ? stlR0_(sp / sq * qty) : existing;
+      } else {
+        const pu = route ? pmU(camp || stlYongCamp_(ctx, route), route) : 0;
+        if (!pu) miss = true;
+        payAmt = pu ? stlR0_(pu * qty) : existing;
+      }
+      if (miss && qty) yongNoP.push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + (wg ? stlAcctLabel_(X, D, whoKey) : y.who) + ' ' + (route || '그날 전체'));
+    }
     // 차액 처리
     //  - 러너 몫 (용차업체는 기본): 수행자에게는 원래 단가(쿠팡 정산서에 잡힌 단가 / 업체 단가)만 지급, 추가지급 없음.
-    //    단가/금액 칸 = 차액부담 기사에게 청구할 단가 (용차업체는 비우면 업체 단가, 품앗이는 비우면 기본 용차단가).
+    //    단가/금액 칸 = 차액부담 기사에게 청구할 단가 (용차업체는 비우면 업체 단가, 품앗이는 비우면 노선관리 품앗이단가).
     //    러너 몫 = 청구 금액 − 수행자 지급
     //  - 수행자 지급 (품앗이는 기본): 단가/금액만큼 수행자에게 지급 (원래 단가와의 차이 = 추가지급)
     const isVendor = !!(wg && wg.vendor), gainMode = str_(y.gain);
@@ -1284,6 +1304,7 @@ function stlCompute_(month) {
     return c + ' (' + (nm || '이름 미확인') + ')';
   };
   const W = function (key, label, list, level, acts) { if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, 50), level: level || 'warn', acts: acts ? acts.slice(0, 50) : null }); };
+  W('yongNoP', '품앗이 단가 없음 (노선관리 품앗이단가가 비어 있어 원래 단가로만 지급 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP, 'warn');
   W('advManual', '수기 가불금 상환 있음 · 자동 공제 건너뜀 (마감하면 가불금 목록 상환금에 기록)', advManualWarn, 'info');
   W('unreg', '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
     Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return cidNm(u.cid) + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad',
@@ -1896,7 +1917,7 @@ const STL_EDIT = {
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
   adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '정산서 메모 (기사 정산서에 보임)', 'text'], ['note', '관리자 메모 (정산서에 안 보임)', 'text']] },
   advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
-  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (품앗이 = 지급 단가 · 용차업체 = 기사 청구 단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 외부용차·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
+  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (품앗이 = 지급 단가, 비우면 노선관리 품앗이단가 · 용차업체 = 기사 청구 단가, 비우면 업체 단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 외부용차·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
   regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
   target: { sheet: 'stl_target', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['goal', '연 목표 계산서 (VAT포함)', 'money'], ['unit', '단위', 'money']] },
   split: { sheet: 'stl_split', scope: 'all', cols: [['from', '원 명의자 (발행 줄일 아이디)', 'acct', 'fromId'], ['to', '받는 명의자', 'acct', 'toId'], ['target', '목표 실수령', 'money'], ['unit', '단위', 'money'], ['repeat', '매달 반복', ['Y', 'N']], ['month', '적용월 (반복 N 일 때)', 'month']] },
@@ -1909,6 +1930,12 @@ const STL_EDIT = {
 function stlEditRows_(name, month) {
   const E = STL_EDIT[name];
   let rows = stlRead_(E.sheet);
+  // 세부정산 설정: 지금 쓰는 항목만, 묶음 순서대로 (예전 항목 줄은 시트에 남아도 화면에 안 보임)
+  if (name === 'config') {
+    const ord = {};
+    STL_CFG.forEach(function (d, i) { ord[d[1]] = i; });
+    rows = rows.filter(function (r) { return r.label in ord; }).sort(function (a, b) { return ord[a.label] - ord[b.label]; });
+  }
   if (E.scope === 'month') rows = rows.filter(function (r) { return r.month === month; });
   if (E.scope === 'date') rows = rows.filter(function (r) { return stlMonthOfDate_(r.date) === month; });
   return rows;
@@ -1958,6 +1985,7 @@ function stlTableView_(name, month) {
           }
         });
         if (calc && calc[r._row]) o._calc = calc[r._row];
+        if (name === 'config') { const d = STL_CFG.filter(function (x) { return x[1] === r.label; })[0]; o._group = d ? d[4] : ''; }
         return o;
       }),
       seen: stlRowsHash_(rows, E.cols), fixed: !!E.fixed, closed: E.scope !== 'all' ? !!stlClosedInfo_(month) : false,

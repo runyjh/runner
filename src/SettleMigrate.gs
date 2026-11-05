@@ -246,7 +246,7 @@ function mgSetup_(sh) {
   // 지급률·보험·일정 값 (B열 이름 → C열 값)
   const LABELS = {
     incRate: '프백가중치(건당)기사지급률', freshRate: '프레시백회수인센티브기사지급률', uncFee: '미계약라우트업체수수료율', etcRate: '기타(프로모션·전월소급등)기사지급률',
-    lossRate: '분실파손기사부담률', vat: '부가세율', lossVat: '분실파손금액도부가세포함환산', yongPrice: '휴무대신용차수행단가', expense: '필요경비공제율',
+    lossRate: '분실파손기사부담률', vat: '부가세율', lossVat: '분실파손금액도부가세포함환산', expense: '필요경비공제율',
     san: '산재보험료율', commute: '출퇴근재해요율', goy: '고용보험료율', goyMin: '고용보험적용최저월보수액', runner: '러너부담률기본값', insBasis: '보험계산기준',
     cpDay: '쿠팡입금일', payDay: '러너기사지급일', payShift: '러너지급일도휴일이면', email: '이메일(세금계산서수신)'
   };
