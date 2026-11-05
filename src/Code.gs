@@ -46,7 +46,7 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
-  id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태',
+  id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일',
   driverType: '기사구분', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
@@ -69,7 +69,7 @@ const D = {
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
-  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea'];
+  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate'];
 // 기사구분 = 단가 코드 (고정/백업/품앗이/외부용차 → 노선관리 기사단가/백업단가/품앗이단가/외부단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -86,11 +86,21 @@ function normTitle_(v) {
   if (/^대표/.test(s)) return '대표';
   return null;
 }
+// 근무상태 = 실제 일하는지 (재직 = 빈칸). '상태'(승인대기·승인·반려·정지)는 기사 앱 사용 여부라 따로 관리
+const WSTAT = ['재직', '휴직', '퇴사'];
+/** 스케줄·입차에서 빠지는 첫날: 퇴사면 퇴사일 다음 날 (퇴사일 = 마지막 근무일), 퇴사일이 없으면 처음부터 */
+function schLeaveFrom_(o) {
+  if (str_(o.workStatus) !== '퇴사') return '';
+  const d = parseYmd_(o.leaveDate);
+  return d ? ymd_(addDays_(d, 1)) : '0000-00-00';
+}
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
   schCamp: '스케줄에서 이 기사가 속한 캠프. camps 탭의 캠프명과 같게 쓰면 소속캠프ID가 자동으로 채워집니다.',
   baseRoute: '평소 맡는 노선. 예: 527B, 530AB (F3), 404D,405AB. 백업 기사는 백업, 용차는 용차',
   fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
+  workStatus: '재직(빈칸) / 휴직 / 퇴사. 기사 앱 사용(상태 칸)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐',
+  leaveDate: '마지막 근무일 (yyyy-mm-dd). 근무상태가 퇴사일 때만 씀',
   backupArea: '백업으로 들어갈 수 있는 곳. 전지역 또는 캠프 이름(예: 강서1,수원1). 기사스케줄 백업 추천에 사용',
   driverType: '고정 / 백업 / 품앗이 / 외부용차 (단가 코드: 노선관리 기사단가 / 백업단가 / 품앗이단가 / 외부단가)',
   title: '관리자 / 운영자 / 대표 (빈칸 = 일반 기사). 단가와 무관한 러너 내부 직책.\n직함이 있는 사람이 대신 뛴 건은 기사 정산서에 수행자 이름이 안 보입니다. 앞으로 권한 부여에도 씁니다.',
@@ -1616,7 +1626,7 @@ const D_EDIT_LABEL = {
   maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
   schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
-  schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위'
+  schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
 
@@ -1629,7 +1639,7 @@ function docsOf_(o) {
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
-    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
+    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
@@ -1910,6 +1920,17 @@ function driverFields_(changes, o) {
       case 'workPattern': f.workPattern = opt(v, '근무형태', 30); break;
       case 'schMemo': f.schMemo = opt(v, '스케줄 메모', 500); break;
       case 'backupArea': f.backupArea = normBackupArea_(opt(v, '백업 범위', 100)); break;
+      case 'workStatus':
+        f.workStatus = str_(v);
+        if (f.workStatus && WSTAT.indexOf(f.workStatus) < 0) fail_('근무상태는 ' + WSTAT.join(' / ') + ' 중에서 골라 주세요.');
+        if (f.workStatus === '재직') f.workStatus = '';
+        break;
+      case 'leaveDate': {
+        const d = str_(v);
+        if (d && !parseYmd_(d)) fail_('퇴사일을 확인해 주세요.');
+        f.leaveDate = d ? ymd_(parseYmd_(d)) : '';
+        break;
+      }
       case 'schOrder':
         f.schOrder = opt(v, '스케줄 순서', 5);
         if (f.schOrder && !/^\d{1,5}$/.test(f.schOrder)) fail_('스케줄 순서는 숫자로 입력해 주세요.');
@@ -4287,7 +4308,8 @@ function schDriver_(o) {
   return {
     id: o.id, name: o.name, loginId: o.loginId, type: o.driverType, code: o.driverCode, status: o.status,
     campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute, fixedOff: o.fixedOff, extraOff: o.extraOff,
-    workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || ''
+    workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
+    workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o)
   };
 }
 
@@ -5198,7 +5220,7 @@ function schBuildUpload_(data, opt) {
     return d.status === ST.ACTIVE || Object.keys(data.cells[d.id] || {}).some(function (k) { return data.dates.indexOf(k) >= 0; });
   }).map(function (d) {
     const campOf = function (id) { return campById[id] || ((d.type === '백업' || d.type === '외부용차') ? '백업' : ''); };
-    const base = { key: d.id, camp: campOf(d.campId), name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: data.cells[d.id] || {} };
+    const base = { key: d.id, camp: campOf(d.campId), name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: data.cells[d.id] || {}, leaveFrom: d.leaveDate || '' };
     // 노선 변경 예약이 걸린 기사: 날짜마다 그날의 캠프·기본노선으로
     if (d.segs) base.at = function (date) {
       const sg = d.segs.filter(function (x) { return x.from <= date && date <= x.to; })[0];
@@ -5207,6 +5229,8 @@ function schBuildUpload_(data, opt) {
     return base;
   });
 
+  const leftInfo = {};
+  info.forEach(function (r) { if (r.leaveFrom) leftInfo[r.key] = { name: r.name, from: r.leaveFrom }; });
   // 일~토 한 주씩 (2주 보기 = 2주, 한 달치 올리기 = 5주)
   const issueBy = {};
   (data.issues || []).forEach(function (x) { issueBy[x.date + '|' + x.driverId] = x.name + ' ' + x.kind + (x.reason ? '(' + x.reason + ')' : ''); });
@@ -5244,6 +5268,10 @@ function schBuildUpload_(data, opt) {
     info.forEach(function (r0) {
       dates.forEach(function (date) {
         const r = r0.at ? r0.at(date) : r0;
+        if (r0.leaveFrom && date >= r0.leaveFrom) { // 퇴사: 퇴사일 다음 날부터 입차 목록에서 빠짐 (맡던 노선은 누가 안 들어가면 미입차로 남음)
+          if (date >= opt.target && r.camp && r.defRt) routeExpand(splitBase(r.defRt).routes).forEach(function (rt) { const bk = [date, r.camp, rt].join('|'); baseRouteSet[bk] = 1; (baseOwner[bk] = baseOwner[bk] || []).push(r0.key); });
+          return;
+        }
         const campStr = r.camp, id = r.id;
         if (!campStr || !id || campStr.indexOf('비고') >= 0 || campStr.indexOf('퇴사') >= 0) return;
         const baseCamp = campStr;
@@ -5375,7 +5403,8 @@ function schBuildUpload_(data, opt) {
     const addMissing = function (t, camp, rt, rot) { const k = [t, camp, rt].join('|'); (gm[k] = gm[k] || {})[rot] = 1; };
     // 미입차 사유: 그 노선 주인(기본노선 기사)에게 그날 이슈가 있으면 비고에
     const whyOf = function (k) {
-      return (baseOwner[k] || []).map(function (id) { return issueBy[k.split('|')[0] + '|' + id]; }).filter(Boolean);
+      const dt = k.split('|')[0];
+      return (baseOwner[k] || []).map(function (id) { return issueBy[dt + '|' + id] || (leftInfo[id] && dt >= leftInfo[id].from ? leftInfo[id].name + ' 퇴사' : ''); }).filter(Boolean);
     };
     const byRoute = {};
     Object.keys(present).forEach(function (p) {

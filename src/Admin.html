@@ -602,6 +602,15 @@
   .smenu > button:hover, .smenu > label:hover { background: var(--gray-weak); }
   .smenu small { display: block; color: var(--faint); font-size: 11px; }
   .smenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  .sg td.c.rcoff.left { background: repeating-linear-gradient(135deg, #f2f4f6 0 6px, #e5e8eb 6px 7px); }
+  .badge.ws-퇴사 { background: #6b7684; color: #fff; } .badge.ws-휴직 { background: #fdf3e2; color: #a15c07; }
+  .rcb.lv { background: #6b7684 !important; color: #fff !important; }
+  .sg td.c.rulex { outline: 2px dashed #8b5cf6; outline-offset: -3px; }
+  .slegend .k-rulex { outline: 2px dashed #8b5cf6; outline-offset: -2px; }
+  .linkbtn { background: none; border: 0; color: var(--brand); font-weight: 700; cursor: pointer; font-size: 12px; padding: 2px 4px; }
+  .srules { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 6px; font-size: 13px; }
+  .srules table { border-collapse: collapse; } .srules th, .srules td { text-align: left; padding: 4px 12px 4px 0; border-bottom: 1px solid var(--line); }
+  .srules p { margin: 8px 0 0; color: var(--sub); font-size: 12px; }
   .slegend .k-iss { background: #fdecec; color: #e5484d; font-weight: 800; }
   .seg { display: inline-flex; background: var(--gray-weak); border-radius: 8px; padding: 3px; }
   .seg button { border: 0; background: none; height: 30px; padding: 0 14px; border-radius: 6px; font-weight: 700; color: var(--sub); }
@@ -819,7 +828,7 @@
     <div class="rbulk hidden" id="dBulk"></div>
     <div class="table-wrap">
       <table>
-        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="driverType">기사구분</th><th class="dsrt" data-ds="driverCode">기사코드</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status">상태</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
+        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="driverType">기사구분</th><th class="dsrt" data-ds="driverCode">기사코드</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status" title="기사 앱 사용 · 근무상태">앱 · 근무</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -1031,7 +1040,22 @@
     <div class="slegend">
       <span class="k-work">출근</span><span class="k-off">휴무</span><span class="k-sick">병가</span><span class="k-mi">미입차</span><span class="k-yong">용차</span>
       <span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other">다른 캠프</span><span style="box-shadow:inset 0 0 0 2px #f59e0b">중복</span><span class="k-iss">! 이슈</span>
+      <span class="k-rulex">규칙 밖</span>
       <em style="font-style:normal">칸 누르고 입력 · <b>오른쪽 클릭 = 이슈</b> · 드래그로 여러 칸 · Ctrl+C/V 엑셀 · Ctrl+Z 되돌리기 · 자동 저장</em>
+      <button type="button" class="linkbtn" id="sRuleBtn">📖 칸 쓰는 법</button>
+    </div>
+    <div class="srules hidden" id="sRules">
+      <table>
+        <tr><th>상황</th><th>쓰는 법</th><th>예</th></tr>
+        <tr><td>내 기본노선 그대로</td><td><b>출근</b></td><td>출근</td></tr>
+        <tr><td>내 캠프 다른 노선</td><td><b>노선만</b></td><td>529A · 404D,405AB</td></tr>
+        <tr><td>다른 캠프 노선</td><td><b>캠프 노선</b></td><td>강서1 527B</td></tr>
+        <tr><td>회전 일부만</td><td>노선 뒤 <b>(회전)</b> · 노선마다 다르면 노선 바로 뒤</td><td>530AB (D1,D2) · 205C(D1),205D</td></tr>
+        <tr><td>다른 아이디로 입차</td><td>끝에 <b>(아이디)</b></td><td>723D,116C (dasom1125)</td></tr>
+        <tr><td>쉼</td><td><b>휴무 · 고정휴무 · 휴가 · 병가</b> (사유는 오른쪽 클릭 → 이슈)</td><td>병가</td></tr>
+        <tr><td>백업 기사</td><td>소속 캠프 노선이면 <b>노선만</b>, 다른 캠프면 <b>캠프 노선</b>. 소속 캠프가 없으면 항상 캠프 노선</td><td>103AB · 시흥2 708C</td></tr>
+      </table>
+      <p>규칙 밖 칸은 보라색 점선 — 마우스를 올리면 이유가 나옵니다. 입력할 때 <code>강서1캠프 527b</code> → <code>강서1 527B</code> 처럼 자동 정리.</p>
     </div>
    </section>
 
@@ -1767,7 +1791,7 @@
         '<td><b class="code">' + esc(r.driverCode) + '</b></td>' +
         '<td>' + (r.schCamp || r.baseRoute ? esc(String(r.schCamp || '').replace(/\s*캠프$/, '')) + (r.baseRoute ? ' · <b class="code">' + esc(r.baseRoute) + '</b>' : '') : '<span class="sub">미배정</span>') + '</td>' +
         '<td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
-        '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
+        '<td><span class="badge b-' + esc(r.status) + '" title="기사 앱 사용">' + esc(r.status || '-') + '</span>' + (r.workStatus ? ' <span class="badge ws-' + esc(r.workStatus) + '" title="근무상태' + (r.leaveDate ? ' · 마지막 근무 ' + esc(r.leaveDate) : '') + '">' + esc(r.workStatus) + '</span>' : '') + '</td>' +
         '<td class="sub">' + esc([r.carNo, r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
         '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
     }).join('');
@@ -1864,9 +1888,9 @@
     $('#dBody').innerHTML =
       (d.status === '승인대기' ? '<div class="warnbox">가입 승인 대기 중입니다. 서류를 확인한 뒤 승인 또는 반려해 주세요.</div>' : '') +
       (d.mustChange ? '<div class="warnbox">임시 비밀번호 상태입니다. 기사님이 다음 로그인 때 비밀번호를 바꿉니다.</div>' : '') +
-      '<div class="sec"><h4>상태</h4><div class="status-row">' +
+      '<div class="sec"><h4>기사 앱 사용 <small class="sub" style="font-weight:500">— 앱 로그인 허용 여부 (근무와 별개)</small></h4><div class="status-row">' +
         STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
-      '</div></div>' +
+      '</div></div>' + workSec(d) +
       typeSec(d) + assignSec() +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디 (앱 로그인용)', d.loginId) +
@@ -2031,6 +2055,13 @@
   $('#dBody').addEventListener('click', (e) => { if (aSel && e.target.closest('#aChips') && unitClick(e, 'a', aSel, campList(aSel.campId))) syncAssign(); });
   $('#dBody').addEventListener('input', (e) => { if (e.target.id === 'aQ') { aSel.q = e.target.value; paintAssign(); } });
 
+  /** 근무상태 (재직·휴직·퇴사 + 퇴사일) — 앱 사용(상태)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐 */
+  function workSec(d) {
+    const ws = d.workStatus || '재직';
+    return '<div class="sec"><h4>근무상태 <small class="sub" style="font-weight:500">— 실제로 일하는지 (퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차에서 빠짐)</small></h4><div class="status-row" style="margin-bottom:8px">' +
+      ['재직', '휴직', '퇴사'].map((w) => '<button type="button" class="st' + (w === ws ? ' on' : '') + '" data-ws="' + w + '">' + w + '</button>').join('') + '</div>' +
+      '<div class="field" id="wsLeave" style="margin:0;max-width:240px' + (ws === '퇴사' ? '' : ';display:none') + '"><label class="lb">퇴사일 (마지막 근무일)</label><input class="inp" type="date" data-k="leaveDate" value="' + esc(d.leaveDate || '') + '"></div></div>';
+  }
   /** 기사구분 버튼 + 기사코드 + 직함 (상세·등록 공용) */
   function typeSec(d) {
     return '<div class="sec"><h4>기사구분 · 기사코드 · 직함' + (d.isNew ? '<span class="req">*</span>' : '') + '</h4><div class="status-row" style="margin-bottom:12px">' +
@@ -2082,7 +2113,7 @@
       '<div class="sec"><h4>정산 계좌</h4><div class="grid2">' +
         fld('bankName', '은행명', '', { select: BANKS }) + inp('accountHolder', '예금주') + inp('account', '계좌번호') +
       '</div></div>' +
-      '<div class="sec"><h4>상태</h4><div class="status-row">' +
+      '<div class="sec"><h4>기사 앱 사용</h4><div class="status-row">' +
         STATUSES.map((st) => '<button type="button" class="st' + (st === cur.status ? ' on' : '') + '" data-st="' + st + '">' + st + '</button>').join('') + '</div></div>' +
       '<div class="sec"><h4>관리자 메모</h4>' + fld('memo', '', '', { area: true }) + '</div>';
     setDirty({});
@@ -2112,7 +2143,16 @@
   $('#dBody').addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') e.target.dispatchEvent(new Event('input', { bubbles: true })); });
   $('#dBody').addEventListener('click', (e) => {
     const st = e.target.closest('[data-st]'), rv = e.target.closest('[data-reveal]'), ed = e.target.closest('[data-edit]'), dc = e.target.closest('[data-doc]');
-    const dt = e.target.closest('[data-dt]'), ttl = e.target.closest('[data-ttl]');
+    const dt = e.target.closest('[data-dt]'), ttl = e.target.closest('[data-ttl]'), ws = e.target.closest('[data-ws]');
+    if (ws && cur) {
+      $$('[data-ws]', $('#dBody')).forEach((b) => b.classList.toggle('on', b === ws));
+      const d = Object.assign({}, dirty), v = ws.dataset.ws === '재직' ? '' : ws.dataset.ws;
+      if (v !== (cur.workStatus || '')) d.workStatus = v; else delete d.workStatus;
+      const lv = $('#wsLeave'); if (lv) lv.style.display = v === '퇴사' ? '' : 'none';
+      if (v === '퇴사') { const inp = $('[data-k="leaveDate"]', $('#dBody')); if (inp && !inp.value) { inp.value = ymdLocal(new Date()); inp.dispatchEvent(new Event('input', { bubbles: true })); return setDirty(Object.assign({}, dirty, d)); } }
+      setDirty(d);
+      return;
+    }
     if (ttl && cur) {
       $$('[data-ttl]', $('#dBody')).forEach((b) => b.classList.toggle('on', b === ttl));
       const d = Object.assign({}, dirty);
@@ -2137,7 +2177,7 @@
       return;
     }
     if (st && cur) {
-      $$('.st', $('#dBody')).forEach((b) => b.classList.toggle('on', b === st));
+      $$('[data-st]', $('#dBody')).forEach((b) => b.classList.toggle('on', b === st));
       const d = Object.assign({}, dirty);
       if (st.dataset.st !== cur.status) d.status = st.dataset.st; else delete d.status;
       setDirty(d);
@@ -2192,7 +2232,7 @@
   function patchList(d) {
     const i = all.findIndex((x) => x.id === d.id);
     const before = i >= 0 ? all[i].status : null;
-    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, title: d.title || '', schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
+    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, title: d.title || '', workStatus: d.workStatus || '', leaveDate: d.leaveDate || '', schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
       carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
     if (i >= 0) all[i] = row; else { all.unshift(row); counts.all = (counts.all || 0) + 1; }
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }
@@ -4393,6 +4433,11 @@
           });
         });
         rows.forEach((r) => {
+          if (r.left && r.left[d]) { // 퇴사 뒤: 일은 안 하지만 맡던 노선은 누가 안 들어가면 미입차
+            const b0 = splitBase(String(r.baseRoute || '').trim());
+            if (r.camp && b0.routes && !/백업|예비|용차/.test(r.baseRoute)) routeExpand(b0.routes).forEach((rt) => { const bk = r.camp + '|' + rt; baseRouteSet.add(bk); if (!owners.has(bk)) owners.set(bk, []); owners.get(bk).push(r.key); });
+            return;
+          }
           if (r.active && !r.active[d]) return; // 노선 변경 예약: 이 줄은 그날 다른 캠프·노선
           const baseCamp = r.camp || '';
           const defRt = String(r.baseRoute || '').trim();
@@ -4651,15 +4696,25 @@
   /** 기사 목록 → 구간별 기사 (구간 없는 기사는 그대로). _key = 계산용 줄 키 */
   function schSegDrivers() {
     const out = [];
+    // 퇴사: 퇴사일 다음 날(leaveDate)부터는 줄이 끝난 것으로 (노선 변경 구간과 같은 방식으로 자름)
+    const clip = (sg, d) => {
+      if (!d.leaveDate) return sg;
+      const last = prevYmd(d.leaveDate), from = sg ? sg.from : '0000-00-00', to = sg ? sg.to : '9999-12-31';
+      if (from > last) return false;
+      return Object.assign({}, sg || {}, { from, to: to < last ? to : last, left: to >= last });
+    };
     SD.drivers.forEach((d) => {
-      if (!d.segs || !d.segs.length) { out.push(Object.assign({}, d, { _key: d.id, _seg: null })); return; }
+      if (!d.segs || !d.segs.length) { const sg = clip(null, d); if (sg !== false) out.push(Object.assign({}, d, { _key: d.id, _seg: sg })); return; }
       const whole = d.segs.length === 1;
-      d.segs.forEach((sg, i) => out.push(Object.assign({}, d, { campId: sg.campId, camp: sg.camp, baseRoute: sg.baseRoute, _key: i ? d.id + '~' + i : d.id, _seg: whole ? null : sg, _segs: d.segs, _si: i })));
+      d.segs.forEach((sg0, i) => { const sg = clip(whole ? null : sg0, d); if (sg === false) return; out.push(Object.assign({}, d, { campId: sg0.campId, camp: sg0.camp, baseRoute: sg0.baseRoute, _key: i ? d.id + '~' + i : d.id, _seg: sg, _segs: whole ? null : d.segs, _si: i })); });
     });
     return out;
   }
+  const prevYmd = (ymd) => { const p = ymd.split('-'); return ymdLocal(new Date(+p[0], +p[1] - 1, +p[2] - 1)); };
   function rcBadge(r) {
     const d = r.d, out = [];
+    if (d.leaveDate) out.push('<small class="rcb lv" title="근무상태 퇴사">' + (d.leaveDate > '0000-00-00' ? '~' + mdOf(prevYmd(d.leaveDate)) + ' ' : '') + '퇴사</small>');
+    else if (d.workStatus === '휴직') out.push('<small class="rcb lv">휴직</small>');
     if (r.seg && d._segs) {
       const prev = d._segs[d._si - 1], next = d._segs[d._si + 1];
       if (next) out.push('<small class="rcb" title="' + esc(mdOf(next.from) + '부터 ' + (next.camp || '') + ' ' + (next.baseRoute || '')) + '">~' + mdOf(r.seg.to) + '</small>');
@@ -4671,6 +4726,7 @@
   }
   function offSegTd(r, ri, dt, ci) {
     const sg = r.seg, before = dt < sg.from;
+    if (sg.left && dt > sg.to) return '<td class="c rcoff left' + (sepCol(ci) ? ' wk2' : '') + '" data-r="' + ri + '" data-c="' + ci + '" title="' + esc('퇴사 (' + mdOf(sg.to) + ' 마지막 근무) — 기사 정보관리 › 근무상태') + '"></td>';
     const tip = before ? mdOf(sg.from) + '부터 이 캠프·노선 (그 전 날짜는 이전 캠프 줄에서)' : mdOf(sg.to) + '까지 이 캠프·노선 (그 뒤 날짜는 새 캠프 줄에서)';
     return '<td class="c rcoff' + (sepCol(ci) ? ' wk2' : '') + '" data-r="' + ri + '" data-c="' + ci + '" title="' + esc(tip) + '"></td>';
   }
@@ -4681,6 +4737,7 @@
     const list = schSegDrivers().filter((d) => {
       const has = Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k) && (!d._seg || (k >= d._seg.from && k <= d._seg.to)));
       if (d.status !== '승인' && !has && !sf.all) return false;
+      if (d.leaveDate && d.leaveDate <= SD.dates[0] && !sf.all) return false; // 보는 기간 전에 퇴사
       if (sf.camp && d.campId !== sf.camp) return false;
       if (q && ![d.name, d.loginId, d.code, d.baseRoute].some((x) => String(x || '').toLowerCase().includes(q))) return false;
       return true;
@@ -4707,7 +4764,8 @@
     const rows = schSegDrivers().filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
       key: d._key, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type,
       cells: SD.dates.map((dt) => (segIn(d._seg, dt) ? sget(d.id, dt) : '')),
-      active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null
+      active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null,
+      left: d.leaveDate ? SD.dates.map((dt) => dt >= d.leaveDate) : null
     }));
     scalc = SchedCalc.compute(rows, campRot, SD.dates.length, SD.dates, SD.maxDays);
   }
@@ -4780,8 +4838,10 @@
     const pm = pmMark(r.row, dt), iss = r.kind === 'd' ? issueAt(r.row, dt) : null;
     if (pm) cls.push('pmk');
     if (iss) cls.push('iss');
-    const tip = v + (pm ? '\n' + pmTip(pm) : '') + (iss ? '\n⚠ ' + issueText(iss) : '');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm || iss ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + pmBadge(pm) + (iss ? '<span class="isb">!</span>' : '') + '</td>';
+    const rx = r.kind === 'd' ? cellRule(r, v) : '';
+    if (rx) cls.push('rulex');
+    const tip = v + (pm ? '\n' + pmTip(pm) : '') + (iss ? '\n⚠ ' + issueText(iss) : '') + (rx ? '\n✎ ' + rx : '');
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm || iss || rx ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + pmBadge(pm) + (iss ? '<span class="isb">!</span>' : '') + '</td>';
   }
   /** '▶ 이지원, ◀ 김등록' → 품▶ (일을 줌) / 품◀ (일을 받음) 작은 표시 */
   function pmBadge(pm) {
@@ -4827,13 +4887,13 @@
       const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
       if (r.seg && !segIn(r.seg, dt)) return;
       const v = sget(r.row, dt), k = r.row + '|' + dt;
-      const iss = r.kind === 'd' ? issueAt(r.row, dt) : null;
-      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '', iss ? 'iss' : '']
+      const iss = r.kind === 'd' ? issueAt(r.row, dt) : null, rx = r.kind === 'd' ? cellRule(r, v) : '';
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '', iss ? 'iss' : '', rx ? 'rulex' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
       const pmv = pmMark(r.row, dt), html = esc(v) + pmBadge(pmv) + (iss ? '<span class="isb">!</span>' : '');
       if (td.innerHTML !== html) td.innerHTML = html;
-      if (v.length > 14 || pmv || iss) td.title = v + (pmv ? '\n' + pmTip(pmv) : '') + (iss ? '\n⚠ ' + issueText(iss) : ''); else td.removeAttribute('title');
+      if (v.length > 14 || pmv || iss || rx) td.title = v + (pmv ? '\n' + pmTip(pmv) : '') + (iss ? '\n⚠ ' + issueText(iss) : '') + (rx ? '\n✎ ' + rx : ''); else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
     $$('[data-cnt]', tb).forEach((td) => { td.innerHTML = cntHtml(td.dataset.cnt); });
@@ -5024,7 +5084,7 @@
     if (grid.length === 1 && grid[0].length === 1 && s && (s.r1 !== s.r2 || s.c1 !== s.c2)) return fillSel(grid[0][0]);
     grid.forEach((line, i) => line.forEach((v, j) => {
       const r = s.r1 + i, c = s.c1 + j;
-      if (r < nRows() && c < nCols() && !segOff(r, c)) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
+      if (r < nRows() && c < nCols() && !segOff(r, c)) list.push({ row: srows[r].row, date: SD.dates[c], value: srows[r].kind === 'd' ? normCell(v) : v });
     }));
     setCells(list);
     sAnchor = { r: s.r1, c: s.c1 }; sAct = { r: Math.min(nRows() - 1, s.r1 + grid.length - 1), c: Math.min(nCols() - 1, s.c1 + Math.max.apply(null, grid.map((g) => g.length)) - 1) };
@@ -5055,7 +5115,7 @@
   }
   function openEdit(initial) {
     if (!sAct || sEdit) return;
-    if (segOff(sAct.r, sAct.c)) { const sg = srows[sAct.r].seg; return toast('이 날은 ' + (SD.dates[sAct.c] < sg.from ? '이전' : '새') + ' 캠프 줄에서 입력해 주세요. (노선 변경 예약)'); }
+    if (segOff(sAct.r, sAct.c)) { const sg = srows[sAct.r].seg; if (sg.left && SD.dates[sAct.c] > sg.to) return toast('퇴사한 기사입니다 (' + mdOf(sg.to) + ' 마지막 근무). 기사 정보관리 › 근무상태에서 바꿀 수 있습니다.'); return toast('이 날은 ' + (SD.dates[sAct.c] < sg.from ? '이전' : '새') + ' 캠프 줄에서 입력해 주세요. (노선 변경 예약)'); }
     const r = srows[sAct.r], dt = SD.dates[sAct.c];
     const td = $('#sGrid').querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]'); if (!td) return;
     const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
@@ -5099,7 +5159,7 @@
     if (!sEdit) return;
     const e = sEdit; sEdit = null;
     e.box.remove();
-    setCells([{ row: e.r.row, date: e.dt, value: e.ta.value }]);
+    setCells([{ row: e.r.row, date: e.dt, value: e.r.kind === 'd' ? normCell(e.ta.value) : e.ta.value }]);
   }
   function closeEdit() { if (sEdit) { sEdit.box.remove(); sEdit = null; } }
 
@@ -5423,6 +5483,57 @@
     }).catch(() => {}).finally(() => { b.disabled = false; });
   });
 
+  // ── 칸 쓰는 규칙 (기사 줄) ──
+  //  출근 = 내 기본노선 그대로 · 529A = 내 캠프 다른 노선 · 강서1 527B = 다른 캠프 · 530AB (D1,D2) = 회전 일부 · 723D (dasom1125) = 다른 아이디로
+  //  쉼: 휴무 / 고정휴무 / 휴가 / 병가 · 백업: 소속 캠프면 노선만, 다른 캠프면 캠프 노선 (소속 캠프가 없으면 항상 캠프 노선)
+  const CELL_WORDS = /^(출근|휴무|고정휴무|계획된 휴무|휴가|병가|퇴사|미입차|용차|업체백업)$/;
+  const CELL_SPECIAL = /업무등록|업무|노선\s*변경|선탑|신규|비고|지원|교육|대기/;
+  /** 입력 정리: '강서1캠프 527b' → '강서1 527B', '(d1, d2)' → '(D1,D2)' */
+  function normCell(v) {
+    let s = String(v == null ? '' : v).replace(/\r\n?/g, '\n').trim();
+    if (!s || s.includes('\n')) return s;
+    s = s.replace(/([가-힣]+\d)\s*캠프/g, '$1');
+    s = s.replace(/(^|[\s,(])(\d{2,4})([a-dA-D]+)(?=$|[\s,()\[])/g, (m, p, n, l) => p + n + l.toUpperCase());
+    s = s.replace(/\(\s*((?:d1|d2|f3)(?:\s*,\s*(?:d1|d2|f3))*)\s*\)/gi, (m, x) => '(' + x.toUpperCase().replace(/\s+/g, '') + ')');
+    s = s.replace(/\s{2,}/g, ' ');
+    return s;
+  }
+  const campUnitCache = {};
+  function campUnits(short) {
+    if (campUnitCache[short] && campUnitCache[short].v === SD.start) return campUnitCache[short].u;
+    const c = SD.camps.find((x) => shortCamp(x.name) === short);
+    const u = c ? new Set(SchedCalc.routeExpand((SD.routes[c.id] || []).join(','))) : null;
+    campUnitCache[short] = { v: SD.start, u };
+    return u;
+  }
+  /** 규칙에 안 맞으면 이유, 맞으면 '' */
+  function cellRule(r, v) {
+    const s0 = String(v || '').trim();
+    if (!s0 || CELL_WORDS.test(s0) || CELL_SPECIAL.test(s0) || s0.includes('\n')) return '';
+    let s = s0.replace(/\[[^\]]*]/g, '').replace(/\(\s*[A-Za-z][A-Za-z0-9_]{2,}\s*\)/g, '').trim();
+    const rot = s.match(/\(([^)]*)\)/);
+    if (rot) {
+      if (!rot[1].split(',').every((x) => /^(D1|D2|F3)$/.test(x.trim()))) return '괄호에는 회전(D1,D2,F3) 또는 아이디만 씁니다';
+      s = s.replace(/\([^)]*\)/g, '').trim();
+    }
+    if (/^출근$/.test(s)) return '';
+    let camp = '';
+    const m = s.match(/^([가-힣]+\d)\s*/);
+    if (m) {
+      camp = m[1]; s = s.slice(m[0].length).trim();
+      if (!SD.camps.some((c) => shortCamp(c.name) === camp)) return '노선관리에 없는 캠프: ' + camp;
+    } else camp = shortCamp(r.d.camp || '');
+    if (!/^\d+[A-Za-z]+(\s*,\s*(\d+)?[A-Za-z]+)*$/.test(s)) return '규칙 밖 글자 — 출근 / 노선(529A) / 캠프 노선(강서1 527B) / 노선 (D1,D2) / 노선 (아이디) / 휴무·고정휴무·휴가·병가';
+    if (!camp) return '소속 캠프가 없는 기사는 캠프를 같이 적어 주세요 (예: 강서1 527B)';
+    const units = campUnits(camp);
+    if (units && units.size) {
+      const bad = SchedCalc.routeExpand(s.replace(/\s+/g, '')).filter((u) => !units.has(u));
+      if (bad.length) return camp + '에 없는 노선: ' + bad.join(',') + (m ? '' : ' (다른 캠프면 "캠프 노선"으로)');
+    }
+    return '';
+  }
+
+  $('#sRuleBtn').addEventListener('click', () => $('#sRules').classList.toggle('hidden'));
   // ── 더보기 메뉴 ──
   $('#sMoreBtn').addEventListener('click', (e) => { e.stopPropagation(); $('#sMenu').classList.toggle('hidden'); });
   $('#sMenu').addEventListener('click', (e) => { if (e.target.closest('button')) $('#sMenu').classList.add('hidden'); });
@@ -5590,12 +5701,12 @@
           const missTxt = hole ? (e.miss.length && e.miss.length < def.length ? e.miss.join(',') + ' ' : '') + '빔' : part ? e.miss.join(',') + ' 빔' : '';
           const pick = hole || part ? ' data-pk="' + esc(camp + '|' + rt + '|' + i) + '"' : '';
           return '<td class="' + cls.join(' ') + '"' + pick + ' title="' + esc((ownTip ? '기본노선: ' + ownTip + '\n' : '') + (dup ? '중복 회전: ' + e.dup.join(',') + '\n' : '') + (pick ? '누르면 넣을 사람 추천' : '')) + '">' + names +
-            (missTxt ? '<em class="bm">' + esc(missTxt) + (own.length ? ' · ' + esc(own.map((d) => d.name + ' ' + (sget(d.id, dt) || '')).join(', ')) : '') + '</em>' : '') + '</td>';
+            (missTxt ? '<em class="bm">' + esc(missTxt) + (own.length ? ' · ' + esc(own.map((d) => d.name + ' ' + (d.leaveDate && dt >= d.leaveDate ? '퇴사' : sget(d.id, dt) || '')).join(', ')) : '') + '</em>' : '') + '</td>';
         }).join('') + '</tr>';
       });
     });
     // 백업 현황: 백업 기사의 날짜별 칸 (빈칸 = 쓸 수 있음)
-    const bks = SD.drivers.filter((d) => d.status === '승인' && d.type === '백업').sort((a, b) => koSort(a.name, b.name));
+    const bks = SD.drivers.filter((d) => d.status === '승인' && d.type === '백업' && !(d.leaveDate && d.leaveDate <= dates[0])).sort((a, b) => koSort(a.name, b.name));
     if (bks.length) {
       body += '<tr class="gtop bkh"><td class="fx f1"><b>백업 현황</b></td><td class="fx f2 rt sub">빈칸 = 비어 있음</td>' + dates.map((dt, i) => '<td class="bc' + (sepCol(i) ? ' wk2' : '') + '"></td>').join('') + '</tr>';
       bks.forEach((d) => {
@@ -5626,7 +5737,7 @@
     const { camp, dt } = pk, units = Array.from(pk.sel), maxD = SD.maxDays || 6;
     const d0 = new Date(dt + 'T00:00:00'), sun = new Date(d0); sun.setDate(d0.getDate() - d0.getDay());
     const wk = []; for (let k = 0; k < 7; k++) { const x = new Date(sun); x.setDate(sun.getDate() + k); wk.push(ymdLocal(x)); }
-    return SD.drivers.filter((d) => d.status === '승인').map((d) => {
+    return SD.drivers.filter((d) => d.status === '승인' && d.workStatus !== '휴직' && !(d.leaveDate && dt >= d.leaveDate)).map((d) => {
       const v = sget(d.id, dt);
       let state = '';
       if (!v) state = 'free'; else if (/병가|퇴사/.test(v)) return null; else if (/휴무|휴가/.test(v)) state = 'off'; else return null;
