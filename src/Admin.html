@@ -188,6 +188,7 @@
   .stw.bad { background: var(--danger-weak); color: #a1262b; }
   .stw.info { background: var(--gray-weak); color: var(--sub); }
   .stw.sub { background: #eef3fb; color: #2b5797; }
+  .stw li.wdone { color: var(--ok); }
   .stw summary { cursor: pointer; font-weight: 700; }
   .ti-ed { display: grid; grid-template-columns: 380px 1fr; gap: 16px; padding: 14px 16px 18px; }
   @media (max-width: 980px) { .ti-ed { grid-template-columns: 1fr; } }
@@ -5291,7 +5292,7 @@
     kinds: '쿠팡 정산서 "구분" 값을 계산 분류로 바꾸는 표. 새 구분값이 나오면 여기에 추가하세요.',
     vendors: '용차업체가 등록한 쿠팡 아이디를 업체 단위로 정산합니다. 건당 단가 = 업체에 주는 단가(VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부단가). 산재·고용 공제 Y = 기사처럼 공제. 아이디 목록의 [용차업체] 칸에서 업체를 고르거나, 정산서 탭 경고창의 [용차업체로 지정]으로 한 번에 넣을 수 있습니다. 업체 아이디는 기사 정보관리에 등록되지 않습니다.',
     ids: '정산의 기준은 쿠팡 아이디입니다. 용차업체 아이디는 명의자를 비우고 [용차업체] 칸에서 업체를 고르세요 (업체별 정산서 1장). 메인 아이디 + 서브 아이디(메인 아이디 칸에 메인 쿠팡ID)가 정산서 하나로 합쳐지고, 정산금·세금계산서·입금은 메인 아이디의 명의자에게 갑니다. 단가 구분(고정/백업/품앗이/외부용차)은 메인 아이디는 기사 정보관리의 기사구분이 최우선이고(기사구분이 비어 있을 때만 이 칸), 서브 아이디는 이 칸에 적은 값이 우선입니다. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
-    usage: '한 아이디로 여러 기사가 일할 때 기록합니다 (기간을 비우면 계속). 기록이 없는 날은 명의자가 일한 것으로 봅니다. 기록한 기간에 그 아이디로 잡힌 매출(배송·프레시백·미계약·프로모션·분실파손)은 일한 기사 본인 정산으로 자동으로 옮겨지고, 단가도 그 기사 아이디 기준으로 계산됩니다. 일한 기사에게 본인 정산 아이디가 없으면 명의자에게 남기고 "확인 필요"에 띄웁니다.',
+    usage: '한 아이디로 여러 기사가 일할 때 기록합니다 (기간을 비우면 계속). 기록이 없는 날은 명의자가 일한 것으로 봅니다. 기록한 기간에 그 아이디로 잡힌 매출(배송·프레시백·미계약·프로모션·분실파손)은 일한 기사 본인 정산으로 자동으로 옮겨지고, 단가도 그 기사 아이디 기준으로 계산됩니다. 일한 기사에게 본인 정산 아이디가 없으면 명의자에게 남기고 "확인 필요"에 띄웁니다. [정산] 칸을 "명의자"로 두면 서브 인원으로 보고 매출을 옮기지 않습니다 (확인 필요의 [👥 처리 → 서브 인원]과 같음).',
     tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 그 기사가 일한 날(아이디 사용 기록 기준, 기록이 없으면 명의자)의 배송에만 적용됩니다. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.'
   };
   // 정산 설정 화면 설명: [꼬리표] 한 줄씩 (무엇 · 우선순위 · 빈칸이면 · 바꾸는 곳 · 주의)
@@ -5451,9 +5452,23 @@
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
     const vsel = (wk, i) => '<select class="inp vset" data-vw="' + esc(wk) + '" data-vi="' + i + '" aria-label="용차업체로 지정"><option value="">🚚 용차업체로 지정…</option>' +
       (s.vendors || []).map((v) => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('') + '<option value="__new">+ 새 업체…</option></select>';
+    // 경고 줄 옆 처리 메뉴: 용차업체 지정 / 정지 아이디 → 퇴사 처리 / 아이디 사용 기록 → 서브 인원·본인 정산 아이디 (마감한 달은 없음)
+    const mon = Number(String(STX.month).slice(5));
+    const WACT = {
+      stopped: { head: '🚪 처리…', all: '🚪 전부…', opts: [['leave', '퇴사 처리 · ' + mon + '월 퇴사 (보류금 기본)'], ['leaveAmt', '퇴사 처리 · 보류금 금액 입력…'], ['unstop', '정지 풀기 (다시 사용)'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['leave', 'ack'] },
+      moveNo: { head: '👥 처리…', all: '👥 전부…', opts: [['sub', '서브 인원 · 명의자 정산에 그대로 포함'], ['ownId', '본인 정산 아이디 만들기 · 그 기사 정산서로 옮김'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['sub', 'ack'] }
+    };
+    const wsel = (w, i) => {
+      const d = WACT[w.key]; if (!d || s.closed) return '';
+      const all = i === 'all', opts = all ? d.opts.filter((o) => d.allOpts.includes(o[0])) : d.opts;
+      const a = all ? null : w.acts[i];
+      return '<select class="inp vset wact" data-wk="' + esc(w.key) + '" data-wi="' + i + '" aria-label="처리"><option value="">' + (all ? d.all : d.head) + '</option>' +
+        opts.map((o) => '<option value="' + o[0] + '">' + esc(o[0] === 'sub' && a && a.owner ? '서브 인원 · 명의자(' + a.owner + ') 정산에 그대로 포함' : o[0] === 'ownId' && a ? '본인 정산 아이디 만들기 · ' + a.name + ' 정산서로 옮김' : o[1]) + '</option>').join('') + '</select>';
+    };
+    const asel = (w, i) => (WACT[w.key] ? wsel(w, i) : vsel(w.key, i));
     $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count +
-      (w.acts && w.acts.length > 1 ? ' ' + vsel(w.key, 'all').replace('🚚 용차업체로 지정…', '🚚 전부 한 업체로…') : '') + '</summary><ul>' +
-      w.items.map((x, i) => '<li>' + esc(x) + (w.acts && w.acts[i] ? ' ' + vsel(w.key, i) : '') + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
+      (w.acts && w.acts.filter(Boolean).length > 1 ? ' ' + (WACT[w.key] ? wsel(w, 'all') : vsel(w.key, 'all').replace('🚚 용차업체로 지정…', '🚚 전부 한 업체로…')) : '') + '</summary><ul>' +
+      w.items.map((x, i) => '<li' + (/✓ \d+월 퇴사 등록됨$/.test(x) ? ' class="wdone"' : '') + '>' + esc(x) + (w.acts && w.acts[i] ? ' ' + asel(w, i) : '') + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
     const q = $('#stQ').value.trim().toLowerCase();
     const list = s.drivers.filter((d) => !q || d.name.toLowerCase().includes(q) || d.cids.some((x) => x.toLowerCase().includes(q)) || (d.workers || []).some((x) => x.toLowerCase().includes(q)));
     STX.slipIds = list.map((d) => d.id);
@@ -6113,6 +6128,33 @@
   // 경고창: 미등록·명의자 없는 아이디 → 용차업체 아이디로 한 번에 지정
   $('#stWarn').addEventListener('click', (e) => { if (e.target.closest('.vset')) e.preventDefault(); });
   $('#stWarn').addEventListener('change', (e) => {
+    const t0 = e.target.closest('.wact');
+    if (t0) {
+      let act = t0.value; t0.value = '';
+      if (!act) return;
+      const w = (STX.sum.warnings || []).find((x) => x.key === t0.dataset.wk); if (!w || !w.acts) return;
+      const list = t0.dataset.wi === 'all' ? w.acts.filter(Boolean) : [w.acts[+t0.dataset.wi]].filter(Boolean);
+      if (!list.length) return;
+      const names = list.map((x) => x.label).join('\n'), m = ymTitle(STX.month), opt = {};
+      if (act === 'leaveAmt') {
+        const v = prompt('퇴사 보류금 금액 (원)을 넣어 주세요.\n' + names); if (v == null) return;
+        opt.amt = String(v).replace(/[^\d]/g, ''); if (!opt.amt) return toast('금액을 숫자로 넣어 주세요.');
+        act = 'leave';
+      } else if (act === 'ownId') {
+        const v = prompt(list[0].name + ' 기사님의 쿠팡 ID (본인 정산 아이디)\n비우면 기사 정보의 쿠팡플렉스 아이디를 씁니다.', ''); if (v == null) return;
+        opt.cid = v.trim();
+      } else {
+        const msg = { leave: m + ' 퇴사로 처리할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환 · 퇴사자 보류금 설정에 기록)', unstop: '아이디 관리에서 정지를 풀까요? (상태 → 사용)', sub: '서브 인원으로 처리할까요?\n(아이디 사용 기록의 정산 칸 = 명의자 → 매출은 명의자 정산에 그대로)', ack: m + ' 정산에서 이 경고를 숨길까요?' }[act];
+        if (!confirm(names + '\n\n' + msg)) return;
+      }
+      api('adm_stlWarnAct', STX.month, act, list, opt).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        const msg = (r.done && r.done.length ? r.done.join(', ') + ' — ' : '') + ({ leave: '퇴사 처리했습니다', unstop: '정지를 풀었습니다', sub: '서브 인원으로 처리했습니다', ownId: '본인 정산 아이디를 만들었습니다', ack: '이 달 경고에서 숨겼습니다' }[act]) + ' (다시 계산함)';
+        toast(msg); STX.sum = null;
+        loadSettle(STX.month, true).then(() => toast(msg));
+      }).catch(() => {});
+      return;
+    }
     const t = e.target.closest('.vset'); if (!t) return;
     let v = t.value; t.value = '';
     if (!v) return;
