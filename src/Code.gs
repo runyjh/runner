@@ -4404,7 +4404,7 @@ function schRead_(sun, end) {
   let pmMarks = {};
   try { pmMarks = pmAdminMarks_(cells, dates, byDrv); } catch (e) { pmMarks = {}; }
   return {
-    ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays,
+    ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, rcMoves: rcMoves
   };
@@ -4925,28 +4925,44 @@ const UPLOAD = {
   COLOR: { KEY: '#E3F2FD', MI: '#FFEBEE', DUP: '#FFF8E1', SEP: '#000000' },
   LEFT_COL: 2, RIGHT_COL: 14, START_ROW: 3, GAP: 5
 };
-function adm_schUploadTable(token, start) {
+/** scope: 'tomorrow'(기본, 보고 있는 2주 중 내일부터) · 'nextweek'(다음 주 일~토 전체) · 'thisweek'(이번 주 내일부터 토요일까지) */
+function adm_schUploadTable(token, start, scope) {
   return run_(function () {
     const a = requireAdmin_(token);
-    const base = parseYmd_(start) || new Date();
+    const today = new Date(), tmr = ymd_(addDays_(today, 1));
+    let base = parseYmd_(start) || today;
+    if (scope === 'nextweek') base = addDays_(sundayOf_(new Date(today.getFullYear(), today.getMonth(), today.getDate())), 7);
+    if (scope === 'thisweek') base = today;
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
     const data = schRead_(sun, addDays_(sun, SCH_DAYS - 1));
     const co = companyInfo_();
     const res = schBuildUpload_(data, {
       bizNo: co.branchBizNo || '654-37-01141', // company 탭 '영업점 사업자번호'
       wave: 'WAVE1',
-      target: ymd_(addDays_(new Date(), 1))
+      target: scope === 'nextweek' ? (ymd_(sun) > tmr ? ymd_(sun) : tmr) : tmr,
+      maxDays: schMaxDays_()
     });
+    res.scope = scope || 'tomorrow';
+    res.weekEnd = scope === 'nextweek' || scope === 'thisweek' ? ymd_(addDays_(sun, 6)) : '';
+    // 주 단위로 올릴 때는 그 주(일~토)의 문제만 신호등에 (2주차 출근 표는 보기용으로 남김)
+    if (res.weekEnd) {
+      const inWk = function (r) { return String(r[0]) <= res.weekEnd; };
+      res.missing = res.missing.filter(inWk); res.dups = res.dups.filter(inWk); res.over7 = res.over7.filter(inWk);
+    }
+    schCheckIds_(res);
     let url = '';
     const lock = scriptLock_();
     try { lock.waitLock(20000); url = schWriteUpload_(res); } catch (e) { res.sheetError = String(e && e.message || e); } finally { lock.releaseLock(); }
     res.url = url;
     res.ok = true;
     logAdmin_(a, '어드민 업로드 테이블 생성', data.dates[0] + ' ~ ' + data.dates[data.dates.length - 1],
-      '출근 ' + (res.weeks[0].length + res.weeks[1].length) + '건 · 미입차 ' + res.missing.length + '건 · 중복 ' + res.dups.length + '건');
+      '출근 ' + (res.weeks[0].length + res.weeks[1].length) + '건 · 미입차 ' + res.missing.length + '건 · 중복 ' + res.dups.length + '건 · 주7일 ' + res.over7.length + '건 · 아이디 ' + res.badId.length + '건');
     return res;
   });
 }
+
+/** 아이디 하나가 한 주(일~토)에 출근할 수 있는 최대 일수 (쿠팡 규칙, 스크립트 속성 SCH_MAX_DAYS, 기본 6) */
+function schMaxDays_() { const v = Number(PropertiesService.getScriptProperties().getProperty('SCH_MAX_DAYS')); return v >= 1 && v <= 7 ? v : 6; }
 
 /** 계산만 (시트·화면 공용). data = schRead_ 결과 */
 function schBuildUpload_(data, opt) {
@@ -4980,10 +4996,18 @@ function schBuildUpload_(data, opt) {
     });
     return out;
   };
-  const splitBase = function (v) {
-    const s = str_(v), m = s.match(/\(([^)]*)\)/);
-    return { routes: s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '' };
+  // '205C(D1),205D' 처럼 노선 바로 뒤 괄호 = 그 노선만의 회전 (쿠팡은 아이디 한 줄에 회전 하나라, 내보낼 땐 합쳐짐)
+  const pullRouteRots = function (s, per) {
+    return String(s || '').replace(/(\d+[A-Za-z]+)\(([^)]*)\)/g, function (m, rt, ro) {
+      const rr = normRot(ro); if (!rr.length) return m;
+      routeExpand(rt).forEach(function (x) { per[x] = rr; }); return rt;
+    });
   };
+  const splitBase = function (v) {
+    const per = {}, s0 = pullRouteRots(str_(v), per), m = s0.match(/\(([^)]*)\)/);
+    return { routes: s0.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '', per: per };
+  };
+  const rotSort = function (arr) { return ALL.filter(function (x) { return arr.indexOf(x) >= 0; }); };
 
   // 아이디 → 이름 (운영시트 nameMap: 스케쥴 시트 D·E열)
   const nameMap = {}, campById = {};
@@ -5006,24 +5030,33 @@ function schBuildUpload_(data, opt) {
   });
 
   const weeks = [data.dates.slice(0, 7), data.dates.slice(7, 14)];
-  const res = { bizNo: opt.bizNo, wave: opt.wave, target: opt.target, dates: data.dates, weeks: [[], []], keys: [[], []], missing: [], dups: [] };
+  const res = { bizNo: opt.bizNo, wave: opt.wave, target: opt.target, dates: data.dates, weeks: [[], []], keys: [[], []], missing: [], dups: [], over7: [], badId: [] };
 
   weeks.forEach(function (dates, widx) {
     const baseRouteSet = {}, entries = [], present = {}, dupe = {}, explicitMi = [];
-    const addPresent = function (date, camp, routes, rots, effId, effNm) {
+    // 중복 규칙: 쿠팡은 아이디 한 줄에 회전 하나라 '205C,205D' + '205C (D2,F3)' 처럼 겹쳐 올린다.
+    //   회전을 좁게 적은 사람(부분)이 그 회전의 주인 → 전체 회전으로 적힌 사람은 나머지 회전만 맡은 것으로 본다.
+    //   중복 = 같은 회전에 부분끼리 2명, 또는 부분 없이 전체끼리 2명
+    const addPresent = function (date, camp, routes, rots, effId, effNm, per) {
+      const full = defRotArr(camp).length;
       routes.forEach(function (rt) {
-        rots.forEach(function (rot) {
+        const rr = per && per[rt] ? per[rt] : rots, part = rr.length < full;
+        rr.forEach(function (rot) {
           const k = [date, camp, rt, rot].join('|');
           present[k] = 1;
-          const dd = dupe[k] || (dupe[k] = { ids: [], names: [] });
-          if (effId && dd.ids.indexOf(String(effId)) < 0) dd.ids.push(String(effId));
-          if (effNm && dd.names.indexOf(String(effNm)) < 0) dd.names.push(String(effNm));
+          const dd = dupe[k] || (dupe[k] = { ids: [], names: [], pids: [], pnames: [] });
+          const I = part ? dd.pids : dd.ids, N = part ? dd.pnames : dd.names;
+          if (effId && I.indexOf(String(effId)) < 0) I.push(String(effId));
+          if (effNm && N.indexOf(String(effNm)) < 0) N.push(String(effNm));
         });
       });
     };
     const pushEntry = function (date, camp, effId, effNm, rots, routes, missJ, priority, mark) {
       entries.push({ row: [date, opt.bizNo, camp, opt.wave, effId, '출근', rots.join(','), routes.join(','), missJ || '', '', effNm], priority: priority, mark: mark });
+      const wk = idDays[String(effId).toLowerCase()] || (idDays[String(effId).toLowerCase()] = { id: effId, name: effNm, dates: {}, camps: {} });
+      wk.dates[date] = 1; if (camp) wk.camps[camp] = 1;
     };
+    const idDays = {};
 
     info.forEach(function (r0) {
       dates.forEach(function (date) {
@@ -5097,13 +5130,15 @@ function schBuildUpload_(data, opt) {
         let finalCamp = dynCamp || baseCamp;
         if (dynCamp) cell = cell.slice(mDyn[0].length).trim();
         cell = cell.replace(/\(\s*([A-Za-z][A-Za-z0-9_]{2,})\s*\)/g, '').replace(/\[[^\]]*]/g, '').trim();
+        let per = {};
+        cell = pullRouteRots(cell, per);
         let rotation = '';
         const mR = cell.match(/\(\s*([^)]+?)\s*\)/);
         if (mR) { rotation = mR[1].replace(/\s+/g, ''); cell = cell.replace(/\([^)]*\)/g, '').trim(); }
         cell = cell.replace(/업무등록/g, '').trim();
         let code;
         if (cell === '출근' || (/업무등록/.test(flat) && !/\d+[A-Za-z]+/.test(flat))) {
-          code = base.routes;
+          code = base.routes; per = base.per;
           if (!rotation && base.rot) rotation = base.rot;
         } else code = cell;
         const parts = String(code).split(/\s+/);
@@ -5125,9 +5160,12 @@ function schBuildUpload_(data, opt) {
         }
         if (include) {
           const effNm = nm(effId) || nm(id);
-          addPresent(date, finalCamp, rl, rots, effId, effNm);
-          const miss = defRotArr(finalCamp).filter(function (x) { return rots.indexOf(x) < 0; });
-          pushEntry(date, finalCamp, effId, effNm, rots, rl, miss.length ? '미입차(' + miss.join(',') + ')' : '', priority, hasWork(flat) || routeHasKey);
+          addPresent(date, finalCamp, rl, rots, effId, effNm, per);
+          // 쿠팡 한 줄 = 회전 하나: 노선별 회전이 다르면 합집합으로 (205C(D1),205D → D1,D2,F3 / 205C,205D)
+          const union = {}; rl.forEach(function (rt) { (per[rt] || rots).forEach(function (x) { union[x] = 1; }); });
+          const rowRots = rotSort(Object.keys(union));
+          const miss = defRotArr(finalCamp).filter(function (x) { return rowRots.indexOf(x) < 0; });
+          pushEntry(date, finalCamp, effId, effNm, rowRots, rl, miss.length ? '미입차(' + miss.join(',') + ')' : '', priority, hasWork(flat) || routeHasKey);
         }
       });
     });
@@ -5140,6 +5178,14 @@ function schBuildUpload_(data, opt) {
     });
     res.weeks[widx] = entries.map(function (e) { return e.row; });
     res.keys[widx] = entries.map(function (e) { return e.mark ? 1 : 0; });
+
+    // 주 7일: 아이디 하나가 일~토 한 주에 출근 7일 (쿠팡 규칙: 주 6일까지, 일요일에 리셋)
+    Object.keys(idDays).forEach(function (k) {
+      const w = idDays[k], ds = Object.keys(w.dates).sort();
+      if (ds.length < (opt.maxDays || 6) + 1) return;
+      res.over7.push([dates[0], opt.bizNo, Object.keys(w.camps).sort().join(','), opt.wave, w.id, '주7일', '', ds.map(function (d) { return d.slice(5).replace('-', '/'); }).join(','),
+        '한 주 출근 ' + ds.length + '일 · 하루는 서브 아이디로 바꾸거나 휴무', '', w.name]);
+    });
 
     // 미입차
     const gm = {};
@@ -5177,7 +5223,7 @@ function schBuildUpload_(data, opt) {
     // 중복
     const dupBy = {};
     Object.keys(dupe).forEach(function (k) {
-      const d = dupe[k];
+      const d0 = dupe[k], d = d0.pids.length ? { ids: d0.pids, names: d0.pnames } : d0;
       if (d.ids.length <= 1 && d.names.length <= 1) return;
       const s = k.split('|'), g = [s[0], s[1], s[2]].join('|');
       const x = dupBy[g] || (dupBy[g] = { date: s[0], camp: s[1], route: s[2], rots: {}, ids: [], names: [] });
@@ -5203,6 +5249,32 @@ function schBuildUpload_(data, opt) {
   };
   res.missing.sort(sortRows);
   res.dups.sort(sortRows);
+  res.over7.sort(sortRows);
+  return res;
+}
+
+/** 아이디 확인: 출근 줄의 아이디가 정산관리 아이디 관리에 없거나(벤더 미등록) 정지면 막는다 */
+function schCheckIds_(res) {
+  let X;
+  try { X = stlIds_(stlDrivers_()); } catch (e) { res.idCheckError = String(e && e.message || e); return res; }
+  const seen = {};
+  res.weeks[0].concat(res.weeks[1]).filter(function (r) { return !res.weekEnd || String(r[0]) <= res.weekEnd; }).forEach(function (r) {
+    const id = String(r[4] || ''), k = stlLogin_(id);
+    if (!k) return;
+    const x = X.by[k];
+    const why = !x ? '미등록' : x.stopped ? '정지' : '';
+    if (!why) return;
+    const g = seen[k] || (seen[k] = { id: id, why: why, camps: {}, dates: {}, name: r[10] || (x ? x.ownerName : '') });
+    g.dates[r[0]] = 1; if (r[2]) g.camps[r[2]] = 1;
+  });
+  Object.keys(seen).forEach(function (k) {
+    const g = seen[k], ds = Object.keys(g.dates).sort();
+    res.badId.push([ds[0], res.bizNo, Object.keys(g.camps).sort().join(','), res.wave, g.id, g.why, '', ds.map(function (d) { return d.slice(5).replace('-', '/'); }).join(','),
+      g.why === '정지' ? '아이디 관리에서 정지 상태 · 정지 풀기 또는 다른 아이디로' : '정산관리 아이디 관리에 없는 아이디 · 등록 뒤 올리기', '', g.name]);
+  });
+  res.badId.sort(function (p, q) { return String(p[4]).localeCompare(String(q[4])); });
+  // 신호등: 빨강 = 올리기 전에 고쳐야 함 (중복·주7일·아이디) / 주황 = 미입차만 / 초록
+  res.level = (res.dups.length || res.over7.length || res.badId.length) ? 'red' : res.missing.length ? 'orange' : 'green';
   return res;
 }
 

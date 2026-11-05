@@ -65,6 +65,11 @@
   .nav a.on { background: var(--cw); color: var(--c); font-weight: 700; box-shadow: inset 3px 0 0 var(--c); }
   .nav a.on::before { opacity: 1; }
   .nav a small { margin-left: auto; }
+  .up-sig { margin: 8px 0; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
+  .up-sig.red { background: var(--danger-weak); color: #8a1f1f; } .up-sig.orange { background: var(--warn-weak); color: #7a4b05; } .up-sig.green { background: var(--ok-weak); color: #0b5c31; }
+  .seg button.bad { color: var(--danger); font-weight: 700; }
+  .wkc { font-size: 10px; color: var(--faint); line-height: 1; margin-top: 2px; }
+  .wkc .over { color: var(--danger); font-weight: 800; }
   .nav a.off { color: #b0b8c1; cursor: default; }
   .nav a small { font-size: 11px; }
   .side .me { flex: none; margin-top: 10px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
@@ -1343,10 +1348,18 @@
       <button type="button" class="btn ghost" id="upRegen">다시 만들기</button>
       <button type="button" class="btn ghost" id="upClose">닫기</button></div>
     <div class="up-bar">
+      <div class="seg" id="upScope"><button type="button" data-scope="nextweek">다음 주 (일~토)</button><button type="button" data-scope="thisweek">이번 주 내일부터</button><button type="button" data-scope="tomorrow" class="on">보고 있는 2주 · 내일부터</button></div>
+      <span class="up-info">쿠팡 어드민은 전날 W1 10시 · W2 15시까지</span>
+    </div>
+    <div class="up-sig hidden" id="upSig"></div>
+    <div class="up-bar">
       <div class="seg" id="upTabs"></div>
       <span class="up-info" id="upInfo"></span>
       <label class="check"><input type="checkbox" id="upWithName"> 명단 열 포함</label>
-      <button type="button" class="btn" id="upCopy">이 표 복사</button>
+      <button type="button" class="btn ghost" id="upCopy">이 표 복사</button>
+      <button type="button" class="btn" id="upXlsx" title="쿠팡 어드민 업로드 양식(업무일·사업자번호·캠프·웨이브·아이디·출근·회전·라우트) 그대로 .xlsx">쿠팡 양식 내려받기</button>
+      <button type="button" class="btn ghost" id="upCmp" title="쿠팡 어드민 [엑셀 다운로드] 파일을 올리면 우리 표와 줄 단위로 맞춰 봅니다">쿠팡 다운로드 대조</button>
+      <input type="file" id="upCmpFile" accept=".xlsx" class="hidden">
     </div>
     <div class="up-wrap" id="upWrap"></div>
   </div>
@@ -4210,22 +4223,32 @@
       if (s === '휴가') return false;
       return !['휴무', '용차', '병가', '퇴사', '미입차', '업무'].some((w) => s.includes(w));
     }
-    /** 기본노선 '530AB (F3)' → { routes: '530AB', rot: 'F3' } */
+    /** '205C(D1),205D' 노선 바로 뒤 괄호 = 그 노선만의 회전 → per 에 담고 괄호는 뗀다 */
+    function pullRouteRots(s, per) {
+      return String(s || '').replace(/(\d+[A-Za-z]+)\(([^)]*)\)/g, (m, rt, ro) => { const rr = normRot(ro); if (!rr.length) return m; routeExpand(rt).forEach((x) => { per[x] = rr; }); return rt; });
+    }
+    /** 기본노선 '530AB (F3)' → { routes: '530AB', rot: 'F3', per: { '205C': ['D1'] } } */
     function splitBase(defRt) {
-      const s = String(defRt || '').trim();
+      const per = {}, s = pullRouteRots(String(defRt || '').trim(), per);
       const m = s.match(/\(([^)]*)\)/);
-      return { routes: s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '' };
+      return { routes: s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '', per };
     }
 
     /**
      * rows: [{ key, camp(짧은 캠프명 예: 강서1, 없으면 ''), name, baseRoute, type, cells: [날짜별 글자] }]
      * camps: { 짧은캠프명: ['D1','D2','F3'] }  (캠프별 기본 회전)
      */
-    function compute(rows, camps, nDays) {
+    function compute(rows, camps, nDays, dates, maxDays) {
       const defRotArr = (camp) => (camps[camp] && camps[camp].length ? camps[camp] : ALL_ROTS);
       const campNames = Object.keys(camps).sort((a, b) => b.length - a.length);
-      const counts = {};
-      rows.forEach((r) => { counts[r.key] = r.cells.filter(isWorkDay).length; });
+      const counts = {}, weekCounts = {};
+      // 주별(일~토) 출근 수: 쿠팡은 아이디 하나가 한 주에 6일까지 (일요일 리셋)
+      const wkOf = (d) => { if (!dates || !dates[d]) return 0; const dt = new Date(dates[d] + 'T00:00:00'); const sun = new Date(dt); sun.setDate(dt.getDate() - dt.getDay()); return sun.toISOString().slice(0, 10); };
+      rows.forEach((r) => {
+        counts[r.key] = r.cells.filter(isWorkDay).length;
+        const wc = {}; r.cells.forEach((v, d) => { if (isWorkDay(v)) { const w = wkOf(d); wc[w] = (wc[w] || 0) + 1; } });
+        weekCounts[r.key] = Object.keys(wc).sort().map((w) => ({ week: w, n: wc[w], over: wc[w] > (maxDays || 6) }));
+      });
 
       // 1) 백업 명단: 백업·예비·용차 기사의 칸에서 노선을 뽑아 캠프별로
       const roster = {};
@@ -4262,11 +4285,17 @@
       const missing = [], dups = [], dupCells = new Set();
       for (let d = 0; d < nDays; d++) {
         const baseRouteSet = new Set(), present = new Map(), explicitMi = [];
-        const addPresent = (camp, routeList, rotArr, key) => routeList.forEach((rt) => rotArr.forEach((rot) => {
-          const k = [camp, rt, rot].join('|');
-          if (!present.has(k)) present.set(k, new Set());
-          present.get(k).add(key);
-        }));
+        // 중복 규칙(서버와 같음): 회전을 좁게 적은 사람이 그 회전의 주인, 전체 회전으로 적힌 사람은 나머지만
+        const partOf = new Map();
+        const addPresent = (camp, routeList, rotArr, key, per) => routeList.forEach((rt) => {
+          const rr = per && per[rt] ? per[rt] : rotArr, part = rr.length < defRotArr(camp).length;
+          rr.forEach((rot) => {
+            const k = [camp, rt, rot].join('|');
+            if (!present.has(k)) present.set(k, new Set());
+            present.get(k).add(key);
+            if (part) { if (!partOf.has(k)) partOf.set(k, new Set()); partOf.get(k).add(key); }
+          });
+        });
         rows.forEach((r) => {
           if (r.active && !r.active[d]) return; // 노선 변경 예약: 이 줄은 그날 다른 캠프·노선
           const baseCamp = r.camp || '';
@@ -4305,13 +4334,15 @@
           const finalCamp = dynCamp || baseCamp;
           if (dynCamp) cell = cell.slice(mDyn[0].length).trim();
           cell = cell.replace(/\(\s*([A-Za-z][A-Za-z0-9_]{2,})\s*\)/g, '').replace(/\[[^\]]*]/g, '').trim();
+          let per = {};
+          cell = pullRouteRots(cell, per);
           let rotation = '';
           const mR = cell.match(/\(\s*([^)]+?)\s*\)/);
           if (mR) { rotation = mR[1].replace(/\s+/g, ''); cell = cell.replace(/\([^)]*\)/g, '').trim(); }
           cell = cell.replace(/업무등록/g, '').trim();
           let code;
           if (cell === '출근' || (/업무등록/.test(flat) && !/\d+[A-Za-z]+/.test(flat))) {
-            code = base.routes;
+            code = base.routes; per = base.per;
             if (!rotation && base.rot) rotation = base.rot;
           } else code = cell;
           const parts = String(code).split(/\s+/);
@@ -4321,7 +4352,7 @@
           let rotArr = normRot(rotation);
           if (!rotArr.length) rotArr = defRotArr(finalCamp);
           const hasKey = KEYWORDS.some((k) => routeList.join(',').includes(k));
-          if (routeList.length && (flat.includes('업무') || hasKey || isValidRouteList(routeList.join(',')))) addPresent(finalCamp, routeList, rotArr, r.key);
+          if (routeList.length && (flat.includes('업무') || hasKey || isValidRouteList(routeList.join(',')))) addPresent(finalCamp, routeList, rotArr, r.key, per);
         });
         // 미입차 모으기
         const miss = new Map();
@@ -4356,7 +4387,8 @@
         }));
         // 중복: 같은 날 같은 캠프·노선·회전에 두 명 이상
         const dl = [];
-        present.forEach((who, k) => {
+        present.forEach((who0, k) => {
+          const who = partOf.has(k) ? partOf.get(k) : who0;
           if (who.size < 2) return;
           const [camp, rt, rot] = k.split('|');
           dl.push({ camp, route: rt, rot, keys: Array.from(who) });
@@ -4364,12 +4396,18 @@
         });
         dups.push(dl);
       }
-      return { counts, roster, missing, dups, dupCells };
+      return { counts, weekCounts, roster, missing, dups, dupCells };
     }
     return { compute, routeExpand, isWorkDay };
   })();
 
   // ───── 기사스케줄 (2주 표) ─────
+  /** 출근일수 칸: 합계 + 주별(일~토) 출근 수. 6일 넘으면 빨강 (쿠팡: 아이디 하나 주 6일까지) */
+  function cntHtml(key) {
+    const wk = (scalc.weekCounts || {})[key] || [];
+    const badges = wk.length > 1 || wk.some((w) => w.over) ? '<div class="wkc">' + wk.map((w) => '<span class="' + (w.over ? 'over' : '') + '" title="' + w.week.slice(5).replace('-', '/') + ' 주 출근 ' + w.n + '일' + (w.over ? ' · 주 ' + (SD.maxDays || 6) + '일 초과' : '') + '">' + w.n + '</span>').join('·') + '</div>' : '';
+    return (scalc.counts[key] || 0) + badges;
+  }
   const SOPTS = ['출근', '휴무', '고정휴무', '계획된휴무', '병가', '휴가', '미입차', '용차', '노선변경', '라우트변경'];
   const TYPE_ORDER = { '고정': 0, '품앗이': 1, '백업': 2, '외부용차': 3 };
   const SD = { start: '', today: '', dates: [], holidays: {}, camps: [], routes: {}, drivers: [], cells: {}, notes: [] };
@@ -4568,7 +4606,7 @@
       cells: SD.dates.map((dt) => (segIn(d._seg, dt) ? sget(d.id, dt) : '')),
       active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null
     }));
-    scalc = SchedCalc.compute(rows, campRot, SD.dates.length);
+    scalc = SchedCalc.compute(rows, campRot, SD.dates.length, SD.dates, SD.maxDays);
   }
 
   /** PDD(배송 예정일) = 오늘 기준 내일. 표에서 파란색으로 강조하는 열 */
@@ -4619,7 +4657,7 @@
         '<span class="mv"><button data-mv="-1" data-mid="' + esc(d.id) + '" title="위로">▲</button><button data-mv="1" data-mid="' + esc(d.id) + '" title="아래로">▼</button></span></td>' +
         '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
-        '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + (scalc.counts[r.key || d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
+        '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + cntHtml(r.key || d.id) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
         '<td class="ex">' + esc(d.workPattern || '') + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
     }).join('');
     $('#sWrap').innerHTML = '<table class="sg' + (sMode === 'month' ? ' month' : '') + '" id="sGrid">' + head + '<tbody>' + body + '</tbody><tbody id="sCalc"></tbody></table>' +
@@ -4691,7 +4729,7 @@
       if (v.length > 14 || pmv) td.title = v + (pmv ? '\n' + pmTip(pmv) : ''); else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
-    $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });
+    $$('[data-cnt]', tb).forEach((td) => { td.innerHTML = cntHtml(td.dataset.cnt); });
     renderCalc();
   }
 
@@ -5007,23 +5045,34 @@
     return t.split(/[,./]/).map((x) => DOW.indexOf(x));
   }
   // ───── 어드민 업로드 테이블 (운영시트 '어드민: 업로드 테이블 생성'과 같은 결과) ─────
-  let upRes = null, upTab = 'w1';
+  let upRes = null, upTab = 'w1', upScope = 'nextweek', upCmpRes = null;
+  try { upScope = localStorage.getItem('runner.sch.upScope') || 'nextweek'; } catch (e) {}
   const UP_HEAD = ['업무일', '사업자등록번호', '캠프명', '웨이브', '아이디', '업무상태', '회전', '업무라우트', '비고', '', '명단'];
+  const md = (d) => String(d || '').slice(5).replace('-', '/');
   function upMake() {
     if (Object.keys(sPending).length) return toast('저장 중인 칸이 있습니다. "모두 저장됨" 이 된 뒤 다시 눌러 주세요.');
     const start = sMode === '2w' && SD.start ? SD.start : '';
     $('#upModal').classList.remove('hidden');
-    $('#upWrap').innerHTML = '<div class="empty">만드는 중…</div>'; $('#upInfo').textContent = ''; $('#upTabs').innerHTML = '';
-    api('adm_schUploadTable', start).then((r) => {
+    $$('#upScope [data-scope]').forEach((b) => b.classList.toggle('on', b.dataset.scope === upScope));
+    $('#upWrap').innerHTML = '<div class="empty">만드는 중…</div>'; $('#upInfo').textContent = ''; $('#upTabs').innerHTML = ''; $('#upSig').classList.add('hidden');
+    upCmpRes = null;
+    api('adm_schUploadTable', start, upScope).then((r) => {
       if (!r.ok) { $('#upWrap').innerHTML = ''; return toast(r.msg); }
       upRes = r;
       const d0 = r.dates[0], d1 = r.dates[r.dates.length - 1];
-      $('#upTitle').textContent = '어드민 업로드 테이블 · ' + d0.slice(5).replace('-', '/') + ' ~ ' + d1.slice(5).replace('-', '/') + ' (PDD ' + r.target.slice(5).replace('-', '/') + '부터)';
+      $('#upTitle').textContent = '어드민 업로드 테이블 · ' + (r.weekEnd ? md(r.target) + ' ~ ' + md(r.weekEnd) + ' (일~토 한 주)' : md(d0) + ' ~ ' + md(d1) + ' (PDD ' + md(r.target) + '부터)');
       $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
       if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
-      upTab = 'all';
-      upTabsRender(); upRender();
+      if (r.idCheckError) toast('아이디 확인을 못 했습니다: ' + r.idCheckError);
+      upTab = r.level === 'red' ? (r.dups.length ? 'dup' : r.over7.length ? 'over' : 'bad') : 'all';
+      upSigRender(); upTabsRender(); upRender();
     }).catch(() => { $('#upWrap').innerHTML = ''; });
+  }
+  /** 올리기 범위: 주 단위(기본)면 그 주 일~토 줄만 */
+  function upWeekRows() {
+    if (!upRes) return [];
+    const all = [].concat(upRes.weeks[0], upRes.weeks[1]);
+    return upRes.weekEnd ? all.filter((r) => r[0] >= upRes.target && r[0] <= upRes.weekEnd) : all;
   }
   function upRows(tab) {
     if (!upRes) return [];
@@ -5031,26 +5080,45 @@
     if (tab === 'w2') return upRes.weeks[1];
     if (tab === 'all') return [].concat(upRes.weeks[0], upRes.weeks[1], upRes.missing);
     if (tab === 'mi') return upRes.missing;
+    if (tab === 'over') return upRes.over7 || [];
+    if (tab === 'bad') return upRes.badId || [];
+    if (tab === 'cmp') return upCmpRes ? upCmpRes.rows : [];
     return upRes.dups;
   }
+  function upSigRender() {
+    const r = upRes, el = $('#upSig');
+    const n = upWeekRows().length;
+    const bad = [r.dups.length ? '중복 ' + r.dups.length : '', (r.over7 || []).length ? '주7일 ' + r.over7.length : '', (r.badId || []).length ? '아이디 ' + r.badId.length : ''].filter(Boolean).join(' · ');
+    el.className = 'up-sig ' + r.level;
+    el.innerHTML = r.level === 'red' ? '<b>🔴 올리기 전에 고쳐야 합니다</b> — ' + bad + (r.missing.length ? ' (미입차 ' + r.missing.length + '건은 경고만)' : '') + '. 고치고 [다시 만들기]'
+      : r.level === 'orange' ? '<b>🟠 미입차 ' + r.missing.length + '건</b> — 비워 둔 채 올릴 수 있습니다. 출근 ' + n + '줄'
+      : '<b>🟢 이상 없음</b> — 출근 ' + n + '줄, 바로 내려받아 올리면 됩니다';
+    el.classList.remove('hidden');
+  }
   function upTabsRender() {
-    const t = [['all', '전체 (출근+미입차)'], ['w1', '1주차 출근'], ['w2', '2주차 출근'], ['mi', '미입차'], ['dup', '중복']];
-    $('#upTabs').innerHTML = t.map(([k, l]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '">' + l + ' ' + upRows(k).length + '</button>').join('');
+    const t = [['all', '전체 (출근+미입차)'], ['w1', '1주차 출근'], ['w2', '2주차 출근'], ['mi', '미입차'], ['dup', '중복'], ['over', '주7일'], ['bad', '아이디 확인']];
+    if (upCmpRes) t.push(['cmp', '쿠팡 대조']);
+    const red = { dup: 1, over: 1, bad: 1 };
+    $('#upTabs').innerHTML = t.map(([k, l]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + (red[k] && upRows(k).length ? ' bad' : '') + (k === 'cmp' && upCmpRes && upCmpRes.rows.length ? ' bad' : '') + '">' + l + ' ' + upRows(k).length + '</button>').join('');
   }
   function upRender() {
     const rows = upRows(upTab), keyOf = (w, i) => upRes.keys[w][i];
     const cls = (r, i) => {
       if (upTab === 'mi' || r[4] === '미입차') return 'mi';
-      if (upTab === 'dup') return 'dup';
+      if (upTab === 'dup' || upTab === 'over' || upTab === 'bad') return 'dup';
+      if (upTab === 'cmp') return r[5] === '같음' ? '' : 'dup';
       if (upTab === 'w1') return keyOf(0, i) ? 'key' : '';
       if (upTab === 'w2') return keyOf(1, i) ? 'key' : '';
       const n0 = upRes.weeks[0].length, n1 = upRes.weeks[1].length;
       return i < n0 ? (keyOf(0, i) ? 'key' : '') : i < n0 + n1 ? (keyOf(1, i - n0) ? 'key' : '') : '';
     };
     const sepAt = upTab === 'all' && upRes.weeks[0].length ? upRes.weeks[0].length : -1;
-    $('#upInfo').textContent = upTab === 'dup' ? '같은 날 같은 캠프·노선·회전에 2명 이상 — 업로드 전에 정리하세요.'
-      : upTab === 'mi' ? '기사가 없는 노선·회전 (캠프·회전별로 묶음)' : '파란 줄 = 업무등록·업무·선탑·신규 등 확인이 필요한 줄';
-    if (!rows.length) { $('#upWrap').innerHTML = '<div class="empty">' + (upTab === 'dup' ? '중복이 없습니다.' : upTab === 'mi' ? '미입차가 없습니다.' : '해당하는 줄이 없습니다.') + '</div>'; return; }
+    $('#upInfo').textContent = upTab === 'dup' ? '같은 날 같은 캠프·노선·회전 칸에 2명 — 노선별 회전이 다르면 205C(D1),205D 처럼 노선 뒤 괄호로 나누세요 (쿠팡엔 합쳐서 올라감).'
+      : upTab === 'mi' ? '기사가 없는 노선·회전 (캠프·회전별로 묶음)'
+      : upTab === 'over' ? '아이디 하나가 일~토 한 주에 출근 ' + ((SD.maxDays || 6) + 1) + '일 이상 — 쿠팡이 받지 않습니다. 하루는 서브 아이디로 바꾸거나 휴무.'
+      : upTab === 'bad' ? '정산관리 아이디 관리에 없거나(미등록) 정지된 아이디 — 쿠팡 업로드가 거절됩니다.'
+      : upTab === 'cmp' ? (upCmpRes ? upCmpRes.info : '') : '파란 줄 = 업무등록·업무·선탑·신규 등 확인이 필요한 줄';
+    if (!rows.length) { $('#upWrap').innerHTML = '<div class="empty">' + (upTab === 'dup' ? '중복이 없습니다.' : upTab === 'mi' ? '미입차가 없습니다.' : upTab === 'over' ? '주 7일 아이디가 없습니다.' : upTab === 'bad' ? '아이디 문제가 없습니다.' : upTab === 'cmp' ? '우리 표와 쿠팡이 모두 같습니다.' : '해당하는 줄이 없습니다.') + '</div>'; return; }
     $('#upWrap').innerHTML = '<table class="up"><thead><tr><th></th>' + UP_HEAD.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
       rows.map((r, i) => (i === sepAt ? '<tr class="sep"><td colspan="12"></td></tr>' : '') +
         '<tr class="' + cls(r, i) + '"><td class="n">' + (i + 1) + '</td>' + r.map((v) => '<td>' + esc(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
@@ -5059,6 +5127,49 @@
   $('#upRegen').addEventListener('click', upMake);
   $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
   $('#upTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-up]'); if (!b) return; upTab = b.dataset.up; upTabsRender(); upRender(); });
+  $('#upScope').addEventListener('click', (e) => { const b = e.target.closest('[data-scope]'); if (!b) return; upScope = b.dataset.scope; try { localStorage.setItem('runner.sch.upScope', upScope); } catch (err) {} upMake(); });
+  // 쿠팡 어드민 업로드 양식 .xlsx (8칸, 업무일은 날짜 칸). 빨강이면 막는다 (중복·주7일·아이디)
+  $('#upXlsx').addEventListener('click', () => {
+    if (!upRes) return;
+    if (upRes.level === 'red') return toast('🔴 중복·주7일·아이디 문제를 고친 뒤 [다시 만들기] 하면 내려받을 수 있습니다.');
+    const rows = upWeekRows();
+    if (!rows.length) return toast('내려받을 출근 줄이 없습니다.');
+    const out = [UP_HEAD.slice(0, 8)].concat(rows.map((r) => [new Date(r[0] + 'T00:00:00'), r[1], r[2], r[3], r[4], r[5], r[6], r[7]]));
+    const d0 = rows[0][0], d1 = rows[rows.length - 1][0];
+    TAXDOC.download(ZIPW.xlsx(out, 'Sheet1'), '쿠팡업로드_' + d0.replace(/-/g, '') + '-' + d1.slice(5).replace('-', '') + '_' + rows.length + '줄.xlsx');
+    toast(rows.length + '줄 (' + md(d0) + '~' + md(d1) + ') 양식을 내려받았습니다. 쿠팡 어드민 [업로드]에 올리세요.' + (upRes.missing.length ? ' 미입차 ' + upRes.missing.length + '건은 빠져 있습니다.' : ''));
+  });
+  // 쿠팡 어드민 [엑셀 다운로드] 파일과 대조 (입차 확인)
+  $('#upCmp').addEventListener('click', () => { if (!upRes) return; $('#upCmpFile').value = ''; $('#upCmpFile').click(); });
+  $('#upCmpFile').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    try {
+      const sheets = await readXlsx(await f.arrayBuffer());
+      const sh = sheets[0] || { rows: [] }, head = (sh.rows[0] || []).map((v) => String(v || '').trim());
+      const col = (n) => head.indexOf(n);
+      const ci = { date: col('업무일'), id: col('아이디'), st: col('업무상태'), rot: col('회전'), rt: col('업무라우트'), camp: col('캠프명'), name: col('이름') };
+      if (ci.date < 0 || ci.id < 0 || ci.st < 0) return toast('쿠팡 어드민 [엑셀 다운로드] 파일이 아닙니다 (업무일·아이디·업무상태 칸이 없음).');
+      const toYmd = (v) => typeof v === 'number' ? new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000).toISOString().slice(0, 10) : String(v || '').slice(0, 10).replace(/\./g, '-').replace(/\//g, '-');
+      const cp = {};
+      sh.rows.slice(1).forEach((r) => { if (!r || !r[ci.id]) return; const k = toYmd(r[ci.date]) + '|' + String(r[ci.id]).trim().toLowerCase(); cp[k] = { st: String(r[ci.st] || ''), rot: String(r[ci.rot] || ''), rt: String(r[ci.rt] || ''), camp: String(r[ci.camp] || ''), name: String(r[ci.name] || '') }; });
+      const cpDates = Object.keys(cp).map((k) => k.split('|')[0]).sort();
+      const ours = upWeekRows().filter((r) => r[0] >= cpDates[0] && r[0] <= cpDates[cpDates.length - 1]);
+      const out = [], seen = {};
+      let same = 0;
+      ours.forEach((r) => {
+        const k = r[0] + '|' + String(r[4]).toLowerCase(); seen[k] = 1;
+        const c = cp[k];
+        if (!c || c.st !== '출근') out.push([r[0], r[1], r[2], r[3], r[4], '쿠팡에 없음', r[6], r[7], c ? '쿠팡은 ' + c.st : '쿠팡 파일에 줄 없음', '', r[10]]);
+        else if (c.rt.replace(/\s/g, '') !== String(r[7]).replace(/\s/g, '') || c.rot.replace(/\s/g, '') !== String(r[6]).replace(/\s/g, '')) out.push([r[0], r[1], r[2], r[3], r[4], '다름', r[6], r[7], '쿠팡: ' + c.rot + ' / ' + c.rt, '', r[10]]);
+        else same++;
+      });
+      Object.keys(cp).forEach((k) => { const c = cp[k]; if (seen[k] || c.st !== '출근') return; const [d, id] = k.split('|'); if (d < upRes.target) return; out.push([d, upRes.bizNo, c.camp, upRes.wave, id, '쿠팡에만 있음', c.rot, c.rt, '우리 표엔 출근 줄 없음', '', c.name]); });
+      out.sort((p, q) => p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : String(p[4]).localeCompare(String(q[4])));
+      upCmpRes = { rows: out, info: '쿠팡 ' + md(cpDates[0]) + '~' + md(cpDates[cpDates.length - 1]) + ' · 같음 ' + same + '줄 · 쿠팡에 없음 ' + out.filter((r) => r[5] === '쿠팡에 없음').length + ' · 다름 ' + out.filter((r) => r[5] === '다름').length + ' · 쿠팡에만 ' + out.filter((r) => r[5] === '쿠팡에만 있음').length };
+      upTab = 'cmp'; upTabsRender(); upRender();
+      toast(out.length ? '대조: 차이 ' + out.length + '줄' : '대조: 전부 같습니다 (' + same + '줄)');
+    } catch (err) { toast('파일을 읽지 못했습니다: ' + (err && err.message || err)); }
+  });
   $('#upCopy').addEventListener('click', () => {
     const rows = upRows(upTab);
     if (!rows.length) return toast('복사할 줄이 없습니다.');
@@ -6690,17 +6801,20 @@
     /** rows = [[값…]…] (행 번호 그대로) → .xlsx Blob. 숫자는 숫자 칸, 나머지는 글자 칸 */
     function xlsx(rows, sheetName) {
       const enc = new TextEncoder();
+      const serial = (d) => Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000);
       const body = rows.map((r, ri) => r ? '<row r="' + (ri + 1) + '">' + r.map((v, ci) => {
         if (v === '' || v == null) return '';
         const ref = colName(ci) + (ri + 1);
+        if (v instanceof Date) return '<c r="' + ref + '" s="1"><v>' + serial(v) + '</v></c>'; // 날짜 칸 (yyyy-mm-dd)
         return typeof v === 'number' ? '<c r="' + ref + '"><v>' + v + '</v></c>' : '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xe(v) + '</t></is></c>';
       }).join('') + '</row>' : '').join('');
       const f = (name, x) => ({ name, data: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + x) });
       return zip([
-        f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'),
+        f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
         f('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
         f('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + xe(sheetName || 'Sheet1') + '" sheetId="1" r:id="rId1"/></sheets></workbook>'),
-        f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'),
+        f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
+        f('xl/styles.xml', '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'),
         f('xl/worksheets/sheet1.xml', '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + body + '</sheetData></worksheet>')
       ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }
