@@ -104,6 +104,12 @@
   .tab.alert b { color: var(--danger); }
 
   .table-wrap { background: #fff; border-radius: var(--radius); overflow: auto; max-height: calc(100vh - 210px); }
+  .info-ro { background: var(--brand-weak); color: var(--brand); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin: 0 0 10px; }
+  #stIdsTbl tr.idsub td:first-child { padding-left: 26px; color: var(--sub); } #stIdsTbl td.go { color: var(--brand); font-weight: 700; font-size: 12px; white-space: nowrap; }
+  #stIdsTbl tr.vrow td { background: #fafbfc; color: var(--sub); font-size: 12px; } #stIdsTbl tr.unk td { background: #fdecec; color: #b3261e; font-size: 12px; } #stIdsTbl tr.unk select { width: auto; max-width: 220px; display: inline-block; margin-left: 6px; padding: 4px 8px; font-size: 12px; }
+  .tbadge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; background: #eef0f3; color: #4e5968; white-space: nowrap; } .tbadge.t-fx { background: var(--brand-weak); color: var(--brand); } .tbadge.t-bk { background: #fdf3e2; color: #c27c0e; } .tbadge.t-pm { background: #f1ecfb; color: #7048d0; } .tbadge.t-ex { background: #e6f6f7; color: #0f7b83; } .tbadge.t-ok { background: #e7f6ee; color: #12a150; }
+  .idrow { display: grid; grid-template-columns: 56px 1fr 150px; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--line); } .idrow .k { color: var(--sub); font-size: 12px; padding-top: 9px; } .idrow:last-of-type { border-bottom: 0; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } @media (max-width: 640px) { .grid3 { grid-template-columns: 1fr; } .idrow { grid-template-columns: 48px 1fr; } .idrow > select { grid-column: 2; } }
   body { word-break: keep-all; overflow-wrap: break-word; }
   .modal .m-box { overflow-wrap: anywhere; } .modal .m-box table th, .modal .m-box table td { overflow-wrap: normal; }
   .tkbar { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; }
@@ -2135,15 +2141,27 @@
     const link = (sid) => {
       if (!sid) return '';
       const x = all.find((r) => String(r.loginId || '').toLowerCase() === String(sid).toLowerCase() && r.id !== d.id);
-      return x ? '<small class="sublink">↳ ' + esc(x.name) + ' 님 가입 아이디 · 기사 앱 ' + esc(x.status) + (x.status === '정지' ? '' : ' (저장하면 정지)') + '</small>' : '<small class="sublink">↳ 가입한 기사 없음 · 정산 아이디 관리에만 서브로 연결</small>';
+      return x ? '<small class="sublink">↳ ' + esc(x.name) + ' 님 가입 아이디 · 기사 앱 ' + esc(x.status) + (x.status === '정지' ? '' : ' (저장하면 정지)') + '</small>' : '<small class="sublink">↳ 가입한 기사 없음</small>';
     };
-    const subIn = (k, label) => '<div class="field"><label class="lb">' + label + '</label><input class="inp" data-k="' + k + '" value="' + esc(d[k] || '') + '" autocomplete="off" spellcheck="false" placeholder="쿠팡플렉스 아이디">' + link(d[k]) + '</div>';
+    const tsel = (k) => '<select class="inp" data-k="' + k + '" aria-label="서브 단가"><option value="">단가: 메인과 같음</option>' +
+      DTYPES.map((t) => '<option value="' + t + '"' + (t === (d[k] || '') ? ' selected' : '') + '>단가: ' + t + '</option>').join('') + '</select>';
+    const subRow = (k, tk, label) => '<div class="idrow"><span class="k">' + label + '</span><div><input class="inp" data-k="' + k + '" value="' + esc(d[k] || '') + '" autocomplete="off" spellcheck="false" placeholder="쿠팡플렉스 아이디">' + link(d[k]) + '</div>' + tsel(tk) + '</div>';
     const subOf = !d.isNew && d.loginId ? all.find((r) => r.id !== d.id && [r.subId1, r.subId2].some((x) => String(x || '').toLowerCase() === String(d.loginId).toLowerCase())) : null;
-    return '<div class="sec"><h4>기사단가 코드' + (d.isNew ? '<span class="req">*</span>' : '') + ' <small class="sub" style="font-weight:500">— 노선관리 단가 (고정 = 기사단가 · 백업 = 백업단가 …)</small></h4><div class="status-row" style="margin-bottom:12px">' +
+    return '<div class="sec"><h4>쿠팡 아이디 · 기사단가' + (d.isNew ? '<span class="req">*</span>' : '') + ' <small class="sub" style="font-weight:500">— 정산은 여기 값으로 계산 (노선관리 단가: 고정 = 기사단가 · 백업 = 백업단가 …)</small></h4><div class="status-row" style="margin-bottom:12px">' +
       DTYPES.map((t) => '<button type="button" class="st' + (t === d.driverType ? ' on' : '') + '" data-dt="' + t + '">' + t + '</button>').join('') + '</div>' +
-      (subOf ? '<div class="warnbox" style="margin:0 0 10px">이 아이디는 <b>' + esc(subOf.name) + '</b> 기사님의 서브아이디입니다 · 기사 앱 사용은 정지로 둡니다.</div>' : '') +
-      '<div class="grid2">' + subIn('subId1', '서브아이디 1') + subIn('subId2', '서브아이디 2') + '</div>' +
-      '<p class="sub" style="font-size:12px;margin:6px 0 0">서브아이디를 넣고 저장하면: 그 아이디로 가입한 기사는 <b>기사 앱 사용만 정지</b> (근무·정산은 그대로), 정산관리 아이디 관리에 <b>서브 (메인 = 이 기사)</b>로 연결됩니다.</p></div>';
+      (subOf ? '<div class="warnbox" style="margin:0 0 10px">이 아이디는 <b>' + esc(subOf.name) + '</b> 기사님의 서브아이디입니다 · 정산은 ' + esc(subOf.name) + ' 기사님 정산서로, 기사 앱 사용은 정지로 둡니다.</div>' : '') +
+      '<div class="idrow"><span class="k">메인</span><div><b>' + esc(d.loginId || '—') + '</b> <small class="sub">(쿠팡플렉스 아이디 · 아래 기본 정보에서 고침)</small></div><span class="sub" style="font-size:12px">단가: ' + esc(d.driverType || '미지정') + '</span></div>' +
+      subRow('subId1', 'subType1', '서브 1') + subRow('subId2', 'subType2', '서브 2') +
+      '<p class="sub" style="font-size:12px;margin:6px 0 0">서브 단가는 비우면 메인과 같음 · 다른 경우만 고름 (예: 서브로 백업 뛸 때). 그 아이디로 가입한 기사는 <b>기사 앱 사용만 정지</b>됩니다.</p></div>' +
+      (d.isNew ? '' : stlSec(d));
+  }
+  /** 정산 설정 (예전 정산관리 아이디 관리 칸): 정산 방식 · 산재·고용 제외 · 프레시백 차감 */
+  function stlSec(d) {
+    const sel = (k, opts) => '<select class="inp" data-k="' + k + '">' + opts.map((o) => '<option value="' + esc(o[0]) + '"' + (o[0] === String(d[k] || '') ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
+    return '<div class="sec"><h4>정산 설정 <small class="sub" style="font-weight:500">— 이 기사 정산서 전체에 적용 (서브 포함)</small></h4><div class="grid3">' +
+      '<div class="field"><label class="lb">정산 방식</label>' + sel('stlMode', [['', '기본'], ['원청단가', '원청단가'], ['용차내역', '용차내역']]) + '</div>' +
+      '<div class="field"><label class="lb">산재·고용 공제</label>' + sel('insEx', [['', '공제함 (기본)'], ['Y', '제외']]) + '</div>' +
+      '<div class="field"><label class="lb">프레시백 차감</label><input class="inp" data-k="fbCut" value="' + esc(d.fbCut || '') + '" placeholder="예: 13% · 비우면 차감 없음"></div></div></div>';
   }
   /** 직급: 기사(빈칸) · 관리자 · 운영자 · 대표 */
   function rankSec(d) {
@@ -6267,12 +6285,13 @@
       (STX.pnl ? '<div class="kpi clk" id="stKpiNet" title="손익·운영비 보기"><small>당기순이익 (공급가 · 세전)</small><b' + (STX.pnl.net < 0 ? ' style="color:var(--danger)"' : '') + '>' + wn(STX.pnl.net) + '</b><em>회사이익 − 보험 실부담 ' + wn(STX.pnl.runnerIns) + ' − 인건비 ' + wn(STX.pnl.staff) + ' − 운영비 ' + wn(STX.pnl.cost) + (STX.pnl.staff || STX.pnl.cost ? '' : ' · 운영비 미입력') + '</em></div>' : '') +
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
     const vsel = (wk, i) => '<select class="inp vset" data-vw="' + esc(wk) + '" data-vi="' + i + '" aria-label="용차업체로 지정"><option value="">🚚 용차업체로 지정…</option>' +
-      (s.vendors || []).map((v) => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('') + '<option value="__new">+ 새 업체…</option></select>';
+      (s.vendors || []).map((v) => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('') + '<option value="__new">+ 새 업체…</option>' +
+      (wk === 'unreg' && i !== 'all' ? '<option value="__link">👤 기사에 연결 (기사 정보관리)…</option>' : '') + '</select>';
     // 경고 줄 옆 처리 메뉴: 용차업체 지정 / 정지 아이디 → 퇴사 처리 / 아이디 사용 기록 → 서브 인원·본인 정산 아이디 (마감한 달은 없음)
     const mon = Number(String(STX.month).slice(5));
     const WACT = {
-      stopped: { head: '🚪 처리…', all: '🚪 전부…', opts: [['leave', '퇴사 처리 · ' + mon + '월 퇴사 (보류금 기본)'], ['leaveAmt', '퇴사 처리 · 보류금 금액 입력…'], ['unstop', '정지 풀기 (다시 사용)'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['leave', 'ack'] },
-      idle: { head: '⏸ 처리…', all: '⏸ 전부…', opts: [['stop', '정지 (아이디 관리 상태 → 정지)'], ['leaveStop', '퇴사 처리 + 정지 · ' + mon + '월 퇴사 (보류금 기본)'], ['leaveStopAmt', '퇴사 처리 + 정지 · 보류금 금액 입력…'], ['ack', '확인함 · 이 달은 숨김 (휴무·예비 아이디)']], allOpts: ['stop', 'ack'] },
+      stopped: { head: '🚪 처리…', all: '🚪 전부…', opts: [['leave', '퇴사 처리 · ' + mon + '월 퇴사 (보류금 기본)'], ['leaveAmt', '퇴사 처리 · 보류금 금액 입력…'], ['unstop', '정지 풀기 · 근무상태 재직'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['leave', 'ack'] },
+      idle: { head: '⏸ 처리…', all: '⏸ 전부…', opts: [['stop', '휴직 (근무상태 → 휴직)'], ['leaveStop', '퇴사 처리 · 근무상태 퇴사 · ' + mon + '월 (보류금 기본)'], ['leaveStopAmt', '퇴사 처리 · 근무상태 퇴사 · 보류금 금액 입력…'], ['ack', '확인함 · 이 달은 숨김 (휴무·예비 아이디)']], allOpts: ['stop', 'ack'] },
       moveNo: { head: '👥 처리…', all: '👥 전부…', opts: [['sub', '서브 인원 · 명의자 정산에 그대로 포함'], ['ownId', '본인 정산 아이디 만들기 · 그 기사 정산서로 옮김'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['sub', 'ack'] }
     };
     const wsel = (w, i) => {
@@ -6532,7 +6551,65 @@
     if (name !== 'migrate') loadEditor(name);
   }
   // ── 표 편집 ──
+  /** 아이디 관리 = 보기 전용 (기사 정보관리 · 용차업체에서 자동으로) */
+  function loadIdsView() {
+    STX.table = null;
+    const help = $('#stEditHelp'); help.className = 'sub st-help'; help.textContent = '';
+    $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    return api('adm_stlIdsView', STX.month).then((r) => {
+      if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
+      if (r.legacy) { STX.idLegacy = true; return loadEditor('ids'); }
+      STX.idv = r; renderIdsView();
+    }).catch(() => {});
+  }
+  function renderIdsView() {
+    const r = STX.idv, wn = (v) => Number(v || 0).toLocaleString('ko-KR');
+    const tb = (t) => t ? '<span class="tbadge t-' + ({ 고정: 'fx', 백업: 'bk', 품앗이: 'pm', 외부용차: 'ex' }[t] || 'g') + '">' + esc(t) + '</span>' : '<span class="sub">미지정</span>';
+    const stTxt = (x) => x.status === '정지' ? '<span class="tbadge t-g">정지' + (x.workStatus ? ' · ' + esc(x.workStatus) : '') + (x.leaveDate ? ' · ' + esc(mdTxt(x.leaveDate)) + ' 퇴사' : '') + '</span>'
+      : x.workStatus === '퇴사' && x.leaveDate ? '<span class="tbadge t-ok">사용 · ' + esc(mdTxt(x.leaveDate)) + ' 퇴사 예정</span>' : '<span class="tbadge t-ok">사용</span>';
+    const rows = r.rows.map((x) => '<tr class="clk' + (x.role === '서브' ? ' idsub' : '') + '" data-odrv="' + esc(x.drvId) + '"><td>' + (x.role === '서브' ? '↳ ' + esc(x.cid) : '<b>' + esc(x.cid) + '</b>') + '</td><td>' + x.role + '</td><td>' + esc(x.owner) + (x.signed ? ' <small class="sub">' + esc(x.signed) + '</small>' : '') + '</td>' +
+      '<td>' + tb(x.type) + (x.subDiff ? ' <small style="color:#b45309;font-weight:700">서브만 다름</small>' : '') + '</td><td>' + esc(x.mode || '기본') + '</td><td>' + (x.insEx ? 'Y' : '') + '</td><td>' + esc(x.fbCut || '') + '</td><td>' + stTxt(x) + '</td><td class="go">기사 열기 →</td></tr>').join('');
+    const vrows = (r.vendors || []).map((v) => '<tr class="vrow clk" data-ovend="1"><td colspan="9">🚚 용차업체 · <b>' + esc(v.name) + '</b>' + (v.stopped ? ' (정지)' : '') + ': ' + v.ids.map(esc).join(' · ') + ' <small class="sub">→ 용차업체 메뉴에서 관리</small></td></tr>').join('');
+    const dOpts = '<option value="">👤 기사에 연결…</option>' + (r.drivers || []).map((d) => '<option value="' + esc(d.id) + '">' + esc(d.name) + (d.loginId ? ' (' + esc(d.loginId) + ' 의 서브로)' : ' (메인으로)') + '</option>').join('');
+    const vOpts = '<option value="">🚚 용차업체로 지정…</option>' + (STX.sum && STX.sum.vendors || (r.vendors || []).map((v) => v.name)).map((v) => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('') + '<option value="__new">+ 새 업체…</option>';
+    const urows = (r.unknown || []).map((u) => '<tr class="unk"><td colspan="9">⚠ 정산서에만 있는 아이디: <b>' + esc(u.label) + '</b> ' +
+      '<select class="inp idlk" data-cid="' + esc(u.cid) + '">' + dOpts + '</select> <select class="inp idvd" data-cid="' + esc(u.cid) + '">' + vOpts + '</select></td></tr>').join('');
+    const clash = (r.clash || []).map((c) => '<div class="warnbox" style="margin:0 0 8px">' + esc(c.name) + ' 기사님 아이디 <b>' + esc(c.cid) + '</b> 가 용차업체 ' + esc(c.vendor) + ' 아이디로도 있어 <b>업체 정산</b>으로 계산됩니다. 둘 중 하나에서 빼 주세요.</div>').join('');
+    let log = '';
+    if (r.log) {
+      const d = (r.log.diff || []).map((m) => '<li><b>' + esc(ymTitle(m.month)) + '</b> · ' + (m.err ? '대조 못 함 (' + esc(m.err) + ')' : m.changed.length ? '<span style="color:var(--danger)">바뀐 정산서 ' + m.changed.length + '건</span>: ' + m.changed.map((c) => esc(c.name) + ' ' + wn(c.before) + ' → ' + wn(c.after)).join(', ') : '<span style="color:var(--ok);font-weight:700">정산 금액 그대로 ✓</span>') +
+        (m.before && m.after ? ' <small class="sub">(계산서 합계 ' + wn(m.before.invoice) + ' → ' + wn(m.after.invoice) + ' · 실입금 ' + wn(m.before.net) + ' → ' + wn(m.after.net) + ')</small>' : '') + '</li>').join('');
+      log = '<details class="stw info"' + ((r.log.diff || []).some((m) => m.changed.length) ? ' open' : '') + '><summary>예전 아이디 관리 → 기사 정보관리로 옮김 (' + esc(r.log.at || '') + ') · ' + ((r.log.diff || []).some((m) => m.changed.length || m.err) ? '<span style="color:var(--danger)">대조: 바뀐 정산서 있음 — 눌러서 확인</span>' : ((r.log.diff || []).length ? '<span style="color:var(--ok)">대조: ' + r.log.diff.map((m) => esc(ymTitle(m.month).replace(/^\d+년\s*/, ''))).join('·') + ' 정산 금액 그대로 ✓</span>' : '대조할 열린 정산월 없음 (마감한 달은 마감 결과 그대로)')) + ' · 옮긴 내용 ' + (r.log.notes || []).length + '건</summary><ul>' + d +
+        (r.log.notes || []).map((n) => '<li class="sub">' + esc(n) + '</li>').join('') + '</ul></details>';
+    }
+    $('#stEditor').innerHTML = '<div class="info-ro">🔒 기사 정보관리에서 자동으로 만들어지는 표입니다. 고칠 때는 줄을 눌러 그 기사 상세 창(쿠팡 아이디 · 기사단가 · 정산 설정)에서. 용차업체 아이디는 용차업체 메뉴에서.</div>' + log + clash +
+      '<div class="table-wrap"><table class="sttbl" id="stIdsTbl"><thead><tr><th>쿠팡ID</th><th>구분</th><th>명의자</th><th>기사단가</th><th>정산 방식</th><th>산재·고용 제외</th><th>프레시백 차감</th><th>상태</th><th></th></tr></thead><tbody>' +
+      urows + rows + vrows + '</tbody></table></div>' + (r.rows.length ? '' : '<p class="sub" style="padding:20px">기사 정보관리에 쿠팡플렉스 아이디가 있는 기사가 없습니다.</p>');
+  }
+  $('#stEditor').addEventListener('click', (e) => {
+    if (!STX.idv || STX.table) return;
+    if (e.target.closest('select')) return;
+    const tr = e.target.closest('tr[data-odrv]');
+    if (tr && tr.dataset.odrv) { switchView('drivers'); openDrawer(tr.dataset.odrv); return; }
+    if (e.target.closest('tr[data-ovend]')) stShowTab('vendors');
+  });
+  $('#stEditor').addEventListener('change', (e) => {
+    const lk = e.target.closest('select.idlk'), vd = e.target.closest('select.idvd');
+    if (!lk && !vd) return;
+    const el = lk || vd, cid = el.dataset.cid, v = el.value;
+    if (!v) return;
+    if (lk) {
+      const d = STX.idv.drivers.find((x) => x.id === v);
+      if (!confirm(cid + ' 를 ' + d.name + ' 기사님 ' + (d.loginId ? '서브아이디' : '쿠팡플렉스 아이디') + '로 넣을까요?')) { el.value = ''; return; }
+      return api('adm_stlWarnAct', STX.month, 'link', [{ cids: [cid] }], { driverId: v }).then((r) => { if (!r.ok) { el.value = ''; return toast(r.msg); } toast('연결했습니다. 정산을 다시 계산합니다.'); STX.sum = null; loadIdsView(); }).catch(() => {});
+    }
+    let name = v;
+    if (v === '__new') { name = (prompt('새 용차업체 이름') || '').trim(); if (!name) { el.value = ''; return; } }
+    api('adm_stlSetVendor', [cid], name).then((r) => { if (!r.ok) { el.value = ''; return toast(r.msg); } toast(name + ' 아이디로 지정했습니다.'); STX.sum = null; loadIdsView(); }).catch(() => {});
+  });
   function loadEditor(name) {
+    if (name === 'ids' && !STX.idLegacy) return loadIdsView();
+    STX.idv = null;
     if (!STX.table || STX.table.name !== name) STX.edQ = ''; // 다른 표로 바꾸면 검색어 비움
     paintHelp(name);
     $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
@@ -7185,18 +7262,18 @@
         if (act === 'leaveStopAmt') opt.stop = true;
         act = 'leave';
       } else if (act === 'leaveStop') {
-        if (!confirm(names + '\n\n' + m + ' 퇴사로 처리하고 아이디를 정지할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환)')) return;
+        if (!confirm(names + '\n\n' + m + ' 퇴사로 처리할까요? 기사 정보관리 근무상태도 퇴사 (퇴사일 = 마지막 배송일)\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환)')) return;
         opt.stop = true; act = 'leave';
       } else if (act === 'ownId') {
         const v = prompt(list[0].name + ' 기사님의 쿠팡 ID (본인 정산 아이디)\n비우면 기사 정보의 쿠팡플렉스 아이디를 씁니다.', ''); if (v == null) return;
         opt.cid = v.trim();
       } else {
-        const msg = { leave: m + ' 퇴사로 처리할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환 · 퇴사자 보류금 설정에 기록)', unstop: '아이디 관리에서 정지를 풀까요? (상태 → 사용)', stop: '아이디 관리에서 정지할까요? (상태 → 정지 · 다시 일하면 정지 풀기)', sub: '서브 인원으로 처리할까요?\n(아이디 사용 기록의 정산 칸 = 명의자 → 매출은 명의자 정산에 그대로)', ack: m + ' 정산에서 이 경고를 숨길까요?' }[act];
+        const msg = { leave: m + ' 퇴사로 처리할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환 · 퇴사자 보류금 설정에 기록)', unstop: '정지를 풀까요? (기사 정보관리 근무상태 → 재직)', stop: '휴직으로 바꿀까요? (기사 정보관리 근무상태 → 휴직 · 다시 일하면 정지 풀기)', sub: '서브 인원으로 처리할까요?\n(아이디 사용 기록의 정산 칸 = 명의자 → 매출은 명의자 정산에 그대로)', ack: m + ' 정산에서 이 경고를 숨길까요?' }[act];
         if (!confirm(names + '\n\n' + msg)) return;
       }
       api('adm_stlWarnAct', STX.month, act, list, opt).then((r) => {
         if (!r.ok) return toast(r.msg);
-        const msg = (r.done && r.done.length ? r.done.join(', ') + ' — ' : '') + ({ leave: opt.stop ? '퇴사 처리하고 정지했습니다' : '퇴사 처리했습니다', unstop: '정지를 풀었습니다', stop: '정지했습니다', sub: '서브 인원으로 처리했습니다', ownId: '본인 정산 아이디를 만들었습니다', ack: '이 달 경고에서 숨겼습니다' }[act]) + ' (다시 계산함)';
+        const msg = (r.done && r.done.length ? r.done.join(', ') + ' — ' : '') + ({ leave: opt.stop ? '퇴사 처리했습니다 (근무상태 퇴사)' : '퇴사 처리했습니다', unstop: '재직으로 바꿨습니다', stop: '휴직으로 바꿨습니다', sub: '서브 인원으로 처리했습니다', ownId: '본인 정산 아이디를 만들었습니다', ack: '이 달 경고에서 숨겼습니다' }[act]) + ' (다시 계산함)';
         toast(msg); STX.sum = null;
         loadSettle(STX.month, true).then(() => toast(msg));
       }).catch(() => {});
@@ -7209,6 +7286,10 @@
     const w = (STX.sum.warnings || []).find((x) => x.key === t.dataset.vw); if (!w || !w.acts) return;
     const cids = t.dataset.vi === 'all' ? w.acts.flatMap((a) => a.cids) : (w.acts[+t.dataset.vi] || {}).cids || [];
     if (!cids.length) return;
+    if (v === '__link') {
+      const nm = (prompt(cids.join(', ') + '\n어느 기사님 아이디인가요? (기사 이름)\n쿠팡플렉스 아이디가 비어 있으면 메인, 있으면 서브아이디로 넣습니다.') || '').trim(); if (!nm) return;
+      return api('adm_stlWarnAct', STX.month, 'link', [{ cids: cids }], { name: nm }).then((r) => { if (!r.ok) return toast(r.msg); toast((r.done || []).join(', ') + ' — 기사 정보관리에 연결했습니다 (다시 계산함)'); STX.sum = null; loadSettle(STX.month, true); }).catch(() => {});
+    }
     if (!confirm(cids.map((c) => c.replace(/@.*/, '')).join(', ') + '\n→ 용차업체 "' + v + '" 아이디로 지정할까요?\n(기사정보에는 등록하지 않고, 업체 정산서 1장으로 묶습니다)')) return;
     api('adm_stlSetVendor', cids, v).then((r) => {
       if (!r.ok) return toast(r.msg);

@@ -35,7 +35,7 @@ const STL_TABS = {
   // 용차업체: 업체가 등록한 쿠팡 아이디는 아이디 관리에서 명의자 대신 '용차업체'를 고르면 업체별 정산서 1장으로 묶인다 (기사정보 등록 없음)
   stl_vendors: {
     name: '업체명', price: '건당 단가', ins: '산재·고용 공제', bizNo: '사업자번호', ceo: '대표자', phone: '연락처', addr: '사업장 주소', bizType: '업태', bizItem: '종목',
-    bank: '은행', account: '계좌번호', holder: '예금주', email: '이메일', status: '상태', memo: '메모'
+    bank: '은행', account: '계좌번호', holder: '예금주', email: '이메일', status: '상태', memo: '메모', ids: '쿠팡 아이디'
   },
   // 한 아이디로 여러 기사가 일할 때: 그 기간 그 아이디로 일한 기사 (지급은 명의자, 일시단가·근무일 판단에 씀)
   stl_usage: { cid: '쿠팡ID', name: '일한 기사', driverId: '기사ID', from: '시작일', to: '종료일', memo: '메모', settle: '정산' },
@@ -156,7 +156,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zK';
+const STL_CALC_VER = '20261106a';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -709,8 +709,12 @@ function stlPerson_(D, name, id) {
  * stl_ids 가 비어 있으면 기사 정보(쿠팡플렉스 아이디)로 처음 한 번 채운다.
  */
 function stlIds_(D) {
-  let rows = stlRead_('stl_ids');
-  if (!rows.length && D.all.some(function (o) { return o.loginId; })) { stlSeedIds_(D); rows = stlRead_('stl_ids'); }
+  let rows;
+  if (stlIdsV2_()) rows = stlIdRows_(D); // 기사 정보관리 = 아이디의 기준 (아이디 관리 탭은 보기 전용)
+  else {
+    rows = stlRead_('stl_ids');
+    if (!rows.length && D.all.some(function (o) { return o.loginId; })) { stlSeedIds_(D); rows = stlRead_('stl_ids'); }
+  }
   const by = {}, groups = {};
   rows.forEach(function (r) {
     const k = stlLogin_(r.cid);
@@ -719,7 +723,7 @@ function stlIds_(D) {
     by[k] = {
       key: k, cid: r.cid, role: r.role === '서브' ? '서브' : '메인', mainRaw: r.main, ownerId: ownerId, ownerName: ownerId ? D.byId[ownerId].name : r.owner,
       type: STL_TYPES.indexOf(r.type) >= 0 ? r.type : '', mode: STL_MODES.indexOf(r.mode) >= 0 ? r.mode : '', insEx: stlYes_(r.insEx), fbCut: r.fbCut,
-      stopped: r.status === '정지' || r.status === '중지', _row: r._row, vendor: str_(r.vendor)
+      stopped: r.status === '정지' || r.status === '중지', stopFrom: str_(r.stopFrom), _row: r._row, vendor: str_(r.vendor), drvId: str_(r.drvId)
     };
   });
   const V = stlVendors_();
@@ -750,6 +754,262 @@ function stlIds_(D) {
   Object.keys(groups).forEach(function (k) { const g = groups[k]; g.cid = g.main.cid; g.ownerId = g.main.ownerId; g.vendor = g.main.vendor || ''; });
   return { by: by, groups: groups, badSub: bad, vendors: V };
 }
+// ───────────────────────── 아이디 = 기사 정보관리 (중간 방식) ─────────────────────────
+/** 기사 정보관리가 아이디의 기준인지 (한 번 옮긴 뒤부터) */
+function stlIdsV2_() { return str_(props_().STL_IDS_V2) === '1'; }
+/** 근무상태 → 아이디 정지 · 정지 시작일 (퇴사 = 퇴사일 다음 날부터, 휴직 = 바로) */
+function stlDrvStop_(o) {
+  if (o.workStatus === '퇴사') return { stopped: true, from: schLeaveFrom_(o) };
+  if (o.workStatus === '휴직') return { stopped: true, from: '' };
+  return { stopped: false, from: '' };
+}
+/**
+ * 기사 정보(쿠팡플렉스 아이디 · 서브아이디1·2 · 서브 단가 · 정산 설정) + 용차업체 아이디 → stl_ids 와 같은 모양의 줄
+ *  - 메인: 기사마다 쿠팡플렉스 아이디 (다른 기사의 서브아이디로 들어가 있으면 메인 아님)
+ *  - 서브: 서브아이디1·2 → 명의자 = 그 기사, 단가 = 서브 단가(비우면 메인과 같음)
+ *  - 용차업체: 용차업체 메뉴의 '쿠팡 아이디'
+ */
+function stlIdRows_(D) {
+  const rows = [], vrows = [], subOf = {}, used = {};
+  // 용차업체 아이디가 먼저 (기사 정보에 같은 아이디가 있어도 업체 정산)
+  stlVendors_().list.forEach(function (v) {
+    v.ids.forEach(function (c) {
+      const k = stlLogin_(c);
+      if (!k || used[k]) return;
+      used[k] = 1;
+      vrows.push({ cid: c, role: '메인', main: '', owner: '', ownerId: '', type: '외부용차', mode: '', insEx: '', fbCut: '', status: v.stopped ? '정지' : '사용', vendor: v.name });
+    });
+  });
+  D.all.forEach(function (o) { [o.subId1, o.subId2].forEach(function (s) { const k = stlLogin_(s); if (k && !subOf[k]) subOf[k] = o; }); });
+  const status = function (o) { const s = stlDrvStop_(o); return { status: s.stopped ? '정지' : '사용', stopFrom: s.stopped && s.from !== '0000-00-00' ? s.from : '' }; };
+  D.all.forEach(function (o) {
+    const k = stlLogin_(o.loginId);
+    if (!k || used[k] || (subOf[k] && subOf[k] !== o)) return;
+    used[k] = 1;
+    const st = status(o);
+    rows.push({ cid: str_(o.loginId), role: '메인', main: '', owner: o.name, ownerId: o.id, drvId: o.id, type: STL_TYPES.indexOf(o.driverType) >= 0 ? o.driverType : '',
+      mode: STL_MODES.indexOf(str_(o.stlMode)) >= 0 ? str_(o.stlMode) : '', insEx: stlYes_(o.insEx) ? 'Y' : '', fbCut: str_(o.fbCut), status: st.status, stopFrom: st.stopFrom, vendor: '' });
+  });
+  D.all.forEach(function (o) {
+    const mk = stlLogin_(o.loginId);
+    if (!mk || !used[mk]) return; // 메인 아이디가 없는 기사의 서브는 묶을 곳이 없음 (기사 정보에 쿠팡플렉스 아이디부터)
+    [['subId1', 'subType1'], ['subId2', 'subType2']].forEach(function (p) {
+      const k = stlLogin_(o[p[0]]);
+      if (!k || used[k]) return;
+      used[k] = 1;
+      const st = status(o), signed = D.byLogin[k];
+      rows.push({ cid: str_(o[p[0]]), role: '서브', main: str_(o.loginId), owner: o.name, ownerId: o.id, drvId: o.id, signedId: signed && signed.id !== o.id ? signed.id : '',
+        type: STL_TYPES.indexOf(str_(o[p[1]])) >= 0 ? str_(o[p[1]]) : '', mode: '', insEx: '', fbCut: '', status: st.status, stopFrom: st.stopFrom, vendor: '' });
+    });
+  });
+  return vrows.concat(rows);
+}
+/** 쿠팡 아이디 → { drv, slot: 'main' | 'subId1' | 'subId2' } (기사 정보에서) */
+function stlDriverOfCid_(D, cid) {
+  const k = stlLogin_(cid);
+  if (!k) return null;
+  for (let i = 0; i < D.all.length; i++) {
+    const o = D.all[i];
+    if (stlLogin_(o.subId1) === k) return { drv: o, slot: 'subId1' };
+    if (stlLogin_(o.subId2) === k) return { drv: o, slot: 'subId2' };
+  }
+  const m = D.all.filter(function (o) { return stlLogin_(o.loginId) === k; })[0];
+  return m ? { drv: m, slot: 'main' } : null;
+}
+/** 기사 정보 고치기 (기사 정보관리 한 명 수정과 같은 검사·연동) */
+function stlSetDrv_(a, o, changes) { return updateDriverCore_(a, o.id, changes); }
+/** 쿠팡 아이디를 기사에 붙인다: 쿠팡플렉스 아이디가 비었으면 메인, 아니면 빈 서브아이디 칸 */
+function stlLinkCid_(a, D0, o, cid) {
+  const D = stlDrivers_(), me = D.byId[o.id] || o;
+  cid = str_(cid).replace(/\s+/g, '');
+  if (!cid) fail_('쿠팡 아이디가 비었습니다.');
+  const h = stlDriverOfCid_(D, cid);
+  if (h && h.drv.id === me.id) return h.slot;
+  if (h && h.slot !== 'main') fail_(cid + ' 는 이미 ' + h.drv.name + ' 기사님의 서브아이디입니다.');
+  if (h && h.slot === 'main' && !(h.drv.status === ST.STOPPED && !me.loginId)) fail_(cid + ' 는 ' + h.drv.name + ' 기사님의 쿠팡플렉스 아이디입니다.');
+  const V = stlVendors_();
+  const hv = V.list.filter(function (v) { return v.ids.some(function (y) { return stlLogin_(y) === stlLogin_(cid); }); })[0];
+  if (hv) fail_(cid + ' 는 용차업체 ' + hv.name + ' 의 아이디입니다. 용차업체 메뉴에서 먼저 빼 주세요.');
+  if (!str_(me.loginId) && !h) { stlSetDrv_(a, me, { loginId: cid }); return 'main'; }
+  const slot = !str_(me.subId1) ? 'subId1' : !str_(me.subId2) ? 'subId2' : '';
+  if (!slot) fail_(me.name + ' 기사님의 서브아이디 칸(2개)이 다 찼습니다. 기사 정보관리에서 정리해 주세요.');
+  const ch = {}; ch[slot] = cid;
+  stlSetDrv_(a, me, ch);
+  return slot;
+}
+
+/** 처음 한 번: 예전 아이디 관리(stl_ids) → 기사 정보 · 용차업체로 옮기고, 열린 달 정산 금액이 같은지 대조 */
+function stlEnsureIdsV2_() {
+  if (stlIdsV2_()) return null;
+  if (!props_().STL_DB_ID || str_(props_().STL_IDS_V2) === '0') return null; // STL_IDS_V2 = 0 → 예전 방식(아이디 관리 탭) 그대로 (되돌리기용)
+  const lock = scriptLock_();
+  lock.waitLock(30000);
+  try {
+    const live = PropertiesService.getScriptProperties().getProperty('STL_IDS_V2');
+    if (str_(live) === '1' || str_(live) === '0') { props_().STL_IDS_V2 = str_(live); return null; }
+    return stlMigrateIdsV2_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+function stlMigrateIdsV2_() {
+  const months = stlMonths_().withData.filter(function (m) { return !stlClosedInfo_(m); }).slice(-3);
+  const snap = function (m) {
+    try {
+      const r = stlCompute_(m), by = {};
+      r.summary.drivers.forEach(function (d) { by[d.id] = { name: d.name, qty: d.qty, sales: d.sales, invoice: d.invoice, net: d.net }; });
+      return { by: by, tot: { qty: r.summary.total.qty, invoice: r.summary.total.invoice, net: r.summary.total.net, n: r.summary.drivers.length } };
+    } catch (e) { return { err: String(e && e.message || e) }; }
+  };
+  const before = {};
+  months.forEach(function (m) { before[m] = snap(m); });
+
+  const notes = [], D = stlDrivers_(), rows = stlRead_('stl_ids'), V = stlVendors_();
+  const set = {}, vIds = {}, taken = {};
+  const ch = function (o) { return set[o.id] || (set[o.id] = {}); };
+  const cur = function (o, k) { return set[o.id] && set[o.id][k] !== undefined ? set[o.id][k] : str_(o[k]); };
+  const nm = function (c) { return String(c).replace(/@.*$/, ''); };
+  // 예전 버전이 drivers 탭에 남긴 정산 열 값은 비운다 (기준은 아이디 관리였음)
+  D.all.forEach(function (o) { ['stlMode', 'insEx', 'fbCut', 'subType1', 'subType2'].forEach(function (k) { if (str_(o[k])) ch(o)[k] = ''; }); });
+  D.all.forEach(function (o) { [o.loginId, o.subId1, o.subId2].forEach(function (c) { const k = stlLogin_(c); if (k) taken[k] = taken[k] || o.id; }); });
+  const addSub = function (o, cid, type) {
+    const k = stlLogin_(cid);
+    if ([cur(o, 'loginId'), cur(o, 'subId1'), cur(o, 'subId2')].some(function (x) { return stlLogin_(x) === k; })) {
+      ['subId1', 'subId2'].forEach(function (s, i) { if (stlLogin_(cur(o, s)) === k && type && type !== cur(o, 'driverType')) ch(o)['subType' + (i + 1)] = type; });
+      return true;
+    }
+    if (taken[k] && taken[k] !== o.id && (stlLogin_(D.byId[taken[k]].subId1) === k || stlLogin_(D.byId[taken[k]].subId2) === k)) { notes.push(nm(cid) + ': 이미 ' + D.byId[taken[k]].name + ' 기사님의 서브아이디 → 그대로 둠'); return false; }
+    const slot = !cur(o, 'subId1') ? 'subId1' : !cur(o, 'subId2') ? 'subId2' : '';
+    if (!slot) { notes.push(nm(cid) + ': ' + o.name + ' 기사님 서브아이디 칸이 다 차서 못 옮김 → 기사 정보관리에서 정리'); return false; }
+    ch(o)[slot] = cid;
+    if (type && type !== cur(o, 'driverType')) ch(o)[slot === 'subId1' ? 'subType1' : 'subType2'] = type;
+    taken[k] = o.id;
+    return true;
+  };
+  const byK = {};
+  rows.forEach(function (r) { const k = stlLogin_(r.cid); if (k && !byK[k]) byK[k] = r; });
+  const mains = [], subs = [];
+  Object.keys(byK).forEach(function (k) {
+    const r = byK[k];
+    if (r.vendor) { (vIds[r.vendor] = vIds[r.vendor] || []).push(r.cid); return; }
+    const mk = stlLogin_(r.main);
+    if (r.role === '서브' && mk && mk !== k && byK[mk]) subs.push(r); else mains.push(r);
+  });
+  mains.forEach(function (r) {
+    const k = stlLogin_(r.cid), pid = stlPerson_(D, r.owner, r.ownerId), o = D.byId[pid];
+    if (!o) { notes.push(nm(r.cid) + ': 명의자 없는 아이디 → 뺌 (정산서에 나오면 [기사에 연결] · [용차업체로 지정])'); return; }
+    const mine = stlLogin_(cur(o, 'loginId'));
+    let asMain = false;
+    if (mine === k) asMain = true;
+    else if (!mine && !(taken[k] && taken[k] !== o.id)) { ch(o).loginId = r.cid; taken[k] = o.id; asMain = true; notes.push(o.name + ': 쿠팡플렉스 아이디 ' + nm(r.cid) + ' 채움'); }
+    if (asMain) {
+      if (STL_TYPES.indexOf(r.type) >= 0 && !str_(o.driverType)) ch(o).driverType = r.type;
+      if (STL_MODES.indexOf(r.mode) >= 0 && r.mode) ch(o).stlMode = r.mode;
+      if (stlYes_(r.insEx)) ch(o).insEx = 'Y';
+      if (str_(r.fbCut)) ch(o).fbCut = str_(r.fbCut);
+    } else {
+      if (addSub(o, r.cid, STL_TYPES.indexOf(r.type) >= 0 ? r.type : '')) notes.push(o.name + ': ' + nm(r.cid) + ' (두 번째 메인) → 서브아이디로');
+      if (r.mode || stlYes_(r.insEx) || str_(r.fbCut)) notes.push(nm(r.cid) + ': 정산 설정(' + [r.mode, stlYes_(r.insEx) ? '산재·고용 제외' : '', r.fbCut ? '프레시백 ' + r.fbCut : ''].filter(String).join(' · ') + ')은 메인 아이디 설정을 따름');
+    }
+    if (r.status === '정지' || r.status === '중지') {
+      if (!asMain) notes.push(nm(r.cid) + ': 정지였음 → 이제 메인 기사 근무상태를 따름');
+      else if (!str_(o.workStatus)) {
+        const ws = o.status === ST.STOPPED ? '퇴사' : '휴직';
+        ch(o).workStatus = ws;
+        notes.push(o.name + ': 아이디 정지 → 근무상태 ' + ws + (ws === '퇴사' ? ' (퇴사일은 기사 정보관리에서 넣어 주세요)' : ''));
+      }
+    }
+  });
+  subs.forEach(function (r) {
+    const mr = byK[stlLogin_(r.main)];
+    if (mr.vendor) { (vIds[mr.vendor] = vIds[mr.vendor] || []).push(r.cid); return; }
+    const mk = stlLogin_(r.main);
+    const owner = D.all.filter(function (o) { return stlLogin_(cur(o, 'loginId')) === mk; })[0] || D.byId[stlPerson_(D, mr.owner, mr.ownerId)];
+    if (!owner) { notes.push(nm(r.cid) + ': 메인 ' + nm(r.main) + ' 의 명의자가 없어 뺌'); return; }
+    if (stlLogin_(cur(owner, 'loginId')) !== mk) { notes.push(nm(r.cid) + ': 메인 ' + nm(r.main) + ' 가 ' + owner.name + ' 기사님의 쿠팡플렉스 아이디가 아니어서 뺌'); return; }
+    addSub(owner, r.cid, STL_TYPES.indexOf(r.type) >= 0 ? r.type : '');
+    const pid = stlPerson_(D, r.owner, r.ownerId);
+    if (pid && pid !== owner.id) notes.push(nm(r.cid) + ': 명의자가 ' + D.byId[pid].name + ' 였음 → ' + owner.name + ' 기사님 서브로 (다른 기사가 쓰면 아이디 사용 기록으로)');
+    if (r.status === '정지' || r.status === '중지') notes.push(nm(r.cid) + ': 정지였던 서브 → 이제 ' + owner.name + ' 기사님 근무상태를 따름');
+  });
+  // 쓰기: 기사 정보 · 용차업체
+  const now = nowText_();
+  Object.keys(set).forEach(function (id) {
+    const o = D.byId[id], f = set[id];
+    Object.keys(f).forEach(function (k) { if (str_(o[k]) === str_(f[k])) delete f[k]; });
+    if (!Object.keys(f).length) return;
+    f.updatedAt = now;
+    writeFields_(SH.DRIVERS, o._row, f);
+    forgetDriver_(o);
+  });
+  const vNames = Object.keys(vIds);
+  if (vNames.length) {
+    stlAddVendors_(vNames);
+    const V2 = stlVendors_();
+    vNames.forEach(function (n) {
+      const v = V2.by[stlVendorKey_(n)];
+      if (!v) return;
+      const ids = v.ids.slice();
+      vIds[n].forEach(function (c) { if (!ids.some(function (y) { return stlLogin_(y) === stlLogin_(c); })) ids.push(c); });
+      stlSetRow_('stl_vendors', v._row, { ids: ids.join(', ') });
+    });
+  }
+  PropertiesService.getScriptProperties().setProperty('STL_IDS_V2', '1');
+  props_().STL_IDS_V2 = '1';
+  stlBump_();
+
+  const diff = [];
+  months.forEach(function (m) {
+    const b = before[m], a = snap(m);
+    const row = { month: m, before: b.tot || null, after: a.tot || null, err: b.err || a.err || '', changed: [] };
+    if (b.by && a.by) {
+      Object.keys(b.by).concat(Object.keys(a.by)).filter(function (k, i, arr) { return arr.indexOf(k) === i; }).forEach(function (k) {
+        const x = b.by[k] || {}, y = a.by[k] || {};
+        if ((x.net || 0) !== (y.net || 0) || (x.invoice || 0) !== (y.invoice || 0)) row.changed.push({ id: k, name: y.name || x.name, before: x.net || 0, after: y.net || 0, qb: x.qty || 0, qa: y.qty || 0 });
+      });
+    }
+    diff.push(row);
+  });
+  const log = { at: now, notes: notes.slice(0, 60), diff: diff.map(function (d) { return Object.assign({}, d, { changed: d.changed.slice(0, 20) }); }) };
+  try { PropertiesService.getScriptProperties().setProperty('STL_IDS_V2_LOG', JSON.stringify(log).slice(0, 8500)); } catch (e) { console.error('옮김 기록 저장 실패: ' + e); }
+  try { logAdmin_({ name: '시스템' }, '아이디 관리 → 기사 정보관리 옮김', notes.length + '건', diff.map(function (d) { return d.month + ' 바뀐 정산서 ' + d.changed.length; }).join(', ')); } catch (e) { /* 무시 */ }
+  return log;
+}
+/** 정산관리 아이디 관리 (보기 전용): 기사 정보관리 · 용차업체에서 만든 줄 + 정산서에만 있는 아이디 + 옮김 기록 */
+function adm_stlIdsView(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    stlEnsureIdsV2_();
+    if (!stlIdsV2_()) return { ok: true, legacy: true }; // STL_IDS_V2 = 0 (되돌림) → 예전 아이디 관리 편집 표
+    const D = stlDrivers_(), rows = stlIdRows_(D), V = stlVendors_();
+    const by = {};
+    D.all.forEach(function (o) { by[o.id] = o; });
+    const out = rows.filter(function (r) { return !r.vendor; }).map(function (r) {
+      const o = by[r.drvId] || {}, mainType = STL_TYPES.indexOf(o.driverType) >= 0 ? o.driverType : '';
+      return { cid: r.cid, role: r.role, main: r.main, owner: r.owner, drvId: r.drvId, type: r.role === '서브' ? (r.type || mainType) : r.type, subDiff: r.role === '서브' && !!r.type && r.type !== mainType,
+        mode: r.role === '서브' ? str_(o.stlMode) : r.mode, insEx: r.role === '서브' ? (stlYes_(o.insEx) ? 'Y' : '') : r.insEx, fbCut: r.role === '서브' ? '' : r.fbCut,
+        status: r.status, workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', app: o.status || '', signed: r.signedId && by[r.signedId] ? by[r.signedId].name + (by[r.signedId].status === ST.STOPPED ? ' (가입 · 앱 정지)' : ' (가입)') : '' };
+    });
+    // 메인 아래 서브가 오게
+    const mains = out.filter(function (r) { return r.role === '메인'; }).sort(function (a, b) { return koCmp_(a.owner, b.owner); });
+    const list = [];
+    mains.forEach(function (m) { list.push(m); out.forEach(function (s) { if (s.role === '서브' && stlLogin_(s.main) === stlLogin_(m.cid)) list.push(s); }); });
+    const vendors = V.list.map(function (v) { return { name: v.name, ids: v.ids, stopped: v.stopped }; }).filter(function (v) { return v.ids.length; });
+    let unknown = [];
+    if (stlMonthOk_(month)) {
+      try {
+        const r = stlResult_(month, false), w = (r.summary.warnings || []).filter(function (x) { return x.key === 'unreg'; })[0];
+        if (w) unknown = w.items.map(function (t, i) { return { cid: w.acts && w.acts[i] ? w.acts[i].cids[0] : String(t).split(/\s/)[0], label: t }; });
+      } catch (e) { /* 무시 */ }
+    }
+    let log = null;
+    try { log = JSON.parse(PropertiesService.getScriptProperties().getProperty('STL_IDS_V2_LOG') || 'null'); } catch (e) { log = null; }
+    const vset = {}, clash = [];
+    V.list.forEach(function (v) { v.ids.forEach(function (c) { vset[stlLogin_(c)] = v.name; }); });
+    D.all.forEach(function (o) { [o.loginId, o.subId1, o.subId2].forEach(function (c) { const k = stlLogin_(c); if (k && vset[k]) clash.push({ drvId: o.id, name: o.name, cid: c, vendor: vset[k] }); }); });
+    return { ok: true, rows: list, vendors: vendors, unknown: unknown, log: log, clash: clash, types: STL_TYPES, drivers: D.all.filter(function (o) { return o.status !== ST.REJECTED; }).map(function (o) { return { id: o.id, name: o.name, loginId: o.loginId || '' }; }).sort(function (a, b) { return koCmp_(a.name, b.name); }) };
+  });
+}
 /** 용차업체 정산 묶음 키: 'v:업체명' (띄어쓰기 없이, 소문자) */
 function stlVendorKey_(name) { return 'v:' + str_(name).replace(/\s+/g, '').toLowerCase(); }
 /** 용차업체 목록 (stl_vendors) → { list, by: {묶음키: 업체} } */
@@ -762,7 +1022,8 @@ function stlVendors_() {
     if (by[k]) return;
     const v = {
       key: k, name: name, price: stlNum_(r.price), ins: !/^n/i.test(str_(r.ins)), bizNo: str_(r.bizNo), ceo: str_(r.ceo), phone: str_(r.phone),
-      bank: str_(r.bank), account: str_(r.account), holder: str_(r.holder), email: str_(r.email), addr: str_(r.addr), bizType: str_(r.bizType), bizItem: str_(r.bizItem), stopped: r.status === '정지' || r.status === '중지'
+      bank: str_(r.bank), account: str_(r.account), holder: str_(r.holder), email: str_(r.email), addr: str_(r.addr), bizType: str_(r.bizType), bizItem: str_(r.bizItem), stopped: r.status === '정지' || r.status === '중지',
+      ids: str_(r.ids).split(/[,\s]+/).map(function (x) { return x.trim(); }).filter(Boolean), _row: r._row
     };
     by[k] = v; list.push(v);
   });
@@ -1028,7 +1289,7 @@ function stlCompute_(month) {
     const idx = X.by[login];
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.sales += sales; u.qty += qty; company.unregSales += sales; return; }
     // 정지된 아이디: 서브로 등록된 아이디(메인 정산에 합산)는 따로, 메인(실제 정지)은 그대로
-    if (idx.stopped) { if (idx.role === '서브' && idx.mainKey && idx.mainKey !== idx.key) warn.stoppedSub[r.cid] = idx.mainKey; else warn.stopped[r.cid] = idx.mainKey; }
+    if (idx.stopped && (!idx.stopFrom || r.date >= idx.stopFrom)) { if (idx.role === '서브' && idx.mainKey && idx.mainKey !== idx.key) warn.stoppedSub[r.cid] = idx.mainKey; else warn.stopped[r.cid] = idx.mainKey; }
     const worker = stlWorkerOf_(ctx, login, r.date);
     // 아이디 사용 기록: 그 날 다른 기사가 이 아이디로 일했으면 그 줄은 일한 기사 본인 정산으로 (단가도 그 기사 아이디 기준)
     const mv = stlMoveOf_(ctx, idx, worker, r, warn);
@@ -1394,7 +1655,7 @@ function stlCompute_(month) {
   W('yongNoP5', '외부단가 없음 (용차업체·외부 수행 노선의 노선관리 외부단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP5, 'warn');
   W('advPrepaid', '이번 정산에 상계할 가불금인데 상환금이 이미 적혀 있어 자동 공제 안 됨 (아직 안 받은 돈이면 가불금 목록에서 상환금을 지우거나 받은 만큼만 남겨 주세요)', advPrepaid, 'warn');
   W('advManual', '수기 가불금 상환 있음 · 자동 공제 건너뜀 (마감하면 가불금 목록 상환금에 기록)', advManualWarn, 'info');
-  W('unreg', '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
+  W('unreg', stlIdsV2_() ? '기사 정보관리에 없는 쿠팡 ID (지급 계산 안 됨 — [기사에 연결] 또는 [용차업체로 지정])' : '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
     Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return cidNm(u.cid) + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad',
     Object.keys(warn.unreg).map(function (k) { return { cids: [warn.unreg[k].cid] }; }));
   const noOwn = drivers.filter(function (d) { return !d.ownerId && !d.vendor; });
@@ -1438,7 +1699,7 @@ function stlCompute_(month) {
   W('idle', '사용 중인 아이디인데 10일 이상 배송 없음 (퇴사·휴직이면 [정지] · 퇴사면 [퇴사 처리])', idle.map(function (x) {
     const lm = leaveOf[X.by[x.k].mainKey];
     return cidNm(x.cid) + ' · ' + (x.last ? '마지막 배송 ' + Number(x.last.slice(5, 7)) + '/' + Number(x.last.slice(8, 10)) + ' (' + x.gap + '일 전)' : '이번 정산기간 배송 없음') + (lm ? ' ✓ ' + Number(lm.slice(5)) + '월 퇴사 등록됨' : '');
-  }), 'info', idle.map(function (x) { return { kind: 'idle', key: x.k, cid: x.cid, label: cidNm(x.cid), name: ownerNm(X.by[x.k].mainKey), leave: !!leaveOf[X.by[x.k].mainKey] }; }));
+  }), 'info', idle.map(function (x) { return { kind: 'idle', key: x.k, cid: x.cid, last: x.last, label: cidNm(x.cid), name: ownerNm(X.by[x.k].mainKey), leave: !!leaveOf[X.by[x.k].mainKey] }; }));
   W('stoppedSub', '정지 상태인 서브 아이디에 배송 기록 (메인 아이디 정산에 합산됨 · 확인만)', Object.keys(warn.stoppedSub).map(function (c) {
     const g = X.groups[warn.stoppedSub[c]];
     return cidNm(c) + ' → 메인 ' + (g ? String(g.cid).replace(/@.*$/, '') + (g.ownerId && D.byId[g.ownerId] ? ' (' + D.byId[g.ownerId].name + ')' : '') : '');
@@ -1789,6 +2050,7 @@ function stlAssertOpen_(month) {
 function adm_stlMonth(token, month, fresh) {
   return run_(function () {
     requireAdmin_(token);
+    stlEnsureIdsV2_(); // 처음 한 번: 아이디 관리 → 기사 정보관리
     const months = stlMonths_();
     if (!stlMonthOk_(month)) month = months.withData.length ? months.withData[months.withData.length - 1] : stlAddMonth_(stlMonthNow_(), -1);
     const r = stlResult_(month, !!fresh);
@@ -2243,7 +2505,7 @@ function adm_stlImport(token, p) {
         const d = D.byLogin[k];
         addIds.push({ cid: o.cid, role: '메인', owner: d ? d.name : '', ownerId: d ? d.id : '', type: d && STL_TYPES.indexOf(d.driverType) >= 0 ? d.driverType : '', status: '사용', memo: month + ' 정산서에서 자동 추가' });
       });
-      if (addIds.length) stlAppend_('stl_ids', addIds);
+      if (addIds.length && !stlIdsV2_()) stlAppend_('stl_ids', addIds); // 기사 정보 기준이 된 뒤에는 모르는 아이디는 '등록 안 된 아이디' 경고로
       stlAppend_('stl_rounds', hist);
       stlBump_();
       const changed = hist.filter(function (h) { return h.diff; }).length;
@@ -2407,7 +2669,7 @@ function fmtAccount_(d, bank) {
 const STL_EDIT = {
   ids: { sheet: 'stl_ids', scope: 'all', cols: [['owner', '명의자 (정산금 받는 기사)', 'person', 'ownerId'], ['vendor', '용차업체 (명의자 대신)', 'vendor'], ['cid', '쿠팡ID', 'cid'], ['role', '구분', STL_ROLES], ['main', '메인 아이디 (서브일 때)', 'text'],
     ['type', '단가 구분', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=구분별 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
-  vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['price', '지급 단가 (러너 → 업체 · VAT포함 · 비우면 외부단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'], ['addr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'],
+  vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['ids', '쿠팡 아이디 (쉼표로 여러 개)', 'text'], ['price', '지급 단가 (러너 → 업체 · VAT포함 · 비우면 외부단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'], ['addr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'],
     ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['holder', '예금주', 'text'], ['email', '이메일 (계산서)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text'], ['settle', '정산 (비우면 일한 기사 본인 정산 · 명의자 = 서브 인원)', ['', '명의자']]] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
@@ -2470,6 +2732,7 @@ function stlRowsHash_(rows, cols) {
 function adm_stlTable(token, name, month) {
   return run_(function () {
     requireAdmin_(token);
+    stlEnsureIdsV2_(); // 처음 한 번: 아이디 관리 → 기사 정보관리
     return stlTableView_(name, month);
   });
 }
@@ -2557,6 +2820,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     const a = requireAdmin_(token);
     const E = STL_EDIT[name];
     if (!E) fail_('알 수 없는 표입니다.');
+    if (name === 'ids' && stlIdsV2_()) fail_('아이디는 기사 정보관리(쿠팡 아이디 · 서브아이디)와 용차업체 메뉴에서 고칩니다.');
     if (E.scope !== 'all' && !stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     if (!Array.isArray(rows) || rows.length > 3000) fail_('줄이 너무 많습니다.');
     const D = stlDrivers_(), X = stlIds_(D);
@@ -2701,6 +2965,17 @@ function adm_stlTableSave(token, name, month, rows, seen) {
         const keep = E.scope === 'all' ? [] : all.filter(function (r) { return E.scope === 'month' ? r.month !== month : stlMonthOfDate_(r.date) !== month; });
         out = keep.concat(clean);
       }
+      if (name === 'vendors' && stlIdsV2_()) { // 업체 아이디가 기사 아이디와 겹치면 막는다
+        const Dv = stlDrivers_(), seenV = {};
+        clean.forEach(function (o) {
+          str_(o.ids).split(/[,\s]+/).filter(Boolean).forEach(function (c) {
+            const h = stlDriverOfCid_(Dv, c), k = stlLogin_(c);
+            if (h) fail_(c + ' 는 ' + h.drv.name + ' 기사님 아이디입니다 (' + o.name + '). 기사 정보관리에서 먼저 빼 주세요.');
+            if (seenV[k]) fail_(c + ' 가 ' + seenV[k] + ' 와 ' + o.name + ' 에 같이 있습니다.');
+            seenV[k] = o.name;
+          });
+        });
+      }
       stlWriteAll_(E.sheet, out);
       if (name === 'ids') stlAddVendors_(clean.map(function (o) { return o.vendor; }));
       if (!STL_NO_RECALC[E.sheet]) stlBump_();
@@ -2791,6 +3066,7 @@ function stlNewExec_() {
  * 아이디의 단가 구분이 예전 기사구분과 같았거나 비어 있을 때만 (따로 정해 둔 값은 그대로).
  */
 function stlSyncIdType_(driverId, loginId, oldType, newType) {
+  if (stlIdsV2_()) { try { stlBump_(); } catch (e) { /* 무시 */ } return 0; }
   try {
     if (!loginId || STL_TYPES.indexOf(newType) < 0 || !props_().STL_DB_ID) return 0;
     const k = stlLogin_(loginId);
@@ -2814,6 +3090,7 @@ function stlSyncIdType_(driverId, loginId, oldType, newType) {
 function stlEnsureIdFor_(o) {
   try {
     if (!o || !o.id || !props_().STL_DB_ID) return;
+    if (stlIdsV2_()) { stlBump_(); return; } // 기사 정보가 기준: 따로 맞출 것 없음
     const rows = stlRead_('stl_ids');
     const k = o.loginId ? stlLogin_(o.loginId) : '';
     let hit = null;
@@ -2899,6 +3176,7 @@ function stlAddVendors_(names) {
 function adm_stlSetVendor(token, cids, vendor) {
   return run_(function () {
     const a = requireAdmin_(token);
+    stlEnsureIdsV2_(); // 처음 한 번: 아이디 관리 → 기사 정보관리
     vendor = str_(vendor).slice(0, 60);
     if (!vendor) fail_('업체명을 넣어 주세요.');
     if (!Array.isArray(cids) || !cids.length || cids.length > 200) fail_('아이디를 골라 주세요.');
@@ -2906,6 +3184,20 @@ function adm_stlSetVendor(token, cids, vendor) {
     lock.waitLock(30000);
     let n = 0, added = 0, vAdd = 0;
     try {
+      if (stlIdsV2_()) {
+        const D = stlDrivers_();
+        cids = cids.map(function (c) { return str_(c).replace(/\s+/g, ''); }).filter(Boolean);
+        cids.forEach(function (c) { const h = stlDriverOfCid_(D, c); if (h) fail_(c + ' 는 ' + h.drv.name + ' 기사님의 ' + (h.slot === 'main' ? '쿠팡 아이디' : '서브아이디') + '입니다. 기사 정보관리에서 먼저 빼 주세요.'); });
+        vAdd = stlAddVendors_([vendor]);
+        const V = stlVendors_(), v = V.by[stlVendorKey_(vendor)];
+        V.list.forEach(function (x) { if (x !== v && x.ids.some(function (y) { return cids.some(function (c) { return stlLogin_(c) === stlLogin_(y); }); })) stlSetRow_('stl_vendors', x._row, { ids: x.ids.filter(function (y) { return !cids.some(function (c) { return stlLogin_(c) === stlLogin_(y); }); }).join(', ') }); });
+        const ids = v.ids.slice();
+        cids.forEach(function (c) { if (!ids.some(function (y) { return stlLogin_(y) === stlLogin_(c); })) { ids.push(c); added++; } else n++; });
+        stlSetRow_('stl_vendors', v._row, { ids: ids.join(', ') });
+        stlBump_();
+        logAdmin_(a, '용차업체 아이디 지정', vendor, cids.join(', '));
+        return { ok: true, changed: n, added: added, vendorAdded: vAdd };
+      }
       const rows = stlRead_('stl_ids'), by = {};
       rows.forEach(function (r) { by[stlLogin_(r.cid)] = r; });
       const app = [];
@@ -2940,8 +3232,9 @@ function adm_stlSetVendor(token, cids, vendor) {
 function adm_stlWarnAct(token, month, act, list, opt) {
   return run_(function () {
     const a = requireAdmin_(token);
+    stlEnsureIdsV2_(); // 처음 한 번: 아이디 관리 → 기사 정보관리
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
-    if (['leave', 'unstop', 'stop', 'sub', 'ownId', 'ack'].indexOf(act) < 0) fail_('알 수 없는 처리입니다.');
+    if (['leave', 'unstop', 'stop', 'sub', 'ownId', 'ack', 'link'].indexOf(act) < 0) fail_('알 수 없는 처리입니다.');
     if (!Array.isArray(list) || !list.length || list.length > 100) fail_('대상을 골라 주세요.');
     opt = opt || {};
     const D = stlDrivers_(), X = stlIds_(D);
@@ -2963,10 +3256,19 @@ function adm_stlWarnAct(token, month, act, list, opt) {
           else stlAppend_('stl_leave', [{ name: nm, acct: String(g.cid).replace(/@.*$/, ''), month: month, amt: amt ? String(amt) : '', memo: '' }]);
           done.push(nm);
         });
-        if (opt.stop) { // 퇴사 처리하면서 아이디도 정지
+        if (opt.stop && stlIdsV2_()) { // 퇴사 처리: 기사 근무상태 = 퇴사 (퇴사일 = 마지막 배송일, 없으면 정산기간 끝)
+          const P = stlPeriod_(month);
+          list.forEach(function (x) { const h = stlDriverOfCid_(D, x.cid); if (h && h.slot === 'main') stlSetDrv_(a, h.drv, { workStatus: '퇴사', leaveDate: str_(x.last) || P.to }); });
+        } else if (opt.stop) { // 퇴사 처리하면서 아이디도 정지
           const ids = stlRead_('stl_ids');
           list.forEach(function (x) { const r = ids.filter(function (r) { return stlLogin_(r.cid) === stlLogin_(x.cid); })[0]; if (r && r.status !== '정지') stlSetRow_('stl_ids', r._row, { status: '정지' }); });
         }
+      } else if ((act === 'stop' || act === 'unstop') && stlIdsV2_()) { // 정지 = 기사 근무상태 휴직 · 정지 풀기 = 재직
+        list.forEach(function (x) {
+          const h = stlDriverOfCid_(D, x.cid); if (!h || h.slot !== 'main') return;
+          if (act === 'stop' && !h.drv.workStatus) { stlSetDrv_(a, h.drv, { workStatus: '휴직' }); done.push(h.drv.name); }
+          if (act === 'unstop' && h.drv.workStatus) { stlSetDrv_(a, h.drv, { workStatus: '', leaveDate: '' }); done.push(h.drv.name); }
+        });
       } else if (act === 'stop') {
         const rows = stlRead_('stl_ids');
         list.forEach(function (x) {
@@ -2988,12 +3290,17 @@ function adm_stlWarnAct(token, month, act, list, opt) {
             if (str_(r.settle) !== '명의자') { stlSetRow_('stl_usage', r._row, { settle: '명의자' }); done.push(r.name + ' · ' + String(r.cid).replace(/@.*$/, '')); }
           });
         });
+      } else if (act === 'link') { // 등록 안 된 쿠팡 아이디 → 기사에 연결 (쿠팡 아이디가 없으면 메인, 있으면 서브)
+        const o = D.byId[stlPerson_(D, opt.name, opt.driverId)];
+        if (!o) fail_('기사 정보관리에서 "' + str_(opt.name) + '" 기사를 찾을 수 없습니다.');
+        list.forEach(function (x) { (x.cids || [x.cid]).forEach(function (c) { stlLinkCid_(a, D, o, c); done.push(o.name + ' ← ' + c); }); });
       } else if (act === 'ownId') {
         if (list.length !== 1) fail_('본인 정산 아이디는 한 명씩 만들어 주세요.');
         const o = D.byId[list[0].worker];
         if (!o) fail_('기사 정보에서 그 기사를 찾을 수 없습니다.');
         const cid = str_(opt.cid || o.loginId).replace(/\s+/g, '').replace(/@.*$/, '');
         if (!cid) fail_(o.name + ' 기사님의 쿠팡 ID 를 넣어 주세요.');
+        if (stlIdsV2_()) { stlLinkCid_(a, D, o, cid); done.push(o.name + ' · ' + cid); stlBump_(); return { ok: true, done: done }; }
         const rows = stlRead_('stl_ids'), hit = rows.filter(function (r) { return stlLogin_(r.cid) === stlLogin_(cid); })[0];
         if (hit) {
           const pid = hit.ownerId || stlPerson_(D, hit.owner, '');

@@ -47,6 +47,7 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
   id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
+  subType1: '서브아이디1 단가', subType2: '서브아이디2 단가', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
   driverType: '기사구분', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
@@ -69,7 +70,8 @@ const D = {
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
-  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2'];
+  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut'];
 // 기사구분 = 단가 코드 (고정/백업/품앗이/외부용차 → 노선관리 기사단가/백업단가/품앗이단가/외부단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -99,8 +101,13 @@ const D_NOTES = {
   schCamp: '스케줄에서 이 기사가 속한 캠프. camps 탭의 캠프명과 같게 쓰면 소속캠프ID가 자동으로 채워집니다.',
   baseRoute: '평소 맡는 노선. 예: 527B, 530AB (F3), 404D,405AB. 백업 기사는 백업, 용차는 용차',
   fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
-  subId1: '이 기사가 쓰는 다른 쿠팡플렉스 아이디 (서브). 넣으면 그 아이디로 가입한 기사는 앱 사용만 정지되고, 정산관리 아이디 관리에 서브로 연결됩니다',
+  subId1: '이 기사가 쓰는 다른 쿠팡플렉스 아이디 (서브). 넣으면 그 아이디로 뛴 건은 이 기사 정산서로 합쳐지고, 그 아이디로 가입한 기사는 앱 사용만 정지됩니다',
   subId2: '두 번째 서브아이디',
+  subType1: '서브아이디1로 뛴 건의 기사단가 (고정/백업/품앗이/외부용차). 비우면 메인과 같음',
+  subType2: '서브아이디2로 뛴 건의 기사단가. 비우면 메인과 같음',
+  stlMode: '정산 방식: 빈칸(기본) / 원청단가 / 용차내역',
+  insEx: '산재·고용보험 공제 제외면 Y',
+  fbCut: '프레시백 차감: 13% 같은 비율 또는 금액 (비우면 차감 없음)',
   workStatus: '재직(빈칸) / 휴직 / 퇴사. 기사 앱 사용(상태 칸)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐',
   leaveDate: '마지막 근무일 (yyyy-mm-dd). 근무상태가 퇴사일 때만 씀',
   backupArea: '백업으로 들어갈 수 있는 곳. 전지역 또는 캠프 이름(예: 강서1,수원1). 기사스케줄 백업 추천에 사용',
@@ -145,7 +152,7 @@ const M = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전해서 자동으로 추가하는 열 (시트별)
 const AUTO_ADD_COLS = { work_memo: ['cat'] };
 // 예전 버전이 쓰던 머리글 (지금은 정산 DB 로 옮겨짐). 남아 있어도 '이름 바뀐 머리글'로 보지 않는다
-const LEGACY_HEADS = { drivers: ['정산 대상 기사ID', '정산 방식', '산재·고용 제외', '프레시백 차감', '기사 일시단가', '기사 일시단가 노선', '기사 일시단가 시작일', '기사 일시단가 종료일'] };
+const LEGACY_HEADS = { drivers: ['정산 대상 기사ID', '기사 일시단가', '기사 일시단가 노선', '기사 일시단가 시작일', '기사 일시단가 종료일'] };
 const M_NOTES = {
   date: '2026-11-03 형식. 2026.11.3, 2026/11/3 처럼 입력해도 자동으로 맞춰집니다.',
   time: '선택. 09:30 형식 (24시간)',
@@ -1628,7 +1635,8 @@ const D_EDIT_LABEL = {
   maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
   schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
-  schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2'
+  schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
+  subType1: '서브아이디1 단가', subType2: '서브아이디2 단가', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
 
@@ -1641,7 +1649,7 @@ function docsOf_(o) {
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
-    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', subId1: o.subId1 || '', subId2: o.subId2 || '', schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
+    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', subId1: o.subId1 || '', subId2: o.subId2 || '', subType1: o.subType1 || '', subType2: o.subType2 || '', stlMode: o.stlMode || '', insEx: o.insEx || '', fbCut: o.fbCut === undefined ? '' : String(o.fbCut), schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
@@ -1665,6 +1673,7 @@ function detailOf_(o) {
 function adm_listDrivers(token) {
   return run_(function () {
     const a = requireAdmin_(token);
+    if (typeof stlEnsureIdsV2_ === 'function') { try { stlEnsureIdsV2_(); } catch (e) { console.error('아이디 옮김 실패: ' + (e && e.message)); } }
     try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); } // 적용일이 된 노선 변경을 먼저
     const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS), last = sh.getLastRow();
     let rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
@@ -1839,6 +1848,7 @@ function updateDriverCore_(a, id, changes, seenRev) {
   const fresh = readObj_(SH.DRIVERS, o._row);
   if (typeof stlEnsureIdFor_ === 'function' && (f.loginId !== undefined || f.name !== undefined)) stlEnsureIdFor_(fresh); // 아이디 관리 연동
   const subMsg = (f.subId1 !== undefined || f.subId2 !== undefined || f.loginId !== undefined) ? drvLinkSubs_(a, fresh, [o.subId1, o.subId2]) : [];
+  if (typeof stlBump_ === 'function' && props_().STL_DB_ID) { try { stlBump_(); } catch (e) { /* 무시 */ } } // 정산 아이디 = 기사 정보 → 다시 계산
   return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, o._row)), subMsg: subMsg };
 }
 /**
@@ -1978,6 +1988,21 @@ function driverFields_(changes, o) {
         f[k] = sid;
         break;
       }
+      case 'subType1': case 'subType2': {
+        const t = str_(v) ? normDriverType_(v) : '';
+        if (t === null) fail_('서브아이디 단가는 ' + DTYPES.join(' / ') + ' 중에서 골라 주세요 (비우면 메인과 같음).');
+        f[k] = t; break;
+      }
+      case 'stlMode':
+        f.stlMode = str_(v) === '기본' ? '' : str_(v);
+        if (['', '원청단가', '용차내역'].indexOf(f.stlMode) < 0) fail_('정산 방식은 기본 / 원청단가 / 용차내역 중에서 골라 주세요.');
+        break;
+      case 'insEx': f.insEx = /^(y|yes|o|예|제외|true|1)$/i.test(str_(v)) ? 'Y' : ''; break;
+      case 'fbCut': {
+        const t = str_(v).replace(/[,\s원]/g, '');
+        if (t && !/^(\d{1,7}|\d{1,2}(\.\d+)?%|0?\.\d+)$/.test(t)) fail_('프레시백 차감은 13% 같은 비율이나 금액으로 써 주세요 (비우면 차감 없음).');
+        f.fbCut = t; break;
+      }
       case 'workStatus':
         f.workStatus = str_(v);
         if (f.workStatus && WSTAT.indexOf(f.workStatus) < 0) fail_('근무상태는 ' + WSTAT.join(' / ') + ' 중에서 골라 주세요.');
@@ -2082,6 +2107,7 @@ function adm_deleteDriver(token, id, confirmName) {
       if (str_(confirmName).replace(/\s+/g, '') !== str_(o.name).replace(/\s+/g, '')) fail_('입력한 이름이 기사 이름과 다릅니다. 삭제하지 않았습니다.');
       sheet_(SH.DRIVERS).deleteRow(o._row);
       forgetDriver_(o);
+      if (typeof stlBump_ === 'function' && props_().STL_DB_ID) { try { stlBump_(); } catch (e) { /* 무시 */ } }
       // 이 기사의 로그인 기록 지우기
       const ss = readAll_(SH.SESSIONS).filter(function (x) { return x.driverId === o.id; });
       delRows_(sheet_(SH.SESSIONS), ss.map(function (x) { return x._row; }));
@@ -2136,6 +2162,7 @@ function adm_deleteDrivers(token, ids, confirm) {
       hit = readAll_(SH.DRIVERS).filter(function (o) { return o.id && want[o.id]; });
       delRows_(sheet_(SH.DRIVERS), hit.map(function (o) { return o._row; }));
       hit.forEach(forgetDriver_);
+      if (typeof stlBump_ === 'function' && props_().STL_DB_ID) { try { stlBump_(); } catch (e) { /* 무시 */ } }
       const gone = {};
       hit.forEach(function (o) { gone[o.id] = 1; });
       const ss = readAll_(SH.SESSIONS).filter(function (x) { return gone[x.driverId]; });
@@ -5253,7 +5280,7 @@ function drvLinkSubs_(a, o, before) {
         msg.push(d.name + '(' + sid + ') 기사 앱 사용을 정지했습니다 (서브아이디)');
       }
     });
-    if (typeof stlRead_ === 'function' && props_().STL_DB_ID && o.loginId) {
+    if (typeof stlRead_ === 'function' && props_().STL_DB_ID && o.loginId && !stlIdsV2_()) {
       const rows = stlRead_('stl_ids');
       let bump = false;
       subs.forEach(function (sid) {
@@ -5605,7 +5632,7 @@ function schCheckIds_(res) {
     const id = String(r[4] || ''), k = stlLogin_(id);
     if (!k) return;
     const x = X.by[k];
-    const why = !x ? '미등록' : x.stopped ? '정지' : '';
+    const why = !x ? '미등록' : x.stopped && (!x.stopFrom || String(r[0]) >= x.stopFrom) ? '정지' : '';
     if (!why) return;
     const g = seen[k] || (seen[k] = { id: id, why: why, camps: {}, dates: {}, name: r[10] || (x ? x.ownerName : '') });
     g.dates[r[0]] = 1; if (r[2]) g.camps[r[2]] = 1;
