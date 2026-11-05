@@ -2,6 +2,15 @@
 <html lang="ko">
 <head>
 <base target="_top">
+<script>
+  // 휴대폰 화면(html.m) / PC 화면: 휴대폰·태블릿(손가락 터치 + 작은 화면)만 휴대폰 화면. PC 는 창을 줄여도 PC 화면.
+  // 아래 [PC 화면 / 휴대폰 화면] 으로 바꾸면 이 기기에 기억 (runner.ui = pc | m)
+  (function () {
+    var o = null; try { o = localStorage.getItem('runner.ui'); } catch (e) {}
+    var touch = window.matchMedia && matchMedia('(pointer: coarse)').matches, small = Math.min(screen.width, screen.height) <= 820;
+    if (o === 'm' || (o !== 'pc' && touch && small)) document.documentElement.classList.add('m');
+  })();
+</script>
 <meta charset="utf-8">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
@@ -141,26 +150,27 @@
   .tk-row label { flex: 1; display: flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   table.tk th.tsrt { cursor: pointer; user-select: none; } table.tk th.tsrt:hover { color: var(--brand); }
   .tk-card-b { display: none; }
-  @media (max-width: 640px) {
-    .tk-card-b { display: inline-block; } .tk-card-b.hidden { display: none; }
-    .tkbar .tk-q { flex: 1 1 100%; width: 100%; order: -1; }
-    .table-wrap.tk-cardwrap { max-height: none; overflow: visible; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
-    table.tk-card, table.tk-card > tbody { display: block; width: 100%; min-width: 0 !important; }
-    table.tk-card > thead { display: none; }
-    table.tk-card > tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
-    table.tk-card > tbody > tr.tk-1 { display: block; text-align: center; }
-    table.tk-card > tbody > tr > td { display: block; border: 0 !important; padding: 0 !important; min-width: 0; max-width: none; position: static !important; box-shadow: none !important; background: none !important; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; text-align: left !important; font-size: 13.5px; }
-    table.tk-card > tbody > tr > td::before { content: attr(data-l); display: block; font-size: 11px; font-weight: 600; color: var(--faint); margin-bottom: 1px; }
-    table.tk-card > tbody > tr > td.tk-t { grid-column: 1 / -1; font-size: 16px; font-weight: 700; padding-right: 34px !important; }
-    table.tk-card > tbody > tr > td.tk-t::before, table.tk-card > tbody > tr > td.tk-k::before, table.tk-card > tbody > tr.tk-1 > td::before { display: none; }
-    table.tk-card > tbody > tr > td.tk-k { position: absolute !important; right: 12px; top: 12px; }
-    table.tk-card > tbody > tr > td.tk-k input { width: 22px; height: 22px; }
-    table.tk-card > tbody > tr > td.tk-e { display: none; }
-    table.tk-card > tbody > tr > td .inp, table.tk-card > tbody > tr > td select, table.tk-card > tbody > tr > td input:not([type=checkbox]) { width: 100% !important; min-width: 0 !important; }
-    table.tk-card > tbody > tr.tot, table.tk-card > tbody > tr.tot td { background: #f5f8ff !important; }
-    table.tk-card > tbody > tr.sel { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); }
-    table.tk-card > tbody > tr:hover > td { background: none !important; }
-  }
+  /* 휴대폰 화면(html.m)만 — PC 는 창을 줄여도 표 그대로 */
+  html.m .tk-card-b { display: inline-block; } html.m .tk-card-b.hidden { display: none; }
+  html.m .tkbar .tk-q { flex: 1 1 100%; width: 100%; order: -1; }
+  html.m .table-wrap.tk-cardwrap { max-height: none; overflow: visible; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
+  html.m table.tk-card, html.m table.tk-card > tbody { display: block; width: 100%; min-width: 0 !important; }
+  html.m table.tk-card > thead { display: none; }
+  html.m table.tk-card > tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  html.m table.tk-card > tbody > tr.tk-1 { display: block; text-align: center; }
+  html.m table.tk-card > tbody > tr > td { display: block; border: 0 !important; padding: 0 !important; min-width: 0; max-width: none; position: static !important; box-shadow: none !important; background: none !important; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; text-align: left !important; font-size: 13.5px; }
+  html.m table.tk-card > tbody > tr > td::before { content: attr(data-l); display: block; font-size: 11px; font-weight: 600; color: var(--faint); margin-bottom: 1px; }
+  html.m table.tk-card > tbody > tr > td.tk-t { grid-column: 1 / -1; font-size: 16px; font-weight: 700; padding-right: 34px !important; }
+  html.m table.tk-card > tbody > tr > td.tk-t::before, html.m table.tk-card > tbody > tr > td.tk-k::before, html.m table.tk-card > tbody > tr.tk-1 > td::before { display: none; }
+  html.m table.tk-card > tbody > tr > td.tk-k { position: absolute !important; right: 12px; top: 12px; }
+  html.m table.tk-card > tbody > tr > td.tk-k input { width: 22px; height: 22px; }
+  html.m table.tk-card > tbody > tr > td.tk-e { display: none; }
+  html.m table.tk-card > tbody > tr > td .inp, html.m table.tk-card > tbody > tr > td select, html.m table.tk-card > tbody > tr > td input:not([type=checkbox]) { width: 100% !important; min-width: 0 !important; }
+  html.m table.tk-card > tbody > tr.tot, html.m table.tk-card > tbody > tr.tot td { background: #f5f8ff !important; }
+  html.m table.tk-card > tbody > tr.sel { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); }
+  html.m table.tk-card > tbody > tr:hover > td { background: none !important; }
+  
+
   table.tk-stick thead th:first-child { left: 0; z-index: 3; }
   table.tk-stick tbody td:first-child { position: sticky; left: 0; z-index: 1; background: #fff; box-shadow: 1px 0 0 var(--line); }
   table.tk-stick tbody tr:hover td:first-child { background: #f9fafb; } table.tk-stick tbody tr.sel td:first-child { background: var(--brand-weak); }
@@ -405,25 +415,24 @@
   .st-card .kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 8px; font-size: 12px; color: var(--sub); } .st-card .kv em { display: block; font-style: normal; color: var(--ink); font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
   .st-card .tags { display: flex; flex-wrap: wrap; gap: 4px; font-size: 11.5px; } .st-card .tags span { background: #f2f4f6; border-radius: 6px; padding: 2px 7px; color: var(--sub); } .st-card .tags .ok { background: #e7f6ee; color: var(--ok); font-weight: 700; } .st-card .tags .bad { background: #fdecec; color: var(--danger); font-weight: 700; }
   .st-card.tot { background: #f5f8ff; border-color: #c9dafc; cursor: default; }
-  @media screen and (max-width: 640px) {
-    #stTable { display: none; }
-    .st-cards { display: grid; gap: 8px; padding: 8px 0; }
-    .kpi em { font-size: 11px; }
-    #stSlipModal { padding: 0; } #stSlipBox.m-box { width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
-    #stSlipBox .m-top { flex-wrap: wrap; gap: 6px; padding: 10px 12px; } #stSlipBox .m-top #stSlipTitle { width: 100%; font-size: 15px; }
-    .slip { padding: 12px 12px 40px; font-size: 13px; }
-    .slip h2 { font-size: 16px; line-height: 1.4; }
-    .slip .cols { grid-template-columns: 1fr; gap: 0; }
-    .slip th, .slip td { white-space: normal; word-break: keep-all; }
-    .slip td.n { white-space: nowrap; }
-    .slip .d-only { display: none; } .slip .m-only { display: table; }
-    /* 표 4칸(이름 · 값 · 이름 · 값) → 2칸씩 두 줄 */
-    .slip table.kv2, .slip table.kv2 tbody { display: block; width: 100%; }
-    .slip table.kv2 tbody tr { display: grid; grid-template-columns: 96px minmax(0, 1fr); }
-    .slip table.kv2 th, .slip table.kv2 td { display: block; border-width: 0 0 1px; }
-    .slip table.kv2 { border: 1px solid #e3e6ea; }
-    .slip .invbox .iamt b { font-size: 19px; }
-    .slip h4 { font-size: 13.5px; margin-top: 16px; }
+  @media screen {
+    html.m #stTable { display: none; }
+    html.m .st-cards { display: grid; gap: 8px; padding: 8px 0; }
+    html.m .kpi em { font-size: 11px; }
+    html.m #stSlipModal { padding: 0; } html.m #stSlipBox.m-box { width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
+    html.m #stSlipBox .m-top { flex-wrap: wrap; gap: 6px; padding: 10px 12px; } html.m #stSlipBox .m-top #stSlipTitle { width: 100%; font-size: 15px; }
+    html.m .slip { padding: 12px 12px 40px; font-size: 13px; }
+    html.m .slip h2 { font-size: 16px; line-height: 1.4; }
+    html.m .slip .cols { grid-template-columns: 1fr; gap: 0; }
+    html.m .slip th, html.m .slip td { white-space: normal; word-break: keep-all; }
+    html.m .slip td.n { white-space: nowrap; }
+    html.m .slip .d-only { display: none; } html.m .slip .m-only { display: table; }
+    /* 표 4칸(이름 · 값 · 이름 · 값) → 2칸씩 두 줄 */ html.m .slip table.kv2, html.m .slip table.kv2 tbody { display: block; width: 100%; }
+    html.m .slip table.kv2 tbody tr { display: grid; grid-template-columns: 96px minmax(0, 1fr); }
+    html.m .slip table.kv2 th, html.m .slip table.kv2 td { display: block; border-width: 0 0 1px; }
+    html.m .slip table.kv2 { border: 1px solid #e3e6ea; }
+    html.m .slip .invbox .iamt b { font-size: 19px; }
+    html.m .slip h4 { font-size: 13.5px; margin-top: 16px; }
   }
   @media print {
     body * { visibility: hidden; }
@@ -836,25 +845,16 @@
 
   @media (max-width: 820px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
-    /* 모바일: 위 막대(로고 · 지금 메뉴 ☰) → 누르면 묶음별 메뉴 */
-    .side { position: sticky; top: 0; z-index: 15; height: auto; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
-    .side .logo { padding: 0; white-space: nowrap; font-size: 15px; } .side .logo .rlogo { width: 26px; }
-    .gsbtn { order: 2; width: 38px; height: 38px; margin: 0 0 0 auto; padding: 0; justify-content: center; background: #fff; font-size: 16px; } .gsbtn .gst, .gsbtn kbd { display: none; }
-    #gsModal { padding: 0; } .gs-box { max-height: 100vh; height: 100vh; border-radius: 0; } .gs-foot { display: none; }
-    .navbtn { order: 3; display: flex; margin-left: 0; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 14px; font-weight: 700; color: var(--ink); max-width: 55%; }
-    .navbtn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .navbtn i { font-style: normal; font-size: 16px; color: var(--sub); }
-    .side.open .navbtn { background: var(--ink); color: #fff; border-color: var(--ink); } .side.open .navbtn i { color: #fff; }
-    .nav, .side .me { display: none; }
-    .side.open .nav { display: block; width: 100%; max-height: calc(100vh - 120px); overflow-y: auto; margin: 4px 0 0; padding: 4px 0; flex: none; }
-    .side.open .ng { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 12px; }
-    .side.open .ngt { grid-column: 1 / -1; font-size: 12px; margin-bottom: 2px; }
-    .side.open .nav a { padding: 11px 10px; font-size: 14.5px; border: 1px solid var(--line); margin: 0; background: #fff; }
-    .side.open .nav a.on { border-color: var(--c); }
+    /* PC 창을 좁혔을 때 (예전 그대로): 메뉴 가로 한 줄 */
+    .side { position: static; height: auto; display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; overflow-x: auto; }
+    .side .logo { padding: 0 8px 0 0; white-space: nowrap; }
+    .nav { display: flex; gap: 4px; overflow: visible; margin: 0; padding: 0; flex: none; }
+    .ng { display: contents; }
+    .ngt { display: none; }
+    .nav a { white-space: nowrap; }
     .nav a small { display: none; }
-    .side.open .me { display: block; width: 100%; margin: 0; padding: 10px 2px 2px; font-size: 13px; }
-    .side.open { z-index: 45; }
-    .side.open .nav { order: 10; } .side.open .me { order: 11; }
-    .side.open::after { content: ''; position: fixed; inset: 0; z-index: -1; background: rgba(0,0,0,.25); }
+    .side .me { position: static; border: 0; margin: 0; padding: 0 0 0 8px; white-space: nowrap; }
+    .gsbtn { width: auto; margin: 0; flex: none; } .gsbtn kbd { display: none; }
     main { padding: 16px 12px; }
     .search { width: 100%; }
     .tools { width: 100%; flex-wrap: wrap; }
@@ -867,8 +867,30 @@
     main { min-width: 0; }
     section > .table-wrap, .table-wrap { max-width: 100%; }
   }
+  /* 휴대폰 화면(html.m): 위 막대(로고 · 🔍 · 지금 메뉴 ☰) → 누르면 묶음별 메뉴 */
+  html.m #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
+  html.m main { padding: 16px 12px; min-width: 0; }
+  html.m .side { overflow: visible; }
+  html.m .side { position: sticky; top: 0; z-index: 15; height: auto; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+  html.m .side .logo { padding: 0; white-space: nowrap; font-size: 15px; } html.m .side .logo .rlogo { width: 26px; }
+  html.m .gsbtn { order: 2; width: 38px; height: 38px; margin: 0 0 0 auto; padding: 0; justify-content: center; background: #fff; font-size: 16px; } html.m .gsbtn .gst, html.m .gsbtn kbd { display: none; }
+  html.m #gsModal { padding: 0; } html.m .gs-box { max-height: 100vh; height: 100vh; border-radius: 0; } html.m .gs-foot { display: none; }
+  html.m .navbtn { order: 3; display: flex; margin-left: 0; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 14px; font-weight: 700; color: var(--ink); max-width: 55%; }
+  html.m .navbtn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } html.m .navbtn i { font-style: normal; font-size: 16px; color: var(--sub); }
+  html.m .side.open .navbtn { background: var(--ink); color: #fff; border-color: var(--ink); } html.m .side.open .navbtn i { color: #fff; }
+  html.m .nav, html.m .side .me { display: none; }
+  html.m .side.open .nav { display: block; width: 100%; max-height: calc(100vh - 120px); overflow-y: auto; margin: 4px 0 0; padding: 4px 0; flex: none; }
+  html.m .side.open .ng { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 12px; }
+  html.m .side.open .ngt { display: flex; grid-column: 1 / -1; font-size: 12px; margin-bottom: 2px; }
+  html.m .side.open .nav a { padding: 11px 10px; font-size: 14.5px; border: 1px solid var(--line); margin: 0; background: #fff; }
+  html.m .side.open .nav a.on { border-color: var(--c); }
+  html.m .nav a small { display: none; }
+  html.m .side.open .me { display: block; position: static; white-space: normal; border: 0; width: 100%; margin: 0; padding: 10px 2px 2px; font-size: 13px; }
+  html.m .side.open { z-index: 45; }
+  html.m .side.open .nav { order: 10; } html.m .side.open .me { order: 11; }
+  html.m .side.open::after { content: ''; position: fixed; inset: 0; z-index: -1; background: rgba(0,0,0,.25); }
   /* 휴대폰: 입력칸 글자 16px (아이폰이 화면을 확대하지 않게) */
-  @media (max-width: 640px) { input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px !important; } }
+  html.m input:not([type=checkbox]):not([type=radio]), html.m select, html.m textarea { font-size: 16px !important; }
 </style>
 </head>
 <body>
@@ -916,7 +938,7 @@
         <a data-view="acc">계정관리</a>
       </div>
     </nav>
-    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a></div>
+    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a><br><a id="uiSw"></a></div>
   </aside>
 
   <main>
@@ -2514,6 +2536,15 @@
   $('#navBtn').addEventListener('click', () => { const sd = $('.side'); sd.classList.toggle('open'); $('#navBtn').setAttribute('aria-expanded', sd.classList.contains('open')); });
   $('.nav').addEventListener('click', (e) => { if (e.target.closest('a')) { $('.side').classList.remove('open'); $('#navBtn').setAttribute('aria-expanded', 'false'); } });
   document.addEventListener('click', (e) => { const sd = $('.side'); if (sd.classList.contains('open') && (!e.target.closest('.side') || e.target === sd)) sd.classList.remove('open'); });
+  // PC 화면 ↔ 휴대폰 화면 (이 기기에 기억)
+  function uiSwLabel() { $('#uiSw').textContent = document.documentElement.classList.contains('m') ? '🖥 PC 화면으로 보기' : '📱 휴대폰 화면으로 보기'; }
+  $('#uiSw').addEventListener('click', () => {
+    const m = !document.documentElement.classList.contains('m');
+    document.documentElement.classList.toggle('m', m);
+    try { localStorage.setItem('runner.ui', m ? 'm' : 'pc'); } catch (e) {}
+    $('.side').classList.remove('open'); uiSwLabel(); if (window.__tkRe) window.__tkRe();
+  });
+  uiSwLabel();
   function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; }
   new MutationObserver(navCur).observe($('.nav'), { subtree: true, attributes: true, attributeFilter: ['class'] });
   function switchView(v) {
@@ -8073,7 +8104,7 @@
         }).join('');
     }
     // 휴대폰(폭 640 이하): 줄 = 카드 (제목 칸 크게 + 나머지 '열 이름: 값'). 표마다 [▦ 표로] / [▤ 카드로] 로 바꿈 (기억)
-    const MOB = window.matchMedia ? window.matchMedia('(max-width: 640px)') : { matches: false };
+    const MOB = { get matches() { return document.documentElement.classList.contains('m'); } };
     const cardable = (tb) => !!tb.closest('.table-wrap') && !tb.closest('.modal') && !tb.classList.contains('up') && tb.dataset.tkNocard == null;
     function applyCard(tb, k) {
       const on = cardable(tb) && pref(k).card !== false;
@@ -8100,7 +8131,7 @@
         });
       }));
     }
-    if (MOB.addEventListener) MOB.addEventListener('change', () => document.querySelectorAll('table.tk').forEach((tb) => tb._tkKey && applyCard(tb, tb._tkKey)));
+    window.__tkRe = () => document.querySelectorAll('table.tk').forEach((tb) => tb._tkKey && applyCard(tb, tb._tkKey));
     function refresh(tb) {
       const hs = headOf(tb); if (!hs) return;
       const k = tb._tkKey;
