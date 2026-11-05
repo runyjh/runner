@@ -12,7 +12,7 @@ const BD_REPORT_HIDE = 3;      // 신고가 이만큼 쌓이면 자동 숨김
 const BD_PAGE = 20;
 const BD_WORDS_DEFAULT = ['씨발', '시발', '병신', '개새끼', '좆', '지랄', '미친놈', '미친년', '꺼져', '새끼야'];
 
-function bdTouch_() { try { cache_().put('bd:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
+function bdTouch_() { fsMark_(); try { cache_().put('bd:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
 function bdVer_() { return cache_().get('bd:v') || '0'; }
 /** 글·댓글 전체 (1분 캐시, 쓰면 바로 버림) */
 function bdData_() {

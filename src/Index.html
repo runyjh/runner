@@ -1120,9 +1120,10 @@
     const saved = viewRestored ? null : ssGet('runner.view');
     viewRestored = true;
     show('home');
-    homeGate([new Promise((res) => setTimeout(() => res(loadNotices()), 0)), sessP]);
+    const sp = sessP; // 사본(Firestore)으로 홈을 그렸으면 로그인 확인은 기다리지 않음 (뒤에서 계속 확인 · 만료면 로그인 화면으로)
+    homeGate([new Promise((res) => setTimeout(() => res(loadNotices()), 0)).then((v) => (v === 'fs' ? null : sp))]);
     setTimeout(() => { if (window.bdRecent) window.bdRecent(); }, 0); // (공지 함수는 뒤에서 선언되므로 한 박자 뒤에)
-    setTimeout(() => { try { fsReady(); } catch (e) {} }, 2500); // Firestore 미리 준비 (스케줄 열 때 바로)
+    setTimeout(() => { try { fsReady(); } catch (e) {} }, 0); // Firestore 준비 (홈 사본)
     if (window.pmAlertStart) setTimeout(() => window.pmAlertStart(), 0);
     if (saved) setTimeout(() => restoreView(saved), 0);
   }
@@ -1399,9 +1400,7 @@
       }).catch(() => { $('#scBody').innerHTML = ''; netErr(); });
     }
     const args = scMode === 'month' ? [token, scMonth] : [token];
-    // 2주 보기는 Firestore 사본 먼저 (오늘 날짜로 만든 것만) → 없거나 못 읽으면 서버
-    const viaFs = scMode === 'month' ? Promise.resolve(null) : fsRead(() => 'drv/' + FSR.uid.slice(2), (d) => d && d.sched && d.sched.ok && d.sched.today === ymdOf(new Date())).then((d) => d && d.sched);
-    viaFs.then((hit) => hit || api('api_mySchedule', ...args)).then((r) => {
+    api('api_mySchedule', ...args).then((r) => {
       if (!r.ok) {
         toast(r.msg || '스케줄을 불러오지 못했습니다.');
         if (r.code === 'EXPIRED') { clearSession(); goLogin(); }
@@ -1563,12 +1562,17 @@
     if (token !== ntTok) { ntList = []; ntAt = 0; ntTok = token; renderNtCard(); } // 다른 기사로 바뀌면 새로 받음
     if (!force && Date.now() - ntAt < 30000) { renderNtCard(); return Promise.resolve(); }
     ntAt = Date.now();
-    return api('api_notices', token).then((r) => {
+    // 홈은 Firestore 사본 먼저 (공지 + 게시판 최근 글 · 오늘 만든 것만) → 없거나 못 읽으면 서버
+    const viaFs = force ? Promise.resolve(null) : fsRead(() => 'drv/' + FSR.uid.slice(2), (d) => d && d.home && d.home.today === ymdOf(new Date())).then((d) => d && d.home);
+    window.__homeFs = viaFs;
+    return viaFs.then((h) => h ? Object.assign({ ok: true, fs: true, bd: h.bd }, { notices: h.notices }) : api('api_notices', token)).then((r) => {
       if (!r || !r.ok) return;
       ntList = r.notices || []; renderNtCard();
+      if (r.fs && window.bdPaint) window.bdPaint(r.bd || []);
       if ($('#v-notice').classList.contains('on')) renderNtList();
       const pop = ntGet(NT_POP), first = ntList.find((n) => n.important && !pop.includes(ntKey(n)));
       if (first && $('#v-home').classList.contains('on')) showNtPop(first);
+      return r.fs ? 'fs' : '';
     }).catch(() => {});
   }
   function renderNtCard() {
@@ -2583,15 +2587,17 @@
   }
   $('#mBoard').addEventListener('click', () => openBoard('home'));
   // 홈: 게시판 최근 글 3개
-  window.bdRecent = function () {
-    const token = store.get(TOKEN); if (!token) return;
-    api('api_bdRecent', token).then((r) => {
+  window.bdPaint = function (posts) {
       const box = $('#bdCard');
-      if (!r || !r.ok || !r.posts.length) { box.classList.add('hidden'); return; }
-      box.innerHTML = r.posts.map((p) => '<button type="button" class="ntrow" data-bp="' + escH(p.id) + '">' +
+      if (!posts || !posts.length) { box.classList.add('hidden'); return; }
+      box.innerHTML = posts.map((p) => '<button type="button" class="ntrow" data-bp="' + escH(p.id) + '">' +
         '<span class="bdc c-' + escH(p.cat) + '">' + escH(p.cat) + '</span><span class="tt">' + escH(p.title) + '</span>' + (p.cmts ? '<span class="dd" style="color:var(--brand);font-weight:700">💬 ' + p.cmts + '</span>' : '') + '<span class="dd">' + escH(bdAgo(p.at)) + '</span></button>').join('');
       box.classList.remove('hidden');
-    }).catch(() => {});
+  };
+  window.bdRecent = function () {
+    const token = store.get(TOKEN); if (!token) return;
+    // 홈 사본을 Firestore 에서 읽었으면 게시판 최근 글도 거기서 (서버 호출 없음)
+    Promise.resolve(window.__homeFs).catch(() => null).then((h) => h ? null : api('api_bdRecent', token).then((r) => { if (r && r.ok) window.bdPaint(r.posts); else window.bdPaint([]); })).catch(() => {});
   };
   $('#bdCard').addEventListener('click', (e) => {
     const b = e.target.closest('[data-bp]'); if (b) { e.stopPropagation(); openBdPost(b.dataset.bp, 'home'); }

@@ -122,13 +122,15 @@ function fsDel_(paths) {
   } catch (e) { console.error('Firestore 지우기 실패: ' + (e && e.message)); return 0; }
 }
 
-// ───────────────────────── 스케줄 화면 사본 (기사 앱 '내 스케줄 2주' · 관리자 '기사스케줄' 이번 주) ─────────────────────────
-// 문서 묶음 (읽기 1번 = 화면 1개):
-//   drv/{기사ID}   = { sched: api_mySchedule 결과(2주) }       ← 그 기사만 읽기
-//   adm/sched      = { start: 이번 주 일요일, res: adm_schWeek 결과 } ← 관리자만
-//   pub/meta       = { dirtyAt: 마지막으로 데이터가 바뀐 시각(ms) } ← 로그인한 사람 모두
-// 앱은 meta 와 화면 문서를 같이 읽고, 문서의 at 이 dirtyAt 보다 나중일 때만 씀 (아니면 서버에서 = 지금처럼).
-// → 손으로 시트를 고쳐도(onSchEdit_) dirtyAt 이 바로 올라가 오래된 사본은 안 쓰인다.
+// ───────────────────────── 사본 화면 2개 (속도 측정으로 고름 · 2026-11-06) ─────────────────────────
+// ① 기사 앱 홈 (앱 열 때): 서버 호출 4번 · 왕복 합 12.2초 (서버 일은 0.3초 — 나머지는 Apps Script 기본 대기) · 기사 전원이 앱을 열 때마다
+// ② 관리자 기사스케줄 (이번 주): adm_schWeek 1번 5.8초 (서버 4.1초) · 가장 느린 관리자 화면
+// 문서 묶음 (화면 1번 = 읽기 2번: 화면 문서 + pub/meta):
+//   drv/{기사ID}   = { home: { today, notices(그 기사 캠프 공지), bd(게시판 최근 3개) } } ← 그 기사만 읽기
+//   adm/sched      = { start: 이번 주 일요일, res: adm_schWeek 결과 }                  ← 관리자만
+//   pub/meta       = { dirtyAt: 마지막으로 데이터가 바뀐 시각(ms) }                    ← 로그인한 사람
+// 앱은 문서 at 이 dirtyAt 보다 나중이고 오늘 만든 것일 때만 씀 (아니면 서버 = 지금처럼).
+// → 시트를 손으로 고쳐도(onSheetEdit / onSchEdit_) dirtyAt 이 바로 올라가 오래된 사본은 안 쓰인다.
 
 /** 데이터가 바뀜: meta.dirtyAt 올리기 + 1분 트리거가 다시 만들도록 표시 */
 function fsDirty_() {
@@ -145,28 +147,33 @@ function fsAs_(driverId, fn, args) {
   try { return fn.apply(null, [PERF_BENCH_.tok].concat(args || [])); } finally { PERF_BENCH_ = null; }
 }
 function fsClean_(r) { if (r && typeof r === 'object') delete r._ms; return r; }
-/** 서버에서 읽은 김에 사본도 저장 (다음 번엔 Firestore 에서) */
-function fsSaveDrvSched_(driverId, res, t0) {
-  if (!fsCfg_() || !res || !res.ok || res.month) return; // 2주 보기만
-  const r = JSON.parse(JSON.stringify(res)); fsClean_(r);
-  fsPut_([{ path: 'drv/' + driverId, data: { sched: r } }], t0);
+/** 서버에서 읽은 김에 홈 사본도 저장 (api_notices 에서) */
+function fsSaveDrvHome_(driverId, notices, t0) {
+  if (!fsCfg_() || !notices || !notices.ok) return;
+  let bd = null;
+  try { bd = fsClean_(fsAs_(driverId, api_bdRecent, [])); } catch (e) { bd = null; }
+  const n = JSON.parse(JSON.stringify(notices)); fsClean_(n);
+  fsPut_([{ path: 'drv/' + driverId, data: { home: { today: n.today, notices: n.notices, bd: bd && bd.ok ? bd.posts : null } } }], t0);
 }
 function fsSaveAdmSched_(start, res, t0) {
   if (!fsCfg_() || !res || res.ok === false) return;
   const r = JSON.parse(JSON.stringify(res)); fsClean_(r);
   fsPut_([{ path: 'adm/sched', data: { start: start, res: r } }], t0);
 }
-/** 다시 만들기: 이번 주 관리자 표 + 로그인 중인 기사들의 2주 스케줄 */
+/** 다시 만들기: 이번 주 관리자 표 + 로그인 중인 기사들의 홈 (공지 · 게시판 최근 글) */
 function fsBuildSched_() {
   const sun = sundayOf_(new Date()), start = Utilities.formatDate(sun, CFG.TZ, 'yyyy-MM-dd');
   const t0 = Date.now(), docs = [];
   try { const a = schRead_(sun, addDays_(sun, SCH_DAYS - 1)); fsClean_(a); docs.push({ path: 'adm/sched', data: { start: start, res: a } }); } catch (e) { console.error('fs adm/sched: ' + e); }
-  // 로그인(세션)이 살아 있는 기사만 — 나머지는 처음 열 때 서버에서 읽으며 사본이 생김
+  // 로그인(세션)이 살아 있는 기사만 — 나머지는 앱을 열 때 서버에서 읽으며 사본이 생김
   const now = Date.now(), live = {};
   readAll_(SH.SESSIONS).forEach(function (s) { const d = str_(s.driverId); if (d && d.indexOf(ADMIN_SESSION) !== 0 && toMs_(s.expiresAt) > now) live[d] = 1; });
   Object.keys(live).forEach(function (id) {
     if (Date.now() - t0 > 240000) return; // 4분 넘으면 나머지는 다음 번에
-    try { const r = fsAs_(id, api_mySchedule, []); if (r && r.ok) docs.push({ path: 'drv/' + id, data: { sched: fsClean_(r) } }); } catch (e) { /* 그 기사만 건너뜀 */ }
+    try {
+      const n = fsAs_(id, api_notices, []), b = fsAs_(id, api_bdRecent, []);
+      if (n && n.ok) docs.push({ path: 'drv/' + id, data: { home: { today: n.today, notices: fsClean_(n).notices, bd: b && b.ok ? b.posts : null } } });
+    } catch (e) { /* 그 기사만 건너뜀 */ }
   });
   return fsPut_(docs, t0);
 }

@@ -2456,6 +2456,7 @@ function noticeFor_(n, campName) {
 /** 기사 앱: 나에게 보이는 공지 (중요 먼저, 최신순) */
 function api_notices(token) {
   return run_(function () {
+    const fsT0 = Date.now();
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
@@ -2464,7 +2465,10 @@ function api_notices(token) {
     if (info.campId) { const c = master_().camps.filter(function (x) { return x.id === info.campId; })[0]; if (c) camp = c.name; }
     const list = noticeAll_().filter(function (n) { return noticeLive_(n, today) && noticeFor_(n, camp); }).sort(noticeSort_).slice(0, 50)
       .map(function (n) { return { id: n.id, title: n.title, body: n.body, important: n.important, date: n.start || n.createdAt.slice(0, 10), updatedAt: n.updatedAt }; });
-    return { ok: true, notices: list, today: today };
+    const out = { ok: true, notices: list, today: today };
+    // 기사 앱 홈 사본 (공지 + 게시판 최근 글) → 다음 번엔 Firestore 에서
+    if (typeof fsSaveDrvHome_ === 'function' && !(typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_)) fsSaveDrvHome_(s.d, out, fsT0);
+    return out;
   });
 }
 
@@ -2484,7 +2488,7 @@ function adm_noticeList(token) {
 /** 공지 추가(id 없음)·수정 */
 function adm_noticeSave(token, n) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     n = n || {};
     const f = {
       title: str_(n.title), body: String(n.body == null ? '' : n.body).replace(/\r\n?/g, '\n').trim(),
@@ -2521,7 +2525,7 @@ function adm_noticeSave(token, n) {
 
 function adm_noticeDelete(token, id) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
@@ -4873,7 +4877,6 @@ function adm_schOrder(token, list) {
  */
 function api_mySchedule(token, month) {
   return run_(function () {
-    const fsT0 = Date.now();
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
@@ -4901,7 +4904,7 @@ function api_mySchedule(token, month) {
     } catch (e) { out.routeChanges = []; }
     // 품앗이: 내가 뛰는 일감(수행)·맡긴 일감(맡김)·지원 중인 일감
     try { out.pumasi = pmScheduleOf_(String(s.d), dates); } catch (e) { out.pumasi = {}; }
-    const fsW = function (o) { if (typeof fsSaveDrvSched_ === 'function' && !(typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_)) fsSaveDrvSched_(s.d, o, fsT0); return o; }; // 다음 번엔 Firestore 에서
+    const fsW = function (o) { return o; };
     if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return fsW(out);
     const h = schHeader_();
     const row = (function () {
