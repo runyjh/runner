@@ -884,7 +884,27 @@
     setInterval(check, 5 * 60000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   })();
+  // ───── 속도 측정: 호출마다 [화면, 함수, 왕복 ms, 서버 ms] 를 모아 1분마다 서버 perf_log 탭으로 (화면·함수별 합계) ─────
+  const PERF = { m: {}, busy: false };
+  function perfAdd(fn, ms, sv) {
+    if (/^(api|adm)_perf/.test(fn)) return;
+    let v = ''; try { v = curView; } catch (e) { v = ''; }
+    const k = v + '|' + fn, o = PERF.m[k] || (PERF.m[k] = { v: v, f: fn, n: 0, rt: 0, mx: 0, sv: 0 });
+    o.n++; o.rt += ms; o.mx = Math.max(o.mx, ms); o.sv += +sv || 0;
+  }
+  function perfFlush() {
+    const rows = Object.values(PERF.m); if (!rows.length || PERF.busy) return;
+    PERF.m = {}; PERF.busy = true;
+    rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); });
+    Promise.resolve().then(() => store.get(TOKEN) && gsCall0('api_perf', [store.get(TOKEN), rows])).catch(() => {}).finally(() => { PERF.busy = false; });
+  }
+  setInterval(perfFlush, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') perfFlush(); });
   function gsCall(fn, args) {
+    const t0 = performance.now();
+    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); return r; });
+  }
+  function gsCall0(fn, args) {
     if (window.google && google.script && google.script.run) {
       return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
     }
@@ -899,7 +919,7 @@
     }).finally(() => clearTimeout(timer));
   }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  const API_BG = ['api_perf', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));

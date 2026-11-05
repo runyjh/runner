@@ -938,7 +938,7 @@
         <a data-view="acc">계정관리</a>
       </div>
     </nav>
-    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a><br><a id="uiSw"></a></div>
+    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a><br><a id="uiSw"></a> · <a id="pfOpen">⏱ 속도 측정</a></div>
   </aside>
 
   <main>
@@ -1647,6 +1647,15 @@
   </div>
 </div>
 <!-- ───────────── 정산: 명세서 ───────────── -->
+<div class="modal hidden" id="pfModal">
+  <div class="m-box wide">
+    <div class="m-top"><b>⏱ 속도 측정 — 화면별 서버 호출 · 걸리는 시간</b><span style="flex:1"></span><button class="btn sm" id="pfRun">지금 측정</button><button class="btn ghost sm" id="pfClose">닫기</button></div>
+    <div style="padding:12px 16px;overflow:auto;flex:1">
+      <p class="sub" style="margin:0 0 8px">[지금 측정] = 화면을 열 때 부르는 서버 함수를 차례로 2번씩 실제로 불러 잰 시간 (기사 앱 화면은 승인된 기사 1명으로 대신 부름 · 1~3분). 아래 [쓰는 기록] = 관리자 앱·기사 앱을 쓰면서 1분마다 쌓인 실제 기록 (perf_log 탭).</p>
+      <div id="pfOut"></div><h4 style="margin:16px 0 6px">쓰는 기록 (최근 7일)</h4><div id="pfStats"></div>
+    </div>
+  </div>
+</div>
 <div class="modal hidden" id="gsModal" role="dialog" aria-label="찾기 · 목차">
   <div class="m-box gs-box">
     <div class="gs-top"><span>🔍</span><input id="gsQ" type="search" autocomplete="off" spellcheck="false" placeholder="메뉴 · 탭 · 기사 이름 · 아이디 (예: 산재, 보류금, ㅅㅈ, 배만호)"><button type="button" class="btn ghost sm" id="gsClose">닫기</button></div>
@@ -1723,7 +1732,27 @@
     setInterval(check, 5 * 60000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   })();
+  // ───── 속도 측정: 호출마다 [화면, 함수, 왕복 ms, 서버 ms] 를 모아 1분마다 서버 perf_log 탭으로 (화면·함수별 합계) ─────
+  const PERF = { m: {}, busy: false };
+  function perfAdd(fn, ms, sv) {
+    if (/^(api|adm)_perf/.test(fn)) return;
+    let v = ''; try { v = currentView + (currentView === 'settle' && typeof STX !== 'undefined' ? '/' + (STX.fin ? 'pnl:' + (STX.pnlT || 'pnl') : STX.tab) : ''); } catch (e) { v = ''; }
+    const k = v + '|' + fn, o = PERF.m[k] || (PERF.m[k] = { v: v, f: fn, n: 0, rt: 0, mx: 0, sv: 0 });
+    o.n++; o.rt += ms; o.mx = Math.max(o.mx, ms); o.sv += +sv || 0;
+  }
+  function perfFlush() {
+    const rows = Object.values(PERF.m); if (!rows.length || PERF.busy) return;
+    PERF.m = {}; PERF.busy = true;
+    rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); });
+    Promise.resolve().then(() => store.get() && gsCall0('adm_perf', [store.get(), rows])).catch(() => {}).finally(() => { PERF.busy = false; });
+  }
+  setInterval(perfFlush, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') perfFlush(); });
   function gsCall(fn, args) {
+    const t0 = performance.now();
+    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); return r; });
+  }
+  function gsCall0(fn, args) {
     if (window.google && google.script && google.script.run) {
       return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
     }
@@ -7898,6 +7927,78 @@
     if (!t) return showLogin();
     call('adm_check', t).then((r) => { if (r.ok) showApp(r.admin); else { store.del(); showLogin(); } })
       .catch(() => { showLogin(); toast('연결이 원활하지 않습니다.'); });
+  })();
+
+  // ───────────── 속도 측정 ─────────────
+  (function () {
+    const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    function plan() {
+      const now = new Date(), sun = new Date(now); sun.setDate(now.getDate() - now.getDay());
+      const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      const stm = (typeof STX !== 'undefined' && STX.month) || '';
+      return [
+        ['관리자', '기사 정보관리', [['adm_listDrivers', []]]],
+        ['관리자', '기사스케줄', [['adm_schWeek', [ymd(sun)]], ['adm_rcList', []]]],
+        ['관리자', '품앗이 관리', [['adm_pmList', [{}]]]],
+        ['관리자', '배번호 관리', [['adm_bibList', []]]],
+        ['관리자', '노선관리', [['adm_routeAll', []], ['adm_routeVolumes', []]]],
+        ['관리자', '업무스케줄', [['adm_memoMonth', [ym]], ['adm_memoPastUndone', []]]],
+        ['관리자', '정산관리', [['adm_stlMonth', [stm, false]]]],
+        ['관리자', '러너 손익·통장', [['adm_stlPnl', [stm]]]],
+        ['관리자', '세금계산서 역발행', [['adm_tiList', []]]],
+        ['관리자', '공지사항', [['adm_noticeList', []]]],
+        ['관리자', '게시판 관리', [['adm_bdList', [{}]]]],
+        ['관리자', '계정관리', [['adm_accList', []]]],
+        ['기사앱', '홈 (앱 열 때)', [['api_checkSession', []], ['api_notices', []], ['api_bdRecent', []], ['api_pmAlerts', ['']]]],
+        ['기사앱', '스케줄 (2주)', [['api_mySchedule', []]]],
+        ['기사앱', '스케줄 (캠프 전체)', [['api_campSchedule', ['']]]],
+        ['기사앱', '정산서', [['api_mySettle', []], ['api_mySlip', [stm]]]],
+        ['기사앱', '품앗이', [['api_pmList', [{}]], ['api_pmAvailList', []]]],
+        ['기사앱', '마이페이지', [['api_myInfo', []], ['api_pmList', [{}]]]],
+        ['기사앱', '자유게시판', [['api_bdList', [{}]]]]
+      ];
+    }
+    async function one(app, fn, args) {
+      const t0 = performance.now();
+      const r = app === '기사앱' ? await call('adm_perfDrv', store.get(), fn, args) : await call(fn, store.get(), ...args);
+      const rt = performance.now() - t0;
+      return { rt, sv: app === '기사앱' ? (r && r.ms) || 0 : (r && r._ms) || 0, ok: !!(r && r.ok && (app !== '기사앱' || r.fnOk)), size: app === '기사앱' ? (r && r.size) || 0 : JSON.stringify(r || {}).length };
+    }
+    const wn2 = (v) => Math.round(v).toLocaleString('ko-KR');
+    async function run() {
+      const P = plan(), out = [], rows = [];
+      $('#pfRun').disabled = true;
+      for (let i = 0; i < P.length; i++) {
+        const [app, scr, calls] = P[i];
+        $('#pfOut').innerHTML = '<p class="sub">측정 중… ' + (i + 1) + ' / ' + P.length + ' · ' + esc(scr) + '</p>';
+        let tot = 0, totSv = 0, bad = 0, size = 0; const det = [];
+        for (const [fn, args] of calls) {
+          let best = null;
+          for (let k = 0; k < 2; k++) { try { const m = await one(app, fn, args); best = best && best.rt <= m.rt ? best : m; if (!m.ok) bad++; rows.push({ v: app + ':' + scr, f: fn, n: 1, rt: m.rt, mx: m.rt, sv: m.sv }); } catch (e) { bad++; } }
+          if (best) { tot += best.rt; totSv += best.sv; size += best.size; det.push(fn.replace(/^(api|adm)_/, '') + ' ' + wn2(best.rt)); }
+        }
+        out.push({ app, scr, n: calls.length, tot, totSv, bad, size, det });
+      }
+      $('#pfRun').disabled = false;
+      out.sort((a, b) => b.tot - a.tot);
+      $('#pfOut').innerHTML = '<div class="table-wrap"><table data-tk-off><thead><tr><th>앱</th><th>화면</th><th class="n">서버 호출</th><th class="n">걸린 시간 (ms, 왕복 합)</th><th class="n">서버 처리 (ms)</th><th class="n">받은 크기</th><th>함수별 (ms)</th></tr></thead><tbody>' +
+        out.map((o) => '<tr><td>' + o.app + '</td><td><b>' + esc(o.scr) + '</b>' + (o.bad ? ' <small style="color:var(--danger)">오류 ' + o.bad + '</small>' : '') + '</td><td class="n">' + o.n + '</td><td class="n"><b>' + wn2(o.tot) + '</b></td><td class="n">' + wn2(o.totSv) + '</td><td class="n">' + wn2(o.size / 1024) + 'KB</td><td class="sub">' + esc(o.det.join(' · ')) + '</td></tr>').join('') + '</tbody></table></div>';
+      call('adm_perf', store.get(), rows, true).catch(() => {});
+      stats();
+    }
+    function stats() {
+      call('adm_perfStats', store.get(), 7).then((r) => {
+        if (!r || !r.ok) return;
+        const by = {};
+        r.list.filter((x) => x.app !== '측정').forEach((x) => { const k = x.app + '|' + x.view; const o = by[k] || (by[k] = { app: x.app, view: x.view, n: 0, t: 0, fns: [] }); o.n += x.n; o.t += x.avg * x.n; o.fns.push(x.fn.replace(/^(api|adm)_/, '') + ' ' + x.n + '회·' + x.avg + 'ms'); });
+        const L = Object.values(by).sort((a, b) => b.t - a.t);
+        $('#pfStats').innerHTML = L.length ? '<p class="sub" style="margin:0 0 6px">' + r.days + '일 기록 · 화면에서 기다린 시간 합계가 큰 순</p><div class="table-wrap"><table data-tk-off><thead><tr><th>앱</th><th>화면</th><th class="n">호출 수</th><th class="n">하루 평균 호출</th><th class="n">평균 (ms)</th><th class="n">기다린 합계 (초)</th><th>함수별</th></tr></thead><tbody>' +
+          L.map((o) => '<tr><td>' + esc(o.app) + '</td><td><b>' + esc(o.view || '-') + '</b></td><td class="n">' + o.n + '</td><td class="n">' + Math.round(o.n / Math.max(1, r.days)) + '</td><td class="n">' + wn2(o.t / Math.max(1, o.n)) + '</td><td class="n"><b>' + wn2(o.t / 1000) + '</b></td><td class="sub">' + esc(o.fns.slice(0, 6).join(' · ')) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="sub">아직 쌓인 기록이 없습니다. 앱을 쓰면 1분마다 쌓입니다.</p>';
+      }).catch(() => {});
+    }
+    $('#pfOpen').addEventListener('click', () => { $('#pfModal').classList.remove('hidden'); $('.side').classList.remove('open'); stats(); });
+    $('#pfClose').addEventListener('click', () => $('#pfModal').classList.add('hidden'));
+    $('#pfRun').addEventListener('click', run);
   })();
 
   // ───────────── 찾기 · 목차 (Ctrl+K) ─────────────

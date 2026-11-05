@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -346,7 +346,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log']);
 
 /** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
 const HEAD_RENAME = {};
@@ -380,6 +380,9 @@ SCHEMA[SH.BWORD] = BWD;
 SCHEMA[SH.APPSET] = APS;
 SCHEMA[SH.TAXINV] = TI;
 SCHEMA[SH.RCHG] = RC;
+// 속도 측정 (Perf.gs): 1분마다 화면·함수별 합계 한 줄
+const PF = { at: '시각', app: '앱', view: '화면', fn: '함수', n: '횟수', rt: '왕복 합계(ms)', rtMax: '왕복 최대(ms)', srv: '서버 합계(ms)', who: '누가' };
+SCHEMA[SH.PERF] = PF;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -722,7 +725,12 @@ function scriptLock_() {
 
 // ───────────────────────── 응답 래퍼 ─────────────────────────
 function run_(fn) {
-  try { return fn(); }
+  const t0 = Date.now();
+  try {
+    const r = fn();
+    if (r && typeof r === 'object' && !Array.isArray(r)) r._ms = Date.now() - t0; // 서버 처리 시간 (속도 측정)
+    return r;
+  }
   catch (err) {
     if (err && err.userMsg) return err.code ? { ok: false, code: err.code, msg: err.userMsg } : { ok: false, msg: err.userMsg };
     if (/lock timeout|lock.*too long|잠금.*(시간|초과)/i.test(String(err && err.message || err))) {
@@ -1132,6 +1140,7 @@ function createSession_(driverId, auto) {
 function sessTtl_(exp) { return Math.max(1, Math.min(CFG.SESS_CACHE, Math.floor((exp - Date.now()) / 1000))); }
 
 function getSession_(token) {
+  if (typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_ && token === PERF_BENCH_.tok) return PERF_BENCH_.s; // 속도 측정 (이 실행 안에서만)
   if (!token || String(token).length > 200) return null;
   const th = tokenHash_(token);
   let s = cache_().get('ss:' + th);
