@@ -1652,6 +1652,7 @@
     <div class="m-top"><b>⏱ 속도 측정 — 화면별 서버 호출 · 걸리는 시간</b><span style="flex:1"></span><button class="btn sm" id="pfRun">지금 측정</button><button class="btn ghost sm" id="pfClose">닫기</button></div>
     <div style="padding:12px 16px;overflow:auto;flex:1">
       <p class="sub" style="margin:0 0 8px">[지금 측정] = 화면을 열 때 부르는 서버 함수를 차례로 2번씩 실제로 불러 잰 시간 (기사 앱 화면은 승인된 기사 1명으로 대신 부름 · 1~3분). 아래 [쓰는 기록] = 관리자 앱·기사 앱을 쓰면서 1분마다 쌓인 실제 기록 (perf_log 탭).</p>
+      <div id="fsSt" class="info-ro" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"></div>
       <div id="pfOut"></div><h4 style="margin:16px 0 6px">쓰는 기록 (최근 7일)</h4><div id="pfStats"></div>
     </div>
   </div>
@@ -1767,6 +1768,59 @@
     }).finally(() => clearTimeout(timer));
   }
   const call = (fn, ...args) => gsCall(fn, args);
+  // ───── Firestore 읽기 사본 (정해 둔 화면만 · 못 읽으면 지금처럼 서버에서) ─────
+  // 로그인 → 서버가 파이어베이스 커스텀 토큰 발급(TOKFN) → 이 기기에 파이어베이스 로그인 유지(다음부터는 서버 호출 없이 바로).
+  // 문서 at 이 pub/meta.dirtyAt(데이터가 바뀐 시각)보다 나중일 때만 씀. 4초 안에 못 읽으면 서버.
+  const FSTOK = () => store.get(), TOKFN = 'adm_fsToken', FSOWN = (uid) => /^a_/.test(uid);
+  const FSV = 1, FSKEY = 'runner.fs.' + 'a';
+  const FSR = { p: null, ok: false, db: null, uid: '', skipUntil: 0 };
+  const fsLs = (v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(FSKEY) || 'null'); if (v === null) localStorage.removeItem(FSKEY); else localStorage.setItem(FSKEY, JSON.stringify(v)); } catch (e) { return null; } };
+  const fsTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('FS_TIMEOUT')), ms))]);
+  function fsLoad(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('FS_LOAD')); document.head.appendChild(s); }); }
+  function fsReady() {
+    if (FSR.p) return FSR.p;
+    FSR.p = (async () => {
+      const tok = FSTOK(); if (!tok) return false;
+      const saved = fsLs();
+      if (saved && saved.off && saved.off > Date.now()) return false; // 서버에 설정이 없다고 했으면 1시간 동안 묻지 않음
+      if (!window.firebase || !firebase.auth) { await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js'); await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js'); }
+      if (!firebase.firestore) await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
+      let app = firebase.apps.find((a) => a.name === 'rfs');
+      if (!app && saved && saved.web) app = firebase.initializeApp(saved.web, 'rfs');
+      let user = null;
+      if (app) user = await fsTimeout(new Promise((res) => { const un = app.auth().onAuthStateChanged((u) => { un(); res(u); }); }), 3000).catch(() => null);
+      if (!user || !saved || user.uid !== saved.uid || !FSOWN(user.uid)) {
+        const r = await gsCall0(TOKFN, [tok]);
+        if (!r || !r.ok || !r.on || !r.token) { fsLs({ off: Date.now() + 3600000 }); return false; }
+        if (!app) app = firebase.initializeApp(r.web, 'rfs');
+        const cred = await app.auth().signInWithCustomToken(r.token);
+        user = cred.user;
+        fsLs({ web: r.web, uid: user.uid });
+      }
+      FSR.db = app.firestore(); FSR.uid = user.uid; FSR.ok = true;
+      return true;
+    })().catch((e) => { console.warn('Firestore 준비 실패 → 서버에서 읽음', e && e.message); FSR.p = null; FSR.skipUntil = Date.now() + 60000; return false; });
+    return FSR.p;
+  }
+  /** path 문서를 읽어 check 를 통과하면 그 값, 아니면 null (→ 서버) */
+  async function fsRead(path, check) {
+    if (Date.now() < FSR.skipUntil) return null;
+    try {
+      if (!FSR.ok) { const p = fsReady(); if (!(await fsTimeout(p, 1500).catch(() => false))) return null; }
+      const t0 = performance.now();
+      const [m, d] = await fsTimeout(Promise.all([FSR.db.doc('pub/meta').get({ source: 'server' }), FSR.db.doc(path()).get({ source: 'server' })]), 4000);
+      if (!d.exists) return null;
+      const x = d.data(); if (+x.v !== FSV) return null;
+      const dirtyAt = m.exists ? +(JSON.parse(m.data().j || '{}').dirtyAt || 0) : 0;
+      if (!(+x.at > dirtyAt)) return null; // 사본을 만든 뒤에 데이터가 바뀜
+      const data = JSON.parse(x.j);
+      if (!check(data)) return null;
+      perfAdd('fs:' + path().split('/')[0], performance.now() - t0, 0);
+      return data;
+    } catch (e) { console.warn('Firestore 읽기 실패 → 서버', e && e.message); FSR.skipUntil = Date.now() + 30000; return null; }
+  }
+  function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
+
   /** 관리자 API 호출: 로그인 만료면 로그인 화면으로 */
   // 화면 맨 위 로딩바: 서버와 주고받는 동안 표시
   let apiPending = 0, lbarTimer = 0;
@@ -1779,6 +1833,7 @@
   }
   async function api(fn, ...args) {
     let r;
+    if (/(Save|Delete|Del|Note|Order|Move|Cancel|Action|Update|Bulk|Create|Approve|Status|Reset|Set|Import|Fill|Write)/.test(fn)) FSR.skipUntil = Date.now() + 120000; // 방금 고쳤으면 2분 동안은 서버에서 (사본이 다시 만들어질 때까지)
     lbar(true);
     try { r = await call(fn, store.get(), ...args); }
     catch (e) { toast('연결이 원활하지 않습니다. 잠시 후 다시 시도해 주세요.'); throw e; }
@@ -1823,6 +1878,7 @@
     $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
     driversLoaded = false;
+    setTimeout(() => { try { fsReady(); } catch (e) {} }, 2000); // Firestore 미리 준비
     // 새로고침하면 보던 메뉴 그대로 (이 창을 닫으면 잊음)
     try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv; } catch (e) {}
     switchView(currentView);
@@ -1864,7 +1920,7 @@
     }).catch(() => {}).finally(() => { btn.disabled = false; btn.textContent = '변경'; });
   });
   $('#logoutBtn').addEventListener('click', () => {
-    const t = store.get(); store.del(); showLogin();
+    const t = store.get(); store.del(); showLogin(); fsSignOut();
     if (t) call('adm_logout', t).catch(() => {});
   });
 
@@ -4862,7 +4918,10 @@
       const r = monthRange(sMonth);
       return api('adm_schRange', r.from, r.to);
     }
-    return api('adm_schWeek', start || SD.start || '');
+    const want = start || SD.start || '', sun = (() => { const t = new Date(); t.setDate(t.getDate() - t.getDay()); return ymdLocal(t); })();
+    // 이번 주(2주 보기)는 Firestore 사본 먼저 → 없거나 못 읽으면 서버
+    const viaFs = (!want || want === sun) ? fsRead(() => 'adm/sched', (d) => d && d.start === sun && d.res && d.res.dates).then((d) => d && d.res) : Promise.resolve(null);
+    return viaFs.then((hit) => hit || api('adm_schWeek', want));
   }
   function paintModeUi() {
     $$('#sMode button').forEach((b) => b.classList.toggle('on', b.dataset.mode === sMode));
@@ -7996,7 +8055,20 @@
           L.map((o) => '<tr><td>' + esc(o.app) + '</td><td><b>' + esc(o.view || '-') + '</b></td><td class="n">' + o.n + '</td><td class="n">' + Math.round(o.n / Math.max(1, r.days)) + '</td><td class="n">' + wn2(o.t / Math.max(1, o.n)) + '</td><td class="n"><b>' + wn2(o.t / 1000) + '</b></td><td class="sub">' + esc(o.fns.slice(0, 6).join(' · ')) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="sub">아직 쌓인 기록이 없습니다. 앱을 쓰면 1분마다 쌓입니다.</p>';
       }).catch(() => {});
     }
-    $('#pfOpen').addEventListener('click', () => { $('#pfModal').classList.remove('hidden'); $('.side').classList.remove('open'); stats(); });
+    function fsSt() {
+      call('adm_fsStatus', store.get()).then((r) => {
+        if (!r || !r.ok) return;
+        $('#fsSt').innerHTML = '<span>🔥 Firestore 읽기 사본: ' + (r.on ? '<b>켜짐</b> (' + esc(r.project) + ' · 키 ' + esc(r.key) + ')' : '<b>꺼짐</b> — 스크립트 속성 FIREBASE_SA(또는 FCM_SA) 없음 / FS_OFF=1') +
+          (r.last ? ' · 마지막 사본 ' + esc(r.last.at) + ' (' + r.last.n + '개 · ' + Math.round(r.last.ms / 1000) + '초)' : '') + (r.err ? '<br><small style="color:var(--danger)">최근 오류: ' + esc(r.err) + '</small>' : '') + '</span>' +
+          (r.on ? '<button class="btn sm" id="fsRebuild" style="margin-left:auto">사본 지금 만들기</button>' : '');
+      }).catch(() => {});
+    }
+    $('#fsSt').addEventListener('click', (e) => {
+      if (!e.target.closest('#fsRebuild')) return;
+      e.target.disabled = true; e.target.textContent = '만드는 중…';
+      call('adm_fsRebuild', store.get()).then((r) => { toast(r.ok ? '사본 ' + r.n + '개를 만들었습니다 (' + Math.round(r.ms / 1000) + '초)' + (r.err ? ' · 오류: ' + r.err : '') : r.msg); fsSt(); }).catch(() => fsSt());
+    });
+    $('#pfOpen').addEventListener('click', () => { $('#pfModal').classList.remove('hidden'); $('.side').classList.remove('open'); stats(); fsSt(); });
     $('#pfClose').addEventListener('click', () => $('#pfModal').classList.add('hidden'));
     $('#pfRun').addEventListener('click', run);
   })();

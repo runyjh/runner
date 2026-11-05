@@ -741,6 +741,8 @@ function run_(fn) {
     return { ok: false, msg: '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' };
   }
 }
+/** Firestore 사본: 데이터가 바뀜 (Firebase.gs · 없으면 아무것도 안 함) */
+function fsMark_() { if (typeof fsDirty_ === 'function') fsDirty_(); }
 function fail_(msg) { const e = new Error(msg); e.userMsg = msg; throw e; }
 
 // ───────────────────────── 값 정리 (사람이 직접 입력한 값도 같은 규칙으로) ─────────────────────────
@@ -937,6 +939,7 @@ function sessionAfterPw_(sessionCreated, pwChangedMs) {
 }
 function mustChange_(o) { return String(o.pwMustChange || '').trim().toUpperCase() === 'Y'; }
 function forgetDriver_(o) {
+  fsMark_();
   try { stlBump_(); } catch (e) { /* 기사 정보가 바뀌면 정산 계산 결과도 다시 */ }
   const keys = [];
   if (o.id) keys.push('dv:' + o.id, 'ir:' + o.id);
@@ -1371,6 +1374,7 @@ function onSheetEdit(e) {
   if (name === TOOLS.SHEET) { onToolsEdit_(e, sh); return; }
   if (name === SCH.SHEET) { onSchEdit_(e, sh); return; }
   if (!SCHEMA[name] || name === SH.ALOG) return;
+  if (name !== SH.PERF && name !== SH.SESSIONS) fsMark_(); // 시트를 손으로 고침 → Firestore 사본은 다시 만들 때까지 안 씀
   _sheets[name] = sh;
   _ss = sh.getParent();
   const r0 = e.range.getRow(), n = e.range.getNumRows();
@@ -3468,6 +3472,7 @@ function masterVer_() {
   return v;
 }
 function bumpMaster_() {
+  fsMark_();
   try { cache_().put('mst:v', Date.now() + Math.random().toString(36).slice(2, 6), CFG.CACHE_MAX); } catch (e) { /* 캐시 오류는 무시 */ }
 }
 function master_() {
@@ -4430,7 +4435,10 @@ function adm_schWeek(token, start) {
     requireAdmin_(token);
     const base = parseYmd_(start) || new Date();
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
-    return schRead_(sun, addDays_(sun, SCH_DAYS - 1));
+    const fsT0 = Date.now(), res = schRead_(sun, addDays_(sun, SCH_DAYS - 1));
+    // 이번 주면 Firestore 사본도 (다음 번엔 거기서)
+    if (typeof fsSaveAdmSched_ === 'function' && sun.getTime() === sundayOf_(new Date()).getTime()) fsSaveAdmSched_(Utilities.formatDate(sun, CFG.TZ, 'yyyy-MM-dd'), res, fsT0);
+    return res;
   });
 }
 /**
@@ -4551,7 +4559,7 @@ function schRead_(sun, end) {
  */
 function adm_schSave(token, changes) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     changes = (changes || []).filter(function (x) { return x && x.row && parseYmd_(x.date); });
     if (!changes.length) return { ok: true, saved: 0, conflicts: [] };
     if (changes.length > 3000) fail_('한 번에 3000칸까지 저장할 수 있습니다.');
@@ -4776,7 +4784,7 @@ function logSchChange_(a, list, saved) {
 /** 비고 줄: action = add / rename / delete */
 function adm_schNote(token, action, id, label) {
   return run_(function () {
-    requireAdmin_(token);
+    requireAdmin_(token); fsMark_();
     const h = schHeader_();
     const lock = scriptLock_();
     lock.waitLock(20000);
@@ -4824,7 +4832,7 @@ function adm_schNote(token, action, id, label) {
  */
 function adm_schOrder(token, list) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     if (!Array.isArray(list) || !list.length) return { ok: true, saved: 0 };
     if (list.length > 1000) fail_('한 번에 너무 많습니다.');
     const want = {};
@@ -4865,6 +4873,7 @@ function adm_schOrder(token, list) {
  */
 function api_mySchedule(token, month) {
   return run_(function () {
+    const fsT0 = Date.now();
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
@@ -4892,7 +4901,8 @@ function api_mySchedule(token, month) {
     } catch (e) { out.routeChanges = []; }
     // 품앗이: 내가 뛰는 일감(수행)·맡긴 일감(맡김)·지원 중인 일감
     try { out.pumasi = pmScheduleOf_(String(s.d), dates); } catch (e) { out.pumasi = {}; }
-    if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
+    const fsW = function (o) { if (typeof fsSaveDrvSched_ === 'function' && !(typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_)) fsSaveDrvSched_(s.d, o, fsT0); return o; }; // 다음 번엔 Firestore 에서
+    if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return fsW(out);
     const h = schHeader_();
     const row = (function () {
       const sh = schSheet_(), last = sh.getLastRow();
@@ -4901,7 +4911,7 @@ function api_mySchedule(token, month) {
       return cell ? cell.getRow() : 0;
     })();
     const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
-    if (!cols.length) return out;
+    if (!cols.length) return fsW(out);
     const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
     if (row) {
       const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
@@ -4914,7 +4924,7 @@ function api_mySchedule(token, month) {
     } catch (e) { out.backup = {}; }
     // 내가 올린 품앗이가 배차 확정되고, 그날 내 스케줄 칸의 캠프·라우트와 같으면 '배차확정 완료' 표시
     try { out.pmDone = pmDoneOf_(String(s.d), out.cells, info.camp || out.camp || ''); } catch (e) { out.pmDone = {}; }
-    return out;
+    return fsW(out);
   });
 }
 
@@ -5134,7 +5144,7 @@ function schIssues_(from, to) {
 /** 이슈 저장. o = { id(있으면 고침), date, driverId, kind, reason, action } */
 function adm_schIssueSave(token, o) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     o = o || {};
     const date = ymd_(parseYmd_(o.date) || new Date(NaN));
     if (!parseYmd_(o.date)) fail_('날짜를 확인해 주세요.');
@@ -5159,7 +5169,7 @@ function adm_schIssueSave(token, o) {
 }
 function adm_schIssueDel(token, id) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     const sh = schIssueSheet_();
     const lock = scriptLock_();
     lock.waitLock(20000);
@@ -5856,6 +5866,7 @@ function adm_campRoutes(token) {
  *   캠프는 노선관리의 캠프명, 이름·기본노선은 기사 정보 그대로. 못 찾거나 여러 명이면 칸 메모로 알려 준다.
  */
 function onSchEdit_(e, sh) {
+  fsMark_();
   const r0 = e.range.getRow(), n = e.range.getNumRows();
   if (r0 === 1) { cache_().remove('sch:h'); if (n === 1) return; }
   const lock = scriptLock_();
@@ -6140,7 +6151,7 @@ function adm_rcList(token) {
 /** 관리자: 기사 한 명 노선 변경 예약. f = { driverId, date, toCampId, toRoute, memo } (적용일이 오늘 이전이면 바로 적용) */
 function adm_rcSave(token, f) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     f = f || {};
     const date = normDate_(f.date);
     if (!date) fail_('적용일을 확인해 주세요.');
@@ -6160,7 +6171,7 @@ function adm_rcSave(token, f) {
 /** 관리자: 예약 취소 (적용 전만). 노선 이관이면 같이 만든 기사 예약도 취소 */
 function adm_rcCancel(token, id) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
@@ -6183,7 +6194,7 @@ function adm_rcCancel(token, id) {
  */
 function adm_rcMove(token, f, dry) {
   return run_(function () {
-    const a = requireAdmin_(token);
+    const a = requireAdmin_(token); fsMark_();
     f = f || {};
     const date = normDate_(f.date);
     if (!date) fail_('적용일을 확인해 주세요.');

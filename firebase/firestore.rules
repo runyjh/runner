@@ -1,0 +1,31 @@
+rules_version = '2';
+// 러너 올인원 — Firestore 읽기 사본 규칙
+//  - 쓰기는 서버(Apps Script · 서비스 계정)만: 서비스 계정은 규칙을 거치지 않으므로 앱에서는 아무도 못 씀
+//  - 로그인 토큰(커스텀 토큰)의 r: 'd' = 기사(d = 기사ID) / 'a' = 관리자
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.r == 'a'; }
+    function isDriver(id) { return signedIn() && request.auth.token.r == 'd' && request.auth.token.d == id; }
+
+    // 기사: 자기 문서만 (관리자는 전체)
+    match /drv/{driverId} {
+      allow read: if isDriver(driverId) || isAdmin();
+      allow write: if false;
+    }
+    // 관리자 화면 사본
+    match /adm/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    // 공용 (데이터가 바뀐 시각 등) — 로그인한 사람만
+    match /pub/{doc} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    // 그 밖은 전부 막음
+    match /{other=**} {
+      allow read, write: if false;
+    }
+  }
+}

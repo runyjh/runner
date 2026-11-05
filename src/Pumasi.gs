@@ -52,7 +52,7 @@ function pmUser_(token) {
   if (info.mustChange) { const e = new Error('x'); e.userMsg = '비밀번호를 먼저 바꿔 주세요.'; e.code = 'MUST_CHANGE'; throw e; }
   return { id: String(s.d), info: info };
 }
-function pmTouch_() { try { cache_().put('pm:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
+function pmTouch_() { fsMark_(); try { cache_().put('pm:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
 function pmVer_() { return cache_().get('pm:v') || '0'; }
 /** 일감·지원 전체 (1분 캐시, 쓰면 바로 버림) */
 function pmData_() {
