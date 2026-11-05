@@ -835,6 +835,36 @@
   // ───── 서버 호출 ─────
   // 구글 앱스크립트 주소에서 열리면 google.script.run, 깃허브 페이지에서 열리면 웹앱 주소(RUNNER_CONFIG.api)로 POST.
   const RUNNER_API = (window.RUNNER_CONFIG && window.RUNNER_CONFIG.api) || '';
+
+  // ── 새 버전 알림: 깃허브 페이지에 새 화면이 올라오면 화면 위에 '새로고침' 안내 (5분마다·화면으로 돌아올 때 확인) ──
+  (function () {
+    const cfg = window.RUNNER_CONFIG;
+    if (!cfg || !cfg.ver || !/^https?:$/.test(location.protocol)) return;
+    const url = (/\/admin\//.test(location.pathname) ? '../' : './') + 'version.json';
+    let last = 0, shown = false;
+    const show = () => {
+      if (shown || !document.body) return;
+      shown = true;
+      const bar = document.createElement('div');
+      bar.id = 'verBar';
+      bar.setAttribute('role', 'status');
+      bar.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:10px;padding:9px 10px 9px 16px;border-radius:12px;background:#191f28;color:#fff;font-size:14px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:calc(100% - 24px)';
+      bar.innerHTML = '<span>새 버전이 나왔습니다.</span><button type="button" style="border:0;border-radius:8px;background:#3182f6;color:#fff;font:inherit;padding:7px 12px;cursor:pointer">새로고침</button><button type="button" aria-label="닫기" style="border:0;background:none;color:#aeb5bc;font:inherit;padding:4px 6px;cursor:pointer">✕</button>';
+      bar.children[1].addEventListener('click', () => location.reload());
+      bar.children[2].addEventListener('click', () => bar.remove());
+      document.body.appendChild(bar);
+    };
+    const check = () => {
+      if (shown || Date.now() - last < 60000) return;
+      last = Date.now();
+      fetch(url + '?t=' + Date.now(), { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => {
+        if (v && v.ver && v.ver !== cfg.ver) show();
+      }).catch(() => {});
+    };
+    setTimeout(check, 15000);
+    setInterval(check, 5 * 60000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  })();
   function gsCall(fn, args) {
     if (window.google && google.script && google.script.run) {
       return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));

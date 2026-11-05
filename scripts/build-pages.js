@@ -105,4 +105,6 @@ fs.writeFileSync(path.join(OUT, 'admin.html'), '<!DOCTYPE html><meta charset="ut
   '<meta http-equiv="refresh" content="0; url=admin/"><script>location.replace("admin/" + location.search + location.hash);</script>' +
   '<a href="admin/">관리자 화면으로 이동</a>');
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
+// 새 버전 알림용: 열려 있는 화면이 이 값과 자기 버전(RUNNER_CONFIG.ver)을 비교해 다르면 '새로고침' 안내를 띄운다
+fs.writeFileSync(path.join(OUT, 'version.json'), JSON.stringify({ ver: ver, at: new Date().toISOString() }));
 console.log('\n깃허브 페이지용 화면을 만들었습니다 (웹앱: ' + api.replace(/\/s\/(.{6}).*\/exec/, '/s/$1…/exec') + ')');
