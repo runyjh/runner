@@ -1323,7 +1323,8 @@
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const TOKEN = 'runner.admin.token';
   const STATUSES = ['승인대기', '승인', '반려', '정지'];
-  const DTYPES = ['고정', '백업', '품앗이', '외부용차', '운영자', '관리자', '대표'];
+  const DTYPES = ['고정', '백업', '품앗이', '외부용차']; // 기사구분 = 단가 코드
+  const TITLES = ['관리자', '운영자', '대표'];          // 직함 = 러너 내부 직책 (단가와 무관 · 정산서 이름 숨김 · 앞으로 권한)
   const DOCS = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };
   const LICENSE_TYPES = ['1종 대형', '1종 보통', '2종 보통', '특수 대형견인', '특수 소형견인'];
   const BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크',
@@ -1578,7 +1579,7 @@
       const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw && r.loginId ? '<span class="tag">비밀번호 없음</span>' : '') + (!r.loginId ? '<span class="tag gray">앱 미사용</span>' : '');
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
         '<td class="ck"><input type="checkbox" data-dck="' + esc(r.id) + '"' + (dsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
-        '<td><b>' + esc(r.name) + '</b></td>' +
+        '<td><b>' + esc(r.name) + '</b>' + (r.title ? ' <span class="badge t-' + esc(r.title) + '">' + esc(r.title) + '</span>' : '') + '</td>' +
         '<td>' + (r.driverType ? '<span class="badge t-' + esc(r.driverType) + '">' + esc(r.driverType) + '</span>' : '<span class="badge t-none">미지정</span>') + '</td>' +
         '<td><b class="code">' + esc(r.driverCode) + '</b></td>' +
         '<td>' + (r.schCamp || r.baseRoute ? esc(String(r.schCamp || '').replace(/\s*캠프$/, '')) + (r.baseRoute ? ' · <b class="code">' + esc(r.baseRoute) + '</b>' : '') : '<span class="sub">미배정</span>') + '</td>' +
@@ -1847,13 +1848,15 @@
   $('#dBody').addEventListener('click', (e) => { if (aSel && e.target.closest('#aChips') && unitClick(e, 'a', aSel, campList(aSel.campId))) syncAssign(); });
   $('#dBody').addEventListener('input', (e) => { if (e.target.id === 'aQ') { aSel.q = e.target.value; paintAssign(); } });
 
-  /** 기사구분 버튼 + 기사코드 (상세·등록 공용) */
+  /** 기사구분 버튼 + 기사코드 + 직함 (상세·등록 공용) */
   function typeSec(d) {
-    return '<div class="sec"><h4>기사구분 · 기사코드' + (d.isNew ? '<span class="req">*</span>' : '') + '</h4><div class="status-row" style="margin-bottom:12px">' +
+    return '<div class="sec"><h4>기사구분 · 기사코드 · 직함' + (d.isNew ? '<span class="req">*</span>' : '') + '</h4><div class="status-row" style="margin-bottom:12px">' +
       DTYPES.map((t) => '<button type="button" class="st' + (t === d.driverType ? ' on' : '') + '" data-dt="' + t + '">' + t + '</button>').join('') + '</div>' +
       '<div class="field" style="margin:0"><label class="lb">기사코드 (기사마다 겹치지 않게)</label><div class="code-row">' +
       '<input class="inp code-inp" data-k="driverCode" value="' + esc(d.driverCode || '') + '" maxlength="20" autocomplete="off" spellcheck="false" placeholder="직접 입력">' +
-      '<button type="button" class="btn sm ghost" data-autocode style="height:40px">자동</button></div></div></div>';
+      '<button type="button" class="btn sm ghost" data-autocode style="height:40px">자동</button></div></div>' +
+      '<div class="field" style="margin:12px 0 0"><label class="lb">직함 — 단가와 무관한 러너 내부 직책 (대신 뛴 건은 기사 정산서에 이름 숨김 · 앞으로 권한 부여용)</label><div class="status-row" style="margin:0">' +
+      [''].concat(TITLES).map((t) => '<button type="button" class="st' + (t === (d.title || '') ? ' on' : '') + '" data-ttl="' + t + '">' + (t || '없음') + '</button>').join('') + '</div></div></div>';
   }
   /** 같은 기사구분의 기존 코드 중 가장 큰 번호 다음 번호를 제안 (예: B007 → B008) */
   function nextCode(type) {
@@ -1926,7 +1929,14 @@
   $('#dBody').addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') e.target.dispatchEvent(new Event('input', { bubbles: true })); });
   $('#dBody').addEventListener('click', (e) => {
     const st = e.target.closest('[data-st]'), rv = e.target.closest('[data-reveal]'), ed = e.target.closest('[data-edit]'), dc = e.target.closest('[data-doc]');
-    const dt = e.target.closest('[data-dt]');
+    const dt = e.target.closest('[data-dt]'), ttl = e.target.closest('[data-ttl]');
+    if (ttl && cur) {
+      $$('[data-ttl]', $('#dBody')).forEach((b) => b.classList.toggle('on', b === ttl));
+      const d = Object.assign({}, dirty);
+      if (ttl.dataset.ttl !== (cur.title || '')) d.title = ttl.dataset.ttl; else delete d.title;
+      setDirty(d);
+      return;
+    }
     if (dt && cur) {
       $$('[data-dt]', $('#dBody')).forEach((b) => b.classList.toggle('on', b === dt));
       const d = Object.assign({}, dirty);
@@ -1999,7 +2009,7 @@
   function patchList(d) {
     const i = all.findIndex((x) => x.id === d.id);
     const before = i >= 0 ? all[i].status : null;
-    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
+    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, title: d.title || '', schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
       carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
     if (i >= 0) all[i] = row; else { all.unshift(row); counts.all = (counts.all || 0) + 1; }
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }

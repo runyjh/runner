@@ -47,7 +47,7 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
   id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태',
-  driverType: '기사구분', driverCode: '기사코드',
+  driverType: '기사구분', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
@@ -69,15 +69,30 @@ const D = {
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
-  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem'];
-const DTYPES = ['고정', '백업', '품앗이', '외부용차', '운영자', '관리자', '대표'];
-const DTYPES_STAFF = ['운영자', '관리자', '대표']; // 러너 내부 인원 (정산서에 수행자 이름을 보이지 않음)
+  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title'];
+// 기사구분 = 단가 코드 (고정/백업/품앗이/외부용차 → 노선관리 기사단가/백업단가/품앗이단가/외부단가)
+const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
+// 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
+const TITLES = ['관리자', '운영자', '대표'];
+const DTYPES_STAFF = TITLES; // (예전 이름)
+/** 러너 내부 인원(관리자·운영자·대표)인지: 직함 칸 (예전에 기사구분에 적은 값도 인정) */
+function isStaff_(o) { return !!o && (TITLES.indexOf(str_(o.title)) >= 0 || TITLES.indexOf(str_(o.driverType)) >= 0); }
+/** 직함 글자 정리. 모르는 값이면 null */
+function normTitle_(v) {
+  const s = str_(v).replace(/\s+/g, '');
+  if (!s) return '';
+  if (/^관리/.test(s)) return '관리자';
+  if (/^운영/.test(s)) return '운영자';
+  if (/^대표/.test(s)) return '대표';
+  return null;
+}
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
   schCamp: '스케줄에서 이 기사가 속한 캠프. camps 탭의 캠프명과 같게 쓰면 소속캠프ID가 자동으로 채워집니다.',
   baseRoute: '평소 맡는 노선. 예: 527B, 530AB (F3), 404D,405AB. 백업 기사는 백업, 용차는 용차',
   fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
-  driverType: '고정 / 백업 / 품앗이 / 외부용차 / 운영자 / 관리자 / 대표 (운영자·관리자·대표가 대신 뛴 건은 기사 정산서에 이름이 안 보임)',
+  driverType: '고정 / 백업 / 품앗이 / 외부용차 (단가 코드: 노선관리 기사단가 / 백업단가 / 품앗이단가 / 외부단가)',
+  title: '관리자 / 운영자 / 대표 (빈칸 = 일반 기사). 단가와 무관한 러너 내부 직책.\n직함이 있는 사람이 대신 뛴 건은 기사 정산서에 수행자 이름이 안 보입니다. 앞으로 권한 부여에도 씁니다.',
   driverCode: '기사마다 겹치지 않는 코드 (영문은 자동 대문자)',
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
   rrn: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n생년월일도 자동 갱신됩니다.\n※ 시트에 직접 입력한 원래 번호는 구글 시트 "버전 기록"에 남습니다. 가능하면 관리자 화면에서 입력하세요.',
@@ -494,6 +509,7 @@ function ensureColumns_(only) {
       sh.getRange(2, c.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(rule);
       const tr = SpreadsheetApp.newDataValidation().requireValueInList(DTYPES, true).setAllowInvalid(true).build();
       sh.getRange(2, c.driverType + 1, sh.getMaxRows() - 1, 1).setDataValidation(tr);
+      if (c.title >= 0) sh.getRange(2, c.title + 1, sh.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(TITLES, true).setAllowInvalid(true).build());
       Object.keys(D_NOTES).forEach(function (k) { sh.getRange(1, c[k] + 1).setNote(D_NOTES[k]); });
       sh.getRange(1, c.pwReset + 1).setBackground('#fff4e5');
     } else if (name === SH.ADMINS) {
@@ -1377,7 +1393,11 @@ function fixDriverRow_(sh, c, o) {
   if (o.schOrder && !/^\d{1,5}$/.test(o.schOrder)) bad('schOrder', '숫자로 입력해 주세요.');
   if (o.driverType) {
     const t = normDriverType_(o.driverType);
-    if (t) set('driverType', t); else bad('driverType', DTYPES.join(' / ') + ' 중 하나로 입력해 주세요.');
+    if (t) set('driverType', t); else bad('driverType', DTYPES.join(' / ') + ' 중 하나로 입력해 주세요. (관리자·운영자·대표는 직함 칸)');
+  }
+  if (o.title) {
+    const t = normTitle_(o.title);
+    if (t) set('title', t); else bad('title', TITLES.join(' / ') + ' 중 하나로 입력하거나 비워 주세요.');
   }
   if (o.driverCode) {
     const code = normDriverCode_(o.driverCode);
@@ -1436,7 +1456,7 @@ function fixDriverRow_(sh, c, o) {
     upd.updatedAt = nowText_();
     Object.keys(upd).forEach(function (k) { sh.getRange(o._row, c[k] + 1).setNumberFormat('@').setValue(upd[k]); });
   }
-  ['phone', 'rrn', 'licenseNo', 'account', 'pwReset', 'driverType', 'driverCode', 'schCamp', 'schOrder'].forEach(function (k) {
+  ['phone', 'rrn', 'licenseNo', 'account', 'pwReset', 'driverType', 'driverCode', 'title', 'schCamp', 'schOrder'].forEach(function (k) {
     const cell = sh.getRange(o._row, c[k] + 1);
     if (notes[k]) cell.setNote(notes[k]);
     else if (o[k] !== '' || upd[k] !== undefined) cell.clearNote();
@@ -1590,7 +1610,7 @@ function fixAdminRow_(sh, c, o) {
 // ───────────────────────── 관리자 : 기사 정보관리 ─────────────────────────
 const D_EDIT_LABEL = {
   loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', address: '주소',
-  driverType: '기사구분', driverCode: '기사코드',
+  driverType: '기사구분', driverCode: '기사코드', title: '직함',
   qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
   maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
@@ -1608,7 +1628,7 @@ function docsOf_(o) {
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
-    driverType: o.driverType, driverCode: o.driverCode, schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
+    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
@@ -1785,6 +1805,8 @@ function adm_updateDriver(token, id, changes, seenRev) {
       if (f.loginId) forgetDriver_({ loginId: f.loginId });
       // 기사구분이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가 구분도 맞춘다
       if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
+      // 직함이 바뀌면 정산 결과(정산서 수행자 이름 숨김)를 다시 계산하게
+      if (f.title !== undefined && f.title !== (o.title || '') && typeof stlBump_ === 'function') { try { stlBump_(); } catch (e) { /* 무시 */ } }
       logAdmin_(a, '기사 정보 수정', o.name + ' (' + o.id + ')', changed.join(', ') +
         (f.status ? ' → ' + f.status : ''));
       const fresh = readObj_(SH.DRIVERS, o._row);
@@ -1869,6 +1891,10 @@ function driverFields_(changes, o) {
         f.driverType = opt(v, '기사구분', 10);
         if (f.driverType && DTYPES.indexOf(f.driverType) < 0) fail_('기사구분은 ' + DTYPES.join(' / ') + ' 중에서 골라 주세요.');
         break;
+      case 'title':
+        f.title = opt(v, '직함', 10);
+        if (f.title && TITLES.indexOf(f.title) < 0) fail_('직함은 ' + TITLES.join(' / ') + ' 중에서 고르거나 비워 주세요.');
+        break;
       case 'schCampId': {
         const id = str_(v);
         if (!id) { f.schCampId = ''; f.schCamp = ''; break; }
@@ -1922,9 +1948,6 @@ function normDriverType_(v) {
   if (/^백업/.test(s)) return '백업';
   if (/^품앗이/.test(s)) return '품앗이';
   if (/^(외부|용차|외부용차)/.test(s)) return '외부용차';
-  if (/^운영/.test(s)) return '운영자';
-  if (/^관리/.test(s)) return '관리자';
-  if (/^대표/.test(s)) return '대표';
   return null;
 }
 

@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zD';
+const STL_CALC_VER = '20261105zE';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1162,7 +1162,7 @@ function stlCompute_(month) {
     }
     const line = {
       date: date, who: wg ? stlAcctLabel_(X, D, whoKey) : y.who, whoId: whoKey, route: routeLabel, mode: isAmt ? '금액' : '건당', price: y.price, vendorPay: vPay, qty: qty, autoQty: found ? autoQty : '',
-      payAmt: paid, charge: charge, defUnit: defUnit, vendor: isVendor, whoStaff: !!(wg && !isVendor && D.byId[wg.ownerId] && ['운영자', '관리자', '대표'].indexOf(D.byId[wg.ownerId].driverType) >= 0), toRunner: toRunner, gain: toRunner ? '러너 몫' : '수행자 지급', runnerGain: (toRunner || vPay) && payerOwner ? charge - paid : 0, sales: sales, profit: sales - paid, camp: camp, existing: existing, extra: extra,
+      payAmt: paid, charge: charge, defUnit: defUnit, vendor: isVendor, whoStaff: !!(wg && !isVendor && isStaff_(D.byId[wg.ownerId])), toRunner: toRunner, gain: toRunner ? '러너 몫' : '수행자 지급', runnerGain: (toRunner || vPay) && payerOwner ? charge - paid : 0, sales: sales, profit: sales - paid, camp: camp, existing: existing, extra: extra,
       payer: payerOwner ? stlAcctLabel_(X, D, payerOwner) : y.payer, payerId: payerOwner, payerPrice: payerPrice, cut: cut, memo: y.memo, _row: y._row
     };
     yongOut.push(line);
