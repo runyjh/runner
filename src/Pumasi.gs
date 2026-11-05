@@ -223,7 +223,7 @@ function pmRouteCodes_(routes) {
   });
   return out.sort();
 }
-/** 센터 + 라우트 → 노선관리의 품앗이단가(없으면 기사단가) 제안 */
+/** 센터 + 라우트 → 노선관리의 품앗이단가(없으면 고정단가) 제안 */
 function api_pmPrice(token, campId, route) {
   return run_(function () {
     pmUser_(token);

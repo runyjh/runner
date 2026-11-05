@@ -73,14 +73,14 @@ const STL_TABS = {
   stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' }
 };
 const STL_TAB_NOTES = {
-  stl_ids: '정산의 기준. 쿠팡 아이디 한 줄 = 하나. 구분: 메인 / 서브(메인 아이디 칸에 메인 쿠팡ID). 명의자 = 정산금·세금계산서를 받는 기사(이름). 단가 구분: 고정 / 백업 / 품앗이 / 외부용차 (메인 아이디는 기사 정보관리의 기사구분이 우선, 서브 아이디는 이 칸이 우선). 정산 방식: 비우면 구분별 단가 / 원청단가 / 용차내역. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
-  stl_vendors: '용차업체 목록. 건당 단가 = 러너가 업체에 주는 지급 단가 (VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부단가). 기사에게 청구하는 기본 단가는 노선관리 외부단가. 산재·고용 공제: Y = 기사처럼 공제 / N = 공제 안 함. 아이디 관리의 용차업체 칸에 업체명을 넣으면 그 아이디는 이 업체 정산서로 묶입니다.',
+  stl_ids: '정산의 기준. 쿠팡 아이디 한 줄 = 하나. 구분: 메인 / 서브(메인 아이디 칸에 메인 쿠팡ID). 명의자 = 정산금·세금계산서를 받는 기사(이름). 단가코드: 고정 / 백업 / 품앗이 / 외부용차 (메인 아이디는 기사 정보관리의 단가코드이 우선, 서브 아이디는 이 칸이 우선). 정산 방식: 비우면 구분별 단가 / 원청단가 / 용차내역. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
+  stl_vendors: '용차업체 목록. 건당 단가 = 러너가 업체에 주는 지급 단가 (VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부용차단가). 기사에게 청구하는 기본 단가는 노선관리 외부용차단가. 산재·고용 공제: Y = 기사처럼 공제 / N = 공제 안 함. 아이디 관리의 용차업체 칸에 업체명을 넣으면 그 아이디는 이 업체 정산서로 묶입니다.',
   stl_usage: '한 아이디로 여러 기사가 일할 때, 그 아이디로 일한 기사와 기간. 기록이 없는 날은 명의자가 일한 것으로 봅니다. 정산: 비우면 일한 기사 본인 정산으로 옮김 / 명의자 = 서브 인원 (명의자 정산 그대로).',
   stl_tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.',
   stl_raw: '쿠팡 정산 엑셀을 [정산관리 → 쿠팡 정산서 올리기]로 넣으면 자동으로 채워집니다. 한 정산월에는 마지막으로 올린 차수만 남습니다.',
   stl_adjust: '기사별 월 추가지급·차감. 항목은 stl_items 의 "항목 이름". 금액은 차감도 양수로.',
   stl_advance: '가불금 원장. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제되고, 그 달을 마감하면 상환금에 자동 기록됩니다. 정산 밖에서 현금으로 받으면 상환금 칸에 직접 적으세요.',
-  stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 품앗이 = 노선관리의 그 노선 품앗이단가, 용차업체 = 그 노선 외부단가(차액부담 기사 청구 단가). 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
+  stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 품앗이 = 노선관리의 그 노선 품앗이단가, 용차업체 = 그 노선 외부용차단가(차액부담 기사 청구 단가). 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
   stl_camps: '캠프 및 기사별 산재·고용. 구분 = 캠프 / 기사. 빈 칸 = 세부정산 설정 기본값. 우선순위: 기사 > 캠프 > 기본값 (칸마다). 산재·고용 ON/OFF 는 기사 줄만 (OFF = 그 보험 공제 안 함). 보험 기준: 공급가 / 부가세포함.',
   stl_config: '값만 고치세요. % 는 10% 처럼 써도 됩니다.',
   stl_cost: '고정 운영비: 매달 똑같이 나가는 돈. 월 금액 = 실제 나가는 돈(VAT포함). 증빙이 세금계산서·카드·현금영수증이면 부가세를 나눠 매입세액 공제로 셉니다. 시작월·종료월(2026-11) 사이 달에 자동 반영.',
@@ -1163,16 +1163,16 @@ function stlPriceIndex_() {
  * 1) 정산 방식 용차내역 → 0 (용차 표 금액으로 지급)
  * 2) 그 날 그 아이디로 일한 기사의 일시단가 (기간·노선이 맞을 때)
  * 3) 원청단가 → 쿠팡 단가 × 1.1 (10원 반올림)
- * 4) 노선관리 구분별 단가 (고정 = 기사단가, 백업 = 백업단가, 품앗이 = 품앗이단가, 외부용차 = 외부단가). 구분은
- *    메인 아이디: 기사 정보관리의 명의자 기사구분이 최우선 → 비어 있으면 아이디 관리의 단가 구분 → 고정
- *    서브 아이디: 아이디 관리의 단가 구분 → 비어 있으면 메인과 같은 규칙
+ * 4) 노선관리 구분별 단가 (고정 = 고정단가, 백업 = 백업단가, 품앗이 = 품앗이단가, 외부용차 = 외부용차단가). 구분은
+ *    메인 아이디: 기사 정보관리의 명의자 단가코드이 최우선 → 비어 있으면 아이디 관리의 단가코드 → 고정
+ *    서브 아이디: 아이디 관리의 단가코드 → 비어 있으면 메인과 같은 규칙
  */
 function stlUnit_(ctx, idx, r, worker) {
   const g0 = ctx.ids.groups[idx.mainKey];
   const main = (g0 && g0.main) || ctx.ids.by[idx.mainKey] || idx;
   const mode = idx.mode || main.mode;
   if (mode === '용차내역') return { u: 0, how: '용차내역' };
-  // 용차업체 아이디: 업체 건당 단가 (모든 노선 같은 단가). 비어 있으면 노선관리 외부단가
+  // 용차업체 아이디: 업체 건당 단가 (모든 노선 같은 단가). 비어 있으면 노선관리 외부용차단가
   if (main.vendor) {
     if (main.vinfo && main.vinfo.price > 0) return { u: main.vinfo.price, how: '업체단가' };
     const fv = ctx.price.find(r.camp, r.route), pv = fv.row ? stlNum_(fv.row.p5) : 0;
@@ -1408,7 +1408,7 @@ function stlCompute_(month) {
     }
     // 단가 칸 = 수행 단가. 입력하면 그 값, 비우면 노선관리 기본값
     //  - 우리 기사(품앗이) = 그 노선 '품앗이단가' (건당 · 프백 가중치까지 포함한 금액)
-    //  - 용차업체(외부용차) = 그 노선 '외부단가' (차액부담 기사에게 청구하는 단가. 업체에 주는 돈은 용차업체 표의 지급 단가)
+    //  - 용차업체(외부용차) = 그 노선 '외부용차단가' (차액부담 기사에게 청구하는 단가. 업체에 주는 돈은 용차업체 표의 지급 단가)
     //  기본값이 비어 있으면 원래 단가 그대로 (추가지급·러너 몫 없음) + 확인 필요
     const isVendor = !!(wg && wg.vendor);
     // 업체 실지급액: 용차업체가 일당 등으로 청구할 때 그 줄에 실제로 주는 총액 (예: 264,000 × 2명 = 528,000)
@@ -1419,7 +1419,7 @@ function stlCompute_(month) {
     else if (stlNum_(y.price)) payAmt = stlR0_(stlNum_(y.price) * qty);
     else if (vPay) { payAmt = vPay; defUnit = qty ? Math.round(vPay / qty) : 0; }
     else {
-      const ext = isVendor || !wg; // 용차업체·외부(정산 아이디 없는 수행자) = 외부단가
+      const ext = isVendor || !wg; // 용차업체·외부(정산 아이디 없는 수행자) = 외부용차단가
       const pk = ext ? 'p5' : 'p4';
       const pmU = function (cp, rt) { const f = ctx.price.find(cp, rt); return f.row ? stlNum_(f.row[pk]) : 0; };
       let miss = false;
@@ -1437,8 +1437,8 @@ function stlCompute_(month) {
     }
     // 차액 처리
     //  - 러너 몫 (용차업체는 기본): 수행자에게는 원래 단가(쿠팡 정산서에 잡힌 단가 / 업체 지급 단가)만 지급, 추가지급 없음.
-    //    차액부담 기사에게는 단가 칸(비우면 품앗이단가/외부단가)으로 청구 → 러너 몫 = 청구 금액 − 수행자 지급
-    //    예: 외부단가 1,350 · 히어로 지급 1,320 → 러너 30원 / 단가 칸 1,400 → 러너 80원
+    //    차액부담 기사에게는 단가 칸(비우면 품앗이단가/외부용차단가)으로 청구 → 러너 몫 = 청구 금액 − 수행자 지급
+    //    예: 외부용차단가 1,350 · 히어로 지급 1,320 → 러너 30원 / 단가 칸 1,400 → 러너 80원
     //  - 수행자 지급 (품앗이는 기본): 단가/금액만큼 수행자에게 지급 (원래 단가와의 차이 = 추가지급)
     const gainMode = str_(y.gain);
     const toRunner = isVendor ? gainMode !== '수행자 지급' : gainMode === '러너 몫';
@@ -1652,7 +1652,7 @@ function stlCompute_(month) {
   };
   const W = function (key, label, list, level, acts) { if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, 50), level: level || 'warn', acts: acts ? acts.slice(0, 50) : null }); };
   W('yongNoP', '품앗이 단가 없음 (노선관리 품앗이단가가 비어 있어 원래 단가로만 지급 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP, 'warn');
-  W('yongNoP5', '외부단가 없음 (용차업체·외부 수행 노선의 노선관리 외부단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP5, 'warn');
+  W('yongNoP5', '외부용차단가 없음 (용차업체·외부 수행 노선의 노선관리 외부용차단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP5, 'warn');
   W('advPrepaid', '이번 정산에 상계할 가불금인데 상환금이 이미 적혀 있어 자동 공제 안 됨 (아직 안 받은 돈이면 가불금 목록에서 상환금을 지우거나 받은 만큼만 남겨 주세요)', advPrepaid, 'warn');
   W('advManual', '수기 가불금 상환 있음 · 자동 공제 건너뜀 (마감하면 가불금 목록 상환금에 기록)', advManualWarn, 'info');
   W('unreg', stlIdsV2_() ? '기사 정보관리에 없는 쿠팡 ID (지급 계산 안 됨 — [기사에 연결] 또는 [용차업체로 지정])' : '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
@@ -2668,14 +2668,14 @@ function fmtAccount_(d, bank) {
 //  acct = 정산 묶음(명의자 또는 쿠팡ID) / acctOrText = 정산 묶음 또는 용차업체 이름 / person = 기사(사람)
 const STL_EDIT = {
   ids: { sheet: 'stl_ids', scope: 'all', cols: [['owner', '명의자 (정산금 받는 기사)', 'person', 'ownerId'], ['vendor', '용차업체 (명의자 대신)', 'vendor'], ['cid', '쿠팡ID', 'cid'], ['role', '구분', STL_ROLES], ['main', '메인 아이디 (서브일 때)', 'text'],
-    ['type', '단가 구분', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=구분별 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
-  vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['ids', '쿠팡 아이디 (쉼표로 여러 개)', 'text'], ['price', '지급 단가 (러너 → 업체 · VAT포함 · 비우면 외부단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'], ['addr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'],
+    ['type', '단가코드', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=단가코드별 노선 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
+  vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['ids', '쿠팡 아이디 (쉼표로 여러 개)', 'text'], ['price', '지급 단가 (러너 → 업체 · VAT포함 · 비우면 외부용차단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'], ['addr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'],
     ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['holder', '예금주', 'text'], ['email', '이메일 (계산서)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text'], ['settle', '정산 (비우면 일한 기사 본인 정산 · 명의자 = 서브 인원)', ['', '명의자']]] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
   adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '정산서 메모 (기사 정산서에 보임)', 'text'], ['note', '관리자 메모 (정산서에 안 보임)', 'text']] },
   advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
-  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체 · 119AB 처럼 여러 개)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본: 품앗이단가 · 용차업체 외부단가)', 'money'], ['vendorPay', '업체 실지급액 (일당 등 · 용차업체만)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 용차업체·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
+  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체 · 119AB 처럼 여러 개)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본: 품앗이단가 · 용차업체 외부용차단가)', 'money'], ['vendorPay', '업체 실지급액 (일당 등 · 용차업체만)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 용차업체·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
   regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
   target: { sheet: 'stl_target', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['goal', '연 목표 계산서 (VAT포함)', 'money'], ['unit', '단위', 'money']] },
   split: { sheet: 'stl_split', scope: 'all', cols: [['from', '원 명의자 (발행 줄일 아이디)', 'acct', 'fromId'], ['to', '받는 명의자', 'acct', 'toId'], ['target', '목표 실수령', 'money'], ['unit', '단위', 'money'], ['repeat', '매달 반복', ['Y', 'N']], ['month', '적용월 (반복 N 일 때)', 'month']] },
@@ -2983,7 +2983,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     } finally {
       lock.releaseLock();
     }
-    // 아이디 관리 → 기사 정보관리 연동 (없는 명의자는 기사로 등록, 메인 아이디는 쿠팡플렉스 아이디·기사구분 맞춤)
+    // 아이디 관리 → 기사 정보관리 연동 (없는 명의자는 기사로 등록, 메인 아이디는 쿠팡플렉스 아이디·단가코드 맞춤)
     let sync = null;
     if (name === 'ids') { try { sync = stlIdsToDrivers_(token); } catch (e) { console.error('기사 정보 연동 실패: ' + (e && e.message)); } }
     // 저장 직후 화면에 쓸 표 (다시 부르지 않아도 되게)
@@ -3062,8 +3062,8 @@ function stlNewExec_() {
 }
 
 /**
- * 기사 정보관리에서 기사구분을 바꾸면 그 기사 본인 아이디(쿠팡플렉스 아이디 = 메인)의 단가 구분도 같이 바꾼다.
- * 아이디의 단가 구분이 예전 기사구분과 같았거나 비어 있을 때만 (따로 정해 둔 값은 그대로).
+ * 기사 정보관리에서 단가코드을 바꾸면 그 기사 본인 아이디(쿠팡플렉스 아이디 = 메인)의 단가코드도 같이 바꾼다.
+ * 아이디의 단가코드이 예전 단가코드과 같았거나 비어 있을 때만 (따로 정해 둔 값은 그대로).
  */
 function stlSyncIdType_(driverId, loginId, oldType, newType) {
   if (stlIdsV2_()) { try { stlBump_(); } catch (e) { /* 무시 */ } return 0; }
@@ -3079,7 +3079,7 @@ function stlSyncIdType_(driverId, loginId, oldType, newType) {
     });
     if (n) stlBump_();
     return n;
-  } catch (e) { console.error('아이디 단가 구분 맞추기 실패: ' + (e && e.message)); return 0; }
+  } catch (e) { console.error('아이디 단가코드 맞추기 실패: ' + (e && e.message)); return 0; }
 }
 
 // ───────────────────────── 아이디 관리 ↔ 기사 정보관리 연동 ─────────────────────────
@@ -3112,9 +3112,9 @@ function stlEnsureIdFor_(o) {
 }
 /**
  * 아이디 관리 → 기사 정보관리: 저장한 뒤 한 번.
- *  - 명의자가 기사 정보에 없으면 기사로 등록 (이름·쿠팡플렉스 아이디(메인일 때)·기사구분·상태)
+ *  - 명의자가 기사 정보에 없으면 기사로 등록 (이름·쿠팡플렉스 아이디(메인일 때)·단가코드·상태)
  *  - 명의자가 있고 메인 아이디인데 기사의 쿠팡플렉스 아이디가 비어 있으면 채운다
- *  - 메인 아이디의 단가 구분을 바꾸면 그 기사의 기사구분도 바꾼다 (본인 쿠팡플렉스 아이디인 줄만)
+ *  - 메인 아이디의 단가코드을 바꾸면 그 기사의 단가코드도 바꾼다 (본인 쿠팡플렉스 아이디인 줄만)
  */
 function stlIdsToDrivers_(token) {
   const out = { created: [], updated: [] };
@@ -3149,7 +3149,7 @@ function stlIdsToDrivers_(token) {
       upd.updatedAt = nowText_();
       writeFields_(SH.DRIVERS, d._row, upd);
       forgetDriver_(d);
-      out.updated.push(d.name + ' (' + Object.keys(upd).filter(function (x) { return x !== 'updatedAt'; }).map(function (x) { return x === 'loginId' ? '쿠팡플렉스 아이디' : '기사구분'; }).join('·') + ')');
+      out.updated.push(d.name + ' (' + Object.keys(upd).filter(function (x) { return x !== 'updatedAt'; }).map(function (x) { return x === 'loginId' ? '쿠팡플렉스 아이디' : '단가코드'; }).join('·') + ')');
     }
   });
   return out;

@@ -2002,7 +2002,7 @@
         '<div class="mystat"><div><b>' + r.stats.posted + '</b>올린 품앗이</div><div><b>' + r.stats.helped + '</b>도와준 품앗이</div></div>';
       pmPostOn = r.postOn !== false; paintPostOn();
       const gv = $('#myGive'); if (gv) gv.textContent = [r.stats.giveDays ? r.stats.giveDays + '일' : '', r.stats.offers ? '제안 ' + r.stats.offers : ''].filter(Boolean).join(' · ');
-      $('#miBody').innerHTML = '<dl>' + [['이름', i.name], ['쿠팡 아이디', i.loginId], ['연락처', i.phone], ['기사구분', i.type], ['소속 캠프', i.camp], ['기본노선', i.baseRoute], ['차량번호', i.carNo],
+      $('#miBody').innerHTML = '<dl>' + [['이름', i.name], ['쿠팡 아이디', i.loginId], ['연락처', i.phone], ['단가코드', i.type], ['소속 캠프', i.camp], ['기본노선', i.baseRoute], ['차량번호', i.carNo],
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';
     }).catch(netErr);
     api('api_pmList', token, {}).then((r) => { $('#myNew').innerHTML = r && r.ok && r.waiting ? '<span class="bdg nw">새 지원 ' + r.waiting + '</span>' : ''; }).catch(() => {});

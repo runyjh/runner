@@ -47,15 +47,15 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
   id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
-  subType1: '서브아이디1 단가', subType2: '서브아이디2 단가', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
-  driverType: '기사구분', driverCode: '기사코드', title: '직함',
+  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
+  driverType: '단가코드', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
   carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
   schCampId: '소속캠프ID', schCamp: '소속캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무',
   workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위',
-  // 정산관리: 명의자 세금계산서 정보 (정산 기준인 쿠팡 아이디·단가 구분·일시단가는 정산 DB 의 아이디 관리·일시단가 탭)
+  // 정산관리: 명의자 세금계산서 정보 (정산 기준인 쿠팡 아이디·단가코드·일시단가는 정산 DB 의 아이디 관리·일시단가 탭)
   bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
   docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증',
@@ -72,12 +72,12 @@ const D = {
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
   'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut'];
-// 기사구분 = 단가 코드 (고정/백업/품앗이/외부용차 → 노선관리 기사단가/백업단가/품앗이단가/외부단가)
+// 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
 const TITLES = ['관리자', '운영자', '대표'];
 const DTYPES_STAFF = TITLES; // (예전 이름)
-/** 러너 내부 인원(관리자·운영자·대표)인지: 직함 칸 (예전에 기사구분에 적은 값도 인정) */
+/** 러너 내부 인원(관리자·운영자·대표)인지: 직함 칸 (예전에 단가코드에 적은 값도 인정) */
 function isStaff_(o) { return !!o && (TITLES.indexOf(str_(o.title)) >= 0 || TITLES.indexOf(str_(o.driverType)) >= 0); }
 /** 직함 글자 정리. 모르는 값이면 null */
 function normTitle_(v) {
@@ -103,15 +103,15 @@ const D_NOTES = {
   fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
   subId1: '이 기사가 쓰는 다른 쿠팡플렉스 아이디 (서브). 넣으면 그 아이디로 뛴 건은 이 기사 정산서로 합쳐지고, 그 아이디로 가입한 기사는 앱 사용만 정지됩니다',
   subId2: '두 번째 서브아이디',
-  subType1: '서브아이디1로 뛴 건의 기사단가 (고정/백업/품앗이/외부용차). 비우면 메인과 같음',
-  subType2: '서브아이디2로 뛴 건의 기사단가. 비우면 메인과 같음',
+  subType1: '서브아이디1로 뛴 건의 단가코드 (고정/백업/품앗이/외부용차). 비우면 메인과 같음',
+  subType2: '서브아이디2로 뛴 건의 단가코드. 비우면 메인과 같음',
   stlMode: '정산 방식: 빈칸(기본) / 원청단가 / 용차내역',
   insEx: '산재·고용보험 공제 제외면 Y',
   fbCut: '프레시백 차감: 13% 같은 비율 또는 금액 (비우면 차감 없음)',
   workStatus: '재직(빈칸) / 휴직 / 퇴사. 기사 앱 사용(상태 칸)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐',
   leaveDate: '마지막 근무일 (yyyy-mm-dd). 근무상태가 퇴사일 때만 씀',
   backupArea: '백업으로 들어갈 수 있는 곳. 전지역 또는 캠프 이름(예: 강서1,수원1). 기사스케줄 백업 추천에 사용',
-  driverType: '고정 / 백업 / 품앗이 / 외부용차 (단가 코드: 노선관리 기사단가 / 백업단가 / 품앗이단가 / 외부단가)',
+  driverType: '고정 / 백업 / 품앗이 / 외부용차 (노선관리 고정단가 / 백업단가 / 품앗이단가 / 외부용차단가)',
   title: '관리자 / 운영자 / 대표 (빈칸 = 일반 기사). 단가와 무관한 러너 내부 직책.\n직함이 있는 사람이 대신 뛴 건은 기사 정산서에 수행자 이름이 안 보입니다. 앞으로 권한 부여에도 씁니다.',
   driverCode: '기사마다 겹치지 않는 코드 (영문은 자동 대문자)',
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
@@ -293,7 +293,7 @@ const CAD_MAX = 10;
 // route_prices 시트: 구분별 단가. 숫자(구분1) + 구분(2~5) + 글자 하나에 한 줄. 예: 110 / 구분3 / B
 const RP = {
   id: '단가ID', campId: '캠프ID', campName: '캠프명', num: '숫자(구분1)', level: '구분', value: '글자',
-  p1: '원청단가', p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가',
+  p1: '원청단가', p2: '고정단가', p3: '백업단가', p4: '품앗이단가', p5: '외부용차단가',
   createdAt: '등록일시', updatedAt: '수정일시'
 };
 const RP_PRICE_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5']; // 일시단가는 정산관리(기사 + 기간)로 옮김
@@ -348,6 +348,8 @@ const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
 const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes']);
 
+/** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
+const HEAD_RENAME = {};
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
 SCHEMA[SH.SESSIONS] = S;
@@ -359,6 +361,8 @@ SCHEMA[SH.CAMPS] = CP;
 SCHEMA[SH.CIMG] = CI;
 SCHEMA[SH.CADDR] = CAD;
 SCHEMA[SH.PRICES] = RP;
+HEAD_RENAME[SH.DRIVERS] = { '기사구분': '단가코드', '서브아이디1 단가': '서브아이디1 단가코드', '서브아이디2 단가': '서브아이디2 단가코드' };
+HEAD_RENAME[SH.PRICES] = { '기사단가': '고정단가', '외부단가': '외부용차단가' };
 SCHEMA[SH.ROUTES] = R;
 SCHEMA[SH.NOTICE] = N;
 SCHEMA[SH.ACC] = AC;
@@ -636,6 +640,14 @@ function cols_(name, fresh) {
     const sh = sheet_(name);
     head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
     cache_().put(ck, JSON.stringify(head), CFG.HEAD_CACHE);
+  }
+  // 이름이 바뀐 머리글: 시트의 예전 이름을 새 이름으로 고쳐 쓴다 (값은 그대로)
+  const ren = HEAD_RENAME[name];
+  if (ren && head.some(function (h) { return ren[h] && head.indexOf(ren[h]) < 0; })) {
+    const sh = sheet_(name);
+    head.forEach(function (h, i) { if (ren[h] && head.indexOf(ren[h]) < 0) sh.getRange(1, i + 1).setValue(ren[h]); });
+    cache_().remove(ck);
+    return cols_(name, true);
   }
   const def = SCHEMA[name], c = { __w: head.length }, missing = [];
   Object.keys(def).forEach(function (k) {
@@ -1630,13 +1642,13 @@ function fixAdminRow_(sh, c, o) {
 // ───────────────────────── 관리자 : 기사 정보관리 ─────────────────────────
 const D_EDIT_LABEL = {
   loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', address: '주소',
-  driverType: '기사구분', driverCode: '기사코드', title: '직함',
+  driverType: '단가코드', driverCode: '기사코드', title: '직함',
   qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
   maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
   schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
   schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
-  subType1: '서브아이디1 단가', subType2: '서브아이디2 단가', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감'
+  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
 
@@ -1839,7 +1851,7 @@ function updateDriverCore_(a, id, changes, seenRev) {
     }
   } catch (e) { console.error('노선 변경 이력 기록 실패: ' + (e && e.message)); }
   if (f.loginId) forgetDriver_({ loginId: f.loginId });
-  // 기사구분이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가 구분도 맞춘다
+  // 단가코드이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가코드도 맞춘다
   if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
   // 직함이 바뀌면 정산 결과(정산서 수행자 이름 숨김)를 다시 계산하게
   if (f.title !== undefined && f.title !== (o.title || '') && typeof stlBump_ === 'function') { try { stlBump_(); } catch (e) { /* 무시 */ } }
@@ -1953,8 +1965,8 @@ function driverFields_(changes, o) {
         break;
       }
       case 'driverType':
-        f.driverType = opt(v, '기사구분', 10);
-        if (f.driverType && DTYPES.indexOf(f.driverType) < 0) fail_('기사구분은 ' + DTYPES.join(' / ') + ' 중에서 골라 주세요.');
+        f.driverType = opt(v, '단가코드', 10);
+        if (f.driverType && DTYPES.indexOf(f.driverType) < 0) fail_('단가코드은 ' + DTYPES.join(' / ') + ' 중에서 골라 주세요.');
         break;
       case 'title':
         f.title = opt(v, '직함', 10);
@@ -2046,7 +2058,7 @@ function normDriverCode_(v) {
   if (!s) return '';
   return /^[0-9A-Z가-힣_-]{1,20}$/.test(s) ? s : null;
 }
-/** 기사구분 글자 정리: '고정기사' → '고정', '용차' → '외부용차'. 모르는 값이면 null */
+/** 단가코드 글자 정리: '고정기사' → '고정', '용차' → '외부용차'. 모르는 값이면 null */
 function normDriverType_(v) {
   const s = str_(v).replace(/\s+/g, '');
   if (!s) return '';
@@ -2063,7 +2075,7 @@ function adm_createDriver(token, fields, tempPw) {
     const a = requireAdmin_(token);
     fields = Object.assign({}, fields || {});
     if (!str_(fields.name)) fail_('이름을 입력해 주세요.');
-    if (!str_(fields.driverType)) fail_('기사구분(고정 / 백업 / 품앗이 / 외부용차)을 골라 주세요.');
+    if (!str_(fields.driverType)) fail_('단가코드(고정 / 백업 / 품앗이 / 외부용차)을 골라 주세요.');
     if (!fields.status) fields.status = ST.ACTIVE;
     const pw = tempPw ? checkPw_(tempPw) : '';
     if (pw && !str_(fields.loginId)) fail_('앱 로그인용 비밀번호를 지정하려면 쿠팡플렉스 아이디를 입력해 주세요.');
@@ -4971,7 +4983,7 @@ function api_campSchedule(token, month) {
 /**
  * 기사 앱용: 내 캠프의 날짜별 백업 명단 { camp: '강서1', list: { 'yyyy-MM-dd': ['527B 김영환', …] } }
  * 관리자 화면 SchedCalc 의 백업 명단 계산(운영시트 updateBackupRoster)과 같은 규칙.
- * 백업 기사 = 기본노선에 백업·예비·용차, 또는 기사구분이 백업·외부용차.
+ * 백업 기사 = 기본노선에 백업·예비·용차, 또는 단가코드이 백업·외부용차.
  * 그 기사의 칸에서 '캠프명 + 노선' 을 찾고, 캠프명이 없으면 그 기사 소속 캠프로 본다.
  */
 function schMyCampBackup_(myId, dates, h, c0, c1) {
@@ -6028,7 +6040,7 @@ function rcWarnings_(o, date, toCampId, toRoute, fromCampId, fromRoute, skipVaca
   const short = function (id) { return String(campName[id] || '').replace(/\s*캠프$/, ''); };
   const u = rcUnits_(toRoute);
   const tk = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외부용차': 'p5' }[o.driverType] || 'p2';
-  const tl = { p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가' }[tk];
+  const tl = { p2: '고정단가', p3: '백업단가', p4: '품앗이단가', p5: '외부용차단가' }[tk];
   u.units.forEach(function (x) {
     const rts = m.routes.filter(function (r) { return r.campId === toCampId && r.g1 === x.num; });
     if (!rts.length) { out.push(short(toCampId) + ' ' + x.num + ' 노선이 노선관리에 없습니다.'); return; }

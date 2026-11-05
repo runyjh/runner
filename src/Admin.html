@@ -936,7 +936,7 @@
     <div class="rbulk hidden" id="dBulk"></div>
     <div class="table-wrap">
       <table>
-        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="title">직급</th><th class="dsrt" data-ds="driverType">기사단가</th><th class="dsrt" data-ds="subId1">서브아이디</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status" title="기사 앱 로그인 허용 여부">앱 사용</th><th class="dsrt" data-ds="workStatus">근무상태</th><th class="dsrt" data-ds="leaveDate">퇴사일</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
+        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="title">직급</th><th class="dsrt" data-ds="driverType">단가코드</th><th class="dsrt" data-ds="subId1">서브아이디</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status" title="기사 앱 로그인 허용 여부">앱 사용</th><th class="dsrt" data-ds="workStatus">근무상태</th><th class="dsrt" data-ds="leaveDate">퇴사일</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -1646,7 +1646,7 @@
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const TOKEN = 'runner.admin.token';
   const STATUSES = ['승인대기', '승인', '반려', '정지'];
-  const DTYPES = ['고정', '백업', '품앗이', '외부용차']; // 기사구분 = 단가 코드
+  const DTYPES = ['고정', '백업', '품앗이', '외부용차']; // 단가코드 = 단가코드
   const TITLES = ['관리자', '운영자', '대표'];          // 직함 = 러너 내부 직책 (단가와 무관 · 정산서 이름 숨김 · 앞으로 권한)
   const DOCS = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };
   const LICENSE_TYPES = ['1종 대형', '1종 보통', '2종 보통', '특수 대형견인', '특수 소형견인'];
@@ -1831,7 +1831,7 @@
   }
   function renderTTabs() {
     const n = (t) => all.filter((r) => (t === '미지정' ? !r.driverType : r.driverType === t)).length;
-    const items = [['', '구분 전체', all.length]].concat(DTYPES.map((t) => [t, t, n(t)]));
+    const items = [['', '단가코드 전체', all.length]].concat(DTYPES.map((t) => [t, t, n(t)]));
     const none = n('미지정'); if (none) items.push(['미지정', '구분 미지정', none]);
     $('#ttabs').innerHTML = items.map(([k, label, c]) => '<button class="tab' + (k === tfilter ? ' on' : '') + '" data-t="' + k + '">' + label + '<b>' + c + '</b></button>').join('');
   }
@@ -1943,7 +1943,7 @@
     b.innerHTML = '<b>' + dsel.size + '명 선택</b><span class="bkl">한 번에 바꾸기</span>' +
       sel('status', '앱 사용', STATUSES.map((x) => [x, x])) +
       sel('workStatus', '근무상태', [['재직', '재직'], ['휴직', '휴직'], ['퇴사', '퇴사 (퇴사일 입력)']]) +
-      sel('driverType', '기사단가', DTYPES.map((x) => [x, x])) +
+      sel('driverType', '단가코드', DTYPES.map((x) => [x, x])) +
       sel('title', '직급', [['', '기사']].concat(TITLES.map((x) => [x, x]))) +
       (camps.length ? sel('schCampId', '배정 캠프', [['', '(배정 안 함)']].concat(camps)) : '') +
       '<span class="bksp"></span><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button><button type="button" class="btn sm danger" id="dBulkDel"' + (dDeleting ? ' disabled>삭제 중…' : '>선택한 기사 삭제') + '</button>';
@@ -1958,7 +1958,7 @@
     renderRows();
   });
   // 일괄 바꾸기: 고른 기사 전부에 같은 값 (한 명 수정과 같은 검사·연동)
-  const BK_LABEL = { status: '기사 앱 사용', workStatus: '근무상태', driverType: '기사단가 코드', title: '직급', schCampId: '배정 캠프' };
+  const BK_LABEL = { status: '기사 앱 사용', workStatus: '근무상태', driverType: '단가코드', title: '직급', schCampId: '배정 캠프' };
   $('#dBulk').addEventListener('change', (e) => {
     const sl = e.target.closest('[data-bk]'); if (!sl) return;
     const k = sl.dataset.bk, idx = sl.selectedIndex; if (!idx) return;
@@ -2220,24 +2220,24 @@
       ['재직', '휴직', '퇴사'].map((w) => '<button type="button" class="st' + (w === ws ? ' on' : '') + '" data-ws="' + w + '">' + w + '</button>').join('') + '</div>' +
       '<div class="field" id="wsLeave" style="margin:0;max-width:240px' + (ws === '퇴사' ? '' : ';display:none') + '"><label class="lb">퇴사일 (마지막 근무일)</label><input class="inp" type="date" data-k="leaveDate" value="' + esc(d.leaveDate || '') + '"></div></div>';
   }
-  /** 기사구분 버튼 + 기사코드 + 직함 (상세·등록 공용) */
-  /** 기사단가 코드 (고정·백업·품앗이·외부용차) + 서브아이디 1·2 (상세·등록 공용). 기사코드는 자동 (화면에 안 보임) */
+  /** 단가코드 버튼 + 기사코드 + 직함 (상세·등록 공용) */
+  /** 단가코드 (고정·백업·품앗이·외부용차) + 서브아이디 1·2 (상세·등록 공용). 기사코드는 자동 (화면에 안 보임) */
   function typeSec(d) {
     const link = (sid) => {
       if (!sid) return '';
       const x = all.find((r) => String(r.loginId || '').toLowerCase() === String(sid).toLowerCase() && r.id !== d.id);
       return x ? '<small class="sublink">↳ ' + esc(x.name) + ' 님 가입 아이디 · 기사 앱 ' + esc(x.status) + (x.status === '정지' ? '' : ' (저장하면 정지)') + '</small>' : '<small class="sublink">↳ 가입한 기사 없음</small>';
     };
-    const tsel = (k) => '<select class="inp" data-k="' + k + '" aria-label="서브 단가"><option value="">단가: 메인과 같음</option>' +
-      DTYPES.map((t) => '<option value="' + t + '"' + (t === (d[k] || '') ? ' selected' : '') + '>단가: ' + t + '</option>').join('') + '</select>';
+    const tsel = (k) => '<select class="inp" data-k="' + k + '" aria-label="서브 단가코드"><option value="">단가코드: 메인과 같음</option>' +
+      DTYPES.map((t) => '<option value="' + t + '"' + (t === (d[k] || '') ? ' selected' : '') + '>단가코드: ' + t + '</option>').join('') + '</select>';
     const subRow = (k, tk, label) => '<div class="idrow"><span class="k">' + label + '</span><div><input class="inp" data-k="' + k + '" value="' + esc(d[k] || '') + '" autocomplete="off" spellcheck="false" placeholder="쿠팡플렉스 아이디">' + link(d[k]) + '</div>' + tsel(tk) + '</div>';
     const subOf = !d.isNew && d.loginId ? all.find((r) => r.id !== d.id && [r.subId1, r.subId2].some((x) => String(x || '').toLowerCase() === String(d.loginId).toLowerCase())) : null;
-    return '<div class="sec"><h4>쿠팡 아이디 · 기사단가' + (d.isNew ? '<span class="req">*</span>' : '') + ' <small class="sub" style="font-weight:500">— 정산은 여기 값으로 계산 (노선관리 단가: 고정 = 기사단가 · 백업 = 백업단가 …)</small></h4><div class="status-row" style="margin-bottom:12px">' +
+    return '<div class="sec"><h4>쿠팡 아이디 · 단가코드' + (d.isNew ? '<span class="req">*</span>' : '') + ' <small class="sub" style="font-weight:500">— 정산은 여기 값으로 계산 (노선관리 고정단가 · 백업단가 · 품앗이단가 · 외부용차단가 중 같은 이름의 단가)</small></h4><div class="status-row" style="margin-bottom:12px">' +
       DTYPES.map((t) => '<button type="button" class="st' + (t === d.driverType ? ' on' : '') + '" data-dt="' + t + '">' + t + '</button>').join('') + '</div>' +
       (subOf ? '<div class="warnbox" style="margin:0 0 10px">이 아이디는 <b>' + esc(subOf.name) + '</b> 기사님의 서브아이디입니다 · 정산은 ' + esc(subOf.name) + ' 기사님 정산서로, 기사 앱 사용은 정지로 둡니다.</div>' : '') +
-      '<div class="idrow"><span class="k">메인</span><div><b>' + esc(d.loginId || '—') + '</b> <small class="sub">(쿠팡플렉스 아이디 · 아래 기본 정보에서 고침)</small></div><span class="sub" style="font-size:12px">단가: ' + esc(d.driverType || '미지정') + '</span></div>' +
+      '<div class="idrow"><span class="k">메인</span><div><b>' + esc(d.loginId || '—') + '</b> <small class="sub">(쿠팡플렉스 아이디 · 아래 기본 정보에서 고침)</small></div><span class="sub" style="font-size:12px">단가코드: ' + esc(d.driverType || '미지정') + '</span></div>' +
       subRow('subId1', 'subType1', '서브 1') + subRow('subId2', 'subType2', '서브 2') +
-      '<p class="sub" style="font-size:12px;margin:6px 0 0">서브 단가는 비우면 메인과 같음 · 다른 경우만 고름 (예: 서브로 백업 뛸 때). 그 아이디로 가입한 기사는 <b>기사 앱 사용만 정지</b>됩니다.</p></div>' +
+      '<p class="sub" style="font-size:12px;margin:6px 0 0">서브 단가코드는 비우면 메인과 같음 · 다른 경우만 고름 (예: 서브로 백업 뛸 때). 그 아이디로 가입한 기사는 <b>기사 앱 사용만 정지</b>됩니다.</p></div>' +
       (d.isNew ? '' : stlSec(d));
   }
   /** 정산 설정 (예전 정산관리 아이디 관리 칸): 정산 방식 · 산재·고용 제외 · 프레시백 차감 */
@@ -2253,7 +2253,7 @@
     return '<div class="sec"><h4>직급 <small class="sub" style="font-weight:500">— 러너 내부 직책 (관리자·운영자·대표가 대신 뛴 건은 기사 정산서에 이름 숨김)</small></h4><div class="status-row" style="margin:0">' +
       [''].concat(TITLES).map((t) => '<button type="button" class="st' + (t === (d.title || '') ? ' on' : '') + '" data-ttl="' + t + '">' + (t || '기사') + '</button>').join('') + '</div></div>';
   }
-  /** 같은 기사구분의 기존 코드 중 가장 큰 번호 다음 번호를 제안 (예: B007 → B008) */
+  /** 같은 단가코드의 기존 코드 중 가장 큰 번호 다음 번호를 제안 (예: B007 → B008) */
   function nextCode(type) {
     const used = new Set(all.map((r) => String(r.driverCode || '').toUpperCase()));
     let best = null;
@@ -2308,7 +2308,7 @@
   function setDirty(d) {
     dirty = d; const n = Object.keys(d).length;
     $('#dSave').disabled = !n; $('#dReset').disabled = !n;
-    $('#dMsg').textContent = cur && cur.isNew ? (n ? n + '개 항목 입력됨' : '이름과 기사구분을 입력하세요.')
+    $('#dMsg').textContent = cur && cur.isNew ? (n ? n + '개 항목 입력됨' : '이름과 단가코드을 입력하세요.')
       : n ? n + '개 항목이 바뀌었습니다.' : '바뀐 항목은 주황색으로 표시됩니다.';
   }
   $('#dBody').addEventListener('input', (e) => {
@@ -2350,7 +2350,7 @@
     }
     if (e.target.closest('[data-autocode]') && cur) {
       const type = dirty.driverType || cur.driverType;
-      if (!type) return toast('기사구분을 먼저 골라 주세요.');
+      if (!type) return toast('단가코드을 먼저 골라 주세요.');
       const code = nextCode(type);
       if (!code) return toast(type + ' 기사 중 번호가 붙은 기사코드가 아직 없습니다. 첫 코드는 직접 입력해 주세요.');
       const inp = $('[data-k="driverCode"]', $('#dBody'));
@@ -2393,7 +2393,7 @@
       const f = Object.assign({}, dirty), pw = f.tempPw || '';
       delete f.tempPw;
       if (!f.name) return toast('이름을 입력해 주세요.');
-      if (!f.driverType) return toast('기사구분(고정 / 백업 / 품앗이 / 외부용차)을 골라 주세요.');
+      if (!f.driverType) return toast('단가코드(고정 / 백업 / 품앗이 / 외부용차)을 골라 주세요.');
       if (pw && (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw))) return toast('임시 비밀번호는 영문과 숫자를 포함해 8자 이상으로 입력해 주세요.');
       if (pw && !f.loginId) return toast('앱 임시 비밀번호를 쓰려면 쿠팡플렉스 아이디도 입력해 주세요.');
       b.disabled = true; b.textContent = '등록 중…';
@@ -3816,7 +3816,7 @@
   }
   function xpRenderRows() {
     const all = xpRows(), list = xpList();
-    $('#xpSum').textContent = '캠프 ' + RT.camps.length + ' · 정산코드 ' + all.length + ' · 기사단가 입력 ' + all.filter((r) => xpCur(r, 'p2')).length + '/' + all.length;
+    $('#xpSum').textContent = '캠프 ' + RT.camps.length + ' · 정산코드 ' + all.length + ' · 고정단가 입력 ' + all.filter((r) => xpCur(r, 'p2')).length + '/' + all.length;
     $('#xpRows').innerHTML = list.map((r) => {
       const cell = (k) => {
         const v = xpCur(r, k), dirty = adirty[r.ak] && k in adirty[r.ak];
@@ -4318,7 +4318,7 @@
 
   // ───── 노선관리: 구분별 단가 (숫자(구분1)마다 구분2~5 글자별로) ─────
   const PKEYS = ['p1', 'p2', 'p3', 'p4', 'p5'];
-  const PLABEL = { p1: '원청단가', p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가' };
+  const PLABEL = { p1: '원청단가', p2: '고정단가', p3: '백업단가', p4: '품앗이단가', p5: '외부용차단가' };
   const PALL = PKEYS; // 일시단가는 정산관리 → 일시단가 (기사 + 기간)
   let rtab = 'routes', pdirty = {};
   const pf = { num: '', level: '', q: '', only: false };
@@ -6155,8 +6155,8 @@
     split: '한 사람이 두 이름으로 계산서를 나눌 때: 원 기사 실수령이 목표 이상이 되는 범위에서 나머지를 받는 기사로 넘깁니다 (세무사 확인 필수).',
     leave: '퇴사월 명세서에 "퇴사 보류금"(입금 차감) → 다음 달에 "보류금 반환"(입금 가산). 다음 달 분실파손은 계산서에서 그대로 빠집니다.',
     kinds: '쿠팡 정산서 "구분" 값을 계산 분류로 바꾸는 표. 새 구분값이 나오면 여기에 추가하세요.',
-    vendors: '용차업체가 등록한 쿠팡 아이디를 업체 단위로 정산합니다. 건당 단가 = 업체에 주는 단가(VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부단가). 산재·고용 공제 Y = 기사처럼 공제. 아이디 목록의 [용차업체] 칸에서 업체를 고르거나, 정산서 탭 경고창의 [용차업체로 지정]으로 한 번에 넣을 수 있습니다. 업체 아이디는 기사 정보관리에 등록되지 않습니다.',
-    ids: '정산의 기준은 쿠팡 아이디입니다. 용차업체 아이디는 명의자를 비우고 [용차업체] 칸에서 업체를 고르세요 (업체별 정산서 1장). 메인 아이디 + 서브 아이디(메인 아이디 칸에 메인 쿠팡ID)가 정산서 하나로 합쳐지고, 정산금·세금계산서·입금은 메인 아이디의 명의자에게 갑니다. 단가 구분(고정/백업/품앗이/외부용차)은 메인 아이디는 기사 정보관리의 기사구분이 최우선이고(기사구분이 비어 있을 때만 이 칸), 서브 아이디는 이 칸에 적은 값이 우선입니다. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
+    vendors: '용차업체가 등록한 쿠팡 아이디를 업체 단위로 정산합니다. 건당 단가 = 업체에 주는 단가(VAT포함, 모든 노선 같은 단가 · 비우면 노선관리 외부용차단가). 산재·고용 공제 Y = 기사처럼 공제. 아이디 목록의 [용차업체] 칸에서 업체를 고르거나, 정산서 탭 경고창의 [용차업체로 지정]으로 한 번에 넣을 수 있습니다. 업체 아이디는 기사 정보관리에 등록되지 않습니다.',
+    ids: '정산의 기준은 쿠팡 아이디입니다. 용차업체 아이디는 명의자를 비우고 [용차업체] 칸에서 업체를 고르세요 (업체별 정산서 1장). 메인 아이디 + 서브 아이디(메인 아이디 칸에 메인 쿠팡ID)가 정산서 하나로 합쳐지고, 정산금·세금계산서·입금은 메인 아이디의 명의자에게 갑니다. 단가코드(고정/백업/품앗이/외부용차)은 메인 아이디는 기사 정보관리의 단가코드이 최우선이고(단가코드이 비어 있을 때만 이 칸), 서브 아이디는 이 칸에 적은 값이 우선입니다. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
     usage: '한 아이디로 여러 기사가 일할 때 기록합니다 (기간을 비우면 계속). 기록이 없는 날은 명의자가 일한 것으로 봅니다. 기록한 기간에 그 아이디로 잡힌 매출(배송·프레시백·미계약·프로모션·분실파손)은 일한 기사 본인 정산으로 자동으로 옮겨지고, 단가도 그 기사 아이디 기준으로 계산됩니다. 일한 기사에게 본인 정산 아이디가 없으면 명의자에게 남기고 "확인 필요"에 띄웁니다. [정산] 칸을 "명의자"로 두면 서브 인원으로 보고 매출을 옮기지 않습니다 (확인 필요의 [👥 처리 → 서브 인원]과 같음).',
     tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 그 기사가 일한 날(아이디 사용 기록 기준, 기록이 없으면 명의자)의 배송에만 적용됩니다. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.'
   };
@@ -6208,9 +6208,9 @@
     ],
     yongcha: [
       ['하는 일', '이 정산기간에 <b>대신 뛴 날</b> 지정 · 수행자 = 우리 기사(품앗이) 또는 용차업체 · 차액부담 = 대신 뛰게 한 기사'],
-      ['단가 칸', '입력하면 <b>그 값</b> · <b>빈칸 = 기본값</b> (칸 안 흐린 글씨) — 품앗이 = 노선관리 <b>품앗이단가</b> · 용차업체 = 노선관리 <b>외부단가</b>'],
+      ['단가 칸', '입력하면 <b>그 값</b> · <b>빈칸 = 기본값</b> (칸 안 흐린 글씨) — 품앗이 = 노선관리 <b>품앗이단가</b> · 용차업체 = 노선관리 <b>외부용차단가</b>'],
       ['품앗이', '수행 기사에게 단가로 지급 (원래 단가와의 차이 = <span class="gp">추가지급</span>) · 차액부담 기사는 그 차이만큼 <span class="gm">차감</span>'],
-      ['용차업체', '업체에는 [용차업체] 표의 <b>지급 단가</b>(예: 히어로 1,320)만 지급 · 차액부담 기사에게는 단가 칸(기본 외부단가 1,350)으로 청구 → (청구 − 본인 단가) × 건수 <span class="gm">차감</span>'],
+      ['용차업체', '업체에는 [용차업체] 표의 <b>지급 단가</b>(예: 히어로 1,320)만 지급 · 차액부담 기사에게는 단가 칸(기본 외부용차단가 1,350)으로 청구 → (청구 − 본인 단가) × 건수 <span class="gm">차감</span>'],
       ['러너 몫', '청구 단가 − 업체 지급 단가 = <span class="gp">러너 이익</span> (예: 1,350 − 1,320 = 30원 · 단가 칸 1,400 이면 80원)'],
       ['일당', '업체가 일당 등으로 청구하면 <b>업체 실지급액</b>에 총액 (예: 264,000 × 2명 = 528,000) → 업체 정산서에 차이 자동 반영 · 단가 칸을 비우면 <b>그 금액 그대로</b> 차액부담 기사에게 청구 (러너 몫 0) · 라우트는 <code>119AB</code> 처럼 여러 개 가능'],
       ['차액 처리', '비우면 품앗이 = 수행자 지급 · 용차업체 = 러너 몫 · 품앗이도 <b>러너 몫</b>을 고르면 수행 기사는 원래 단가만, 차액은 러너'],
@@ -6218,8 +6218,8 @@
     ],
     vendors: [
       ['하는 일', '용차업체가 등록한 쿠팡 아이디를 <b>업체 단위</b>로 정산 (업체별 정산서 1장)'],
-      ['지급 단가', '러너가 <b>업체에 주는</b> 건당 단가 (VAT포함 · 모든 노선 같음 · 빈칸 = 노선관리 외부단가)'],
-      ['청구 기본값', '대신 뛰게 한 기사에게 청구하는 단가는 노선관리 <b>외부단가</b> · [품앗이/용차 지정] 단가 칸에 넣으면 그 값 · 차이 = <span class="gp">러너 몫</span>'],
+      ['지급 단가', '러너가 <b>업체에 주는</b> 건당 단가 (VAT포함 · 모든 노선 같음 · 빈칸 = 노선관리 외부용차단가)'],
+      ['청구 기본값', '대신 뛰게 한 기사에게 청구하는 단가는 노선관리 <b>외부용차단가</b> · [품앗이/용차 지정] 단가 칸에 넣으면 그 값 · 차이 = <span class="gp">러너 몫</span>'],
       ['아이디 연결', '[아이디 관리] 아이디 목록의 <b>용차업체</b> 칸에서 업체 선택 · 또는 정산서 탭 경고창의 <b>[용차업체로 지정]</b>'],
       ['산재·고용', 'Y = 기사처럼 공제 · N = 공제 안 함'],
       ['참고', '업체 아이디는 기사 정보관리에 등록되지 않음']
@@ -6681,8 +6681,8 @@
       log = '<details class="stw info"' + ((r.log.diff || []).some((m) => m.changed.length) ? ' open' : '') + '><summary>예전 아이디 관리 → 기사 정보관리로 옮김 (' + esc(r.log.at || '') + ') · ' + ((r.log.diff || []).some((m) => m.changed.length || m.err) ? '<span style="color:var(--danger)">대조: 바뀐 정산서 있음 — 눌러서 확인</span>' : ((r.log.diff || []).length ? '<span style="color:var(--ok)">대조: ' + r.log.diff.map((m) => esc(ymTitle(m.month).replace(/^\d+년\s*/, ''))).join('·') + ' 정산 금액 그대로 ✓</span>' : '대조할 열린 정산월 없음 (마감한 달은 마감 결과 그대로)')) + ' · 옮긴 내용 ' + (r.log.notes || []).length + '건</summary><ul>' + d +
         (r.log.notes || []).map((n) => '<li class="sub">' + esc(n) + '</li>').join('') + '</ul></details>';
     }
-    $('#stEditor').innerHTML = '<div class="info-ro">🔒 기사 정보관리에서 자동으로 만들어지는 표입니다. 고칠 때는 줄을 눌러 그 기사 상세 창(쿠팡 아이디 · 기사단가 · 정산 설정)에서. 용차업체 아이디는 용차업체 메뉴에서.</div>' + log + clash +
-      '<div class="table-wrap"><table class="sttbl" id="stIdsTbl"><thead><tr><th>쿠팡ID</th><th>구분</th><th>명의자</th><th>기사단가</th><th>정산 방식</th><th>산재·고용 제외</th><th>프레시백 차감</th><th>상태</th><th></th></tr></thead><tbody>' +
+    $('#stEditor').innerHTML = '<div class="info-ro">🔒 기사 정보관리에서 자동으로 만들어지는 표입니다. 고칠 때는 줄을 눌러 그 기사 상세 창(쿠팡 아이디 · 단가코드 · 정산 설정)에서. 용차업체 아이디는 용차업체 메뉴에서.</div>' + log + clash +
+      '<div class="table-wrap"><table class="sttbl" id="stIdsTbl"><thead><tr><th>쿠팡ID</th><th>구분</th><th>명의자</th><th>단가코드</th><th>정산 방식</th><th>산재·고용 제외</th><th>프레시백 차감</th><th>상태</th><th></th></tr></thead><tbody>' +
       urows + rows + vrows + '</tbody></table></div>' + (r.rows.length ? '' : '<p class="sub" style="padding:20px">기사 정보관리에 쿠팡플렉스 아이디가 있는 기사가 없습니다.</p>');
   }
   $('#stEditor').addEventListener('click', (e) => {
@@ -7087,12 +7087,12 @@
     const cell = (d, c) => {
       const v = val(d, c[0]) || '', at = ' data-sd="' + esc(d.id) + '" data-k="' + c[0] + '"', dirty = STX.drvDirty[d.id] && c[0] in STX.drvDirty[d.id] ? ' dirty' : '';
       if (c[2] === 'owner') return '<td><input class="inp' + dirty + '" list="sdOwnDL"' + at + ' value="' + esc(byId[v] ? lab(byId[v]) : v) + '" placeholder="(본인)" style="min-width:150px"></td>';
-      if (c[2] === 'mode') return '<td><select class="inp' + dirty + '"' + at + '>' + R.modes.map((m) => '<option value="' + m + '"' + (m === v ? ' selected' : '') + '>' + (m || '구분별 단가') + '</option>').join('') + '</select></td>';
+      if (c[2] === 'mode') return '<td><select class="inp' + dirty + '"' + at + '>' + R.modes.map((m) => '<option value="' + m + '"' + (m === v ? ' selected' : '') + '>' + (m || '기본 (단가코드별 노선 단가)') + '</option>').join('') + '</select></td>';
       if (c[2] === 'check') return '<td style="text-align:center"><input type="checkbox"' + at + (v === 'Y' ? ' checked' : '') + '></td>';
       return '<td><input class="inp' + dirty + '" type="' + (c[2] === 'date' ? 'date' : 'text') + '"' + at + ' value="' + esc(v) + '"' + (c[0] === 'fbCut' ? ' placeholder="13% 또는 금액" style="width:110px"' : c[0] === 'tmpPrice' ? ' style="width:90px"' : '') + '></td>';
     };
     $('#sdTable').innerHTML =
-      '<thead><tr><th>이름</th><th>쿠팡플렉스 아이디</th><th>상태</th><th>기사구분</th>' + SD_COLS.map((c) => '<th>' + c[1] + '</th>').join('') + '<th>은행 · 계좌 · 예금주</th></tr></thead><tbody>' +
+      '<thead><tr><th>이름</th><th>쿠팡플렉스 아이디</th><th>상태</th><th>단가코드</th>' + SD_COLS.map((c) => '<th>' + c[1] + '</th>').join('') + '<th>은행 · 계좌 · 예금주</th></tr></thead><tbody>' +
       list.map((d) => '<tr><td><b>' + esc(d.name) + '</b></td><td class="sub">' + esc(d.loginId) + '</td><td>' + esc(d.status) + '</td><td>' + esc(d.type || '고정') + '</td>' + SD_COLS.map((c) => cell(d, c)).join('') +
         '<td class="sub">' + esc([d.bank, d.account, d.holder].filter(Boolean).join(' · ') || '-') + '</td></tr>').join('') + '</tbody>';
     tsApply($('#sdTable'));
