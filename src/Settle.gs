@@ -52,7 +52,7 @@ const STL_TABS = {
   stl_split: { from: '원 명의자', fromId: '원 정산 아이디', to: '받는 명의자', toId: '받는 정산 아이디', target: '목표 실수령', unit: '단위', repeat: '매달 반복', month: '적용월' },
   stl_leave: { name: '명의자', acct: '정산 아이디', month: '퇴사월', amt: '보류금' },
   stl_items: { order: '순서', side: '구분', name: '항목 이름', method: '계산 방식', show: '표시', taxCut: '계산서에서 빼기', desc: '설명' },
-  stl_camps: { camp: '캠프명', expense: '경비공제율', san: '산재율', goy: '고용율', runner: '러너부담률' },
+  stl_camps: { kind: '구분', camp: '캠프명', name: '기사', acct: '정산 아이디', basis: '보험 기준', expense: '경비공제율', san: '산재율', goy: '고용율', sanOn: '산재 ON/OFF', goyOn: '고용 ON/OFF', memo: '메모' },
   stl_kinds: { raw: '쿠팡 구분 값', std: '표준 분류' },
   stl_config: { label: '항목', value: '값', desc: '설명' },
   stl_pay: { month: '정산월', acct: '정산 아이디', name: '명의자', checked: '입금체크', date: '입금일', memo: '메모' },
@@ -68,6 +68,7 @@ const STL_TAB_NOTES = {
   stl_adjust: '기사별 월 추가지급·차감. 항목은 stl_items 의 "항목 이름". 금액은 차감도 양수로.',
   stl_advance: '가불금 원장. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제되고, 그 달을 마감하면 상환금에 자동 기록됩니다. 정산 밖에서 현금으로 받으면 상환금 칸에 직접 적으세요.',
   stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 품앗이 = 노선관리의 그 노선 품앗이단가, 용차업체 = 업체 단가. 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
+  stl_camps: '캠프 및 기사별 산재·고용. 구분 = 캠프 / 기사. 빈 칸 = 세부정산 설정 기본값. 우선순위: 기사 > 캠프 > 기본값 (칸마다). 산재·고용 ON/OFF 는 기사 줄만 (OFF = 그 보험 공제 안 함). 보험 기준: 공급가 / 부가세포함.',
   stl_config: '값만 고치세요. % 는 10% 처럼 써도 됩니다.',
   stl_closed: '마감할 때 프로그램이 기록합니다. 손으로 고치지 마세요.'
 };
@@ -139,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zA';
+const STL_CALC_VER = '20261105zB';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -268,7 +269,7 @@ function stlSeed_(name) {
   if (name === 'stl_kinds') return STL_KIND_DEFAULT.map(function (r) { return r.slice(); });
   if (name === 'stl_config') return STL_CFG.map(function (r) { return [r[1], r[2], r[3]]; });
   if (name === 'stl_camps') {
-    try { return master_().camps.map(function (c) { return [stlShort_(c.name), '', '', '', '']; }); } catch (e) { return []; }
+    try { return master_().camps.map(function (c) { return ['캠프', stlShort_(c.name), '', '', '', '', '', '', '', '', '']; }); } catch (e) { return []; }
   }
   return [];
 }
@@ -609,15 +610,29 @@ function stlKinds_() {
   stlRead_('stl_kinds').forEach(function (o) { if (o.raw && STL_STD_KINDS.indexOf(o.std) >= 0) map[o.raw] = o.std; });
   return map;
 }
-function stlCampIns_(cfg) {
-  const map = {};
+/** 캠프 및 기사별 산재·고용 설정 (stl_camps). 빈 칸 = 세부정산 설정 기본값
+ *  camp[캠프] = { basis, expense, san, goy } (빈 칸은 기본값으로 채움)
+ *  acct[정산 묶음] = { basis, expense, san, goy (빈 칸 null → 캠프값/기본값), sanOff, goyOff, row } */
+function stlInsKind_(o) { return str_(o.kind) === '기사' || (!str_(o.kind) && str_(o.name) && !str_(o.camp)) ? '기사' : '캠프'; }
+function stlInsBasis_(v) { const t = str_(v).replace(/\s/g, ''); return t === '부가세포함' || t === 'VAT포함' ? '부가세포함' : t === '공급가' ? '공급가' : ''; }
+function stlOff_(v) { return /^(off|n|no|x|끔|안함|미적용|제외)$/i.test(str_(v).replace(/\s/g, '')); }
+function stlCampIns_(cfg, X, D) {
+  const out = { camp: {}, acct: {} };
   stlRead_('stl_camps').forEach(function (o) {
+    if (stlInsKind_(o) === '기사') {
+      if (!X || !D) return;
+      const id = stlAcct_(X, D, o.name, o.acct);
+      if (!id) return;
+      const r = function (v) { return str_(v) ? stlRate_(v, null) : null; };
+      out.acct[id] = { basis: stlInsBasis_(o.basis), expense: r(o.expense), san: r(o.san), goy: r(o.goy), sanOff: stlOff_(o.sanOn), goyOff: stlOff_(o.goyOn), row: o._row };
+      return;
+    }
     if (!o.camp) return;
-    map[stlShort_(o.camp)] = {
-      expense: stlRate_(o.expense, cfg.expense), san: stlRate_(o.san, cfg.san), goy: stlRate_(o.goy, cfg.goy), runner: stlRate_(o.runner, cfg.runner)
+    out.camp[stlShort_(o.camp)] = {
+      basis: stlInsBasis_(o.basis) || cfg.insBasis, expense: stlRate_(o.expense, cfg.expense), san: stlRate_(o.san, cfg.san), goy: stlRate_(o.goy, cfg.goy), row: o._row
     };
   });
-  return map;
+  return out;
 }
 
 // ───────────────────────── 기사 (러너 올인원 DB drivers) ─────────────────────────
@@ -926,8 +941,9 @@ function stlCompute_(month) {
   const P = stlPeriod_(month);
   stlLoad_(STL_SMALL);
   const cfg = stlCfg_();
-  const kinds = stlKinds_(), items = stlItems_(), campIns = stlCampIns_(cfg);
+  const kinds = stlKinds_(), items = stlItems_();
   const D = stlDrivers_(), X = stlIds_(D);
+  const campIns = stlCampIns_(cfg, X, D);
   const ctx = { cfg: cfg, price: stlPriceIndex_(), D: D, ids: X, usage: {}, tmp: {} };
   stlRead_('stl_usage').forEach(function (u) {
     const k = stlLogin_(u.cid), pid = stlPerson_(D, u.name, u.driverId);
@@ -1490,31 +1506,44 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
   });
   const invoice = pay - taxDed;
   const supply = Math.round(invoice / (1 + cfg.vat)), tax = invoice - supply;
-  // 산재·고용: 캠프별 산식 (기사 지급액 비중으로 안분)
+  // 산재·고용: 기본값(세부정산 설정) → 캠프별 값(기사 지급액 비중으로 안분) → 기사별 값 순서로 덮어씀
   const ins = { base: 0, bosu: 0, exp: cfg.expense, san: cfg.san, goy: cfg.goy, runner: cfg.runner, sanD: 0, goyD: 0, sanAct: 0, goyAct: 0 };
-  const excluded = !!s.insEx || s.mode === '용차내역';
+  const dv = (campIns.acct || {})[s.id] || null;
+  const excluded = !!s.insEx || s.mode === '용차내역' || !!(dv && dv.sanOff && dv.goyOff);
   let san = 0, goy = 0, runnerIns = 0, insGain = 0;
   if (!excluded && invoice > 0) {
-    let tw = 0, we = 0, ws = 0, wg = 0, wr = 0;
+    const baseOf = function (b) { return b === '부가세포함' ? invoice : supply; };
+    let tw = 0, we = 0, ws = 0, wg = 0, wb = 0;
+    const w = {};
     Object.keys(s.campPay).forEach(function (c) {
-      const w = s.campPay[c]; if (w <= 0) return;
-      const ci = campIns[c] || {};
-      tw += w; we += w * (ci.expense != null ? ci.expense : cfg.expense); ws += w * (ci.san != null ? ci.san : cfg.san);
-      wg += w * (ci.goy != null ? ci.goy : cfg.goy); wr += w * (ci.runner != null ? ci.runner : cfg.runner);
+      const x = s.campPay[c]; if (x <= 0) return;
+      const ci = (campIns.camp || {})[c] || {};
+      tw += x; we += x * (ci.expense != null ? ci.expense : cfg.expense); ws += x * (ci.san != null ? ci.san : cfg.san);
+      wg += x * (ci.goy != null ? ci.goy : cfg.goy); wb += x * baseOf(ci.basis || cfg.insBasis);
+      w[c] = x;
     });
-    if (tw > 0) { ins.exp = we / tw; ins.san = ws / tw; ins.goy = wg / tw; ins.runner = wr / tw; }
-    ins.base = cfg.insBasis === '부가세포함' ? invoice : supply;
+    ins.base = baseOf(cfg.insBasis);
+    if (tw > 0) { ins.exp = we / tw; ins.san = ws / tw; ins.goy = wg / tw; ins.base = wb / tw; Object.keys(w).forEach(function (c) { w[c] = w[c] / tw; }); }
+    if (dv) {
+      if (dv.basis) ins.base = baseOf(dv.basis);
+      if (dv.expense != null) ins.exp = dv.expense;
+      if (dv.san != null) ins.san = dv.san;
+      if (dv.goy != null) ins.goy = dv.goy;
+    }
+    const sanOff = !!(dv && dv.sanOff), goyOff = !!(dv && dv.goyOff);
     ins.bosu = ins.base * (1 - ins.exp);
-    san = stlFloor10_(ins.bosu * (ins.san + cfg.commute));
-    goy = ins.bosu < cfg.goyMin ? 0 : stlFloor10_(ins.bosu * ins.goy);
-    // 공단 실제 납부 (항상 기본 경비율·요율)
-    const bosu0 = ins.base * (1 - cfg.expense);
-    const san0 = stlFloor10_(bosu0 * (cfg.san + cfg.commute)), goy0 = bosu0 < cfg.goyMin ? 0 : stlFloor10_(bosu0 * cfg.goy);
+    san = sanOff ? 0 : stlFloor10_(ins.bosu * (ins.san + cfg.commute));
+    goy = goyOff || ins.bosu < cfg.goyMin ? 0 : stlFloor10_(ins.bosu * ins.goy);
+    // 공단 실제 납부 (항상 세부정산 설정 기본값: 보험 기준·경비율·요율). OFF 인 보험은 납부도 없음
+    const bosu0 = baseOf(cfg.insBasis) * (1 - cfg.expense);
+    const san0 = sanOff ? 0 : stlFloor10_(bosu0 * (cfg.san + cfg.commute)), goy0 = goyOff || bosu0 < cfg.goyMin ? 0 : stlFloor10_(bosu0 * cfg.goy);
     const r = Math.min(0.95, Math.max(0, ins.runner));
     const totalAct = Math.round((san0 + goy0) / (1 - r));
     ins.sanAct = san0; ins.goyAct = goy0;
     runnerIns = totalAct - (san + goy);
     insGain = (san + goy) - (san0 + goy0); // 기사 공제가 공단 기사분보다 많은 만큼 = 러너 몫
+    // 캠프 및 기사별 설정 화면의 차액 칸용
+    ins.w = w; ins.drv = dv ? dv.row : 0; ins.sanD = san; ins.goyD = goy; ins.san0 = san0; ins.goy0 = goy0;
   }
   ins.excluded = excluded;
   san += insAdjS; goy += insAdjG;
@@ -1923,10 +1952,23 @@ const STL_EDIT = {
   split: { sheet: 'stl_split', scope: 'all', cols: [['from', '원 명의자 (발행 줄일 아이디)', 'acct', 'fromId'], ['to', '받는 명의자', 'acct', 'toId'], ['target', '목표 실수령', 'money'], ['unit', '단위', 'money'], ['repeat', '매달 반복', ['Y', 'N']], ['month', '적용월 (반복 N 일 때)', 'month']] },
   leave: { sheet: 'stl_leave', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['month', '퇴사월', 'month'], ['amt', '보류금 (비우면 기본)', 'money']] },
   items: { sheet: 'stl_items', scope: 'all', cols: [['order', '순서', 'text'], ['side', '구분', ['지급', '차감']], ['name', '항목 이름', 'text'], ['method', '계산 방식', STL_METHODS], ['show', '표시', ['항상', '금액 있을 때']], ['taxCut', '계산서에서 빼기 (차감만)', ['', 'Y', 'N']], ['desc', '설명', 'text']] },
-  camps: { sheet: 'stl_camps', scope: 'all', cols: [['camp', '캠프명', 'camp'], ['expense', '경비공제율', 'text'], ['san', '산재율 (기사분)', 'text'], ['goy', '고용율 (기사분)', 'text'], ['runner', '러너부담률', 'text']] },
+  // 캠프 및 기사별 산재·고용: when = 그 구분의 줄에만 쓰는 칸
+  camps: { sheet: 'stl_camps', scope: 'all', cols: [['kind', '구분', ['캠프', '기사']], ['camp', '캠프', 'camp', '', '캠프'], ['name', '기사 (정산 아이디)', 'acct', 'acct', '기사'], ['basis', '보험 기준', ['', '공급가', '부가세포함']],
+    ['expense', '경비공제율', 'text'], ['san', '산재율 (기사분)', 'text'], ['goy', '고용율 (기사분)', 'text'], ['sanOn', '산재', ['', 'OFF'], '', '기사'], ['goyOn', '고용', ['', 'OFF'], '', '기사'], ['memo', '메모', 'text']] },
   kinds: { sheet: 'stl_kinds', scope: 'all', cols: [['raw', '쿠팡 구분 값', 'text'], ['std', '표준 분류', STL_STD_KINDS]] },
   config: { sheet: 'stl_config', scope: 'all', fixed: true, cols: [['label', '항목', 'readonly'], ['value', '값', 'text'], ['desc', '설명', 'readonly']] }
 };
+/** 빈 칸에 흐리게 보여 줄 기본값 (예: 기본 34.6%) */
+function stlColPh_(name, k) {
+  if (name !== 'camps') return '';
+  const cfg = stlCfg_(), pct = function (x) { return '기본 ' + (Math.round(x * 10000) / 100) + '%'; };
+  if (k === 'basis') return '기본 (' + cfg.insBasis + ')';
+  if (k === 'expense') return pct(cfg.expense);
+  if (k === 'san') return pct(cfg.san);
+  if (k === 'goy') return pct(cfg.goy);
+  if (k === 'sanOn' || k === 'goyOn') return 'ON';
+  return '';
+}
 function stlEditRows_(name, month) {
   const E = STL_EDIT[name];
   let rows = stlRead_(E.sheet);
@@ -1936,6 +1978,8 @@ function stlEditRows_(name, month) {
     STL_CFG.forEach(function (d, i) { ord[d[1]] = i; });
     rows = rows.filter(function (r) { return r.label in ord; }).sort(function (a, b) { return ord[a.label] - ord[b.label]; });
   }
+  // 캠프 및 기사별 산재·고용: 캠프 줄 먼저, 그다음 기사 줄 (각각 시트 순서)
+  if (name === 'camps') rows = rows.map(function (r, i) { return { r: r, i: i, k: stlInsKind_(r) === '기사' ? 1 : 0 }; }).sort(function (a, b) { return a.k - b.k || a.i - b.i; }).map(function (x) { return x.r; });
   if (E.scope === 'month') rows = rows.filter(function (r) { return r.month === month; });
   if (E.scope === 'date') rows = rows.filter(function (r) { return stlMonthOfDate_(r.date) === month; });
   return rows;
@@ -1962,7 +2006,28 @@ function stlTableView_(name, month) {
       .sort(function (a, b) { return (a.stopped ? 1 : 0) - (b.stopped ? 1 : 0) || koCmp_(a.label, b.label); });
     const persons = D.all.map(function (o) { return { id: o.id, label: (D.byName[o.name] || []).length > 1 ? o.name + ' (' + (o.loginId || o.id) + ')' : o.name, status: o.status }; })
       .sort(function (a, b) { return (a.status === ST.ACTIVE ? 0 : 1) - (b.status === ST.ACTIVE ? 0 : 1) || koCmp_(a.label, b.label); });
-    let calc = null;
+    let calc = null, calcSum = null;
+    if (name === 'camps' && stlMonthOk_(month)) {
+      // 이번 정산월 차액: 기사 공제(산재+고용) − 기본값으로 계산했을 때. 기사 줄이 있으면 그 기사 줄에, 없으면 일한 캠프 비중대로 캠프 줄에
+      calc = {}; calcSum = { n: 0, ded: 0, ded0: 0 };
+      const campRow = {}, acctRow = {};
+      rows.forEach(function (r) { if (stlInsKind_(r) === '기사') { const k = stlAcct_(X, D, r.name, r.acct); if (k) acctRow[k] = r._row; } else if (r.camp) campRow[stlShort_(r.camp)] = r._row; });
+      const put = function (row, n, ded, ded0) { const o = calc[row] || (calc[row] = { n: 0, ded: 0, ded0: 0 }); o.n += n; o.ded += ded; o.ded0 += ded0; };
+      let res = null;
+      try { res = stlResult_(month, false); } catch (e) { res = null; }
+      const slips = (res && res.slips) || {};
+      Object.keys(slips).forEach(function (id) {
+        const ins = slips[id] && slips[id].ins;
+        if (!ins || ins.excluded || ins.san0 == null) return;
+        const ded = (ins.sanD || 0) + (ins.goyD || 0), ded0 = (ins.san0 || 0) + (ins.goy0 || 0);
+        calcSum.n++; calcSum.ded += ded; calcSum.ded0 += ded0;
+        if (ins.drv && acctRow[id]) { put(acctRow[id], 1, ded, ded0); return; }
+        Object.keys(ins.w || {}).forEach(function (c) { if (campRow[c] && ins.w[c] > 0) put(campRow[c], 1, ded * ins.w[c], ded0 * ins.w[c]); });
+      });
+      Object.keys(calc).forEach(function (k) { calc[k].ded = Math.round(calc[k].ded); calc[k].ded0 = Math.round(calc[k].ded0); calc[k].diff = calc[k].ded - calc[k].ded0; });
+      calcSum.diff = calcSum.ded - calcSum.ded0;
+      calcSum.closed = !!(res && res.summary && res.summary.closed) && !Object.keys(calc).length;
+    }
     if (name === 'yongcha' || name === 'advance') {
       if (name === 'yongcha') { const r = stlResult_(month, false); calc = {}; (r.summary.yong || []).forEach(function (y) { calc[y._row] = y; }); }
       else {
@@ -1973,8 +2038,8 @@ function stlTableView_(name, month) {
     return {
       ok: true, name: name, month: month, cols: E.cols.map(function (c) {
         if (c[2] === 'vendor') return { k: c[0], label: c[1], type: 'select', opts: [''].concat(X.vendors.list.map(function (v) { return v.name; })), idk: '' };
-        return { k: c[0], label: c[1], type: Array.isArray(c[2]) ? 'select' : c[2], opts: Array.isArray(c[2]) ? c[2] : null, idk: c[3] || '' };
-      }),
+        return { k: c[0], label: c[1], type: Array.isArray(c[2]) ? 'select' : c[2], opts: Array.isArray(c[2]) ? c[2] : null, idk: c[3] || '', when: c[4] || '', ph: stlColPh_(name, c[0]) };
+      }), calcSum: calcSum,
       rows: rows.map(function (r) {
         const o = { _row: r._row };
         E.cols.forEach(function (c) {
@@ -1986,6 +2051,7 @@ function stlTableView_(name, month) {
         });
         if (calc && calc[r._row]) o._calc = calc[r._row];
         if (name === 'config') { const d = STL_CFG.filter(function (x) { return x[1] === r.label; })[0]; o._group = d ? d[4] : ''; }
+        if (name === 'camps') o.kind = stlInsKind_(r);
         return o;
       }),
       seen: stlRowsHash_(rows, E.cols), fixed: !!E.fixed, closed: E.scope !== 'all' ? !!stlClosedInfo_(month) : false,
@@ -2005,7 +2071,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     if (!Array.isArray(rows) || rows.length > 3000) fail_('줄이 너무 많습니다.');
     const D = stlDrivers_(), X = stlIds_(D);
     const seenCid = {};
-    const clean = rows.map(function (r, i) {
+    let clean = rows.map(function (r, i) {
       const o = {};
       E.cols.forEach(function (c) {
         let v = str_(r[c[0]]).slice(0, 300);
@@ -2038,6 +2104,34 @@ function adm_stlTableSave(token, name, month, rows, seen) {
       if (E.scope === 'date' && o.date && stlMonthOfDate_(o.date) !== month) fail_((i + 1) + '번째 줄 날짜가 ' + month + ' 정산기간(' + stlPeriod_(month).from + ' ~ ' + stlPeriod_(month).to + ') 밖입니다.');
       return o;
     }).filter(function (o) { return E.cols.some(function (c) { return c[2] !== 'readonly' && o[c[0]]; }) || E.fixed; });
+    if (name === 'camps') {
+      const seenC = {}, seenA = {};
+      clean = clean.filter(function (o) { return o.camp || o.name; });
+      clean.forEach(function (o, i) {
+        o.kind = o.kind || (o.name && !o.camp ? '기사' : '캠프');
+        const who = o.kind === '기사' ? o.name : o.camp;
+        if (o.kind === '기사') {
+          if (!o.name) fail_((i + 1) + '번째 줄: 기사 줄은 기사(정산 아이디)를 넣어 주세요.');
+          o.camp = '';
+          const k = stlLogin_(o.acct || o.name);
+          if (seenA[k]) fail_(o.name + ' 기사 줄이 두 번 있습니다.');
+          seenA[k] = 1;
+        } else {
+          if (!o.camp) fail_((i + 1) + '번째 줄: 캠프 줄은 캠프를 골라 주세요.');
+          o.name = ''; o.acct = ''; o.sanOn = ''; o.goyOn = '';
+          const k = stlShort_(o.camp);
+          if (seenC[k]) fail_(o.camp + ' 캠프 줄이 두 번 있습니다.');
+          seenC[k] = 1;
+        }
+        ['expense', 'san', 'goy'].forEach(function (f) {
+          const v = str_(o[f]).replace(/\s/g, '');
+          if (!v) return;
+          const n = /^\d+(\.\d+)?%?$/.test(v) ? stlRate_(v, NaN) : NaN;
+          if (!isFinite(n) || n < 0 || n >= 1) fail_(who + ': ' + { expense: '경비공제율', san: '산재율', goy: '고용율' }[f] + ' 은(는) 20.5% 처럼 넣어 주세요.');
+          o[f] = /%$/.test(v) ? v : (Math.round(n * 10000) / 100) + '%';
+        });
+      });
+    }
     if (name === 'vendors') {
       const seenV = {};
       clean.forEach(function (o, i) {

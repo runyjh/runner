@@ -169,6 +169,16 @@
   .st-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
   .st-tools .search { max-width: 260px; }
   .st-help { font-size: 13px; margin: 0 0 10px; }
+  .stg { display: grid; gap: 5px; background: #fafbfd; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; color: var(--ink); line-height: 1.55; }
+  .stg-r { display: flex; gap: 10px; align-items: baseline; }
+  .stg-t { flex: 0 0 auto; min-width: 92px; text-align: center; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 1px 8px; background: var(--gray-weak); color: var(--sub); }
+  .stg-t.g-what { background: var(--brand-weak); color: var(--brand); } .stg-t.g-order { background: #f1ebfd; color: #6b3fd4; }
+  .stg-t.g-empty { background: #e9f7f6; color: #0f7b75; } .stg-t.g-where { background: var(--ok-weak); color: #0a7a3d; }
+  .stg-t.g-warn { background: var(--danger-weak); color: var(--danger); } .stg-t.g-diff { background: var(--warn-weak); color: var(--warn); }
+  .stg-t.g-camp { background: #eef3fb; color: #2b5797; } .stg-t.g-drv { background: #fdf0f7; color: #b0306f; }
+  .stg b { color: var(--brand); } .stg .gp { color: #0a7a3d; font-weight: 800; } .stg .gm { color: var(--danger); font-weight: 800; }
+  .stg code { background: #eef1f5; border-radius: 4px; padding: 0 5px; font-size: 12px; }
+  @media (max-width: 640px) { .stg-r { flex-direction: column; gap: 2px; } .stg-t { min-width: 0; } }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
   .kpi { background: #fff; border-radius: 10px; padding: 12px 14px; }
   .kpi small { display: block; font-size: 12px; color: var(--sub); }
@@ -211,6 +221,16 @@
   table.sttbl.ed td { padding: 4px 6px; }
   table.sttbl.ed .inp { height: 32px; padding: 0 8px; font-size: 13px; min-width: 70px; }
   table.sttbl.ed td.calc { color: var(--sub); font-size: 12px; white-space: nowrap; }
+  table.sttbl.ed td.na { color: #c3c9d2; text-align: center; }
+  table.sttbl.ed select[data-k="basis"] { min-width: 128px; } table.sttbl.ed input[data-k="expense"], table.sttbl.ed input[data-k="san"], table.sttbl.ed input[data-k="goy"] { min-width: 100px; }
+  table.sttbl.ed select[data-k="kind"] { min-width: 72px; } table.sttbl.ed select[data-k="sanOn"], table.sttbl.ed select[data-k="goyOn"] { min-width: 76px; }
+  table.sttbl.ed td.calc.pos { color: #0a7a3d; font-weight: 800; } table.sttbl.ed td.calc.neg { color: var(--danger); font-weight: 800; }
+  table.sttbl.ed th small { font-weight: 500; color: var(--sub); }
+  table.sttbl.ed .inp.off { color: var(--danger); font-weight: 800; } table.sttbl.ed select.inp.dflt { color: #98a2b3; }
+  table.sttbl.ed .inp::placeholder { color: #a8b1bd; }
+  .inssum { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: #f0f6ff; border: 1px solid #c9dbf7; color: #23406b; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
+  .inssum b { width: 100%; } .inssum span { background: #fff; border-radius: 8px; padding: 3px 8px; border: 1px solid #dbe7f8; } .inssum em { font-style: normal; font-weight: 800; }
+  .inssum .pos em { color: #0a7a3d; } .inssum .neg em { color: var(--danger); }
   table.sttbl.ed tr.ed-grp td { background: #eef3fb; color: var(--brand); font-weight: 800; font-size: 13px; padding: 7px 10px; border-top: 2px solid #d6e2f5; }
   table.sttbl .inp.dirty { border-color: var(--warn); background: #fffdf7; }
   .ed-bar { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
@@ -955,7 +975,7 @@
       <div class="tabs sub2 hidden" id="stCfgTabs">
         <button class="tab on" data-cfg="config">세부정산 설정</button>
         <button class="tab" data-cfg="items">정산서 항목설정</button>
-        <button class="tab" data-cfg="camps">캠프별 산재·고용</button>
+        <button class="tab" data-cfg="camps">캠프 및 기사별 산재고용설정</button>
         <button class="tab" data-cfg="regular">고정수당 및 공제설정</button>
         <button class="tab" data-cfg="target">자동 매출 분배설정</button>
         <button class="tab" data-cfg="split">사업자 매출분할 설정</button>
@@ -963,7 +983,7 @@
         <button class="tab" data-cfg="kinds">쿠팡 구분항목설정</button>
         <button class="tab" data-cfg="migrate">기존 정산 시트 가져오기</button>
       </div>
-      <p class="sub st-help" id="stEditHelp"></p>
+      <div class="sub st-help" id="stEditHelp"></div>
       <div id="stEditor"></div>
       <div id="stMigrate" class="hidden">
         <div class="mg-box">
@@ -5250,7 +5270,7 @@
     yongcha: '이 정산기간 날짜의 품앗이·용차 지정. 우리 기사가 대신 뛰면(품앗이) 수행자에 그 기사 → 단가 칸을 비우면 노선관리의 그 노선 「품앗이단가」(프백 가중치까지 포함한 건당 금액)로 지급하고, 수행자 단가코드(고정/백업/품앗이 …)의 노선 단가와의 차액만 추가 지급. 품앗이단가가 빈 노선은 원래 단가로만 지급하고 확인 필요에 띄웁니다. 차액부담 기사를 넣으면 (단가 − 부담 기준단가) × 건수를 그 기사 계산서에서 뺍니다 (부담 기준단가를 비우면 수행자 단가코드 기준). 용차업체(외부용차)는 업체 건당 단가로만 지급하고, 단가 칸은 차액부담 기사에게 청구할 단가입니다: (청구 단가 − 기사 본인 단가) × 건수를 차감하고, 청구 단가 − 업체 단가는 러너 몫 (예: 청구 1,350 · 업체 1,320 · 내 단가 880 → 기사 470원 차감, 러너 30원). 품앗이도 [차액 처리]를 「러너 몫」으로 고르면 같은 방식: 수행 기사는 원래 단가만, 차액부담 기사는 (단가 − 본인 단가) 차감, 단가 − 수행 기사 단가는 러너 몫.',
     config: '세부정산서: 지급률·보험·일정 기본값. 바꾸면 마감하지 않은 달 전체가 다시 계산됩니다.',
     items: '명세서에 나오는 줄 이름표. 계산 방식이 "직접입력"인 항목은 [공제·가감]에서 금액을 넣습니다. "입금가산" = 계산서에는 빼고 실입금에만 더함. 자동 항목(배송기본·분실파손 등)의 계산 방식은 바꾸지 마세요.',
-    camps: '캠프마다 기사에게 공제할 산재·고용 산식. 빈 칸은 기본값(지급률·보험 탭). 기사가 여러 캠프를 뛰면 지급액 비중대로 나눕니다. 공단 실제 납부는 항상 기본값으로 계산하고, 차이는 러너 몫으로 잡힙니다.',
+    camps: '캠프 및 기사별 산재·고용. 우선순위: 기사별 > 캠프별 > 세부정산 설정 기본값 (빈 칸 = 기본값). 기사가 여러 캠프를 뛰면 지급액 비중대로 나눕니다. 기사별 산재/고용 OFF = 그 보험 공제 안 함. 공단 실제 납부는 항상 기본값으로 계산하고, 차액은 러너 몫(−면 러너 부담)으로 잡힙니다.',
     regular: '매달 똑같이 주거나 빼는 돈. 시작월·종료월(2026-11 처럼) 사이의 정산월에 자동으로 들어갑니다. 그만둘 땐 줄을 지우지 말고 종료월을 넣으세요.',
     target: '1년 계산서 합계가 목표에 맞도록 매달 수당 자동 계산: 수당 = 연 목표 ÷ 12 − 수당 빼고 이번 달 계산서 (단위 아래 버림).',
     split: '한 사람이 두 이름으로 계산서를 나눌 때: 원 기사 실수령이 목표 이상이 되는 범위에서 나머지를 받는 기사로 넘깁니다 (세무사 확인 필수).',
@@ -5261,6 +5281,64 @@
     usage: '한 아이디로 여러 기사가 일할 때 기록합니다 (기간을 비우면 계속). 기록이 없는 날은 명의자가 일한 것으로 봅니다. 기록한 기간에 그 아이디로 잡힌 매출(배송·프레시백·미계약·프로모션·분실파손)은 일한 기사 본인 정산으로 자동으로 옮겨지고, 단가도 그 기사 아이디 기준으로 계산됩니다. 일한 기사에게 본인 정산 아이디가 없으면 명의자에게 남기고 "확인 필요"에 띄웁니다.',
     tmp: '기사가 정해진 기간 동안 다른 단가로 일할 때. 그 기사가 일한 날(아이디 사용 기록 기준, 기록이 없으면 명의자)의 배송에만 적용됩니다. 적용 노선을 비우면 전체, 708C 또는 시흥2|708C 처럼 쉼표로 여러 개.'
   };
+  // 정산 설정 화면 설명: [꼬리표] 한 줄씩 (무엇 · 우선순위 · 빈칸이면 · 바꾸는 곳 · 주의)
+  const ST_GUIDE = {
+    config: [
+      ['하는 일', '모든 정산 계산의 <b>기본값</b> — 지급률 · 보험 요율 · 지급일'],
+      ['덮어쓰는 곳', '산재·고용 → <b>[캠프 및 기사별 산재고용설정]</b> · 퇴사 보류금 → <b>[퇴사자 보류금 설정]</b> (거기 빈칸이면 이 값)'],
+      ['바꾸면', '마감 안 한 달은 <b>바로 다시 계산</b> · 마감한 달은 그대로'],
+      ['입력', '<b>값</b> 칸만 고치기 · % 는 <code>10%</code> 처럼']
+    ],
+    items: [
+      ['하는 일', '기사 정산서에 나오는 <b>줄 이름표</b> · <span class="gp">지급</span> = 더 주는 돈 · <span class="gm">차감</span> = 빼는 돈'],
+      ['금액 넣는 곳', '계산 방식 <b>직접입력</b> 항목 → [공제·가감]에 그 달 금액 · 매달 같으면 [고정수당 및 공제설정]'],
+      ['계산서', '차감 항목 <b>계산서에서 빼기 Y</b> = 세금계산서 금액에서 빠짐 · <b>N</b> = 입금액에서만 빠짐'],
+      ['주의', '자동 항목(배송 기본 · 분실파손 · 산재보험 …)의 <b>계산 방식은 바꾸지 마세요</b>']
+    ],
+    camps: [
+      ['하는 일', '기사에게 공제할 <b>산재·고용</b>을 캠프별 · 기사별로 따로 정함'],
+      ['우선순위', '<b>기사별 &gt; 캠프별 &gt; 세부정산 설정</b> — 칸마다 따로 (빈 칸만 다음 단계 값을 씀)'],
+      ['빈칸', '<b>빈칸 = 기본값</b> · 칸 안의 흐린 글씨가 지금 기본값 (예: <code>기본 34.6%</code>)'],
+      ['캠프별', '그 캠프에서 일한 금액에 적용 · 여러 캠프를 뛰면 <b>지급액 비중대로</b> 나눔'],
+      ['기사별', '이 기사만 다르게 · <b>산재 / 고용 OFF</b> = 그 보험은 공제 안 함 (공단 납부도 없음으로 계산)'],
+      ['차액', '기사 공제 − 기본값으로 계산한 공제 → <span class="gp">+ 러너 몫</span> / <span class="gm">− 러너 부담</span> · 공단 실납부는 항상 기본값'],
+      ['기본값 바꾸는 곳', '[세부정산 설정] → <b>산재 · 고용보험</b>']
+    ],
+    regular: [
+      ['하는 일', '<b>매달 똑같이</b> 주거나 빼는 돈 (예: 유류비지원 250,000)'],
+      ['기간', '시작월 ~ 종료월(<code>2026-11</code>) 사이 정산월에 자동으로 들어감 · <b>빈칸 = 제한 없음</b>'],
+      ['그만둘 때', '줄을 지우지 말고 <b>종료월</b> 넣기'],
+      ['항목', '[정산서 항목설정]의 이름 중에서 · 한 달만이면 [공제·가감]']
+    ],
+    target: [
+      ['하는 일', '1년 계산서 합계가 <b>연 목표</b>에 맞도록 매달 수당을 자동 계산'],
+      ['계산', '수당 = 연 목표 ÷ 12 − 이번 달 계산서(수당 빼고) · <b>단위</b> 아래는 버림 · 0 이하면 수당 없음'],
+      ['빈칸', '단위 빈칸 = <b>10,000원</b>']
+    ],
+    split: [
+      ['하는 일', '한 사람이 <b>두 이름</b>으로 계산서를 나눌 때 — 원 명의자 실수령이 목표 이상인 범위에서 나머지를 받는 명의자에게 넘김'],
+      ['정산서', '원 명의자 <span class="gm">매출 분할 이전</span> · 받는 명의자 <span class="gp">매출 분할 수령</span> 줄이 자동으로 생김'],
+      ['빈칸', '단위 빈칸 = <b>10,000원</b> · 매달 반복 <b>N</b> 이면 적용월에만'],
+      ['주의', '<b>세무사 확인 필수</b>']
+    ],
+    leave: [
+      ['하는 일', '퇴사월 정산서 <span class="gm">퇴사 보류금</span>(입금액에서 차감) → 다음 달 <span class="gp">보류금 반환</span>(입금 가산)'],
+      ['빈칸', '보류금 빈칸 = [세부정산 설정] <b>퇴사 보류금 기본 금액</b>'],
+      ['참고', '다음 달에 잡힌 분실파손은 계산서에서 그대로 빠짐']
+    ],
+    kinds: [
+      ['하는 일', '쿠팡 정산서의 <b>구분</b> 값 → 계산 분류(배송 · 프레시백 · 분실파손 …)로 바꾸는 표'],
+      ['언제', '처음 보는 구분값은 정산서 탭 <b>[확인 필요]</b>에 뜸 → 여기에 한 줄 추가'],
+      ['주의', '있는 줄의 분류를 바꾸면 마감 안 한 달 계산이 바뀜']
+    ]
+  };
+  const ST_GTAG = { '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
+  function paintHelp(name) {
+    const el = $('#stEditHelp'), g = ST_GUIDE[name];
+    if (!g) { el.className = 'sub st-help'; el.textContent = name === 'migrate' ? '' : ST_HELP[name] || ''; return; }
+    el.className = 'st-help stg';
+    el.innerHTML = g.map((x) => '<div class="stg-r"><span class="stg-t g-' + (ST_GTAG[x[0]] || 'info') + '">' + esc(x[0]) + '</span><span>' + x[1] + '</span></div>').join('');
+  }
   function loadSettle(month, fresh) {
     if (!STX.sum) $('#stTable').innerHTML = '<tr><td style="padding:40px"><div class="spin"></div></td></tr>';
     return api('adm_stlMonth', month || STX.month || '', !!fresh).then((r) => {
@@ -5348,13 +5426,13 @@
     $$('#stCfgTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.cfg === name));
     $('#stMigrate').classList.toggle('hidden', name !== 'migrate');
     $('#stEditor').classList.toggle('hidden', name === 'migrate');
-    $('#stEditHelp').textContent = name === 'migrate' ? '' : ST_HELP[name] || '';
+    paintHelp(name);
     if (name !== 'migrate') loadEditor(name);
   }
   // ── 표 편집 ──
   function loadEditor(name) {
     if (!STX.table || STX.table.name !== name) STX.edQ = ''; // 다른 표로 바꾸면 검색어 비움
-    $('#stEditHelp').textContent = ST_HELP[name] || '';
+    paintHelp(name);
     $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
     return api('adm_stlTable', name, STX.month).then((r) => {
       if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
@@ -5367,10 +5445,14 @@
     const T = STX.table, rows = STX.edRows, ro = T.closed;
     const dl = '<datalist id="stAcctDL">' + (T.accts || []).map((o) => '<option value="' + esc(o.label) + '">' + (o.stopped ? '정지' : '') + '</option>').join('') + '</datalist>' +
       '<datalist id="stPersonDL">' + (T.persons || []).map((o) => '<option value="' + esc(o.label) + '">' + esc(o.status !== '승인' ? o.status : '') + '</option>').join('') + '</datalist>';
-    const calcH = T.name === 'yongcha' ? ['자동건수', '지급액', '쿠팡매출', '기존지급', '추가지급', '부담 차감', '러너 몫'] : T.name === 'advance' ? ['잔여', '자동 공제 정산월'] : [];
+    const mon = ymTitle(T.month || STX.month).replace(/^\d+년\s*/, '');
+    const calcH = T.name === 'yongcha' ? ['자동건수', '지급액', '쿠팡매출', '기존지급', '추가지급', '부담 차감', '러너 몫'] : T.name === 'advance' ? ['잔여', '자동 공제 정산월']
+      : T.name === 'camps' ? [mon + ' 인원', mon + ' 기사 공제<br><small>산재+고용</small>', '기본값이면', '차액<br><small>+러너 몫 / −러너 부담</small>'] : [];
+    const kindOf = (r) => r.kind || (r.name && !r.camp ? '기사' : '캠프');
     const cell = (r, i, c) => {
       const v = r[c.k] == null ? '' : String(r[c.k]);
       const at = ' data-r="' + i + '" data-k="' + c.k + '"' + (ro ? ' disabled' : '');
+      if (c.when && kindOf(r) !== c.when) return '<td class="na">—</td>'; // 이 구분의 줄에는 안 쓰는 칸
       if (c.type === 'readonly') return '<td>' + esc(v) + '</td>';
       if (c.type === 'item' && T.itemsInfo) {
         // 항목: 지급 / 차감 으로 나눠서. 차감은 세금계산서에서 빠지는지(계산서 차감) 입금액에서만 빠지는지 표시
@@ -5383,16 +5465,24 @@
       if (c.type === 'select' || c.type === 'item' || c.type === 'camp') {
         let opts = c.type === 'item' ? [''].concat(T.items) : c.type === 'camp' ? [''].concat(T.camps) : c.opts;
         if (v && !opts.includes(v)) opts = opts.concat([v]);
-        return '<td><select class="inp"' + at + '>' + opts.map((o) => '<option' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select></td>';
+        const cls = v === 'OFF' ? 'inp off' : !v && c.ph ? 'inp dflt' : 'inp';
+        return '<td><select class="' + cls + '"' + at + '>' + opts.map((o) => '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>' + esc(o === '' && c.ph ? c.ph : o) + '</option>').join('') + '</select></td>';
       }
       const type = c.type === 'date' ? 'date' : c.type === 'month' ? 'month' : 'text';
       const extra = c.type === 'acct' || c.type === 'acctOrText' ? ' list="stAcctDL" style="min-width:170px"' : c.type === 'person' ? ' list="stPersonDL" style="min-width:120px"' : c.type === 'cid' ? ' style="min-width:150px" spellcheck="false" autocapitalize="off"' : c.type === 'money' ? ' inputmode="decimal" style="text-align:right;width:110px"' : '';
-      return '<td><input class="inp" type="' + type + '"' + at + extra + ' value="' + esc(c.type === 'money' && v ? wn(v) : v) + '"></td>';
+      return '<td><input class="inp" type="' + type + '"' + at + extra + (c.ph ? ' placeholder="' + esc(c.ph) + '"' : '') + ' value="' + esc(c.type === 'money' && v ? wn(v) : v) + '"></td>';
     };
     const calc = (r) => {
       if (T.name === 'yongcha') {
         const x = r._calc; if (!x) return '<td class="calc" colspan="6">저장하면 계산</td>';
         return '<td class="calc">' + (x.autoQty === '' ? '-' : wn(x.autoQty)) + '</td><td class="calc">' + wn(x.payAmt) + '</td><td class="calc">' + wnz(x.sales) + '</td><td class="calc">' + wnz(x.existing) + '</td><td class="calc">' + wnz(x.extra) + '</td><td class="calc">' + wnz(x.cut) + '</td><td class="calc"' + (x.toRunner ? ' title="기사 청구 ' + wn(x.charge) + ' − 수행자 지급 ' + wn(x.payAmt) + '"' : '') + '>' + (x.toRunner ? wnz(x.runnerGain) : '-') + '</td>';
+      }
+      if (T.name === 'camps') {
+        const x = r._calc;
+        if (!r._row) return '<td class="calc" colspan="4">저장하면 계산</td>';
+        if (!x) return '<td class="calc">0명</td><td class="calc">-</td><td class="calc">-</td><td class="calc">-</td>';
+        const d = x.diff, dc = d > 0 ? ' class="calc pos"' : d < 0 ? ' class="calc neg"' : ' class="calc"';
+        return '<td class="calc">' + x.n + '명</td><td class="calc">' + wnz(x.ded) + '</td><td class="calc">' + wnz(x.ded0) + '</td><td' + dc + '>' + (d > 0 ? '+' : '') + (d ? wn(d) : '0') + '</td>';
       }
       if (T.name === 'advance') {
         const left = (Number(String(r.amt).replace(/,/g, '')) || 0) - (Number(String(r.paid).replace(/,/g, '')) || 0), x = r._calc || {};
@@ -5404,6 +5494,7 @@
     // 정렬: 제목을 누르면 오름차순 → 내림차순 → 원래 순서 (화면 순서만 바뀌고 저장 순서는 그대로)
     const so = STX.edSort && STX.edSort.t === T.name ? STX.edSort : null;
     const order = rows.map((r, i) => i);
+    if (!so && T.name === 'camps') order.sort((a, b) => (kindOf(rows[a]) === '기사') - (kindOf(rows[b]) === '기사') || a - b);
     if (so) {
       const num = (v) => { const n = Number(String(v).replace(/[,\s원%]/g, '')); return String(v).trim() !== '' && !isNaN(n) ? n : null; };
       order.sort((a, b) => {
@@ -5418,7 +5509,8 @@
     // 세부정산 설정은 묶음(금액 환산·분실파손·보험·지급일…)마다, 정산서 항목설정은 지급/차감마다 제목 줄
     const ncol = T.cols.length + calcH.length + (T.fixed || ro ? 0 : 1);
     let prevG = null;
-    const grpOf = (r) => (T.name === 'config' ? r._group || '' : T.name === 'items' ? (r.side === '차감' ? '차감 항목 (빼는 돈)' : r.side === '지급' ? '지급 항목 (더 주는 돈)' : '') : null);
+    const grpOf = (r) => (T.name === 'config' ? r._group || '' : T.name === 'items' ? (r.side === '차감' ? '차감 항목 (빼는 돈)' : r.side === '지급' ? '지급 항목 (더 주는 돈)' : '')
+      : T.name === 'camps' ? (kindOf(r) === '기사' ? '기사별 — 캠프값보다 우선 · 산재/고용 OFF 가능' : '캠프별 — 그 캠프에서 일한 금액에 적용') : null);
     const grpRow = (r) => {
       if (so) return '';
       const g = grpOf(r);
@@ -5436,7 +5528,14 @@
       const left = Object.keys(by).filter((k) => by[k] > 0).sort((a, b) => by[b] - by[a] || koSort(a, b));
       advSum = '<div class="advsum">' + (left.length ? '<b>잔여 가불금 ' + left.length + '명 · 합계 ' + wn(left.reduce((x, k) => x + by[k], 0)) + '원</b>' + left.map((k) => '<span>' + esc(k) + ' · 잔여 가불금 <em>' + wn(by[k]) + '원</em></span>').join('') : '<b>남은 가불금이 없습니다.</b>') + '</div>';
     }
-    $('#stEditor').innerHTML = dl + advSum + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : (T.fixed ? '' : '<button class="btn ghost sm" id="edAdd">+ 줄 추가</button>') +
+    if (T.name === 'camps' && T.calcSum) {
+      const c = T.calcSum, d = c.diff;
+      advSum = '<div class="inssum"><b>' + esc(ymTitle(T.month || STX.month)) + ' 정산 산재·고용</b>' +
+        (c.closed ? '<span>마감한 달이라 차액을 다시 계산하지 않습니다.</span>' : '<span>공제 대상 <em>' + c.n + '명</em></span><span>기사 공제 <em>' + wn(c.ded) + '원</em></span><span>기본값이면 <em>' + wn(c.ded0) + '원</em></span>' +
+        '<span class="' + (d > 0 ? 'pos' : d < 0 ? 'neg' : '') + '">차액 <em>' + (d > 0 ? '+' : '') + wn(d) + '원</em> ' + (d > 0 ? '러너 몫' : d < 0 ? '러너 부담' : '') + '</span>') + '</div>';
+    }
+    const addBtn = T.fixed ? '' : T.name === 'camps' ? '<button class="btn ghost sm ed-add" id="edAdd" data-kind="캠프">+ 캠프 추가</button><button class="btn ghost sm ed-add" data-kind="기사">+ 기사 추가</button>' : '<button class="btn ghost sm ed-add" id="edAdd">+ 줄 추가</button>';
+    $('#stEditor').innerHTML = dl + advSum + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : addBtn +
       '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button>') +
       '<input class="inp edq" id="edQ" type="search" placeholder="검색 (이름·아이디 등)" value="' + esc(STX.edQ || '') + '"><span class="sub" id="edCnt">' + scope + rows.length + '줄 · 정산 DB "stl_' + esc(T.name) + '" 탭에서도 직접 고칠 수 있습니다</span></div>' +
       '<div class="table-wrap"><table class="sttbl ed">' + head + '<tbody>' + body + '</tbody></table>' + (rows.length ? '' : '<div class="empty">기록이 없습니다.</div>') + '</div>';
@@ -5464,7 +5563,12 @@
     if (col && col.idk) r[col.idk] = '';
     el.classList.add('dirty'); edMark();
   });
-  $('#stEditor').addEventListener('change', (e) => { const el = e.target.closest('select[data-k]'); if (el) { STX.edRows[+el.dataset.r][el.dataset.k] = el.value; el.classList.add('dirty'); edMark(); } });
+  $('#stEditor').addEventListener('change', (e) => {
+    const el = e.target.closest('select[data-k]'); if (!el) return;
+    STX.edRows[+el.dataset.r][el.dataset.k] = el.value; el.classList.add('dirty'); edMark();
+    el.classList.toggle('off', el.value === 'OFF'); el.classList.remove('dflt');
+    if (STX.table && STX.table.cols.some((c) => c.when) && el.dataset.k === 'kind') renderEditor(); // 구분(캠프/기사)에 따라 쓰는 칸이 바뀜
+  });
   $('#stEditor').addEventListener('click', (e) => {
     const sh = e.target.closest('th[data-sort]');
     if (sh) {
@@ -5472,13 +5576,15 @@
       STX.edSort = cur === '' ? { t: T.name, k, dir: 'asc' } : cur === 'asc' ? { t: T.name, k, dir: 'desc' } : null;
       return renderEditor();
     }
-    if (e.target.id === 'edAdd') {
+    const addB = e.target.closest('.ed-add');
+    if (addB) {
       const o = {}; STX.table.cols.forEach((c) => { o[c.k] = ''; });
+      if (addB.dataset.kind) o.kind = addB.dataset.kind;
       if (STX.table.name === 'yongcha') { o.mode = '건당'; o.date = STX.sum ? STX.sum.period.from : ''; }
       if (STX.table.name === 'split') o.repeat = 'Y';
       if (STX.table.name === 'ids') { o.role = '메인'; o.status = '사용'; }
       STX.edRows.push(o); edMark(); renderEditor();
-      const last = $$('#stEditor tbody tr'); if (last.length) { const f = last[last.length - 1].querySelector('.inp'); if (f) f.focus(); }
+      const nr = $('#stEditor tr[data-ri="' + (STX.edRows.length - 1) + '"]'); if (nr) { const f = nr.querySelector('.inp:not([data-k="kind"])') || nr.querySelector('.inp'); if (f) { f.focus(); nr.scrollIntoView({ block: 'nearest' }); } }
       return;
     }
     const del = e.target.closest('[data-del]');

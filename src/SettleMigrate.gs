@@ -239,7 +239,7 @@ function mgSetup_(sh) {
       take(r + 1, function (x) { out.leave.push({ name: str_(x[1]), month: str_(x[2]), amt: String(stlNum_(x[3]) || '') }); });
     } else if (K(r, 1) === '구분' && K(r, 2) === '캠프명' && /^경비/.test(K(r, 3))) {
       for (let q = r + 1; q < v.length && /^캠프/.test(K(q, 1)); q++) {
-        if (str_(v[q][2])) out.camps.push({ camp: str_(v[q][2]), expense: str_(v[q][3]), san: str_(v[q][4]), goy: str_(v[q][5]), runner: str_(v[q][6]) });
+        if (str_(v[q][2])) out.camps.push({ kind: '캠프', camp: str_(v[q][2]), expense: str_(v[q][3]), san: str_(v[q][4]), goy: str_(v[q][5]) });
       }
     }
   }
