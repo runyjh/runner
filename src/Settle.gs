@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105z7';
+const STL_CALC_VER = '20261105z8';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1122,20 +1122,40 @@ function stlCompute_(month) {
     (adj[ownerId] = adj[ownerId] || []).push({ item: item, amt: amt, memo: memo || '', auto: !!auto });
   };
   const adjBad = [], manualRepay = {};
+  // 수기 가불 상환: 항목 이름에 '가불'이 들어간 차감 항목 (예: 가불금 상환, 가불 상환, 가불금). 지급 쪽 항목(예: 가불금 지급)은 제외
+  const itemSide = {};
+  try { stlItems_().list.forEach(function (it) { itemSide[it.name] = it.side; }); } catch (e) { /* 기본 */ }
+  const isRepay = function (item) { const n = str_(item); return n === STL_ADV_ITEM || (/가불/.test(n) && itemSide[n] !== '지급'); };
   stlRead_('stl_adjust').filter(function (a) { return a.month === month; }).forEach(function (a) {
     const id = stlAcct_(X, D, a.name, a.acct);
     if (!id) { adjBad.push(a.name || a.acct); return; }
-    if (a.item === STL_ADV_ITEM) manualRepay[id] = 1;
+    if (isRepay(a.item) && stlNum_(a.amt) > 0) manualRepay[id] = (manualRepay[id] || 0) + stlNum_(a.amt);
     addAdj(id, a.item, stlNum_(a.amt), a.memo, false);
   });
   // 가불금: 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액을 '가불금 상환'으로 자동 공제
-  //  (그 달 공제·가감에 '가불금 상환'을 손으로 넣었으면 자동은 건너뜀). 마감하면 가불금 표의 상환금에 자동 기록
-  const advAuto = [];
+  //  그 달 공제·가감에 수기 가불 상환이 있으면 그 기사는 자동 공제를 건너뛰고, 수기 금액을 오래된 가불금부터 상환금에 기록한다.
+  //  마감하면 가불금 표의 상환금에 기록 ([2026-10 정산 상계 300,000]), 마감 해제하면 되돌림
+  const advAuto = [], advRows = [], advManualWarn = [];
   stlRead_('stl_advance').forEach(function (a) {
     const id = stlAcct_(X, D, a.name, a.acct), left = stlNum_(a.amt) - stlNum_(a.paid);
-    if (!id || left <= 0 || !a.due || stlAdvMonth_(a.due, cfg) !== month || manualRepay[id]) return;
+    if (!id || left <= 0) return;
+    advRows.push({ a: a, id: id, left: left });
+    if (!a.due || stlAdvMonth_(a.due, cfg) !== month || manualRepay[id]) return;
     addAdj(id, STL_ADV_ITEM, left, (a.date ? stlYmd_(a.date).slice(5).replace('-', '/') + ' 가불 ' : '가불 ') + won_(stlNum_(a.amt)) + '원 · 상환일 ' + stlYmd_(a.due) + ' (자동)', true);
     advAuto.push({ row: a._row, id: id, amt: left });
+  });
+  Object.keys(manualRepay).forEach(function (id) {
+    let rest = manualRepay[id];
+    const mine = advRows.filter(function (x) { return x.id === id; })
+      .sort(function (p, q) { return (stlYmd_(p.a.date) || '9') < (stlYmd_(q.a.date) || '9') ? -1 : (stlYmd_(p.a.date) || '9') > (stlYmd_(q.a.date) || '9') ? 1 : p.a._row - q.a._row; });
+    mine.forEach(function (x) {
+      if (rest <= 0) return;
+      const amt = Math.min(rest, x.left);
+      advAuto.push({ row: x.a._row, id: id, amt: amt, manual: true });
+      rest -= amt;
+    });
+    const name = X.groups[id] && X.groups[id].ownerId && D.byId[X.groups[id].ownerId] ? D.byId[X.groups[id].ownerId].name : id;
+    advManualWarn.push(name + ' 수기 ' + won_(manualRepay[id]) + '원' + (mine.length ? ' → 가불금 상환금에 기록' + (rest > 0 ? ' (남은 가불금보다 ' + won_(rest) + '원 많음)' : '') : ' (남은 가불금 없음)'));
   });
   stlRead_('stl_regular').forEach(function (a) {
     if (a.from && month < a.from.slice(0, 7)) return;
@@ -1264,6 +1284,7 @@ function stlCompute_(month) {
     return c + ' (' + (nm || '이름 미확인') + ')';
   };
   const W = function (key, label, list, level, acts) { if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, 50), level: level || 'warn', acts: acts ? acts.slice(0, 50) : null }); };
+  W('advManual', '수기 가불금 상환 있음 · 자동 공제 건너뜀 (마감하면 가불금 목록 상환금에 기록)', advManualWarn, 'info');
   W('unreg', '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
     Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return cidNm(u.cid) + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad',
     Object.keys(warn.unreg).map(function (k) { return { cids: [warn.unreg[k].cid] }; }));
