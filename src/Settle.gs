@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105z2';
+const STL_CALC_VER = '20261105z3';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1072,7 +1072,9 @@ function stlCompute_(month) {
     const payAmt = isAmt ? stlR0_(stlNum_(y.price)) : stlR0_((stlNum_(y.price) || cfg.yongPrice) * qty);
     let existing = 0;
     if (wg && wg.main.mode !== '용차내역') {
-      if (route && (camp || y.route)) {
+      // 쿠팡 정산서에 그날 수행 배송이 있으면 실제로 잡힌 단가 그대로 (원청단가·일시단가 기사도 정확하게)
+      if (found && autoQty) existing = stlR0_(perfUnitSum / autoQty * qty);
+      else if (route && (camp || y.route)) {
         const u = stlUnit_(ctx, wg.main, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 }, stlWorkerOf_(ctx, whoKey, date));
         existing = stlR0_(u.u * qty);
       } else existing = stlR0_(perfUnitSum);
