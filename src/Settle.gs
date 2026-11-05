@@ -59,6 +59,10 @@ const STL_TABS = {
   stl_close: { month: '정산월', at: '마감일시', admin: '관리자' },
   // 정산서 탭 확인 필요에서 [확인함]으로 그 달만 숨긴 항목
   stl_ack: { month: '정산월', kind: '구분', key: '대상', memo: '내용', at: '처리일시', admin: '관리자' },
+  // 러너 손익·운영비: 고정 운영비(매달 자동) · 직원(급여·원천세) · 지출 기록(그 달 실제 지출)
+  stl_cost: { cat: '분류', name: '항목', amt: '월 금액', proof: '증빙', bank: '결제 통장', day: '결제일', from: '시작월', to: '종료월', memo: '메모' },
+  stl_staff: { name: '이름', pay: '월 급여', taxRate: '원천세율', day: '지급일', bank: '은행', account: '계좌번호', from: '시작월', to: '종료월', memo: '메모' },
+  stl_expense: { month: '귀속월', date: '날짜', cat: '분류', name: '내용', vendor: '거래처', amt: '금액', proof: '증빙', bank: '통장', memo: '메모' },
   stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' }
 };
 const STL_TAB_NOTES = {
@@ -72,6 +76,9 @@ const STL_TAB_NOTES = {
   stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 품앗이 = 노선관리의 그 노선 품앗이단가, 용차업체 = 그 노선 외부단가(차액부담 기사 청구 단가). 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
   stl_camps: '캠프 및 기사별 산재·고용. 구분 = 캠프 / 기사. 빈 칸 = 세부정산 설정 기본값. 우선순위: 기사 > 캠프 > 기본값 (칸마다). 산재·고용 ON/OFF 는 기사 줄만 (OFF = 그 보험 공제 안 함). 보험 기준: 공급가 / 부가세포함.',
   stl_config: '값만 고치세요. % 는 10% 처럼 써도 됩니다.',
+  stl_cost: '고정 운영비: 매달 똑같이 나가는 돈. 월 금액 = 실제 나가는 돈(VAT포함). 증빙이 세금계산서·카드·현금영수증이면 부가세를 나눠 매입세액 공제로 셉니다. 시작월·종료월(2026-11) 사이 달에 자동 반영.',
+  stl_staff: '직원(기사 아님): 월 급여(세전) · 원천세율(비우면 3.3% = 소득세 3% + 지방소득세 0.3%).',
+  stl_expense: '그 달 실제 지출. 귀속월 = 손익에 넣을 정산월. 금액 = VAT포함.',
   stl_closed: '마감할 때 프로그램이 기록합니다. 손으로 고치지 마세요.'
 };
 
@@ -144,7 +151,11 @@ const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
 const STL_CALC_VER = '20261105zI';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
-const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack'];
+const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense'];
+// 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
+const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1 };
+const STL_COST_CATS = ['사무실', '세무·회계', '차량', '통신', '보험·공과', '이자·수수료', '소모품', '유류비', '수리·정비', '식대·접대', '기타'];
+const STL_PROOFS = ['', '세금계산서', '카드', '현금영수증', '면세·없음'];
 function stlSS_() {
   if (_stlSS) return _stlSS;
   const id = props_().STL_DB_ID;
@@ -1670,7 +1681,7 @@ function stlDates_(month, cfg) {
 /** 계산 결과 캐시 키: 정산 DB 탭 버전(입금 탭 제외) + 기사 정보 버전 */
 function stlVer_() {
   const v = stlTv_();
-  const txt = v._ + ':' + Object.keys(v).filter(function (k) { return k !== '_' && k !== 'stl_pay'; }).sort().map(function (k) { return k + v[k]; }).join(',');
+  const txt = v._ + ':' + Object.keys(v).filter(function (k) { return k !== '_' && !STL_NO_RECALC[k]; }).sort().map(function (k) { return k + v[k]; }).join(',');
   return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, txt, Utilities.Charset.UTF_8)).slice(0, 22);
 }
 /** 기사 정보·설정 등 정산 DB 밖의 데이터가 바뀌었을 때 계산 결과만 버린다 */
@@ -1732,7 +1743,77 @@ function adm_stlMonth(token, month, fresh) {
     const months = stlMonths_();
     if (!stlMonthOk_(month)) month = months.withData.length ? months.withData[months.withData.length - 1] : stlAddMonth_(stlMonthNow_(), -1);
     const r = stlResult_(month, !!fresh);
-    return { ok: true, month: month, months: months.slice(), summary: r.summary, items: stlItems_().list.map(function (i) { return { name: i.name, side: i.side, method: i.method, taxCut: i.taxCut }; }) };
+    let pnl = null;
+    try { pnl = stlPnl_(month, r.summary); } catch (e) { pnl = null; }
+    return { ok: true, month: month, months: months.slice(), summary: r.summary, pnl: pnl, items: stlItems_().list.map(function (i) { return { name: i.name, side: i.side, method: i.method, taxCut: i.taxCut }; }) };
+  });
+}
+// ───────────────────────── 러너 손익 (당기순이익) ─────────────────────────
+// 당기순이익(세전, 공급가) = 회사이익금 − 러너 보험 실부담 − 직원 인건비(세전) − 고정 운영비 − 지출 기록
+//  · 회사이익금 = 쿠팡 공급가 − 분실 − 기사 공급가 − 영업점 수수료 (러너 잉여 = 프백·보험 차액·용차는 이미 안에 들어 있어 더하지 않음)
+//  · 운영비 금액은 실제 나가는 돈(VAT포함). 증빙이 세금계산서·카드·현금영수증이면 ÷1.1 로 공급가·부가세(매입세액 공제)를 나눔
+const STL_PROOF_VAT = { '세금계산서': 1, '카드': 1, '현금영수증': 1 };
+function stlSplitVat_(amt, proof) {
+  const a = stlR0_(stlNum_(amt));
+  if (!STL_PROOF_VAT[str_(proof)]) return { supply: a, vat: 0 };
+  const sp = Math.round(a / 1.1);
+  return { supply: sp, vat: a - sp };
+}
+function stlActiveIn_(r, month) {
+  const f = str_(r.from).slice(0, 7), t = str_(r.to).slice(0, 7);
+  return (!f || f <= month) && (!t || t >= month);
+}
+/** 원천세: 3.3% = 소득세 3% + 지방소득세(소득세의 10%), 각각 10원 미만 버림. 다른 율이면 그 율로 10원 미만 버림 */
+function stlWht_(pay, rate) {
+  const r = str_(rate) ? stlRate_(rate, 0.033) : 0.033;
+  if (Math.abs(r - 0.033) < 1e-9) { const inc = Math.floor(pay * 0.03 / 10) * 10; return inc + Math.floor(inc * 0.1 / 10) * 10; }
+  return Math.floor(pay * r / 10) * 10;
+}
+function stlPnl_(month, sum) {
+  const t = (sum && sum.total) || {}, c = (sum && sum.company) || {};
+  const o = {
+    month: month, closed: !!(sum && sum.closed), hasData: !!(sum && (sum.drivers || []).length),
+    qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: (c.sales || 0) - (c.supplyCp || 0), loss: c.lossCp || 0, progFee: -(c.vendorCut || 0),
+    drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0), surplus: (t.fbKeep || 0) + (t.fbCut || 0) + (t.insGain || 0) + (c.yongGain || 0),
+    runnerIns: t.runnerIns || 0, insDrv: (t.san || 0) + (t.goy || 0),
+    staff: 0, staffWht: 0, staffNet: 0, staffN: 0, fixed: 0, fixedVat: 0, fixedN: 0, varCost: 0, varVat: 0, varN: 0, byCat: {}
+  };
+  const cat = function (k, v) { if (v) o.byCat[k || '기타'] = (o.byCat[k || '기타'] || 0) + v; };
+  stlRead_('stl_staff').forEach(function (r) {
+    const pay = stlR0_(stlNum_(r.pay));
+    if (!r.name || !pay || !stlActiveIn_(r, month)) return;
+    const w = stlWht_(pay, r.taxRate);
+    o.staff += pay; o.staffWht += w; o.staffNet += pay - w; o.staffN++;
+  });
+  stlRead_('stl_cost').forEach(function (r) {
+    if (!stlNum_(r.amt) || !stlActiveIn_(r, month)) return;
+    const x = stlSplitVat_(r.amt, r.proof);
+    o.fixed += x.supply; o.fixedVat += x.vat; o.fixedN++; cat(r.cat, x.supply);
+  });
+  stlRead_('stl_expense').forEach(function (r) {
+    if (r.month !== month || !stlNum_(r.amt)) return;
+    const x = stlSplitVat_(r.amt, r.proof);
+    o.varCost += x.supply; o.varVat += x.vat; o.varN++; cat(r.cat, x.supply);
+  });
+  o.cost = o.fixed + o.varCost;
+  o.net = o.profit - o.runnerIns - o.staff - o.cost;
+  o.rate = o.salesSupply ? o.net / o.salesSupply : 0;
+  o.vatDue = o.salesVat - o.drvVat - o.fixedVat - o.varVat; // 부가세 예상 (매출세액 − 기사 매입세액 − 운영비 매입세액)
+  return o;
+}
+/** 월별 손익 (조회월이 속한 해) */
+function adm_stlPnl(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const y = month.slice(0, 4), ms = stlMonths_().withData.filter(function (m) { return m.slice(0, 4) === y; });
+    if (ms.indexOf(month) < 0) { ms.push(month); ms.sort(); }
+    const rows = ms.map(function (m) {
+      let sum = null;
+      try { sum = stlResult_(m, false).summary; } catch (e) { sum = null; }
+      return stlPnl_(m, sum);
+    });
+    return { ok: true, year: y, rows: rows };
   });
 }
 function stlMonths_() {
@@ -2030,7 +2111,11 @@ const STL_EDIT = {
   camps: { sheet: 'stl_camps', scope: 'all', cols: [['kind', '구분', ['캠프', '기사']], ['camp', '캠프', 'camp', '', '캠프'], ['name', '기사 (정산 아이디)', 'acct', 'acct', '기사'], ['basis', '보험 기준', ['', '공급가', '부가세포함']],
     ['expense', '경비공제율', 'text'], ['san', '산재율 (기사분)', 'text'], ['goy', '고용율 (기사분)', 'text'], ['sanOn', '산재', ['', 'OFF'], '', '기사'], ['goyOn', '고용', ['', 'OFF'], '', '기사'], ['memo', '메모', 'text']] },
   kinds: { sheet: 'stl_kinds', scope: 'all', cols: [['raw', '쿠팡 구분 값', 'text'], ['std', '표준 분류', STL_STD_KINDS]] },
-  config: { sheet: 'stl_config', scope: 'all', fixed: true, cols: [['label', '항목', 'readonly'], ['value', '값', 'text'], ['desc', '설명', 'readonly']] }
+  config: { sheet: 'stl_config', scope: 'all', fixed: true, cols: [['label', '항목', 'readonly'], ['value', '값', 'text'], ['desc', '설명', 'readonly']] },
+  // 러너 손익·운영비
+  cost: { sheet: 'stl_cost', scope: 'all', cols: [['cat', '분류', [''].concat(STL_COST_CATS)], ['name', '항목', 'text'], ['amt', '월 금액 (실제 나가는 돈 · VAT포함)', 'money'], ['proof', '증빙 (비우면 부가세 없음)', STL_PROOFS], ['bank', '결제 통장', 'text'], ['day', '결제일', 'text'], ['from', '시작월', 'month'], ['to', '종료월 (비우면 계속)', 'month'], ['memo', '메모', 'text']] },
+  staff: { sheet: 'stl_staff', scope: 'all', cols: [['name', '이름', 'text'], ['pay', '월 급여 (세전)', 'money'], ['taxRate', '원천세율 (비우면 3.3%)', 'text'], ['day', '지급일', 'text'], ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['from', '시작월', 'month'], ['to', '종료월 (비우면 계속)', 'month'], ['memo', '메모', 'text']] },
+  expense: { sheet: 'stl_expense', scope: 'month', cols: [['date', '날짜', 'date'], ['cat', '분류', [''].concat(STL_COST_CATS)], ['name', '내용', 'text'], ['vendor', '거래처', 'text'], ['amt', '금액 (VAT포함)', 'money'], ['proof', '증빙 (비우면 부가세 없음)', STL_PROOFS], ['bank', '통장', 'text'], ['memo', '메모', 'text']] }
 };
 /** 빈 칸에 흐리게 보여 줄 기본값 (예: 기본 34.6%) */
 function stlColPh_(name, k) {
@@ -2259,7 +2344,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
       }
       stlWriteAll_(E.sheet, out);
       if (name === 'ids') stlAddVendors_(clean.map(function (o) { return o.vendor; }));
-      stlBump_();
+      if (!STL_NO_RECALC[E.sheet]) stlBump_();
       logAdmin_(a, '정산 표 저장', name + (E.scope !== 'all' ? ' ' + month : ''), clean.length + '줄');
     } finally {
       lock.releaseLock();
