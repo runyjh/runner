@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zG';
+const STL_CALC_VER = '20261105zH';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1193,9 +1193,13 @@ function stlCompute_(month) {
   // 가불금: 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액을 '가불금 상환'으로 자동 공제
   //  그 달 공제·가감에 수기 가불 상환이 있으면 그 기사는 자동 공제를 건너뛰고, 수기 금액을 오래된 가불금부터 상환금에 기록한다.
   //  마감하면 가불금 표의 상환금에 기록 ([2026-10 정산 상계 300,000]), 마감 해제하면 되돌림
-  const advAuto = [], advRows = [], advManualWarn = [];
+  const advAuto = [], advRows = [], advManualWarn = [], advPrepaid = [];
   stlRead_('stl_advance').forEach(function (a) {
     const id = stlAcct_(X, D, a.name, a.acct), left = stlNum_(a.amt) - stlNum_(a.paid);
+    // 상계 예정일이 이번 정산인데 상환금이 이미 다 적혀 있음 (마감 기록 없이) → 자동 공제 안 됨. 아직 안 받은 돈이면 상환금을 지워야 공제됨
+    if (id && left <= 0 && stlNum_(a.amt) > 0 && a.due && stlAdvMonth_(a.due, cfg) === month && str_(a.memo).indexOf('[' + month + ' 정산 상계') < 0) {
+      advPrepaid.push(stlAcctLabel_(X, D, id) + ' · ' + (a.date ? stlYmd_(a.date).slice(5).replace('-', '/') + ' ' : '') + '가불 ' + won_(stlNum_(a.amt)) + '원 · 상계 예정일 ' + stlYmd_(a.due) + ' · 상환금 ' + won_(stlNum_(a.paid)) + '원');
+    }
     if (!id || left <= 0) return;
     advRows.push({ a: a, id: id, left: left });
     if (!a.due || stlAdvMonth_(a.due, cfg) !== month || manualRepay[id]) return;
@@ -1344,6 +1348,7 @@ function stlCompute_(month) {
   const W = function (key, label, list, level, acts) { if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, 50), level: level || 'warn', acts: acts ? acts.slice(0, 50) : null }); };
   W('yongNoP', '품앗이 단가 없음 (노선관리 품앗이단가가 비어 있어 원래 단가로만 지급 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP, 'warn');
   W('yongNoP5', '외부단가 없음 (용차업체·외부 수행 노선의 노선관리 외부단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP5, 'warn');
+  W('advPrepaid', '이번 정산에 상계할 가불금인데 상환금이 이미 적혀 있어 자동 공제 안 됨 (아직 안 받은 돈이면 가불금 목록에서 상환금을 지우거나 받은 만큼만 남겨 주세요)', advPrepaid, 'warn');
   W('advManual', '수기 가불금 상환 있음 · 자동 공제 건너뜀 (마감하면 가불금 목록 상환금에 기록)', advManualWarn, 'info');
   W('unreg', '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
     Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return cidNm(u.cid) + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad',
