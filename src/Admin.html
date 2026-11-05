@@ -623,6 +623,8 @@
   .smenu small { display: block; color: var(--faint); font-size: 11px; }
   .smenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .sg td.c.rcoff.left { background: repeating-linear-gradient(135deg, #f2f4f6 0 6px, #e5e8eb 6px 7px); }
+  #dBulk b { margin-right: 0; }
+  .rbulk .bksel { height: 32px; width: auto; font-size: 13px; padding: 0 8px; } .rbulk .bkl { font-size: 12px; color: var(--sub); margin-left: 6px; } .rbulk .bksp { flex: 1; }
   .sublink { display: block; font-size: 11.5px; color: var(--sub); margin-top: 4px; }
   .badge.subb { background: #eef0f3; color: #4e5968; }
   .badge.ws-퇴사 { background: #6b7684; color: #fff; } .badge.ws-휴직 { background: #fdf3e2; color: #a15c07; }
@@ -1844,7 +1846,16 @@
     $('#dAll').indeterminate = !$('#dAll').checked && vis.some((r) => dsel.has(r.id));
     const b = $('#dBulk');
     b.classList.toggle('hidden', !dsel.size);
-    b.innerHTML = '<b>' + dsel.size + '명 선택</b><button type="button" class="btn sm danger" id="dBulkDel"' + (dDeleting ? ' disabled>삭제 중…' : '>선택한 기사 삭제') + '</button><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button>';
+    const sel = (k, label, opts) => '<select class="inp bksel" data-bk="' + k + '" aria-label="' + label + '"><option value="">' + label + ' ▾</option>' + opts.map(([v, t]) => '<option value="' + esc(v) + '">' + esc(t) + '</option>').join('') + '</select>';
+    const camps = CR && CR.camps ? CR.camps.slice().sort((x, y) => koSort(x.name, y.name)).map((c) => [c.id, c.name]) : [];
+    if (dsel.size && !CR) loadCR().then(() => { if (dsel.size) paintDBulk(); }).catch(() => {});
+    b.innerHTML = '<b>' + dsel.size + '명 선택</b><span class="bkl">한 번에 바꾸기</span>' +
+      sel('status', '앱 사용', STATUSES.map((x) => [x, x])) +
+      sel('workStatus', '근무상태', [['재직', '재직'], ['휴직', '휴직'], ['퇴사', '퇴사 (퇴사일 입력)']]) +
+      sel('driverType', '기사단가', DTYPES.map((x) => [x, x])) +
+      sel('title', '직급', [['', '기사']].concat(TITLES.map((x) => [x, x]))) +
+      (camps.length ? sel('schCampId', '배정 캠프', [['', '(배정 안 함)']].concat(camps)) : '') +
+      '<span class="bksp"></span><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button><button type="button" class="btn sm danger" id="dBulkDel"' + (dDeleting ? ' disabled>삭제 중…' : '>선택한 기사 삭제') + '</button>';
   }
   $('#rows').addEventListener('change', (e) => {
     const c = e.target.closest('[data-dck]'); if (!c) return;
@@ -1854,6 +1865,28 @@
   $('#dAll').addEventListener('change', (e) => {
     visibleRows().forEach((r) => (e.target.checked ? dsel.add(r.id) : dsel.delete(r.id)));
     renderRows();
+  });
+  // 일괄 바꾸기: 고른 기사 전부에 같은 값 (한 명 수정과 같은 검사·연동)
+  const BK_LABEL = { status: '기사 앱 사용', workStatus: '근무상태', driverType: '기사단가 코드', title: '직급', schCampId: '배정 캠프' };
+  $('#dBulk').addEventListener('change', (e) => {
+    const sl = e.target.closest('[data-bk]'); if (!sl) return;
+    const k = sl.dataset.bk, idx = sl.selectedIndex; if (!idx) return;
+    const v = sl.value, txt = sl.options[idx].text.replace(' (퇴사일 입력)', '');
+    const ids = [...dsel], names = all.filter((r) => dsel.has(r.id)).map((r) => r.name);
+    const ch = {}; ch[k] = v === '재직' && k === 'workStatus' ? '' : v;
+    let pre = Promise.resolve(true);
+    if (k === 'workStatus' && v === '퇴사') pre = ask('퇴사일 (마지막 근무일)', names.length + '명의 퇴사일을 yyyy-mm-dd 로 입력하세요. 다음 날부터 스케줄·쿠팡 입차에서 빠집니다.', '', ymdLocal(new Date())).then((d) => { if (d == null) return false; if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d).trim())) { toast('날짜를 yyyy-mm-dd 로 입력해 주세요.'); return false; } ch.leaveDate = String(d).trim(); return true; });
+    else pre = Promise.resolve(confirm(names.length + '명의 ' + BK_LABEL[k] + '을(를) "' + txt + '"(으)로 바꿀까요?\n\n' + names.slice(0, 20).join(', ') + (names.length > 20 ? ' 외 ' + (names.length - 20) + '명' : '')));
+    pre.then((go) => {
+      sl.selectedIndex = 0;
+      if (!go) return;
+      $$('select', $('#dBulk')).forEach((x) => { x.disabled = true; });
+      api('adm_bulkUpdateDrivers', ids, ch).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        toast(r.done.length + '명 ' + BK_LABEL[k] + ' → ' + txt + (r.failed.length ? ' · 실패 ' + r.failed.length + '명: ' + r.failed.map((x) => x.name + '(' + x.msg + ')').join(', ') : '') + (r.subMsg.length ? ' · ' + r.subMsg.join(' · ') : ''));
+        return loadList(true);
+      }).catch(() => {}).finally(() => { $$('select', $('#dBulk')).forEach((x) => { x.disabled = false; }); });
+    });
   });
   $('#dBulk').addEventListener('click', (e) => {
     if (e.target.id === 'dBulkClear') { dsel.clear(); renderRows(); return; }
@@ -3329,10 +3362,10 @@
   });
 
   // 진행 버튼
-  function ask(title, desc, placeholder) {
+  function ask(title, desc, placeholder, initial) {
     return new Promise((resolve) => {
       $('#askTitle').textContent = title; $('#askDesc').textContent = desc || '';
-      $('#askInput').value = ''; $('#askInput').placeholder = placeholder || '';
+      $('#askInput').value = initial || ''; $('#askInput').placeholder = placeholder || '';
       $('#askModal').classList.remove('hidden'); $('#askInput').focus();
       const done = (v) => { $('#askModal').classList.add('hidden'); $('#askForm').onsubmit = null; $('#askCancel').onclick = null; resolve(v); };
       $('#askForm').onsubmit = (e) => { e.preventDefault(); const v = $('#askInput').value.trim(); if (!v) return toast('입력해 주세요.'); done(v); };

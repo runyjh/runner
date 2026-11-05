@@ -1799,42 +1799,77 @@ function adm_updateDriver(token, id, changes, seenRev) {
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
-      const o = driverById_(String(id || ''));
-      if (!o) fail_('기사를 찾을 수 없습니다. 목록을 새로고침해 주세요.');
-      if (seenRev && String(seenRev) !== rev_(o)) {
-        fail_('다른 곳(시트 또는 다른 관리자)에서 먼저 수정되었습니다. 새로고침 후 다시 수정해 주세요.');
-      }
-      const r = driverFields_(changes, o), f = r.f, changed = r.changed;
-      if (!changed.length) return { ok: true, driver: detailOf_(o) };
-      f.updatedAt = nowText_();
-      writeFields_(SH.DRIVERS, o._row, f);
-      forgetDriver_(o);
-      // 소속캠프·기본노선을 바로 바꾸면 이력으로 남긴다 (지난 날짜 스케줄·업로드는 예전 캠프·노선으로 계산되게)
-      try {
-        const nc = f.schCampId !== undefined ? f.schCampId : o.schCampId, nr = f.baseRoute !== undefined ? f.baseRoute : o.baseRoute;
-        if ((o.schCampId || o.baseRoute) && (nc !== o.schCampId || nr !== o.baseRoute)) {
-          appendObj_(SH.RCHG, {
-            id: uniqId_('RC'), kind: RCK.DRV, date: todayText_(), driverId: o.id, name: o.name,
-            fromCampId: o.schCampId, fromCamp: o.schCamp, fromRoute: o.baseRoute, toCampId: nc, toCamp: f.schCamp !== undefined ? f.schCamp : o.schCamp, toRoute: nr,
-            status: RCS.DONE, parentId: '', memo: '바로 변경', admin: a.name, createdAt: f.updatedAt, appliedAt: f.updatedAt
-          });
-          rcTouch_();
-        }
-      } catch (e) { console.error('노선 변경 이력 기록 실패: ' + (e && e.message)); }
-      if (f.loginId) forgetDriver_({ loginId: f.loginId });
-      // 기사구분이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가 구분도 맞춘다
-      if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
-      // 직함이 바뀌면 정산 결과(정산서 수행자 이름 숨김)를 다시 계산하게
-      if (f.title !== undefined && f.title !== (o.title || '') && typeof stlBump_ === 'function') { try { stlBump_(); } catch (e) { /* 무시 */ } }
-      logAdmin_(a, '기사 정보 수정', o.name + ' (' + o.id + ')', changed.join(', ') +
-        (f.status ? ' → ' + f.status : ''));
-      const fresh = readObj_(SH.DRIVERS, o._row);
-      if (typeof stlEnsureIdFor_ === 'function' && (f.loginId !== undefined || f.name !== undefined)) stlEnsureIdFor_(fresh); // 아이디 관리 연동
-      const subMsg = (f.subId1 !== undefined || f.subId2 !== undefined || f.loginId !== undefined) ? drvLinkSubs_(a, fresh, [o.subId1, o.subId2]) : [];
-      return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, o._row)), subMsg: subMsg };
+      return updateDriverCore_(a, id, changes, seenRev);
     } finally {
       lock.releaseLock();
     }
+  });
+}
+/** 기사 한 명 수정 (잠금 안에서 부름): 검사 → 시트 → 노선 이력 → 정산 아이디 · 서브아이디 연동 */
+function updateDriverCore_(a, id, changes, seenRev) {
+  const o = driverById_(String(id || ''));
+  if (!o) fail_('기사를 찾을 수 없습니다. 목록을 새로고침해 주세요.');
+  if (seenRev && String(seenRev) !== rev_(o)) {
+    fail_('다른 곳(시트 또는 다른 관리자)에서 먼저 수정되었습니다. 새로고침 후 다시 수정해 주세요.');
+  }
+  const r = driverFields_(changes, o), f = r.f, changed = r.changed;
+  if (!changed.length) return { ok: true, driver: detailOf_(o) };
+  f.updatedAt = nowText_();
+  writeFields_(SH.DRIVERS, o._row, f);
+  forgetDriver_(o);
+  // 소속캠프·기본노선을 바로 바꾸면 이력으로 남긴다 (지난 날짜 스케줄·업로드는 예전 캠프·노선으로 계산되게)
+  try {
+    const nc = f.schCampId !== undefined ? f.schCampId : o.schCampId, nr = f.baseRoute !== undefined ? f.baseRoute : o.baseRoute;
+    if ((o.schCampId || o.baseRoute) && (nc !== o.schCampId || nr !== o.baseRoute)) {
+      appendObj_(SH.RCHG, {
+        id: uniqId_('RC'), kind: RCK.DRV, date: todayText_(), driverId: o.id, name: o.name,
+        fromCampId: o.schCampId, fromCamp: o.schCamp, fromRoute: o.baseRoute, toCampId: nc, toCamp: f.schCamp !== undefined ? f.schCamp : o.schCamp, toRoute: nr,
+        status: RCS.DONE, parentId: '', memo: '바로 변경', admin: a.name, createdAt: f.updatedAt, appliedAt: f.updatedAt
+      });
+      rcTouch_();
+    }
+  } catch (e) { console.error('노선 변경 이력 기록 실패: ' + (e && e.message)); }
+  if (f.loginId) forgetDriver_({ loginId: f.loginId });
+  // 기사구분이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가 구분도 맞춘다
+  if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
+  // 직함이 바뀌면 정산 결과(정산서 수행자 이름 숨김)를 다시 계산하게
+  if (f.title !== undefined && f.title !== (o.title || '') && typeof stlBump_ === 'function') { try { stlBump_(); } catch (e) { /* 무시 */ } }
+  logAdmin_(a, '기사 정보 수정', o.name + ' (' + o.id + ')', changed.join(', ') +
+    (f.status ? ' → ' + f.status : ''));
+  const fresh = readObj_(SH.DRIVERS, o._row);
+  if (typeof stlEnsureIdFor_ === 'function' && (f.loginId !== undefined || f.name !== undefined)) stlEnsureIdFor_(fresh); // 아이디 관리 연동
+  const subMsg = (f.subId1 !== undefined || f.subId2 !== undefined || f.loginId !== undefined) ? drvLinkSubs_(a, fresh, [o.subId1, o.subId2]) : [];
+  return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, o._row)), subMsg: subMsg };
+}
+/**
+ * 여러 기사 한 번에: ids = [기사ID…], changes = { status | workStatus | leaveDate | driverType | title | schCampId … }
+ * 기사마다 한 명 수정과 같은 검사·연동을 거친다. 반환: { done: [{id,name}], failed: [{id,name,msg}], subMsg: [] }
+ */
+function adm_bulkUpdateDrivers(token, ids, changes) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    ids = (ids || []).map(String).filter(Boolean);
+    changes = changes || {};
+    if (!ids.length) fail_('기사를 골라 주세요.');
+    if (ids.length > 300) fail_('한 번에 300명까지 바꿀 수 있습니다.');
+    const keys = Object.keys(changes).filter(function (k) { return D_EDIT_LABEL[k] && ['loginId', 'name', 'rrn', 'licenseNo', 'account', 'phone', 'subId1', 'subId2', 'driverCode'].indexOf(k) < 0; });
+    if (!keys.length) fail_('일괄로 바꿀 항목이 없습니다.');
+    const ch = {}; keys.forEach(function (k) { ch[k] = changes[k]; });
+    const out = { ok: true, done: [], failed: [], subMsg: [] };
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    try {
+      ids.forEach(function (id) {
+        const o = driverById_(id);
+        try {
+          const r = updateDriverCore_(a, id, Object.assign({}, ch), null);
+          out.done.push({ id: id, name: o ? o.name : id });
+          (r.subMsg || []).forEach(function (m) { out.subMsg.push(m); });
+        } catch (e) { out.failed.push({ id: id, name: o ? o.name : id, msg: String(e && e.message || e) }); }
+      });
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '기사 일괄 수정', out.done.length + '명', keys.map(function (k) { return D_EDIT_LABEL[k] + '=' + (ch[k] === '' ? '(빈칸)' : ch[k]); }).join(', ') + (out.failed.length ? ' · 실패 ' + out.failed.length : ''));
+    return out;
   });
 }
 
