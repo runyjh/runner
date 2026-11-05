@@ -70,13 +70,14 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem'];
-const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
+const DTYPES = ['고정', '백업', '품앗이', '외부용차', '운영자', '관리자', '대표'];
+const DTYPES_STAFF = ['운영자', '관리자', '대표']; // 러너 내부 인원 (정산서에 수행자 이름을 보이지 않음)
 const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 'pwSalt'];
 const D_NOTES = {
   schCamp: '스케줄에서 이 기사가 속한 캠프. camps 탭의 캠프명과 같게 쓰면 소속캠프ID가 자동으로 채워집니다.',
   baseRoute: '평소 맡는 노선. 예: 527B, 530AB (F3), 404D,405AB. 백업 기사는 백업, 용차는 용차',
   fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
-  driverType: '고정 / 백업 / 품앗이 / 외부용차',
+  driverType: '고정 / 백업 / 품앗이 / 외부용차 / 운영자 / 관리자 / 대표 (운영자·관리자·대표가 대신 뛴 건은 기사 정산서에 이름이 안 보임)',
   driverCode: '기사마다 겹치지 않는 코드 (영문은 자동 대문자)',
   status: '승인대기 / 승인 / 반려 / 정지 중 선택.\n승인으로 바꾸면 승인일시가 자동 기록됩니다.',
   rrn: '새 번호를 그대로 입력하면 자동 암호화되고 가린 번호로 바뀝니다.\n생년월일도 자동 갱신됩니다.\n※ 시트에 직접 입력한 원래 번호는 구글 시트 "버전 기록"에 남습니다. 가능하면 관리자 화면에서 입력하세요.',
@@ -1921,6 +1922,9 @@ function normDriverType_(v) {
   if (/^백업/.test(s)) return '백업';
   if (/^품앗이/.test(s)) return '품앗이';
   if (/^(외부|용차|외부용차)/.test(s)) return '외부용차';
+  if (/^운영/.test(s)) return '운영자';
+  if (/^관리/.test(s)) return '관리자';
+  if (/^대표/.test(s)) return '대표';
   return null;
 }
 

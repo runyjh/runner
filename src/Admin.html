@@ -98,6 +98,7 @@
   .t-백업 { background: var(--warn-weak); color: var(--warn); }
   .t-품앗이 { background: var(--ok-weak); color: var(--ok); }
   .t-외부용차 { background: #f1ecfb; color: #6b46c1; }
+  .t-운영자, .t-관리자, .t-대표 { background: #e8edf3; color: #334155; }
   .t-none { background: var(--gray-weak); color: var(--faint); }
   .tabs.sub2 .tab { padding: 4px 10px; font-size: 13px; }
   .code-row { display: flex; gap: 6px; }
@@ -238,6 +239,7 @@
   .slip td.n { text-align: right; font-variant-numeric: tabular-nums; }
   .slip .big td { font-size: 14px; font-weight: 700; }
   .slip .smemo { color: var(--faint); font-size: 11px; white-space: normal; }
+  .slip .ytag { font-weight: 800; color: #d9480f; } .slip .ytag.p { color: #6741d9; }
   .slip .foot { color: var(--sub); font-size: 11.5px; margin-top: 6px; }
   .slip .invbox { margin-top: 10px; border: 2px solid #1b64da; border-radius: 8px; background: #f3f7ff; padding: 8px 10px 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .slip .invbox .ihd { font-size: 14px; font-weight: 800; color: #1b64da; margin-bottom: 6px; }
@@ -1300,7 +1302,7 @@
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const TOKEN = 'runner.admin.token';
   const STATUSES = ['승인대기', '승인', '반려', '정지'];
-  const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
+  const DTYPES = ['고정', '백업', '품앗이', '외부용차', '운영자', '관리자', '대표'];
   const DOCS = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };
   const LICENSE_TYPES = ['1종 대형', '1종 보통', '2종 보통', '특수 대형견인', '특수 소형견인'];
   const BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크',
@@ -5474,10 +5476,20 @@
     const li = (l, sign) => { const note = l.memo || goyNote(l); return '<tr><td>' + esc(lname(l)) + (note ? '<div class="smemo">' + esc(note) + '</div>' : '') + '</td><td class="n">' + (l.amt ? sign + wn(l.amt) : (goyNote(l) ? '0' : '-')) + '</td></tr>'; };
     const n = Math.max(pays.length + adds.length, deds.length);
     const dedSum = deds.reduce((a, l) => a + l.amt, 0);
-    const days = Object.keys(s.daily).concat(Object.keys(s.sched || {})).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
+    // 이 기사 대신 다른 사람이 뛴 날 (차액 부담): 스케줄 글자보다 우선해서 [품앗이] / [외부용차] 로 강조
+    const ydays = {};
+    (s.yong || []).forEach((y) => {
+      if (y.whoId === d.id || y.payerId !== d.id || !y.date) return;
+      const o = ydays[y.date] = ydays[y.date] || { kinds: [], rts: [] };
+      const k = !!y.whoId && String(y.whoId).indexOf('v:') !== 0 ? '품앗이' : '외부용차';
+      if (!o.kinds.includes(k)) o.kinds.push(k);
+      if (y.route && !o.rts.includes(y.route)) o.rts.push(y.route);
+    });
+    const yTag = (x) => { const o = ydays[x]; return o ? o.kinds.map((k) => '<b class="ytag' + (k === '품앗이' ? ' p' : '') + '">[' + k + ']</b>').join(' ') + (o.rts.length ? ' ' + esc(o.rts.join(',')) : '') : ''; };
+    const days = Object.keys(s.daily).concat(Object.keys(s.sched || {}), Object.keys(ydays)).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
     const work = Object.keys(s.sched || {}).filter((x) => x >= P.from && x <= P.to).length;
     const dow = ['일', '월', '화', '수', '목', '금', '토'];
-    const dayRows = days.map((x) => { const dd = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)); const v = s.daily[x] || {}; return '<tr><td>' + mdTxt(x) + ' (' + dow[dd.getDay()] + ')</td><td>' + esc(v.route || (s.sched || {})[x] || '') + '</td><td class="n">' + wnz(v.qty) + '</td><td class="n">' + wnz(v.amt) + '</td></tr>'; });
+    const dayRows = days.map((x) => { const dd = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)); const v = s.daily[x] || {}; return '<tr><td>' + mdTxt(x) + ' (' + dow[dd.getDay()] + ')</td><td>' + (yTag(x) ? yTag(x) + (v.route ? ' · ' + esc(v.route) : '') : esc(v.route || (s.sched || {})[x] || '')) + '</td><td class="n">' + wnz(v.qty) + '</td><td class="n">' + wnz(v.amt) + '</td></tr>'; });
     const half = Math.ceil(dayRows.length / 2);
     const dayTbl = (rows) => '<table><thead><tr><th>날짜</th><th>노선 · 스케줄</th><th>건수</th><th>금액</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
     const routes = s.routes.map((x) => '<tr><td>' + esc(x.camp) + '</td><td>' + esc(x.route) + '</td><td>' + esc(x.how || '') + '</td><td class="n">' + wn(x.qty) + '</td><td class="n">' + wn(x.unit) + '</td><td class="n">' + wnz(x.inc) + '</td><td class="n">' + wn(x.unit + x.inc) + '</td><td class="n">' + wn(x.amt) + '</td></tr>').join('');
@@ -5485,7 +5497,7 @@
     // 우리 기사(정산 아이디)가 대신 뛴 건 = 품앗이, 용차업체·외부 = 외부용차. 용차업체 정산서는 전부 '용차업체'
     const isOurs = (y) => !!y.whoId && String(y.whoId).indexOf('v:') !== 0;
     const ykind = (y) => (d.vendor ? '용차업체' : isOurs(y) ? '품앗이' : '외부용차');
-    const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>' + ykind(y) + ' · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담' + (y.who ? ' · 수행 ' + esc(String(y.who).replace(/\s*\(.*\)$/, '')) : '') + ')') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? wn(y.extra) : y.cut < 0 ? '+' + wn(-y.cut) : '−' + wn(y.cut)) + '</td></tr>').join('');
+    const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>' + ykind(y) + ' · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담' + (y.who && !y.whoStaff ? ' · 수행 ' + esc(String(y.who).replace(/\s*\(.*\)$/, '')) : '') + ')') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? wn(y.extra) : y.cut < 0 ? '+' + wn(-y.cut) : '−' + wn(y.cut)) + '</td></tr>').join('');
     const loss = (s.loss || []).map((x) => '<tr><td>' + mdTxt(x.date) + '</td><td>' + esc(x.item || x.detail || x.type || '분실') + (x.waybill ? '<div class="smemo">' + esc(x.waybill) + '</div>' : '') + '</td><td class="n">−' + wn(x.amt) + '</td></tr>').join('');
     const yongAllOurs = (s.yong || []).filter((y) => y.whoId !== d.id).every(isOurs);
     const yk = new Set((s.yong || []).map((y) => (y.whoId === d.id || isOurs(y) ? '품앗이' : '외부용차')));
