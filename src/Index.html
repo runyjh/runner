@@ -2167,7 +2167,7 @@
   function slipCard(r, sl) {
     const d = sl.row, co = r.company || {}, D = r.dates || {}, P = r.period || {};
     const yAllOurs = (sl.yong || []).filter((y) => !y.mine).every((y) => y.ours);
-    const lname = (l) => (l.method === '용차수행' || (l.method === '용차지출' && yAllOurs) ? String(l.name).replace(/용차/g, '품앗이') : l.name);
+    const lname = (l) => (l.method === '용차수행' || (l.method === '용차지출' && yAllOurs) ? String(l.name).replace(/용차/g, '품앗이') : l.method === '용차지출' ? String(l.name).replace(/^용차/, '외부용차') : l.name);
     const line = (l, sign) => '<div class="sl-line"><div>' + escH(lname(l)) + (l.memo ? '<small>' + escH(l.memo) + '</small>' : '') + '</div><b' + (sign === '−' ? ' class="neg"' : '') + '>' + (l.amt ? sign + slWon(l.amt) : (l.method === '고용보험' && sl.ins && !sl.ins.excluded && sl.ins.bosu > 0 ? '0' : '-')) + '</b></div>';
     const pays = sl.lines.filter((l) => l.side === '지급' && l.method !== '입금가산'), adds = sl.lines.filter((l) => l.method === '입금가산'), deds = sl.lines.filter((l) => l.side === '차감');
     const dedSum = deds.reduce((a, l) => a + l.amt, 0);

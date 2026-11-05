@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105y';
+const STL_CALC_VER = '20261105z';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1081,8 +1081,10 @@ function stlCompute_(month) {
     const payerOwner = stlAcct_(X, D, y.payer, y.payerId);
     let payerPrice = stlNum_(y.payerPrice), cut = 0;
     if (payerOwner && qty) {
-      // 부담 기준단가 (비우면): 수행자의 단가코드(고정/백업/품앗이 …)로 본 그 라우트 단가 → 차액부담자는 수행자가 더 받는 만큼 부담
-      if (!payerPrice && wg && wg.main.mode !== '용차내역' && existing) payerPrice = Math.round(existing / qty);
+      // 부담 기준단가 (비우면)
+      //  - 품앗이(우리 기사가 수행): 수행자의 단가코드(고정/백업/품앗이 …)로 본 그 라우트 단가 → 수행자가 더 받는 만큼 부담
+      //  - 외부용차(용차업체·외부 수행자): 차액부담자 본인 단가 → 용차 단가(수행자 우선) − 내 단가 차액을 부담
+      if (!payerPrice && wg && !wg.vendor && wg.main.mode !== '용차내역' && existing) payerPrice = Math.round(existing / qty);
       if (!payerPrice) {
         payerPrice = stlUnit_(ctx, X.groups[payerOwner].main, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 }, stlWorkerOf_(ctx, payerOwner, date)).u;
       }
@@ -1836,7 +1838,7 @@ const STL_EDIT = {
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
   adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '메모', 'text']] },
   advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
-  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면 수행자 단가코드 기준)', 'money'], ['memo', '메모', 'text']] },
+  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 외부용차 = 차액부담자 본인 단가)', 'money'], ['memo', '메모', 'text']] },
   regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
   target: { sheet: 'stl_target', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['goal', '연 목표 계산서 (VAT포함)', 'money'], ['unit', '단위', 'money']] },
   split: { sheet: 'stl_split', scope: 'all', cols: [['from', '원 명의자 (발행 줄일 아이디)', 'acct', 'fromId'], ['to', '받는 명의자', 'acct', 'toId'], ['target', '목표 실수령', 'money'], ['unit', '단위', 'money'], ['repeat', '매달 반복', ['Y', 'N']], ['month', '적용월 (반복 N 일 때)', 'month']] },
