@@ -2226,7 +2226,8 @@
       '<span>지급일</span><b>' + escH(D.pay || '') + '</b></div></div>' +
       '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
       '<div class="sl-card"><h3>차감 · 공제</h3>' + deds.map((l) => line(l, '−')).join('') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +
-      '<div class="sl-card sl-inv"><h3>📄 세금계산서 발행 <small>기사님 → ' + escH(co.name || '러너') + '</small></h3>' +
+      // 공급자 이름: 사업자 상호 → 기사 이름 → '기사님'
+      '<div class="sl-card sl-inv"><h3>📄 세금계산서 발행 <small>' + escH(d.bizName || (d.name && !/^\(명의자 없음\)/.test(d.name) ? d.name : '') || '기사님') + ' → ' + escH(co.name || '러너') + '</small></h3>' +
       '<div class="sl-amt"><span>발행 금액 (합계)</span><b>' + slWon(d.invoice) + '원</b></div><div class="sl-kv">' +
       '<span>공급가액</span><b>' + slWon(d.supply) + '</b><span>세액</span><b>' + slWon(d.tax) + '</b>' +
       '<span>공급받는자</span><b>' + escH((co.name || '') + (co.ceo ? ' / 대표 ' + co.ceo : '')) + '</b>' +

@@ -5710,7 +5710,8 @@
       Array.from({ length: n }, (_, i) => { const p = pays.concat(adds)[i], q = deds[i]; return '<tr>' + (p ? li(p, '').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + (q ? li(q, '−').replace(/^<tr>|<\/tr>$/g, '') : '<td></td><td></td>') + '</tr>'; }).join('') +
       '<tr class="big"><td>지급 합계</td><td class="n">' + wn(d.pay + d.depAdd) + '</td><td>공제 합계</td><td class="n">−' + wn(dedSum) + '</td></tr></tbody></table>' +
       // 세금계산서 발행 안내 (기사가 이 칸만 보고 바로 발행할 수 있게) + 실 입금액
-      '<div class="invbox"><div class="ihd">📄 세금계산서 발행 <small>' + (d.vendor ? esc(d.name) : '기사님') + ' → ' + esc(co.name || '러너') + '</small></div>' +
+      // 공급자 이름: 사업자 상호 → 기사 이름 → '기사님' (용차업체는 업체명)
+      '<div class="invbox"><div class="ihd">📄 세금계산서 발행 <small>' + esc(d.vendor ? d.name : d.bizName || (d.ownerId && d.name) || '기사님') + ' → ' + esc(co.name || '러너') + '</small></div>' +
       '<div class="iamt"><span>발행 금액 (합계)</span><b>' + wn(d.invoice) + '원</b></div>' +
       '<table><tbody><tr><th>공급가액</th><td class="n">' + wn(d.supply) + '</td><th>세액</th><td class="n">' + wn(d.tax) + '</td></tr>' +
       '<tr><th>공급받는자</th><td colspan="3">' + esc(co.name || '') + (co.ceo ? ' / 대표 ' + esc(co.ceo) : '') + '</td></tr>' +

@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zE';
+const STL_CALC_VER = '20261105zF';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1317,7 +1317,7 @@ function stlCompute_(month) {
       base: s.base, inc: s.inc, fresh: s.fresh, fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
       profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
-      bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '',
+      bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '', bizName: o.vendor ? '' : o.bizName || '',
       checked: stlYes_(p.checked), payDate: p.date || '', payMemo: p.memo || '',
       advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty,
       movedIn: Object.keys(s.movedIn).map(function (k) { return s.movedIn[k].label; }), movedOut: Object.keys(s.movedOut).map(function (k) { return s.movedOut[k].label; })
@@ -1711,6 +1711,11 @@ function stlMonths_() {
   return all;
 }
 /** 기사 한 명 명세서 */
+/** 정산서 세금계산서 칸의 공급자 이름(상호): 지금 기사 정보의 상호가 있으면 그것 (마감한 달도 나중에 넣은 상호가 보이게) */
+function stlLiveBizName_(row) {
+  if (!row || row.vendor || !row.ownerId) return;
+  try { const o = stlDrivers_().byId[row.ownerId]; if (o && str_(o.bizName)) row.bizName = str_(o.bizName); } catch (e) { /* 무시 */ }
+}
 function adm_stlSlip(token, month, id) {
   return run_(function () {
     requireAdmin_(token);
@@ -1718,6 +1723,7 @@ function adm_stlSlip(token, month, id) {
     const r = stlResult_(month, false);
     const s = r.slips[id];
     if (!s) fail_('이 달 정산 기록이 없는 기사입니다.');
+    stlLiveBizName_(s.row);
     let co = {};
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
     const cfg = stlCfg_();
@@ -2476,10 +2482,11 @@ function api_mySlip(token, month) {
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
     const slips = groups.map(function (g) { return r.slips[g]; }).filter(Boolean).map(function (sl) {
       const d = sl.row;
+      stlLiveBizName_(d);
       return {
         row: {
           name: d.name, cids: d.cids, workDays: d.workDays, workDaysSrc: d.workDaysSrc, qty: d.qty, pay: d.pay, taxDed: d.taxDed, invoice: d.invoice, supply: d.supply, tax: d.tax,
-          san: d.san, goy: d.goy, depDed: d.depDed, depAdd: d.depAdd, net: d.net, bank: d.bank, holder: d.holder, account: d.account, bizNo: d.bizNo, movedIn: d.movedIn, movedOut: d.movedOut
+          san: d.san, goy: d.goy, depDed: d.depDed, depAdd: d.depAdd, net: d.net, bank: d.bank, holder: d.holder, account: d.account, bizNo: d.bizNo, bizName: d.bizName || '', ownerId: d.ownerId || '', movedIn: d.movedIn, movedOut: d.movedOut
         },
         lines: sl.lines, routes: sl.routes, daily: sl.daily, sched: sl.sched, idUse: sl.idUse || {}, loss: sl.loss,
         yong: (sl.yong || []).map(function (y) { return { date: y.date, route: y.route, camp: y.camp, qty: y.qty, extra: y.extra, cut: y.cut, mine: y.whoId === d.id, ours: !!y.whoId && String(y.whoId).indexOf('v:') !== 0, memo: y.memo }; }),
