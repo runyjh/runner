@@ -41,7 +41,7 @@ const STL_TABS = {
   stl_usage: { cid: '쿠팡ID', name: '일한 기사', driverId: '기사ID', from: '시작일', to: '종료일', memo: '메모' },
   // 기사 일시단가: 그 기사가 일한 날(아이디 사용 기록 기준)의 배송에만 적용
   stl_tmp: { name: '기사', driverId: '기사ID', from: '시작일', to: '종료일', price: '일시단가', routes: '적용 노선', memo: '메모' },
-  stl_adjust: { month: '정산월', name: '명의자', acct: '정산 아이디', item: '항목', amt: '금액', memo: '메모' },
+  stl_adjust: { month: '정산월', name: '명의자', acct: '정산 아이디', item: '항목', amt: '금액', memo: '메모', note: '관리자 메모' },
   stl_advance: { name: '명의자', acct: '정산 아이디', date: '지급일', amt: '가불금', due: '상계 예정일', paid: '상환금', memo: '메모' },
   stl_yongcha: {
     date: '날짜', who: '수행자', whoId: '수행 정산 아이디', route: '라우트', mode: '지급구분', price: '단가/금액', qty: '건수',
@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105z8';
+const STL_CALC_VER = '20261105z9';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1894,7 +1894,7 @@ const STL_EDIT = {
     ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['holder', '예금주', 'text'], ['email', '이메일 (계산서)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text']] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
-  adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '메모', 'text']] },
+  adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '정산서 메모 (기사 정산서에 보임)', 'text'], ['note', '관리자 메모 (정산서에 안 보임)', 'text']] },
   advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
   yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (품앗이 = 지급 단가 · 용차업체 = 기사 청구 단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 외부용차·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
   regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
@@ -1962,6 +1962,7 @@ function stlTableView_(name, month) {
       }),
       seen: stlRowsHash_(rows, E.cols), fixed: !!E.fixed, closed: E.scope !== 'all' ? !!stlClosedInfo_(month) : false,
       accts: accts, persons: persons, items: stlItems_().list.map(function (i) { return i.name; }),
+      itemsInfo: stlItems_().list.map(function (i) { return { name: i.name, side: i.side, taxCut: i.taxCut, method: i.method }; }),
       camps: master_().camps.map(function (c) { return stlShort_(c.name); }).sort(koCmp_)
     };
   }
