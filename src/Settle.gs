@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105z5';
+const STL_CALC_VER = '20261105z6';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1150,6 +1150,29 @@ function stlCompute_(month) {
 
   // 기사별 마무리 계산
   Object.keys(S).forEach(function (id) { S[id].sched = stlGroupSched_(ctx, X.groups[id], sched, P, S[id].cidDays); });
+  // 스케줄 칸에 다른 명의자 아이디로 뛴 날 (예: '723D,116C (dasom1125) 업무등록'): 그 아이디의 그날 배송을 참고로 보여 준다.
+  //  매출·금액은 그 아이디 명의자 정산서에만 들어간다 (이 정산서 합계에는 안 들어감)
+  Object.keys(S).forEach(function (id) {
+    const cells = (S[id].sched && S[id].sched.cells) || {}, use = {};
+    Object.keys(cells).forEach(function (d) {
+      const re = /\(([A-Za-z][A-Za-z0-9_.-]{2,})\)/g;
+      let m;
+      while ((m = re.exec(String(cells[d] || '')))) {
+        const lg = stlLogin_(m[1]), ix = X.by[lg];
+        if (!ix || ix.mainKey === id) continue;
+        const o = use[d] = use[d] || [];
+        if (o.some(function (x) { return x.login === lg; })) continue;
+        const g = X.groups[ix.mainKey], rows = byDateLogin[d + '|' + lg] || [];
+        const routes = [];
+        rows.forEach(function (x) { if (x.route && routes.indexOf(x.route) < 0) routes.push(x.route); });
+        o.push({
+          login: lg, cid: String(m[1]).replace(/@.*$/, ''), owner: g ? (g.vendor || (g.ownerId && D.byId[g.ownerId] ? D.byId[g.ownerId].name : '')) : '',
+          routes: routes, qty: rows.reduce(function (a, x) { return a + x.qty; }, 0), amt: rows.reduce(function (a, x) { return a + stlR0_(x.qty * x.unit); }, 0)
+        });
+      }
+    });
+    S[id].idUse = use;
+  });
   const fin = function (id, extra) { return stlFinish_(S[id], (adj[id] || []).concat(extra || []), items, cfg, campIns); };
 
   // 동일인 매출 분할 → 목표 매출 자동 수당
@@ -1223,7 +1246,7 @@ function stlCompute_(month) {
     };
     drivers.push(row);
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
-      daily: s.daily, sched: s.sched.cells, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers,
+      daily: s.daily, sched: s.sched.cells, idUse: s.idUse || {}, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers,
       movedIn: stlMoveList_(s.movedIn), movedOut: stlMoveList_(s.movedOut) };
     ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
   });
@@ -2273,7 +2296,7 @@ function api_mySlip(token, month) {
           name: d.name, cids: d.cids, workDays: d.workDays, workDaysSrc: d.workDaysSrc, qty: d.qty, pay: d.pay, taxDed: d.taxDed, invoice: d.invoice, supply: d.supply, tax: d.tax,
           san: d.san, goy: d.goy, depDed: d.depDed, depAdd: d.depAdd, net: d.net, bank: d.bank, holder: d.holder, account: d.account, bizNo: d.bizNo, movedIn: d.movedIn, movedOut: d.movedOut
         },
-        lines: sl.lines, routes: sl.routes, daily: sl.daily, sched: sl.sched, loss: sl.loss,
+        lines: sl.lines, routes: sl.routes, daily: sl.daily, sched: sl.sched, idUse: sl.idUse || {}, loss: sl.loss,
         yong: (sl.yong || []).map(function (y) { return { date: y.date, route: y.route, camp: y.camp, qty: y.qty, extra: y.extra, cut: y.cut, mine: y.whoId === d.id, ours: !!y.whoId && String(y.whoId).indexOf('v:') !== 0, memo: y.memo }; }),
         movedIn: sl.movedIn, movedOut: sl.movedOut, ins: sl.ins ? { excluded: sl.ins.excluded, bosu: sl.ins.bosu } : null
       };

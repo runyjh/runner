@@ -317,7 +317,7 @@
   .sl-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
   .sl-tbl th, .sl-tbl td { padding: 6px 4px; border-top: 1px solid var(--line); text-align: left; }
   .sl-tbl th { color: var(--sub); font-weight: 600; font-size: 12px; border-top: 0; }
-  .ytag { font-weight: 800; color: #d9480f; } .ytag.p { color: #6741d9; }
+  .ytag { font-weight: 800; color: #d9480f; } .ytag.p { color: #6741d9; } .ytag.u { color: #0b7285; }
   .sl-tbl td.n, .sl-tbl th.n { text-align: right; font-variant-numeric: tabular-nums; }
   .sl-warn { background: #fdf3e2; color: #8a5a00; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
   .mc .pmdot { font-size: 9.5px; color: #8a5a00; font-weight: 700; }
@@ -2172,17 +2172,21 @@
     const line = (l, sign) => '<div class="sl-line"><div>' + escH(lname(l)) + (l.memo ? '<small>' + escH(l.memo) + '</small>' : '') + '</div><b' + (sign === '−' ? ' class="neg"' : '') + '>' + (l.amt ? sign + slWon(l.amt) : (l.method === '고용보험' && sl.ins && !sl.ins.excluded && sl.ins.bosu > 0 ? '0' : '-')) + '</b></div>';
     const pays = sl.lines.filter((l) => l.side === '지급' && l.method !== '입금가산'), adds = sl.lines.filter((l) => l.method === '입금가산'), deds = sl.lines.filter((l) => l.side === '차감');
     const dedSum = deds.reduce((a, l) => a + l.amt, 0);
-    // 나 대신 다른 사람이 뛴 날 (차액 부담): 스케줄보다 우선해서 [품앗이] / [외부용차]
+    // 품앗이·용차가 걸린 날 (내가 대신 뛴 날 · 남이 대신 뛴 날): 스케줄보다 우선해서 [품앗이] / [외부용차]
     const ydays = {};
     (sl.yong || []).forEach((y) => {
-      if (y.mine || !y.date) return;
-      const o = ydays[y.date] = ydays[y.date] || { kinds: [], rts: [] }, k = y.ours ? '품앗이' : '외부용차';
+      if (!y.date) return;
+      const o = ydays[y.date] = ydays[y.date] || { kinds: [], rts: [], did: false }, k = y.mine || y.ours ? '품앗이' : '외부용차';
       if (!o.kinds.includes(k)) o.kinds.push(k);
-      if (y.route && !o.rts.includes(y.route)) o.rts.push(y.route);
+      if (y.mine) o.did = true; else if (y.route && !o.rts.includes(y.route)) o.rts.push(y.route);
     });
-    const yTag = (x) => { const o = ydays[x]; return o ? o.kinds.map((k) => '<b class="ytag' + (k === '품앗이' ? ' p' : '') + '">[' + k + ']</b>').join(' ') + (o.rts.length ? ' ' + escH(o.rts.join(',')) : '') : ''; };
-    const days = Object.keys(sl.daily || {}).concat(Object.keys(ydays)).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
-    const dayRows = days.map((x) => { const v = sl.daily[x] || {}; return '<tr><td>' + slMd(x) + '</td><td>' + (yTag(x) ? yTag(x) + (v.route ? ' · ' + escH(v.route) : '') : escH(v.route || (sl.sched || {})[x] || '')) + '</td><td class="n">' + slWon(v.qty) + '</td><td class="n">' + slWon(v.amt) + '</td></tr>'; }).join('');
+    const yTag = (x) => { const o = ydays[x]; return o ? o.kinds.map((k) => '<b class="ytag' + (k === '품앗이' ? ' p' : '') + '">[' + k + (o.did && !o.rts.length ? ' 수행' : '') + ']</b>').join(' ') + (o.rts.length ? ' ' + escH(o.rts.join(',')) : '') : ''; };
+    // 다른 명의자 아이디로 뛴 날: 참고로 (금액은 그 명의자 정산서에)
+    const idUse = sl.idUse || {};
+    const useTag = (x) => (idUse[x] || []).map((u) => '<b class="ytag u">[' + escH(u.owner || '다른 명의') + ' 아이디]</b> ' + escH(u.cid) + (u.routes.length ? ' · ' + escH(u.routes.join(',')) : '')).join(' / ');
+    const useNum = (x, k) => { const n = (idUse[x] || []).reduce((a, u) => a + (u[k] || 0), 0); return n ? '<span style="color:var(--sub)">(' + slWon(n) + ')</span>' : ''; };
+    const days = Object.keys(sl.daily || {}).concat(Object.keys(ydays), Object.keys(idUse)).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
+    const dayRows = days.map((x) => { const v = sl.daily[x] || {}, yt = yTag(x), ut = useTag(x); const txt = yt || ut ? [yt + (yt && v.route ? ' · ' + escH(v.route) : ''), !yt && v.route ? escH(v.route) : '', ut].filter(Boolean).join(' / ') : escH(v.route || (sl.sched || {})[x] || ''); return '<tr><td>' + slMd(x) + '</td><td>' + txt + '</td><td class="n">' + (v.qty ? slWon(v.qty) : useNum(x, 'qty') || '-') + '</td><td class="n">' + (v.amt ? slWon(v.amt) : useNum(x, 'amt') || '-') + '</td></tr>'; }).join('');
     const routes = (sl.routes || []).map((x) => '<tr><td>' + escH(x.camp) + ' ' + escH(x.route) + '</td><td class="n">' + slWon(x.qty) + '</td><td class="n">' + slWon(x.unit + x.inc) + '</td><td class="n">' + slWon(x.amt) + '</td></tr>').join('');
     const yongRows = (sl.yong || []).map((y) => '<tr><td>' + slMd(y.date) + '</td><td>' + (y.ours ? '품앗이 ' : '외부용차 ') + escH((y.camp || '') + ' ' + (y.route || '')) + (y.mine ? ' (수행)' : ' (차액 부담)') + '</td><td class="n">' + (y.mine ? slWon(y.extra) : '−' + slWon(y.cut)) + '</td></tr>').join('');
     const lossRows = (sl.loss || []).map((x) => '<tr><td>' + slMd(x.date) + '</td><td>' + escH(x.item || x.detail || x.type || '분실') + '</td><td class="n">−' + slWon(x.amt) + '</td></tr>').join('');
