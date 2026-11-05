@@ -5332,6 +5332,7 @@
       ['품앗이', '수행 기사에게 단가로 지급 (원래 단가와의 차이 = <span class="gp">추가지급</span>) · 차액부담 기사는 그 차이만큼 <span class="gm">차감</span>'],
       ['용차업체', '업체에는 [용차업체] 표의 <b>지급 단가</b>(예: 히어로 1,320)만 지급 · 차액부담 기사에게는 단가 칸(기본 외부단가 1,350)으로 청구 → (청구 − 본인 단가) × 건수 <span class="gm">차감</span>'],
       ['러너 몫', '청구 단가 − 업체 지급 단가 = <span class="gp">러너 이익</span> (예: 1,350 − 1,320 = 30원 · 단가 칸 1,400 이면 80원)'],
+      ['일당', '업체가 일당 등으로 청구하면 <b>업체 실지급액</b>에 총액 (예: 264,000 × 2명 = 528,000) → 업체 정산서에 차이 자동 반영 · 단가 칸을 비우면 <b>그 금액 그대로</b> 차액부담 기사에게 청구 (러너 몫 0) · 라우트는 <code>119AB</code> 처럼 여러 개 가능'],
       ['차액 처리', '비우면 품앗이 = 수행자 지급 · 용차업체 = 러너 몫 · 품앗이도 <b>러너 몫</b>을 고르면 수행 기사는 원래 단가만, 차액은 러너'],
       ['빈칸', '건수 빈칸 = 쿠팡 정산서에서 자동 · 라우트 빈칸 = 그날 전체 · 부담 기준단가 빈칸 = 품앗이는 수행자 단가코드, 용차업체·러너 몫은 차액부담 기사 본인 단가']
     ],
@@ -5349,7 +5350,7 @@
       ['주의', '있는 줄의 분류를 바꾸면 마감 안 한 달 계산이 바뀜']
     ]
   };
-  const ST_GTAG = { '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
+  const ST_GTAG = { '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
   function paintHelp(name) {
     const el = $('#stEditHelp'), g = ST_GUIDE[name];
     if (!g) { el.className = 'sub st-help'; el.textContent = name === 'migrate' ? '' : ST_HELP[name] || ''; return; }
@@ -5487,7 +5488,8 @@
       }
       const type = c.type === 'date' ? 'date' : c.type === 'month' ? 'month' : 'text';
       const extra = c.type === 'acct' || c.type === 'acctOrText' ? ' list="stAcctDL" style="min-width:170px"' : c.type === 'person' ? ' list="stPersonDL" style="min-width:120px"' : c.type === 'cid' ? ' style="min-width:150px" spellcheck="false" autocapitalize="off"' : c.type === 'money' ? ' inputmode="decimal" style="text-align:right;width:110px"' : '';
-      const ph = T.name === 'yongcha' && c.k === 'price' ? (r._calc && r._calc.defUnit && r.mode !== '금액' ? '기본 ' + wn(r._calc.defUnit) : '비우면 기본값') : c.ph;
+      const ph = T.name === 'yongcha' && c.k === 'price' ? (r._calc && r._calc.defUnit && r.mode !== '금액' ? '기본 ' + wn(r._calc.defUnit) : '비우면 기본값')
+        : T.name === 'yongcha' && c.k === 'vendorPay' ? (r._calc && r._calc.vendor ? '기본 ' + wn(r._calc.existing) : '용차업체만') : c.ph;
       return '<td><input class="inp" type="' + type + '"' + at + extra + (ph ? ' placeholder="' + esc(ph) + '"' : '') + ' value="' + esc(c.type === 'money' && v ? wn(v) : v) + '"></td>';
     };
     const calc = (r) => {

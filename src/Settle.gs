@@ -45,7 +45,7 @@ const STL_TABS = {
   stl_advance: { name: '명의자', acct: '정산 아이디', date: '지급일', amt: '가불금', due: '상계 예정일', paid: '상환금', memo: '메모' },
   stl_yongcha: {
     date: '날짜', who: '수행자', whoId: '수행 정산 아이디', route: '라우트', mode: '지급구분', price: '단가/금액', qty: '건수',
-    payer: '차액부담', payerId: '차액부담 정산 아이디', payerPrice: '부담 기준단가', memo: '메모', gain: '차액 처리'
+    payer: '차액부담', payerId: '차액부담 정산 아이디', payerPrice: '부담 기준단가', memo: '메모', gain: '차액 처리', vendorPay: '업체 실지급액'
   },
   stl_regular: { name: '명의자', acct: '정산 아이디', item: '항목', amt: '월 금액', from: '시작월', to: '종료월', memo: '메모' },
   stl_target: { name: '명의자', acct: '정산 아이디', item: '항목', goal: '연 목표 계산서', unit: '단위' },
@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105zC';
+const STL_CALC_VER = '20261105zD';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1070,7 +1070,10 @@ function stlCompute_(month) {
   const yong = stlRead_('stl_yongcha').filter(function (y) { return y.date && stlMonthOfDate_(y.date) === month; });
   const yongOut = [], yongNoP = [], yongNoP5 = [];
   yong.forEach(function (y) {
-    const date = stlYmd_(y.date), route = normCode_(y.route);
+    const date = stlYmd_(y.date), routes = stlYongRoutes_(y.route);
+    const route = routes.length === 1 ? routes[0] : '';                 // 라우트 하나
+    const rset = routes.length > 1 ? routes.reduce(function (o, r) { o[r] = 1; return o; }, {}) : null; // 119AB · 119A,119B 처럼 여러 개
+    const routeLabel = routes.length > 1 ? normCode_(y.route) : route;
     const whoKey = stlAcct_(X, D, y.who, y.whoId);
     const wg = whoKey ? X.groups[whoKey] : null;
     let autoQty = 0, sales = 0, camp = '', perfUnitSum = 0, found = false;
@@ -1079,6 +1082,7 @@ function stlCompute_(month) {
       wg.cids.forEach(function (c) {
         (byDateLogin[date + '|' + stlLogin_(c)] || []).forEach(function (x) {
           if (route && x.route !== route) return;
+          if (rset && !rset[x.route]) return;
           hits.push(x);
           // 기존지급 = 그날 실제로 받은 단가 (기본단가 + 프백 가중치) → 용차 단가(예 1,100)가 프백 가중치까지 포함한 건당 금액이 된다
           found = true; autoQty += x.qty; sales += x.sales; camp = camp || x.camp; perfUnitSum += x.qty * (x.unit + (x.inc || 0));
@@ -1101,9 +1105,13 @@ function stlCompute_(month) {
     //  - 용차업체(외부용차) = 그 노선 '외부단가' (차액부담 기사에게 청구하는 단가. 업체에 주는 돈은 용차업체 표의 지급 단가)
     //  기본값이 비어 있으면 원래 단가 그대로 (추가지급·러너 몫 없음) + 확인 필요
     const isVendor = !!(wg && wg.vendor);
+    // 업체 실지급액: 용차업체가 일당 등으로 청구할 때 그 줄에 실제로 주는 총액 (예: 264,000 × 2명 = 528,000)
+    //  → 업체 정산서에 (실지급액 − 지급 단가 × 건수) 자동 반영 · 단가 칸을 비우면 그 금액 그대로 차액부담 기사에게 청구
+    const vPay = isVendor ? stlR0_(stlNum_(y.vendorPay)) : 0;
     let payAmt, defUnit = 0;
     if (isAmt) payAmt = stlR0_(stlNum_(y.price));
     else if (stlNum_(y.price)) payAmt = stlR0_(stlNum_(y.price) * qty);
+    else if (vPay) { payAmt = vPay; defUnit = qty ? Math.round(vPay / qty) : 0; }
     else {
       const ext = isVendor || !wg; // 용차업체·외부(정산 아이디 없는 수행자) = 외부단가
       const pk = ext ? 'p5' : 'p4';
@@ -1119,7 +1127,7 @@ function stlCompute_(month) {
         payAmt = pu ? stlR0_(pu * qty) : existing;
       }
       defUnit = qty ? Math.round(payAmt / qty) : 0;
-      if (miss && qty) (ext ? yongNoP5 : yongNoP).push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + (wg ? stlAcctLabel_(X, D, whoKey) : y.who) + ' ' + (route || '그날 전체'));
+      if (miss && qty) (ext ? yongNoP5 : yongNoP).push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + (wg ? stlAcctLabel_(X, D, whoKey) : y.who) + ' ' + (routeLabel || '그날 전체'));
     }
     // 차액 처리
     //  - 러너 몫 (용차업체는 기본): 수행자에게는 원래 단가(쿠팡 정산서에 잡힌 단가 / 업체 지급 단가)만 지급, 추가지급 없음.
@@ -1128,8 +1136,8 @@ function stlCompute_(month) {
     //  - 수행자 지급 (품앗이는 기본): 단가/금액만큼 수행자에게 지급 (원래 단가와의 차이 = 추가지급)
     const gainMode = str_(y.gain);
     const toRunner = isVendor ? gainMode !== '수행자 지급' : gainMode === '러너 몫';
-    const charge = payAmt;                       // 차액부담 계산에 쓰는 금액 (단가 칸 / 기본값)
-    const paid = toRunner ? existing : payAmt;   // 수행자에게 실제로 주는 금액
+    const charge = payAmt;                                    // 차액부담 계산에 쓰는 금액 (단가 칸 / 기본값)
+    const paid = vPay ? vPay : toRunner ? existing : payAmt;  // 수행자에게 실제로 주는 금액 (업체 실지급액이 있으면 그 금액)
     const extra = paid - existing;
     const payerOwner = stlAcct_(X, D, y.payer, y.payerId);
     let payerPrice = stlNum_(y.payerPrice), cut = 0;
@@ -1139,14 +1147,22 @@ function stlCompute_(month) {
       //  - 외부용차(용차업체·외부 수행자): 차액부담자 본인 단가 → (청구 단가 − 내 단가) × 건수를 부담
       //  - 러너 몫으로 고르면 품앗이도 차액부담자 본인 단가 기준
       if (!payerPrice && wg && !isVendor && !toRunner && wg.main.mode !== '용차내역' && existing) payerPrice = Math.round(existing / qty);
+      let cutDone = false;
       if (!payerPrice) {
-        payerPrice = stlUnit_(ctx, X.groups[payerOwner].main, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 }, stlWorkerOf_(ctx, payerOwner, date)).u;
+        const pm = X.groups[payerOwner].main, pw = stlWorkerOf_(ctx, payerOwner, date);
+        if (!route && hits.length) {
+          // 라우트가 여러 개(119AB)·그날 전체: 노선마다 차액부담자 본인 단가 × 그 노선 건수
+          let base = 0, hq = 0;
+          hits.forEach(function (x) { base += x.qty * stlUnit_(ctx, pm, { date: date, route: x.route, camp: x.camp, price: 0 }, pw).u; hq += x.qty; });
+          if (hq && base) { base = base * qty / hq; payerPrice = Math.round(base / qty); cut = stlR0_(charge - base); cutDone = true; }
+        }
+        if (!payerPrice) payerPrice = stlUnit_(ctx, pm, { date: date, route: route, camp: camp || stlYongCamp_(ctx, route), price: 0 }, pw).u;
       }
-      cut = stlR0_(charge / qty - payerPrice) * qty;
+      if (!cutDone) cut = stlR0_(charge / qty - payerPrice) * qty;
     }
     const line = {
-      date: date, who: wg ? stlAcctLabel_(X, D, whoKey) : y.who, whoId: whoKey, route: route, mode: isAmt ? '금액' : '건당', price: y.price, qty: qty, autoQty: found ? autoQty : '',
-      payAmt: paid, charge: charge, defUnit: defUnit, vendor: isVendor, whoStaff: !!(wg && !isVendor && D.byId[wg.ownerId] && ['운영자', '관리자', '대표'].indexOf(D.byId[wg.ownerId].driverType) >= 0), toRunner: toRunner, gain: toRunner ? '러너 몫' : '수행자 지급', runnerGain: toRunner && payerOwner ? charge - paid : 0, sales: sales, profit: sales - paid, camp: camp, existing: existing, extra: extra,
+      date: date, who: wg ? stlAcctLabel_(X, D, whoKey) : y.who, whoId: whoKey, route: routeLabel, mode: isAmt ? '금액' : '건당', price: y.price, vendorPay: vPay, qty: qty, autoQty: found ? autoQty : '',
+      payAmt: paid, charge: charge, defUnit: defUnit, vendor: isVendor, whoStaff: !!(wg && !isVendor && D.byId[wg.ownerId] && ['운영자', '관리자', '대표'].indexOf(D.byId[wg.ownerId].driverType) >= 0), toRunner: toRunner, gain: toRunner ? '러너 몫' : '수행자 지급', runnerGain: (toRunner || vPay) && payerOwner ? charge - paid : 0, sales: sales, profit: sales - paid, camp: camp, existing: existing, extra: extra,
       payer: payerOwner ? stlAcctLabel_(X, D, payerOwner) : y.payer, payerId: payerOwner, payerPrice: payerPrice, cut: cut, memo: y.memo, _row: y._row
     };
     yongOut.push(line);
@@ -1379,6 +1395,17 @@ function stlRouteLabel_(rt) {
       .map(function (n) { return n + nums[n].split('').filter(function (x, i, a) { return a.indexOf(x) === i; }).sort().join(''); });
     return (c ? c + ' ' : '') + list.join(', ');
   }).join(' / ');
+}
+/** 품앗이/용차 지정 라우트 칸 → 라우트 목록. 119A · 119AB(→119A,119B) · 119A,119B · 530A/530B · 빈칸(그날 전체) */
+function stlYongRoutes_(v) {
+  const out = [];
+  str_(v).toUpperCase().split(/[\s,·/|]+/).forEach(function (t) {
+    if (!t) return;
+    const m = t.match(/^(\d+)-?([A-Z]{2,})$/);
+    if (m) m[2].split('').forEach(function (ch) { if (out.indexOf(m[1] + ch) < 0) out.push(m[1] + ch); });
+    else if (out.indexOf(t) < 0) out.push(t);
+  });
+  return out;
 }
 function stlYongCamp_(ctx, route) { return route ? ctx.price.campOf(route) : ''; }
 /** 기사(사람) → 그 기사 본인 정산 묶음(메인 아이디키). 본인 쿠팡플렉스 아이디의 묶음 → 없으면 명의자로 된 첫 묶음 */
@@ -1952,7 +1979,7 @@ const STL_EDIT = {
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
   adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '정산서 메모 (기사 정산서에 보임)', 'text'], ['note', '관리자 메모 (정산서에 안 보임)', 'text']] },
   advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
-  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본: 품앗이단가 · 용차업체 외부단가)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 용차업체·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
+  yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체 · 119AB 처럼 여러 개)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본: 품앗이단가 · 용차업체 외부단가)', 'money'], ['vendorPay', '업체 실지급액 (일당 등 · 용차업체만)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 용차업체·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
   regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
   target: { sheet: 'stl_target', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['goal', '연 목표 계산서 (VAT포함)', 'money'], ['unit', '단위', 'money']] },
   split: { sheet: 'stl_split', scope: 'all', cols: [['from', '원 명의자 (발행 줄일 아이디)', 'acct', 'fromId'], ['to', '받는 명의자', 'acct', 'toId'], ['target', '목표 실수령', 'money'], ['unit', '단위', 'money'], ['repeat', '매달 반복', ['Y', 'N']], ['month', '적용월 (반복 N 일 때)', 'month']] },
@@ -2110,6 +2137,13 @@ function adm_stlTableSave(token, name, month, rows, seen) {
       if (E.scope === 'date' && o.date && stlMonthOfDate_(o.date) !== month) fail_((i + 1) + '번째 줄 날짜가 ' + month + ' 정산기간(' + stlPeriod_(month).from + ' ~ ' + stlPeriod_(month).to + ') 밖입니다.');
       return o;
     }).filter(function (o) { return E.cols.some(function (c) { return c[2] !== 'readonly' && o[c[0]]; }) || E.fixed; });
+    if (name === 'yongcha') {
+      clean.forEach(function (o, i) {
+        if (!stlNum_(o.vendorPay)) return;
+        const k = stlAcct_(X, D, o.who, o.whoId);
+        if (!k || !X.groups[k].vendor) fail_((i + 1) + '번째 줄: 업체 실지급액은 수행자가 용차업체인 줄에만 넣을 수 있습니다.');
+      });
+    }
     if (name === 'camps') {
       const seenC = {}, seenA = {};
       clean = clean.filter(function (o) { return o.camp || o.name; });
