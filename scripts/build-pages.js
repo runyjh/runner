@@ -74,12 +74,12 @@ const pages = [
       '<meta name="mobile-web-app-capable" content="yes">',
       '<meta name="apple-mobile-web-app-title" content="러너 관리자">',
       SW.replace("register(\'sw.js\')", "register(\'../sw.js\')"),
-      // 관리자 화면 보안 정책: 서버(구글 웹앱) 외의 곳으로는 데이터를 보낼 수 없고, 다른 곳의 스크립트도 실행되지 않는다
+      // 관리자 화면 보안 정책: 서버(구글 웹앱)와 Firestore 읽기 사본(파이어베이스 runner-push) 외의 곳으로는 연결할 수 없고, 다른 곳의 스크립트도 실행되지 않는다
       '<meta http-equiv="Content-Security-Policy" content="' + [
-        "default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "default-src 'self'", "script-src 'self' 'unsafe-inline' https://www.gstatic.com", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
         "font-src 'self' https://cdn.jsdelivr.net data:", "img-src 'self' data: blob:", "manifest-src 'self'",
-        "connect-src 'self' https://script.google.com https://script.googleusercontent.com",
-        "frame-src 'self' blob: data:", "worker-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"
+        "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
+        "frame-src 'self' blob: data: https://runner-push.firebaseapp.com", "worker-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"
       ].join('; ') + '">'
     ])
   }
