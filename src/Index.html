@@ -319,6 +319,23 @@
   .sl-tbl th { color: var(--sub); font-weight: 600; font-size: 12px; border-top: 0; }
   .ytag { font-weight: 800; color: #d9480f; } .ytag.p { color: #6741d9; } .ytag.u { color: #0b7285; }
   .sl-tbl td.n, .sl-tbl th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .sl-hero { background: linear-gradient(160deg, #1b64da, #2f7cf6); color: #fff; padding: 16px 18px; }
+  .sl-hm { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; } .sl-hm span { opacity: .8; font-size: 12.5px; }
+  .sl-hl { margin-top: 14px; font-size: 13px; opacity: .85; font-weight: 600; }
+  .sl-hn { font-size: 32px; font-weight: 800; letter-spacing: -.5px; font-variant-numeric: tabular-nums; line-height: 1.2; } .sl-hn small { font-size: 18px; margin-left: 2px; } .sl-hn.neg { color: #ffd2d2; }
+  .sl-hs { font-size: 12.5px; opacity: .9; margin-top: 2px; } .sl-hs b { font-weight: 700; }
+  .sl-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+  .sl-stats div { background: rgba(255,255,255,.14); border-radius: 10px; padding: 8px 9px; min-width: 0; } .sl-stats span { display: block; font-size: 11.5px; opacity: .85; } .sl-stats b { display: block; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sl-stats b.neg { color: #ffd2d2; }
+  .sl-who { margin: -4px 0 8px; font-size: 12.5px; color: var(--sub); }
+  .sl-dd { font-size: 12px; font-weight: 800; background: #e8f0fd; color: var(--brand); border-radius: 999px; padding: 3px 9px; } .sl-dd.hot { background: #fdecec; color: var(--danger); }
+  .sl-kv3 { grid-template-columns: auto 1fr auto; align-items: center; } .sl-kv3 i { display: block; }
+  .sl-cp { border: 1px solid var(--line); background: #fff; color: var(--brand); font-size: 12px; font-weight: 700; border-radius: 8px; padding: 4px 9px; min-height: 30px; cursor: pointer; }
+  .sl-fold { padding: 0 16px; } .sl-fold > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px; margin: 0 -16px; cursor: pointer; font-size: 15px; }
+  .sl-fold > summary::-webkit-details-marker { display: none; } .sl-fold > summary span { color: var(--sub); font-size: 13px; font-weight: 600; margin-left: auto; } .sl-fold > summary::after { content: '▾'; color: var(--faint); transition: transform .15s; } .sl-fold[open] > summary::after { transform: rotate(180deg); }
+  .sl-fold[open] { padding-bottom: 12px; }
+  .sl-tbl tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
+  .sl-days .sun { color: var(--danger); } .sl-days .sat { color: var(--brand); } .sl-days td:first-child { white-space: nowrap; }
+  .sl-foot { font-size: 13px; } .sl-foot .sl-kv { font-size: 13px; }
   .sl-warn { background: #fdf3e2; color: #8a5a00; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
   .mc .pmdot { font-size: 9.5px; color: #8a5a00; font-weight: 700; }
   .ntcard { background: #fff; border-radius: var(--radius); padding: 14px 16px 6px; margin: 0 0 12px; }
@@ -2185,6 +2202,8 @@
         '<div class="sl-taximg" id="slTaxImg' + i + '"><button class="btn ghost" type="button" data-taxv="' + i + '" style="height:44px">세금계산서 그림 보기</button></div></div>').join('') + '</div>';
   }
   $('#slBody').addEventListener('click', (e) => {
+    const cpb = e.target.closest('[data-copy]');
+    if (cpb) { const v = cpb.dataset.copy; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast(cpb.dataset.lab + ' ' + v + ' 복사했습니다.')).catch(() => toast('복사하지 못했습니다. 길게 눌러 복사해 주세요.')); return; }
     const b = e.target.closest('[data-taxv]'), sv = e.target.closest('[data-taxs]');
     if (sv) { const t = slTax[+sv.dataset.taxs]; return TAXDOC.png(t, 'sup', 2).then((bl) => TAXDOC.download(bl, TAXDOC.fileName(t, 'sup'))).catch((er) => toast(er.message)); }
     if (!b) return;
@@ -2215,33 +2234,43 @@
     const idUse = sl.idUse || {};
     const useTag = (x) => (idUse[x] || []).map((u) => '<b class="ytag u">[' + escH(u.cid) + ']</b>' + (u.routes.length ? ' ' + escH(u.routes.join(',')) : '')).join(' / ');
     const days = Object.keys(sl.daily || {}).concat(Object.keys(ydays), Object.keys(idUse)).filter((x, i, a) => a.indexOf(x) === i && x >= P.from && x <= P.to).sort();
-    const dayRows = days.map((x) => { const v = sl.daily[x] || {}, yt = yTag(x), ut = useTag(x); const txt = yt || ut ? [yt + (yt && v.route ? ' · ' + escH(v.route) : ''), !yt && v.route ? escH(v.route) : '', ut].filter(Boolean).join(' / ') : escH(v.route || (sl.sched || {})[x] || ''); return '<tr><td>' + slMd(x) + '</td><td>' + txt + '</td><td class="n">' + (v.qty ? slWon(v.qty) : '-') + '</td><td class="n">' + (v.amt ? slWon(v.amt) : '-') + '</td></tr>'; }).join('');
     const routes = (sl.routes || []).map((x) => '<tr><td>' + escH(x.camp) + ' ' + escH(x.route) + '</td><td class="n">' + slWon(x.qty) + '</td><td class="n">' + slWon(x.unit + x.inc) + '</td><td class="n">' + slWon(x.amt) + '</td></tr>').join('');
     const yongRows = (sl.yong || []).map((y) => '<tr><td>' + slMd(y.date) + '</td><td>' + (y.ours ? '품앗이 ' : '외부용차 ') + escH((y.camp || '') + ' ' + (y.route || '')) + (y.mine ? ' (수행)' : ' (차액 부담)') + '</td><td class="n">' + (y.mine ? slWon(y.extra) : '−' + slWon(y.cut)) + '</td></tr>').join('');
     const lossRows = (sl.loss || []).map((x) => '<tr><td>' + slMd(x.date) + '</td><td>' + escH(x.item || x.detail || x.type || '분실') + '</td><td class="n">−' + slWon(x.amt) + '</td></tr>').join('');
     const moved = (sl.movedIn || []).concat(sl.movedOut || []);
-    return '<div class="sl-card"><h3>' + escH(slMonthTxt(r.month)) + '<small>' + slMd(P.from) + ' ~ ' + slMd(P.to) + '</small></h3><div class="sl-kv">' +
-      '<span>정산 아이디</span><b>' + escH((d.cids || []).map((x) => String(x).replace(/@.*/, '')).join(', ')) + '</b>' +
-      '<span>근무일수</span><b>' + slWon(d.workDays) + '일</b><span>총 배송수량</span><b>' + slWon(d.qty) + '건</b>' +
-      '<span>지급일</span><b>' + escH(D.pay || '') + '</b></div></div>' +
-      '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
-      '<div class="sl-card"><h3>차감 · 공제</h3>' + deds.map((l) => line(l, '−')).join('') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +
+    const dow = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayTxt = (x) => { const w = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)).getDay(); return '<span class="' + (w === 0 ? 'sun' : w === 6 ? 'sat' : '') + '">' + slMd(x) + ' ' + dow[w] + '</span>'; };
+    const dayRows2 = days.map((x) => { const v = sl.daily[x] || {}, yt = yTag(x), ut = useTag(x); const txt = yt || ut ? [yt + (yt && v.route ? ' · ' + escH(v.route) : ''), !yt && v.route ? escH(v.route) : '', ut].filter(Boolean).join(' / ') : escH(v.route || (sl.sched || {})[x] || ''); return '<tr><td>' + dayTxt(x) + '</td><td>' + txt + '</td><td class="n">' + (v.qty ? slWon(v.qty) : '-') + '</td><td class="n">' + (v.amt ? slWon(v.amt) : '-') + '</td></tr>'; }).join('');
+    const rq = (sl.routes || []).reduce((a, x) => a + x.qty, 0), ra = (sl.routes || []).reduce((a, x) => a + x.amt, 0);
+    const dq = days.reduce((a, x) => a + ((sl.daily[x] || {}).qty || 0), 0);
+    const yongSum = (sl.yong || []).reduce((a, y) => a + (y.mine ? y.extra : -y.cut), 0), lossSum = (sl.loss || []).reduce((a, x) => a + x.amt, 0);
+    // 세금계산서 발행기한 D-day
+    const dd = (() => { if (!/^\d{4}-\d{2}-\d{2}$/.test(D.invoice || '')) return ''; const t = new Date(); t.setHours(0, 0, 0, 0); const n = Math.round((new Date(+D.invoice.slice(0, 4), +D.invoice.slice(5, 7) - 1, +D.invoice.slice(8, 10)) - t) / 864e5); return n > 0 ? 'D-' + n : n === 0 ? '오늘까지' : '기한 지남'; })();
+    const cp = (v, lab) => '<button type="button" class="sl-cp" data-copy="' + escH(String(v).replace(/[^\d]/g, '')) + '" data-lab="' + escH(lab) + '">복사</button>';
+    const fold = (title, sub, body, open) => '<details class="sl-card sl-fold"' + (open ? ' open' : '') + '><summary><b>' + title + '</b><span>' + sub + '</span></summary>' + body + '</details>';
+    return '<div class="sl-card sl-hero"><div class="sl-hm"><b>' + escH(slMonthTxt(r.month)) + '</b><span>' + slMd(P.from) + ' ~ ' + slMd(P.to) + '</span></div>' +
+      '<div class="sl-hl">실 입금액</div><div class="sl-hn' + (d.net < 0 ? ' neg' : '') + '">' + slWon(d.net) + '<small>원</small></div>' +
+      '<div class="sl-hs">' + (D.pay ? '지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
+      '<div class="sl-stats"><div><span>지급 합계</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
       // 공급자 이름: 사업자 상호 → 기사 이름 → '기사님'
-      '<div class="sl-card sl-inv"><h3>📄 세금계산서 발행 <small>' + escH(d.bizName || (d.name && !/^\(명의자 없음\)/.test(d.name) ? d.name : '') || '기사님') + ' → ' + escH(co.name || '러너') + '</small></h3>' +
-      '<div class="sl-amt"><span>발행 금액 (합계)</span><b>' + slWon(d.invoice) + '원</b></div><div class="sl-kv">' +
-      '<span>공급가액</span><b>' + slWon(d.supply) + '</b><span>세액</span><b>' + slWon(d.tax) + '</b>' +
-      '<span>공급받는자</span><b>' + escH((co.name || '') + (co.ceo ? ' / 대표 ' + co.ceo : '')) + '</b>' +
-      '<span>사업자번호</span><b>' + escH(co.bizNo || '') + '</b>' + (co.email ? '<span>이메일</span><b>' + escH(co.email) + '</b>' : '') +
-      '<span>작성일자</span><b>' + escH(D.writeDate || '') + '</b><span>품목</span><b>배송(' + escH(r.month) + ')</b>' +
-      '<span class="sl-due">발행기한</span><b class="sl-due">' + escH(D.invoice || '') + ' 까지</b></div></div>' +
-      '<div class="sl-card"><div class="sl-net"><span style="font-weight:700">실 입금액</span><b>' + slWon(d.net) + '원</b></div>' +
-      '<div style="font-size:12.5px;color:var(--sub);margin-top:4px">' + escH([d.bank, d.account, d.holder ? '(' + d.holder + ')' : ''].filter(Boolean).join(' ')) + '</div></div>' +
-      (moved.length ? '<div class="sl-card"><h3>다른 아이디 사용</h3><table class="sl-tbl"><thead><tr><th>내용</th><th>기간</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' +
-        moved.map((m) => '<tr><td>' + escH(m.label) + '</td><td>' + slMd(m.from) + (m.to && m.to !== m.from ? '~' + slMd(m.to) : '') + '</td><td class="n">' + slWon(m.qty) + '</td><td class="n">' + slWon(m.amt) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
-      (routes ? '<div class="sl-card"><h3>노선별 내역 <small>부가세 포함</small></h3><table class="sl-tbl"><thead><tr><th>노선</th><th class="n">건수</th><th class="n">단가</th><th class="n">금액</th></tr></thead><tbody>' + routes + '</tbody></table></div>' : '') +
-      (dayRows ? '<div class="sl-card"><h3>일자별 내역</h3><table class="sl-tbl"><thead><tr><th>날짜</th><th>노선</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' + dayRows + '</tbody></table></div>' : '') +
-      (yongRows ? '<div class="sl-card"><h3>품앗이 · 용차</h3><table class="sl-tbl"><tbody>' + yongRows + '</tbody></table></div>' : '') +
-      (lossRows ? '<div class="sl-card"><h3>분실파손</h3><table class="sl-tbl"><tbody>' + lossRows + '</tbody></table></div>' : '');
+      '<div class="sl-card sl-inv"><h3>📄 세금계산서 발행' + (dd ? '<span class="sl-dd' + (dd === '기한 지남' || dd === '오늘까지' || /^D-[1-3]$/.test(dd) ? ' hot' : '') + '">' + dd + '</span>' : '') + '</h3>' +
+      '<p class="sl-who">' + escH(d.bizName || (d.name && !/^\(명의자 없음\)/.test(d.name) ? d.name : '') || '기사님') + ' → ' + escH(co.name || '러너') + '</p>' +
+      '<div class="sl-amt"><span>발행 금액 (합계)</span><b>' + slWon(d.invoice) + '원</b></div><div class="sl-kv sl-kv3">' +
+      '<span>공급가액</span><b>' + slWon(d.supply) + '</b>' + cp(d.supply, '공급가액') + '<span>세액</span><b>' + slWon(d.tax) + '</b>' + cp(d.tax, '세액') +
+      '<span>공급받는자</span><b>' + escH((co.name || '') + (co.ceo ? ' / 대표 ' + co.ceo : '')) + '</b><i></i>' +
+      '<span>사업자번호</span><b>' + escH(co.bizNo || '') + '</b>' + (co.bizNo ? cp(co.bizNo, '사업자번호') : '<i></i>') + (co.email ? '<span>이메일</span><b>' + escH(co.email) + '</b><i></i>' : '') +
+      '<span>작성일자</span><b>' + escH(D.writeDate || '') + '</b><i></i><span>품목</span><b>배송(' + escH(r.month) + ')</b><i></i>' +
+      '<span class="sl-due">발행기한</span><b class="sl-due">' + escH(D.invoice || '') + ' 까지</b><i></i></div></div>' +
+      '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
+      '<div class="sl-card"><h3>차감 · 공제</h3>' + (deds.length ? deds.map((l) => line(l, '−')).join('') : '<div class="sl-line"><div class="hint">없음</div></div>') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +
+      (moved.length ? fold('다른 아이디 사용', moved.length + '건', '<table class="sl-tbl"><thead><tr><th>내용</th><th>기간</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' +
+        moved.map((m) => '<tr><td>' + escH(m.label) + '</td><td>' + slMd(m.from) + (m.to && m.to !== m.from ? '~' + slMd(m.to) : '') + '</td><td class="n">' + slWon(m.qty) + '</td><td class="n">' + slWon(m.amt) + '</td></tr>').join('') + '</tbody></table>', true) : '') +
+      (routes ? fold('노선별 내역', (sl.routes || []).length + '개 · ' + slWon(ra) + '원', '<p class="hint" style="margin:0 0 4px">단가·금액 부가세 포함</p><table class="sl-tbl"><thead><tr><th>노선</th><th class="n">건수</th><th class="n">단가</th><th class="n">금액</th></tr></thead><tbody>' + routes + '<tr class="tot"><td>합계</td><td class="n">' + slWon(rq) + '</td><td></td><td class="n">' + slWon(ra) + '</td></tr></tbody></table>', true) : '') +
+      (dayRows2 ? fold('일자별 내역', days.length + '일 · ' + slWon(dq) + '건', '<table class="sl-tbl sl-days"><thead><tr><th>날짜</th><th>노선</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' + dayRows2 + '</tbody></table>', false) : '') +
+      (yongRows ? fold('품앗이 · 용차', (sl.yong || []).length + '건 · ' + (yongSum < 0 ? '−' : '') + slWon(Math.abs(yongSum)) + '원', '<table class="sl-tbl"><tbody>' + yongRows + '</tbody></table>', true) : '') +
+      (lossRows ? fold('분실파손', (sl.loss || []).length + '건 · −' + slWon(lossSum) + '원', '<table class="sl-tbl"><tbody>' + lossRows + '</tbody></table>', true) : '') +
+      '<div class="sl-card sl-foot"><div class="sl-kv"><span>정산 아이디</span><b>' + escH((d.cids || []).map((x) => String(x).replace(/@.*/, '')).join(', ')) + '</b>' +
+      (d.account ? '<span>입금 계좌</span><b>' + escH([d.bank, d.account, d.holder ? '(' + d.holder + ')' : ''].filter(Boolean).join(' ')) + '</b>' : '') + '</div></div>';
   }
   $('#mSettle').addEventListener('click', openSettle);
   $('#slBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
