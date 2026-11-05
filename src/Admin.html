@@ -103,7 +103,27 @@
   .tab.on b { color: var(--brand); }
   .tab.alert b { color: var(--danger); }
 
-  .table-wrap { background: #fff; border-radius: var(--radius); overflow: auto; }
+  .table-wrap { background: #fff; border-radius: var(--radius); overflow: auto; max-height: calc(100vh - 210px); }
+  body { word-break: keep-all; overflow-wrap: break-word; }
+  .modal .m-box { overflow-wrap: anywhere; } .modal .m-box table th, .modal .m-box table td { overflow-wrap: normal; }
+  .tkbar { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; }
+  .up-bar + .tkbar, .m-top + .tkbar, .tkbar { padding: 0 2px; } .modal .tkbar { padding: 6px 16px 0; margin: 0; }
+  .tk-q { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; width: 200px; font-size: 13px; background: #fff; }
+  .tk-q:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+  .tk-n { font-size: 12px; color: var(--faint); white-space: nowrap; } .tk-sp { flex: 1; }
+  .tk-b { height: 30px; padding: 0 10px; border: 1px solid var(--line); background: #fff; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .tk-b:hover { background: var(--gray-weak); }
+  .tk-cw { position: relative; }
+  .tk-panel { position: absolute; right: 0; top: 34px; z-index: 50; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,.14); padding: 8px; width: 260px; max-height: 60vh; overflow: auto; }
+  .tk-ph { display: flex; gap: 6px; align-items: center; padding: 2px 4px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; } .tk-ph b { margin-right: auto; font-size: 13px; }
+  .tk-ph button, .tk-row button { border: 1px solid var(--line); background: #fff; border-radius: 6px; font-size: 11px; padding: 2px 6px; cursor: pointer; }
+  .tk-row button:disabled { opacity: .3; cursor: default; }
+  .tk-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px; border-radius: 6px; } .tk-row:hover { background: var(--gray-weak); }
+  .tk-row label { flex: 1; display: flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  table.tk th.tsrt { cursor: pointer; user-select: none; } table.tk th.tsrt:hover { color: var(--brand); }
+  table.tk-stick thead th:first-child { left: 0; z-index: 3; }
+  table.tk-stick tbody td:first-child { position: sticky; left: 0; z-index: 1; background: #fff; box-shadow: 1px 0 0 var(--line); }
+  table.tk-stick tbody tr:hover td:first-child { background: #f9fafb; } table.tk-stick tbody tr.sel td:first-child { background: var(--brand-weak); }
   table { width: 100%; border-collapse: collapse; min-width: 760px; }
   th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th { font-size: 12px; color: var(--sub); font-weight: 600; background: #fafbfc; position: sticky; top: 0; }
@@ -825,10 +845,11 @@
     </div>
     <div class="tabs" id="tabs"></div>
     <div class="tabs sub2" id="ttabs"></div>
+    <div class="tabs sub2" id="wtabs"></div>
     <div class="rbulk hidden" id="dBulk"></div>
     <div class="table-wrap">
       <table>
-        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="driverType">기사구분</th><th class="dsrt" data-ds="driverCode">기사코드</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status" title="기사 앱 사용 · 근무상태">앱 · 근무</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
+        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="title">직함</th><th class="dsrt" data-ds="driverType">기사구분</th><th class="dsrt" data-ds="driverCode">기사코드</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status" title="기사 앱 로그인 허용 여부">앱 사용</th><th class="dsrt" data-ds="workStatus">근무상태</th><th class="dsrt" data-ds="leaveDate">퇴사일</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -1702,7 +1723,7 @@
   });
 
   // ───── 목록 ─────
-  let all = [], counts = {}, filter = '전체', tfilter = '', selectedId = '';
+  let all = [], counts = {}, filter = '전체', tfilter = '', wfilter = '', selectedId = '';
   function loadList(keepSel) {
     $('#rows').innerHTML = '<tr><td colspan="12"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
     return api('adm_listDrivers').then((r) => {
@@ -1720,8 +1741,15 @@
     $('#ttabs').innerHTML = items.map(([k, label, c]) => '<button class="tab' + (k === tfilter ? ' on' : '') + '" data-t="' + k + '">' + label + '<b>' + c + '</b></button>').join('');
   }
   $('#ttabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; tfilter = b.dataset.t; renderTTabs(); renderRows(); });
+  // 근무상태 (재직·휴직·퇴사) — 앱 사용과 따로
+  function renderWTabs() {
+    const n = (w) => all.filter((r) => (r.workStatus || '재직') === w).length;
+    const items = [['', '근무 전체', all.length]].concat(['재직', '휴직', '퇴사'].map((w) => [w, w, n(w)]));
+    $('#wtabs').innerHTML = items.map(([k, label, c]) => '<button class="tab' + (k === wfilter ? ' on' : '') + '" data-w="' + k + '">' + label + '<b>' + c + '</b></button>').join('');
+  }
+  $('#wtabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (!b) return; wfilter = b.dataset.w; renderWTabs(); renderRows(); });
   function renderTabs() {
-    renderTTabs();
+    renderTTabs(); renderWTabs();
     const items = [['전체', counts.all || 0]].concat(STATUSES.map((s) => [s, counts[s] || 0]));
     $('#tabs').innerHTML = items.map(([k, n]) =>
       '<button class="tab' + (k === filter ? ' on' : '') + (k === '승인대기' && n ? ' alert' : '') + '" data-f="' + k + '">' + k + '<b>' + n + '</b></button>').join('');
@@ -1748,7 +1776,7 @@
 
   // 머리글을 누르면 오름차순 → 내림차순 → 정렬 해제
   let dsort = { k: '', d: 0 };
-  const dsVal = (r, k) => k === 'camp' ? String(r.schCamp || '') + ' ' + String(r.baseRoute || '') : k === 'docs' ? Object.keys(DOCS).filter((x) => r.docs && r.docs[x]).length : String(r[k] == null ? '' : r[k]);
+  const dsVal = (r, k) => k === 'workStatus' ? (r.workStatus || '재직') : k === 'camp' ? String(r.schCamp || '') + ' ' + String(r.baseRoute || '') : k === 'docs' ? Object.keys(DOCS).filter((x) => r.docs && r.docs[x]).length : String(r[k] == null ? '' : r[k]);
   function paintDSort() { $$('#dHead th.dsrt').forEach((th) => { const i = th.querySelector('i'); if (i) i.remove(); if (th.dataset.ds === dsort.k && dsort.d) th.insertAdjacentHTML('beforeend', '<i>' + (dsort.d > 0 ? '▲' : '▼') + '</i>'); }); }
   $('#dHead').addEventListener('click', (e) => {
     const th = e.target.closest('th.dsrt'); if (!th) return;
@@ -1762,6 +1790,7 @@
       // 검색할 때는 상태·구분 탭과 상관없이 전체에서 찾는다 (승인대기 탭에 있어도 승인된 기사가 나오도록)
       if (!q && filter !== '전체' && r.status !== filter) return false;
       if (!q && tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
+      if (!q && wfilter && (r.workStatus || '재직') !== wfilter) return false;
       if (!q) return true;
       return [r.name, r.driverCode, r.loginId, r.carName, r.carNo, r.schCamp, r.baseRoute, r.phone].some((v) => nfc(v).indexOf(q) >= 0) ||
         (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
@@ -1786,12 +1815,15 @@
       const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw && r.loginId ? '<span class="tag">비밀번호 없음</span>' : '') + (!r.loginId ? '<span class="tag gray">앱 미사용</span>' : '');
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
         '<td class="ck"><input type="checkbox" data-dck="' + esc(r.id) + '"' + (dsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
-        '<td><b>' + esc(r.name) + '</b>' + (r.title ? ' <span class="badge t-' + esc(r.title) + '">' + esc(r.title) + '</span>' : '') + '</td>' +
+        '<td><b>' + esc(r.name) + '</b></td>' +
+        '<td>' + (r.title ? '<span class="badge t-' + esc(r.title) + '">' + esc(r.title) + '</span>' : '<span class="sub">-</span>') + '</td>' +
         '<td>' + (r.driverType ? '<span class="badge t-' + esc(r.driverType) + '">' + esc(r.driverType) + '</span>' : '<span class="badge t-none">미지정</span>') + '</td>' +
         '<td><b class="code">' + esc(r.driverCode) + '</b></td>' +
         '<td>' + (r.schCamp || r.baseRoute ? esc(String(r.schCamp || '').replace(/\s*캠프$/, '')) + (r.baseRoute ? ' · <b class="code">' + esc(r.baseRoute) + '</b>' : '') : '<span class="sub">미배정</span>') + '</td>' +
         '<td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
-        '<td><span class="badge b-' + esc(r.status) + '" title="기사 앱 사용">' + esc(r.status || '-') + '</span>' + (r.workStatus ? ' <span class="badge ws-' + esc(r.workStatus) + '" title="근무상태' + (r.leaveDate ? ' · 마지막 근무 ' + esc(r.leaveDate) : '') + '">' + esc(r.workStatus) + '</span>' : '') + '</td>' +
+        '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
+        '<td>' + (r.workStatus ? '<span class="badge ws-' + esc(r.workStatus) + '">' + esc(r.workStatus) + '</span>' : '<span class="sub">재직</span>') + '</td>' +
+        '<td class="sub">' + esc(r.leaveDate || '') + '</td>' +
         '<td class="sub">' + esc([r.carNo, r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
         '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
     }).join('');
@@ -7602,6 +7634,170 @@
     if (!t) return showLogin();
     call('adm_check', t).then((r) => { if (r.ok) showApp(r.admin); else { store.del(); showLogin(); } })
       .catch(() => { showLogin(); toast('연결이 원활하지 않습니다.'); });
+  })();
+
+  // ───────────── 표 도구 (모든 목록 표 공통) ─────────────
+  // 표 위에: 표 안에서 찾기 · 열(숨김·좌우 순서) · 엑셀(CSV) · 복사. 제목을 누르면 정렬 (자체 정렬이 있는 표는 그대로).
+  // 열 설정은 이 브라우저에 표마다 기억. 위아래는 표 안에서 스크롤(제목 고정), 좌우는 가로 스크롤(첫 칸 고정).
+  (function () {
+    const SEL = '.table-wrap > table, table.sttbl, table.up';
+    const Q = {}; // 표마다 찾기 글자
+    const txt = (el) => String(el.innerText || el.textContent || '').replace(/[▲▼]/g, '').replace(/\s+/g, ' ').trim();
+    const hash = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+    const MEM = {};
+    const pref = (k) => { if (!MEM[k]) { try { MEM[k] = JSON.parse(localStorage.getItem('runner.tk.' + k) || '{}'); } catch (e) { MEM[k] = {}; } } return JSON.parse(JSON.stringify(MEM[k])); };
+    const savePref = (k, v) => { MEM[k] = v; try { localStorage.setItem('runner.tk.' + k, JSON.stringify(v)); } catch (e) {} };
+    function headOf(tb) { const h = tb.tHead; return h && h.rows.length === 1 ? [...h.rows[0].cells] : null; }
+    function ok(tb) {
+      if (tb.classList.contains('ed') || tb.classList.contains('sg') || tb.dataset.tkOff != null) return false;
+      if (tb.closest('.srules, .slip-box, .slip, [data-tk-off]')) return false;
+      const hs = headOf(tb); return !!hs && hs.length >= 2 && tb.tBodies.length > 0;
+    }
+    function keyOf(tb, hs) {
+      const host = tb.closest('section[id], .modal[id]');
+      return (host ? host.id : 'x') + '|' + (tb.dataset.tkId || tb.id || '') + '|' + hash(hs.map(txt).join('¦'));
+    }
+    const spanRows = (tb) => [...tb.tBodies].some((b) => [...b.rows].some((r) => [...r.cells].some((c) => c.colSpan > 1 || c.rowSpan > 1)));
+    // 열 순서·숨김: 원래 열 번호(data-tkc)를 붙여 두고 그 순서대로 다시 놓는다 (다시 그려도 같은 결과)
+    function applyCols(tb, k) {
+      const hs = headOf(tb); if (!hs) return;
+      const n = hs.length, p = pref(k);
+      hs.forEach((c, i) => { if (c.dataset.tkc == null) c.dataset.tkc = i; });
+      const names = [...hs].sort((a, b) => a.dataset.tkc - b.dataset.tkc).map(txt);
+      const order = (p.order || []).map((t) => names.indexOf(t)).filter((i) => i >= 0);
+      names.forEach((t, i) => { if (!order.includes(i)) order.push(i); });
+      const hide = new Set((p.hide || []).map((t) => names.indexOf(t)).filter((i) => i >= 0));
+      const fix = (row) => {
+        const cells = [...row.cells]; if (cells.length !== n) return;
+        cells.forEach((c, i) => { if (c.dataset.tkc == null) c.dataset.tkc = i; });
+        const by = {}; cells.forEach((c) => { by[c.dataset.tkc] = c; });
+        if (order.some((o, i) => cells[i] !== by[o])) order.forEach((o) => row.appendChild(by[o]));
+        cells.forEach((c) => { const h = hide.has(+c.dataset.tkc); if (h !== (c.style.display === 'none')) c.style.display = h ? 'none' : ''; });
+      };
+      [...tb.rows].forEach(fix);
+    }
+    function applyQ(tb, k, bar) {
+      const q = String(Q[k] || '').trim().toLowerCase();
+      let shown = 0, all = 0;
+      [...tb.tBodies].forEach((b) => [...b.rows].forEach((r) => {
+        if (r.classList.contains('tot') || r.classList.contains('sep') || (r.cells.length === 1 && r.cells[0].colSpan > 1)) return; // 합계·구분선·'불러오는 중' 줄
+        all++;
+        const hit = !q || String(r.textContent || '').toLowerCase().includes(q) || [...r.querySelectorAll('input,select')].some((x) => String(x.value || '').toLowerCase().includes(q));
+        if ((r.style.display === 'none') === hit) r.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      }));
+      if (bar) bar.querySelector('.tk-n').textContent = q ? shown + ' / ' + all + '줄' : all + '줄';
+    }
+    function rowsFor(tb) {
+      const hs = headOf(tb) || [];
+      const vis = (c) => c.style.display !== 'none';
+      const head = hs.filter(vis).filter((c) => !c.querySelector('input[type=checkbox]')).map(txt);
+      const body = [];
+      [...tb.tBodies].forEach((b) => [...b.rows].forEach((r) => {
+        if (r.style.display === 'none' || r.classList.contains('sep')) return;
+        body.push([...r.cells].filter(vis).filter((c) => !c.querySelector('input[type=checkbox]')).map((c) => { const f = c.querySelector('input:not([type=checkbox]),select'); return f && !txt(c) ? String(f.value || '') : txt(c); }));
+      }));
+      return [head].concat(body);
+    }
+    function titleOf(tb) {
+      const m = tb.closest('.modal'); const h = m ? m.querySelector('.m-top b, h3') : (tb.closest('section') || document).querySelector('.head h2, h2');
+      return (h ? txt(h) : '표').replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
+    }
+    function bar(tb, k) {
+      const box = tb.closest('.table-wrap, .up-wrap') || tb.parentElement;
+      let b = box.previousElementSibling;
+      if (!(b && b.classList.contains('tkbar'))) {
+        b = document.createElement('div'); b.className = 'tkbar';
+        b.innerHTML = '<input class="tk-q" type="search" placeholder="🔍 표 안에서 찾기" aria-label="표 안에서 찾기"><span class="tk-n"></span>' +
+          '<span class="tk-sp"></span><div class="tk-cw"><button type="button" class="tk-b tk-cols" title="열 숨기기 · 좌우 순서">☰ 열</button><div class="tk-panel hidden"></div></div>' +
+          '<button type="button" class="tk-b tk-copy" title="보이는 줄을 엑셀에 붙여넣을 수 있게 복사">⧉ 복사</button><button type="button" class="tk-b tk-csv" title="보이는 줄을 엑셀 파일(CSV)로">⬇ 엑셀</button>';
+        box.parentNode.insertBefore(b, box);
+      }
+      b._tb = tb; b._k = k;
+      const qi = b.querySelector('.tk-q'); if (qi.value !== (Q[k] || '')) qi.value = Q[k] || '';
+      // 화면에 이미 검색칸이 있으면 표 찾기는 숨김 (같은 일을 두 번 보이지 않게)
+      const sec = tb.closest('section');
+      const own = sec && [...sec.querySelectorAll('input')].some((x) => !x.closest('.tkbar') && /검색/.test(x.placeholder || ''));
+      qi.classList.toggle('hidden', !!own);
+      return b;
+    }
+    function panel(b) {
+      const tb = b._tb, k = b._k, hs = headOf(tb); if (!hs) return;
+      const p = pref(k), names = [...hs].sort((a, c) => a.dataset.tkc - c.dataset.tkc).map(txt);
+      const cur = [...hs].map((c) => names[+c.dataset.tkc]);
+      const hide = new Set(p.hide || []);
+      b.querySelector('.tk-panel').innerHTML = '<div class="tk-ph"><b>열</b><button type="button" data-tka="all">모두 보기</button><button type="button" data-tka="reset">처음대로</button></div>' +
+        cur.map((t, i) => {
+          const isCk = (c) => !!(c && c.querySelector('input[type=checkbox]'));
+          if (isCk(hs[i])) return ''; // 선택 칸은 늘 맨 앞
+          const first = i === 0 || isCk(hs[i - 1]);
+          return '<div class="tk-row"><label><input type="checkbox" data-tkh="' + esc(t) + '"' + (hide.has(t) ? '' : ' checked') + '> ' + esc(t || '(제목 없음)') + '</label>' +
+            '<button type="button" data-tkm="' + i + '" data-d="-1" title="왼쪽으로"' + (first ? ' disabled' : '') + '>◀</button><button type="button" data-tkm="' + i + '" data-d="1" title="오른쪽으로"' + (i < cur.length - 1 ? '' : ' disabled') + '>▶</button></div>';
+        }).join('');
+    }
+    function refresh(tb) {
+      const hs = headOf(tb); if (!hs) return;
+      const k = tb._tkKey;
+      applyCols(tb, k);
+      applyQ(tb, k, tb._tkBar);
+    }
+    function enhance(tb) {
+      const hs = headOf(tb); if (!hs) return;
+      if (tb._tkKey) { refresh(tb); return; }
+      const k = keyOf(tb, hs);
+      tb._tkKey = k;
+      if (!tb.id) tb.id = 'tk' + hash(k);
+      tb.classList.add('tk');
+      if (tb.closest('.table-wrap') && !(hs[0] && hs[0].querySelector('input[type=checkbox]'))) tb.classList.add('tk-stick');
+      tb._tkBar = bar(tb, k);
+      // 정렬: 자체 정렬이 없는 표만 (제목 클릭 · 같은 열 다시 누르면 반대 · 세 번째는 원래대로)
+      if (!hs.some((c) => c.classList.contains('dsrt')) && !tb.dataset.tsb && !spanRows(tb)) { tsBind(tb.id); if (TSORT[tb.id]) tsApply(tb); else hs.forEach((th) => { if (!th.querySelector('input')) { th.classList.add('tsrt'); th.title = th.title || '눌러서 정렬'; } }); }
+      refresh(tb);
+    }
+    let timer = 0;
+    function scan() { timer = 0; document.querySelectorAll(SEL).forEach((tb) => { if (ok(tb)) enhance(tb); }); }
+    new MutationObserver((ms) => { if (ms.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && !(n.classList && (n.classList.contains('tkbar') || n.classList.contains('tk-row')))))) { if (!timer) timer = setTimeout(scan, 60); } })
+      .observe(document.body, { childList: true, subtree: true });
+    setTimeout(scan, 300);
+    document.addEventListener('input', (e) => {
+      const qi = e.target.closest && e.target.closest('.tk-q'); if (!qi) return;
+      const b = qi.closest('.tkbar'); Q[b._k] = qi.value; applyQ(b._tb, b._k, b);
+    });
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('.tkbar');
+      document.querySelectorAll('.tk-panel:not(.hidden)').forEach((p) => { if (!b || !p.closest('.tkbar').contains(e.target) || (!e.target.closest('.tk-panel') && !e.target.closest('.tk-cols'))) p.classList.add('hidden'); });
+      if (!b) return;
+      const tb = b._tb, k = b._k;
+      if (e.target.closest('.tk-cols')) { const pn = b.querySelector('.tk-panel'); panel(b); pn.classList.toggle('hidden'); return; }
+      const mv = e.target.closest('[data-tkm]'), act = e.target.closest('[data-tka]');
+      if (mv || act) {
+        const hs = headOf(tb), names = [...hs].sort((a, c) => a.dataset.tkc - c.dataset.tkc).map(txt), p = pref(k);
+        let cur = [...hs].map((c) => names[+c.dataset.tkc]);
+        if (mv) { const i = +mv.dataset.tkm, j = i + +mv.dataset.d; if (j >= 0 && j < cur.length) { [cur[i], cur[j]] = [cur[j], cur[i]]; p.order = cur; } }
+        else if (act.dataset.tka === 'all') p.hide = [];
+        else { delete p.order; p.hide = []; }
+        savePref(k, p); applyCols(tb, k); panel(b);
+        return;
+      }
+      if (e.target.closest('.tk-copy')) {
+        const rows = rowsFor(tb), tsv = rows.map((r) => r.map((v) => String(v).replace(/[\t\n]/g, ' ')).join('\t')).join('\n');
+        const done = () => toast((rows.length - 1) + '줄을 복사했습니다. 엑셀·구글시트에 붙여넣으세요.');
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done).catch(() => toast('복사하지 못했습니다.')); else toast('이 브라우저는 복사를 지원하지 않습니다.');
+        return;
+      }
+      if (e.target.closest('.tk-csv')) {
+        const rows = rowsFor(tb), csv = '﻿' + rows.map((r) => r.map((v) => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v)).join(',')).join('\r\n');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        a.download = titleOf(tb) + '_' + ymdLocal(new Date()) + '.csv'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+        toast((rows.length - 1) + '줄을 엑셀(CSV) 파일로 내려받았습니다.');
+      }
+    });
+    document.addEventListener('change', (e) => {
+      const c = e.target.closest && e.target.closest('[data-tkh]'); if (!c) return;
+      const b = c.closest('.tkbar'), p = pref(b._k), h = new Set(p.hide || []);
+      if (c.checked) h.delete(c.dataset.tkh); else h.add(c.dataset.tkh);
+      p.hide = [...h]; savePref(b._k, p); applyCols(b._tb, b._k);
+    });
   })();
 })();
 </script>
