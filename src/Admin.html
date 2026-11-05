@@ -569,6 +569,10 @@
   .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
   .sg tr.pmr td.c { background: #fffbef; }
   .sg td.c.pmk { box-shadow: inset 0 -3px 0 #12a150; }
+  /* 노선 변경 예약: 다른 캠프 줄에 있는 날짜 칸, 이름 옆 배지 */
+  .sg td.c.rcoff { background: repeating-linear-gradient(135deg, var(--line) 0 2px, transparent 2px 8px); cursor: not-allowed; }
+  .rcb { display: inline-block; margin: 2px 2px 0 0; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 700; line-height: 17px; color: #8a4b00; background: #fff1d6; white-space: nowrap; }
+  .rcb.new { color: #0b5cad; background: #e3efff; }
   .sg td.c { position: relative; }
   .pmb { position: absolute; top: 1px; right: 1px; display: inline-flex; align-items: center; gap: 1px; font-size: 10px; font-weight: 800; color: #0b6b3a; background: #e3f7ea; border-radius: 8px; padding: 0 3px 0 4px; line-height: 14px; pointer-events: none; }
   .pmb i { font-style: normal; display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; border-radius: 50%; border: 1.3px solid currentColor; font-size: 7px; line-height: 1; }
@@ -873,6 +877,7 @@
       <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
       <div class="grow">
         <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
+        <button class="btn ghost" data-rcopen="list" title="날짜부터 바뀌는 캠프·노선 (스케줄 칸에 '노선변경 군포1 212AB' 라고 써도 예약됩니다)">노선 변경 예약</button>
         <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
         <button class="btn ghost" id="sFill" title="고정·품앗이 기사의 오늘 이후 빈칸을 출근/고정휴무로">빈칸 자동 채우기</button>
         <button class="btn ghost" id="sReload">새로고침</button>
@@ -892,6 +897,7 @@
       <h2>노선관리</h2>
       <div class="tools">
         <button class="btn ghost" id="xpOpen" title="모든 캠프의 정산코드별 단가를 한 표로 봅니다">전체 단가표</button>
+        <button class="btn ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button>
         <button class="btn ghost" id="rtReload">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="route">데이터 초기화</button>
         <button class="btn" id="campNew">+ 캠프 추가</button>
@@ -1194,6 +1200,22 @@
   </div>
 </div>
 
+<!-- ───────────── 노선 변경 예약 · 노선 이관 ───────────── -->
+<div class="modal hidden" id="rcModal">
+  <div class="m-box" style="width:min(820px,100%)">
+    <div class="m-top"><b>노선 변경 예약 · 노선 이관</b><button class="btn sm ghost" id="rcClose">닫기</button></div>
+    <div class="tabs" id="rcTabs" style="margin:6px 0 10px"><button type="button" class="tab on" data-rct="list">예약 · 이력</button><button type="button" class="tab" data-rct="move">노선 이관 (쿠팡 노선 통째로)</button></div>
+    <div id="rcBody"><div class="sub">불러오는 중…</div></div>
+  </div>
+</div>
+<div class="modal hidden" id="rcInfo">
+  <div class="m-box" style="width:min(560px,100%)">
+    <h3 id="rcInfoTitle" style="margin-top:0">노선 변경</h3>
+    <div id="rcInfoBody" style="font-size:14px;line-height:1.6"></div>
+    <div class="m-actions"><button type="button" class="btn" id="rcInfoClose">확인</button></div>
+  </div>
+</div>
+
 <!-- ───────────── 스케줄: 기사 스케줄 설정 ───────────── -->
 <div class="modal hidden" id="sdModal">
   <form class="m-box" id="sdForm" novalidate style="width:min(520px,100%)">
@@ -1202,6 +1224,8 @@
       <div class="field full"><label class="lb" for="sdCamp">소속 캠프 (노선관리)</label><select class="inp" id="sdCamp"></select></div>
       <div class="field full"><span class="lb">라우트 (노선관리) — 여러 개 고를 수 있습니다</span><div class="rchips" id="sdChips"></div>
         <div class="radios" id="sdRots"></div><div class="brprev">저장될 기본노선: <b id="sdBr"></b></div><input type="hidden" id="sdRoute"></div>
+      <div class="field full"><label class="lb" for="sdWhen">캠프·노선 적용일 — 비우면 바로 바뀌고, 날짜를 넣으면 그날부터 바뀌도록 예약합니다</label>
+        <input class="inp" type="date" id="sdWhen" style="max-width:200px"><div class="sub" id="sdRcInfo" style="font-size:12px;margin-top:4px"></div></div>
       <div class="field full"><span class="lb">고정휴무일</span><div class="offbtns" id="sdOffBtns">
         <button type="button" data-off="0">일</button><button type="button" data-off="1">월</button><button type="button" data-off="2">화</button><button type="button" data-off="3">수</button><button type="button" data-off="4">목</button><button type="button" data-off="5">금</button><button type="button" data-off="6">토</button></div>
         <input class="inp" id="sdOff" placeholder="예: 목,금 (요일로 적으면 빈칸 자동 채우기에 쓰임)"></div>
@@ -4099,6 +4123,7 @@
           present.get(k).add(key);
         }));
         rows.forEach((r) => {
+          if (r.active && !r.active[d]) return; // 노선 변경 예약: 이 줄은 그날 다른 캠프·노선
           const baseCamp = r.camp || '';
           const defRt = String(r.baseRoute || '').trim();
           const base = splitBase(defRt);
@@ -4333,12 +4358,42 @@
       .catch(() => { list.forEach((x) => { if (!(x.id in sOrderPend)) sOrderPend[x.id] = x.order; }); });
   }
   /** 표에 나올 줄: 승인된 기사 (+ 이 2주에 기록이 있는 다른 기사) → 캠프·구분·순서·이름 순 */
+  // ── 노선 변경 예약: 보는 기간 안에서 캠프·노선이 바뀌는 기사는 구간마다 줄을 나눠 그 캠프 쪽에 보인다 ──
+  const segIn = (sg, dt) => !sg || (dt >= sg.from && dt <= sg.to);
+  const segOff = (ri, ci) => { const r = srows[ri]; return !!(r && r.seg && !segIn(r.seg, SD.dates[ci])); };
+  const mdOf = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
+  /** 기사 목록 → 구간별 기사 (구간 없는 기사는 그대로). _key = 계산용 줄 키 */
+  function schSegDrivers() {
+    const out = [];
+    SD.drivers.forEach((d) => {
+      if (!d.segs || !d.segs.length) { out.push(Object.assign({}, d, { _key: d.id, _seg: null })); return; }
+      const whole = d.segs.length === 1;
+      d.segs.forEach((sg, i) => out.push(Object.assign({}, d, { campId: sg.campId, camp: sg.camp, baseRoute: sg.baseRoute, _key: i ? d.id + '~' + i : d.id, _seg: whole ? null : sg, _segs: d.segs, _si: i })));
+    });
+    return out;
+  }
+  function rcBadge(r) {
+    const d = r.d, out = [];
+    if (r.seg && d._segs) {
+      const prev = d._segs[d._si - 1], next = d._segs[d._si + 1];
+      if (next) out.push('<small class="rcb" title="' + esc(mdOf(next.from) + '부터 ' + (next.camp || '') + ' ' + (next.baseRoute || '')) + '">~' + mdOf(r.seg.to) + '</small>');
+      if (prev) out.push('<small class="rcb new" title="' + esc(mdOf(r.seg.from) + '부터 (이전 ' + (prev.camp || '') + ' ' + (prev.baseRoute || '') + ')') + '">' + mdOf(r.seg.from) + '~</small>');
+    } else (d.changes || []).filter((c) => c.status === '예약').forEach((c) => {
+      out.push('<small class="rcb" title="' + esc(mdOf(c.date) + '부터 ' + c.toCamp + ' ' + c.toRoute + ' (노선 변경 예약)') + '">' + mdOf(c.date) + '~ ' + esc(shortCamp(c.toCamp) + ' ' + c.toRoute) + '</small>');
+    });
+    return out.join('');
+  }
+  function offSegTd(r, ri, dt, ci) {
+    const sg = r.seg, before = dt < sg.from;
+    const tip = before ? mdOf(sg.from) + '부터 이 캠프·노선 (그 전 날짜는 이전 캠프 줄에서)' : mdOf(sg.to) + '까지 이 캠프·노선 (그 뒤 날짜는 새 캠프 줄에서)';
+    return '<td class="c rcoff' + (sepCol(ci) ? ' wk2' : '') + '" data-r="' + ri + '" data-c="' + ci + '" title="' + esc(tip) + '"></td>';
+  }
   function buildRows() {
     const q = sf.q.trim().toLowerCase();
     const camps = {};
     SD.camps.forEach((c) => { camps[c.id] = c; });
-    const list = SD.drivers.filter((d) => {
-      const has = Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k));
+    const list = schSegDrivers().filter((d) => {
+      const has = Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k) && (!d._seg || (k >= d._seg.from && k <= d._seg.to)));
       if (d.status !== '승인' && !has && !sf.all) return false;
       if (sf.camp && d.campId !== sf.camp) return false;
       if (q && ![d.name, d.loginId, d.code, d.baseRoute].some((x) => String(x || '').toLowerCase().includes(q))) return false;
@@ -4347,7 +4402,7 @@
       const ca = camps[a.campId] ? camps[a.campId].name : '￿', cb = camps[b.campId] ? camps[b.campId].name : '￿';
       return koSort(ca, cb) || drvCmp(a, b);
     });
-    const rows = list.map((d) => ({ kind: 'd', row: d.id, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
+    const rows = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
     // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트
     const campShort = sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
     (SD.pmRows || []).filter((p) => {
@@ -4363,9 +4418,10 @@
     SD.camps.forEach((c) => { campRot[shortCamp(c.name)] = String(c.rot || 'D1,D2,F3').split(',').filter(Boolean); });
     const campById = {};
     SD.camps.forEach((c) => { campById[c.id] = c; });
-    const rows = SD.drivers.filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
-      key: d.id, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type,
-      cells: SD.dates.map((dt) => sget(d.id, dt))
+    const rows = schSegDrivers().filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
+      key: d._key, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type,
+      cells: SD.dates.map((dt) => (segIn(d._seg, dt) ? sget(d.id, dt) : '')),
+      active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null
     }));
     scalc = SchedCalc.compute(rows, campRot, SD.dates.length);
   }
@@ -4410,14 +4466,15 @@
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp;
       prevCamp = r.camp;
+      const rcTag = rcBadge(r);
       return '<tr class="drv' + (gtop ? ' gtop' : '') + (d.status !== '승인' ? ' dim' : '') + (d.id === sMoved ? ' moved' : '') + '">' +
         '<td class="fx f1">' + esc(shortCamp(r.camp) || '-') + '</td>' +
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
-        (d.baseRoute ? '<small class="drt" title="기본노선(배정 라우트)">' + esc(d.baseRoute) + '</small>' : '') +
+        (d.baseRoute ? '<small class="drt" title="기본노선(배정 라우트)">' + esc(d.baseRoute) + '</small>' : '') + rcTag +
         '<span class="mv"><button data-mv="-1" data-mid="' + esc(d.id) + '" title="위로">▲</button><button data-mv="1" data-mid="' + esc(d.id) + '" title="아래로">▼</button></span></td>' +
         '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
-        '<td class="ex num" data-cnt="' + esc(d.id) + '">' + (scalc.counts[d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
+        '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + (scalc.counts[r.key || d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
         '<td class="ex">' + esc(d.workPattern || '') + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
     }).join('');
     $('#sWrap').innerHTML = '<table class="sg' + (sMode === 'month' ? ' month' : '') + '" id="sGrid">' + head + '<tbody>' + body + '</tbody><tbody id="sCalc"></tbody></table>' +
@@ -4426,10 +4483,11 @@
     $('#sCount').textContent = srows.filter((r) => r.kind === 'd').length + '명';
   }
   function tdCell(r, ri, dt, ci) {
+    if (r.seg && !segIn(r.seg, dt)) return offSegTd(r, ri, dt, ci);
     const v = sget(r.row, dt), k = r.row + '|' + dt;
     const cls = ['c', cellKind(v)];
     if (sPending[k]) cls.push('pend');
-    if (scalc && scalc.dupCells.has(r.row + '|' + ci)) cls.push('dup');
+    if (scalc && scalc.dupCells.has((r.key || r.row) + '|' + ci)) cls.push('dup');
     if (dt === pddDate()) cls.push('today');
     if (sepCol(ci)) cls.push('wk2');
     const pm = pmMark(r.row, dt);
@@ -4452,7 +4510,7 @@
       vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="5"></td></tr>';
     let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l) => l.filter((x) => campOk(x.split(' ')[0])).map(esc).join('<br>')));
     html += line('du', '중복', '같은 노선·회전 2명 이상', scalc.dups.map((l) => l.filter((x) => campOk(x.camp)).map((x) => esc(x.camp + ' ' + x.route + '(' + x.rot + ') ' +
-      x.keys.map((k) => (SD.drivers.find((d) => d.id === k) || {}).name || k).join('·'))).join('<br>')));
+      x.keys.map((k) => (SD.drivers.find((d) => d.id === String(k).split('~')[0]) || {}).name || k).join('·'))).join('<br>')));
     SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).forEach((c) => {
       const s = shortCamp(c.name);
       if (s === '품앗이') return; // 품앗이 줄은 아래에서 따로 (품앗이로 받은 라우트)
@@ -4478,8 +4536,9 @@
     // 바뀐 칸 / 출근일수 / 중복 표시만 다시 그림
     $$('td.c', tb).forEach((td) => {
       const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
+      if (r.seg && !segIn(r.seg, dt)) return;
       const v = sget(r.row, dt), k = r.row + '|' + dt;
-      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '']
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
       const pmv = pmMark(r.row, dt), html = esc(v) + pmBadge(pmv);
@@ -4533,6 +4592,14 @@
         sBase[k] = sent[k];
         if (sPending[k] && sPending[k].value === sent[k]) delete sPending[k];
       });
+      // '노선변경' 칸은 노선 변경 예약이 되고 칸은 '출근'으로 저장됨
+      (r.replaced || []).forEach((x) => { const k = x.row + '|' + x.date; sBase[k] = x.value; (SD.cells[x.row] = SD.cells[x.row] || {})[x.date] = x.value; });
+      if ((r.routeChanges && r.routeChanges.length) || (r.routeWarn && r.routeWarn.length)) {
+        const lines = (r.routeChanges || []).map((c) => c.name + ' · ' + mdOf(c.date) + '부터 ' + c.text + (c.dup ? ' (이미 있던 예약)' : c.applied ? ' (바로 적용)' : ' 예약'));
+        const warns = [].concat(...(r.routeChanges || []).map((c) => c.warnings || []), r.routeWarn || []);
+        rcShowInfo(lines.length ? '노선 변경 예약 — ' + lines.join(' / ') : '노선 변경을 알아보지 못했습니다', warns);
+        if (r.routeChanges && r.routeChanges.length) setTimeout(() => loadSched(SD.start), 50);
+      }
       if (r.conflicts && r.conflicts.length) {
         r.conflicts.forEach((c) => {
           const k = c.row + '|' + c.date;
@@ -4621,7 +4688,7 @@
   function fillSel(v) {
     const s = selRect(); if (!s) return;
     const list = [];
-    for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
+    for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) if (!segOff(r, c)) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
     setCells(list);
   }
   // 복사 · 붙여넣기 (엑셀·구글시트와 주고받기)
@@ -4657,7 +4724,7 @@
     if (grid.length === 1 && grid[0].length === 1 && s && (s.r1 !== s.r2 || s.c1 !== s.c2)) return fillSel(grid[0][0]);
     grid.forEach((line, i) => line.forEach((v, j) => {
       const r = s.r1 + i, c = s.c1 + j;
-      if (r < nRows() && c < nCols()) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
+      if (r < nRows() && c < nCols() && !segOff(r, c)) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
     }));
     setCells(list);
     sAnchor = { r: s.r1, c: s.c1 }; sAct = { r: Math.min(nRows() - 1, s.r1 + grid.length - 1), c: Math.min(nCols() - 1, s.c1 + Math.max.apply(null, grid.map((g) => g.length)) - 1) };
@@ -4688,6 +4755,7 @@
   }
   function openEdit(initial) {
     if (!sAct || sEdit) return;
+    if (segOff(sAct.r, sAct.c)) { const sg = srows[sAct.r].seg; return toast('이 날은 ' + (SD.dates[sAct.c] < sg.from ? '이전' : '새') + ' 캠프 줄에서 입력해 주세요. (노선 변경 예약)'); }
     const r = srows[sAct.r], dt = SD.dates[sAct.c];
     const td = $('#sGrid').querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]'); if (!td) return;
     const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
@@ -4894,6 +4962,9 @@
     $('#sdOff').value = d.fixedOff || ''; $('#sdExtra').value = d.extraOff || '';
     $('#sdPat').value = d.workPattern || ''; $('#sdMemo').value = d.memo || ''; $('#sdOrder').value = d.order || '';
     paintOffBtns();
+    $('#sdWhen').value = ''; $('#sdWhen').min = SD.today || '';
+    const pend = (d.changes || []).filter((c) => c.status === '예약');
+    $('#sdRcInfo').innerHTML = pend.length ? '예약됨: ' + pend.map((c) => '<b>' + mdOf(c.date) + '부터 ' + esc(c.toCamp + ' ' + c.toRoute) + '</b>').join(', ') + ' · <a href="#" data-rcopen="list">예약 보기·취소</a>' : '';
     $('#sdModal').classList.remove('hidden');
   }
   function paintOffBtns() {
@@ -4945,18 +5016,136 @@
       workPattern: $('#sdPat').value.trim(), schMemo: $('#sdMemo').value.trim(), schOrder: $('#sdOrder').value.trim() };
     const was = { schCampId: d.campId || '', baseRoute: d.baseRoute || '', fixedOff: d.fixedOff || '', extraOff: d.extraOff || '', workPattern: d.workPattern || '', schMemo: d.memo || '', schOrder: d.order || '' };
     Object.keys(f).forEach((k) => { if (f[k] === was[k]) delete f[k]; });
-    if (!Object.keys(f).length) return $('#sdModal').classList.add('hidden');
+    // 적용일을 넣고 캠프·노선을 바꿨으면: 그날부터 바뀌도록 예약 (지금 기사 정보는 그대로)
+    const when = $('#sdWhen').value, today = SD.today || '';
+    let rc = null;
+    if (when && when > today && ('schCampId' in f || 'baseRoute' in f)) {
+      rc = { driverId: d.id, date: when, toCampId: $('#sdCamp').value, toRoute: $('#sdRoute').value.trim() };
+      delete f.schCampId; delete f.baseRoute;
+    }
+    if (!Object.keys(f).length && !rc) return $('#sdModal').classList.add('hidden');
     const b = $('#sdSave'); b.disabled = true;
-    api('adm_updateDriver', d.id, f, null).then((r) => {
-      if (!r.ok) return toast(r.msg);
-      return fetchSched(SD.start).then((w) => {
-        if (w.ok) { SD.drivers = w.drivers; }
-        $('#sdModal').classList.add('hidden'); renderSched(); toast(d.name + ' 기사님 스케줄 설정을 저장했습니다.');
+    const step1 = rc ? api('adm_rcSave', rc) : Promise.resolve(null);
+    step1.then((rr) => {
+      if (rr && !rr.ok) { toast(rr.msg); return; }
+      return (Object.keys(f).length ? api('adm_updateDriver', d.id, f, null) : Promise.resolve({ ok: true })).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        return fetchSched(SD.start).then((w) => {
+          if (w.ok) { SD.drivers = w.drivers; }
+          $('#sdModal').classList.add('hidden'); renderSched();
+          if (rr) rcShowInfo(d.name + ' · ' + mdOf(rr.change.date) + '부터 ' + rr.change.toCamp + ' ' + rr.change.toRoute + (rr.dup ? ' (이미 있던 예약)' : ' 예약했습니다'), rr.warnings);
+          else toast(d.name + ' 기사님 스케줄 설정을 저장했습니다.');
+        });
       });
     }).catch(() => {}).finally(() => { b.disabled = false; });
   });
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sdModal').classList.contains('hidden')) $('#sdModal').classList.add('hidden'); });
+
+  // ───── 노선 변경 예약 · 노선 이관 ─────
+  const RC = { tab: 'list', data: null, plan: null };
+  function rcShowInfo(title, warns) {
+    $('#rcInfoTitle').textContent = title;
+    $('#rcInfoBody').innerHTML = warns && warns.length ? '<div style="color:var(--danger);font-weight:700;margin-bottom:4px">확인해 주세요</div><ul style="margin:0;padding-left:18px">' + warns.map((w) => '<li>' + esc(w) + '</li>').join('') + '</ul>'
+      : '<div class="sub">확인할 것이 없습니다. 적용일이 되면 기사 정보의 소속캠프·기본노선도 자동으로 바뀝니다.</div>';
+    $('#rcInfo').classList.remove('hidden');
+  }
+  $('#rcInfoClose').addEventListener('click', () => $('#rcInfo').classList.add('hidden'));
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rcopen]'); if (!b) return;
+    e.preventDefault(); openRc(b.dataset.rcopen);
+  });
+  $('#rcClose').addEventListener('click', () => $('#rcModal').classList.add('hidden'));
+  $('#rcTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-rct]'); if (b) { RC.tab = b.dataset.rct; renderRc(); } });
+  function openRc(tab) {
+    RC.tab = tab || 'list'; RC.plan = null;
+    $('#rcModal').classList.remove('hidden'); $('#rcBody').innerHTML = '<div class="sub">불러오는 중…</div>';
+    return api('adm_rcList').then((r) => { if (!r.ok) return toast(r.msg); RC.data = r; renderRc(); }).catch(() => {});
+  }
+  function renderRc() {
+    $$('#rcTabs [data-rct]').forEach((b) => b.classList.toggle('on', b.dataset.rct === RC.tab));
+    const r = RC.data; if (!r) return;
+    if (RC.tab === 'list') {
+      const ch = r.changes.filter((c) => c.memo !== '바로 변경' || c.date >= r.today);
+      $('#rcBody').innerHTML = '<p class="sub" style="margin:0 0 8px;font-size:13px">기사스케줄 칸에 <b>노선변경 군포1 212AB</b> 처럼 쓰거나, 기사 이름을 눌러 스케줄 설정의 <b>적용일</b>을 넣으면 예약됩니다. 적용일 전에는 언제든 취소할 수 있습니다.</p>' +
+        (ch.length ? '<div class="table-wrap"><table><thead><tr><th>적용일</th><th>종류</th><th>기사</th><th>이전</th><th></th><th>새 캠프·노선</th><th>상태</th><th>등록</th><th></th></tr></thead><tbody>' +
+          ch.map((c) => '<tr' + (c.status === '취소' ? ' style="opacity:.5"' : '') + '><td><b>' + esc(c.date) + '</b></td><td>' + esc(c.kind) + '</td><td>' + esc(c.kind === '노선이관' ? '-' : c.name) + '</td>' +
+            '<td>' + esc(shortCamp(c.fromCamp || '') + ' ' + (c.fromRoute || '')) + '</td><td>→</td><td><b>' + esc(shortCamp(c.toCamp || '') + ' ' + (c.toRoute || '')) + '</b></td>' +
+            '<td><span class="badge ' + (c.status === '예약' ? 'b-승인대기' : c.status === '적용' ? 'b-승인' : 'b-정지') + '">' + esc(c.status) + '</span></td>' +
+            '<td class="sub" title="' + esc(c.memo || '') + '">' + esc((c.admin || '') + ' ' + String(c.createdAt || '').slice(5, 16)) + '</td>' +
+            '<td>' + (c.status === '예약' && !c.parentId ? '<button class="btn sm ghost danger-t" data-rccancel="' + esc(c.id) + '">취소</button>' : c.parentId && c.status === '예약' ? '<span class="sub" style="font-size:12px">이관에 포함</span>' : '') + '</td></tr>').join('') +
+          '</tbody></table></div>' : '<div class="sub">예약·이력이 없습니다.</div>');
+      return;
+    }
+    // 노선 이관
+    const camps = r.camps.slice().sort((a, b) => koSort(a.name, b.name));
+    const opt = (sel) => camps.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+    const f = RC.form || (RC.form = { fromCampId: (camps.find((c) => (r.nums[c.id] || []).length) || {}).id || '', fromNum: '', toCampId: '', toCampName: '', toNum: '', date: '', copyPrice: true });
+    const nums = (r.nums[f.fromCampId] || []).filter((x) => !x.off);
+    if (!nums.some((x) => x.num === f.fromNum)) f.fromNum = nums.length ? nums[0].num : '';
+    $('#rcBody').innerHTML = '<p class="sub" style="margin:0 0 10px;font-size:13px">쿠팡이 노선을 통째로 옮길 때 씁니다. 그 노선을 맡은 기사 전원이 같은 날짜로 예약되고, 적용일에 옛 노선은 정지됩니다(지난 정산 단가는 그대로 남음).</p>' +
+      '<div class="grid2">' +
+      '<div class="field"><label class="lb">옮기기 전 캠프</label><select class="inp" id="rcFromCamp">' + opt(f.fromCampId) + '</select></div>' +
+      '<div class="field"><label class="lb">노선 번호 (구분1)</label><select class="inp" id="rcFromNum">' + nums.map((x) => '<option value="' + esc(x.num) + '"' + (x.num === f.fromNum ? ' selected' : '') + '>' + esc(x.code) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label class="lb">옮겨 갈 캠프</label><select class="inp" id="rcToCamp"><option value="">(새 캠프 만들기)</option>' + opt(f.toCampId) + '</select>' +
+        (f.toCampId ? '' : '<input class="inp" id="rcToNew" placeholder="새 캠프 이름 (예: 군포1)" value="' + esc(f.toCampName) + '" style="margin-top:6px">') + '</div>' +
+      '<div class="field"><label class="lb">새 노선 번호</label><input class="inp" id="rcToNum" inputmode="numeric" placeholder="예: 212" value="' + esc(f.toNum) + '"></div>' +
+      '<div class="field"><label class="lb">적용일 (이날부터 새 노선)</label><input class="inp" type="date" id="rcDate" value="' + esc(f.date) + '"></div>' +
+      '<div class="field" style="align-self:end"><label class="check"><input type="checkbox" id="rcCopy"' + (f.copyPrice ? ' checked' : '') + '> 옛 노선 단가를 새 노선으로 복사 (새 노선에 단가가 없을 때)</label></div>' +
+      '</div><div class="m-actions" style="justify-content:flex-start"><button type="button" class="btn ghost" id="rcPreview">미리보기</button></div><div id="rcPlan"></div>';
+    if (RC.plan) paintRcPlan();
+  }
+  function rcReadForm() {
+    const f = RC.form;
+    f.fromCampId = $('#rcFromCamp').value; f.fromNum = $('#rcFromNum') ? $('#rcFromNum').value : ''; f.toCampId = $('#rcToCamp').value;
+    f.toCampName = $('#rcToNew') ? $('#rcToNew').value.trim() : ''; f.toNum = $('#rcToNum').value.trim(); f.date = $('#rcDate').value; f.copyPrice = $('#rcCopy').checked;
+    return f;
+  }
+  $('#rcBody').addEventListener('change', (e) => {
+    if (!['rcFromCamp', 'rcToCamp'].includes(e.target.id)) return;
+    rcReadForm(); RC.plan = null; renderRc();
+  });
+  function paintRcPlan() {
+    const p = RC.plan; if (!p) return;
+    const li = (x) => '<li>' + esc(x) + '</li>';
+    $('#rcPlan').innerHTML = '<div class="okbox" style="margin-top:8px"><b>' + esc(p.from.camp + ' ' + p.from.codes.join(',')) + ' → ' + esc(p.to.camp + (p.to.newCamp ? '(새로 만듦)' : '') + ' ' + p.to.code) + '</b> · ' + esc(mdOf(p.date)) + '부터' + (p.applyNow ? ' <b style="color:var(--danger)">(오늘 이전 날짜라 바로 적용)</b>' : '') + '</div>' +
+      '<div style="margin-top:8px;font-size:14px"><b>바뀌는 기사 ' + p.drivers.length + '명</b><ul style="margin:4px 0;padding-left:18px">' + (p.drivers.map((d) => li(d.name + ' : ' + d.from + ' → ' + d.to)).join('') || '<li class="sub">없음</li>') + '</ul>' +
+      '<b>노선관리</b><ul style="margin:4px 0;padding-left:18px">' + li(p.to.routeExists ? p.to.camp + '에 ' + p.to.num + ' 노선이 이미 있어 그대로 씁니다.' : p.to.camp + '에 ' + p.to.code + ' 노선을 만듭니다.') +
+        li(p.prices.copy ? '옛 노선 단가 ' + p.prices.from + '줄을 새 노선으로 복사합니다. (군포1 단가가 다르면 노선관리에서 고쳐 주세요)' : p.prices.to ? '새 노선에 단가가 이미 ' + p.prices.to + '줄 있어 복사하지 않습니다.' : '단가를 복사하지 않습니다. 새 노선 단가를 노선관리에서 넣어 주세요.') +
+        li(mdOf(p.date) + '부터 ' + p.from.camp + ' ' + p.from.num + ' 노선은 정지됩니다. 지난 정산의 단가는 그대로 계산됩니다.') + '</ul>' +
+      (p.check.length ? '<b style="color:var(--danger)">직접 정할 기사</b><ul style="margin:4px 0;padding-left:18px">' + p.check.map(li).join('') + '</ul>' : '') +
+      (p.warnings.length ? '<b style="color:var(--danger)">확인할 것</b><ul style="margin:4px 0;padding-left:18px">' + p.warnings.map(li).join('') + '</ul>' : '') +
+      '</div><div class="m-actions"><button type="button" class="btn" id="rcDo">' + (p.applyNow ? '이관 바로 적용' : '이관 예약') + '</button></div>';
+  }
+  $('#rcBody').addEventListener('click', (e) => {
+    const cb = e.target.closest('[data-rccancel]');
+    if (cb) {
+      if (!confirm('이 노선 변경 예약을 취소할까요?')) return;
+      cb.disabled = true;
+      return api('adm_rcCancel', cb.dataset.rccancel).then((r) => { if (!r.ok) { cb.disabled = false; return toast(r.msg); } toast('예약을 취소했습니다.' + (r.cancelled > 1 ? ' (기사 ' + (r.cancelled - 1) + '명 예약 같이 취소)' : '')); rcAfter(); }).catch(() => { cb.disabled = false; });
+    }
+    if (e.target.id === 'rcPreview') {
+      const f = rcReadForm(), b = e.target; b.disabled = true;
+      return api('adm_rcMove', f, true).then((r) => { if (!r.ok) return toast(r.msg); RC.plan = r; paintRcPlan(); }).catch(() => {}).finally(() => { b.disabled = false; });
+    }
+    if (e.target.id === 'rcDo') {
+      const f = rcReadForm(), b = e.target;
+      if (!confirm(RC.plan.from.camp + ' ' + RC.plan.from.num + ' → ' + RC.plan.to.camp + ' ' + RC.plan.to.num + ' 이관을 ' + (RC.plan.applyNow ? '바로 적용' : mdOf(RC.plan.date) + '부터로 예약') + '할까요?')) return;
+      b.disabled = true; b.textContent = '처리 중…';
+      return api('adm_rcMove', f, false).then((r) => {
+        if (!r.ok) { b.disabled = false; b.textContent = '이관 예약'; return toast(r.msg); }
+        RC.form = null; RC.plan = null; RC.tab = 'list';
+        toast('노선 이관을 ' + (r.applyNow ? '적용' : '예약') + '했습니다. 기사 ' + (r.made || []).length + '명' + (r.copied ? ' · 단가 ' + r.copied + '줄 복사' : ''));
+        rcAfter(true);
+      }).catch(() => { b.disabled = false; b.textContent = '이관 예약'; });
+    }
+  });
+  function rcAfter(master) {
+    openRc(RC.tab);
+    if (currentView === 'sched') loadSched(SD.start);
+    if (master) { RT.camps = []; if (currentView === 'route') loadRoutes(); }
+    driversLoaded = false;
+  }
   // ───── 데이터 초기화 (메뉴별, 확인 문구 '모조리 없앤다') ─────
   const RESET_PHRASE = '모조리 없앤다';
   const RESET_INFO = {

@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -202,6 +202,15 @@ const COMPANY = [
 ];
 const COMPANY_SHEET = 'company';
 
+// route_changes 시트 (노선 변경 예약·이력). 기사 한 명의 캠프·기본노선 변경, 또는 쿠팡 노선 이관(안양1 110 → 군포1 212)
+const RC = {
+  id: '변경ID', kind: '종류', date: '적용일', driverId: '기사ID', name: '기사',
+  fromCampId: '이전 캠프ID', fromCamp: '이전 캠프', fromRoute: '이전 노선', toCampId: '새 캠프ID', toCamp: '새 캠프', toRoute: '새 노선',
+  status: '상태', parentId: '이관ID', memo: '메모', admin: '등록자', createdAt: '등록일시', appliedAt: '적용일시'
+};
+const RCK = { DRV: '기사', MOVE: '노선이관' };
+const RCS = { WAIT: '예약', DONE: '적용', OFF: '취소' };
+
 // ── 노선관리 (2단계 기준 데이터). 캠프명 > 노선코드 ──
 // camps 시트: 캠프 기본 정보
 const CP = { id: '캠프ID', name: '캠프명', address: '주소', memo: '메모', rot: '기본 회전', createdAt: '등록일시', updatedAt: '수정일시' };
@@ -301,7 +310,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes']);
 
 const SCHEMA = {};
 SCHEMA[SH.DRIVERS] = D;
@@ -330,6 +339,7 @@ SCHEMA[SH.BBAN] = BBN;
 SCHEMA[SH.BWORD] = BWD;
 SCHEMA[SH.APPSET] = APS;
 SCHEMA[SH.TAXINV] = TI;
+SCHEMA[SH.RCHG] = RC;
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -1621,6 +1631,7 @@ function detailOf_(o) {
 function adm_listDrivers(token) {
   return run_(function () {
     const a = requireAdmin_(token);
+    try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); } // 적용일이 된 노선 변경을 먼저
     const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS), last = sh.getLastRow();
     let rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
     // 기사ID가 겹친 줄이 있으면 먼저 고친다 (겹치면 한 명을 고를 때 다른 기사도 같이 선택됨)
@@ -1758,6 +1769,18 @@ function adm_updateDriver(token, id, changes, seenRev) {
       f.updatedAt = nowText_();
       writeFields_(SH.DRIVERS, o._row, f);
       forgetDriver_(o);
+      // 소속캠프·기본노선을 바로 바꾸면 이력으로 남긴다 (지난 날짜 스케줄·업로드는 예전 캠프·노선으로 계산되게)
+      try {
+        const nc = f.schCampId !== undefined ? f.schCampId : o.schCampId, nr = f.baseRoute !== undefined ? f.baseRoute : o.baseRoute;
+        if ((o.schCampId || o.baseRoute) && (nc !== o.schCampId || nr !== o.baseRoute)) {
+          appendObj_(SH.RCHG, {
+            id: uniqId_('RC'), kind: RCK.DRV, date: todayText_(), driverId: o.id, name: o.name,
+            fromCampId: o.schCampId, fromCamp: o.schCamp, fromRoute: o.baseRoute, toCampId: nc, toCamp: f.schCamp !== undefined ? f.schCamp : o.schCamp, toRoute: nr,
+            status: RCS.DONE, parentId: '', memo: '바로 변경', admin: a.name, createdAt: f.updatedAt, appliedAt: f.updatedAt
+          });
+          rcTouch_();
+        }
+      } catch (e) { console.error('노선 변경 이력 기록 실패: ' + (e && e.message)); }
       if (f.loginId) forgetDriver_({ loginId: f.loginId });
       // 기사구분이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가 구분도 맞춘다
       if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
@@ -3187,6 +3210,7 @@ function cleanupSessions() {
   } finally {
     lock.releaseLock();
     try { pmAlertCleanup_(); } catch (e) { console.error('품앗이 알림 정리 실패: ' + (e && e.message)); } // 60일 지난 품앗이 알림 정리
+    try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); } // 적용일이 된 노선 변경
   }
 }
 
@@ -4320,12 +4344,26 @@ function schRead_(sun, end) {
   // 캠프 이름은 노선관리(camps)에서, 이름·노선은 기사 정보에서 바로 가져온다
   const campName = {};
   m.camps.forEach(function (c) { campName[c.id] = c.name; });
+  try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); }
   const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(function (o) {
     const d = schDriver_(o);
     if (d.campId && !campName[d.campId]) { d.campId = ''; d.camp = ''; } // 노선관리에서 지워진 캠프
     else if (d.campId) d.camp = campName[d.campId];
     return d;
   });
+  // 노선 변경 예약: 보는 기간 안에서 캠프·노선이 바뀌는 기사는 구간(segs)을 붙인다 → 적용일부터 새 캠프 쪽에 보인다
+  let rcBy = {};
+  try { rcBy = rcByDriver_(); } catch (e) { rcBy = {}; }
+  const rcMoves = [];
+  drivers.forEach(function (d) {
+    const list = rcBy[d.id];
+    if (!list) return;
+    const segs = rcSegs_({ campId: d.campId, camp: d.camp, baseRoute: d.baseRoute }, list, dates);
+    if (segs) { segs.forEach(function (x) { x.camp = campName[x.campId] || x.camp; }); d.segs = segs; }
+    const show = list.filter(function (c) { return c.status === RCS.WAIT || (c.date >= dates[0] && c.date <= dates[dates.length - 1]); });
+    if (show.length) d.changes = show.map(function (c) { return rcView_(c, campName); });
+  });
+  try { rcRows_().forEach(function (c) { if (c.kind === RCK.MOVE && c.status === RCS.WAIT) rcMoves.push(rcView_(c, campName)); }); } catch (e) { /* 무시 */ }
   if (last >= 2) schSyncCopies_(sh, h, drivers);
   const holidays = {};
   dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
@@ -4341,7 +4379,7 @@ function schRead_(sun, end) {
   return {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays,
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
-    routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks
+    routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, rcMoves: rcMoves
   };
 }
 
@@ -4360,6 +4398,30 @@ function adm_schSave(token, changes) {
       x.old = String(x.old == null ? '' : x.old).replace(/\r\n?/g, '\n').trim();
       if (x.value.length > SCH_MAX_TEXT) fail_('한 칸에 ' + SCH_MAX_TEXT + '자까지 입력할 수 있습니다.');
     });
+    // 칸에 '노선변경'이 들어가면 노선 변경 예약으로 바꾸고, 칸은 '출근'으로 저장한다
+    const rcExtra = { replaced: [], routeChanges: [], routeWarn: [] };
+    const rcCh = changes.filter(function (x) { return x.value && !/^NOTE\d+$/.test(x.row) && x.row.indexOf(SCH_PM_PREFIX) !== 0 && /노선\s*변경/.test(x.value); });
+    if (rcCh.length) {
+      const lk = scriptLock_();
+      lk.waitLock(20000);
+      try {
+        rcCh.forEach(function (x) {
+          const o = driverById_(x.row);
+          if (!o) return;
+          const at = rcAt_({ campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute }, rcByDriver_()[o.id], x.date);
+          const pr = rcParseCell_(x.value, at.campId);
+          const day = x.date.slice(5).replace('-', '/');
+          if (!pr || pr.err) { rcExtra.routeWarn.push(o.name + ' ' + day + ': ' + (pr ? pr.err : '알아볼 수 없음') + ' — 칸 글자는 그대로 저장했습니다.'); return; }
+          const r = rcAddDriver_(a, o, x.date, pr.campId, pr.route, '기사스케줄 칸: ' + x.value.slice(0, 60), '');
+          const c = r.change;
+          rcExtra.routeChanges.push({ name: o.name, date: c.date, dup: r.dup, applied: c.status === RCS.DONE, text: (rcCampNames_()[c.toCampId] || c.toCamp) + ' ' + c.toRoute,
+            warnings: rcWarnings_(o, c.date, c.toCampId, c.toRoute, c.fromCampId, c.fromRoute, !!c.parentId) });
+          x.value = '출근';
+          rcExtra.replaced.push({ row: x.row, date: x.date, value: '출근' });
+          if (!r.dup) logAdmin_(a, '노선 변경 예약', o.name + ' (' + o.id + ')', c.date + ' → ' + c.toCamp + ' ' + c.toRoute + ' (기사스케줄 칸)');
+        });
+      } finally { lk.releaseLock(); }
+    }
     const dmin = changes.reduce(function (m, x) { return x.date < m ? x.date : m; }, changes[0].date);
     const dmax = changes.reduce(function (m, x) { return x.date > m ? x.date : m; }, changes[0].date);
     let h = schEnsureDates_(parseYmd_(dmin), parseYmd_(dmax));
@@ -4375,7 +4437,7 @@ function adm_schSave(token, changes) {
         changes = changes.filter(function (x) { return !/^NOTE\d+$/.test(x.row); });
         if (!changes.length) {
           if (noteRes.saved) logAdmin_(a, '기사스케줄 비고 수정', noteRes.saved + '칸', '업무스케줄에 저장');
-          return { ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts };
+          return Object.assign({ ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts }, rcExtra);
         }
       }
       // 행 찾기 (없는 기사는 새 줄)
@@ -4408,7 +4470,7 @@ function adm_schSave(token, changes) {
       // 지금 값 읽어서 충돌 확인 (바뀌는 칸을 감싸는 범위를 한 번에)
       const ok = changes.filter(function (x) { return rowOf[x.row]; });
       const conflicts = [];
-      if (!ok.length) return { ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts };
+      if (!ok.length) return Object.assign({ ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts }, rcExtra);
       const r0 = Math.min.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
       const r1 = Math.max.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
       const cs = ok.map(function (x) { return h.dates[x.date] + 1; });
@@ -4425,7 +4487,7 @@ function adm_schSave(token, changes) {
         saved++;
       });
       if (saved) logSchChange_(a, ok, saved);
-      return { ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts) };
+      return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts) }, rcExtra);
     } finally {
       lock.releaseLock();
     }
@@ -4659,6 +4721,13 @@ function api_mySchedule(token, month) {
     }
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
+    // 노선 변경 예약 안내: '11/11부터 군포1캠프 212AB'
+    try {
+      rcApplyDue_();
+      const cn = rcCampNames_(), t0 = todayText_();
+      out.routeChanges = (rcByDriver_()[String(s.d)] || []).filter(function (c) { return c.status === RCS.WAIT || (c.date >= addDaysText_(t0, -7) && c.memo !== '바로 변경'); })
+        .map(function (c) { return { date: c.date, camp: cn[c.toCampId] || c.toCamp, route: c.toRoute, fromCamp: cn[c.fromCampId] || c.fromCamp, fromRoute: c.fromRoute, done: c.status === RCS.DONE }; });
+    } catch (e) { out.routeChanges = []; }
     // 품앗이: 내가 뛰는 일감(수행)·맡긴 일감(맡김)·지원 중인 일감
     try { out.pumasi = pmScheduleOf_(String(s.d), dates); } catch (e) { out.pumasi = {}; }
     if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
@@ -4712,14 +4781,29 @@ function api_campSchedule(token, month) {
     }
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, holidays: {}, camp: '', drivers: [], backup: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
+    try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); }
     const all = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
     const me = all.filter(function (o) { return o.id === String(s.d); })[0];
-    if (!me || !me.schCampId) { out.noCamp = true; return out; }
-    const camp = master_().camps.filter(function (c) { return c.id === me.schCampId; })[0];
+    // 노선 변경 예약: 날짜마다 그날 그 캠프에 있는 기사만 (적용일부터 새 캠프 쪽에 보인다)
+    let rcBy = {};
+    try { rcBy = rcByDriver_(); } catch (e) { rcBy = {}; }
+    const today = todayText_(), ref = dates.indexOf(today) >= 0 ? today : (today < dates[0] ? dates[0] : dates[dates.length - 1]);
+    const at = function (o, d) { return rcAt_({ campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute }, rcBy[o.id], d, today); };
+    const myCampId = me ? at(me, ref).campId : '';
+    if (!me || !myCampId) { out.noCamp = true; return out; }
+    const camp = master_().camps.filter(function (c) { return c.id === myCampId; })[0];
     out.camp = camp ? String(camp.name).replace(/\s*캠프\s*$/, '').trim() : (me.schCamp || '');
-    const mates = all.filter(function (o) { return o.schCampId === me.schCampId && o.status === ST.ACTIVE; });
+    const inCamp = {};
+    all.forEach(function (o) {
+      if (o.status !== ST.ACTIVE) return;
+      const days = {};
+      let any = false, route = '';
+      dates.forEach(function (d) { const v = rcBy[o.id] ? at(o, d) : { campId: o.schCampId, baseRoute: o.baseRoute }; if (v.campId === myCampId) { days[d] = 1; any = true; if (!route || d === ref) route = v.baseRoute; } });
+      if (any) inCamp[o.id] = { days: days, route: route };
+    });
+    const mates = all.filter(function (o) { return inCamp[o.id]; });
     const byId = {};
-    mates.forEach(function (o) { byId[o.id] = { id: o.id, name: o.name, route: o.baseRoute || '', type: o.driverType || '', me: o.id === me.id, cells: {}, order: 1e9 }; });
+    mates.forEach(function (o) { byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', me: o.id === me.id, cells: {}, order: 1e9 }; });
     if (props_().SCH_DB_ID && schSS_().getSheetByName(SCH.SHEET)) {
       const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
       const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
@@ -4731,7 +4815,7 @@ function api_campSchedule(token, month) {
           const x = byId[str_(r[0])];
           if (!x || x.order < 1e9) return;
           x.order = i;
-          dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(block[i][c - c0]); if (v) x.cells[d] = v; } });
+          dates.forEach(function (d) { if (!inCamp[x.id].days[d]) return; const c = h.dates[d]; if (c !== undefined) { const v = str_(block[i][c - c0]); if (v) x.cells[d] = v; } });
         });
         try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1).list; } catch (e) { out.backup = {}; }
       }
@@ -4884,8 +4968,14 @@ function schBuildUpload_(data, opt) {
   const info = data.drivers.filter(function (d) {
     return d.status === ST.ACTIVE || Object.keys(data.cells[d.id] || {}).some(function (k) { return data.dates.indexOf(k) >= 0; });
   }).map(function (d) {
-    const camp = campById[d.campId] || ((d.type === '백업' || d.type === '외부용차') ? '백업' : '');
-    return { key: d.id, camp: camp, name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: data.cells[d.id] || {} };
+    const campOf = function (id) { return campById[id] || ((d.type === '백업' || d.type === '외부용차') ? '백업' : ''); };
+    const base = { key: d.id, camp: campOf(d.campId), name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: data.cells[d.id] || {} };
+    // 노선 변경 예약이 걸린 기사: 날짜마다 그날의 캠프·기본노선으로
+    if (d.segs) base.at = function (date) {
+      const sg = d.segs.filter(function (x) { return x.from <= date && date <= x.to; })[0];
+      return sg ? Object.assign({}, base, { camp: campOf(sg.campId), defRt: sg.baseRoute || '' }) : base;
+    };
+    return base;
   });
 
   const weeks = [data.dates.slice(0, 7), data.dates.slice(7, 14)];
@@ -4908,12 +4998,13 @@ function schBuildUpload_(data, opt) {
       entries.push({ row: [date, opt.bizNo, camp, opt.wave, effId, '출근', rots.join(','), routes.join(','), missJ || '', '', effNm], priority: priority, mark: mark });
     };
 
-    info.forEach(function (r) {
-      const campStr = r.camp, id = r.id;
-      if (!campStr || !id || campStr.indexOf('비고') >= 0 || campStr.indexOf('퇴사') >= 0) return;
-      const baseCamp = campStr;
-      const base = splitBase(r.defRt);
+    info.forEach(function (r0) {
       dates.forEach(function (date) {
+        const r = r0.at ? r0.at(date) : r0;
+        const campStr = r.camp, id = r.id;
+        if (!campStr || !id || campStr.indexOf('비고') >= 0 || campStr.indexOf('퇴사') >= 0) return;
+        const baseCamp = campStr;
+        const base = splitBase(r.defRt);
         if (date < opt.target) return;
         if (r.defRt) routeExpand(base.routes).forEach(function (rt) { baseRouteSet[[date, baseCamp, rt].join('|')] = 1; });
         const lines = String(r.cells[date] || '').replace(/<br\s*\/?>/gi, '\n').split(/\r?\n|\r/).map(function (v) { return v.trim(); }).filter(Boolean);
@@ -5343,3 +5434,390 @@ function onSchEdit_(e, sh) {
     lock.releaseLock();
   }
 }
+
+// ───────────────────────── 노선 변경 예약 (날짜부터 캠프·기본노선 바꾸기 / 쿠팡 노선 이관) ─────────────────────────
+/*
+ * route_changes 시트 한 줄 = 변경 하나.
+ *  - 종류 '기사': 그 기사의 소속캠프·기본노선을 적용일부터 바꾼다.
+ *  - 종류 '노선이관': 쿠팡이 노선을 통째로 옮긴 것 (예: 안양1캠프 110 → 군포1캠프 212). 이전 노선 칸 = 숫자(구분1).
+ *    그 노선을 맡은 기사들은 같은 날짜의 '기사' 줄로 같이 만들어지고(이관ID), 적용일에 옛 노선은 정지된다.
+ * 날짜별 캠프·기본노선은 rcAt_ 으로 계산한다 (기사스케줄 표시, 어드민 업로드 테이블, 기사 앱).
+ * 적용일이 되면 기사 정보의 소속캠프·기본노선도 바뀐다 (화면을 열 때·매일 새벽 정리 때).
+ */
+let _rcRows = null;
+function rcRows_(fresh) {
+  if (_rcRows && !fresh) return _rcRows;
+  let rows = [];
+  try { rows = readAll_(SH.RCHG).filter(function (o) { return o.id && o.status !== RCS.OFF; }); } catch (e) { rows = []; }
+  rows.forEach(function (o) { o.date = normDate_(o.date) || o.date; });
+  return (_rcRows = rows);
+}
+function rcTouch_() { _rcRows = null; try { cache_().remove('rc:due:' + todayText_()); } catch (e) { /* 무시 */ } }
+const rcSort_ = function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0); };
+/** 기사ID → 그 기사의 변경 목록 (적용일 순) */
+function rcByDriver_() {
+  const by = {};
+  rcRows_().forEach(function (c) { if (c.kind !== RCK.MOVE && c.driverId) (by[c.driverId] = by[c.driverId] || []).push(c); });
+  Object.keys(by).forEach(function (k) { by[k].sort(rcSort_); });
+  return by;
+}
+/**
+ * 그날 기사의 { campId, camp, baseRoute }. cur = 지금 기사 정보.
+ * 오늘 이후: 지금 정보에 그날까지의 예약을 차례로 얹는다. 지난 날: 이력(그날 이전 마지막 변경의 새 값, 없으면 첫 변경의 이전 값).
+ */
+function rcAt_(cur, list, date, today) {
+  const base = { campId: cur.campId || '', camp: cur.camp || '', baseRoute: cur.baseRoute || '' };
+  if (!list || !list.length) return base;
+  today = today || todayText_();
+  const pick = function (c) { return { campId: c.toCampId || '', camp: c.toCamp || '', baseRoute: c.toRoute || '', change: c }; };
+  if (date >= today) {
+    let v = base;
+    list.forEach(function (c) { if (c.status === RCS.WAIT && c.date <= date) v = pick(c); });
+    return v;
+  }
+  let hit = null;
+  list.forEach(function (c) { if (c.date <= date) hit = c; });
+  if (hit) return pick(hit);
+  return { campId: list[0].fromCampId || '', camp: list[0].fromCamp || '', baseRoute: list[0].fromRoute || '' };
+}
+/** 보는 기간 안에서 캠프·노선이 같은 구간들. 지금 정보와 하나도 다르지 않으면 null */
+function rcSegs_(cur, list, dates) {
+  if (!list || !list.length || !dates.length) return null;
+  const today = todayText_(), segs = [];
+  dates.forEach(function (d) {
+    const v = rcAt_(cur, list, d, today), last = segs[segs.length - 1];
+    if (last && last.campId === v.campId && last.baseRoute === v.baseRoute) { last.to = d; return; }
+    segs.push({ from: d, to: d, campId: v.campId, camp: v.camp, baseRoute: v.baseRoute, changeId: v.change ? v.change.id : '' });
+  });
+  if (segs.length === 1 && segs[0].campId === (cur.campId || '') && segs[0].baseRoute === (cur.baseRoute || '')) return null;
+  return segs;
+}
+function rcView_(c, campName) {
+  const nm = function (id, fb) { return (campName && id && campName[id]) || fb || ''; };
+  return {
+    id: c.id, kind: c.kind, date: c.date, driverId: c.driverId, name: c.name, status: c.status, parentId: c.parentId, memo: c.memo,
+    fromCampId: c.fromCampId, fromCamp: nm(c.fromCampId, c.fromCamp), fromRoute: c.fromRoute,
+    toCampId: c.toCampId, toCamp: nm(c.toCampId, c.toCamp), toRoute: c.toRoute, admin: c.admin, createdAt: c.createdAt, appliedAt: c.appliedAt
+  };
+}
+function rcCampNames_() { const m = {}; master_().camps.forEach(function (c) { m[c.id] = c.name; }); return m; }
+
+/** 적용일이 된 예약을 적용한다 (기사 정보 바꾸기, 이관된 옛 노선 정지). 하루에 몇 번만 실제로 확인한다 */
+function rcApplyDue_() {
+  const today = todayText_(), ck = 'rc:due:' + today;
+  try { if (cache_().get(ck)) return 0; } catch (e) { /* 무시 */ }
+  const due = function () { return rcRows_(true).filter(function (c) { return c.status === RCS.WAIT && c.date && c.date <= today; }).sort(rcSort_); };
+  if (!due().length) { try { cache_().put(ck, '1', 1800); } catch (e) { /* 무시 */ } return 0; }
+  const lock = scriptLock_();
+  lock.waitLock(20000);
+  let n = 0;
+  try {
+    const now = nowText_();
+    due().forEach(function (c) { rcApply_(c, now); n++; });
+    if (n) { bumpMaster_(); rcTouch_(); }
+  } finally { lock.releaseLock(); }
+  try { cache_().put(ck, '1', 1800); } catch (e) { /* 무시 */ }
+  return n;
+}
+/** 잠금 안에서: 변경 하나 적용 */
+function rcApply_(c, now) {
+  if (c.kind === RCK.MOVE) {
+    readAll_(SH.ROUTES).forEach(function (r) {
+      if (r.campId !== c.fromCampId || splitCode_(r.code).g1 !== c.fromRoute) return;
+      writeFields_(SH.ROUTES, r._row, { status: RST.OFF, memo: (r.memo ? r.memo + ' / ' : '') + c.date + ' ' + c.toCamp + ' ' + c.toRoute + '(으)로 이관', updatedAt: now });
+    });
+  } else {
+    const o = driverById_(c.driverId);
+    if (o) {
+      writeFields_(SH.DRIVERS, o._row, { schCampId: c.toCampId, schCamp: c.toCamp, baseRoute: c.toRoute, updatedAt: now });
+      forgetDriver_(o);
+    }
+  }
+  if (c._row) writeFields_(SH.RCHG, c._row, { status: RCS.DONE, appliedAt: now });
+  c.status = RCS.DONE; c.appliedAt = now;
+}
+
+/** 기본노선 글자 → 노선 조각들. '110AB, 116C (F3) [B01]' → [{num:'110', letters:'AB'}, {num:'116', letters:'C'}] (백업·용차는 special) */
+function rcUnits_(baseRoute) {
+  const s = str_(baseRoute).replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').toUpperCase();
+  if (/백업|예비|용차/.test(s)) return { special: true, units: [] };
+  const units = [];
+  let lastNum = '';
+  s.split(/[\s,]+/).forEach(function (t) {
+    let m = t.match(/^(\d+)([A-Z]*)$/);
+    if (m) { lastNum = m[1]; units.push({ num: m[1], letters: m[2] }); return; }
+    m = t.match(/^([A-Z]+)$/);
+    if (m && lastNum) units.push({ num: lastNum, letters: m[1] });
+  });
+  return { special: false, units: units };
+}
+/** 저장 전에 알려 줄 것들 (막지는 않음) */
+function rcWarnings_(o, date, toCampId, toRoute, fromCampId, fromRoute, skipVacant) {
+  const out = [], m = master_(), campName = {};
+  m.camps.forEach(function (c) { campName[c.id] = c.name; });
+  const short = function (id) { return String(campName[id] || '').replace(/\s*캠프$/, ''); };
+  const u = rcUnits_(toRoute);
+  const tk = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외부용차': 'p5' }[o.driverType] || 'p2';
+  const tl = { p2: '기사단가', p3: '백업단가', p4: '품앗이단가', p5: '외부단가' }[tk];
+  u.units.forEach(function (x) {
+    const rts = m.routes.filter(function (r) { return r.campId === toCampId && r.g1 === x.num; });
+    if (!rts.length) { out.push(short(toCampId) + ' ' + x.num + ' 노선이 노선관리에 없습니다.'); return; }
+    String(x.letters || '').split('').forEach(function (ch) {
+      if (!rts.some(function (r) { return [r.g2, r.g3, r.g4, r.g5].indexOf(ch) >= 0; })) { out.push(short(toCampId) + ' ' + x.num + ch + ' 노선이 노선관리에 없습니다.'); return; }
+      const p = m.prices.filter(function (pr) { return pr.campId === toCampId && pr.num === x.num && pr.value === ch && Number(pr[tk]) > 0; });
+      if (!p.length) out.push(short(toCampId) + ' ' + x.num + ch + ' ' + tl + '가 비어 있습니다 (정산 때 단가 없음).');
+    });
+  });
+  // 기사 일시단가가 적용일 뒤까지 걸려 있으면
+  try {
+    if (typeof stlRead_ === 'function') stlRead_('stl_tmp').forEach(function (t) {
+      if (t.driverId !== o.id) return;
+      if (t.to && t.to < date) return;
+      out.push('기사 일시단가(' + (t.from || '') + '~' + (t.to || '') + ' ' + (t.routes || '전체 노선') + ')가 적용일 뒤까지 걸려 있습니다. 정산관리에서 확인해 주세요.');
+    });
+  } catch (e) { /* 정산 DB 없음 */ }
+  // 옛 노선을 이어 맡을 기사가 없으면 (업로드 테이블에서 미입차로도 안 잡히므로)
+  if (!skipVacant && fromCampId && fromRoute) {
+    const by = rcByDriver_(), today = todayText_();
+    const covered = {};
+    readAll_(SH.DRIVERS).forEach(function (d) {
+      if (!d.id || d.id === o.id || d.status !== ST.ACTIVE) return;
+      const v = rcAt_({ campId: d.schCampId, camp: d.schCamp, baseRoute: d.baseRoute }, by[d.id], date, today);
+      if (v.campId !== fromCampId) return;
+      rcUnits_(v.baseRoute).units.forEach(function (x) { String(x.letters || '').split('').forEach(function (ch) { covered[x.num + ch] = 1; }); });
+    });
+    const left = [];
+    rcUnits_(fromRoute).units.forEach(function (x) {
+      const nu = rcUnits_(toRoute).units;
+      String(x.letters || '').split('').forEach(function (ch) {
+        if (fromCampId === toCampId && nu.some(function (y) { return y.num === x.num && y.letters.indexOf(ch) >= 0; })) return;
+        if (!covered[x.num + ch]) left.push(x.num + ch);
+      });
+    });
+    if (left.length) out.push(date.slice(5).replace('-', '/') + '부터 ' + short(fromCampId) + ' ' + left.join(',') + ' 담당 기사가 없습니다. 다른 기사에게 넘기거나, 노선이 없어졌으면 노선관리에서 정지해 주세요.');
+  }
+  return out;
+}
+/** 잠금 안에서: 기사 한 명 변경 만들기. 같은 기사·같은 새 노선 예약이 14일 안에 이미 있으면 그것을 쓴다 */
+function rcAddDriver_(a, o, date, toCampId, toRoute, memo, parentId) {
+  const campName = rcCampNames_();
+  if (toCampId && !campName[toCampId]) fail_('캠프를 찾을 수 없습니다. 새로고침해 주세요.');
+  toRoute = normBaseRoute_(toRoute);
+  const today = todayText_(), now = nowText_();
+  const list = rcByDriver_()[o.id] || [];
+  const same = list.filter(function (c) {
+    return c.status === RCS.WAIT && c.toCampId === toCampId && normBaseRoute_(c.toRoute) === toRoute &&
+      Math.abs((parseYmd_(c.date) - parseYmd_(date)) / 864e5) <= 14;
+  })[0];
+  if (same) {
+    if (date < same.date) { writeFields_(SH.RCHG, same._row, { date: date }); same.date = date; rcTouch_(); }
+    return { change: same, dup: true };
+  }
+  const prev = rcAt_({ campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute }, list, ymd_(addDays_(parseYmd_(date), -1)), today);
+  const row = {
+    id: uniqId_('RC'), kind: RCK.DRV, date: date, driverId: o.id, name: o.name,
+    fromCampId: prev.campId, fromCamp: campName[prev.campId] || prev.camp || '', fromRoute: prev.baseRoute,
+    toCampId: toCampId, toCamp: campName[toCampId] || '', toRoute: toRoute, status: RCS.WAIT, parentId: parentId || '',
+    memo: str_(memo).slice(0, 300), admin: a.name, createdAt: now, appliedAt: ''
+  };
+  // 같은 날짜의 예전 예약은 새 것으로 바꾼다 (취소)
+  list.filter(function (c) { return c.status === RCS.WAIT && c.date === date; }).forEach(function (c) { writeFields_(SH.RCHG, c._row, { status: RCS.OFF, memo: (c.memo ? c.memo + ' / ' : '') + '같은 날 새 예약으로 바뀜' }); });
+  row._row = appendObj_(SH.RCHG, row);
+  rcTouch_();
+  if (date <= today) { rcApply_(row, now); rcTouch_(); }
+  return { change: row, dup: false };
+}
+
+/** 관리자: 예약 목록 (최근 300개) + 캠프 */
+function adm_rcList(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    rcApplyDue_();
+    const campName = rcCampNames_();
+    let all = [];
+    try { all = readAll_(SH.RCHG).filter(function (o) { return o.id; }); } catch (e) { all = []; }
+    all.forEach(function (o) { o.date = normDate_(o.date) || o.date; });
+    all.sort(function (a, b) { return rcSort_(b, a); });
+    const m = master_(), nums = {};
+    m.routes.forEach(function (r) { if (!r.g1) return; const l = nums[r.campId] = nums[r.campId] || []; if (!l.some(function (x) { return x.num === r.g1; })) l.push({ num: r.g1, code: r.code, off: r.status === RST.OFF }); });
+    return {
+      ok: true, today: todayText_(), changes: all.slice(0, 300).map(function (c) { return rcView_(c, campName); }),
+      camps: m.camps.map(function (c) { return { id: c.id, name: c.name }; }), nums: nums
+    };
+  });
+}
+/** 관리자: 기사 한 명 노선 변경 예약. f = { driverId, date, toCampId, toRoute, memo } (적용일이 오늘 이전이면 바로 적용) */
+function adm_rcSave(token, f) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    f = f || {};
+    const date = normDate_(f.date);
+    if (!date) fail_('적용일을 확인해 주세요.');
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const o = driverById_(str_(f.driverId));
+      if (!o) fail_('기사를 찾을 수 없습니다.');
+      const r = rcAddDriver_(a, o, date, str_(f.toCampId), str_(f.toRoute), f.memo, '');
+      const c = r.change;
+      const warnings = rcWarnings_(o, date, c.toCampId, c.toRoute, c.fromCampId, c.fromRoute, false);
+      logAdmin_(a, '노선 변경 예약', o.name + ' (' + o.id + ')', date + ' ' + (c.fromCamp || '') + ' ' + (c.fromRoute || '') + ' → ' + c.toCamp + ' ' + c.toRoute + (c.status === RCS.DONE ? ' (바로 적용)' : ''));
+      return { ok: true, change: rcView_(c, rcCampNames_()), dup: r.dup, warnings: warnings };
+    } finally { lock.releaseLock(); }
+  });
+}
+/** 관리자: 예약 취소 (적용 전만). 노선 이관이면 같이 만든 기사 예약도 취소 */
+function adm_rcCancel(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const rows = rcRows_(true);
+      const c = rows.filter(function (x) { return x.id === str_(id); })[0];
+      if (!c) fail_('예약을 찾을 수 없습니다. 새로고침해 주세요.');
+      if (c.status === RCS.DONE) fail_('이미 적용된 변경입니다. 되돌리려면 원래 캠프·노선으로 새로 예약해 주세요.');
+      writeFields_(SH.RCHG, c._row, { status: RCS.OFF });
+      let n = 1;
+      if (c.kind === RCK.MOVE) rows.forEach(function (x) { if (x.parentId === c.id && x.status === RCS.WAIT) { writeFields_(SH.RCHG, x._row, { status: RCS.OFF }); n++; } });
+      rcTouch_();
+      logAdmin_(a, '노선 변경 예약 취소', c.kind === RCK.MOVE ? c.fromCamp + ' ' + c.fromRoute + ' 이관' : c.name, c.date + (n > 1 ? ' · 기사 ' + (n - 1) + '명 같이 취소' : ''));
+      return { ok: true, cancelled: n };
+    } finally { lock.releaseLock(); }
+  });
+}
+/**
+ * 관리자: 쿠팡 노선 이관. f = { fromCampId, fromNum, toCampId 또는 toCampName(새 캠프), toNum, date, copyPrice, memo }
+ * dry = true 면 미리보기만 (바뀔 기사·노선·단가·확인할 것). false 면 실제로 만든다.
+ */
+function adm_rcMove(token, f, dry) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    f = f || {};
+    const date = normDate_(f.date);
+    if (!date) fail_('적용일을 확인해 주세요.');
+    const fromNum = normCode_(f.fromNum).replace(/[^0-9]/g, ''), toNum = normCode_(f.toNum).replace(/[^0-9]/g, '');
+    if (!fromNum || !toNum) fail_('옮기기 전·후 노선 번호(숫자)를 입력해 주세요. 예: 110 → 212');
+    const m = master_();
+    const fromCamp = m.camps.filter(function (c) { return c.id === str_(f.fromCampId); })[0];
+    if (!fromCamp) fail_('옮기기 전 캠프를 골라 주세요.');
+    let toCamp = m.camps.filter(function (c) { return c.id === str_(f.toCampId); })[0] || null;
+    let newCampName = '';
+    if (!toCamp) {
+      let n = str_(f.toCampName).replace(/\s+/g, '');
+      if (!n) fail_('옮겨 갈 캠프를 고르거나 새 캠프 이름을 입력해 주세요.');
+      if (!/캠프$/.test(n)) n += '캠프';
+      toCamp = m.camps.filter(function (c) { return campKey_(c.name) === campKey_(n); })[0] || null;
+      if (!toCamp) newCampName = n;
+    }
+    if (toCamp && toCamp.id === fromCamp.id && toNum === fromNum) fail_('옮기기 전과 후가 같습니다.');
+    const olds = m.routes.filter(function (r) { return r.campId === fromCamp.id && r.g1 === fromNum; });
+    if (!olds.length) fail_(fromCamp.name + '에 ' + fromNum + ' 노선이 없습니다.');
+    const letters = [];
+    olds.forEach(function (r) { [r.g2, r.g3, r.g4, r.g5].forEach(function (ch) { if (ch && letters.indexOf(ch) < 0) letters.push(ch); }); });
+    const toCampLabel = toCamp ? toCamp.name : newCampName;
+    const routeExists = toCamp ? m.routes.some(function (r) { return r.campId === toCamp.id && r.g1 === toNum; }) : false;
+    const priceFrom = m.prices.filter(function (p) { return p.campId === fromCamp.id && p.num === fromNum; });
+    const priceTo = toCamp ? m.prices.filter(function (p) { return p.campId === toCamp.id && p.num === toNum; }) : [];
+    // 바뀌는 기사: 적용일에 그 캠프에서 그 번호를 맡는 기사
+    const by = rcByDriver_(), today = todayText_(), drivers = [], check = [];
+    const swap = function (br) { return str_(br).replace(new RegExp('(^|[^0-9])' + fromNum + '(?=[A-Za-z])', 'g'), '$1' + toNum); };
+    readAll_(SH.DRIVERS).forEach(function (d) {
+      if (!d.id || !d.name) return;
+      const v = rcAt_({ campId: d.schCampId, camp: d.schCamp, baseRoute: d.baseRoute }, by[d.id], date, today);
+      if (v.campId !== fromCamp.id) return;
+      const u = rcUnits_(v.baseRoute);
+      if (!u.units.some(function (x) { return x.num === fromNum; })) return;
+      if (u.units.some(function (x) { return x.num !== fromNum; })) { check.push(d.name + ' (' + v.baseRoute + ' — 다른 번호도 맡고 있어 직접 정해 주세요)'); return; }
+      drivers.push({ id: d.id, name: d.name, status: d.status, from: v.baseRoute, to: swap(v.baseRoute) });
+    });
+    // 확인할 것: 옛 노선에 걸린 진행 중 품앗이 일감, 일시단가
+    const warn = [];
+    try {
+      if (typeof pmData_ === 'function') pmData_().jobs.forEach(function (j) {
+        if (j.date < date || ['취소', '모집 마감'].indexOf(j.status) >= 0) return;
+        if (String(j.campId || '') !== fromCamp.id || !new RegExp('^' + fromNum + '(?=[A-Z]|$)').test(normCode_(j.route))) return;
+        warn.push('품앗이 일감 ' + j.date.slice(5).replace('-', '/') + ' ' + j.route + ' (' + j.status + ')이 옛 노선으로 올라와 있습니다.');
+      });
+    } catch (e) { /* 품앗이 없음 */ }
+    try {
+      if (typeof stlRead_ === 'function') stlRead_('stl_tmp').forEach(function (t) {
+        if (t.to && t.to < date) return;
+        if (!new RegExp('(^|[^0-9])' + fromNum + '(?=[A-Za-z]|$)').test(str_(t.routes))) return;
+        warn.push('기사 일시단가 ' + (t.name || '') + ' (' + (t.routes || '') + ')가 옛 노선 번호로 되어 있습니다. 정산관리에서 확인해 주세요.');
+      });
+    } catch (e) { /* 정산 DB 없음 */ }
+    const plan = {
+      ok: true, dry: !!dry, date: date, applyNow: date <= today,
+      from: { campId: fromCamp.id, camp: fromCamp.name, num: fromNum, codes: olds.map(function (r) { return r.code; }) },
+      to: { campId: toCamp ? toCamp.id : '', camp: toCampLabel, newCamp: !!newCampName, num: toNum, code: toNum + letters.join(''), routeExists: routeExists },
+      prices: { from: priceFrom.length, to: priceTo.length, copy: !!f.copyPrice && priceFrom.length > 0 && !priceTo.length },
+      drivers: drivers, check: check, warnings: warn
+    };
+    if (dry) return plan;
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    try {
+      const now = nowText_();
+      // 새 캠프 (회전은 옛 캠프와 같게)
+      if (!toCamp) {
+        const row = appendObj_(SH.CAMPS, { id: newRid_('C'), name: newCampName, address: '', memo: fromCamp.name + ' ' + fromNum + ' 노선 이관으로 만듦', rot: fromCamp.rot || ROTS.join(','), createdAt: now, updatedAt: now });
+        toCamp = campView_(readObj_(SH.CAMPS, row));
+      }
+      if (!routeExists) appendObj_(SH.ROUTES, routeRowObj_(toCamp.id, toCamp.name, toNum + letters.join(''), RST.ON, fromCamp.name + ' ' + fromNum + '에서 이관 (' + date + ')', now));
+      let copied = 0;
+      if (plan.prices.copy) {
+        const add = readAll_(SH.PRICES).filter(function (p) { return p.id && p.campId === fromCamp.id && normCode_(p.num) === fromNum; }).map(function (p) {
+          const x = {};
+          Object.keys(RP).forEach(function (k) { x[k] = p[k]; });
+          x.id = newRid_('P'); x.campId = toCamp.id; x.campName = toCamp.name; x.num = toNum; x.createdAt = now; x.updatedAt = now;
+          return x;
+        });
+        appendObjs_(SH.PRICES, add); copied = add.length;
+      }
+      bumpMaster_();
+      const mv = {
+        id: uniqId_('RC'), kind: RCK.MOVE, date: date, driverId: '', name: '',
+        fromCampId: fromCamp.id, fromCamp: fromCamp.name, fromRoute: fromNum, toCampId: toCamp.id, toCamp: toCamp.name, toRoute: toNum,
+        status: RCS.WAIT, parentId: '', memo: str_(f.memo).slice(0, 300), admin: a.name, createdAt: now, appliedAt: ''
+      };
+      mv._row = appendObj_(SH.RCHG, mv);
+      rcTouch_();
+      const made = [];
+      drivers.forEach(function (x) {
+        const o = driverById_(x.id);
+        if (!o) return;
+        rcAddDriver_(a, o, date, toCamp.id, x.to, fromCamp.name + ' ' + fromNum + ' → ' + toCamp.name + ' ' + toNum + ' 이관', mv.id);
+        made.push(x.name);
+      });
+      if (date <= today) rcApply_(mv, now);
+      bumpMaster_(); rcTouch_();
+      logAdmin_(a, '노선 이관', fromCamp.name + ' ' + fromNum + ' → ' + toCamp.name + ' ' + toNum, date + ' · 기사 ' + made.length + '명' + (copied ? ' · 단가 ' + copied + '줄 복사' : '') + (newCampName ? ' · 새 캠프' : ''));
+      plan.dry = false; plan.to.campId = toCamp.id; plan.made = made; plan.copied = copied; plan.moveId = mv.id;
+      return plan;
+    } finally { lock.releaseLock(); }
+  });
+}
+
+/**
+ * 스케줄 칸 글자에 '노선변경'(띄어쓰기 무관)이 있으면 노선 변경 예약으로 읽는다.
+ *   '캠프및 노선변경 군포1 212AB' / '노선 변경 군포1캠프 212CD (F3)' / '노선변경 212AB'(캠프 그대로)
+ * 반환: null (해당 없음) | { err } | { campId, route }
+ */
+function rcParseCell_(v, curCampId) {
+  const t = str_(v).replace(/\s+/g, ' ');
+  if (!/노선\s*변경/.test(t)) return null;
+  const rest = t.replace(/^.*?노선\s*변경\s*/, '').trim();
+  const rm = rest.match(/(\d+[A-Za-z]+(?:\s*,\s*\d*[A-Za-z]+)*)(\s*\([^)]*\))?/);
+  if (!rm) return { err: '바뀔 노선(예: 212AB)을 찾지 못했습니다' };
+  const before = rest.slice(0, rest.indexOf(rm[0])).replace(/\s+/g, '').replace(/캠프$/, '');
+  let campId = curCampId || '';
+  if (before) {
+    const c = master_().camps.filter(function (x) { return campKey_(String(x.name).replace(/\s*캠프$/, '')) === campKey_(before); })[0];
+    if (!c) return { err: before + '캠프가 노선관리에 없습니다 (노선관리에서 캠프를 만들거나 노선 이관을 먼저 해 주세요)' };
+    campId = c.id;
+  }
+  if (!campId) return { err: '바뀔 캠프를 알 수 없습니다' };
+  return { campId: campId, route: normBaseRoute_(rm[1].replace(/\s+/g, '') + (rm[2] ? ' ' + rm[2].trim() : '')) };
+}
+function addDaysText_(ymd, n) { const d = parseYmd_(ymd); return d ? ymd_(addDays_(d, n)) : ymd; }

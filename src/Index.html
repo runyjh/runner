@@ -1284,7 +1284,7 @@
       if (scMode === 'month') return renderMonth(r);
       // PDD(배송 예정일) = 오늘 기준 내일 → 파란색 강조
       const week = (list, title, cls, tag) => '<div class="wk"><h3>' + title + '<small class="' + cls + '">' + tag + '</small></h3>' + list.map((d) => dayRow(r, d)).join('') + '</div>';
-      $('#scBody').innerHTML = week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
+      $('#scBody').innerHTML = rcNote(r) + week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
     }).catch(() => { $('#scBody').innerHTML = ''; netErr(); });
   }
   function renderCampSched() {
@@ -1343,6 +1343,14 @@
       escH(String(x.camp || '').replace(/\s*캠프$/, '') + ' ' + x.route) + (x.accepted ? ' → ' + escH(x.accepted) + ' 기사님' : '') + '</button>').join('');
   }
   let scLast = null;
+  /** 노선 변경 안내: '11/11(수)부터 군포1캠프 212AB' (관리자가 예약한 캠프·노선 변경) */
+  function rcNote(r) {
+    const list = (r.routeChanges || []);
+    if (!list.length) return '';
+    const md = (d) => { const p = d.split('-'); return +p[1] + '/' + +p[2] + '(' + '일월화수목금토'[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
+    return list.map((c) => '<div class="card" style="border-left:4px solid var(--brand);padding:12px 14px;margin-bottom:10px;font-size:14px;line-height:1.5">🚚 <b>' + md(c.date) + '부터 ' + escH(c.camp + ' ' + c.route) + '</b>' +
+      (c.done ? '로 바뀌었습니다.' : '로 바뀝니다.') + (c.fromCamp || c.fromRoute ? '<div style="color:var(--sub);font-size:13px">이전: ' + escH((c.fromCamp || '') + ' ' + (c.fromRoute || '')) + '</div>' : '') + '</div>').join('');
+  }
   function renderMonth(r) {
     scLast = r;
     const pdd = pddOf(r.today), [y, m] = r.month.split('-').map(Number);
@@ -1362,7 +1370,7 @@
         (np.length ? '<span class="pmdot">🤝 ' + escH(np.some((x) => x.role === '수행') ? '수행' : np[0].role) + '</span>' : '') +
         (nb ? '<span class="bkdot">백업 ' + nb + '</span>' : '') + '</button>');
     });
-    $('#scBody').innerHTML = '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
+    $('#scBody').innerHTML = rcNote(r) + '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
       '<div class="msum">근무 ' + work + '일 · 휴무 ' + off + '일' + (r.camp ? ' · ' + escH(r.camp) : '') + '</div>' +
       '<div class="mgrid">' + DOWK.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + w + '</div>').join('') + cells.join('') + '</div></div>' +
       '<div class="wk mdet" id="scDet">' + dayRow(r, scSel) + '</div>';
