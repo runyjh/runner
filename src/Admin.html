@@ -233,6 +233,17 @@
   .inssum { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: #f0f6ff; border: 1px solid #c9dbf7; color: #23406b; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
   .inssum b { width: 100%; } .inssum span { background: #fff; border-radius: 8px; padding: 3px 8px; border: 1px solid #dbe7f8; } .inssum em { font-style: normal; font-weight: 800; }
   .inssum .pos em { color: #0a7a3d; } .inssum .neg em { color: var(--danger); }
+  #stPnlTabs .tsep { display: inline-block; width: 1px; height: 22px; background: var(--line); margin: 0 4px; vertical-align: middle; }
+  .fund-dep { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #f0f6ff; border: 1px solid #c9dbf7; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .fund-dep.ok { background: var(--ok-weak); border-color: #bfe6cf; } .fund-dep small { color: var(--sub); margin-left: 6px; }
+  .fund-ctl { display: flex; gap: 8px; align-items: center; } .fund-ctl .inp { height: 34px; width: 150px; } .fund-ctl .check { margin: 0; white-space: nowrap; }
+  table.fund-tbl .inp { height: 32px; } table.fund-tbl .fnum { text-align: right; width: 130px; }
+  table.fund-tbl tr.done td { background: #f3fbf6; } table.fund-tbl tr.rest td { border-top: 2px solid var(--line); }
+  table.fund-tbl tfoot td { font-weight: 700; background: var(--gray-weak); }
+  .bank-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 8px; }
+  .bank-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .bank-card.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); } .bank-card small { color: var(--sub); font-size: 11.5px; }
+  .bank-card em { font-style: normal; font-weight: 800; font-size: 17px; } .bank-card em.neg { color: var(--danger); } .bank-card span { font-size: 11.5px; color: var(--sub); }
   .kpi.clk { cursor: pointer; } .kpi.clk:hover { box-shadow: 0 0 0 2px var(--brand-weak); }
   .pnl-box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; max-width: 860px; }
   .pnl-box h4 { margin: 0 0 8px; font-size: 15px; } .pnl-box h4 small { color: var(--sub); font-weight: 500; font-size: 12px; margin-left: 6px; }
@@ -700,7 +711,7 @@
       <a data-view="route">노선관리</a>
       <a data-view="settle">정산관리</a>
       <a data-view="memo">업무스케줄</a>
-      <a data-view="settle" data-st-go="pnl">러너 손익·운영비</a>
+      <a data-view="settle" data-st-go="pnl">러너 손익·통장</a>
       <a data-view="taxinv">세금계산서 역발행</a>
       <a data-view="bib">배번호 관리</a>
       <a data-view="notice">공지사항</a>
@@ -974,7 +985,7 @@
       <button class="tab" data-st="adjust">공제·가감</button>
       <button class="tab" data-st="tmp">기사별 일시단가</button>
       <button class="tab" data-st="cfg">정산 설정</button>
-      <button class="tab" data-st="pnl">손익·운영비</button>
+      <button class="tab" data-st="pnl">손익·통장</button>
     </div>
     <div id="stp-list">
       <div class="kpis" id="stKpi"></div>
@@ -1001,9 +1012,16 @@
       </div>
       <div class="tabs sub2 hidden" id="stPnlTabs">
         <button class="tab on" data-pnl="pnl">월별 손익</button>
+        <button class="tab" data-pnl="fund">자금배분</button>
+        <button class="tab" data-pnl="bal">통장 잔액</button>
+        <button class="tab" data-pnl="banktx">입·출금 기록</button>
+        <i class="tsep"></i>
         <button class="tab" data-pnl="cost">고정 운영비</button>
         <button class="tab" data-pnl="staff">직원 (원천세)</button>
         <button class="tab" data-pnl="expense">지출 기록</button>
+        <i class="tsep"></i>
+        <button class="tab" data-pnl="banks">통장 목록</button>
+        <button class="tab" data-pnl="alloc">배분 설정</button>
       </div>
       <div class="sub st-help" id="stEditHelp"></div>
       <div id="stPnl" class="hidden"></div>
@@ -5391,6 +5409,33 @@
       ['주의', '러너 잉여(프백·보험 차액·용차)는 회사이익금 안에 이미 있어 <b>더하지 않음</b> · 대표 급여(인출)는 개인사업자 비용이 아니라 <b>빼지 않음</b>'],
       ['바꾸는 곳', '[고정 운영비] 매달 같은 돈 · [직원] 급여·원천세 · [지출 기록] 그 달 실제 지출 — 저장하면 바로 반영 (기사 정산은 다시 계산 안 함)']
     ],
+    fund: [
+      ['하는 일', '쿠팡 입금을 <b>통장별로 나눠 보내기</b> — 항목마다 보낼 통장과 계산 금액이 자동'],
+      ['순서', '① 쿠팡 입금이 들어오면 실제 금액 확인 후 <b>받음</b> ② 항목별로 보내고 <b>이체</b> 체크 → 통장 잔액에 바로 반영'],
+      ['금액', '보낼 금액을 비우면 <b>계산 금액</b> 그대로 · 다르게 보냈으면 그 금액을 넣기 · 유보금 = 쿠팡 입금 − 나머지 합계'],
+      ['바꾸는 곳', '보낼 통장·금액 규칙(종소세 적립률 · 대표 인출) → <b>[배분 설정]</b> · 통장 → <b>[통장 목록]</b>']
+    ],
+    bal: [
+      ['하는 일', '통장별 <b>지금 잔액</b> = 기초잔액 + 들어온 돈 − 나간 돈'],
+      ['자동', '자금배분 <b>받음·이체</b> 체크 · 입금확인에서 체크한 <b>기사 지급</b>(기사정산 통장에서 빠짐)'],
+      ['직접', '부가세·산재 납부, 고정비 결제, 대표 사용처럼 그 밖의 돈은 <b>[입·출금 기록]</b>에'],
+      ['맞추기', '실제 통장과 다르면 [통장 목록]의 <b>기초잔액·기초일</b>을 오늘 실제 잔액으로 맞추기 (기초일 이전 움직임은 안 셈)']
+    ],
+    banktx: [
+      ['하는 일', '자금배분 · 기사 지급 말고 <b>직접 넣는 입·출금</b> (부가세 납부 · 산재고용 납부 · 고정비 결제 · 대표 사용 · 이자 …)'],
+      ['구분', '<b>입금</b> = 입금 통장만 · <b>출금</b> = 출금 통장만 · <b>이체</b> = 둘 다 (통장끼리 옮김)'],
+      ['참고', '정산월은 선택 — 넣으면 그 달 기록으로 묶여 보임']
+    ],
+    banks: [
+      ['하는 일', '러너 <b>통장 목록</b> · 용도로 자동 연결 (쿠팡 입금 = 받는 통장, 기사정산 = 기사 지급이 빠지는 통장)'],
+      ['기초잔액', '<b>기초일</b> 그날의 실제 잔액 · 그 날 이후 움직임만 더하고 뺌'],
+      ['주의', '통장명을 바꾸면 [배분 설정] · [입·출금 기록]의 통장도 같이 바꿔 주세요']
+    ],
+    alloc: [
+      ['하는 일', '자금배분 항목마다 <b>보낼 통장</b>과 <b>금액 규칙</b>'],
+      ['금액 규칙', '<b>빈칸 = 자동</b> (기사 실입금 · 부가세 예상 · 공단 실납부 · 인건비 · 고정비 · 지출) · <code>3000000</code> = 그 금액 · <code>20%</code> = 당기순이익의 20%'],
+      ['예시', '종합소득세 적립 <code>20%</code> · 대표 인출 <code>3000000</code> (비우면 0) · 유보금은 늘 나머지']
+    ],
     cost: [
       ['하는 일', '매달 <b>똑같이 나가는 돈</b> (임대료 · 관리비 · 세무 기장료 · 대표 리스 · 핸드폰 · 차량 · 보험 …)'],
       ['금액', '<b>실제 통장에서 나가는 돈</b> (VAT포함) 그대로 · 증빙이 <b>세금계산서·카드·현금영수증</b>이면 ÷1.1 로 나눠 부가세는 매입세액 공제, 공급가만 손익에'],
@@ -5416,7 +5461,7 @@
       ['주의', '있는 줄의 분류를 바꾸면 마감 안 한 달 계산이 바뀜']
     ]
   };
-  const ST_GTAG = { '계산': 'order', '금액': 'empty', '원천세': 'diff', '귀속월': 'where', '매달 같으면': 'where', '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
+  const ST_GTAG = { '순서': 'order', '자동': 'empty', '직접': 'where', '맞추기': 'diff', '구분': 'empty', '기초잔액': 'empty', '금액 규칙': 'empty', '예시': 'info', '계산': 'order', '금액': 'empty', '원천세': 'diff', '귀속월': 'where', '매달 같으면': 'where', '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
   function paintHelp(name) {
     const el = $('#stEditHelp'), g = ST_GUIDE[name];
     if (!g) { el.className = 'sub st-help'; el.textContent = name === 'migrate' ? '' : ST_HELP[name] || ''; return; }
@@ -5580,11 +5625,82 @@
     STX.pnlT = name; STX.edDirty = false;
     $$('#stPnlTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.pnl === name));
     $('#stMigrate').classList.add('hidden');
-    $('#stPnl').classList.toggle('hidden', name !== 'pnl');
-    $('#stEditor').classList.toggle('hidden', name === 'pnl');
+    const pane = ['pnl', 'fund', 'bal'].includes(name);
+    $('#stPnl').classList.toggle('hidden', !pane);
+    $('#stEditor').classList.toggle('hidden', pane);
     paintHelp(name === 'pnl' ? 'pnlSum' : name);
-    if (name === 'pnl') loadPnl(); else loadEditor(name);
+    if (name === 'pnl') loadPnl(); else if (name === 'fund') loadFund(); else if (name === 'bal') loadBal(); else loadEditor(name);
   }
+  // 자금배분: 쿠팡 입금 → 통장별
+  function loadFund() {
+    const el = $('#stPnl');
+    el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    const seq = STX.fundSeq = (STX.fundSeq || 0) + 1;
+    api('adm_stlFund', STX.month).then((r) => {
+      if (seq !== STX.fundSeq) return;
+      if (!r.ok) { el.innerHTML = ''; return toast(r.msg); }
+      STX.fund = r; renderFund();
+    }).catch(() => {});
+  }
+  function renderFund() {
+    const F = STX.fund; if (!F) return;
+    const d = F.deposit, mt = ymTitle(F.month), bal = {};
+    (F.banks || []).forEach((b) => { bal[b.name] = b.balance; });
+    const today = new Date().toISOString().slice(0, 10);
+    const amtIn = (key, v, ph, dis) => '<input class="inp fnum" data-fk="' + key + '" data-ff="amt" inputmode="numeric" value="' + (v === '' || v == null ? '' : wn(v)) + '" placeholder="' + esc(wn(ph)) + '"' + (dis ? ' disabled' : '') + '>';
+    const dep = '<div class="fund-dep' + (d.done ? ' ok' : '') + '"><div><b>쿠팡 입금</b> <small>' + esc(mt) + ' 정산 · 입금 예정 ' + esc(mdTxt(d.due)) + ' · 받는 통장 ' + esc(d.bank || '(통장 목록에 \'쿠팡 입금\' 용도 통장 없음)') + '</small>' +
+      '<div class="sub" style="font-size:12px">계산 금액 ' + wn(d.plan) + ' = (쿠팡 공급가 − 분실) × 1.1 · 실제로 들어온 금액이 다르면 넣어 주세요</div></div>' +
+      '<div class="fund-ctl">' + amtIn('deposit', d.amt || '', d.plan, d.done) + '<input class="inp" type="date" data-fk="deposit" data-ff="date" value="' + esc(d.date || '') + '"><label class="check"><input type="checkbox" data-fk="deposit" data-ff="done"' + (d.done ? ' checked' : '') + '> 받음</label></div></div>';
+    const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '') + '</div></td>' +
+      '<td>' + (x.bank ? esc(x.bank) + (bal[x.bank] != null ? '<div class="smemo">잔액 ' + wn(bal[x.bank]) + '</div>' : '') : '<span style="color:var(--danger)">통장 없음</span>') + '</td>' +
+      '<td class="n">' + wn(x.plan) + '</td><td class="n">' + amtIn(x.key, x.adj ? x.amt : '', x.plan, x.done) + '</td>' +
+      '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? ' title="받는 통장과 같아 이체할 필요 없음"' : '') + '></td>' +
+      '<td><input class="inp" type="date" data-fk="' + x.key + '" data-ff="date" value="' + esc(x.date || '') + '" style="width:140px"></td>' +
+      '<td><input class="inp" data-fk="' + x.key + '" data-ff="memo" value="' + esc(x.memo || '') + '" style="min-width:140px"></td></tr>';
+    const sent = F.items.filter((x) => x.done).reduce((a, x) => a + x.amt, 0), total = F.items.reduce((a, x) => a + x.amt, 0);
+    const rest = F.items.find((x) => x.key === 'rest') || {};
+    $('#stPnl').innerHTML = dep +
+      (rest.amt < 0 ? '<div class="stw bad" style="margin-bottom:10px">쿠팡 입금보다 배분할 돈이 ' + wn(-rest.amt) + '원 많습니다. 금액을 조정하거나 유보금에서 채워 주세요.</div>' : '') +
+      '<div class="table-wrap"><table class="sttbl fund-tbl"><thead><tr><th>항목</th><th>보낼 통장</th><th class="n">계산 금액</th><th class="n">보낼 금액 <small>(비우면 계산 금액)</small></th><th>이체</th><th>이체일</th><th>메모</th></tr></thead><tbody>' +
+      F.items.map(row).join('') + '</tbody><tfoot><tr><td colspan="3">배분 합계 <small>(이체 완료 ' + wn(sent) + ')</small></td><td class="n"><b>' + wn(total) + '</b></td><td colspan="3" class="sub">쿠팡 입금 ' + wn(F.base) + (d.done ? ' (받음)' : ' (예정)') + '</td></tr></tfoot></table></div>';
+  }
+  $('#stPnl').addEventListener('change', (e) => {
+    const el = e.target.closest('[data-fk]'); if (!el || !STX.fund) return;
+    const key = el.dataset.fk, ff = el.dataset.ff, f = {};
+    if (ff === 'done') f.done = el.checked;
+    else if (ff === 'amt') f.amt = el.value.replace(/[^\d-]/g, '');
+    else f[ff] = el.value;
+    if (ff === 'done' && el.checked) { const box = el.closest('tr, .fund-dep'), a = box && box.querySelector('[data-ff="amt"]'), dt = box && box.querySelector('[data-ff="date"]'); if (a && a.value) f.amt = a.value.replace(/[^\d-]/g, ''); if (dt && dt.value) f.date = dt.value; }
+    el.disabled = true;
+    api('adm_stlFundSave', STX.month, key, f).then((r) => {
+      if (!r.ok) { el.disabled = false; return toast(r.msg); }
+      if (ff === 'done') toast(el.checked ? (key === 'deposit' ? '쿠팡 입금을 받음으로 기록했습니다.' : '이체 완료로 기록했습니다 (통장 잔액에 반영).') : '완료를 취소했습니다.');
+      loadFund();
+    }).catch(() => { el.disabled = false; });
+  });
+  // 통장 잔액
+  function loadBal() {
+    const el = $('#stPnl');
+    el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    api('adm_stlBank').then((r) => { if (!r.ok) { el.innerHTML = ''; return toast(r.msg); } STX.bank = r; renderBal(); }).catch(() => {});
+  }
+  function renderBal() {
+    const B = STX.bank; if (!B) return;
+    const sel = STX.balSel || '';
+    const cards = '<div class="bank-cards">' + B.banks.map((b) => '<div class="bank-card' + (sel === b.name ? ' on' : '') + '" data-bsel="' + esc(b.name) + '"><small>' + esc(b.role || '-') + (b.bankName ? ' · ' + esc(b.bankName) : '') + '</small><b>' + esc(b.name) + '</b><em' + (b.balance < 0 ? ' class="neg"' : '') + '>' + wn(b.balance) + '원</em>' +
+      '<span>기초 ' + wn(b.opening) + (b.openDate ? ' (' + esc(mdTxt(b.openDate)) + ')' : '') + ' · 들어옴 ' + wn(b.inSum) + ' · 나감 ' + wn(b.outSum) + '</span></div>').join('') + '</div>';
+    const total = B.banks.reduce((a, b) => a + b.balance, 0);
+    const mv = B.moves.filter((m) => !sel || m.bank === sel);
+    const tb = '<div class="st-tools" style="margin-top:6px"><b>전체 잔액 ' + wn(total) + '원</b><span class="sub">' + (sel ? esc(sel) + ' 움직임 · <a data-bsel="">전체 보기</a>' : '통장을 누르면 그 통장 움직임만') + '</span></div>' +
+      '<div class="table-wrap"><table class="sttbl" id="balTable"><thead><tr><th>날짜</th><th>통장</th><th>구분</th><th>내용</th><th class="n">들어옴</th><th class="n">나감</th><th class="n">잔액</th></tr></thead><tbody>' +
+      (mv.length ? mv.map((m) => '<tr><td>' + esc(m.date) + '</td><td>' + esc(m.bank) + '</td><td><span class="badge">' + esc(m.kind) + '</span></td><td>' + esc(m.text) + '</td><td class="n">' + (m.amt > 0 ? wn(m.amt) : '') + '</td><td class="n neg">' + (m.amt < 0 ? wn(-m.amt) : '') + '</td><td class="n">' + wn(m.after) + '</td></tr>').join('')
+        : '<tr><td colspan="7" class="sub" style="padding:20px">아직 움직임이 없습니다. 자금배분에서 이체를 체크하거나 입·출금 기록에 넣으면 여기에 쌓입니다.</td></tr>') + '</tbody></table></div>';
+    $('#stPnl').innerHTML = cards + tb;
+  }
+  $('#stPnl').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-bsel]'); if (!c || !STX.bank) return;
+    STX.balSel = STX.balSel === c.dataset.bsel ? '' : c.dataset.bsel; renderBal();
+  });
   function loadPnl() {
     const el = $('#stPnl');
     el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';

@@ -63,6 +63,11 @@ const STL_TABS = {
   stl_cost: { cat: '분류', name: '항목', amt: '월 금액', proof: '증빙', bank: '결제 통장', day: '결제일', from: '시작월', to: '종료월', memo: '메모' },
   stl_staff: { name: '이름', pay: '월 급여', taxRate: '원천세율', day: '지급일', bank: '은행', account: '계좌번호', from: '시작월', to: '종료월', memo: '메모' },
   stl_expense: { month: '귀속월', date: '날짜', cat: '분류', name: '내용', vendor: '거래처', amt: '금액', proof: '증빙', bank: '통장', memo: '메모' },
+  // 통장 · 자금배분: 통장 목록 / 배분 설정(항목마다 보낼 통장·금액 규칙) / 정산월별 배분 기록(이체 체크) / 직접 입·출금 기록
+  stl_bank: { name: '통장명', role: '용도', bankName: '은행', account: '계좌번호', opening: '기초잔액', openDate: '기초일', memo: '메모' },
+  stl_alloc: { label: '항목', bank: '보낼 통장', rule: '금액 규칙', desc: '설명' },
+  stl_fund: { month: '정산월', item: '항목', bank: '통장', plan: '계산 금액', amt: '금액', done: '완료', date: '날짜', memo: '메모' },
+  stl_banktx: { date: '날짜', kind: '구분', from: '출금 통장', to: '입금 통장', amt: '금액', memo: '내용', month: '정산월' },
   stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' }
 };
 const STL_TAB_NOTES = {
@@ -151,9 +156,24 @@ const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
 const STL_CALC_VER = '20261105zI';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
-const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense'];
+const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
-const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1 };
+const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1, stl_bank: 1, stl_alloc: 1, stl_fund: 1, stl_banktx: 1 };
+// 통장 용도 · 기본 통장 (기존 운영시트 통장 8개)
+const STL_BANK_ROLES = ['쿠팡 입금', '기사정산', '부가세', '산재고용', '운영비', '인건비', '대표', '유보금', '기타'];
+const STL_BANK_DEFAULT = [['운영 통장', '쿠팡 입금'], ['기사정산 통장', '기사정산'], ['부가세 통장', '부가세'], ['산재고용 통장', '산재고용'], ['운영고정비 통장', '운영비'], ['인건비 통장', '인건비'], ['대표 통장', '대표'], ['유보금 통장', '유보금']];
+// 자금배분 항목: [키, 항목, 기본 통장 용도, 설명]
+const STL_FUND_ITEMS = [
+  ['driver', '기사정산금', '기사정산', '기사 실입금 합계 (입금확인에서 체크하면 이 통장에서 빠짐) · 지급일'],
+  ['vat', '부가세', '부가세', '부가세 예상 = 매출세액 − 기사 매입세액 − 운영비 매입세액 · 1/25 · 7/25 납부'],
+  ['ins', '산재·고용', '산재고용', '공단 실납부 전체 = 기사 공제분 + 러너 부담분 · 다음 달 10일'],
+  ['staff', '인건비', '인건비', '직원 세전 급여 합계 (실지급 + 원천세)'],
+  ['fixed', '운영 고정비', '운영비', '고정 운영비 (실제 나가는 돈, VAT포함)'],
+  ['var', '변동 지출', '운영비', '지출 기록 (실제 나간 돈, VAT포함)'],
+  ['tax', '종합소득세 적립', '유보금', '당기순이익 × 적립률 · 금액 규칙에 20% 처럼 (비우면 0) · 다음 해 5월'],
+  ['owner', '대표 인출', '대표', '대표가 가져가는 돈 · 금액 규칙에 금액 또는 % (당기순이익 기준, 비우면 0)'],
+  ['rest', '유보금 (나머지)', '유보금', '쿠팡 입금 − 위 항목 합계']
+];
 const STL_COST_CATS = ['사무실', '세무·회계', '차량', '통신', '보험·공과', '이자·수수료', '소모품', '유류비', '수리·정비', '식대·접대', '기타'];
 const STL_PROOFS = ['', '세금계산서', '카드', '현금영수증', '면세·없음'];
 function stlSS_() {
@@ -281,6 +301,8 @@ function stlSeed_(name) {
   if (name === 'stl_items') return STL_ITEM_DEFAULT.map(function (r) { return r.slice(); });
   if (name === 'stl_kinds') return STL_KIND_DEFAULT.map(function (r) { return r.slice(); });
   if (name === 'stl_config') return STL_CFG.map(function (r) { return [r[1], r[2], r[3]]; });
+  if (name === 'stl_bank') return STL_BANK_DEFAULT.map(function (b) { return [b[0], b[1], '', '', '', '', '']; });
+  if (name === 'stl_alloc') return STL_FUND_ITEMS.map(function (f) { const b = STL_BANK_DEFAULT.filter(function (x) { return x[1] === f[2]; })[0]; return [f[1], b ? b[0] : '', '', f[3]]; });
   if (name === 'stl_camps') {
     try { return master_().camps.map(function (c) { return ['캠프', stlShort_(c.name), '', '', '', '', '', '', '', '', '']; }); } catch (e) { return []; }
   }
@@ -1773,7 +1795,7 @@ function stlPnl_(month, sum) {
   const t = (sum && sum.total) || {}, c = (sum && sum.company) || {};
   const o = {
     month: month, closed: !!(sum && sum.closed), hasData: !!(sum && (sum.drivers || []).length),
-    qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: (c.sales || 0) - (c.supplyCp || 0), loss: c.lossCp || 0, progFee: -(c.vendorCut || 0),
+    qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 0.1), loss: c.lossCp || 0, progFee: -(c.vendorCut || 0),
     drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0), surplus: (t.fbKeep || 0) + (t.fbCut || 0) + (t.insGain || 0) + (c.yongGain || 0),
     runnerIns: t.runnerIns || 0, insDrv: (t.san || 0) + (t.goy || 0),
     staff: 0, staffWht: 0, staffNet: 0, staffN: 0, fixed: 0, fixedVat: 0, fixedN: 0, varCost: 0, varVat: 0, varN: 0, byCat: {}
@@ -1814,6 +1836,152 @@ function adm_stlPnl(token, month) {
       return stlPnl_(m, sum);
     });
     return { ok: true, year: y, rows: rows };
+  });
+}
+// ───────────────────────── 통장 · 자금배분 ─────────────────────────
+function stlBanks_() { return stlRead_('stl_bank').filter(function (b) { return b.name; }); }
+/** 배분 설정 줄이 빠져 있으면 채운다 (새 항목이 생겨도) */
+function stlAllocRows_() {
+  const rows = stlRead_('stl_alloc'), have = {};
+  rows.forEach(function (r) { have[r.label] = 1; });
+  const banks = stlBanks_(), miss = STL_FUND_ITEMS.filter(function (f) { return !have[f[1]]; });
+  if (miss.length) {
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      stlAppend_('stl_alloc', miss.map(function (f) { const b = banks.filter(function (x) { return x.role === f[2]; })[0]; return { label: f[1], bank: b ? b.name : '', rule: '', desc: f[3] }; }));
+    } finally { lock.releaseLock(); }
+  }
+  const by = {};
+  stlRead_('stl_alloc').forEach(function (r) { by[r.label] = r; });
+  return by;
+}
+/** 금액 규칙: 비우면 자동값, 3000000 = 그 금액, 20% = base × 20% (base 가 음수면 0) */
+function stlRuleAmt_(rule, auto, base) {
+  const r = str_(rule).replace(/[\s,원]/g, '');
+  if (!r) return auto;
+  if (/%$/.test(r)) return Math.max(0, Math.round(Math.max(0, base) * stlRate_(r, 0)));
+  return stlR0_(stlNum_(r));
+}
+/** 그 정산월 자금배분: 쿠팡 입금 → 항목별 보낼 통장·계산 금액 · 이체 기록 */
+function stlFund_(month) {
+  const res = stlResult_(month, false), sum = res.summary, t = sum.total || {}, c = sum.company || {};
+  const pnl = stlPnl_(month, sum), banks = stlBanks_(), alloc = stlAllocRows_();
+  const roleBank = function (role) { const b = banks.filter(function (x) { return x.role === role; })[0]; return b ? b.name : ''; };
+  const source = roleBank('쿠팡 입금') || (banks[0] ? banks[0].name : '');
+  const rows = {};
+  stlRead_('stl_fund').forEach(function (r) { if (r.month === month) rows[r.item] = r; });
+  const dep = rows['쿠팡 입금'] || {};
+  const depPlan = Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 1.1);
+  const deposit = { plan: depPlan, amt: stlNum_(dep.amt) || 0, done: stlYes_(dep.done), date: dep.date || '', memo: dep.memo || '', due: (sum.dates || {}).coupang || '', bank: source };
+  const auto = {
+    driver: t.net || 0, vat: Math.max(0, pnl.vatDue), ins: (t.san || 0) + (t.goy || 0) + (t.runnerIns || 0), staff: pnl.staff,
+    fixed: pnl.fixed + pnl.fixedVat, var: pnl.varCost + pnl.varVat, tax: 0, owner: 0
+  };
+  const items = [];
+  let used = 0;
+  STL_FUND_ITEMS.forEach(function (f) {
+    if (f[0] === 'rest') return;
+    const a = alloc[f[1]] || {}, r = rows[f[1]] || {};
+    const plan = stlRuleAmt_(a.rule, auto[f[0]], pnl.net);
+    const amt = str_(r.amt) !== '' ? stlNum_(r.amt) : plan;
+    used += amt;
+    items.push({ key: f[0], label: f[1], bank: a.bank || roleBank(f[2]), plan: plan, amt: amt, adj: str_(r.amt) !== '', done: stlYes_(r.done), date: r.date || '', memo: r.memo || '', desc: f[3], rule: a.rule || '' });
+  });
+  const base = deposit.amt || deposit.plan, rr = rows['유보금 (나머지)'] || {}, ra = alloc['유보금 (나머지)'] || {};
+  const restPlan = base - used;
+  items.push({ key: 'rest', label: '유보금 (나머지)', bank: ra.bank || roleBank('유보금'), plan: restPlan, amt: str_(rr.amt) !== '' ? stlNum_(rr.amt) : restPlan, adj: str_(rr.amt) !== '', done: stlYes_(rr.done), date: rr.date || '', memo: rr.memo || '', desc: STL_FUND_ITEMS[STL_FUND_ITEMS.length - 1][3], rule: '' });
+  return { month: month, closed: !!sum.closed, source: source, deposit: deposit, items: items, used: used, base: base, pnlNet: pnl.net, dates: sum.dates || {} };
+}
+/** 통장별 움직임: 기초잔액 · 직접 입출금 · 자금배분 완료 · 입금확인(기사 지급) */
+function stlBankMoves_() {
+  const banks = stlBanks_(), byName = {}, moves = [];
+  banks.forEach(function (b) { byName[b.name] = b; });
+  const openOk = function (bank, date) { const b = byName[bank]; return b && (!b.openDate || !date || stlYmd_(date) >= stlYmd_(b.openDate)); };
+  const add = function (date, bank, amt, text, kind, month) { if (bank && amt && byName[bank] && openOk(bank, date)) moves.push({ date: stlYmd_(date) || '', bank: bank, amt: amt, text: text, kind: kind, month: month || '' }); };
+  stlRead_('stl_banktx').forEach(function (x) {
+    const a = stlNum_(x.amt), m = str_(x.memo) || x.kind;
+    if (x.kind === '입금') add(x.date, x.to, a, m, '입금', x.month);
+    else if (x.kind === '출금') add(x.date, x.from, -a, m, '출금', x.month);
+    else { add(x.date, x.from, -a, m + ' → ' + x.to, '이체', x.month); add(x.date, x.to, a, m + ' ← ' + x.from, '이체', x.month); }
+  });
+  // 자금배분 완료 (쿠팡 입금 받음 · 항목 이체)
+  const fundRows = stlRead_('stl_fund').filter(function (r) { return stlYes_(r.done) && stlNum_(r.amt); });
+  const srcOf = function () { const b = banks.filter(function (x) { return x.role === '쿠팡 입금'; })[0]; return b ? b.name : (banks[0] ? banks[0].name : ''); };
+  const src = srcOf();
+  fundRows.forEach(function (r) {
+    const a = stlNum_(r.amt), mt = Number(String(r.month).slice(5)) + '월 ';
+    if (r.item === '쿠팡 입금') { add(r.date, r.bank || src, a, mt + '쿠팡 입금', '자금배분', r.month); return; }
+    if (!r.bank || r.bank === src) return;
+    add(r.date, src, -a, mt + r.item + ' → ' + r.bank, '자금배분', r.month);
+    add(r.date, r.bank, a, mt + r.item + ' ← ' + src, '자금배분', r.month);
+  });
+  // 입금확인에서 체크한 기사 지급 (기사정산 통장에서 빠짐)
+  const drvBank = (banks.filter(function (x) { return x.role === '기사정산'; })[0] || {}).name || src;
+  const payByMonth = {};
+  stlRead_('stl_pay').forEach(function (p) { if (stlYes_(p.checked)) (payByMonth[p.month] = payByMonth[p.month] || []).push(p); });
+  Object.keys(payByMonth).forEach(function (m) {
+    if (!stlMonthOk_(m)) return;
+    let res = null;
+    try { res = stlResult_(m, false); } catch (e) { res = null; }
+    if (!res) return;
+    const net = {};
+    (res.summary.drivers || []).forEach(function (d) { net[d.id] = d.net; });
+    const byDate = {};
+    payByMonth[m].forEach(function (p) { const k = stlYmd_(p.date) || (res.summary.dates || {}).pay || ''; const v = net[stlLogin_(p.acct)] || 0; if (!v) return; const o = byDate[k] || (byDate[k] = { n: 0, amt: 0 }); o.n++; o.amt += v; });
+    Object.keys(byDate).forEach(function (k) { add(k, drvBank, -byDate[k].amt, Number(m.slice(5)) + '월 기사 정산금 입금 ' + byDate[k].n + '명', '기사 지급', m); });
+  });
+  moves.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  const bal = {};
+  banks.forEach(function (b) { bal[b.name] = { name: b.name, role: b.role, bankName: b.bankName, account: b.account, opening: stlNum_(b.opening), openDate: b.openDate || '', balance: stlNum_(b.opening), inSum: 0, outSum: 0 }; });
+  moves.forEach(function (m) { const x = bal[m.bank]; x.balance += m.amt; if (m.amt > 0) x.inSum += m.amt; else x.outSum -= m.amt; m.after = x.balance; });
+  return { banks: banks.map(function (b) { return bal[b.name]; }), moves: moves };
+}
+function adm_stlFund(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const f = stlFund_(month), b = stlBankMoves_();
+    f.banks = b.banks;
+    return Object.assign({ ok: true }, f);
+  });
+}
+/** 자금배분 한 줄 저장: key = 'deposit' 또는 항목 키, f = { amt, done, date, memo } (amt '' = 계산 금액 그대로) */
+function adm_stlFundSave(token, month, key, f) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    f = f || {};
+    const it = key === 'deposit' ? ['deposit', '쿠팡 입금'] : STL_FUND_ITEMS.filter(function (x) { return x[0] === key; })[0];
+    if (!it) fail_('알 수 없는 항목입니다.');
+    const cur = stlFund_(month);
+    const plan = key === 'deposit' ? cur.deposit.plan : cur.items.filter(function (x) { return x.key === key; })[0].plan;
+    const bank = key === 'deposit' ? cur.source : cur.items.filter(function (x) { return x.key === key; })[0].bank;
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const rows = stlRead_('stl_fund'), hit = rows.filter(function (r) { return r.month === month && r.item === it[1]; })[0];
+      const o = hit ? Object.assign({}, hit) : { month: month, item: it[1] };
+      if (f.amt !== undefined) { const v = str_(f.amt).replace(/[\s,원]/g, ''); if (v && !/^-?\d+$/.test(v)) fail_('금액은 숫자로 넣어 주세요.'); o.amt = v; }
+      if (f.memo !== undefined) o.memo = str_(f.memo).slice(0, 200);
+      if (f.date !== undefined) o.date = f.date ? stlYmd_(f.date) : '';
+      if (f.done !== undefined) {
+        o.done = f.done ? 'Y' : '';
+        if (f.done) { if (!str_(o.amt)) o.amt = String(plan); if (!o.date) o.date = todayText_(); if (!bank) fail_('보낼 통장이 없습니다. 배분 설정에서 통장을 골라 주세요.'); }
+        else o.date = f.date ? stlYmd_(f.date) : '';
+      }
+      o.bank = bank; o.plan = String(plan);
+      if (hit) stlSetRow_('stl_fund', hit._row, o); else stlAppend_('stl_fund', [o]);
+      if (f.done !== undefined) logAdmin_(a, '자금배분 ' + (f.done ? '완료' : '취소'), month + ' ' + it[1], won_(stlNum_(o.amt)) + '원 → ' + bank);
+    } finally { lock.releaseLock(); }
+    return { ok: true };
+  });
+}
+function adm_stlBank(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const b = stlBankMoves_();
+    return { ok: true, banks: b.banks, moves: b.moves.slice(-1000).reverse() };
   });
 }
 function stlMonths_() {
@@ -2115,6 +2283,9 @@ const STL_EDIT = {
   // 러너 손익·운영비
   cost: { sheet: 'stl_cost', scope: 'all', cols: [['cat', '분류', [''].concat(STL_COST_CATS)], ['name', '항목', 'text'], ['amt', '월 금액 (실제 나가는 돈 · VAT포함)', 'money'], ['proof', '증빙 (비우면 부가세 없음)', STL_PROOFS], ['bank', '결제 통장', 'text'], ['day', '결제일', 'text'], ['from', '시작월', 'month'], ['to', '종료월 (비우면 계속)', 'month'], ['memo', '메모', 'text']] },
   staff: { sheet: 'stl_staff', scope: 'all', cols: [['name', '이름', 'text'], ['pay', '월 급여 (세전)', 'money'], ['taxRate', '원천세율 (비우면 3.3%)', 'text'], ['day', '지급일', 'text'], ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['from', '시작월', 'month'], ['to', '종료월 (비우면 계속)', 'month'], ['memo', '메모', 'text']] },
+  banks: { sheet: 'stl_bank', scope: 'all', cols: [['name', '통장명', 'text'], ['role', '용도', [''].concat(STL_BANK_ROLES)], ['bankName', '은행', 'text'], ['account', '계좌번호', 'text'], ['opening', '기초잔액', 'money'], ['openDate', '기초일 (이 날 잔액)', 'date'], ['memo', '메모', 'text']] },
+  alloc: { sheet: 'stl_alloc', scope: 'all', fixed: true, cols: [['label', '항목', 'readonly'], ['bank', '보낼 통장', 'bank'], ['rule', '금액 규칙 (비우면 자동)', 'text'], ['desc', '설명', 'readonly']] },
+  banktx: { sheet: 'stl_banktx', scope: 'all', cols: [['date', '날짜', 'date'], ['kind', '구분', ['입금', '출금', '이체']], ['from', '출금 통장', 'bank'], ['to', '입금 통장', 'bank'], ['amt', '금액', 'money'], ['memo', '내용', 'text'], ['month', '정산월 (선택)', 'month']] },
   expense: { sheet: 'stl_expense', scope: 'month', cols: [['date', '날짜', 'date'], ['cat', '분류', [''].concat(STL_COST_CATS)], ['name', '내용', 'text'], ['vendor', '거래처', 'text'], ['amt', '금액 (VAT포함)', 'money'], ['proof', '증빙 (비우면 부가세 없음)', STL_PROOFS], ['bank', '통장', 'text'], ['memo', '메모', 'text']] }
 };
 /** 빈 칸에 흐리게 보여 줄 기본값 (예: 기본 34.6%) */
@@ -2135,6 +2306,11 @@ function stlEditRows_(name, month) {
   if (name === 'config') {
     const ord = {};
     STL_CFG.forEach(function (d, i) { ord[d[1]] = i; });
+    rows = rows.filter(function (r) { return r.label in ord; }).sort(function (a, b) { return ord[a.label] - ord[b.label]; });
+  }
+  if (name === 'alloc') {
+    const ord = {};
+    STL_FUND_ITEMS.forEach(function (f, i) { ord[f[1]] = i; });
     rows = rows.filter(function (r) { return r.label in ord; }).sort(function (a, b) { return ord[a.label] - ord[b.label]; });
   }
   // 캠프 및 기사별 산재·고용: 캠프 줄 먼저, 그다음 기사 줄 (각각 시트 순서)
@@ -2159,6 +2335,7 @@ function stlTableView_(name, month) {
     if (!E) fail_('알 수 없는 표입니다.');
     if (E.scope !== 'all' && !stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     if (name === 'config') stlCfg_();
+    if (name === 'alloc') stlAllocRows_();
     const D = stlDrivers_(), X = stlIds_(D);
     const rows = stlEditRows_(name, month);
     const accts = Object.keys(X.groups).map(function (k) { return { id: k, label: stlAcctLabel_(X, D, k), stopped: X.groups[k].main.stopped }; })
@@ -2197,6 +2374,7 @@ function stlTableView_(name, month) {
     return {
       ok: true, name: name, month: month, cols: E.cols.map(function (c) {
         if (c[2] === 'vendor') return { k: c[0], label: c[1], type: 'select', opts: [''].concat(X.vendors.list.map(function (v) { return v.name; })), idk: '' };
+        if (c[2] === 'bank') return { k: c[0], label: c[1], type: 'select', opts: [''].concat(stlBanks_().map(function (b) { return b.name; })), idk: '' };
         return { k: c[0], label: c[1], type: Array.isArray(c[2]) ? 'select' : c[2], opts: Array.isArray(c[2]) ? c[2] : null, idk: c[3] || '', when: c[4] || '', ph: stlColPh_(name, c[0]) };
       }), calcSum: calcSum,
       rows: rows.map(function (r) {
@@ -2263,6 +2441,34 @@ function adm_stlTableSave(token, name, month, rows, seen) {
       if (E.scope === 'date' && o.date && stlMonthOfDate_(o.date) !== month) fail_((i + 1) + '번째 줄 날짜가 ' + month + ' 정산기간(' + stlPeriod_(month).from + ' ~ ' + stlPeriod_(month).to + ') 밖입니다.');
       return o;
     }).filter(function (o) { return E.cols.some(function (c) { return c[2] !== 'readonly' && o[c[0]]; }) || E.fixed; });
+    if (E.cols.some(function (c) { return c[2] === 'bank'; })) {
+      const names = {};
+      stlBanks_().forEach(function (b) { names[b.name] = 1; });
+      clean.forEach(function (o, i) { E.cols.forEach(function (c) { if (c[2] === 'bank' && o[c[0]] && !names[o[c[0]]]) fail_((i + 1) + '번째 줄: 통장 "' + o[c[0]] + '" 이(가) 통장 목록에 없습니다.'); }); });
+    }
+    if (name === 'banks') {
+      const seen = {};
+      clean = clean.filter(function (o) { return o.name; });
+      clean.forEach(function (o) { if (seen[o.name]) fail_('통장명 ' + o.name + ' 이(가) 두 번 있습니다.'); seen[o.name] = 1; });
+      if (!clean.length) fail_('통장을 하나 이상 넣어 주세요.');
+    }
+    if (name === 'banktx') {
+      clean.forEach(function (o, i) {
+        const n = (i + 1) + '번째 줄: ';
+        if (!o.date) fail_(n + '날짜를 넣어 주세요.');
+        if (!(stlNum_(o.amt) > 0)) fail_(n + '금액을 넣어 주세요.');
+        if (!o.kind) o.kind = o.from && o.to ? '이체' : o.from ? '출금' : '입금';
+        if (o.kind === '입금') { if (!o.to) fail_(n + '입금은 입금 통장을 골라 주세요.'); o.from = ''; }
+        if (o.kind === '출금') { if (!o.from) fail_(n + '출금은 출금 통장을 골라 주세요.'); o.to = ''; }
+        if (o.kind === '이체' && (!o.from || !o.to || o.from === o.to)) fail_(n + '이체는 서로 다른 출금·입금 통장을 골라 주세요.');
+      });
+    }
+    if (name === 'alloc') {
+      clean.forEach(function (o) {
+        const r = str_(o.rule).replace(/[\s,원]/g, '');
+        if (r && !/^\d+(\.\d+)?%?$/.test(r)) fail_(o.label + ': 금액 규칙은 비우거나 3000000 · 20% 처럼 넣어 주세요.');
+      });
+    }
     if (name === 'yongcha') {
       clean.forEach(function (o, i) {
         if (!stlNum_(o.vendorPay)) return;
@@ -2334,9 +2540,9 @@ function adm_stlTableSave(token, name, month, rows, seen) {
       let out;
       if (E.fixed) {
         // 설정: 값만 바꾼다
-        const by = {};
-        clean.forEach(function (o) { by[o.label] = o.value; });
-        out = stlRead_(E.sheet).map(function (r) { const o = Object.assign({}, r); if (o.label in by) o.value = by[o.label]; return o; });
+        const by = {}, ed = E.cols.filter(function (c) { return c[2] !== 'readonly' && c[0] !== 'label'; }).map(function (c) { return c[0]; });
+        clean.forEach(function (o) { by[o.label] = o; });
+        out = stlRead_(E.sheet).map(function (r) { const o = Object.assign({}, r); if (o.label in by) ed.forEach(function (k) { o[k] = by[o.label][k]; }); return o; });
       } else {
         const all = stlRead_(E.sheet);
         const keep = E.scope === 'all' ? [] : all.filter(function (r) { return E.scope === 'month' ? r.month !== month : stlMonthOfDate_(r.date) !== month; });
