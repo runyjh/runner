@@ -46,7 +46,7 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
-  id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일',
+  id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
   driverType: '기사구분', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
@@ -69,7 +69,7 @@ const D = {
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
-  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate'];
+  'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2'];
 // 기사구분 = 단가 코드 (고정/백업/품앗이/외부용차 → 노선관리 기사단가/백업단가/품앗이단가/외부단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -99,6 +99,8 @@ const D_NOTES = {
   schCamp: '스케줄에서 이 기사가 속한 캠프. camps 탭의 캠프명과 같게 쓰면 소속캠프ID가 자동으로 채워집니다.',
   baseRoute: '평소 맡는 노선. 예: 527B, 530AB (F3), 404D,405AB. 백업 기사는 백업, 용차는 용차',
   fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
+  subId1: '이 기사가 쓰는 다른 쿠팡플렉스 아이디 (서브). 넣으면 그 아이디로 가입한 기사는 앱 사용만 정지되고, 정산관리 아이디 관리에 서브로 연결됩니다',
+  subId2: '두 번째 서브아이디',
   workStatus: '재직(빈칸) / 휴직 / 퇴사. 기사 앱 사용(상태 칸)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐',
   leaveDate: '마지막 근무일 (yyyy-mm-dd). 근무상태가 퇴사일 때만 씀',
   backupArea: '백업으로 들어갈 수 있는 곳. 전지역 또는 캠프 이름(예: 강서1,수원1). 기사스케줄 백업 추천에 사용',
@@ -1626,7 +1628,7 @@ const D_EDIT_LABEL = {
   maxLoad: '최대적재량', carNo: '차량번호', bankName: '은행명', accountHolder: '예금주', memo: '관리자 메모',
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
   schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
-  schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일'
+  schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
 
@@ -1639,7 +1641,7 @@ function docsOf_(o) {
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
-    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
+    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', subId1: o.subId1 || '', subId2: o.subId2 || '', schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
@@ -1684,6 +1686,12 @@ function adm_listDrivers(token) {
       counts.all++;
       if (counts[o.status] !== undefined) counts[o.status]++;
     });
+    // 기사코드: 비어 있으면 자동으로 (R001, R002 … 가입 순서, 한 번 정하면 그대로)
+    if (list.some(function (r) { return !r.driverCode; })) { try { fillDriverCodes_(); list.forEach(function (r) { if (!r.driverCode) { const x = driverById_(r.id); if (x) r.driverCode = x.driverCode; } }); } catch (e) { console.error('기사코드 자동 채우기 실패: ' + e); } }
+    // 서브아이디: 다른 기사의 서브로 등록된 아이디면 표시
+    const subOf = {};
+    list.forEach(function (r) { [r.subId1, r.subId2].forEach(function (x) { if (x) subOf[String(x).toLowerCase()] = r.name; }); });
+    list.forEach(function (r) { if (r.loginId && subOf[String(r.loginId).toLowerCase()]) r.subOf = subOf[String(r.loginId).toLowerCase()]; });
     list.sort(function (p, q) { return p.createdAt < q.createdAt ? 1 : p.createdAt > q.createdAt ? -1 : 0; });
     return { ok: true, rows: list, counts: counts, repaired: repaired };
   });
@@ -1822,7 +1830,8 @@ function adm_updateDriver(token, id, changes, seenRev) {
         (f.status ? ' → ' + f.status : ''));
       const fresh = readObj_(SH.DRIVERS, o._row);
       if (typeof stlEnsureIdFor_ === 'function' && (f.loginId !== undefined || f.name !== undefined)) stlEnsureIdFor_(fresh); // 아이디 관리 연동
-      return { ok: true, driver: detailOf_(fresh) };
+      const subMsg = (f.subId1 !== undefined || f.subId2 !== undefined || f.loginId !== undefined) ? drvLinkSubs_(a, fresh, [o.subId1, o.subId2]) : [];
+      return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, o._row)), subMsg: subMsg };
     } finally {
       lock.releaseLock();
     }
@@ -1920,6 +1929,20 @@ function driverFields_(changes, o) {
       case 'workPattern': f.workPattern = opt(v, '근무형태', 30); break;
       case 'schMemo': f.schMemo = opt(v, '스케줄 메모', 500); break;
       case 'backupArea': f.backupArea = normBackupArea_(opt(v, '백업 범위', 100)); break;
+      case 'subId1': case 'subId2': {
+        const sid = str_(v).replace(/\s+/g, '');
+        if (sid && !/^[A-Za-z0-9_.@-]{3,40}$/.test(sid)) fail_('서브아이디는 쿠팡플렉스 아이디(영문·숫자)로 써 주세요.');
+        const mine = str_(changes.loginId !== undefined ? changes.loginId : o.loginId).toLowerCase();
+        if (sid && sid.toLowerCase() === mine) fail_('서브아이디가 이 기사의 쿠팡플렉스 아이디와 같습니다.');
+        const other = k === 'subId1' ? (changes.subId2 !== undefined ? changes.subId2 : o.subId2) : (changes.subId1 !== undefined ? changes.subId1 : o.subId1);
+        if (sid && str_(other).toLowerCase() === sid.toLowerCase()) fail_('서브아이디1과 2가 같습니다.');
+        if (sid) {
+          const dup = readAll_(SH.DRIVERS).filter(function (x) { return x.id !== o.id && [x.subId1, x.subId2].some(function (y) { return str_(y).toLowerCase() === sid.toLowerCase(); }); })[0];
+          if (dup) fail_(sid + ' 는 이미 ' + dup.name + ' 기사님의 서브아이디입니다.');
+        }
+        f[k] = sid;
+        break;
+      }
       case 'workStatus':
         f.workStatus = str_(v);
         if (f.workStatus && WSTAT.indexOf(f.workStatus) < 0) fail_('근무상태는 ' + WSTAT.join(' / ') + ' 중에서 골라 주세요.');
@@ -1990,6 +2013,7 @@ function adm_createDriver(token, fields, tempPw) {
       const r = driverFields_(fields, { _row: -1, loginId: '', approvedAt: '' });
       const now = nowText_();
       const row = Object.assign({ id: newDriverId_(), createdAt: now, updatedAt: now }, r.f);
+      if (!row.driverCode) row.driverCode = nextDriverCode_();
       if (row.status === ST.ACTIVE) row.approvedAt = now;
       if (pw) { Object.assign(row, passwordFields_(pw)); row.pwMustChange = 'Y'; }
       const at = appendObj_(SH.DRIVERS, row);
@@ -1997,7 +2021,8 @@ function adm_createDriver(token, fields, tempPw) {
       logAdmin_(a, '기사 등록', row.name + ' (' + row.id + ')', [row.driverType, row.driverCode].filter(String).join(' ') + (pw ? ', 임시 비밀번호 지정' : ''));
       const made = readObj_(SH.DRIVERS, at);
       if (typeof stlEnsureIdFor_ === 'function') stlEnsureIdFor_(made); // 정산관리 아이디 관리에도 추가
-      return { ok: true, driver: detailOf_(made) };
+      const subMsg = made.subId1 || made.subId2 ? drvLinkSubs_(a, made, []) : [];
+      return { ok: true, driver: detailOf_(readObj_(SH.DRIVERS, at)), subMsg: subMsg };
     } finally {
       lock.releaseLock();
     }
@@ -5151,6 +5176,70 @@ function adm_schYear(token, year) {
       cols: hg.myeong.map(function (g) { return { key: g.key, kind: g.kind, dates: g.dates, names: g.dates.map(function (d) { return HOLIDAYS[d]; }) }; }),
       holidays: hg.other.map(function (d) { return { date: d, name: HOLIDAYS[d] }; }), rows: rows };
   });
+}
+
+/** 기사코드 자동: R + 세 자리 (가장 큰 번호 다음) */
+function nextDriverCode_() {
+  let max = 0;
+  readAll_(SH.DRIVERS).forEach(function (x) { const m = str_(x.driverCode).match(/^R(\d+)$/i); if (m && +m[1] > max) max = +m[1]; });
+  return 'R' + ('00' + (max + 1)).slice(-3);
+}
+/** 기사코드가 빈 기사에게 가입 순서대로 번호를 준다 (잠금 안) */
+function fillDriverCodes_() {
+  const lock = scriptLock_();
+  if (!lock.tryLock(5000)) return;
+  try {
+    const all = readAll_(SH.DRIVERS).filter(function (x) { return x.id && x.name; });
+    let max = 0;
+    all.forEach(function (x) { const m = str_(x.driverCode).match(/^R(\d+)$/i); if (m && +m[1] > max) max = +m[1]; });
+    all.filter(function (x) { return !str_(x.driverCode); }).sort(function (p, q) { return str_(p.createdAt) < str_(q.createdAt) ? -1 : str_(p.createdAt) > str_(q.createdAt) ? 1 : 0; })
+      .forEach(function (x) { max++; writeFields_(SH.DRIVERS, x._row, { driverCode: 'R' + ('00' + max).slice(-3) }); forgetDriver_(x); });
+  } finally { lock.releaseLock(); }
+}
+/**
+ * 서브아이디 연동: 메인 기사(o)의 서브아이디1·2
+ *  - 그 아이디로 가입한 기사가 있으면 기사 앱 사용만 '정지' (근무·정산은 그대로)
+ *  - 정산관리 아이디 관리: 그 아이디를 '서브', 메인 = 이 기사의 쿠팡플렉스 아이디 (없으면 새 줄)
+ *  - 빠진 서브아이디(전에 있었는데 지운 것)는 아이디 관리에서 메인으로 되돌린다
+ * 반환: 화면에 보여 줄 안내 글
+ */
+function drvLinkSubs_(a, o, before) {
+  const msg = [];
+  try {
+    const subs = [o.subId1, o.subId2].map(str_).filter(Boolean);
+    const gone = (before || []).map(str_).filter(Boolean).filter(function (x) { return subs.map(function (y) { return y.toLowerCase(); }).indexOf(x.toLowerCase()) < 0; });
+    const all = readAll_(SH.DRIVERS);
+    subs.forEach(function (sid) {
+      const d = all.filter(function (x) { return x.id !== o.id && str_(x.loginId).toLowerCase() === sid.toLowerCase(); })[0];
+      if (d && d.status !== ST.STOPPED) {
+        writeFields_(SH.DRIVERS, d._row, { status: ST.STOPPED, updatedAt: nowText_() });
+        forgetDriver_(d);
+        logAdmin_(a, '서브아이디 연동', d.name + ' (' + d.id + ')', o.name + ' 기사님의 서브 → 기사 앱 사용 정지');
+        msg.push(d.name + '(' + sid + ') 기사 앱 사용을 정지했습니다 (서브아이디)');
+      }
+    });
+    if (typeof stlRead_ === 'function' && props_().STL_DB_ID && o.loginId) {
+      const rows = stlRead_('stl_ids');
+      let bump = false;
+      subs.forEach(function (sid) {
+        const k = stlLogin_(sid), r = rows.filter(function (x) { return stlLogin_(x.cid) === k; })[0];
+        const d = all.filter(function (x) { return str_(x.loginId).toLowerCase() === sid.toLowerCase(); })[0];
+        if (r) {
+          if (r.role !== '서브' || stlLogin_(r.main) !== stlLogin_(o.loginId)) { stlSetRow_('stl_ids', r._row, { role: '서브', main: o.loginId }); bump = true; msg.push('정산 아이디 관리: ' + sid + ' → ' + o.loginId + ' 의 서브'); }
+        } else {
+          stlAppend_('stl_ids', [{ cid: sid, role: '서브', main: o.loginId, owner: d ? d.name : o.name, ownerId: d ? d.id : o.id,
+            type: STL_TYPES.indexOf(o.driverType) >= 0 ? o.driverType : '', mode: '', insEx: '', fbCut: '', status: '사용', memo: '기사 정보관리 서브아이디' }]);
+          bump = true; msg.push('정산 아이디 관리에 ' + sid + ' (서브) 추가');
+        }
+      });
+      gone.forEach(function (sid) {
+        const k = stlLogin_(sid), r = rows.filter(function (x) { return stlLogin_(x.cid) === k; })[0];
+        if (r && r.role === '서브' && stlLogin_(r.main) === stlLogin_(o.loginId)) { stlSetRow_('stl_ids', r._row, { role: '메인', main: '' }); bump = true; msg.push('정산 아이디 관리: ' + sid + ' 서브 해제 (메인으로)'); }
+      });
+      if (bump) stlBump_();
+    }
+  } catch (e) { console.error('서브아이디 연동 실패: ' + (e && e.message)); msg.push('서브아이디 연동 중 오류: ' + (e && e.message)); }
+  return msg;
 }
 
 /** 백업 범위: '전지역' 또는 캠프 짧은 이름 목록 ('강서1캠프, 수원1' → '강서1,수원1') */

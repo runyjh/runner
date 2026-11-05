@@ -623,6 +623,8 @@
   .smenu small { display: block; color: var(--faint); font-size: 11px; }
   .smenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .sg td.c.rcoff.left { background: repeating-linear-gradient(135deg, #f2f4f6 0 6px, #e5e8eb 6px 7px); }
+  .sublink { display: block; font-size: 11.5px; color: var(--sub); margin-top: 4px; }
+  .badge.subb { background: #eef0f3; color: #4e5968; }
   .badge.ws-퇴사 { background: #6b7684; color: #fff; } .badge.ws-휴직 { background: #fdf3e2; color: #a15c07; }
   .rcb.lv { background: #6b7684 !important; color: #fff !important; }
   .sg td.c.rulex { outline: 2px dashed #8b5cf6; outline-offset: -3px; }
@@ -837,7 +839,7 @@
     <div class="head">
       <h2>기사 정보관리</h2>
       <div class="tools">
-        <input class="inp search" id="q" placeholder="이름, 기사코드, 아이디, 연락처, 차량 검색">
+        <input class="inp search" id="q" placeholder="이름, 아이디·서브아이디, 연락처, 차량 검색">
         <button class="btn ghost" id="reloadBtn" title="시트의 최신 내용 불러오기">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="drivers">데이터 초기화</button>
         <button class="btn" id="drvNew">+ 새 기사 등록</button>
@@ -849,7 +851,7 @@
     <div class="rbulk hidden" id="dBulk"></div>
     <div class="table-wrap">
       <table>
-        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="title">직함</th><th class="dsrt" data-ds="driverType">기사구분</th><th class="dsrt" data-ds="driverCode">기사코드</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status" title="기사 앱 로그인 허용 여부">앱 사용</th><th class="dsrt" data-ds="workStatus">근무상태</th><th class="dsrt" data-ds="leaveDate">퇴사일</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
+        <thead id="dHead"><tr><th class="ck"><input type="checkbox" id="dAll" aria-label="보이는 기사 모두 선택"></th><th class="dsrt" data-ds="name">이름</th><th class="dsrt" data-ds="title">직급</th><th class="dsrt" data-ds="driverType">기사단가</th><th class="dsrt" data-ds="subId1">서브아이디</th><th class="dsrt" data-ds="camp">배정 캠프 · 라우트</th><th class="dsrt" data-ds="loginId">쿠팡플렉스 아이디</th><th class="dsrt" data-ds="phone">연락처</th><th class="dsrt" data-ds="status" title="기사 앱 로그인 허용 여부">앱 사용</th><th class="dsrt" data-ds="workStatus">근무상태</th><th class="dsrt" data-ds="leaveDate">퇴사일</th><th class="dsrt" data-ds="carNo">차량</th><th class="dsrt" data-ds="docs">서류</th><th class="dsrt" data-ds="createdAt">가입일</th><th>비고</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="empty hidden" id="empty"></div>
@@ -1792,7 +1794,7 @@
       if (!q && tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
       if (!q && wfilter && (r.workStatus || '재직') !== wfilter) return false;
       if (!q) return true;
-      return [r.name, r.driverCode, r.loginId, r.carName, r.carNo, r.schCamp, r.baseRoute, r.phone].some((v) => nfc(v).indexOf(q) >= 0) ||
+      return [r.name, r.driverCode, r.loginId, r.subId1, r.subId2, r.carName, r.carNo, r.schCamp, r.baseRoute, r.phone].some((v) => nfc(v).indexOf(q) >= 0) ||
         (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
     });
     if (dsort.k && dsort.d) {
@@ -1815,10 +1817,10 @@
       const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw && r.loginId ? '<span class="tag">비밀번호 없음</span>' : '') + (!r.loginId ? '<span class="tag gray">앱 미사용</span>' : '');
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
         '<td class="ck"><input type="checkbox" data-dck="' + esc(r.id) + '"' + (dsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
-        '<td><b>' + esc(r.name) + '</b></td>' +
-        '<td>' + (r.title ? '<span class="badge t-' + esc(r.title) + '">' + esc(r.title) + '</span>' : '<span class="sub">-</span>') + '</td>' +
+        '<td><b>' + esc(r.name) + '</b>' + (r.subOf ? ' <span class="badge subb" title="' + esc(r.subOf) + ' 기사님의 서브아이디">' + esc(r.subOf) + '의 서브</span>' : '') + '</td>' +
+        '<td>' + (r.title ? '<span class="badge t-' + esc(r.title) + '">' + esc(r.title) + '</span>' : '<span class="sub">기사</span>') + '</td>' +
         '<td>' + (r.driverType ? '<span class="badge t-' + esc(r.driverType) + '">' + esc(r.driverType) + '</span>' : '<span class="badge t-none">미지정</span>') + '</td>' +
-        '<td><b class="code">' + esc(r.driverCode) + '</b></td>' +
+        '<td class="sub">' + esc([r.subId1, r.subId2].filter(Boolean).join(', ')) + '</td>' +
         '<td>' + (r.schCamp || r.baseRoute ? esc(String(r.schCamp || '').replace(/\s*캠프$/, '')) + (r.baseRoute ? ' · <b class="code">' + esc(r.baseRoute) + '</b>' : '') : '<span class="sub">미배정</span>') + '</td>' +
         '<td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
         '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
@@ -1923,7 +1925,7 @@
       '<div class="sec"><h4>기사 앱 사용 <small class="sub" style="font-weight:500">— 앱 로그인 허용 여부 (근무와 별개)</small></h4><div class="status-row">' +
         STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
       '</div></div>' + workSec(d) +
-      typeSec(d) + assignSec() +
+      typeSec(d) + rankSec(d) + assignSec() +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디 (앱 로그인용)', d.loginId) +
         fld('phone', '연락처', d.phone) + '<div class="field"><label class="lb">생년월일 (주민번호에서 자동)</label><input class="inp" value="' + esc(d.birthDate) + '" readonly></div>' +
@@ -2095,14 +2097,25 @@
       '<div class="field" id="wsLeave" style="margin:0;max-width:240px' + (ws === '퇴사' ? '' : ';display:none') + '"><label class="lb">퇴사일 (마지막 근무일)</label><input class="inp" type="date" data-k="leaveDate" value="' + esc(d.leaveDate || '') + '"></div></div>';
   }
   /** 기사구분 버튼 + 기사코드 + 직함 (상세·등록 공용) */
+  /** 기사단가 코드 (고정·백업·품앗이·외부용차) + 서브아이디 1·2 (상세·등록 공용). 기사코드는 자동 (화면에 안 보임) */
   function typeSec(d) {
-    return '<div class="sec"><h4>기사구분 · 기사코드 · 직함' + (d.isNew ? '<span class="req">*</span>' : '') + '</h4><div class="status-row" style="margin-bottom:12px">' +
+    const link = (sid) => {
+      if (!sid) return '';
+      const x = all.find((r) => String(r.loginId || '').toLowerCase() === String(sid).toLowerCase() && r.id !== d.id);
+      return x ? '<small class="sublink">↳ ' + esc(x.name) + ' 님 가입 아이디 · 기사 앱 ' + esc(x.status) + (x.status === '정지' ? '' : ' (저장하면 정지)') + '</small>' : '<small class="sublink">↳ 가입한 기사 없음 · 정산 아이디 관리에만 서브로 연결</small>';
+    };
+    const subIn = (k, label) => '<div class="field"><label class="lb">' + label + '</label><input class="inp" data-k="' + k + '" value="' + esc(d[k] || '') + '" autocomplete="off" spellcheck="false" placeholder="쿠팡플렉스 아이디">' + link(d[k]) + '</div>';
+    const subOf = !d.isNew && d.loginId ? all.find((r) => r.id !== d.id && [r.subId1, r.subId2].some((x) => String(x || '').toLowerCase() === String(d.loginId).toLowerCase())) : null;
+    return '<div class="sec"><h4>기사단가 코드' + (d.isNew ? '<span class="req">*</span>' : '') + ' <small class="sub" style="font-weight:500">— 노선관리 단가 (고정 = 기사단가 · 백업 = 백업단가 …)</small></h4><div class="status-row" style="margin-bottom:12px">' +
       DTYPES.map((t) => '<button type="button" class="st' + (t === d.driverType ? ' on' : '') + '" data-dt="' + t + '">' + t + '</button>').join('') + '</div>' +
-      '<div class="field" style="margin:0"><label class="lb">기사코드 (기사마다 겹치지 않게)</label><div class="code-row">' +
-      '<input class="inp code-inp" data-k="driverCode" value="' + esc(d.driverCode || '') + '" maxlength="20" autocomplete="off" spellcheck="false" placeholder="직접 입력">' +
-      '<button type="button" class="btn sm ghost" data-autocode style="height:40px">자동</button></div></div>' +
-      '<div class="field" style="margin:12px 0 0"><label class="lb">직함 — 단가와 무관한 러너 내부 직책 (대신 뛴 건은 기사 정산서에 이름 숨김 · 앞으로 권한 부여용)</label><div class="status-row" style="margin:0">' +
-      [''].concat(TITLES).map((t) => '<button type="button" class="st' + (t === (d.title || '') ? ' on' : '') + '" data-ttl="' + t + '">' + (t || '없음') + '</button>').join('') + '</div></div></div>';
+      (subOf ? '<div class="warnbox" style="margin:0 0 10px">이 아이디는 <b>' + esc(subOf.name) + '</b> 기사님의 서브아이디입니다 · 기사 앱 사용은 정지로 둡니다.</div>' : '') +
+      '<div class="grid2">' + subIn('subId1', '서브아이디 1') + subIn('subId2', '서브아이디 2') + '</div>' +
+      '<p class="sub" style="font-size:12px;margin:6px 0 0">서브아이디를 넣고 저장하면: 그 아이디로 가입한 기사는 <b>기사 앱 사용만 정지</b> (근무·정산은 그대로), 정산관리 아이디 관리에 <b>서브 (메인 = 이 기사)</b>로 연결됩니다.</p></div>';
+  }
+  /** 직급: 기사(빈칸) · 관리자 · 운영자 · 대표 */
+  function rankSec(d) {
+    return '<div class="sec"><h4>직급 <small class="sub" style="font-weight:500">— 러너 내부 직책 (관리자·운영자·대표가 대신 뛴 건은 기사 정산서에 이름 숨김)</small></h4><div class="status-row" style="margin:0">' +
+      [''].concat(TITLES).map((t) => '<button type="button" class="st' + (t === (d.title || '') ? ' on' : '') + '" data-ttl="' + t + '">' + (t || '기사') + '</button>').join('') + '</div></div>';
   }
   /** 같은 기사구분의 기존 코드 중 가장 큰 번호 다음 번호를 제안 (예: B007 → B008) */
   function nextCode(type) {
@@ -2129,7 +2142,9 @@
     const inp = (key, label, extra) => fld(key, label + (extra && extra.req ? '<span class="req">*</span>' : ''), '', extra);
     $('#dBody').innerHTML =
       '<div class="warnbox" style="background:var(--brand-weak);color:var(--brand)">관리자가 직접 등록하는 기사는 바로 승인 상태로 만들어집니다. <span class="req">*</span> 표시만 꼭 입력하면 되고, 나머지는 나중에 채워도 됩니다.</div>' +
-      typeSec(cur) + assignSec() +
+      '<div class="sec"><h4>기사 앱 사용</h4><div class="status-row">' +
+        STATUSES.map((st) => '<button type="button" class="st' + (st === cur.status ? ' on' : '') + '" data-st="' + st + '">' + st + '</button>').join('') + '</div></div>' +
+      workSec(cur) + typeSec(cur) + rankSec(cur) + assignSec() +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         inp('name', '이름', { req: true }) + inp('phone', '연락처') +
         inp('loginId', '쿠팡플렉스 아이디 (앱 로그인용, 선택)') + inp('tempPw', '앱 임시 비밀번호 (선택, 영문+숫자 8자 이상)') +
@@ -2145,8 +2160,6 @@
       '<div class="sec"><h4>정산 계좌</h4><div class="grid2">' +
         fld('bankName', '은행명', '', { select: BANKS }) + inp('accountHolder', '예금주') + inp('account', '계좌번호') +
       '</div></div>' +
-      '<div class="sec"><h4>기사 앱 사용</h4><div class="status-row">' +
-        STATUSES.map((st) => '<button type="button" class="st' + (st === cur.status ? ' on' : '') + '" data-st="' + st + '">' + st + '</button>').join('') + '</div></div>' +
       '<div class="sec"><h4>관리자 메모</h4>' + fld('memo', '', '', { area: true }) + '</div>';
     setDirty({});
     initAssign(cur);
@@ -2250,21 +2263,23 @@
       b.disabled = true; b.textContent = '등록 중…';
       return api('adm_createDriver', f, pw).then((r) => {
         if (!r.ok) { toast(r.msg); return; }
-        toast(r.driver.name + ' 기사님을 등록했습니다.' + (pw ? ' 임시 비밀번호를 알려 주세요.' : ''));
+        toast(r.driver.name + ' 기사님을 등록했습니다.' + (pw ? ' 임시 비밀번호를 알려 주세요.' : '') + (r.subMsg && r.subMsg.length ? ' ' + r.subMsg.join(' · ') : ''));
         selectedId = r.driver.id; renderDetail(r.driver); patchList(r.driver);
+        if (r.subMsg && r.subMsg.length) loadList(true);
       }).catch(() => {}).finally(() => { b.textContent = cur && cur.isNew ? '등록' : '저장'; b.disabled = !Object.keys(dirty).length; });
     }
     b.disabled = true; b.textContent = '저장 중…';
     api('adm_updateDriver', cur.id, dirty, cur.rev).then((r) => {
       if (!r.ok) { toast(r.msg); return; }
-      toast('저장했습니다.');
+      toast('저장했습니다.' + (r.subMsg && r.subMsg.length ? ' ' + r.subMsg.join(' · ') : ''));
       renderDetail(r.driver); patchList(r.driver);
+      if (r.subMsg && r.subMsg.length) loadList(true).then(() => { if (cur && cur.id === r.driver.id) renderDetail(r.driver); });
     }).catch(() => {}).finally(() => { b.textContent = '저장'; b.disabled = !Object.keys(dirty).length; });
   });
   function patchList(d) {
     const i = all.findIndex((x) => x.id === d.id);
     const before = i >= 0 ? all[i].status : null;
-    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, title: d.title || '', workStatus: d.workStatus || '', leaveDate: d.leaveDate || '', schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
+    const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, title: d.title || '', workStatus: d.workStatus || '', leaveDate: d.leaveDate || '', subId1: d.subId1 || '', subId2: d.subId2 || '', subOf: (all.find((x) => x.id === d.id) || {}).subOf || '', schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
       carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
     if (i >= 0) all[i] = row; else { all.unshift(row); counts.all = (counts.all || 0) + 1; }
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }
