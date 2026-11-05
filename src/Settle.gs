@@ -140,7 +140,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261105z6';
+const STL_CALC_VER = '20261105z7';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close'];
 function stlSS_() {
@@ -1003,7 +1003,7 @@ function stlCompute_(month) {
         ((dl.rt = dl.rt || {})[sub] = dl.rt[sub] || {})[stlShort_(camp) + '|' + normCode_(r.route)] = 1;
       }
       const dk = r.date + '|' + login;
-      (byDateLogin[dk] = byDateLogin[dk] || []).push({ route: normCode_(r.route), qty: qty, sales: sales, unit: u.u, camp: camp, cid: r.cid });
+      (byDateLogin[dk] = byDateLogin[dk] || []).push({ route: normCode_(r.route), qty: qty, sales: sales, unit: u.u, inc: incU, camp: camp, cid: r.cid });
     } else if (kind === '프레시백') {
       pay = stlR0_(fresh * cfg.freshRate); s.freshRaw += fresh; s.fresh += pay;
       s.fbKeep += fresh - pay; // 프백 잉여: 쿠팡 회수 인센티브 중 기사 지급률(예 89%) 밖의 몫 → 러너
@@ -1063,7 +1063,8 @@ function stlCompute_(month) {
       wg.cids.forEach(function (c) {
         (byDateLogin[date + '|' + stlLogin_(c)] || []).forEach(function (x) {
           if (route && x.route !== route) return;
-          found = true; autoQty += x.qty; sales += x.sales; camp = camp || x.camp; perfUnitSum += x.qty * x.unit;
+          // 기존지급 = 그날 실제로 받은 단가 (기본단가 + 프백 가중치) → 용차 단가(예 1,100)가 프백 가중치까지 포함한 건당 금액이 된다
+          found = true; autoQty += x.qty; sales += x.sales; camp = camp || x.camp; perfUnitSum += x.qty * (x.unit + (x.inc || 0));
         });
       });
     }
