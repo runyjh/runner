@@ -40,6 +40,8 @@ function appSetPut_(key, value, memo) {
 }
 /** 품앗이 일감 올리기 켜짐? (관리자 품앗이 관리에서 ON/OFF, 기본 ON) */
 function pmPostOn_() { return !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(appSet_().pmPostOn)); }
+/** 일감 제안(품앗이 주세요 · 일할 기사 찾기에서 특정 기사에게 맡기기) 켜짐 — 자유 등록(pmPostOn)과 따로 */
+function pmOfferOn_() { return !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(appSet_().pmOfferOn)); }
 /** 배송 아이디: 일감을 받은 기사 아이디로 / 일감을 준 기사 아이디로 / 협의 */
 const PM_USE_IDS = ['받는 기사 아이디', '주는 기사 아이디', '협의'];
 
@@ -142,7 +144,7 @@ function api_pmList(token, f) {
         });
       });
     } catch (e) { gives = []; }
-    return { ok: true, today: today, jobs: list, waiting: waiting, confirmed: confirmed, gives: gives, postOn: pmPostOn_() };
+    return { ok: true, today: today, jobs: list, waiting: waiting, confirmed: confirmed, gives: gives, postOn: pmPostOn_(), offerOn: pmOfferOn_() };
   });
 }
 /** 상세: 공개 항목 + (등록 기사·확정 기사에게만) 비공개 항목 + (등록 기사에게) 지원자 목록 */
@@ -210,7 +212,7 @@ function api_pmForm(token) {
     const myCamp = m.camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
     return {
       ok: true, camps: camps, myCampId: myCamp ? myCamp.id : '', myRoute: String(me.baseRoute || '').replace(/\(.*?\)|\[.*?\]/g, '').trim().split(/[\s,]+/)[0] || '',
-      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_()
+      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_(), offerOn: pmOfferOn_()
     };
   });
 }
@@ -266,7 +268,8 @@ function api_pmSave(token, job) {
     f.pay = t(job.pay, 10, '지급방법', true);
     if (PM_PAYS.indexOf(f.pay) < 0) fail_('지급방법을 골라 주세요.');
     f.useId = PM_USE_IDS.indexOf(str_(job.useId)) >= 0 ? str_(job.useId) : '';
-    if (!job.id && !pmPostOn_()) fail_('지금은 사무실에서 품앗이 일감 올리기를 잠시 막아 두었습니다. 사무실에 문의해 주세요.');
+    if (!job.id && !job.offerToId && !pmPostOn_()) fail_('지금은 사무실에서 품앗이 일감 올리기를 잠시 막아 두었습니다. 사무실에 문의해 주세요.');
+    if (!job.id && job.offerToId && !pmOfferOn_()) fail_('지금은 사무실에서 품앗이 일감 제안을 잠시 막아 두었습니다. 사무실에 문의해 주세요.');
     f.desc = t(job.desc, 3000, '상세 설명');
     f.secret = t(job.secret, 1500, '비공개 정보');
     // 첨부 (이미지 1장) — 잠금 밖에서 올린다
@@ -525,7 +528,7 @@ function api_myInfo(token) {
         helped: d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date < today; }).length,
         giveDays: (d.avail || []).filter(function (a) { return a.driverId === u.id && a.date >= today; }).length,
         offers: d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OFFER && a.date >= today; }).length
-      }, postOn: pmPostOn_()
+      }, postOn: pmPostOn_(), offerOn: pmOfferOn_()
     };
   });
 }
@@ -1129,7 +1132,7 @@ function adm_pmList(token, f) {
       if (q && (j.poster + j.accepted + j.area + j.camp + j.route).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return false;
       return true;
     }).sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time); });
-    return { ok: true, today: today, from: from, to: to, jobs: rows, count: count, total: all.length, postOn: pmPostOn_() };
+    return { ok: true, today: today, from: from, to: to, jobs: rows, count: count, total: all.length, postOn: pmPostOn_(), offerOn: pmOfferOn_() };
   });
 }
 /** 관리자 상세: 모든 칸 + 지원자(연락처·자격증) + 첨부 링크 */
@@ -1194,14 +1197,21 @@ function adm_pmDelete(token, ids) {
   });
 }
 
-/** 관리자: 기사 앱 품앗이 일감 올리기 켜기/끄기 (끄면 새 일감·제안을 못 올림, 이미 올린 일감은 그대로) */
-function adm_pmPostSet(token, on) {
+/**
+ * 관리자: 기사 앱 품앗이 스위치. which = 'offer' 면 일감 제안, 아니면 일감 올리기(자유 등록).
+ * 끄면 그 버튼·메뉴가 기사 앱에서 숨겨진다. 이미 올린 일감·지원·확정은 그대로
+ */
+function adm_pmPostSet(token, on, which) {
   return run_(function () {
     const a = requireAdmin_(token);
+    const offer = which === 'offer';
     const lock = scriptLock_();
     lock.waitLock(20000);
-    try { appSetPut_('pmPostOn', on ? 'ON' : 'OFF', '품앗이 일감 올리기 (ON/OFF) — 관리자 품앗이 관리에서 바꿈'); } finally { lock.releaseLock(); }
-    logAdmin_(a, '품앗이 일감 올리기 ' + (on ? '켜기' : '끄기'), '', '');
-    return { ok: true, postOn: !!on };
+    try {
+      if (offer) appSetPut_('pmOfferOn', on ? 'ON' : 'OFF', '품앗이 일감 제안 (ON/OFF) — 품앗이 주세요·일할 기사 찾기에서 맡기기');
+      else appSetPut_('pmPostOn', on ? 'ON' : 'OFF', '품앗이 일감 올리기 · 자유 등록 (ON/OFF) — 관리자 품앗이 관리에서 바꿈');
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '품앗이 ' + (offer ? '일감 제안 ' : '일감 올리기 ') + (on ? '켜기' : '끄기'), '', '');
+    return { ok: true, postOn: pmPostOn_(), offerOn: pmOfferOn_() };
   });
 }

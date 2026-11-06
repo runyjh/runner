@@ -1695,7 +1695,7 @@
     api('api_pmList', token, { onlyAvail: $('#pmAvail').checked, q: $('#pmQ').value.trim() }).then((r) => {
       if (!pmOk(r, '품앗이 목록을 불러오지 못했습니다.')) { $('#pmList').innerHTML = ''; return; }
       r.jobs = pmShown(r.jobs);
-      pmPostOn = r.postOn !== false; paintPostOn();
+      pmPostOn = r.postOn !== false; pmOfferOn = r.offerOn !== false; paintPostOn();
       const gives = $('#pmAvail').checked ? [] : (r.gives || []);
       pmGives = gives;
       const bits = ['일감 ' + r.jobs.length + '건'];
@@ -1718,14 +1718,13 @@
   $('#pmQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loadPmList(); } });
   $('#pmQ').addEventListener('search', loadPmList);
   $('#pmNew').addEventListener('click', () => openPmForm('', 'pumasi'));
-  let pmShowMode = 'all', pmGives = [], pmPostOn = true;
-  /** 사무실에서 일감 올리기를 끄면: 일감 올리기·제안 버튼을 누를 수 없게 */
+  let pmShowMode = 'all', pmGives = [], pmPostOn = true, pmOfferOn = true;
+  /** 사무실 스위치: 일감 올리기(자유 등록)를 끄면 그 메뉴·버튼을 숨김 / 일감 제안을 끄면 제안 버튼을 누를 수 없게 */
   function paintPostOn() {
-    $('#pmNew').disabled = !pmPostOn; $('#pmNew').classList.toggle('off', !pmPostOn);
-    $('#pmNew').textContent = pmPostOn ? '+ 일감 올리기' : '일감 올리기 중지';
-    const nb = $('#pmOffNote'); if (nb) nb.classList.toggle('hidden', pmPostOn);
-    $$('[data-my="new"]').forEach((b) => { b.disabled = !pmPostOn; b.classList.toggle('off', !pmPostOn); });
-    $$('#pmList [data-gvact], #gvBody [data-offer]').forEach((b) => { if (!b.closest('.pmc') || !b.closest('.pmc').querySelector('.bdg.me')) { b.disabled = !pmPostOn; b.classList.toggle('off', !pmPostOn); } });
+    $('#pmNew').classList.toggle('hidden', !pmPostOn);
+    const nb = $('#pmOffNote'); if (nb) nb.classList.add('hidden');
+    $$('[data-my="new"]').forEach((b) => { b.classList.toggle('hidden', !pmPostOn); });
+    $$('#pmList [data-gvact], #gvBody [data-offer]').forEach((b) => { if (!b.closest('.pmc') || !b.closest('.pmc').querySelector('.bdg.me')) { b.disabled = !pmOfferOn; b.classList.toggle('off', !pmOfferOn); } });
   }
   $('#pmShow').addEventListener('click', (e) => { const b = e.target.closest('[data-s]'); if (!b || b.dataset.s === pmShowMode) return; pmShowMode = b.dataset.s; $$('#pmShow button').forEach((x) => x.classList.toggle('on', x === b)); loadPmList(); });
   $('#pmList').addEventListener('click', (e) => {
@@ -1888,7 +1887,8 @@
   }
   let pmOffer = null; // { id, name, date, kind } 품앗이 주세요 → 이 기사에게 제안
   function openPmForm(id, from, raw, offer) {
-    if (!id && !pmPostOn) return toast('지금은 사무실에서 품앗이 일감 올리기를 잠시 멈춰 두었습니다.');
+    if (!id && !offer && !pmPostOn) return toast('지금은 사무실에서 품앗이 일감 올리기를 잠시 멈춰 두었습니다.');
+    if (!id && offer && !pmOfferOn) return toast('지금은 사무실에서 품앗이 일감 제안을 잠시 멈춰 두었습니다.');
     pmEditId = id || ''; pmFormFrom = from || 'pumasi'; pmOffer = id ? null : (offer || null);
     $('#pfTitle').textContent = id ? '품앗이 일감 수정' : '품앗이 일감 올리기';
     $('#pfBtn').textContent = id ? '저장' : '올리기';
@@ -2085,7 +2085,7 @@
       $('#myCard').innerHTML = '<div class="myhd"><div class="av">' + escH(String(i.name || '?').slice(0, 1)) + '</div><div><b>' + escH(i.name) + ' 기사님</b><small>' +
         escH([i.type, i.camp].filter(Boolean).join(' · ') || '러너 기사') + '</small></div></div>' +
         '<div class="mystat"><div><b>' + r.stats.posted + '</b>올린 품앗이</div><div><b>' + r.stats.helped + '</b>도와준 품앗이</div></div>';
-      pmPostOn = r.postOn !== false; paintPostOn();
+      pmPostOn = r.postOn !== false; pmOfferOn = r.offerOn !== false; paintPostOn();
       const gv = $('#myGive'); if (gv) gv.textContent = [r.stats.giveDays ? r.stats.giveDays + '일' : '', r.stats.offers ? '제안 ' + r.stats.offers : ''].filter(Boolean).join(' · ');
       $('#miBody').innerHTML = '<dl>' + [['이름', i.name], ['쿠팡 아이디', i.loginId], ['연락처', i.phone], ['단가코드', i.type], ['소속 캠프', i.camp], ['기본노선', i.baseRoute], ['차량번호', i.carNo],
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';

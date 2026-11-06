@@ -1005,7 +1005,8 @@
         <input class="inp" type="date" id="paFrom" title="배차일 시작"><input class="inp" type="date" id="paTo" title="배차일 끝">
         <input class="inp search" id="paQ" placeholder="기사·배송지·센터·라우트 검색" style="width:220px">
         <button class="btn ghost" id="paReload">새로고침</button>
-        <button class="btn pmsw" id="paPostSw" type="button" title="기사 앱의 품앗이 일감 올리기(제안 포함)를 켜고 끕니다">일감 올리기 <b>…</b></button>
+        <button class="btn pmsw" id="paPostSw" type="button" title="기사 앱의 '품앗이 일감 올리기'(자유 등록)를 켜고 끕니다. 끄면 기사 앱에서 메뉴가 숨겨집니다">일감 올리기 <b>…</b></button>
+        <button class="btn pmsw" id="paOfferSw" type="button" title="기사 앱의 '💌 일감 제안'(품앗이 주세요 · 일할 기사 찾기)을 켜고 끕니다">일감 제안 <b>…</b></button>
         <button class="btn ghost danger-t" type="button" data-reset="pumasi">데이터 초기화</button>
       </div>
     </div>
@@ -2567,7 +2568,7 @@
     api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
       if (seq !== PA.seq) return;
       if (!r.ok) return toast(r.msg);
-      PA.jobs = r.jobs; PA.count = r.count; paintPostSw(r.postOn !== false); renderPumasi();
+      PA.jobs = r.jobs; PA.count = r.count; paintPostSw(r.postOn !== false, r.offerOn !== false); renderPumasi();
     }).catch(() => {});
   }
   function renderPumasi() {
@@ -2613,11 +2614,17 @@
   $('#paTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-pst]'); if (b) { PA.status = b.dataset.pst; renderPumasi(); } });
   $('#paReload').addEventListener('click', loadPumasi);
   // 일감 올리기 ON/OFF
-  function paintPostSw(on) { const b = $('#paPostSw'); b.dataset.on = on ? '1' : ''; b.classList.toggle('on', on); b.innerHTML = '일감 올리기 <b>' + (on ? 'ON' : 'OFF') + '</b>'; }
+  function paintSw(id, label, on) { const b = $(id); b.dataset.on = on ? '1' : ''; b.classList.toggle('on', on); b.innerHTML = label + ' <b>' + (on ? 'ON' : 'OFF') + '</b>'; }
+  function paintPostSw(on, offerOn) { paintSw('#paPostSw', '일감 올리기', on); if (offerOn !== undefined) paintSw('#paOfferSw', '일감 제안', offerOn); }
   $('#paPostSw').addEventListener('click', () => {
     const on = !$('#paPostSw').dataset.on;
-    if (!on && !confirm('기사 앱의 품앗이 일감 올리기를 끌까요?\n끄면 기사님들은 새 일감 올리기·품앗이 제안을 누를 수 없습니다. (이미 올라온 일감 보기·지원·확정은 그대로)')) return;
-    api('adm_pmPostSet', on).then((r) => { if (!r.ok) return toast(r.msg); paintPostSw(r.postOn); toast('일감 올리기를 ' + (r.postOn ? '켰습니다.' : '껐습니다. 기사 앱에서 누를 수 없습니다.')); }).catch(() => {});
+    if (!on && !confirm('기사 앱의 "품앗이 일감 올리기"(자유 등록)를 끌까요?\n끄면 기사 앱에서 일감 올리기 메뉴·버튼이 숨겨집니다. (일감 제안, 이미 올라온 일감 보기·지원·확정은 그대로)')) return;
+    api('adm_pmPostSet', on).then((r) => { if (!r.ok) return toast(r.msg); paintPostSw(r.postOn, r.offerOn); toast('일감 올리기를 ' + (r.postOn ? '켰습니다.' : '껐습니다. 기사 앱에서 메뉴가 숨겨집니다.')); }).catch(() => {});
+  });
+  $('#paOfferSw').addEventListener('click', () => {
+    const on = !$('#paOfferSw').dataset.on;
+    if (!on && !confirm('기사 앱의 "💌 일감 제안"(품앗이 주세요 · 일할 기사 찾기)을 끌까요?')) return;
+    api('adm_pmPostSet', on, 'offer').then((r) => { if (!r.ok) return toast(r.msg); paintPostSw(r.postOn, r.offerOn); toast('일감 제안을 ' + (r.offerOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {});
   });
   $('#paFrom').addEventListener('change', loadPumasi); $('#paTo').addEventListener('change', loadPumasi);
   let paQT = 0; $('#paQ').addEventListener('input', () => { clearTimeout(paQT); paQT = setTimeout(loadPumasi, 400); });
