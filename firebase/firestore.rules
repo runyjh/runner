@@ -6,10 +6,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // 우리 서버가 발급한 토큰인지 + 유효 시간(x, 밀리초) 안인지 — 파이어베이스 로그인은 스스로 연장되므로 x 로 끊는다
-    function fresh() { return request.auth != null && request.auth.token.x is int && request.auth.token.x > request.time.toMillis(); }
+    function fresh() { return request.auth != null && ('x' in request.auth.token) && request.auth.token.x is int && request.auth.token.x > request.time.toMillis() && ('r' in request.auth.token); }
     function signedIn() { return fresh() && request.auth.token.r in ['a', 'd']; }
     function isAdmin() { return fresh() && request.auth.token.r == 'a'; }
-    function isDriver(id) { return fresh() && request.auth.token.r == 'd' && request.auth.token.d == id; }
+    function isDriver(id) { return fresh() && request.auth.token.r == 'd' && ('d' in request.auth.token) && request.auth.token.d == id; }
 
     // 기사: 자기 문서만 (관리자는 전체)
     match /drv/{driverId} {
