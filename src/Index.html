@@ -747,8 +747,8 @@
       <button type="button" data-my="give">🙋 품앗이 주세요 (내 근무 가능일)<em id="myGive"></em></button>
       <button type="button" data-my="find">🔎 일할 기사 찾기 (품앗이 주세요)</button>
       <button type="button" data-my="new">품앗이 일감 올리기</button>
-      <button type="button" data-my="posted">품앗이 관리 (지원자 보기)<em id="myNew"></em></button>
-      <button type="button" data-my="applied">지원한 품앗이</button>
+      <button type="button" data-my="posted"><span class="mylab">품앗이 관리 (지원자 보기)</span><em id="myNew"></em></button>
+      <button type="button" data-my="applied"><span class="mylab">지원한 품앗이</span></button>
       <button type="button" data-my="done">완료한 품앗이</button>
       <button type="button" data-my="board">💬 내가 쓴 게시글</button>
     </div>
@@ -1727,6 +1727,8 @@
     $('#pmNew').classList.toggle('hidden', !pmPostOn);
     // 일감 올리기가 꺼져 있으면 전체/맡길 일감/품앗이 주세요 선택 칸을 숨기고 전체(= 품앗이 주세요 + 남아 있는 일감)로
     $('#pmShow').classList.toggle('hidden', !pmPostOn);
+    const lab = (k, on, off) => { const el = document.querySelector('[data-my="' + k + '"] .mylab'); if (el) el.textContent = pmPostOn ? on : off; };
+    lab('posted', '품앗이 관리 (지원자 보기)', '📤 보낸 제안'); lab('applied', '지원한 품앗이', '📥 받은 제안');
     if (!pmPostOn && pmShowMode !== 'all') { pmShowMode = 'all'; $$('#pmShow button').forEach((x) => x.classList.toggle('on', x.dataset.s === 'all')); loadPmList(); }
     const nb = $('#pmOffNote'); if (nb) nb.classList.add('hidden');
     $$('[data-my="new"]').forEach((b) => { b.classList.toggle('hidden', !pmPostOn); });
@@ -2120,8 +2122,13 @@
     applied: ['지원한 품앗이', '지원한 일감입니다. 올린 기사님이 전화로 연락합니다.', '지원한 일감이 없습니다.'],
     done: ['완료한 품앗이', '배차 확정되고 배차일이 지난 품앗이입니다 (맡긴 것·뛴 것 모두).', '완료한 품앗이가 없습니다.']
   };
+  // 일감 올리기가 꺼져 있으면 품앗이는 '제안'으로만 오가므로 이름을 맞춘다
+  const PM_MINE_OFFER = {
+    posted: ['📤 보낸 제안', '내가 보낸 일감 제안입니다. 상대 기사님의 수락·거절을 확인하고 완료·취소를 처리하세요.', '보낸 제안이 없습니다.'],
+    applied: ['📥 받은 제안', '나에게 온 일감 제안과 수락한 품앗이입니다.', '받은 제안이 없습니다.']
+  };
   function loadPmMine() {
-    const t = PM_MINE[pmMineKind];
+    const t = (!pmPostOn && PM_MINE_OFFER[pmMineKind]) || PM_MINE[pmMineKind];
     $('#pmmTitle').textContent = t[0]; $('#pmmHint').textContent = t[1];
     const token = pmTok(); if (!token) return;
     $('#pmmList').innerHTML = '<div class="pmempty">불러오는 중…</div>';
