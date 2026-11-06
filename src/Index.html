@@ -939,13 +939,13 @@
       if (!app && saved && saved.web) app = firebase.initializeApp(saved.web, 'rfs');
       let user = null;
       if (app) user = await fsTimeout(new Promise((res) => { const un = app.auth().onAuthStateChanged((u) => { un(); res(u); }); }), 3000).catch(() => null);
-      if (!user || !saved || user.uid !== saved.uid || !FSOWN(user.uid)) {
+      if (!user || !saved || user.uid !== saved.uid || !FSOWN(user.uid) || !(saved.x > Date.now() + 600000)) { // 유효 시간(x)이 10분 안 남았으면 서버에서 다시 (그때 로그인·상태 다시 확인)
         const r = await gsCall0(TOKFN, [tok]);
         if (!r || !r.ok || !r.on || !r.token) { fsLs({ off: Date.now() + 3600000 }); return false; }
         if (!app) app = firebase.initializeApp(r.web, 'rfs');
         const cred = await app.auth().signInWithCustomToken(r.token);
         user = cred.user;
-        fsLs({ web: r.web, uid: user.uid });
+        fsLs({ web: r.web, uid: user.uid, x: r.x });
       }
       FSR.db = app.firestore(); FSR.uid = user.uid; FSR.ok = true;
       return true;
@@ -967,7 +967,11 @@
       if (!check(data)) return null;
       perfAdd('fs:' + path().split('/')[0], performance.now() - t0, 0);
       return data;
-    } catch (e) { console.warn('Firestore 읽기 실패 → 서버', e && e.message); FSR.skipUntil = Date.now() + 30000; return null; }
+    } catch (e) {
+      console.warn('Firestore 읽기 실패 → 서버', e && e.message);
+      if (e && e.code === 'permission-denied') fsSignOut(); // 권한 없음(유효 시간 지남·퇴사 등) → 다음엔 서버에서 새로 확인받음
+      FSR.skipUntil = Date.now() + 30000; return null;
+    }
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)

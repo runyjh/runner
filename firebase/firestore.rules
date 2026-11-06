@@ -1,12 +1,15 @@
 rules_version = '2';
 // 러너 올인원 — Firestore 읽기 사본 규칙
 //  - 쓰기는 서버(Apps Script · 서비스 계정)만: 서비스 계정은 규칙을 거치지 않으므로 앱에서는 아무도 못 씀
-//  - 로그인 토큰(커스텀 토큰)의 r: 'd' = 기사(d = 기사ID) / 'a' = 관리자
+//  - 로그인 토큰(커스텀 토큰)의 r: 'd' = 기사(d = 기사ID) / 'a' = 관리자 · x = 이 시각(ms)까지만 (기사 12시간 · 관리자 8시간)
+//  - 우리 서버 토큰이 아닌 로그인(익명·이메일 등 다른 방법을 나중에 켜더라도)은 r·x 가 없어 아무것도 못 읽음
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isAdmin() { return signedIn() && request.auth.token.r == 'a'; }
-    function isDriver(id) { return signedIn() && request.auth.token.r == 'd' && request.auth.token.d == id; }
+    // 우리 서버가 발급한 토큰인지 + 유효 시간(x, 밀리초) 안인지 — 파이어베이스 로그인은 스스로 연장되므로 x 로 끊는다
+    function fresh() { return request.auth != null && request.auth.token.x is int && request.auth.token.x > request.time.toMillis(); }
+    function signedIn() { return fresh() && request.auth.token.r in ['a', 'd']; }
+    function isAdmin() { return fresh() && request.auth.token.r == 'a'; }
+    function isDriver(id) { return fresh() && request.auth.token.r == 'd' && request.auth.token.d == id; }
 
     // 기사: 자기 문서만 (관리자는 전체)
     match /drv/{driverId} {

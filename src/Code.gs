@@ -2132,6 +2132,7 @@ function adm_deleteDriver(token, id, confirmName) {
       if (str_(confirmName).replace(/\s+/g, '') !== str_(o.name).replace(/\s+/g, '')) fail_('입력한 이름이 기사 이름과 다릅니다. 삭제하지 않았습니다.');
       sheet_(SH.DRIVERS).deleteRow(o._row);
       forgetDriver_(o);
+      if (typeof fsDropDriver_ === 'function') fsDropDriver_([o.id]);
       if (typeof stlBump_ === 'function' && props_().STL_DB_ID) { try { stlBump_(); } catch (e) { /* 무시 */ } }
       // 이 기사의 로그인 기록 지우기
       const ss = readAll_(SH.SESSIONS).filter(function (x) { return x.driverId === o.id; });
@@ -2187,6 +2188,7 @@ function adm_deleteDrivers(token, ids, confirm) {
       hit = readAll_(SH.DRIVERS).filter(function (o) { return o.id && want[o.id]; });
       delRows_(sheet_(SH.DRIVERS), hit.map(function (o) { return o._row; }));
       hit.forEach(forgetDriver_);
+      if (typeof fsDropDriver_ === 'function') fsDropDriver_(hit.map(function (o) { return o.id; }));
       if (typeof stlBump_ === 'function' && props_().STL_DB_ID) { try { stlBump_(); } catch (e) { /* 무시 */ } }
       const gone = {};
       hit.forEach(function (o) { gone[o.id] = 1; });

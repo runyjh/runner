@@ -76,7 +76,7 @@ const pages = [
       SW.replace("register(\'sw.js\')", "register(\'../sw.js\')"),
       // 관리자 화면 보안 정책: 서버(구글 웹앱)와 Firestore 읽기 사본(파이어베이스 runner-push) 외의 곳으로는 연결할 수 없고, 다른 곳의 스크립트도 실행되지 않는다
       '<meta http-equiv="Content-Security-Policy" content="' + [
-        "default-src 'self'", "script-src 'self' 'unsafe-inline' https://www.gstatic.com", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "default-src 'self'", "script-src 'self' 'unsafe-inline' https://www.gstatic.com/firebasejs/10.12.2/", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
         "font-src 'self' https://cdn.jsdelivr.net data:", "img-src 'self' data: blob:", "manifest-src 'self'",
         "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
         "frame-src 'self' blob: data: https://runner-push.firebaseapp.com", "worker-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"

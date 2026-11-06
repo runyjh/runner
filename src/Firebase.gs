@@ -7,6 +7,10 @@
  *  - 끄기: 스크립트 속성 FS_OFF = 1 → 복사도 읽기도 안 함 (전부 시트에서).
  */
 const FS_VER = 1; // 문서 모양이 바뀌면 올림 → 예전 문서는 안 읽음
+// 파이어베이스 로그인 유효 시간 (토큰의 x = 이 시각까지만 읽기 허용 · firestore.rules).
+// 파이어베이스는 한 번 로그인하면 스스로 계속 연장하므로, 퇴사·정지·관리자 삭제·비밀번호 변경이 늦어도 이 시간 안에 막히게 한다.
+// 지나면 앱이 서버에 다시 받으러 오고, 서버는 그때 로그인·상태를 다시 확인한다.
+const FS_TTL_DRV = 12 * 3600 * 1000, FS_TTL_ADM = 8 * 3600 * 1000;
 
 function fsCfg_() {
   const p = props_();
@@ -60,9 +64,14 @@ function api_fsToken(token) {
   return run_(function () {
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
-    if (!s || !info || info.status !== ST.ACTIVE) return { ok: false, code: 'EXPIRED' };
-    const t = fsCustomToken_('d_' + s.d, { r: 'd', d: String(s.d) });
-    return t ? { ok: true, on: true, token: t, web: fsWeb_(), ver: FS_VER } : { ok: true, on: false };
+    // 다른 기사 앱 함수와 같은 확인: 승인된 기사 · 비밀번호를 바꾼 뒤의 로그인 · 임시 비밀번호 변경 완료 · 퇴사 아님
+    if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED' };
+    if (info.mustChange) return { ok: false, code: 'MUST_CHANGE' };
+    const o = driverById_(s.d);
+    if (!o || o.workStatus === '퇴사') return { ok: true, on: false };
+    const x = Date.now() + FS_TTL_DRV;
+    const t = fsCustomToken_('d_' + s.d, { r: 'd', d: String(s.d), x: x });
+    return t ? { ok: true, on: true, token: t, web: fsWeb_(), ver: FS_VER, x: x } : { ok: true, on: false };
   });
 }
 /** 관리자 앱: 파이어베이스 로그인 토큰 */
@@ -70,8 +79,9 @@ function adm_fsToken(token) {
   return run_(function () {
     const a = requireAdmin_(token);
     fsEnsureTrigger_();
-    const t = fsCustomToken_('a_' + a.loginId, { r: 'a' });
-    return t ? { ok: true, on: true, token: t, web: fsWeb_(), ver: FS_VER } : { ok: true, on: false };
+    const x = Date.now() + FS_TTL_ADM;
+    const t = fsCustomToken_('a_' + a.loginId, { r: 'a', x: x });
+    return t ? { ok: true, on: true, token: t, web: fsWeb_(), ver: FS_VER, x: x } : { ok: true, on: false };
   });
 }
 
@@ -222,3 +232,6 @@ function adm_fsRebuild(token) {
     return { ok: true, n: n, ms: Date.now() - t, err: n ? '' : cache_().get('fs:err') || '' };
   });
 }
+
+/** 기사를 지우면 그 기사 사본도 지움 */
+function fsDropDriver_(ids) { try { if (fsCfg_() && ids && ids.length) fsDel_(ids.map(function (id) { return 'drv/' + id; })); } catch (e) { /* 무시 */ } }

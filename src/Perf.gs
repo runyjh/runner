@@ -20,10 +20,12 @@ function perfRows_(rows, app, who) {
   }).filter(function (o) { return o.fn && o.n; });
   if (!out.length) return 0;
   const c = cols_(SH.PERF, true), sh = sheet_(SH.PERF);
-  const vals = out.map(function (o) { const a = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { a[c[k]] = o[k]; }); return a; });
   const r = sh.getLastRow() + 1;
+  if (r > 30000) { console.warn('perf_log 가 3만 줄을 넘어 더 기록하지 않습니다 (지우면 다시 기록).'); return 0; } // 시트가 끝없이 커지지 않게
+  // 글자는 글자 서식(@)으로 · '=' '+' 로 시작하면 앞에 공백 (시트 수식으로 실행되지 않게)
+  const vals = out.map(function (o) { const a = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { a[c[k]] = typeof o[k] === 'string' ? safeText_(o[k]) : o[k]; }); return a; });
   if (r + vals.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(500, vals.length));
-  sh.getRange(r, 1, vals.length, c.__w).setValues(vals);
+  sh.getRange(r, 1, vals.length, c.__w).setNumberFormat('@').setValues(vals);
   return out.length;
 }
 /** 기사 앱: 측정값 보내기 (로그인한 기사만 · 기사 이름은 남기지 않음) */
@@ -31,6 +33,10 @@ function api_perf(token, rows) {
   return run_(function () {
     const s = getSession_(token);
     if (!s) return { ok: true, n: 0 };
+    // 한 기기에서 1분에 3번까지만 (앱은 1분에 1번 보냄 · 마구 보내 시트를 키우지 못하게)
+    const k = 'pf:' + s.th, c = cache_(), n = +(c.get(k) || 0);
+    if (n >= 3) return { ok: true, n: 0 };
+    c.put(k, String(n + 1), 60);
     return { ok: true, n: perfRows_(rows, '기사앱', '') };
   });
 }
