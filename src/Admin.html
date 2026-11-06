@@ -5883,6 +5883,7 @@
     const WACT = {
       stopped: { head: '🚪 처리…', all: '🚪 전부…', opts: [['leave', '퇴사 처리 · ' + mon + '월 퇴사 (보류금 기본)'], ['leaveAmt', '퇴사 처리 · 보류금 금액 입력…'], ['unstop', '정지 풀기 · 근무상태 재직'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['leave', 'ack'] },
       idle: { head: '⏸ 처리…', all: '⏸ 전부…', opts: [['stop', '휴직 (근무상태 → 휴직)'], ['leaveStop', '퇴사 처리 · 근무상태 퇴사 · ' + mon + '월 (보류금 기본)'], ['leaveStopAmt', '퇴사 처리 · 근무상태 퇴사 · 보류금 금액 입력…'], ['ack', '확인함 · 이 달은 숨김 (휴무·예비 아이디)']], allOpts: ['stop', 'ack'] },
+      manual: { head: '처리…', all: '전부…', opts: [['manualOn', '✅ 반영 (배송 기본에 포함)'], ['manualOff', '⬜ 반영 안 함']], allOpts: ['manualOn', 'manualOff'] },
       moveNo: { head: '👥 처리…', all: '👥 전부…', opts: [['sub', '서브 인원 · 명의자 정산에 그대로 포함'], ['ownId', '본인 정산 아이디 만들기 · 그 기사 정산서로 옮김'], ['ack', '확인함 · 이 달은 숨김']], allOpts: ['sub', 'ack'] }
     };
     const wsel = (w, i) => {
@@ -6859,7 +6860,7 @@
       const w = (STX.sum.warnings || []).find((x) => x.key === t0.dataset.wk); if (!w || !w.acts) return;
       const list = t0.dataset.wi === 'all' ? w.acts.filter(Boolean) : [w.acts[+t0.dataset.wi]].filter(Boolean);
       if (!list.length) return;
-      const names = list.map((x) => x.label).join('\n'), m = ymTitle(STX.month), opt = {};
+      const names = (list.length > 8 ? list.slice(0, 8).map((x) => x.label).concat(['… 외 ' + (list.length - 8) + '줄']) : list.map((x) => x.label)).join('\n'), m = ymTitle(STX.month), opt = {};
       if (act === 'leaveAmt' || act === 'leaveStopAmt') {
         const v = prompt('퇴사 보류금 금액 (원)을 넣어 주세요.\n' + names); if (v == null) return;
         opt.amt = String(v).replace(/[^\d]/g, ''); if (!opt.amt) return toast('금액을 숫자로 넣어 주세요.');
@@ -6872,12 +6873,12 @@
         const v = prompt(list[0].name + ' 기사님의 쿠팡 ID (본인 정산 아이디)\n비우면 기사 정보의 쿠팡플렉스 아이디를 씁니다.', ''); if (v == null) return;
         opt.cid = v.trim();
       } else {
-        const msg = { leave: m + ' 퇴사로 처리할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환 · 퇴사자 보류금 설정에 기록)', unstop: '정지를 풀까요? (기사 정보관리 근무상태 → 재직)', stop: '휴직으로 바꿀까요? (기사 정보관리 근무상태 → 휴직 · 다시 일하면 정지 풀기)', sub: '서브 인원으로 처리할까요?\n(아이디 사용 기록의 정산 칸 = 명의자 → 매출은 명의자 정산에 그대로)', ack: m + ' 정산에서 이 경고를 숨길까요?' }[act];
+        const msg = { leave: m + ' 퇴사로 처리할까요?\n(' + m + ' 정산서에 퇴사 보류금 차감 → 다음 달 정산서에 보류금 반환 · 퇴사자 보류금 설정에 기록)', unstop: '정지를 풀까요? (기사 정보관리 근무상태 → 재직)', stop: '휴직으로 바꿀까요? (기사 정보관리 근무상태 → 휴직 · 다시 일하면 정지 풀기)', sub: '서브 인원으로 처리할까요?\n(아이디 사용 기록의 정산 칸 = 명의자 → 매출은 명의자 정산에 그대로)', ack: m + ' 정산에서 이 경고를 숨길까요?', manualOn: '쿠팡 수기반영을 반영할까요?\n(건수 × 기사 단가로 배송 기본에 포함)', manualOff: '쿠팡 수기반영을 반영하지 않을까요?\n(배송 기본에서 뺌)' }[act];
         if (!confirm(names + '\n\n' + msg)) return;
       }
       api('adm_stlWarnAct', STX.month, act, list, opt).then((r) => {
         if (!r.ok) return toast(r.msg);
-        const msg = (r.done && r.done.length ? r.done.join(', ') + ' — ' : '') + ({ leave: opt.stop ? '퇴사 처리했습니다 (근무상태 퇴사)' : '퇴사 처리했습니다', unstop: '재직으로 바꿨습니다', stop: '휴직으로 바꿨습니다', sub: '서브 인원으로 처리했습니다', ownId: '본인 정산 아이디를 만들었습니다', ack: '이 달 경고에서 숨겼습니다' }[act]) + ' (다시 계산함)';
+        const msg = (r.done && r.done.length ? r.done.join(', ') + ' — ' : '') + ({ leave: opt.stop ? '퇴사 처리했습니다 (근무상태 퇴사)' : '퇴사 처리했습니다', unstop: '재직으로 바꿨습니다', stop: '휴직으로 바꿨습니다', sub: '서브 인원으로 처리했습니다', ownId: '본인 정산 아이디를 만들었습니다', ack: '이 달 경고에서 숨겼습니다', manualOn: '수기반영을 반영했습니다', manualOff: '수기반영을 빼었습니다' }[act]) + ' (다시 계산함)';
         toast(msg); STX.sum = null;
         loadSettle(STX.month, true).then(() => toast(msg));
       }).catch(() => {});
