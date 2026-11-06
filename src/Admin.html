@@ -1571,7 +1571,9 @@
       <div class="field full"><span class="lb">라우트 (노선관리) — 여러 개 고를 수 있습니다</span><div class="rchips" id="sdChips"></div>
         <div class="radios" id="sdRots"></div><div class="brprev">저장될 기본노선: <b id="sdBr"></b></div><input type="hidden" id="sdRoute"></div>
       <div class="field full"><label class="lb" for="sdWhen">캠프·노선 적용일 — 비우면 바로 바뀌고, 날짜를 넣으면 그날부터 바뀌도록 예약합니다</label>
-        <input class="inp" type="date" id="sdWhen" style="max-width:200px"><div class="sub" id="sdRcInfo" style="font-size:12px;margin-top:4px"></div></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><input class="inp" type="date" id="sdWhen" style="max-width:200px">
+        <label class="check" style="margin:0" title="잘못 넣은 캠프·노선을 바로잡을 때: 변경 이력을 남기지 않아 표가 두 줄로 나뉘지 않고, 지난 날짜도 새 값으로 봅니다"><input type="checkbox" id="sdFix"> 정정 (이력 안 남김)</label></div>
+        <div class="sub" id="sdRcInfo" style="font-size:12px;margin-top:4px"></div></div>
       <div class="field full"><span class="lb">고정휴무일</span><div class="offbtns" id="sdOffBtns">
         <button type="button" data-off="0">일</button><button type="button" data-off="1">월</button><button type="button" data-off="2">화</button><button type="button" data-off="3">수</button><button type="button" data-off="4">목</button><button type="button" data-off="5">금</button><button type="button" data-off="6">토</button></div>
         <input class="inp" id="sdOff" placeholder="예: 목,금 (요일로 적으면 빈칸 자동 채우기에 쓰임)"></div>
@@ -5853,7 +5855,7 @@
     $('#sdPat').value = d.workPattern || ''; $('#sdMemo').value = d.memo || ''; $('#sdOrder').value = d.order || '';
     $('#sdArea').value = d.backupArea || ''; paintAreaBtns();
     paintOffBtns();
-    $('#sdWhen').value = ''; $('#sdWhen').min = SD.today || '';
+    $('#sdWhen').value = ''; $('#sdFix').checked = false; $('#sdWhen').min = SD.today || '';
     const pend = (d.changes || []).filter((c) => c.status === '예약');
     $('#sdRcInfo').innerHTML = pend.length ? '예약됨: ' + pend.map((c) => '<b>' + mdOf(c.date) + '부터 ' + esc(c.toCamp + ' ' + c.toRoute) + '</b>').join(', ') + ' · <a href="#" data-rcopen="list">예약 보기·취소</a>' : '';
     $('#sdModal').classList.remove('hidden');
@@ -5908,9 +5910,10 @@
     const was = { schCampId: d.campId || '', baseRoute: d.baseRoute || '', fixedOff: d.fixedOff || '', extraOff: d.extraOff || '', workPattern: d.workPattern || '', schMemo: d.memo || '', schOrder: d.order || '', backupArea: d.backupArea || '' };
     Object.keys(f).forEach((k) => { if (f[k] === was[k]) delete f[k]; });
     // 적용일을 넣고 캠프·노선을 바꿨으면: 그날부터 바뀌도록 예약 (지금 기사 정보는 그대로)
-    const when = $('#sdWhen').value, today = SD.today || '';
+    const when = $('#sdWhen').value, today = SD.today || '', fix = $('#sdFix').checked;
     let rc = null;
-    if (when && when > today && ('schCampId' in f || 'baseRoute' in f)) {
+    if (fix && ('schCampId' in f || 'baseRoute' in f)) f._fix = 1; // 정정: 이력 안 남김 (적용일 무시)
+    else if (when && when > today && ('schCampId' in f || 'baseRoute' in f)) {
       rc = { driverId: d.id, date: when, toCampId: $('#sdCamp').value, toRoute: $('#sdRoute').value.trim() };
       delete f.schCampId; delete f.baseRoute;
     }

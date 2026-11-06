@@ -1858,6 +1858,9 @@ function updateDriverCore_(a, id, changes, seenRev) {
   if (seenRev && String(seenRev) !== rev_(o)) {
     fail_('다른 곳(시트 또는 다른 관리자)에서 먼저 수정되었습니다. 새로고침 후 다시 수정해 주세요.');
   }
+  // _fix = 정정 (잘못 넣은 캠프·노선 바로잡기): 노선 변경 이력을 남기지 않는다
+  const fix = !!(changes && changes._fix);
+  if (changes && '_fix' in changes) { changes = Object.assign({}, changes); delete changes._fix; }
   const r = driverFields_(changes, o), f = r.f, changed = r.changed;
   if (!changed.length) return { ok: true, driver: detailOf_(o) };
   f.updatedAt = nowText_();
@@ -1866,7 +1869,7 @@ function updateDriverCore_(a, id, changes, seenRev) {
   // 소속캠프·기본노선을 바로 바꾸면 이력으로 남긴다 (지난 날짜 스케줄·업로드는 예전 캠프·노선으로 계산되게)
   try {
     const nc = f.schCampId !== undefined ? f.schCampId : o.schCampId, nr = f.baseRoute !== undefined ? f.baseRoute : o.baseRoute;
-    if ((o.schCampId || o.baseRoute) && (nc !== o.schCampId || nr !== o.baseRoute)) {
+    if (!fix && (o.schCampId || o.baseRoute) && (nc !== o.schCampId || nr !== o.baseRoute)) {
       appendObj_(SH.RCHG, {
         id: uniqId_('RC'), kind: RCK.DRV, date: todayText_(), driverId: o.id, name: o.name,
         fromCampId: o.schCampId, fromCamp: o.schCamp, fromRoute: o.baseRoute, toCampId: nc, toCamp: f.schCamp !== undefined ? f.schCamp : o.schCamp, toRoute: nr,
