@@ -5224,6 +5224,26 @@ function schHolidayGroups_(from, to) {
 /** 출근으로 세는 칸 (화면 출근일수와 같은 규칙) / 쉰 칸 */
 function schIsWork_(v) { const s = str_(v); return !!s && s !== '휴가' && !/휴무|용차|병가|퇴사|미입차|업무/.test(s); }
 function schIsRest_(v) { return /휴무|휴가|병가/.test(str_(v)); }
+/** 기사 한 명의 스케줄 칸 { 날짜: 글자 } (스케줄 DB · 없으면 빈 객체) */
+function schCellsOf_(driverId, dates) {
+  const out = {};
+  if (!dates.length || !props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
+  const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+  if (last < 2) return out;
+  const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(String(driverId)).matchEntireCell(true).matchCase(true).findNext();
+  if (!cell) return out;
+  const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
+  if (!cols.length) return out;
+  const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+  const vals = sh.getRange(cell.getRow(), c0 + 1, 1, c1 - c0 + 1).getValues()[0];
+  dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out[d] = v; } });
+  return out;
+}
+/** 그 기사가 이미 근무 스케줄이 있는 날 (휴무·휴가·병가·퇴사·미입차·용차 칸은 근무 아님) */
+function schWorkDates_(driverId, from, to) {
+  const cells = schCellsOf_(driverId, schDateRange_(parseYmd_(from), parseYmd_(to)));
+  return Object.keys(cells).filter(function (d) { return schIsWork_(cells[d]); }).sort();
+}
 /** year = 'yyyy' 또는 'all'(스케줄 DB 전체 기간) */
 function adm_schYear(token, year) {
   return run_(function () {

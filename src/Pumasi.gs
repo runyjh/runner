@@ -580,7 +580,10 @@ function api_pmAvailMine(token) {
     const myCamp = master_().camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
     if (!mine.length) { info.campId = myCamp ? myCamp.id : ''; info.camp = myCamp ? myCamp.name : ''; info.crew = '1인'; info.price = String(PM_GIVE_PRICE); info.pay = '당일지급'; info.useId = '받는 기사 아이디'; }
     const camps = master_().camps.map(function (c) { return { id: c.id, name: c.name }; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
-    return { ok: true, today: today, until: ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS)), list: list, memo: memo, info: info, booked: booked, kinds: PM_AVAIL_KINDS, qual: !!me.docQual,
+    const until0 = ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS));
+    let busy = [];
+    try { busy = schWorkDates_(u.id, today, until0); } catch (e) { busy = []; }
+    return { ok: true, today: today, until: until0, list: list, memo: memo, info: info, booked: booked, busy: busy, kinds: PM_AVAIL_KINDS, qual: !!me.docQual,
       camps: camps, crews: PM_CREWS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE, myLogin: me.loginId || '' };
   });
 }
@@ -603,9 +606,14 @@ function api_pmAvailSave(token, list, memo, info) {
     const pr = str_(info.price) === '' ? null : pmMoney_(info.price);
     if (str_(info.price) !== '' && (pr === null || pr <= 0)) fail_('희망 단가는 숫자로 입력해 주세요.');
     inf.price = pr ? String(pr) : '';
+    // 이미 근무 스케줄이 있는 날은 근무 가능일로 올릴 수 없다
+    let busy = {};
+    try { schWorkDates_(u.id, today, until).forEach(function (d) { busy[d] = 1; }); } catch (e) { busy = {}; }
+    const busyHit = [];
     list.forEach(function (x) {
       const dt = pmDate_(x && x.date);
       if (!dt || dt < today || dt > until || seen[dt]) return;
+      if (busy[dt]) { busyHit.push(dt); return; }
       seen[dt] = 1;
       rows.push(Object.assign({ id: uniqId_('V'), driverId: u.id, name: u.info.name, date: dt, kind: PM_AVAIL_KINDS.indexOf(x.kind) >= 0 ? x.kind : '무관', memo: m, createdAt: now }, inf));
     });
@@ -619,7 +627,7 @@ function api_pmAvailSave(token, list, memo, info) {
     } finally {
       lock.releaseLock();
     }
-    return { ok: true, count: rows.length };
+    return { ok: true, count: rows.length, busy: busyHit };
   });
 }
 /** 근무 가능한 다른 기사들 (오늘 이후). 이미 품앗이가 확정된 날은 뺀다 */
