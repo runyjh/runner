@@ -716,7 +716,12 @@
   .seg { display: inline-flex; background: var(--gray-weak); border-radius: 8px; padding: 3px; }
   .seg button { border: 0; background: none; height: 30px; padding: 0 14px; border-radius: 6px; font-weight: 700; color: var(--sub); }
   .seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-  table.sg.month th.dc, table.sg.month td.c, table.sg.month tr.calc td.cc { width: 80px; min-width: 80px; max-width: 80px; }
+  /* 한 달(4주): 칸 폭을 화면에 맞춤 (--dw = JS 가 표 폭에서 계산) */
+  table.sg.month th.dc, table.sg.month td.c, table.sg.month tr.calc td.cc { width: var(--dw, 80px); min-width: var(--dw, 80px); max-width: var(--dw, 80px); padding: 0 2px; }
+  table.sg.month td.c { font-size: 11px; }
+  table.sg.month th.dc b { font-size: 11px; } table.sg.month th.dc small { font-size: 9px; } table.sg.month th.dc i { font-size: 9px; padding: 0 1px; }
+  table.sg.month .rots i { font-size: 8px; padding: 0 2px; margin: 0 .5px; }
+  table.sg.month td.ex { max-width: 90px; }
   .ssave { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--gray-weak); color: var(--sub); white-space: nowrap; }
   .ssave.ok { background: var(--ok-weak); color: var(--ok); }
   .ssave.wait, .ssave.busy { background: var(--warn-weak); color: var(--warn); }
@@ -5207,7 +5212,7 @@
       return '<tr class="drv' + (gtop ? ' gtop' : '') + (d.status !== '승인' ? ' dim' : '') + (d.id === sMoved ? ' moved' : '') + '">' +
         '<td class="fx f1">' + esc(shortCamp(r.camp) || '-') + '</td>' +
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
-        (d.baseRoute ? '<small class="drt" title="기본노선(배정 라우트)">' + esc(d.baseRoute) + '</small>' : '') + rcTag +
+        rcTag +
         '<span class="mv"><button data-mv="-1" data-mid="' + esc(d.id) + '" title="위로">▲</button><button data-mv="1" data-mid="' + esc(d.id) + '" title="아래로">▼</button></span></td>' +
         '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + (routeHtml(d.baseRoute, d.campId) || esc(d.baseRoute || '')) + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
@@ -5216,10 +5221,18 @@
     }).join('');
     $('#sWrap').innerHTML = '<table class="sg' + (sMode === 'month' ? ' month' : '') + '" id="sGrid">' + head + '<tbody>' + body + '</tbody><tbody id="sCalc"></tbody></table>' +
       (srows.length ? '' : '<div class="empty">표시할 기사가 없습니다. 기사 정보관리에서 기사를 승인하거나, 캠프 필터를 바꿔 보세요.</div>');
-    renderCalc(); paintSel();
+    renderCalc(); paintSel(); fitMonth();
     $('#sCount').textContent = srows.filter((r) => r.kind === 'd').length + '명';
     if (sViewMode === 'route') renderBoard();
   }
+  /** 한 달 보기: 날짜 칸 폭 = (표 영역 폭 − 고정 칸 − 오른쪽 칸) ÷ 날짜 수 → 가로 스크롤 없이 4주가 한 화면에 */
+  function fitMonth() {
+    const t = $('#sGrid'); if (!t || sMode !== 'month') return;
+    const fixed = $$('thead tr.h1 th.fx, thead tr.h1 th.ex', t).reduce((a, th) => a + th.getBoundingClientRect().width, 0);
+    const w = Math.max(34, Math.floor(($('#sWrap').clientWidth - fixed - 4) / Math.max(1, SD.dates.length)));
+    t.style.setProperty('--dw', w + 'px');
+  }
+  window.addEventListener('resize', () => { if (currentView === 'sched') fitMonth(); });
   function tdCell(r, ri, dt, ci) {
     if (r.kind === 'r') return '<td class="c none' + (dt === pddDate() ? ' today' : '') + (sepCol(ci) ? ' wk2' : '') + '" data-r="' + ri + '" data-c="' + ci + '"></td>';
     if (r.seg && !segIn(r.seg, dt)) return offSegTd(r, ri, dt, ci);
