@@ -757,7 +757,8 @@
   .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; cursor: cell; user-select: none; text-align: center; font-weight: 600; white-space: pre; line-height: 1.25; }
   .sg td.wk2, .sg th.wk2 { border-left: 2px solid #c9d1da; }
   /* PDD 열: 진하게 구분 */
-  .sg td.today { background-color: #eaf2ff; border-left: 2px solid var(--brand); border-right: 2px solid var(--brand); }
+  .sg td.today { border-left: 2px solid var(--brand); border-right: 2px solid var(--brand); }
+  .sg td.today:not([class*=" k-"]) { background-color: #eaf2ff; }
   .sg tbody tr:last-child td.today { border-bottom: 2px solid var(--brand); }
   /* 매칭된 기사가 없는 노선 줄 */
   .sg tr.rtonly td.fx { color: var(--faint); } .sg tr.rtonly td.fx.f4 { color: var(--ink); font-weight: 700; }
@@ -769,12 +770,17 @@
   .sdd button.on, .sdd button:hover { background: #f2f4f6; }
   .sdd button.clr { color: var(--faint); font-weight: 500; border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; margin-top: 2px; }
   /* 칸 값 6가지 (드롭다운): 배경 없이 글자색만 */
-  .k-work { color: #59b4ff; } .k-off { color: #ff6b6b; }
-  .k-pm { color: #9b6bff; } .k-quit { color: #8b95a1; }
-  .k-sick { color: #2bb673; }
-  .k-mi { color: #d15555; font-weight: 800; }
-  .k-yong { background: #e6cff2; color: #5a3286; }
-  .k-chg { background: #0a53a8; color: #bfe0f6; }
+  .k-work { background: #d9f0ff; color: #2f8fe0; } .k-off { background: #ffc7c7; color: #e5484d; }
+  .k-pm { background: #ece3ff; color: #7a4fe0; } .k-quit { background: #e9ecef; color: #6b7684; }
+  /* 노선 칸: 노선 글자 아래 회전 아이콘 */
+  .rots { display: block; margin-top: 1px; line-height: 1; }
+  .rots i { display: inline-block; font-style: normal; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 4px; margin: 0 1px; color: #fff; background: #8b95a1; }
+  .rots i.r-d1 { background: #3b82f6; } .rots i.r-d2 { background: #14b8a6; } .rots i.r-f3 { background: #f59e0b; }
+  .sg td.c .rots, .sg td.f4 .rots { margin-top: 2px; } .sg td.f4 { line-height: 1.2; }
+  .k-sick { background: #dcf3e5; color: #1f9254; }
+  .k-mi { background: #ffe1e1; color: #c03434; font-weight: 800; }
+  .k-yong { background: #f3e6fb; color: #7b3fa8; }
+  .k-chg { background: #dbe7fb; color: #1b64da; }
   .k-reg { background: #d9f5ef; color: #0b6b57; }
   .k-other { background: #fff4d6; color: #7a4d00; }
   .k-route { color: var(--ink); }
@@ -1169,7 +1175,7 @@
         <div class="smore">
           <button class="btn ghost" type="button" id="sMoreBtn" aria-haspopup="true">⋯ 더보기</button>
           <div class="smenu hidden" id="sMenu">
-            <button type="button" id="sFill">고정휴무로 채우기 <small>보이는 기간 빈칸 → 출근/휴무</small></button>
+            <button type="button" id="sFill">고정휴무로 채우기 <small>보이는 기간 빈칸 → 업무/휴무</small></button>
             <button type="button" id="sNoteAdd">비고 줄 추가</button>
             <button type="button" data-rcopen="list">노선 변경 예약</button>
             <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
@@ -1184,10 +1190,10 @@
     <div class="swrap" id="sWrap" tabindex="0"></div>
     <div class="swrap hidden" id="sBoard"></div>
     <div class="slegend">
-      <span class="k-work">출근</span><span class="k-off">휴무</span><span class="k-pm">품앗이</span><span class="k-sick">병가</span><span class="k-quit">퇴사</span><span class="k-mi">미입차</span>
+      <span class="k-work">업무</span><span class="k-off">휴무</span><span class="k-pm">품앗이</span><span class="k-sick">병가</span><span class="k-quit">퇴사</span><span class="k-mi">미입차</span><span class="k-yong">용차</span><span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other">다른 캠프</span>
       <span style="background:#eaf2ff;box-shadow:inset 2px 0 0 var(--brand),inset -2px 0 0 var(--brand);color:var(--brand);font-weight:800">PDD</span><span style="box-shadow:inset 0 0 0 2px #f59e0b">중복</span><span class="k-iss">! 이슈</span>
       <span class="k-rulex">규칙 밖</span>
-      <em style="font-style:normal">칸 더블클릭·Enter·첫 글자 = 고르기 (위 6가지만) · <b>오른쪽 클릭 = 이슈</b> · 드래그로 여러 칸 · Ctrl+C/V · Ctrl+Z 되돌리기 · 자동 저장</em>
+      <em style="font-style:normal">칸 누르고 입력 (자유 입력 · 추천 목록) · <b>오른쪽 클릭 = 이슈</b> · 드래그로 여러 칸 · Ctrl+C/V · Ctrl+Z 되돌리기 · 자동 저장</em>
       <button type="button" class="linkbtn" id="sRuleBtn">📖 칸 쓰는 법</button>
     </div>
     <div class="srules hidden" id="sRules">
@@ -4888,7 +4894,7 @@
     if (!n || !w) return '';
     return (Math.round(n / w * 2) / 2) + '일';
   }
-  const SOPTS = ['출근', '휴무', '고정휴무', '계획된휴무', '병가', '휴가', '미입차', '용차', '노선변경', '라우트변경'];
+  const SOPTS = ['업무', '휴무', '품앗이', '병가', '퇴사', '미입차', '고정휴무', '계획된휴무', '휴가', '용차', '노선변경', '라우트변경'];
   /** 기사 줄 칸에 넣을 수 있는 값 (드롭다운) — 이 밖의 글자는 입력 불가. 나중에 여기에 추가 */
   const SVALS = ['출근', '휴무', '품앗이', '병가', '퇴사', '미입차'];
   const TYPE_ORDER = { '고정': 0, '품앗이': 1, '백업': 2, '외부용차': 3 };
@@ -4906,12 +4912,26 @@
   const shiftDays = (ds, n) => { const p = ds.split('-').map(Number); return ymdLocal(new Date(p[0], p[1] - 1, p[2] + n)); };
   const sget = (row, date) => ((SD.cells[row] || {})[date] || '');
   /** 칸 글자 HTML (출근·휴무 색은 칸 class 로) */
-  const cellTxt = (v) => esc(v);
+  /** 화면 글자: 저장 값 '출근' 은 '업무' 로 보임 */
+  const dispV = (v) => (String(v || '').trim() === '출근' ? '업무' : String(v || ''));
+  /** 캠프 기본 회전 (짧은 캠프명 또는 캠프 ID) */
+  const campRotsOf = (camp) => { const c = SD.camps.find((x) => x.id === camp || shortCamp(x.name) === shortCamp(camp)); return String((c && c.rot) || 'D1,D2,F3').split(',').map((x) => x.trim()).filter(Boolean); };
+  /** 노선 표기('527B', '530AB (F3)', '강서1 529A(D1)')면 노선 글자 + 아래에 회전 아이콘(D1·D2·F3). 회전을 안 적었으면 캠프 기본 회전 */
+  function routeHtml(v, camp) {
+    const t = String(v || '').trim();
+    if (!t || t.includes('\n')) return null;
+    const m = t.match(/^([가-힣]+\d\s+)?(.+)$/), pre = m[1] || '';
+    const b = SchedCalc.splitBase(m[2]);
+    if (!/^\d+[A-Za-z]+(\s*,\s*(\d+)?[A-Za-z]+)*$/.test(b.routes.replace(/\s/g, ''))) return null;
+    const rots = b.rot ? b.rot.split(',').filter(Boolean) : campRotsOf(pre ? pre.trim() : camp);
+    return esc(pre + b.routes.replace(/\s/g, '')) + '<span class="rots">' + rots.map((x) => '<i class="r-' + esc(x.toLowerCase()) + '">' + esc(x) + '</i>').join('') + '</span>';
+  }
+  const cellTxt = (v, camp) => routeHtml(v, camp) || esc(dispV(v));
   /** 칸 글자 → 색 구분 (운영시트 드롭다운 색과 같게) */
   function cellKind(v) {
     const s = String(v || '').trim();
     if (!s) return '';
-    if (s === '출근') return 'k-work';
+    if (s === '출근' || s === '업무') return 'k-work';
     if (s === '품앗이') return 'k-pm';
     if (s === '퇴사') return 'k-quit';
     if (/미입차/.test(s)) return 'k-mi';
@@ -4936,10 +4956,11 @@
     if (sBasis === 'settle' && p[2] >= 26) { m++; if (m > 12) { m = 1; y++; } }
     return y + '-' + String(m).padStart(2, '0');
   }
-  /** 그 달 범위 → 시작은 첫째 주 일요일, 끝은 마지막 주 토요일 (쿠팡 주: 일~토) */
+  /** 그 달 범위 → 첫째 주 일요일부터 4주(28일) (쿠팡 주: 일~토) */
   function monthRange(ym) {
     const r = monthRange0(ym), dow = (ds) => { const p = ds.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getDay(); };
-    return { from: shiftDays(r.from, -dow(r.from)), to: shiftDays(r.to, 6 - dow(r.to)), core: r };
+    const from = shiftDays(r.from, -dow(r.from));
+    return { from, to: shiftDays(from, 27), core: r }; // 한 달 = 4주(28일) 고정 → 화면 폭 안에
   }
   function monthRange0(ym) {
     const [y, m] = ym.split('-').map(Number);
@@ -5188,7 +5209,7 @@
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
         (d.baseRoute ? '<small class="drt" title="기본노선(배정 라우트)">' + esc(d.baseRoute) + '</small>' : '') + rcTag +
         '<span class="mv"><button data-mv="-1" data-mid="' + esc(d.id) + '" title="위로">▲</button><button data-mv="1" data-mid="' + esc(d.id) + '" title="아래로">▼</button></span></td>' +
-        '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
+        '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + (routeHtml(d.baseRoute, d.campId) || esc(d.baseRoute || '')) + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
         '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + cntHtml(r.key || d.id) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td>' +
         '<td class="ex num" data-pat="' + esc(r.key || d.id) + '">' + patHtml(r.key || d.id) + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
@@ -5214,7 +5235,7 @@
     const rx = r.kind === 'd' ? cellRule(r, v) : '';
     if (rx) cls.push('rulex');
     const tip = v + (pm ? '\n' + pmTip(pm) : '') + (iss ? '\n⚠ ' + issueText(iss) : '') + (rx ? '\n✎ ' + rx : '');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm || iss || rx ? ' title="' + esc(tip) + '"' : '') + '>' + cellTxt(v) + pmBadge(pm) + (iss ? '<span class="isb">!</span>' : '') + '</td>';
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm || iss || rx ? ' title="' + esc(tip) + '"' : '') + '>' + cellTxt(v, r.d ? r.d.campId : '') + pmBadge(pm) + (iss ? '<span class="isb">!</span>' : '') + '</td>';
   }
   /** '▶ 이지원, ◀ 김등록' → 품▶ (일을 줌) / 품◀ (일을 받음) 작은 표시 */
   function pmBadge(pm) {
@@ -5265,7 +5286,7 @@
       const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '', iss ? 'iss' : '', rx ? 'rulex' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
-      const pmv = pmMark(r.row, dt), html = cellTxt(v) + pmBadge(pmv) + (iss ? '<span class="isb">!</span>' : '');
+      const pmv = pmMark(r.row, dt), html = cellTxt(v, r.d ? r.d.campId : '') + pmBadge(pmv) + (iss ? '<span class="isb">!</span>' : '');
       if (td.innerHTML !== html) td.innerHTML = html;
       if (v.length > 14 || pmv || iss || rx) td.title = v + (pmv ? '\n' + pmTip(pmv) : '') + (iss ? '\n⚠ ' + issueText(iss) : '') + (rx ? '\n✎ ' + rx : ''); else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
@@ -5278,12 +5299,6 @@
 
   // ── 값 바꾸기 · 자동 저장 ──
   function setCells(list, opts) {
-    // 기사 줄은 드롭다운 값(SVALS)과 빈칸만. 되돌리기(Ctrl+Z)는 예전 값 그대로 복원
-    if (!(opts && opts.noUndo)) {
-      const drv = new Set(srows.filter((r) => r.kind === 'd').map((r) => r.row));
-      const bad = list.filter((x) => drv.has(x.row) && String(x.value == null ? '' : x.value).trim() && !SVALS.includes(String(x.value).trim()));
-      if (bad.length) { toast(SVALS.join('·') + ' 만 넣을 수 있습니다. (' + bad.length + '칸 건너뜀)'); list = list.filter((x) => !bad.includes(x)); }
-    }
     const undo = [];
     list.forEach((x) => {
       const v = String(x.value == null ? '' : x.value).replace(/\r\n?/g, '\n').trim();
@@ -5452,7 +5467,7 @@
     if (currentView !== 'sched' || sEdit || document.activeElement !== $('#sWrap')) return;
     const s = selRect(); if (!s) return;
     const out = [];
-    for (let r = s.r1; r <= s.r2; r++) { const line = []; for (let c = s.c1; c <= s.c2; c++) line.push(tsvCell(sget(srows[r].row, SD.dates[c]))); out.push(line.join('\t')); }
+    for (let r = s.r1; r <= s.r2; r++) { const line = []; for (let c = s.c1; c <= s.c2; c++) line.push(tsvCell(dispV(sget(srows[r].row, SD.dates[c])))); out.push(line.join('\t')); }
     e.clipboardData.setData('text/plain', out.join('\n')); e.preventDefault();
     toast((s.r2 - s.r1 + 1) * (s.c2 - s.c1 + 1) + '칸을 복사했습니다.');
   });
@@ -5477,7 +5492,7 @@
     const t = String(text || '').trim().toUpperCase();
     const d = r.d, myCamp = d ? d.campId : '', out = [];
     const push = (v, hint) => { if (v && !out.some((x) => x.v === v)) out.push({ v, hint }); };
-    if (d && d.baseRoute && !/백업|용차/.test(d.baseRoute)) push('출근', d.baseRoute);
+    if (d && d.baseRoute && !/백업|용차/.test(d.baseRoute)) push('업무', d.baseRoute);
     SOPTS.forEach((o) => push(o));
     // 노선: 노선관리에 등록된 노선 + 기사들의 기본노선 + 이 2주에 이미 쓴 값
     const campRoutes = {};
@@ -5497,7 +5512,6 @@
   function openEdit(initial) {
     if (!sAct || sEdit) return;
     if (srows[sAct.r] && srows[sAct.r].kind === 'r') return toast('담당 기사가 없는 노선입니다. 기사 스케줄 설정에서 담당노선을 넣으면 그 기사 줄이 됩니다.');
-    if (srows[sAct.r] && srows[sAct.r].kind === 'd' && !segOff(sAct.r, sAct.c)) return openDrop(initial);
     if (segOff(sAct.r, sAct.c)) { const sg = srows[sAct.r].seg; if (sg.left && SD.dates[sAct.c] > sg.to) return toast('퇴사한 기사입니다 (' + mdOf(sg.to) + ' 마지막 근무). 기사 정보관리 › 근무상태에서 바꿀 수 있습니다.'); return toast('이 날은 ' + (SD.dates[sAct.c] < sg.from ? '이전' : '새') + ' 캠프 줄에서 입력해 주세요. (노선 변경 예약)'); }
     const r = srows[sAct.r], dt = SD.dates[sAct.c];
     const td = $('#sGrid').querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]'); if (!td) return;
@@ -5508,11 +5522,11 @@
     box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea><div class="sug"></div><div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
     wrap.appendChild(box);
     const ta = box.querySelector('textarea');
-    ta.value = initial != null ? initial : sget(r.row, dt);
+    ta.value = initial != null ? initial : dispV(sget(r.row, dt));
     sEdit = { box, ta, r, dt, idx: -1 };
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
     const renderSug = () => {
-      const list = suggestions(r, ta.value === sget(r.row, dt) && initial == null ? '' : ta.value);
+      const list = suggestions(r, ta.value === dispV(sget(r.row, dt)) && initial == null ? '' : ta.value);
       sEdit.list = list; sEdit.idx = Math.min(sEdit.idx, list.length - 1);
       box.querySelector('.sug').innerHTML = list.map((x, i) => '<button type="button" data-i="' + i + '" class="' + cellKind(x.v) + (i === sEdit.idx ? ' on' : '') + '">' +
         esc(x.v) + (x.hint ? '<small>' + esc(x.hint) + '</small>' : '') + '</button>').join('');
@@ -5802,7 +5816,7 @@
     if (!confirm('이 기간 빈칸 ' + list.length + '개를 채웁니다.\n출근 ' + (list.length - nOff) + '칸 · 휴무 ' + nOff + '칸\n(담당노선이 있는 기사 · 고정휴무 요일 기준 · 이미 적힌 칸은 그대로)' +
       (skipped.length ? '\n\n고정휴무 요일이 없어 건너뛰는 기사: ' + skipped.join(', ') : '') + '\n\n채울까요? (Ctrl+Z 로 되돌릴 수 있습니다)')) return;
     setCells(list);
-    toast('출근 ' + (list.length - nOff) + '칸 · 휴무 ' + nOff + '칸을 채웠습니다.' + (skipped.length ? ' 고정휴무 없음: ' + skipped.join(', ') : ''));
+    toast('업무 ' + (list.length - nOff) + '칸 · 휴무 ' + nOff + '칸을 채웠습니다.' + (skipped.length ? ' 고정휴무 없음: ' + skipped.join(', ') : ''));
   });
 
   // ── 기사 스케줄 설정 ──
@@ -5906,6 +5920,7 @@
   /** 입력 정리: '강서1캠프 527b' → '강서1 527B', '(d1, d2)' → '(D1,D2)' */
   function normCell(v) {
     let s = String(v == null ? '' : v).replace(/\r\n?/g, '\n').trim();
+    if (s === '업무') return '출근'; // 화면 이름 '업무' = 저장 값 '출근'
     if (!s || s.includes('\n')) return s;
     s = s.replace(/([가-힣]+\d)\s*캠프/g, '$1');
     s = s.replace(/(^|[\s,(])(\d{2,4})([a-dA-D]+)(?=$|[\s,()\[])/g, (m, p, n, l) => p + n + l.toUpperCase());
