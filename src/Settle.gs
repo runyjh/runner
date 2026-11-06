@@ -156,7 +156,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261107b';
+const STL_CALC_VER = '20261107c';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -1644,6 +1644,13 @@ function stlCompute_(month) {
       advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty,
       movedIn: Object.keys(s.movedIn).map(function (k) { return s.movedIn[k].label; }), movedOut: Object.keys(s.movedOut).map(function (k) { return s.movedOut[k].label; })
     };
+    // 대표(직함 '대표' 또는 원청단가): 지급하지 않는다 — 매출은 그대로 러너 수익. 명세서는 확인용으로 계산값(ceoView)만 남김
+    if (normTitle_(o.title) === '대표' || s.mode === '원청단가') {
+      row.ceo = true;
+      row.ceoView = {};
+      ['pay', 'taxDed', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'runnerIns', 'insGain'].forEach(function (k) { row.ceoView[k] = row[k]; row[k] = 0; });
+      row.profit = Math.round(s.supplyCp - s.lossCp);
+    }
     drivers.push(row);
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
       daily: s.daily, sched: s.sched.cells, idUse: s.idUse || {}, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers,
@@ -3383,7 +3390,7 @@ function api_mySlip(token, month) {
     let co = {};
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
     const slips = groups.map(function (g) { return r.slips[g]; }).filter(Boolean).map(function (sl) {
-      const d = sl.row;
+      const d = sl.row.ceo ? Object.assign({}, sl.row, sl.row.ceoView) : sl.row;
       stlLiveBizName_(d);
       return {
         row: {

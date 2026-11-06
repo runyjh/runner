@@ -397,6 +397,7 @@
   .slip .smemo { color: var(--faint); font-size: 11px; white-space: normal; }
   .slip .ytag { font-weight: 800; color: #d9480f; } .slip .ytag.p { color: #6741d9; } .slip .ytag.u { color: #0b7285; } .slip .ref { color: var(--faint); }
   .slip .foot { color: var(--sub); font-size: 11.5px; margin-top: 6px; }
+  .slip .ceo-note { margin: 4px 0 8px; padding: 7px 10px; border-radius: 8px; background: #fff4d6; border: 1px solid #f5d38a; color: #8a4b00; font-size: 13px; }
   .slip .invbox { margin-top: 10px; border: 2px solid #1b64da; border-radius: 8px; background: #f3f7ff; padding: 8px 10px 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .slip .invbox .ihd { font-size: 14px; font-weight: 800; color: #1b64da; margin-bottom: 6px; }
   .slip .invbox .ihd small { font-size: 11.5px; font-weight: 600; color: var(--sub); margin-left: 6px; }
@@ -5902,7 +5903,7 @@
     STX.slipIds = list.map((d) => d.id);
     const H = ['명의자', '정산 아이디 (메인 · 서브)', '근무일', '배송건수', '지급 합계', '분실파손금액', '세금계산서', '공급가', '세액', '산재', '고용', '공제금액', '실입금', '회사이익금', '입금'];
     const num = (v, neg) => '<td class="n' + (neg && v < 0 ? ' neg' : '') + '">' + wnz(v) + '</td>';
-    const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.vendor ? ' <span class="vtag">용차업체' + (d.vendorPrice ? ' · 지급 ' + wn(d.vendorPrice) : '') + '</span>' : '') + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
+    const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.vendor ? ' <span class="vtag">용차업체' + (d.vendorPrice ? ' · 지급 ' + wn(d.vendorPrice) : '') + '</span>' : '') + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.ceo ? ' <span class="vtag" title="대표: 지급하지 않음 · 매출은 러너 수익 · 명세서는 확인용">대표 · 러너 수익</span>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
       '<td class="sub">' + d.cids.map((x, i) => (i ? '<span style="opacity:.7">' : '<b style="color:var(--ink)">') + esc(x.replace(/@.*/, '')) + (i ? '</span>' : '</b>')).join(', ') +
         (d.workers && d.workers.length ? '<br><small>일한 기사: ' + esc(d.workers.join(', ')) + '</small>' : '') +
         (d.movedIn && d.movedIn.length ? '<br><small style="color:var(--ok)">' + esc(d.movedIn.join(', ')) + '</small>' : '') +
@@ -6439,7 +6440,7 @@
     return (d.workDays || 0) + '일';
   }
   function slipHtml(r) {
-    const s = r.slip, d = s.row, co = r.company, P = r.period, D = r.dates;
+    const s = r.slip, d = s.row.ceo ? Object.assign({}, s.row, s.row.ceoView) : s.row, co = r.company, P = r.period, D = r.dates;
     const pays = s.lines.filter((l) => l.side === '지급' && l.method !== '입금가산'), deds = s.lines.filter((l) => l.side === '차감'), adds = s.lines.filter((l) => l.method === '입금가산');
     // 고용보험 0원: 월 보수액이 기준(설정 '고용보험 적용 최저 월 보수액') 미만이라 제외된 경우 이유를 적어 준다
     const goyNote = (l) => l.method === '고용보험' && !l.amt && s.ins && !s.ins.excluded && s.ins.bosu > 0 ? '월 보수액 ' + wn(Math.round(s.ins.bosu)) + '원 → 기준 미만이라 적용 제외' : '';
@@ -6483,6 +6484,7 @@
     const lname = (l) => d.vendor ? String(l.name).replace(/품앗이|외부용차|용차/g, '용차업체')
       : (l.method === '용차수행' || (l.method === '용차지출' && yongAllOurs) ? String(l.name).replace(/용차/g, '품앗이') : l.method === '용차지출' ? String(l.name).replace(/^용차/, '외부용차') : l.name);
     return '<h2>' + ymTitle(r.month) + ' ' + esc(co.name || '러너') + ' 정산서 (급여내역서) — ' + esc(d.name) + '</h2>' +
+      (d.ceo ? '<div class="ceo-note">대표 명세서 · <b>지급하지 않음</b> — 매출은 러너 수익으로 잡히고, 아래 금액은 확인용입니다. (입금 목록 · 세금계산서 · 합계에서 빠짐)</div>' : '') +
       '<div class="cols"><div><h4>① 기본 정보 · 정산 요약 (부가세 포함)</h4><table class="kv2"><tbody>' +
       '<tr><th>' + (d.vendor ? '업체명' : '기사명') + '</th><td>' + esc(d.name) + '</td><th>정산월</th><td>' + esc(r.month) + '</td></tr>' +
       '<tr><th>정산 아이디</th><td>' + esc(d.cids.map((x) => x.replace(/@.*/, '')).join(', ')) + '</td><th>정산기간</th><td>' + mdTxt(P.from) + ' ~ ' + mdTxt(P.to) + '</td></tr>' +
