@@ -4944,6 +4944,9 @@ function api_mySchedule(token, month) {
     } catch (e) { out.backup = {}; }
     // 내가 올린 품앗이가 배차 확정되고, 그날 내 스케줄 칸의 캠프·라우트와 같으면 '배차확정 완료' 표시
     try { out.pmDone = pmDoneOf_(String(s.d), out.cells, info.camp || out.camp || ''); } catch (e) { out.pmDone = {}; }
+    // 관리자가 기사스케줄 칸에 적은 지시사항 (스케줄 이슈 '지시')
+    out.inst = {};
+    try { schIssues_(dates[0], dates[dates.length - 1]).forEach(function (x) { if (x.kind === '지시' && x.driverId === String(s.d) && x.reason) out.inst[x.date] = x.reason; }); } catch (e) { out.inst = {}; }
     return fsW(out);
   });
 }

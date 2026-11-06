@@ -162,6 +162,9 @@
   .day .bk { font-size: 12.5px; color: #5a3286; background: #f5eefb; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; }
   .day .bk b { font-weight: 700; margin-right: 4px; }
   .day .bk.none { color: #b0b8c1; background: transparent; padding: 0 2px; }
+  .day .inst { font-size: 13px; color: #8a4b00; background: #fff4d6; border: 1px solid #f5d38a; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; white-space: pre-wrap; }
+  .day .inst b { display: block; font-size: 12px; font-weight: 800; margin-bottom: 1px; }
+  .mc .instdot { position: absolute; top: 2px; right: 3px; font-size: 10px; line-height: 1; }
   .inst { display: block; width: 100%; text-align: left; border: 0; background: var(--brand); color: #fff; border-radius: var(--radius); padding: 14px 16px; margin: 12px 0 4px; font: inherit; }
   .inst b { display: block; font-size: 16px; } .inst span { font-size: 13px; opacity: .85; }
   .ihelp { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; z-index: 50; padding: 16px; }
@@ -373,7 +376,7 @@
   .mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
   .mgrid .wd { text-align: center; font-size: 12px; color: var(--sub); font-weight: 700; padding: 2px 0 4px; }
   .mgrid .wd.sun { color: var(--danger); } .mgrid .wd.sat { color: var(--brand); }
-  .mc { min-height: 64px; border-radius: 8px; padding: 3px; border: 1.5px solid transparent; background: #fafbfc; display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; color: inherit; }
+  .mc { position: relative; min-height: 64px; border-radius: 8px; padding: 3px; border: 1.5px solid transparent; background: #fafbfc; display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; color: inherit; }
   .mc.blank { background: none; }
   .mc .n { font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
   .mc.sun .n { color: var(--danger); } .mc.sat .n { color: var(--brand); }
@@ -1470,7 +1473,8 @@
     const pm = ((r.pumasi || {})[d] || []).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : '') + '</b>' + escH(x.text) + '</button>').join('');
     return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
       '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +
-      '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' + pmDoneRow(r, d) + pm + bk + '</div></div>';
+      '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' +
+      ((r.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(r.inst[d]) + '</div>' : '') + pmDoneRow(r, d) + pm + bk + '</div></div>';
   }
   /** 내가 올린 품앗이가 배차 확정 + 그날 내 칸과 캠프·라우트가 같을 때 */
   function pmDoneRow(r, d) {
@@ -1499,7 +1503,7 @@
       const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', nb = ((r.backup || {})[d] || []).length, np = ((r.pumasi || {})[d] || []);
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
         '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + '</span>' +
-        (d === pdd ? '<em class="pddt">PDD</em>' : '') +
+        (d === pdd ? '<em class="pddt">PDD</em>' : '') + ((r.inst || {})[d] ? '<span class="instdot" title="지시사항">📌</span>' : '') +
         (v ? '<span class="v ' + schKind(v) + '">' + escH(v) + '</span>' : '') +
         (((r.pmDone || {})[d] || []).length ? '<span class="pmok">✅ 확정완료</span>' : '') +
         (np.length ? '<span class="pmdot">🤝 ' + escH(np.some((x) => x.role === '수행') ? '수행' : np[0].role) + '</span>' : '') +
