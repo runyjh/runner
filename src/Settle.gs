@@ -52,7 +52,7 @@ const STL_TABS = {
   stl_split: { from: '원 명의자', fromId: '원 정산 아이디', to: '받는 명의자', toId: '받는 정산 아이디', target: '목표 실수령', unit: '단위', repeat: '매달 반복', month: '적용월' },
   stl_leave: { name: '명의자', acct: '정산 아이디', month: '퇴사월', amt: '보류금', memo: '정산서 메모' },
   stl_items: { order: '순서', side: '구분', name: '항목 이름', method: '계산 방식', show: '표시', taxCut: '계산서에서 빼기', desc: '설명' },
-  stl_camps: { kind: '구분', camp: '캠프명', name: '기사', acct: '정산 아이디', basis: '보험 기준', expense: '경비공제율', san: '산재율', goy: '고용율', sanOn: '산재 ON/OFF', goyOn: '고용 ON/OFF', memo: '메모' },
+  stl_camps: { kind: '구분', camp: '캠프명', name: '기사', acct: '정산 아이디', basis: '보험 기준', expense: '경비공제율', san: '산재율', goy: '고용율', runner: '러너 부담률', sanOn: '산재 ON/OFF', goyOn: '고용 ON/OFF', memo: '메모' },
   stl_kinds: { raw: '쿠팡 구분 값', std: '표준 분류' },
   stl_config: { label: '항목', value: '값', desc: '설명' },
   stl_pay: { month: '정산월', acct: '정산 아이디', name: '명의자', checked: '입금체크', date: '입금일', memo: '메모' },
@@ -81,7 +81,7 @@ const STL_TAB_NOTES = {
   stl_adjust: '기사별 월 추가지급·차감. 항목은 stl_items 의 "항목 이름". 금액은 차감도 양수로.',
   stl_advance: '가불금 원장. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제되고, 그 달을 마감하면 상환금에 자동 기록됩니다. 정산 밖에서 현금으로 받으면 상환금 칸에 직접 적으세요.',
   stl_yongcha: '지급구분: 건당 / 금액. 단가를 비우면 품앗이 = 노선관리의 그 노선 품앗이단가, 용차업체 = 그 노선 외부용차단가(차액부담 기사 청구 단가). 건수를 비우면 쿠팡 정산서에서 자동으로 셉니다.',
-  stl_camps: '캠프 및 기사별 산재·고용. 구분 = 캠프 / 기사. 빈 칸 = 세부정산 설정 기본값. 우선순위: 기사 > 캠프 > 기본값 (칸마다). 산재·고용 ON/OFF 는 기사 줄만 (OFF = 그 보험 공제 안 함). 보험 기준: 공급가 / 부가세포함.',
+  stl_camps: '캠프 및 기사별 산재·고용. 구분 = 캠프 / 기사. 빈 칸 = 세부정산 설정 기본값. 우선순위: 기사 > 캠프 > 기본값 (칸마다). 산재·고용 ON/OFF 는 기사 줄만 (OFF = 그 보험 공제 안 함). 보험 기준: 공급가 / 부가세포함. 산재율·고용율 = 전체 요율(기사+러너), 기사 공제 = 요율 × (1 − 러너 부담률).',
   stl_config: '값만 고치세요. % 는 10% 처럼 써도 됩니다.',
   stl_cost: '고정 운영비: 매달 똑같이 나가는 돈. 월 금액 = 실제 나가는 돈(VAT포함). 증빙이 세금계산서·카드·현금영수증이면 부가세를 나눠 매입세액 공제로 셉니다. 시작월·종료월(2026-11) 사이 달에 자동 반영.',
   stl_staff: '직원(기사 아님): 월 급여(세전) · 원천세율(비우면 3.3% = 소득세 3% + 지방소득세 0.3%).',
@@ -162,7 +162,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261107d';
+const STL_CALC_VER = '20261107e';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -681,12 +681,12 @@ function stlCampIns_(cfg, X, D) {
       const id = stlAcct_(X, D, o.name, o.acct);
       if (!id) return;
       const r = function (v) { return str_(v) ? stlRate_(v, null) : null; };
-      out.acct[id] = { basis: stlInsBasis_(o.basis), expense: r(o.expense), san: r(o.san), goy: r(o.goy), sanOff: stlOff_(o.sanOn), goyOff: stlOff_(o.goyOn), row: o._row };
+      out.acct[id] = { basis: stlInsBasis_(o.basis), expense: r(o.expense), san: r(o.san), goy: r(o.goy), runner: r(o.runner), sanOff: stlOff_(o.sanOn), goyOff: stlOff_(o.goyOn), row: o._row };
       return;
     }
     if (!o.camp) return;
     out.camp[stlShort_(o.camp)] = {
-      basis: stlInsBasis_(o.basis) || cfg.insBasis, expense: stlRate_(o.expense, cfg.expense), san: stlRate_(o.san, cfg.san), goy: stlRate_(o.goy, cfg.goy), row: o._row
+      basis: stlInsBasis_(o.basis) || cfg.insBasis, expense: stlRate_(o.expense, cfg.expense), san: stlRate_(o.san, cfg.san), goy: stlRate_(o.goy, cfg.goy), runner: stlRate_(o.runner, cfg.runner), row: o._row
     };
   });
   return out;
@@ -1945,33 +1945,35 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
   let san = 0, goy = 0, runnerIns = 0, insGain = 0;
   if (!excluded && invoice > 0) {
     const baseOf = function (b) { return b === '부가세포함' ? invoice : supply; };
-    let tw = 0, we = 0, ws = 0, wg = 0, wb = 0;
+    let tw = 0, we = 0, ws = 0, wg = 0, wb = 0, wr = 0;
     const w = {};
     Object.keys(s.campPay).forEach(function (c) {
       const x = s.campPay[c]; if (x <= 0) return;
       const ci = (campIns.camp || {})[c] || {};
       tw += x; we += x * (ci.expense != null ? ci.expense : cfg.expense); ws += x * (ci.san != null ? ci.san : cfg.san);
-      wg += x * (ci.goy != null ? ci.goy : cfg.goy); wb += x * baseOf(ci.basis || cfg.insBasis);
+      wg += x * (ci.goy != null ? ci.goy : cfg.goy); wb += x * baseOf(ci.basis || cfg.insBasis); wr += x * (ci.runner != null ? ci.runner : cfg.runner);
       w[c] = x;
     });
     ins.base = baseOf(cfg.insBasis);
-    if (tw > 0) { ins.exp = we / tw; ins.san = ws / tw; ins.goy = wg / tw; ins.base = wb / tw; Object.keys(w).forEach(function (c) { w[c] = w[c] / tw; }); }
+    if (tw > 0) { ins.exp = we / tw; ins.san = ws / tw; ins.goy = wg / tw; ins.base = wb / tw; ins.runner = wr / tw; Object.keys(w).forEach(function (c) { w[c] = w[c] / tw; }); }
     if (dv) {
       if (dv.basis) ins.base = baseOf(dv.basis);
       if (dv.expense != null) ins.exp = dv.expense;
       if (dv.san != null) ins.san = dv.san;
       if (dv.goy != null) ins.goy = dv.goy;
+      if (dv.runner != null) ins.runner = dv.runner;
     }
     const sanOff = !!(dv && dv.sanOff), goyOff = !!(dv && dv.goyOff);
     // 요율 = 전체 요율(기사+러너). 기사 공제 = 보수액 × 요율 × (1 − 러너 부담률). 예: 1.96% · 러너 50% → 기사 0.98%
-    const r = Math.min(0.95, Math.max(0, ins.runner)), dr = 1 - r;
+    const r = Math.min(0.95, Math.max(0, ins.runner)), dr = 1 - r; // 기사 공제용 (캠프·기사별 러너 부담률)
+    const r0 = Math.min(0.95, Math.max(0, cfg.runner)), dr0 = 1 - r0; // 공단 실제 납부 기준 (세부정산 설정 기본값)
     ins.bosu = ins.base * (1 - ins.exp);
     san = sanOff ? 0 : stlFloor10_(ins.bosu * (ins.san + cfg.commute) * dr);
     goy = goyOff || ins.bosu < cfg.goyMin ? 0 : stlFloor10_(ins.bosu * ins.goy * dr);
     // 공단 실제 납부 (항상 세부정산 설정 기본값: 보험 기준·경비율·요율). OFF 인 보험은 납부도 없음. san0·goy0 = 그중 기사분
     const bosu0 = baseOf(cfg.insBasis) * (1 - cfg.expense);
-    const san0 = sanOff ? 0 : stlFloor10_(bosu0 * (cfg.san + cfg.commute) * dr), goy0 = goyOff || bosu0 < cfg.goyMin ? 0 : stlFloor10_(bosu0 * cfg.goy * dr);
-    const totalAct = Math.round((san0 + goy0) / dr);
+    const san0 = sanOff ? 0 : stlFloor10_(bosu0 * (cfg.san + cfg.commute) * dr0), goy0 = goyOff || bosu0 < cfg.goyMin ? 0 : stlFloor10_(bosu0 * cfg.goy * dr0);
+    const totalAct = Math.round((san0 + goy0) / dr0);
     ins.sanAct = san0; ins.goyAct = goy0;
     runnerIns = totalAct - (san + goy);
     insGain = (san + goy) - (san0 + goy0); // 기사 공제가 공단 기사분보다 많은 만큼 = 러너 몫
@@ -2727,7 +2729,7 @@ const STL_EDIT = {
   items: { sheet: 'stl_items', scope: 'all', cols: [['order', '순서', 'text'], ['side', '구분', ['지급', '차감']], ['name', '항목 이름', 'text'], ['method', '계산 방식', STL_METHODS], ['show', '표시', ['항상', '금액 있을 때']], ['taxCut', '계산서에서 빼기 (차감만)', ['', 'Y', 'N']], ['desc', '설명', 'text']] },
   // 캠프 및 기사별 산재·고용: when = 그 구분의 줄에만 쓰는 칸
   camps: { sheet: 'stl_camps', scope: 'all', cols: [['kind', '구분', ['캠프', '기사']], ['camp', '캠프', 'camp', '', '캠프'], ['name', '기사 (정산 아이디)', 'acct', 'acct', '기사'], ['basis', '보험 기준', ['', '공급가', '부가세포함']],
-    ['expense', '경비공제율', 'text'], ['san', '산재율 (기사분)', 'text'], ['goy', '고용율 (기사분)', 'text'], ['sanOn', '산재', ['', 'OFF'], '', '기사'], ['goyOn', '고용', ['', 'OFF'], '', '기사'], ['memo', '메모', 'text']] },
+    ['expense', '경비공제율', 'text'], ['san', '산재율 (전체)', 'text'], ['goy', '고용율 (전체)', 'text'], ['runner', '러너 부담률', 'text'], ['sanOn', '산재', ['', 'OFF'], '', '기사'], ['goyOn', '고용', ['', 'OFF'], '', '기사'], ['memo', '메모', 'text']] },
   kinds: { sheet: 'stl_kinds', scope: 'all', cols: [['raw', '쿠팡 구분 값', 'text'], ['std', '표준 분류', STL_STD_KINDS]] },
   config: { sheet: 'stl_config', scope: 'all', fixed: true, cols: [['label', '항목', 'readonly'], ['value', '값', 'text'], ['desc', '설명', 'readonly']] },
   // 러너 손익·운영비
