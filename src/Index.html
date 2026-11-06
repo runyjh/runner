@@ -1898,11 +1898,12 @@
     if (!id && !offer && !pmPostOn) return toast('지금은 사무실에서 품앗이 일감 올리기를 잠시 멈춰 두었습니다.');
     if (!id && offer && !pmOfferOn) return toast('지금은 사무실에서 품앗이 일감 제안을 잠시 멈춰 두었습니다.');
     pmEditId = id || ''; pmFormFrom = from || 'pumasi'; pmOffer = id ? null : (offer || null);
-    $('#pfTitle').textContent = id ? '품앗이 일감 수정' : '품앗이 일감 올리기';
-    $('#pfBtn').textContent = id ? '저장' : '올리기';
+    $('#pfTitle').textContent = id ? '품앗이 일감 수정' : offer ? '💌 일감 제안하기' : '품앗이 일감 올리기';
+    $('#pfBtn').textContent = id ? '저장' : offer ? '제안 보내기' : '올리기';
     const token = pmTok(); if (!token) return;
     const go = (f) => {
-      if (!id && f.postOn === false) { pmPostOn = false; return toast('지금은 사무실에서 품앗이 일감 올리기를 잠시 멈춰 두었습니다.'); }
+      if (!id && !offer && f.postOn === false) { pmPostOn = false; paintPostOn(); return toast('지금은 사무실에서 품앗이 일감 올리기를 잠시 멈춰 두었습니다.'); }
+      if (!id && offer && f.offerOn === false) { pmOfferOn = false; paintPostOn(); return toast('지금은 사무실에서 품앗이 일감 제안을 잠시 멈춰 두었습니다.'); }
       pmFormData = f; pmFillForm(f, id ? raw : null);
       const ob = $('#pfOffer');
       if (pmOffer) {
