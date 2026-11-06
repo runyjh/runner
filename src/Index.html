@@ -667,7 +667,7 @@
   <!-- ───────────── 품앗이 (기사끼리 품앗이 일감 주고받기) ───────────── -->
   <section id="v-pumasi" class="view">
     <div class="topbar"><button class="back" id="pmBack" aria-label="뒤로">←</button><h2>품앗이</h2>
-      <button class="btn sm ghost" id="pmGive" type="button" style="margin-left:auto;height:38px;padding:0 10px">🙋 품앗이 주세요</button>
+      <button class="btn sm" id="pmGive" type="button" style="margin-left:auto;height:38px;padding:0 10px">🙋 품앗이 주세요</button>
       <button class="btn sm" id="pmNew" type="button" style="margin-left:6px;height:38px;padding:0 10px">+ 일감 올리기</button></div>
     <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.<small>기사님끼리 품앗이 일감을 맡기고 대신 뛰어 주세요.</small></div>
     <div class="pmofr hidden" id="pmOffNote">지금은 사무실에서 <b>품앗이 일감 올리기</b>를 잠시 멈춰 두었습니다. 올라온 일감 보기·지원은 그대로 할 수 있습니다.</div>
@@ -1708,7 +1708,7 @@
         .sort((a, b) => a.d.localeCompare(b.d));
       setTimeout(paintPostOn, 0);
       $('#pmList').innerHTML = items.length ? items.map((x) => x.h).join('')
-        : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 일감 올리기</b>로 첫 일감을 올려 보세요.') + '</div>';
+        : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : (pmPostOn ? '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 일감 올리기</b>로 첫 일감을 올려 보세요.' : '아직 올라온 일감이 없습니다.')) + '</div>';
     }).catch(() => { $('#pmList').innerHTML = ''; netErr(); });
   }
   $('#mPm').addEventListener('click', () => openPumasi('home'));
