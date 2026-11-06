@@ -2825,6 +2825,15 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     if (!Array.isArray(rows) || rows.length > 3000) fail_('줄이 너무 많습니다.');
     const D = stlDrivers_(), X = stlIds_(D);
     const seenCid = {};
+    // 일시단가: 기사 칸에 '배만호,임동준,강준길' 처럼 쉼표로 여러 명 → 한 사람씩 같은 내용의 줄로 나눠 저장
+    if (name === 'tmp') {
+      rows = [].concat.apply([], rows.map(function (r) {
+        const names = str_(r && r.name).split(/[,，、]/).map(function (x) { return x.trim(); }).filter(Boolean);
+        if (names.length < 2) return [r];
+        return names.map(function (n) { return Object.assign({}, r, { name: n, driverId: '' }); });
+      }));
+      if (rows.length > 3000) fail_('줄이 너무 많습니다.');
+    }
     let clean = rows.map(function (r, i) {
       const o = {};
       E.cols.forEach(function (c) {
