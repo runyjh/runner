@@ -415,6 +415,9 @@ function doPost(e) {
     else {
       out = f.apply(null, Array.isArray(req.args) ? req.args : []);
       if (out === undefined) out = null;
+      // Firestore 사본: 읽기 전용으로 등록된 함수가 아니면(= 새로 만든 기능 포함) '데이터가 바뀌었을 수 있음' 으로 표시
+      // → 개발하면서 저장 기능을 추가해도 오래된 사본이 쓰이지 않는다 (안전한 쪽이 기본)
+      if (out && out.ok !== false && FS_READ_FNS.indexOf(fn) < 0) fsMark_();
     }
   } catch (err) {
     out = { ok: false, msg: '서버 오류: ' + (err && err.message || err) };
@@ -741,6 +744,15 @@ function run_(fn) {
     return { ok: false, msg: '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' };
   }
 }
+/** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
+const FS_READ_FNS = ['adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+  'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
+  'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
+  'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
+  'adm_stlMonth', 'adm_stlPayList', 'adm_stlPnl', 'adm_stlRoundInfo', 'adm_stlSlip', 'adm_stlTable', 'adm_stlTax', 'adm_tiList',
+  'api_bdList', 'api_bdPost', 'api_bdRecent', 'api_bdAttach', 'api_campSchedule', 'api_checkLoginId', 'api_checkSession', 'api_fsToken', 'api_login', 'api_logout',
+  'api_changePassword', 'api_myInfo', 'api_mySchedule', 'api_mySettle', 'api_mySlip', 'api_notices', 'api_perf', 'api_ping', 'api_pmAlerts', 'api_pmAlertsRead',
+  'api_pmAttach', 'api_pmAvailList', 'api_pmAvailMine', 'api_pmForm', 'api_pmJob', 'api_pmList', 'api_pmMine', 'api_pmPrice', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel'];
 /** Firestore 사본: 데이터가 바뀜 (Firebase.gs · 없으면 아무것도 안 함) */
 function fsMark_() { if (typeof fsDirty_ === 'function') fsDirty_(); }
 function fail_(msg) { const e = new Error(msg); e.userMsg = msg; throw e; }

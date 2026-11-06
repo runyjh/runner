@@ -188,8 +188,22 @@ function fsBuildSched_() {
   return fsPut_(docs, t0);
 }
 /** 1분마다 (트리거): 바뀐 게 있으면 사본 다시 만들기 */
+/**
+ * 사본을 만드는 코드가 바뀌었는지 (배포할 때마다 확인): 바뀌었으면 예전 사본은 쓰지 않게 표시 → 새 코드로 다시 만듦.
+ * 개발하면서 공지·게시판·기사스케줄 결과 모양을 바꿔도 손으로 할 일이 없다.
+ */
+function fsCodeCheck_() {
+  try {
+    const src = [api_notices, api_bdRecent, bdCard_, noticeFor_, noticeLive_, schRead_, schDriver_, fsBuildSched_, fsSaveDrvHome_, fsSaveAdmSched_].map(String).join('|') + '|' + FS_VER;
+    const h = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_1, src, Utilities.Charset.UTF_8));
+    const sp = PropertiesService.getScriptProperties();
+    if (sp.getProperty('FS_CODE') !== h) { sp.setProperty('FS_CODE', h); fsDirty_(); return true; }
+  } catch (e) { console.error('fsCodeCheck_: ' + (e && e.message)); }
+  return false;
+}
 function fsSync() {
   if (!fsCfg_()) return;
+  fsCodeCheck_();
   const c = cache_(), dirty = +c.get('fs:dirty') || 0, built = +c.get('fs:built') || 0;
   const today = todayText_(), day = c.get('fs:day');
   if (!(dirty > built) && day === today) return;
