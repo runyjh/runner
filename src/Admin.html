@@ -397,6 +397,8 @@
   .slip .smemo { color: var(--faint); font-size: 11px; white-space: normal; }
   .slip .ytag { font-weight: 800; color: #d9480f; } .slip .ytag.p { color: #6741d9; } .slip .ytag.u { color: #0b7285; } .slip .ref { color: var(--faint); }
   .slip .foot { color: var(--sub); font-size: 11.5px; margin-top: 6px; }
+  .fbt th.fbs { cursor: pointer; user-select: none; white-space: nowrap; } .fbt th.fbs.on { color: var(--brand); }
+  .fbt tr.fbdirty td { background: #fff8e1; }
   .slip .ceo-note { margin: 4px 0 8px; padding: 7px 10px; border-radius: 8px; background: #fff4d6; border: 1px solid #f5d38a; color: #8a4b00; font-size: 13px; }
   .slip .invbox { margin-top: 10px; border: 2px solid #1b64da; border-radius: 8px; background: #f3f7ff; padding: 8px 10px 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .slip .invbox .ihd { font-size: 14px; font-weight: 800; color: #1b64da; margin-bottom: 6px; }
@@ -1195,6 +1197,7 @@
         <button class="tab on" data-cfg="config">세부정산 설정</button>
         <button class="tab" data-cfg="items">정산서 항목설정</button>
         <button class="tab" data-cfg="camps">캠프 및 기사별 산재고용설정</button>
+        <button class="tab" data-cfg="fbcut">기사별 프레시백 설정</button>
         <button class="tab" data-cfg="regular">고정수당 및 공제설정</button>
         <button class="tab" data-cfg="target">자동 매출 분배설정</button>
         <button class="tab" data-cfg="split">사업자 매출분할 설정</button>
@@ -2237,7 +2240,7 @@
     return '<div class="sec"><h4>정산 설정 <small class="sub" style="font-weight:500">— 이 기사 정산서 전체에 적용 (서브 포함)</small></h4><div class="grid3">' +
       '<div class="field"><label class="lb">정산 방식</label>' + sel('stlMode', [['', '기본'], ['원청단가', '원청단가'], ['용차내역', '용차내역']]) + '</div>' +
       '<div class="field"><label class="lb">산재·고용 공제</label>' + sel('insEx', [['', '공제함 (기본)'], ['Y', '제외']]) + '</div>' +
-      '<div class="field"><label class="lb">프레시백 차감</label><input class="inp" data-k="fbCut" value="' + esc(d.fbCut || '') + '" placeholder="예: 13% · 비우면 차감 없음"></div></div></div>';
+      '<div class="field"><label class="lb">프레시백 차감</label><div class="sub" style="font-size:12.5px;padding-top:8px">정산관리 › 정산 설정 › <b>기사별 프레시백 설정</b>에서 관리</div></div></div></div>';
   }
   /** 직급: 기사(빈칸) · 관리자 · 운영자 · 대표 */
   function rankSec(d) {
@@ -5663,6 +5666,11 @@
   };
   // 정산 설정 화면 설명: [꼬리표] 한 줄씩 (무엇 · 우선순위 · 빈칸이면 · 바꾸는 곳 · 주의)
   const ST_GUIDE = {
+    fbcut: [
+      ['하는 일', '기사별로 쿠팡 프레시백 금액에서 <b>금액(31000) 또는 비율(13%)</b>을 빼고 나머지를 기사에게 지급 · 뺀 돈 = 러너 몫'],
+      ['일괄', '체크한 기사(없으면 보이는 기사 전체)에 같은 값을 한 번에 넣기 → [저장]'],
+      ['보기', '머리글을 누르면 오름차순 · 한 번 더 누르면 내림차순 · 이익률 = 러너 몫 ÷ 쿠팡 원래 금액']
+    ],
     config: [
       ['하는 일', '모든 정산 계산의 <b>기본값</b> — 지급률 · 보험 요율 · 지급일'],
       ['덮어쓰는 곳', '산재·고용 → <b>[캠프 및 기사별 산재고용설정]</b> · 퇴사 보류금 → <b>[퇴사자 보류금 설정]</b> (거기 빈칸이면 이 값)'],
@@ -6149,8 +6157,104 @@
     $('#stMigrate').classList.toggle('hidden', name !== 'migrate');
     $('#stEditor').classList.toggle('hidden', name === 'migrate');
     paintHelp(name);
+    if (name === 'fbcut') return loadFbView();
     if (name !== 'migrate') loadEditor(name);
   }
+  // ── 기사별 프레시백 설정 (쿠팡 원래 금액 · 차감 · 지급 · 러너 몫 · 이익률) ──
+  const FB = { rows: [], edit: {}, sort: { k: 'name', d: 1 }, sel: new Set(), q: '' };
+  function loadFbView() {
+    STX.table = null;
+    $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    return api('adm_stlFbView', STX.month).then((r) => {
+      if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
+      FB.rows = r.rows; FB.edit = {}; FB.sel = new Set(); FB.closed = r.closed;
+      if (r.moved) toast('기사 정보의 프레시백 차감 ' + r.moved + '명을 이 표로 옮겼습니다.');
+      renderFbView();
+    }).catch(() => {});
+  }
+  /** '31000' / '13%' → 그 기사 차감액 (계산 화면 미리보기용 · 서버와 같은 규칙: 비율은 100원 반올림) */
+  function fbCutOf(x, t) {
+    t = String(t || '').replace(/[,\s원]/g, '');
+    if (!t) return 0;
+    const n = parseFloat(t);
+    if (!(n >= 0)) return 0;
+    const v = /%$/.test(t) || (n > 0 && n < 1) ? Math.round(x.raw * (/%$/.test(t) ? n / 100 : n) / 100) * 100 : Math.round(n);
+    return Math.max(0, Math.min(v, x.raw));
+  }
+  function fbCalc(x) {
+    const t = x.id in FB.edit ? FB.edit[x.id] : x.cutTxt;
+    if (!(x.id in FB.edit)) return { t, cut: x.raw - x.pay - x.keep >= 0 ? x.cut : x.cut, pay: x.pay, runner: x.runner, rate: x.rate };
+    const cut = fbCutOf(x, t), pay = Math.ceil(Math.max(0, x.raw - x.keep - cut) / 100) * 100, runner = x.raw - pay;
+    return { t, cut, pay, runner, rate: x.raw ? runner / x.raw : 0 };
+  }
+  function renderFbView() {
+    const wn = (v) => Number(v || 0).toLocaleString('ko-KR'), pct = (v) => (Math.round(v * 1000) / 10).toFixed(1) + '%';
+    const q = FB.q.trim().toLowerCase();
+    const list = FB.rows.filter((x) => !q || x.name.toLowerCase().includes(q) || (x.cids || []).some((c) => c.toLowerCase().includes(q)))
+      .map((x) => Object.assign({}, x, { c: fbCalc(x) }));
+    const key = { name: (x) => x.name, raw: (x) => x.raw, t: (x) => fbCutOf(x, x.c.t), cut: (x) => x.c.cut, pay: (x) => x.c.pay, runner: (x) => x.c.runner, rate: (x) => x.c.rate }[FB.sort.k];
+    list.sort((a, b) => { const A = key(a), B = key(b); return (typeof A === 'string' ? koSort(A, B) : A - B) * FB.sort.d; });
+    const sum = (f) => list.reduce((a, x) => a + f(x), 0);
+    const tRaw = sum((x) => x.raw), tPay = sum((x) => x.c.pay), tRun = sum((x) => x.c.runner);
+    const dirty = Object.keys(FB.edit).length;
+    const th = (k, lab, n) => '<th class="fbs' + (n ? ' n' : '') + (FB.sort.k === k ? ' on' : '') + '" data-fbs="' + k + '">' + lab + (FB.sort.k === k ? (FB.sort.d > 0 ? ' ▲' : ' ▼') : '') + '</th>';
+    $('#stEditor').innerHTML =
+      '<div class="ed-bar" style="flex-wrap:wrap;gap:8px">' +
+        '<input class="inp" id="fbBulk" placeholder="일괄 값 (예: 13% 또는 30000 · 비우면 차감 없음)" style="width:260px">' +
+        '<button class="btn sm ghost" id="fbBulkGo">' + (FB.sel.size ? '체크한 ' + FB.sel.size + '명에 넣기' : '보이는 ' + list.length + '명 모두 넣기') + '</button>' +
+        '<button class="btn sm" id="fbSave"' + (dirty && !FB.closed ? '' : ' disabled') + '>저장' + (dirty ? ' (' + dirty + ')' : '') + '</button>' +
+        '<button class="btn sm ghost" id="fbReset"' + (dirty ? '' : ' disabled') + '>되돌리기</button>' +
+        '<input class="inp" id="fbQ" placeholder="검색 (이름·아이디)" value="' + esc(FB.q) + '" style="width:180px">' +
+        '<span class="sub">' + esc(ymTitle(STX.month)) + ' 기준 · 쿠팡 ' + wn(tRaw) + ' → 기사 ' + wn(tPay) + ' · 러너 ' + wn(tRun) + ' (' + pct(tRaw ? tRun / tRaw : 0) + ')' + (FB.closed ? ' · 마감한 달은 보기만' : '') + ' · 정산 DB "stl_fbcut" 탭에서도 고칠 수 있습니다</span></div>' +
+      '<div class="tblwrap"><table class="tbl fbt"><thead><tr><th class="ck"><input type="checkbox" id="fbAll"' + (list.length && list.every((x) => FB.sel.has(x.id)) ? ' checked' : '') + '></th>' +
+        th('name', '명의자 (정산 아이디)') + th('raw', '쿠팡 프레시백 (원래 금액)', 1) + th('t', '차감 설정 (금액 또는 %)') + th('cut', '차감액', 1) + th('pay', '기사 지급', 1) + th('runner', '러너 몫', 1) + th('rate', '이익률', 1) + '</tr></thead><tbody>' +
+      list.map((x) => '<tr' + (x.id in FB.edit ? ' class="fbdirty"' : '') + '><td class="ck"><input type="checkbox" data-fbck="' + esc(x.id) + '"' + (FB.sel.has(x.id) ? ' checked' : '') + '></td>' +
+        '<td><b>' + esc(x.name) + '</b> <small class="sub">' + esc((x.cids || []).map((c) => c.replace(/@.*/, '')).join(', ')) + '</small>' + (x.vendor ? ' <span class="vtag">용차업체</span>' : '') + '</td>' +
+        '<td class="n">' + wn(x.raw) + '</td>' +
+        '<td><input class="inp" data-fbin="' + esc(x.id) + '" value="' + esc(x.c.t || '') + '" placeholder="없음" style="width:120px;height:32px"' + (FB.closed ? ' disabled' : '') + '></td>' +
+        '<td class="n">' + wn(x.c.cut) + '</td><td class="n">' + wn(x.c.pay) + '</td><td class="n">' + wn(x.c.runner) + '</td><td class="n">' + pct(x.c.rate) + '</td></tr>').join('') +
+      '<tr class="big"><td></td><td>합계 ' + list.length + '명</td><td class="n">' + wn(tRaw) + '</td><td></td><td class="n">' + wn(sum((x) => x.c.cut)) + '</td><td class="n">' + wn(tPay) + '</td><td class="n">' + wn(tRun) + '</td><td class="n">' + pct(tRaw ? tRun / tRaw : 0) + '</td></tr>' +
+      '</tbody></table></div>';
+  }
+  $('#stEditor').addEventListener('click', (e) => {
+    if (STX.cfg !== 'fbcut' || $('#stCfgTabs').classList.contains('hidden')) return;
+    const s0 = e.target.closest('[data-fbs]');
+    if (s0) { const k = s0.dataset.fbs; FB.sort = { k, d: FB.sort.k === k ? -FB.sort.d : 1 }; return renderFbView(); }
+    if (e.target.id === 'fbBulkGo') {
+      const v = $('#fbBulk').value.trim().replace(/[,\s원]/g, '');
+      if (v && !/^\d+(\.\d+)?%?$/.test(v)) return toast('금액(30000) 또는 비율(13%)로 넣어 주세요.');
+      const q = FB.q.trim().toLowerCase();
+      const ids = FB.sel.size ? [...FB.sel] : FB.rows.filter((x) => !q || x.name.toLowerCase().includes(q) || (x.cids || []).some((c) => c.toLowerCase().includes(q))).map((x) => x.id);
+      if (!confirm(ids.length + '명의 프레시백 차감을 "' + (v || '없음') + '" 로 바꿀까요? (저장을 눌러야 반영)')) return;
+      ids.forEach((id) => { const x = FB.rows.find((r) => r.id === id); if (x && String(x.cutTxt || '') !== v) FB.edit[id] = v; else delete FB.edit[id]; });
+      return renderFbView();
+    }
+    if (e.target.id === 'fbReset') { FB.edit = {}; return renderFbView(); }
+    if (e.target.id === 'fbSave') {
+      const list = Object.keys(FB.edit).map((id) => ({ id, cut: FB.edit[id] }));
+      if (!list.length) return;
+      e.target.disabled = true;
+      return api('adm_stlFbSave', list).then((r) => {
+        if (!r.ok) { e.target.disabled = false; return toast(r.msg); }
+        toast('프레시백 차감 ' + list.length + '명을 저장했습니다. (정산 다시 계산)'); STX.sum = null; loadFbView();
+      }).catch(() => { e.target.disabled = false; });
+    }
+  });
+  $('#stEditor').addEventListener('change', (e) => {
+    if (STX.cfg !== 'fbcut') return;
+    const ck = e.target.closest('[data-fbck]');
+    if (ck) { if (ck.checked) FB.sel.add(ck.dataset.fbck); else FB.sel.delete(ck.dataset.fbck); return renderFbView(); }
+    if (e.target.id === 'fbAll') { const q = FB.q.trim().toLowerCase(); FB.rows.filter((x) => !q || x.name.toLowerCase().includes(q)).forEach((x) => (e.target.checked ? FB.sel.add(x.id) : FB.sel.delete(x.id))); return renderFbView(); }
+    const inp = e.target.closest('[data-fbin]');
+    if (inp) {
+      const id = inp.dataset.fbin, v = inp.value.trim().replace(/[,\s원]/g, ''), x = FB.rows.find((r) => r.id === id);
+      if (v && !/^\d+(\.\d+)?%?$/.test(v)) { toast('금액(30000) 또는 비율(13%)로 넣어 주세요.'); inp.value = ''; return; }
+      if (x && String(x.cutTxt || '') === v) delete FB.edit[id]; else FB.edit[id] = v;
+      renderFbView();
+    }
+  });
+  $('#stEditor').addEventListener('input', (e) => { if (STX.cfg === 'fbcut' && e.target.id === 'fbQ') { FB.q = e.target.value; const p = e.target.selectionStart; renderFbView(); const i = $('#fbQ'); i.focus(); i.setSelectionRange(p, p); } });
+
   // ── 표 편집 ──
   /** 아이디 관리 = 보기 전용 (기사 정보관리 · 용차업체에서 자동으로) */
   function loadIdsView() {

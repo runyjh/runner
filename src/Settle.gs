@@ -48,6 +48,7 @@ const STL_TABS = {
     payer: '차액부담', payerId: '차액부담 정산 아이디', payerPrice: '부담 기준단가', memo: '메모', gain: '차액 처리', vendorPay: '업체 실지급액'
   },
   stl_regular: { name: '명의자', acct: '정산 아이디', item: '항목', amt: '월 금액', from: '시작월', to: '종료월', memo: '메모' },
+  stl_fbcut: { name: '명의자', acct: '정산 아이디', cut: '프백 차감 (금액 또는 %)', memo: '메모' },
   stl_target: { name: '명의자', acct: '정산 아이디', item: '항목', goal: '연 목표 계산서', unit: '단위' },
   stl_split: { from: '원 명의자', fromId: '원 정산 아이디', to: '받는 명의자', toId: '받는 정산 아이디', target: '목표 실수령', unit: '단위', repeat: '매달 반복', month: '적용월' },
   stl_leave: { name: '명의자', acct: '정산 아이디', month: '퇴사월', amt: '보류금', memo: '정산서 메모' },
@@ -162,9 +163,9 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261107e';
+const STL_CALC_VER = '20261107f';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
-const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
+const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
 const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1, stl_bank: 1, stl_alloc: 1, stl_fund: 1, stl_banktx: 1, stl_taxpay: 1 };
 // 통장 용도 · 기본 통장 (기존 운영시트 통장 8개)
@@ -1010,6 +1011,12 @@ function adm_stlIdsView(token, month) {
         mode: r.role === '서브' ? str_(o.stlMode) : r.mode, insEx: r.role === '서브' ? (stlYes_(o.insEx) ? 'Y' : '') : r.insEx, fbCut: r.role === '서브' ? '' : r.fbCut,
         status: r.status, workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', app: o.status || '', signed: r.signedId && by[r.signedId] ? by[r.signedId].name + (by[r.signedId].status === ST.STOPPED ? ' (가입 · 앱 정지)' : ' (가입)') : '' };
     });
+    // 프레시백 차감은 [기사별 프레시백 설정] 표 값으로 보여 준다
+    try {
+      const X = stlIds_(D), fb = {};
+      stlRead_('stl_fbcut').forEach(function (o) { const id = stlAcct_(X, D, o.name, o.acct); if (id) fb[id] = str_(o.cut); });
+      out.forEach(function (r) { if (r.role !== '메인') return; const b = X.by[stlLogin_(r.cid)]; if (b && b.mainKey in fb) r.fbCut = fb[b.mainKey]; });
+    } catch (e) { /* 표 없음 */ }
     // 메인 아래 서브가 오게
     const mains = out.filter(function (r) { return r.role === '메인'; }).sort(function (a, b) { return koCmp_(a.owner, b.owner); });
     const list = [];
@@ -1371,9 +1378,12 @@ function stlCompute_(month) {
     if (mv) stlMoveNote_(s, sum(idx.mainKey), r, worker, X, D, idx, pay, (kind === '배송' || kind === '수기반영') ? qty : 0, mv.key);
   });
 
-  // 프레시백 차감 (메인 아이디의 '프레시백 차감': 13% 처럼 비율 → 100원 반올림 / 금액 → 그대로) → 러너 몫
+  // 프레시백 차감 ([정산 설정 → 기사별 프레시백 설정] 표 · 없으면 예전 기사 정보 '프레시백 차감'): 13% 처럼 비율 → 100원 반올림 / 금액 → 그대로) → 러너 몫
+  const fbMap = {};
+  stlRead_('stl_fbcut').forEach(function (o) { const id = stlAcct_(X, D, o.name, o.acct); if (id) fbMap[id] = str_(o.cut); });
   Object.keys(S).forEach(function (id) {
-    const s = S[id], t = str_(s.fbCutTxt);
+    const s = S[id], t = str_(id in fbMap ? fbMap[id] : s.fbCutTxt);
+    s.fbCutTxt = t;
     if (!t || !s.fresh) return;
     const n = stlNum_(t);
     const cut = /%$/.test(t.replace(/\s/g, '')) || (n > 0 && n < 1) ? stlR100_(s.fresh * stlRate_(t, 0)) : Math.round(n);
@@ -1656,7 +1666,7 @@ function stlCompute_(month) {
       id: id, cid: s.cid, name: s.name, ownerId: s.ownerId, vendor: s.vendor, vendorPrice: s.vendor && X.groups[id].main.vinfo ? X.groups[id].main.vinfo.price : 0, ids: X.groups[id].cids.length, cids: X.groups[id].cids.slice(), usedCids: Object.keys(s.ids), type: s.type || '', mode: s.mode || '',
       workers: workers.filter(function (w) { return !w.owner && !(s.vendor && !w.id); }).map(function (w) { return w.name; }),
       workDays: s.sched.days, workDaysBy: s.sched.byCid, workDaysSrc: s.sched.src, qty: s.qty, sales: s.sales,
-      base: s.base, inc: s.inc, fresh: s.fresh, fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
+      base: s.base, inc: s.inc, fresh: s.fresh, freshRaw: s.freshRaw, fbCutTxt: s.fbCutTxt || '', fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
       profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '', bizName: o.vendor ? '' : o.bizName || '',
@@ -3467,5 +3477,75 @@ function adm_routeVolumes(token) {
     const out = { ok: true, months: months, vol: vol };
     stlCachePut_(key, out, 1800);
     return out;
+  });
+}
+
+
+// ───────────────────────── 기사별 프레시백 설정 ─────────────────────────
+/** 처음 한 번: 기사 정보의 '프레시백 차감' → stl_fbcut 표로 옮기고 기사 정보 칸은 비운다 */
+function stlFbMigrate_(a) {
+  const D = stlDrivers_(), X = stlIds_(D);
+  const has = D.all.filter(function (o) { return str_(o.fbCut); });
+  if (!has.length) return 0;
+  const cur = stlRead_('stl_fbcut'), seen = {};
+  cur.forEach(function (o) { const id = stlAcct_(X, D, o.name, o.acct); if (id) seen[id] = 1; });
+  const add = [];
+  has.forEach(function (o) {
+    const b = o.loginId ? X.by[stlLogin_(o.loginId)] : null, id = b ? b.mainKey : '';
+    if (id && !seen[id]) { add.push({ name: stlAcctLabel_(X, D, id), acct: String(X.groups[id].cid).replace(/@.*$/, ''), cut: str_(o.fbCut), memo: '기사 정보에서 옮김' }); seen[id] = 1; }
+  });
+  const lock = scriptLock_();
+  lock.waitLock(30000);
+  try { stlAppend_('stl_fbcut', add); } finally { lock.releaseLock(); }
+  has.forEach(function (o) { try { stlSetDrv_(a, o, { fbCut: '' }); } catch (e) { /* 그 기사만 건너뜀 */ } });
+  stlBump_();
+  return add.length;
+}
+/** 관리자: 기사별 프레시백 (쿠팡 원래 금액 · 차감 설정 · 기사 지급 · 러너 몫 · 이익률) */
+function adm_stlFbView(token, month) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    stlEnsureIdsV2_();
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const moved = stlFbMigrate_(a);
+    const r = stlResult_(month, !!moved);
+    const set = {};
+    const D = stlDrivers_(), X = stlIds_(D);
+    stlRead_('stl_fbcut').forEach(function (o) { const id = stlAcct_(X, D, o.name, o.acct); if (id) set[id] = { cut: str_(o.cut), memo: str_(o.memo) }; });
+    const rows = (r.summary.drivers || []).map(function (d) {
+      const raw = d.freshRaw != null ? d.freshRaw : d.fresh + d.fbCut + (d.fbKeep || 0);
+      const runner = raw - d.fresh;
+      return { id: d.id, name: d.name, cids: d.cids, vendor: d.vendor || '', raw: raw, cutTxt: set[d.id] ? set[d.id].cut : (d.fbCutTxt || ''), memo: set[d.id] ? set[d.id].memo : '',
+        cut: d.fbCut, keep: d.fbKeep || 0, pay: d.fresh, runner: runner, rate: raw ? runner / raw : 0 };
+    }).filter(function (x) { return x.raw || x.cutTxt; });
+    return { ok: true, month: month, closed: !!r.summary.closed, moved: moved, rows: rows };
+  });
+}
+/** 관리자: 기사별 프레시백 차감 저장. list = [{ id: 정산 묶음 키, cut: '31000' | '13%' | '', memo }] (보낸 줄만 바꿈 · 빈 cut 이면 그 줄 지움) */
+function adm_stlFbSave(token, list) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!Array.isArray(list) || !list.length || list.length > 500) fail_('바꿀 줄이 없습니다.');
+    const D = stlDrivers_(), X = stlIds_(D);
+    list.forEach(function (x) {
+      const t = str_(x && x.cut).replace(/[,\s원]/g, '');
+      if (t && !/^\d+(\.\d+)?%?$/.test(t)) fail_((x.id || '') + ': 금액(31000) 또는 비율(13%)로 넣어 주세요.');
+      if (t && /%$/.test(t) && parseFloat(t) > 100) fail_('비율은 100% 이하로 넣어 주세요.');
+      if (!X.groups[x.id]) fail_('정산 아이디를 찾을 수 없습니다: ' + x.id);
+    });
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    try {
+      const cur = stlRead_('stl_fbcut'), byId = {};
+      cur.forEach(function (o) { const id = stlAcct_(X, D, o.name, o.acct); if (id) byId[id] = o; });
+      list.forEach(function (x) { byId[x.id] = { name: stlAcctLabel_(X, D, x.id), acct: String(X.groups[x.id].cid).replace(/@.*$/, ''), cut: str_(x.cut).replace(/[,\s원]/g, ''), memo: str_(x.memo).slice(0, 100) }; });
+      cur.forEach(function (o) { const id = stlAcct_(X, D, o.name, o.acct); if (!id) byId['?' + o._row] = o; }); // 못 찾는 줄도 그대로 보관
+      const out = Object.keys(byId).map(function (k) { return byId[k]; }).filter(function (o) { return str_(o.cut) || str_(o.memo); })
+        .map(function (o) { return { name: o.name, acct: o.acct, cut: o.cut, memo: o.memo }; });
+      stlWriteAll_('stl_fbcut', out);
+      stlBump_();
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '기사별 프레시백 차감 저장', list.length + '줄', list.slice(0, 20).map(function (x) { return x.id + '=' + (x.cut || '없음'); }).join(', '));
+    return { ok: true };
   });
 }
