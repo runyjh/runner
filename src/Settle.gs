@@ -118,6 +118,12 @@ const STL_ITEM_DEFAULT = [
 ];
 const STL_METHODS = ['배송기본', '프레시백', '미계약', '기타프로모션', '분실파손', '용차지출', '용차수행', '산재보험', '고용보험', '직접입력', '입금가산'];
 
+// 이름을 바꾼 설정 [예전 이름, 새 이름] — 2026-11-07 산재·고용 요율 = 전체 요율 (기사 공제 = 요율 × (1 − 러너 부담률))
+const STL_CFG_RENAME = [
+  ['산재보험료율 (기사 부담분)', '산재보험료율 (전체 요율 · 기사+러너)'],
+  ['출퇴근재해 요율 (기사 부담분)', '출퇴근재해 요율 (전체 요율)'],
+  ['고용보험료율 (기사 부담분)', '고용보험료율 (전체 요율 · 기사+러너)']
+];
 // 설정 (키, 항목 이름, 기본값, 설명, 묶음)
 const STL_CFG = [
   ['vat', '부가세율', '10%', '쿠팡 정산서 금액(공급가) → 부가세 포함 환산', '금액 환산 · 기사 지급률'],
@@ -128,9 +134,9 @@ const STL_CFG = [
   ['lossRate', '분실파손 기사 부담률', '100%', '', '분실파손'],
   ['lossVat', '분실파손 부가세 포함 환산 (Y/N)', 'Y', 'Y = 차감금액 × 1.1 을 기사 부담', '분실파손'],
   ['expense', '필요경비 공제율 (경비율, 공단 기준)', '34.6%', '보수액 = 기준금액 × (1 − 경비율)', '산재 · 고용보험'],
-  ['san', '산재보험료율 (기사 부담분)', '1.76%', '10원 미만 버림', '산재 · 고용보험'],
-  ['commute', '출퇴근재해 요율 (기사 부담분)', '0%', '', '산재 · 고용보험'],
-  ['goy', '고용보험료율 (기사 부담분)', '1.6%', '10원 미만 버림', '산재 · 고용보험'],
+  ['san', '산재보험료율 (전체 요율 · 기사+러너)', '1.76%', '기사 공제 = 보수액 × 요율 × (1 − 러너 부담률) · 10원 미만 버림', '산재 · 고용보험'],
+  ['commute', '출퇴근재해 요율 (전체 요율)', '0%', '', '산재 · 고용보험'],
+  ['goy', '고용보험료율 (전체 요율 · 기사+러너)', '1.6%', '기사 공제 = 보수액 × 요율 × (1 − 러너 부담률) · 10원 미만 버림', '산재 · 고용보험'],
   ['goyMin', '고용보험 적용 최저 월 보수액', '800000', '미만이면 고용보험 제외', '산재 · 고용보험'],
   ['runner', '러너 부담률 기본값', '50%', '50% = 러너가 기사와 같은 금액 부담', '산재 · 고용보험'],
   ['insBasis', '보험 계산 기준 (공급가/부가세포함)', '공급가', '', '산재 · 고용보험'],
@@ -156,7 +162,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261107c';
+const STL_CALC_VER = '20261107d';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -606,6 +612,20 @@ function stlMonthNow_() { return stlMonthOfDate_(todayText_()); }
 function stlCfg_() {
   const rows = stlRead_('stl_config'), map = {};
   rows.forEach(function (o) { map[o.label] = o.value; });
+  // 항목 이름이 바뀐 설정: 예전 이름 줄을 새 이름으로 고쳐 쓴다 (값은 그대로)
+  const ren = STL_CFG_RENAME.filter(function (x) { return !(x[1] in map) && (x[0] in map); });
+  if (ren.length) {
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      ren.forEach(function (x) {
+        const r = rows.filter(function (o) { return o.label === x[0]; })[0];
+        const d = STL_CFG.filter(function (c) { return c[1] === x[1]; })[0];
+        stlSetRow_('stl_config', r._row, { label: x[1], desc: d ? d[3] : r.desc });
+        map[x[1]] = map[x[0]];
+      });
+    } finally { lock.releaseLock(); }
+  }
   const missing = STL_CFG.filter(function (d) { return !(d[1] in map); });
   if (missing.length) {
     const lock = scriptLock_();
@@ -1943,14 +1963,15 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
       if (dv.goy != null) ins.goy = dv.goy;
     }
     const sanOff = !!(dv && dv.sanOff), goyOff = !!(dv && dv.goyOff);
+    // 요율 = 전체 요율(기사+러너). 기사 공제 = 보수액 × 요율 × (1 − 러너 부담률). 예: 1.96% · 러너 50% → 기사 0.98%
+    const r = Math.min(0.95, Math.max(0, ins.runner)), dr = 1 - r;
     ins.bosu = ins.base * (1 - ins.exp);
-    san = sanOff ? 0 : stlFloor10_(ins.bosu * (ins.san + cfg.commute));
-    goy = goyOff || ins.bosu < cfg.goyMin ? 0 : stlFloor10_(ins.bosu * ins.goy);
-    // 공단 실제 납부 (항상 세부정산 설정 기본값: 보험 기준·경비율·요율). OFF 인 보험은 납부도 없음
+    san = sanOff ? 0 : stlFloor10_(ins.bosu * (ins.san + cfg.commute) * dr);
+    goy = goyOff || ins.bosu < cfg.goyMin ? 0 : stlFloor10_(ins.bosu * ins.goy * dr);
+    // 공단 실제 납부 (항상 세부정산 설정 기본값: 보험 기준·경비율·요율). OFF 인 보험은 납부도 없음. san0·goy0 = 그중 기사분
     const bosu0 = baseOf(cfg.insBasis) * (1 - cfg.expense);
-    const san0 = sanOff ? 0 : stlFloor10_(bosu0 * (cfg.san + cfg.commute)), goy0 = goyOff || bosu0 < cfg.goyMin ? 0 : stlFloor10_(bosu0 * cfg.goy);
-    const r = Math.min(0.95, Math.max(0, ins.runner));
-    const totalAct = Math.round((san0 + goy0) / (1 - r));
+    const san0 = sanOff ? 0 : stlFloor10_(bosu0 * (cfg.san + cfg.commute) * dr), goy0 = goyOff || bosu0 < cfg.goyMin ? 0 : stlFloor10_(bosu0 * cfg.goy * dr);
+    const totalAct = Math.round((san0 + goy0) / dr);
     ins.sanAct = san0; ins.goyAct = goy0;
     runnerIns = totalAct - (san + goy);
     insGain = (san + goy) - (san0 + goy0); // 기사 공제가 공단 기사분보다 많은 만큼 = 러너 몫
