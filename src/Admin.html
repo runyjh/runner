@@ -822,6 +822,10 @@
   .offbtns { display: flex; gap: 4px; margin-bottom: 6px; }
   .offbtns button { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 700; color: var(--sub); }
   .offbtns button.on { background: #f08c8c; color: #fff; border-color: #f08c8c; }
+  /* 백업 범위: 캠프 이름이 길어 요일 칸(34px)에 안 들어감 → 글자 길이만큼 · 줄바꿈 */
+  #sdAreaBtns { flex-wrap: wrap; }
+  #sdAreaBtns button { width: auto; min-width: 34px; padding: 0 10px; white-space: nowrap; word-break: keep-all; }
+  #sdAreaBtns button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
   .slegend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; margin-top: 8px; color: var(--sub); align-items: center; }
   .slegend span { padding: 1px 6px; border-radius: 4px; font-weight: 600; }
   @media (max-width: 820px) {
