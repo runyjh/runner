@@ -757,8 +757,12 @@
   .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; cursor: cell; user-select: none; text-align: center; font-weight: 600; white-space: pre; line-height: 1.25; }
   .sg td.wk2, .sg th.wk2 { border-left: 2px solid #c9d1da; }
   .sg td.today { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.04); }
-  .k-work { color: #59b4ff; }
-  .k-off { color: #ff6b6b; }
+  /* 출근·휴무: 칸 안에 타원형 배경 + 흰 글자 */
+  .k-work { color: #59b4ff; } .k-off { color: #ff6b6b; }
+  .kp { display: inline-block; min-width: 44px; padding: 1px 10px; border-radius: 999px; color: #fff; line-height: 18px; }
+  .k-work .kp, .slegend span.k-work { background: #59b4ff; color: #fff; }
+  .k-off .kp, .slegend span.k-off { background: #ff6b6b; color: #fff; }
+  .slegend span.k-work, .slegend span.k-off { border-radius: 999px; padding: 1px 9px; }
   .k-sick { background: #d4edbc; color: #11734b; }
   .k-mi { background: #d15555; color: #ffcfc9; }
   .k-yong { background: #e6cff2; color: #5a3286; }
@@ -4885,6 +4889,8 @@
   const ymdLocal = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const shiftDays = (ds, n) => { const p = ds.split('-').map(Number); return ymdLocal(new Date(p[0], p[1] - 1, p[2] + n)); };
   const sget = (row, date) => ((SD.cells[row] || {})[date] || '');
+  /** 칸 글자 HTML: 출근·휴무는 타원형 배경 안에 */
+  const cellTxt = (v) => { const k = cellKind(v); return k === 'k-work' || k === 'k-off' ? '<span class="kp">' + esc(v) + '</span>' : esc(v); };
   /** 칸 글자 → 색 구분 (운영시트 드롭다운 색과 같게) */
   function cellKind(v) {
     const s = String(v || '').trim();
@@ -5157,7 +5163,7 @@
     const rx = r.kind === 'd' ? cellRule(r, v) : '';
     if (rx) cls.push('rulex');
     const tip = v + (pm ? '\n' + pmTip(pm) : '') + (iss ? '\n⚠ ' + issueText(iss) : '') + (rx ? '\n✎ ' + rx : '');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm || iss || rx ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + pmBadge(pm) + (iss ? '<span class="isb">!</span>' : '') + '</td>';
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pm) + '"' : '') + (v.length > 14 || pm || iss || rx ? ' title="' + esc(tip) + '"' : '') + '>' + cellTxt(v) + pmBadge(pm) + (iss ? '<span class="isb">!</span>' : '') + '</td>';
   }
   /** '▶ 이지원, ◀ 김등록' → 품▶ (일을 줌) / 품◀ (일을 받음) 작은 표시 */
   function pmBadge(pm) {
@@ -5207,7 +5213,7 @@
       const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', pmMark(r.row, dt) ? 'pmk' : '', iss ? 'iss' : '', rx ? 'rulex' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
-      const pmv = pmMark(r.row, dt), html = esc(v) + pmBadge(pmv) + (iss ? '<span class="isb">!</span>' : '');
+      const pmv = pmMark(r.row, dt), html = cellTxt(v) + pmBadge(pmv) + (iss ? '<span class="isb">!</span>' : '');
       if (td.innerHTML !== html) td.innerHTML = html;
       if (v.length > 14 || pmv || iss || rx) td.title = v + (pmv ? '\n' + pmTip(pmv) : '') + (iss ? '\n⚠ ' + issueText(iss) : '') + (rx ? '\n✎ ' + rx : ''); else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
