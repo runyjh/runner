@@ -156,7 +156,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261106a';
+const STL_CALC_VER = '20261107a';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -1261,7 +1261,7 @@ function stlCompute_(month) {
   const raw = stlReadMonth_('stl_raw', month);
   const loss = stlReadMonth_('stl_loss', month);
   const sched = stlSchedule_(P.from, P.to);
-  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {}, stoppedSub: {}, moveNo: {} };
+  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {}, stoppedSub: {}, moveNo: {}, manual: [], noRtPrice: [] };
   const S = {};
   /** 정산 묶음(메인 아이디) 하나의 합계. 정산금은 메인 아이디 명의자에게 */
   const sum = function (gkey) {
@@ -1303,13 +1303,19 @@ function stlCompute_(month) {
       const wk = s.workers[worker || '_'] || (s.workers[worker || '_'] = { qty: 0, amt: 0, dates: {}, cids: {} });
       if (u.missing && r.route) {
         const k = camp + '|' + r.route;
-        const w = warn.noPrice[k] || (warn.noPrice[k] = { camp: camp, route: r.route, qty: 0, type: u.how, routeKnown: u.f ? u.f.routeKnown : false });
-        w.qty += qty; s.noPriceQty += qty;
+        const w = warn.noPrice[k] || (warn.noPrice[k] = { camp: camp, route: r.route, qty: 0, type: u.how, routeKnown: u.f ? u.f.routeKnown : false, manual: 0 });
+        w.qty += qty; s.noPriceQty += qty; if (kind === '수기반영') w.manual += qty;
+      } else if (qty && !r.route && !(u.u > 0)) {
+        // 노선이 비어 단가를 못 찾은 줄 (쿠팡 수기반영에 흔함) → 기사 지급 0원 · 경고
+        warn.noRtPrice.push(s.name + ' · ' + String(r.date).slice(5) + ' · ' + (camp || '캠프 없음') + ' · ' + kind + ' ' + won_(qty) + '건 (쿠팡 ' + won_(sales) + '원)');
+        s.noPriceQty += qty;
       }
       // 용차업체 건당 고정단가면 프백 가중치(추가인센티브)는 더하지 않는다 (러너 몫)
       const incU = u.how === '업체단가' ? 0 : stlHalfDown_(stlHalfDown_(stlNum_(r.inc) * (1 + cfg.vat)) * cfg.incRate);
       const base = stlR0_(qty * u.u), inc = stlR0_(qty * incU);
       s.base += base; s.inc += inc; s.qty += qty; pay = base + inc;
+      // 쿠팡 수기반영: 배송 기본에 그대로 합침 (정산서에 따로 안 보임) · 관리자 확인용 목록만
+      if (kind === '수기반영') warn.manual.push(s.name + ' · ' + String(r.date).slice(5) + ' · ' + (camp || '') + ' ' + (normCode_(r.route) || '노선 없음') + ' · ' + won_(qty) + '건 × ' + won_(u.u + incU) + ' = ' + won_(pay) + '원 (쿠팡 ' + won_(sales) + '원)');
       wk.qty += qty; wk.amt += pay; wk.dates[r.date] = 1; wk.cids[r.cid] = 1;
       if (qty && r.date >= P.from && r.date <= P.to) ((s.cidDays[login] = s.cidDays[login] || {}))[r.date] = 1;
       const rk = camp + '|' + normCode_(r.route) + '|' + u.u + '|' + incU;
@@ -1705,8 +1711,10 @@ function stlCompute_(month) {
     return cidNm(c) + ' → 메인 ' + (g ? String(g.cid).replace(/@.*$/, '') + (g.ownerId && D.byId[g.ownerId] ? ' (' + D.byId[g.ownerId].name + ')' : '') : '');
   }), 'sub');
   W('noCamp', '노선관리에 없는 캠프', Object.keys(warn.noCamp), 'bad');
+  W('noRtPrice', '단가 미반영 — 노선이 비어 있는 줄 (기사 지급 0원 · 쿠팡 정산 파일의 수기반영 등. 아이디 사용 기록·조정으로 처리해 주세요)', warn.noRtPrice, 'warn');
+  W('manual', '수기반영 (확인용 · 배송 기본에 포함되어 정산서에는 따로 안 보임)', warn.manual, 'info');
   W('noPrice', '단가 미입력 (노선관리 → 구분별 단가)', Object.keys(warn.noPrice).map(function (k) {
-    const w = warn.noPrice[k]; return w.camp + ' ' + w.route + (w.type ? ' · ' + w.type + '단가' : '') + ' · ' + won_(w.qty) + '건' + (w.routeKnown ? '' : ' (노선 미등록)');
+    const w = warn.noPrice[k]; return w.camp + ' ' + w.route + (w.type ? ' · ' + w.type + '단가' : '') + ' · ' + won_(w.qty) + '건' + (w.manual ? ' (수기반영 ' + won_(w.manual) + '건)' : '') + (w.routeKnown ? '' : ' (노선 미등록)');
   }), 'bad');
   W('kind', '분류 안 된 쿠팡 구분값 (stl_kinds 에 추가)', Object.keys(warn.kind).map(function (k) { return k + ' ' + warn.kind[k] + '줄'; }));
   W('adjBad', '공제·가감의 기사명을 찾을 수 없음', adjBad);
