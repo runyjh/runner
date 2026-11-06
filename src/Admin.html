@@ -757,6 +757,16 @@
   .sed .sug button.on, .sed .sug button:hover { outline: 2px solid var(--brand); outline-offset: -2px; }
   .sed .sug small { opacity: .7; font-weight: 500; }
   .sed .shint { font-size: 10px; color: var(--faint); padding: 3px 8px; border-top: 1px solid var(--line); }
+  /* 칸 편집기: 캠프 · 라우트 고르기 */
+  .sed .spk { border-top: 1px solid var(--line); padding: 6px 8px; background: #fafbfc; }
+  .sed .spk-h select { height: 30px; font-size: 13px; width: 100%; }
+  .sed .spk .rchips { margin-top: 6px; } .sed .spk .rchips button { padding: 3px 8px; font-size: 12px; }
+  .sed .spk .ugrid { max-height: 180px; margin-top: 6px; gap: 4px; }
+  .sed .spk .urow > b { width: 40px; font-size: 12px; } .sed .spk .urow button.lt { width: 30px; min-width: 30px; height: 26px; font-size: 12px; }
+  .sed .spk .urow .uall { height: 24px; padding: 0 8px; font-size: 11px; }
+  .sed .spk-rot { margin-top: 6px; font-size: 12px; gap: 10px; }
+  .sed .spk-f { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; }
+  .sed .spk-f .btn { height: 28px; padding: 0 12px; }
   .offbtns { display: flex; gap: 4px; margin-bottom: 6px; }
   .offbtns button { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 700; color: var(--sub); }
   .offbtns button.on { background: #f08c8c; color: #fff; border-color: #f08c8c; }
@@ -5108,12 +5118,55 @@
     const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
     const box = document.createElement('div'); box.className = 'sed';
     box.style.left = (rc.left - wc.left + wrap.scrollLeft) + 'px'; box.style.top = (rc.top - wc.top + wrap.scrollTop) + 'px';
-    box.style.minWidth = Math.max(rc.width, 170) + 'px';
-    box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea><div class="sug"></div><div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
+    const isDrv = r.kind === 'd';
+    box.style.minWidth = Math.max(rc.width, isDrv ? 330 : 170) + 'px';
+    box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea>' + (isDrv ? '<div class="spk"></div>' : '') + '<div class="sug"></div><div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
     wrap.appendChild(box);
     const ta = box.querySelector('textarea');
     ta.value = initial != null ? initial : sget(r.row, dt);
     sEdit = { box, ta, r, dt, idx: -1 };
+    // ── 캠프 · 라우트 고르기 (기사 정보관리 '배정 캠프 · 라우트' 와 같은 방식) → 칸 글자를 만든다
+    //   내 캠프면 '530AB (D1)', 다른 캠프면 '강서1 527B' · 용차 버튼 = '용차'
+    const pkEl = box.querySelector('.spk');
+    let pk = null;
+    if (pkEl) {
+      const myCamp = r.d.campId || '', campOf = (id) => SD.camps.find((c) => c.id === id);
+      const v0 = String(ta.value || '').trim(), mc = v0.match(/^([가-힣]+\d)\s+(.+)$/);
+      const c0 = mc ? SD.camps.find((c) => shortCamp(c.name).replace(/\s/g, '') === mc[1]) : null;
+      const body = c0 ? mc[2] : v0, p0 = /^\d/.test(body) || /^용차/.test(body) ? parseBR(body) : { units: [], special: '', rots: [] };
+      pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: p0.special === '용차' ? '용차' : '', rots: p0.rots };
+      if (!pk.rots.length) pk.rots = sdCampRots(pk.campId);
+      const list = () => (SD.routes[pk.campId] || []).map((c) => ({ code: c, stopped: false }));
+      const compose = () => {
+        const base = composeUnits(pk.units, pk.special, pk.rots, sdCampRots(pk.campId));
+        if (!base || base === '용차') return base;
+        const c = campOf(pk.campId);
+        return pk.campId && pk.campId !== myCamp && c ? shortCamp(c.name).replace(/\s/g, '') + ' ' + base : base;
+      };
+      const paintPk = () => {
+        const rots = sdCampRots(pk.campId), v = compose();
+        pkEl.innerHTML = '<div class="spk-h"><select class="inp" data-pkcamp>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
+          .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === pk.campId ? ' selected' : '') + '>' + esc(c.name) + (c.id === myCamp ? ' (소속)' : '') + '</option>').join('') + '</select></div>' +
+          unitPickerHtml('pk', pk.campId ? list() : [], pk.units, pk.special, '').replace(/<button[^>]*data-pksp="백업"[^>]*>[^<]*<\/button>/, '') +
+          (pk.units.length && !pk.special ? '<div class="radios spk-rot">' + rots.map((x) => '<label><input type="checkbox" data-pkrot="' + x + '"' + (pk.rots.includes(x) ? ' checked' : '') + '> ' + x + '</label>').join('') + '</div>' : '') +
+          '<div class="spk-f"><span>입력될 값: <b>' + (v ? esc(v) : '<span style="color:var(--faint)">없음</span>') + '</b></span><button type="button" class="btn sm" data-pkput' + (v ? '' : ' disabled') + '>넣기</button></div>';
+      };
+      pkEl.addEventListener('mousedown', (e) => { if (!e.target.closest('select')) e.preventDefault(); });
+      pkEl.addEventListener('click', (e) => {
+        if (e.target.closest('[data-pkput]')) { const v = compose(); if (v) { ta.value = v; commitEdit(); $('#sWrap').focus({ preventScroll: true }); } return; }
+        if (unitClick(e, 'pk', pk, list())) { ta.value = compose(); grow(); renderSug(); paintPk(); }
+      });
+      pkEl.addEventListener('change', (e) => {
+        if (e.target.dataset.pkcamp !== undefined) { pk.campId = e.target.value; pk.units = []; pk.special = ''; pk.rots = sdCampRots(pk.campId); }
+        else if (e.target.dataset.pkrot) {
+          const x = e.target.dataset.pkrot;
+          pk.rots = e.target.checked ? pk.rots.concat([x]) : pk.rots.filter((y) => y !== x);
+          if (!pk.rots.length) { pk.rots = [x]; toast('회전은 하나 이상 골라야 합니다.'); }
+        } else return;
+        ta.value = compose(); grow(); renderSug(); paintPk(); ta.focus();
+      });
+      sEdit.paintPk = () => paintPk();
+    }
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
     const renderSug = () => {
       const list = suggestions(r, ta.value === sget(r.row, dt) && initial == null ? '' : ta.value);
@@ -5138,7 +5191,13 @@
       const b = e.target.closest('[data-i]'); if (!b) return;
       e.preventDefault(); ta.value = sEdit.list[+b.dataset.i].v; commitEdit(); $('#sWrap').focus({ preventScroll: true });
     });
-    ta.addEventListener('blur', () => setTimeout(() => { if (sEdit && sEdit.ta === ta) commitEdit(); }, 120));
+    // 고르기 칸(캠프 선택 등)으로 포커스가 옮겨 가면 저장하지 않는다
+    ta.addEventListener('blur', () => setTimeout(() => { if (sEdit && sEdit.ta === ta && !box.contains(document.activeElement)) commitEdit(); }, 120));
+    if (pkEl) {
+      pkEl.addEventListener('focusout', () => setTimeout(() => { if (sEdit && sEdit.ta === ta && !box.contains(document.activeElement)) commitEdit(); }, 120));
+      pkEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); closeEdit(); $('#sWrap').focus({ preventScroll: true }); } });
+      sEdit.paintPk();
+    }
     grow(); renderSug(); ta.focus();
     if (initial == null) ta.select(); else ta.setSelectionRange(ta.value.length, ta.value.length);
   }
