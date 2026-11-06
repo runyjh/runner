@@ -6208,6 +6208,23 @@ function adm_rcCancel(token, id) {
     } finally { lock.releaseLock(); }
   });
 }
+/** 관리자: '바로 변경'으로 남은 노선 변경 이력 지우기 (정정이었을 때 · 줄이 나뉘지 않게). 기사 정보는 그대로 */
+function adm_rcDropHistory(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token); fsMark_();
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const c = rcRows_(true).filter(function (x) { return x.id === str_(id); })[0];
+      if (!c) fail_('기록을 찾을 수 없습니다.');
+      if (c.status !== RCS.DONE || c.memo !== '바로 변경') fail_('바로 변경 이력만 지울 수 있습니다. 예약은 취소를 써 주세요.');
+      writeFields_(SH.RCHG, c._row, { status: RCS.OFF, memo: '바로 변경 (정정으로 지움)' });
+      rcTouch_();
+      logAdmin_(a, '노선 변경 이력 지움 (정정)', c.name, c.date + ' ' + c.fromRoute + ' → ' + c.toRoute);
+      return { ok: true };
+    } finally { lock.releaseLock(); }
+  });
+}
 /**
  * 관리자: 쿠팡 노선 이관. f = { fromCampId, fromNum, toCampId 또는 toCampName(새 캠프), toNum, date, copyPrice, memo }
  * dry = true 면 미리보기만 (바뀔 기사·노선·단가·확인할 것). false 면 실제로 만든다.
