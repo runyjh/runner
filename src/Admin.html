@@ -721,7 +721,13 @@
   table.sg.month td.c { font-size: 11px; }
   table.sg.month th.dc b { font-size: 11px; } table.sg.month th.dc small { font-size: 9px; } table.sg.month th.dc i { font-size: 9px; padding: 0 1px; }
   table.sg.month .rots i { font-size: 8px; padding: 0 2px; margin: 0 .5px; }
-  table.sg.month td.ex { max-width: 90px; }
+  table.sg.month td.ex, table.sg.month th.ex { max-width: 70px; font-size: 11px; padding: 0 3px; }
+  table.sg.month .wkc { display: none; }
+  /* 한 달: 왼쪽 고정 칸도 좁게 */
+  table.sg.month .f1 { width: 48px; min-width: 48px; max-width: 48px; }
+  table.sg.month .f2 { left: 48px; width: 84px; min-width: 84px; max-width: 84px; }
+  table.sg.month .f3 { left: 132px; width: 78px; min-width: 78px; max-width: 78px; font-size: 11px; }
+  table.sg.month .f4 { left: 210px; width: 72px; min-width: 72px; max-width: 72px; font-size: 11px; }
   .ssave { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--gray-weak); color: var(--sub); white-space: nowrap; }
   .ssave.ok { background: var(--ok-weak); color: var(--ok); }
   .ssave.wait, .ssave.busy { background: var(--warn-weak); color: var(--warn); }
