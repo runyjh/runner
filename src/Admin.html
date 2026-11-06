@@ -6166,6 +6166,7 @@
     STX.table = null;
     $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
     return api('adm_stlFbView', STX.month).then((r) => {
+      if (STX.cfg !== 'fbcut') return; // 그새 다른 탭으로 옮김
       if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
       FB.rows = r.rows; FB.edit = {}; FB.sel = new Set(); FB.closed = r.closed;
       if (r.moved) toast('기사 정보의 프레시백 차감 ' + r.moved + '명을 이 표로 옮겼습니다.');
@@ -6319,6 +6320,7 @@
     paintHelp(name);
     $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
     return api('adm_stlTable', name, STX.month).then((r) => {
+      if (STX.cfg === 'fbcut' && !$('#stCfgTabs').classList.contains('hidden') && name !== 'fbcut') return; // 그새 다른 탭(프레시백)으로 옮김
       if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
       STX.table = r; STX.edRows = r.rows.map((x) => Object.assign({}, x)); STX.edDirty = false;
       renderEditor();
