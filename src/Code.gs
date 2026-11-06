@@ -5130,7 +5130,7 @@ function adm_schUploadTable(token, start, scope) {
 // ───────────────────────── 스케줄 이슈 (칸별 사유: 부상·병가·차량 등) ─────────────────────────
 // 스케줄 DB 파일의 'issues' 탭. 시트에서 직접 고쳐도 된다 (이슈ID 는 비워 두면 다음에 자동으로 채워짐).
 const SCH_ISSUE = { SHEET: 'issues', HEAD: ['이슈ID', '날짜', '기사ID', '이름', '구분', '사유', '조치', '작성자', '작성일시'],
-  KINDS: ['부상', '병가', '개인사유', '차량', '사고', '경조사', '기타'] };
+  KINDS: ['부상', '병가', '개인사유', '차량', '사고', '경조사', '기타', '지시'] }; // 지시 = 칸 편집기의 '지시사항' (기사스케줄 칸에 표시)
 function schIssueSheet_() {
   const book = schSS_();
   let sh = book.getSheetByName(SCH_ISSUE.SHEET);

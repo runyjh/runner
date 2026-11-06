@@ -767,6 +767,13 @@
   .sed .spk-rot { margin-top: 6px; font-size: 12px; gap: 10px; }
   .sed .spk-f { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; }
   .sed .spk-f .btn { height: 28px; padding: 0 12px; }
+  .sed .sinst { border-top: 1px solid var(--line); padding: 6px 8px; background: #fffaf0; }
+  .sed .sinst label { display: block; font-size: 12px; font-weight: 800; color: #9a6700; margin-bottom: 4px; } .sed .sinst label small { font-weight: 500; color: var(--faint); }
+  .sed .sinst textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; font-size: 12.5px; resize: vertical; min-height: 40px; outline: none; }
+  .sed .sinst textarea:focus { border-color: var(--brand); }
+  /* 지시사항 있는 칸: 오른쪽 위 주황 삼각 */
+  .sg td.c.inst { position: relative; }
+  .sg td.c.inst::after { content: ''; position: absolute; top: 0; right: 0; border-top: 9px solid #f59e0b; border-left: 9px solid transparent; }
   .offbtns { display: flex; gap: 4px; margin-bottom: 6px; }
   .offbtns button { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 700; color: var(--sub); }
   .offbtns button.on { background: #f08c8c; color: #fff; border-color: #f08c8c; }
@@ -4884,8 +4891,13 @@
     if (scalc && scalc.dupCells.has(r.row + '|' + ci)) cls.push('dup');
     if (dt === pddDate()) cls.push('today');
     if (sepCol(ci)) cls.push('wk2');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (v.length > 14 ? ' title="' + esc(v) + '"' : '') + '>' + esc(v) + '</td>';
+    const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
+    if (ins) cls.push('inst');
+    const tip = (v.length > 14 ? v : '') + (ins ? (v.length > 14 ? '\n' : '') + '📌 ' + ins.reason : '');
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + '</td>';
   }
+  /** 칸의 지시사항 (스케줄 이슈 중 구분 '지시') */
+  function instOf(row, dt) { return (SD.issues || []).find((x) => x.driverId === row && x.date === dt && x.kind === '지시') || null; }
   function renderCalc() {
     const dates = SD.dates, campOk = (short) => !sf.camp || shortCamp((SD.camps.find((c) => c.id === sf.camp) || {}).name) === short;
     const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f1 lab">' + lab + '</td><td class="fx f2 lab" colspan="3">' + sub + '</td>' +
@@ -4910,11 +4922,13 @@
     $$('td.c', tb).forEach((td) => {
       const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
       const v = sget(r.row, dt), k = r.row + '|' + dt;
-      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '']
+      const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
       if (td.textContent !== v) td.textContent = v;
-      if (v.length > 14) td.title = v; else td.removeAttribute('title');
+      const tip = (v.length > 14 ? v : '') + (ins ? (v.length > 14 ? '\n' : '') + '📌 ' + ins.reason : '');
+      if (tip) td.title = tip; else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
     $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });
@@ -5120,11 +5134,22 @@
     box.style.left = (rc.left - wc.left + wrap.scrollLeft) + 'px'; box.style.top = (rc.top - wc.top + wrap.scrollTop) + 'px';
     const isDrv = r.kind === 'd';
     box.style.minWidth = Math.max(rc.width, isDrv ? 330 : 170) + 'px';
-    box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea>' + (isDrv ? '<div class="spk"></div>' : '') + '<div class="sug"></div><div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
+    box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea>' + (isDrv ? '<div class="spk"></div>' : '') + '<div class="sug"></div>' +
+      (isDrv ? '<div class="sinst"><label>📌 지시사항 <small>기사스케줄 칸에 표시 (마우스를 올리면 보임)</small></label><textarea class="instta" rows="2" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량"></textarea></div>' : '') +
+      '<div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
     wrap.appendChild(box);
     const ta = box.querySelector('textarea');
     ta.value = initial != null ? initial : sget(r.row, dt);
     sEdit = { box, ta, r, dt, idx: -1 };
+    const insTa = box.querySelector('.instta');
+    if (insTa) {
+      const cur = instOf(r.row, dt); insTa.value = cur ? cur.reason : ''; sEdit.ins0 = insTa.value; sEdit.insTa = insTa;
+      insTa.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); closeEdit(); $('#sWrap').focus({ preventScroll: true }); }
+        else if (e.key === 'Enter' && !e.altKey && !e.shiftKey) { e.preventDefault(); commitEdit(); $('#sWrap').focus({ preventScroll: true }); }
+      });
+      insTa.addEventListener('blur', () => setTimeout(() => { if (sEdit && sEdit.ta === ta && !box.contains(document.activeElement)) commitEdit(); }, 120));
+    }
     // ── 캠프 · 라우트 고르기 (기사 정보관리 '배정 캠프 · 라우트' 와 같은 방식) → 칸 글자를 만든다
     //   내 캠프면 '530AB (D1)', 다른 캠프면 '강서1 527B' · 용차 버튼 = '용차'
     const pkEl = box.querySelector('.spk');
@@ -5206,6 +5231,23 @@
     const e = sEdit; sEdit = null;
     e.box.remove();
     setCells([{ row: e.r.row, date: e.dt, value: e.ta.value }]);
+    if (e.insTa) saveInst(e.r.row, e.dt, e.insTa.value.trim(), e.ins0);
+  }
+  /** 지시사항 저장 (스케줄 이슈 '지시' 로 · 비우면 지움) */
+  function saveInst(row, dt, text, was) {
+    if (text === String(was || '').trim()) return;
+    const cur = instOf(row, dt);
+    const done = () => refreshAfterChange();
+    if (!text) {
+      if (!cur) return;
+      SD.issues = SD.issues.filter((x) => x !== cur); done();
+      api('adm_schIssueDel', cur.id).then((r) => { if (!r.ok) toast(r.msg); }).catch(() => {});
+      return;
+    }
+    api('adm_schIssueSave', { id: cur ? cur.id : '', date: dt, driverId: row, kind: '지시', reason: text }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      SD.issues = (SD.issues || []).filter((x) => x !== cur).concat([r.issue]); done(); toast('지시사항을 저장했습니다.');
+    }).catch(() => {});
   }
   function closeEdit() { if (sEdit) { sEdit.box.remove(); sEdit = null; } }
 
