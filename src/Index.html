@@ -1722,6 +1722,9 @@
   /** 사무실 스위치: 일감 올리기(자유 등록)를 끄면 그 메뉴·버튼을 숨김 / 일감 제안을 끄면 제안 버튼을 누를 수 없게 */
   function paintPostOn() {
     $('#pmNew').classList.toggle('hidden', !pmPostOn);
+    // 일감 올리기가 꺼져 있으면 전체/맡길 일감/품앗이 주세요 선택 칸을 숨기고 전체(= 품앗이 주세요 + 남아 있는 일감)로
+    $('#pmShow').classList.toggle('hidden', !pmPostOn);
+    if (!pmPostOn && pmShowMode !== 'all') { pmShowMode = 'all'; $$('#pmShow button').forEach((x) => x.classList.toggle('on', x.dataset.s === 'all')); loadPmList(); }
     const nb = $('#pmOffNote'); if (nb) nb.classList.add('hidden');
     $$('[data-my="new"]').forEach((b) => { b.classList.toggle('hidden', !pmPostOn); });
     $$('#pmList [data-gvact], #gvBody [data-offer]').forEach((b) => { if (!b.closest('.pmc') || !b.closest('.pmc').querySelector('.bdg.me')) { b.disabled = !pmOfferOn; b.classList.toggle('off', !pmOfferOn); } });
