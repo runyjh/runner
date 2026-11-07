@@ -1001,22 +1001,28 @@
   //  · 읽기 전용 함수만 · 기사(토큰)별로 이 기기에만 보관 · 로그아웃하면 지움 · 7일 넘은 것은 안 씀
   //  · 내가 저장·지원·글쓰기 등을 하면 2분 동안은 기다려서라도 서버의 새 값을 받음 (방금 한 일이 바로 보이게)
   //  · 15초 안에 같은 걸 다시 부르면 서버에 다시 묻지 않음
-  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost', 'api_mySettle', 'api_mySlip', 'api_pmJob'];
-  const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만
+  // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
+  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost', 'api_pmJob'];
+  const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만
   const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts']);
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
   const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
-  const swrAll = () => { try { return JSON.parse(localStorage.getItem(SWR.LS) || '{}') || {}; } catch (e) { return {}; } };
+  // 자동 로그인이면 이 기기(localStorage), 아니면 이 창에만(sessionStorage · 창을 닫으면 사라짐) — 로그인 토큰과 같은 곳
+  const swrStore = () => { try { return localStorage.getItem(TOKEN) ? localStorage : sessionStorage; } catch (e) { return null; } };
+  const swrAll = () => { try { const st = swrStore(); return (st && JSON.parse(st.getItem(SWR.LS) || '{}')) || {}; } catch (e) { return {}; } };
   function swrSave(k, r) {
     if (r && typeof r === 'object') delete r._ms;
+    if (SWR_FRESH.includes(k.split('|')[1])) { SWR.mem[k] = { t: Date.now(), r: r }; return; } // 메모리에만 (15초)
     SWR.mem[k] = { t: Date.now(), r: r };
     try {
-      const all = swrAll(); all[k] = { t: Date.now(), r: r };
+      const st = swrStore(); if (!st) return;
+      const me = k.split('|')[0], all = swrAll(); Object.keys(all).forEach((x) => { if (x.split('|')[0] !== me) delete all[x]; }); // 다른 로그인의 것은 지움
+      all[k] = { t: Date.now(), r: r };
       const ks = Object.keys(all).sort((a, b) => all[b].t - all[a].t); ks.slice(SWR.MAX).forEach((x) => delete all[x]);
-      localStorage.setItem(SWR.LS, JSON.stringify(all));
-    } catch (e) { try { localStorage.removeItem(SWR.LS); } catch (x) {} } // 저장 공간이 꽉 차면 비움
+      st.setItem(SWR.LS, JSON.stringify(all));
+    } catch (e) { try { localStorage.removeItem(SWR.LS); sessionStorage.removeItem(SWR.LS); } catch (x) {} } // 저장 공간이 꽉 차면 비움
   }
-  function swrClear() { SWR.mem = {}; try { localStorage.removeItem(SWR.LS); } catch (e) {} }
+  function swrClear() { SWR.mem = {}; try { localStorage.removeItem(SWR.LS); sessionStorage.removeItem(SWR.LS); } catch (e) {} }
   const swrCopy = (r) => JSON.parse(JSON.stringify(r));
   function apiRead(fn, args) {
     const k = swrKey(fn, args), now = Date.now(), m = SWR.mem[k];
