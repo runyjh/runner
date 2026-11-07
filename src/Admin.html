@@ -119,6 +119,19 @@
   .search { width: 260px; }
 
   .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  /* 올인원 설정 · 화면 문구 */
+  .uitbl td { vertical-align: middle; } .uitbl td.w { color: var(--sub); font-size: 12px; white-space: nowrap; } .uitbl td.d { color: #8b95a1; }
+  .uitbl input.inp, .uitbl textarea.inp { height: 34px; } .uitbl textarea.inp { height: auto; min-height: 90px; padding: 8px 10px; line-height: 1.55; font-size: 12.5px; resize: vertical; }
+  .uitbl .ch { border-color: var(--brand); background: var(--brand-weak); font-weight: 600; }
+  .uitbl tr.grp td { background: #fafbfc; font-weight: 700; font-size: 12px; color: #4e5968; }
+  .uitbl .rs { color: var(--brand); font-size: 12px; white-space: nowrap; cursor: pointer; background: none; border: 0; padding: 0; }
+  .uitbl pre { margin: 0; white-space: pre-wrap; font: inherit; font-size: 12px; color: #6b7684; line-height: 1.55; }
+  body.ui-edit [data-uik], body.ui-edit [data-uig] { outline: 1.5px dashed #f59f00; outline-offset: 2px; border-radius: 4px; cursor: text !important; }
+  body.ui-edit [data-uig] { outline-offset: 4px; }
+  #uiBar { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); z-index: 9000; background: #fff4e5; border: 1px solid #ffd8a8; color: #a15c00; border-radius: 10px; padding: 8px 10px 8px 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.12); font-size: 13px; max-width: calc(100vw - 24px); }
+  #uiPop { position: fixed; z-index: 9001; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px; width: 340px; max-width: calc(100vw - 20px); }
+  #uiPop .inp { width: 100%; margin: 6px 0; border-color: var(--brand); } #uiPop textarea.inp { height: 200px; padding: 8px 10px; line-height: 1.5; font-size: 12.5px; }
+  #uiPop .r { display: flex; gap: 6px; align-items: center; } #uiPop .r .btn { height: 32px; font-size: 12.5px; }
   .tab { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; color: var(--sub); }
   .tab b { margin-left: 4px; color: var(--ink); }
   .tab.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand); }
@@ -898,6 +911,7 @@
       </div>
       <div class="ng g-set"><p class="ngt">설정</p>
         <a data-view="acc">계정관리</a>
+        <a data-view="uiset">올인원 설정</a>
       </div>
     </nav>
     <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a><br><a id="uiSw"></a> · <a id="pfOpen">⏱ 속도 측정</a></div>
@@ -948,6 +962,21 @@
       </table>
       <div class="empty hidden" id="acEmpty"></div>
     </div>
+   </section>
+
+   <section id="view-uiset" class="hidden">
+    <div class="head">
+      <h2>올인원 설정</h2>
+      <div class="tools">
+        <input class="inp search" id="uiQ" placeholder="🔍 문구 검색 (예: 보험, 정산서)" autocomplete="off">
+        <button class="btn ghost" id="uiEditBtn" type="button">✏️ 문구 편집 모드</button>
+        <button class="btn ghost" id="uiResetAll" type="button" title="이 탭에 보이는 바꾼 문구를 모두 비움 (저장해야 반영)">전체 기본값으로</button>
+        <button class="btn" id="uiSaveBtn" type="button">저장 · 바로 반영</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">메뉴 · 탭 · 화면 제목 · 설명서 글자를 직접 바꿉니다. <b>기능과 계산은 그대로</b>이고, 바꾼 문구를 비우면 기본 문구가 나옵니다. 화면에서 바로 고치려면 <b>✏️ 문구 편집 모드</b>를 켜세요.</p>
+    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="log">변경 기록</button></div>
+    <div id="uiBody"></div>
    </section>
    <section id="view-taxinv" class="hidden">
     <div class="head">
@@ -1768,6 +1797,7 @@
     $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
     driversLoaded = false;
+    uiLoad();
     setTimeout(() => { try { fsReady(); } catch (e) {} }, 2000); // Firestore 미리 준비
     // 새로고침하면 보던 메뉴 그대로 (이 창을 닫으면 잊음)
     try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv; } catch (e) {}
@@ -2537,6 +2567,8 @@
     if (v === 'taxinv') loadTax();
     if (v === 'board') loadBoardAdm();
     $('#view-acc').classList.toggle('hidden', v !== 'acc');
+    $('#view-uiset').classList.toggle('hidden', v !== 'uiset');
+    if (v === 'uiset') uiOpen();
     if (v === 'acc') loadAccounts();
     if (v === 'notice') loadNotices();
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
@@ -5803,7 +5835,8 @@
   };
   const ST_GTAG = { '정산서 메모': 'where', '예상 금액': 'empty', '낸 금액': 'where', '순서': 'order', '자동': 'empty', '직접': 'where', '맞추기': 'diff', '구분': 'empty', '기초잔액': 'empty', '금액 규칙': 'empty', '예시': 'info', '계산': 'order', '금액': 'empty', '원천세': 'diff', '귀속월': 'where', '매달 같으면': 'where', '일당': 'order', '단가 칸': 'empty', '지급 단가': 'where', '청구 기본값': 'empty', '러너 몫': 'diff', '품앗이': 'camp', '용차업체': 'drv', '하는 일': 'what', '우선순위': 'order', '빈칸': 'empty', '바꾸면': 'where', '덮어쓰는 곳': 'where', '금액 넣는 곳': 'where', '기본값 바꾸는 곳': 'where', '주의': 'warn', '차액': 'diff', '캠프별': 'camp', '기사별': 'drv' };
   function paintHelp(name) {
-    const el = $('#stEditHelp'), g = ST_GUIDE[name];
+    const el = $('#stEditHelp'), g = uiGuide(name) || ST_GUIDE[name];
+    UI.lastHelp = name; el.dataset.uig = name;
     if (!g) { el.className = 'sub st-help'; el.textContent = name === 'migrate' ? '' : ST_HELP[name] || ''; return; }
     el.className = 'st-help stg';
     el.innerHTML = g.map((x) => '<div class="stg-r"><span class="stg-t g-' + (ST_GTAG[x[0]] || 'info') + '">' + esc(x[0]) + '</span><span>' + x[1] + '</span></div>').join('');
@@ -5975,7 +6008,8 @@
   /** 러너 손익·통장 = 정산관리와 같은 정산월을 쓰는 별도 화면 (정산관리 탭·버튼은 숨김) */
   function setFin(on) {
     STX.fin = on;
-    $('#stTitle').textContent = on ? '러너 손익·통장' : '정산관리';
+    const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!on);
+    $('#stTitle').textContent = na ? na.textContent.trim() : on ? '러너 손익·통장' : '정산관리';
     $('#stTabs').classList.toggle('hidden', on);
     ['#stRecalc', '#stCloseBtn', '#stUpBtn'].forEach((id) => $(id).classList.toggle('hidden', on));
     $('#stPnlTabs').classList.toggle('hidden', !on);
@@ -7609,6 +7643,208 @@
     $('#pfClose').addEventListener('click', () => $('#pfModal').classList.add('hidden'));
     $('#pfRun').addEventListener('click', run);
   })();
+
+  // ───────────── 올인원 설정 · 화면 문구 ─────────────
+  // 메뉴 · 메뉴 묶음 · 화면 제목 · 탭 · 설명서 글자를 관리자가 직접 바꾼다 (DB 시트 ui_text). 기능·계산은 그대로, 글자만 바뀜.
+  // 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. 바꾼 문구가 비면 기본 문구.
+  const UI = { map: {}, defs: {}, edit: false, tab: 'menu', draft: {}, log: null, lastHelp: '' };
+  try { UI.map = JSON.parse(localStorage.getItem('runner.uiText') || '{}') || {}; } catch (e) { UI.map = {}; }
+  try { UI.defs = JSON.parse(localStorage.getItem('runner.uiDefs') || '{}') || {}; } catch (e) { UI.defs = {}; }
+  const uiFirstText = (el) => { for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) return n; return null; };
+  const uiSecTitle = (el) => {
+    const sec = el.closest('section[id^="view-"]'); if (!sec) return '';
+    if (sec.id === 'view-settle') { const a = $$('.nav a[data-view="settle"]').find((x) => (x.dataset.stGo === 'pnl') === !!STX.fin); return a ? a.textContent.trim() : '정산관리'; }
+    const h = $('.head h2', sec), t = h && uiFirstText(h); return t ? t.nodeValue.trim() : sec.id.slice(5);
+  };
+  function uiKeyOf(el) {
+    if (el.matches('.nav a[data-view]')) {
+      const g = el.closest('.ng'), gt = g && $('.ngt', g);
+      return ['nav:' + el.dataset.view + (el.dataset.stGo ? '/' + el.dataset.stGo : ''), '메뉴', '왼쪽 메뉴 · ' + (gt ? gt.textContent.trim() : '')];
+    }
+    if (el.matches('.nav .ngt')) { const g = [...el.parentNode.classList].find((c) => /^g-/.test(c)); return g ? ['ng:' + g, '메뉴 묶음', '왼쪽 메뉴'] : null; }
+    if (el.matches('section[id^="view-"] > .head h2') && el.id !== 'stTitle') return ['h2:' + el.closest('section').id, '화면 제목', '화면 맨 위'];
+    if (el.matches('.tabs .tab')) {
+      const box = el.closest('.tabs'), k = Object.keys(el.dataset).find((x) => x !== 'uik');
+      if (!k || el.dataset[k] === '') return null;
+      const where = uiSecTitle(el) || '기타';
+      return ['tab:' + (box.id || where) + ':' + k + '=' + el.dataset[k], '탭', where];
+    }
+    return null;
+  }
+  const UI_SEL = '.nav a[data-view], .nav .ngt, section[id^="view-"] > .head h2, .tabs .tab';
+  function uiApplyEl(el) {
+    const k = uiKeyOf(el); if (!k) return;
+    const tn = uiFirstText(el); if (!tn) return;
+    if (tn.__uiSet !== tn.nodeValue) tn.__uiDef = tn.nodeValue; // 처음 보거나 화면이 글자를 새로 넣었음 → 그게 기본 문구
+    const raw = tn.__uiDef, def = raw.trim();
+    if (!def || (k[1] === '탭' && /\d/.test(def))) return; // 숫자가 든 탭(건수 등)은 바꾸지 않음
+    el.dataset.uik = k[0];
+    UI.defs[k[0]] = { def: def, kind: k[1], where: k[2] };
+    const o = UI.map[k[0]], want = o && o.text ? raw.replace(def, o.text) : raw;
+    if (tn.nodeValue !== want) tn.nodeValue = want;
+    tn.__uiSet = want;
+  }
+  function uiApplyAll() {
+    $$(UI_SEL).forEach(uiApplyEl);
+    // 같은 글자면 다시 넣지 않는다 (넣으면 MutationObserver 가 또 불러 무한 반복)
+    const setT = (el, t) => { if (el && t && el.textContent !== t) el.textContent = t; };
+    const on = $$('.nav a.on'); setT($('#navCur'), on.length ? on[on.length - 1].textContent.trim() : '');
+    if (STX.fin != null) { const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!STX.fin); setT($('#stTitle'), na && na.textContent.trim()); }
+  }
+  let uiRaf = 0;
+  new MutationObserver(() => { if (!uiRaf) uiRaf = requestAnimationFrame(() => { uiRaf = 0; uiApplyAll(); }); }).observe(document.body, { childList: true, subtree: true });
+  uiApplyAll();
+  // 설명서: "태그 | 내용" 한 줄씩, **굵게**
+  const uiMd = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const uiUnhtml = (h) => { const d = document.createElement('textarea'); d.innerHTML = String(h).replace(/<b>(.*?)<\/b>/g, '**$1**').replace(/<[^>]+>/g, ''); return d.value; };
+  const uiGuideDef = (name) => (ST_GUIDE[name] || []).map((x) => x[0] + ' | ' + uiUnhtml(x[1])).join('\n');
+  function uiGuide(name) {
+    const o = UI.map['guide:' + name]; if (!o || !o.text) return null;
+    return o.text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf('|'); return i < 0 ? ['', uiMd(l)] : [l.slice(0, i).trim(), uiMd(l.slice(i + 1).trim())]; });
+  }
+  const uiGuideWhere = (name) => { const b = $('#stCfgTabs [data-cfg="' + name + '"], #stPnlTabs [data-pnl="' + name + '"], #stIdTabs [data-idt="' + name + '"]'); return b ? (b.closest('#stPnlTabs') ? '러너 손익·통장 → ' : '정산 설정 → ') + b.textContent.trim() : name === 'pnlSum' ? '러너 손익·통장 → 월별 손익' : name; };
+  function uiRepaint() {
+    localStorage.setItem('runner.uiText', JSON.stringify(UI.map));
+    uiApplyAll();
+    if (UI.lastHelp && $('#stEditHelp') && $('#stEditHelp').dataset.uig === UI.lastHelp) paintHelp(UI.lastHelp);
+    if (currentView === 'uiset') uiRender();
+  }
+  function uiLoad() {
+    return api('adm_uiText', false).then((r) => { if (r && r.ok) { UI.map = r.map || {}; uiRepaint(); } }).catch(() => {});
+  }
+  function uiSave(list) {
+    if (!list.length) return Promise.resolve(toast('바꾼 내용이 없습니다.'));
+    return api('adm_uiTextSave', list).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      UI.map = r.map || {}; UI.log = r.log || UI.log; UI.draft = {};
+      uiRepaint();
+      toast(r.changed ? '문구 ' + r.changed + '개를 바꿨습니다 · 바로 반영' : '저장했습니다');
+    }).catch(() => {});
+  }
+  // ── 설정 화면
+  function uiOpen() {
+    uiApplyAll();
+    try { localStorage.setItem('runner.uiDefs', JSON.stringify(UI.defs)); } catch (e) {}
+    uiRender();
+    api('adm_uiText', true).then((r) => { if (r && r.ok) { UI.map = r.map || {}; UI.log = r.log || []; uiRepaint(); } }).catch(() => {});
+  }
+  function uiRows(kind) {
+    const keys = [], seen = {};
+    const add = (k) => { if (!seen[k]) { seen[k] = 1; keys.push(k); } };
+    if (kind === 'guide') Object.keys(ST_GUIDE).forEach((n) => add('guide:' + n));
+    else {
+      const kinds = kind === 'tab' ? ['탭'] : ['메뉴 묶음', '메뉴', '화면 제목'];
+      $$('[data-uik]').forEach((el) => { const d = UI.defs[el.dataset.uik]; if (d && kinds.includes(d.kind)) add(el.dataset.uik); });
+      Object.keys(UI.defs).forEach((k) => { if (kinds.includes(UI.defs[k].kind)) add(k); });
+      Object.keys(UI.map).forEach((k) => { if (kinds.includes(UI.map[k].kind)) add(k); });
+    }
+    return keys.map((k) => {
+      const d = UI.defs[k] || {}, o = UI.map[k] || {}, dr = UI.draft[k];
+      const g = k.startsWith('guide:') ? k.slice(6) : '';
+      return { key: k, kind: g ? '설명서' : d.kind || o.kind, where: g ? uiGuideWhere(g) : d.where || o.where || '', def: g ? uiGuideDef(g) : d.def || o.def || '', text: dr ? dr.text : o.text || '', memo: dr ? dr.memo : o.memo || '' };
+    });
+  }
+  function uiRender() {
+    $$('#uiTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.uit === UI.tab));
+    $('#uiResetAll').classList.toggle('hidden', UI.tab === 'log');
+    $('#uiSaveBtn').classList.toggle('hidden', UI.tab === 'log');
+    const q = $('#uiQ').value.trim().toLowerCase();
+    if (UI.tab === 'log') {
+      const L = (UI.log || []).filter((x) => !q || (x.def + x.before + x.after + x.by).toLowerCase().includes(q));
+      $('#uiBody').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th>때</th><th>바꾼 사람</th><th>기본 문구</th><th>이전</th><th>이후</th></tr></thead><tbody>' +
+        (L.length ? L.map((x) => '<tr><td class="w">' + esc(x.at) + '</td><td>' + esc(x.by) + '</td><td class="d">' + esc(String(x.def).split('\n')[0]) + '</td><td>' + esc(String(x.before || '(기본)').split('\n')[0]) + '</td><td><b>' + esc(String(x.after || '(기본)').split('\n')[0]) + '</b></td></tr>').join('') : '<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">' + (UI.log ? '변경 기록이 없습니다.' : '불러오는 중…') + '</td></tr>') + '</tbody></table></div>';
+      return;
+    }
+    const rows = uiRows(UI.tab).filter((r) => !q || (r.def + ' ' + r.text + ' ' + r.where + ' ' + r.memo).toLowerCase().includes(q));
+    let last = '';
+    const body = rows.map((r) => {
+      const grp = r.where !== last ? '<tr class="grp"><td colspan="5">' + esc(r.where) + '</td></tr>' : ''; last = r.where;
+      const inp = r.kind === '설명서'
+        ? '<textarea class="inp' + (r.text ? ' ch' : '') + '" data-uk="' + esc(r.key) + '" rows="' + Math.max(4, r.def.split('\n').length + 1) + '" placeholder="비우면 기본 설명서 · 한 줄 = 태그 | 내용 · **굵게**">' + esc(r.text) + '</textarea>'
+        : '<input class="inp' + (r.text ? ' ch' : '') + '" data-uk="' + esc(r.key) + '" value="' + esc(r.text) + '" placeholder="' + esc(r.def) + '">';
+      return grp + '<tr data-row="' + esc(r.key) + '"><td class="w">' + esc(r.kind) + '</td><td class="d">' + (r.kind === '설명서' ? '<pre>' + esc(r.def) + '</pre>' : esc(r.def)) + '</td><td>' + inp + '</td>' +
+        '<td><input class="inp" data-um="' + esc(r.key) + '" value="' + esc(r.memo) + '" placeholder="메모"></td><td>' + (r.text ? '<button class="rs" data-ur="' + esc(r.key) + '">↺ 기본값</button>' : '') + (r.kind === '설명서' && !r.text ? '<button class="rs" data-ucopy="' + esc(r.key) + '">기본 내용 복사해 고치기</button>' : '') + '</td></tr>';
+    }).join('');
+    $('#uiBody').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th style="width:90px">구분</th><th style="width:' + (UI.tab === 'guide' ? '34%' : '220px') + '">기본 문구</th><th>바꾼 문구 (비우면 기본)</th><th style="width:170px">메모</th><th style="width:90px"></th></tr></thead><tbody>' +
+      (body || '<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">' + (q ? '"' + esc(q) + '" 에 맞는 문구가 없습니다.' : '없습니다.') + '</td></tr>') + '</tbody></table></div>' +
+      (UI.tab === 'tab' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 번도 열어 보지 않은 화면의 탭은 목록에 없을 수 있어요. 그 화면을 열거나 ✏️ 문구 편집 모드로 바로 고치세요. 건수(숫자)가 붙는 탭은 바꿀 수 없습니다.</p>' : '') +
+      (UI.tab === 'guide' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 줄 = <b>태그 | 내용</b> (예: <code>주의 | 마감한 달은 **그대로**</code>) · <code>**글자**</code> = 굵게 · 비우면 기본 설명서.</p>' : '');
+  }
+  const uiDraftOf = (k) => { const o = UI.map[k] || {}; return UI.draft[k] || (UI.draft[k] = { text: o.text || '', memo: o.memo || '' }); };
+  $('#uiBody').addEventListener('input', (e) => {
+    const t = e.target, k = t.dataset.uk || t.dataset.um; if (!k) return;
+    const d = uiDraftOf(k);
+    if (t.dataset.uk) { d.text = t.value; t.classList.toggle('ch', !!t.value.trim()); } else d.memo = t.value;
+  });
+  $('#uiBody').addEventListener('click', (e) => {
+    const r = e.target.closest('[data-ur]'), c = e.target.closest('[data-ucopy]');
+    if (r) { uiDraftOf(r.dataset.ur).text = ''; const i = $('[data-uk="' + CSS.escape(r.dataset.ur) + '"]', $('#uiBody')); if (i) { i.value = ''; i.classList.remove('ch'); } r.remove(); }
+    if (c) { const k = c.dataset.ucopy, i = $('[data-uk="' + CSS.escape(k) + '"]', $('#uiBody')); if (i) { i.value = uiGuideDef(k.slice(6)); uiDraftOf(k).text = i.value; i.classList.add('ch'); i.focus(); } c.remove(); }
+  });
+  const uiCollect = () => Object.keys(UI.draft).map((k) => {
+    const d = UI.draft[k], r = uiRows(k.startsWith('guide:') ? 'guide' : (UI.defs[k] || UI.map[k] || {}).kind === '탭' ? 'tab' : 'menu').find((x) => x.key === k) || { kind: '', where: '', def: '' };
+    let text = String(d.text || '').trim(); if (text === r.def) text = '';
+    return { key: k, kind: r.kind, where: r.where, def: r.def, text: text, memo: d.memo || '' };
+  });
+  $('#uiSaveBtn').addEventListener('click', () => uiSave(uiCollect()));
+  $('#uiResetAll').addEventListener('click', () => {
+    const rows = uiRows(UI.tab).filter((r) => r.text);
+    if (!rows.length) return toast('이 탭에는 바꾼 문구가 없습니다.');
+    if (!confirm('이 탭의 바꾼 문구 ' + rows.length + '개를 모두 기본값으로 되돌릴까요?')) return;
+    rows.forEach((r) => { uiDraftOf(r.key).text = ''; });
+    uiSave(uiCollect());
+  });
+  $('#uiTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-uit]'); if (!b || UI.edit) return; UI.tab = b.dataset.uit; uiRender(); });
+  onSearch($('#uiQ'), uiRender);
+  // ── ✏️ 문구 편집 모드: 점선 글자를 눌러 바로 고친다
+  function uiEditMode(on) {
+    UI.edit = !!on;
+    document.body.classList.toggle('ui-edit', UI.edit);
+    uiPopClose();
+    let bar = $('#uiBar');
+    if (UI.edit && !bar) {
+      bar = document.createElement('div'); bar.id = 'uiBar';
+      bar.innerHTML = '<span>✏️ <b>문구 편집 모드</b> — 점선 글자를 눌러 바로 고치세요 · Enter 저장 · Esc 취소 (다른 메뉴로 가려면 편집 끝내기)</span><button class="btn sm ghost" type="button" id="uiBarEnd">편집 끝내기</button>';
+      document.body.appendChild(bar);
+      $('#uiBarEnd').addEventListener('click', () => uiEditMode(false));
+    }
+    if (!UI.edit && bar) bar.remove();
+    $('#uiEditBtn').textContent = UI.edit ? '✏️ 편집 끝내기' : '✏️ 문구 편집 모드';
+  }
+  $('#uiEditBtn').addEventListener('click', () => uiEditMode(!UI.edit));
+  function uiPopClose() { const p = $('#uiPop'); if (p) p.remove(); }
+  function uiPopOpen(el, key, guide) {
+    uiPopClose();
+    const d = UI.defs[key] || {}, o = UI.map[key] || {};
+    const def = guide ? uiGuideDef(guide) : d.def || o.def || '';
+    const cur = o.text || def;
+    const p = document.createElement('div'); p.id = 'uiPop';
+    p.innerHTML = '<div class="sub" style="font-size:12px">' + esc(guide ? '설명서 · ' + uiGuideWhere(guide) : (d.kind || '문구') + ' · 기본: ' + def) + '</div>' +
+      (guide ? '<textarea class="inp" id="uiPopIn">' + esc(cur) + '</textarea><div class="sub" style="font-size:11.5px;margin-bottom:6px">한 줄 = 태그 | 내용 · **굵게** · Ctrl+Enter 저장</div>' : '<input class="inp" id="uiPopIn" value="' + esc(cur) + '">') +
+      '<div class="r">' + (o.text ? '<button class="rs" type="button" id="uiPopDef" style="color:var(--brand);background:none;border:0;cursor:pointer;font-size:12px">↺ 기본값</button>' : '') + '<span style="flex:1"></span><button class="btn ghost" type="button" id="uiPopNo">취소</button><button class="btn" type="button" id="uiPopOk">저장</button></div>';
+    document.body.appendChild(p);
+    const rc = el.getBoundingClientRect(), W = p.offsetWidth, H = p.offsetHeight;
+    p.style.left = Math.max(10, Math.min(rc.left, innerWidth - W - 10)) + 'px';
+    p.style.top = (rc.bottom + 8 + H > innerHeight ? Math.max(10, rc.top - H - 8) : rc.bottom + 8) + 'px';
+    const inp = $('#uiPopIn'); inp.focus(); if (inp.select && !guide) inp.select();
+    const kind = guide ? '설명서' : d.kind || o.kind || '', where = guide ? uiGuideWhere(guide) : d.where || o.where || '';
+    const done = (text) => { uiPopClose(); text = String(text).trim(); if (text === def) text = ''; if (text === (o.text || '')) return; uiSave([{ key: key, kind: kind, where: where, def: def, text: text, memo: o.memo || '' }]); };
+    $('#uiPopOk').addEventListener('click', () => done(inp.value));
+    $('#uiPopNo').addEventListener('click', uiPopClose);
+    if ($('#uiPopDef')) $('#uiPopDef').addEventListener('click', () => done(''));
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); uiPopClose(); }
+      if (e.key === 'Enter' && (!guide || e.ctrlKey || e.metaKey)) { e.preventDefault(); done(inp.value); }
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (!UI.edit || e.target.closest('#uiBar, #uiPop')) return;
+    const el = e.target.closest('[data-uik]'), g = !el && e.target.closest('[data-uig]');
+    if (!el && !g) return;
+    e.preventDefault(); e.stopPropagation();
+    if (el) uiPopOpen(el, el.dataset.uik); else uiPopOpen(g, 'guide:' + g.dataset.uig, g.dataset.uig);
+  }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && UI.edit && !$('#uiPop')) uiEditMode(false); });
 
   // ───────────── 찾기 · 목차 (Ctrl+K) ─────────────
   // 메뉴 → 탭 → 하위 탭 · 자주 쓰는 버튼 · 기사(이름·아이디·연락처·차량)를 한 곳에서 찾아 바로 이동. 빈칸이면 전체 목차.
