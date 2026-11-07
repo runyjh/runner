@@ -263,6 +263,8 @@
   .d-foot { background: #fff; padding: 12px 20px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
   .d-foot .msg { color: var(--sub); font-size: 12px; margin-right: auto; }
   .sec { background: #fff; border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .dtabs { position: sticky; top: -16px; z-index: 3; background: var(--bg); margin: -16px -20px 12px; padding: 12px 20px 10px; gap: 6px; border-bottom: 1px solid var(--line); }
+  .dtabs .tab { padding: 6px 12px; font-size: 13px; }
   .sec h4 { margin: 0 0 12px; font-size: 14px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
   .grid2 .full { grid-column: 1 / -1; }
@@ -2110,8 +2112,32 @@
         '<span>비밀번호</span><span>' + (d.hasPw ? '설정됨 (변경 ' + esc(d.pwChangedAt || '-') + ')' : '없음 - 임시 비밀번호를 지정해 주세요') + '</span>' +
       '</div><div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button>' +
       '<button type="button" class="btn sm ghost danger-t" id="delDrvBtn" style="margin-left:auto">기사 삭제</button></div></div>';
+    drawerTabs();
     initAssign(d);
   }
+  // 기사 정보 창: 위 5칸(기사 앱 · 근무상태 · 직급 · 쿠팡아이디·단가코드 · 배정 캠프·라우트)은 한 묶음, 나머지는 위쪽 버튼으로 하나씩
+  //  (화면만 나눔 — 모든 칸은 그대로 있어서 어느 탭에서 고쳐도 [저장] 한 번에 같이 저장됨)
+  let DTAB = 'main';
+  function drawerTabs() {
+    const body = $('#dBody'), secs = [...body.children].filter((e) => e.classList.contains('sec'));
+    const ai = secs.findIndex((e) => e.id === 'aSec'); if (ai < 0) return;
+    const tabs = [['main', '근무 · 배정']];
+    secs.forEach((sec, i) => {
+      if (i <= ai) { sec.dataset.dp = 'main'; return; }
+      const h = $('h4', sec), t = h && [...h.childNodes].find((n) => n.nodeType === 3 && n.nodeValue.trim());
+      const k = 'p' + i; sec.dataset.dp = k; tabs.push([k, t ? t.nodeValue.trim() : '기타']);
+    });
+    if (!tabs.some((x) => x[0] === DTAB)) DTAB = 'main';
+    const bar = document.createElement('div'); bar.className = 'tabs dtabs';
+    bar.innerHTML = tabs.map((x) => '<button type="button" class="tab' + (x[0] === DTAB ? ' on' : '') + '" data-dp="' + x[0] + '">' + esc(x[1]) + '</button>').join('');
+    body.insertBefore(bar, body.firstChild);
+    paintDTab();
+  }
+  function paintDTab() {
+    $$('#dBody .sec[data-dp]').forEach((s) => s.classList.toggle('hidden', s.dataset.dp !== DTAB));
+    $$('#dBody .dtabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.dp === DTAB));
+  }
+  $('#dBody').addEventListener('click', (e) => { const b = e.target.closest('.dtabs .tab'); if (!b || document.body.classList.contains('ui-edit')) return; DTAB = b.dataset.dp; paintDTab(); $('#dBody').scrollTop = 0; });
 
   // ── 배정 캠프 · 라우트 (노선관리 데이터에서 고르기) ──
   let CR = null, aSel = null;
