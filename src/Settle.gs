@@ -2120,8 +2120,11 @@ function adm_stlMonth(token, month, fresh) {
   });
 }
 // ───────────────────────── 러너 손익 (당기순이익) ─────────────────────────
-// 당기순이익(세전, 공급가) = 회사이익금 − 러너 보험 실부담 − 직원 인건비(세전) − 고정 운영비 − 지출 기록
-//  · 회사이익금 = 쿠팡 공급가 − 분실 − 기사 공급가 − 영업점 수수료 (러너 잉여 = 프백·보험 차액·용차는 이미 안에 들어 있어 더하지 않음)
+// 당기순이익(세전, 공급가) = 회사이익금 − 러너 산재·고용 50% + 보험 차액 − 직원 인건비(세전) − 고정 운영비 − 지출 기록
+//  · 회사이익금 = 쿠팡 공급가 − 분실 − 기사 공급가 − 영업점 수수료 (프백·용차 잉여는 이미 안에 있음)
+//  · 산재·고용 신고 기준 (기존 운영정산 시트와 같은 방식): 기사 매입 공급가 합계 × (1 − 경비율) = 월보수액
+//    기사 산재 = 보수 × 산재율 × (1 − 러너 부담률) · 기사 고용 = 보수 × 고용율 × (1 − 러너 부담률) · 러너 = 기사분과 같은 비율
+//    합계 = 공단 신고액 = 매달 빼둘 돈. 보험 차액 = 기사 정산서에서 실제 공제한 보험 − 신고 기준 기사분 (러너 잉여)
 //  · 운영비 금액은 실제 나가는 돈(VAT포함). 증빙이 세금계산서·카드·현금영수증이면 ÷1.1 로 공급가·부가세(매입세액 공제)를 나눔
 const STL_PROOF_VAT = { '세금계산서': 1, '카드': 1, '현금영수증': 1 };
 function stlSplitVat_(amt, proof) {
@@ -2145,10 +2148,20 @@ function stlPnl_(month, sum) {
   const o = {
     month: month, closed: !!(sum && sum.closed), hasData: !!(sum && (sum.drivers || []).length),
     qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 0.1), loss: c.lossCp || 0, progFee: -(c.vendorCut || 0),
-    drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0), surplus: (t.fbKeep || 0) + (t.fbCut || 0) + (t.insGain || 0) + (c.yongGain || 0),
-    runnerIns: t.runnerIns || 0, insDrv: (t.san || 0) + (t.goy || 0),
+    drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0),
+    insDrv: (t.san || 0) + (t.goy || 0),
     staff: 0, staffWht: 0, staffNet: 0, staffN: 0, fixed: 0, fixedVat: 0, fixedN: 0, varCost: 0, varVat: 0, varN: 0, byCat: {}
   };
+  // 산재·고용 신고 기준
+  const cfg = stlCfg_(), rr = Math.min(0.95, Math.max(0, cfg.runner)), dr = 1 - rr;
+  const ins = { base: o.drvSupply, exp: cfg.expense, san: cfg.san + cfg.commute, goy: cfg.goy, runner: rr };
+  ins.bosu = Math.round(ins.base * (1 - cfg.expense));
+  ins.sanD = Math.round(ins.bosu * ins.san * dr); ins.goyD = Math.round(ins.bosu * ins.goy * dr);
+  ins.runnerAmt = dr > 0 ? Math.round((ins.sanD + ins.goyD) * rr / dr) : 0;
+  ins.total = ins.sanD + ins.goyD + ins.runnerAmt;
+  ins.gap = o.insDrv - (ins.sanD + ins.goyD); // 기사에게 실제 공제한 보험 − 신고 기준 기사분 → 러너 잉여
+  o.ins = ins; o.runnerIns = ins.runnerAmt; o.insGap = ins.gap;
+  o.surplus = (t.fbKeep || 0) + (t.fbCut || 0) + ins.gap + (c.yongGain || 0);
   const cat = function (k, v) { if (v) o.byCat[k || '기타'] = (o.byCat[k || '기타'] || 0) + v; };
   stlRead_('stl_staff').forEach(function (r) {
     const pay = stlR0_(stlNum_(r.pay));
@@ -2167,7 +2180,7 @@ function stlPnl_(month, sum) {
     o.varCost += x.supply; o.varVat += x.vat; o.varN++; cat(r.cat, x.supply);
   });
   o.cost = o.fixed + o.varCost;
-  o.net = o.profit - o.runnerIns - o.staff - o.cost;
+  o.net = o.profit - o.runnerIns + o.insGap - o.staff - o.cost;
   o.rate = o.salesSupply ? o.net / o.salesSupply : 0;
   o.vatDue = o.salesVat - o.drvVat - o.fixedVat - o.varVat; // 부가세 예상 (매출세액 − 기사 매입세액 − 운영비 매입세액)
   return o;
@@ -2224,7 +2237,7 @@ function stlFund_(month) {
   const depPlan = Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 1.1);
   const deposit = { plan: depPlan, amt: stlNum_(dep.amt) || 0, done: stlYes_(dep.done), date: dep.date || '', memo: dep.memo || '', due: (sum.dates || {}).coupang || '', bank: source };
   const auto = {
-    driver: t.net || 0, vat: Math.max(0, pnl.vatDue), ins: (t.san || 0) + (t.goy || 0) + (t.runnerIns || 0), staff: pnl.staff,
+    driver: t.net || 0, vat: Math.max(0, pnl.vatDue), ins: pnl.ins.total, staff: pnl.staff,
     fixed: pnl.fixed + pnl.fixedVat, var: pnl.varCost + pnl.varVat, tax: 0, owner: 0
   };
   const items = [];
@@ -2315,7 +2328,7 @@ function stlTax_(month) {
     try { sum = stlResult_(m, false).summary; } catch (e) { sum = null; }
     if (!sum) return;
     const t = sum.total || {}, p = stlPnl_(m, sum);
-    per[m] = { wht: p.staffWht, ins: (t.san || 0) + (t.goy || 0) + (t.runnerIns || 0), vat: p.vatDue, net: p.net, payMonth: String(sum.dates && sum.dates.pay || stlAddMonth_(m, 1)).slice(0, 7) };
+    per[m] = { wht: p.staffWht, ins: p.ins.total, vat: p.vatDue, net: p.net, payMonth: String(sum.dates && sum.dates.pay || stlAddMonth_(m, 1)).slice(0, 7) };
   });
   const paid = {};
   stlRead_('stl_taxpay').forEach(function (r) { if (r.key) paid[r.key] = r; });
