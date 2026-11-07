@@ -101,8 +101,15 @@ function tiNewId_() {
 function adm_tiList(token) {
   return run_(function () {
     requireAdmin_(token);
-    const on = {}; readAll_(SH.DRIVERS).forEach(function (o) { if (str_(o.tiOn) === 'Y') on[String(o.id)] = 1; });
-    const list = readAll_(SH.TAXINV).filter(function (r) { return r.id; }).map(function (r) { const t = tiOut_(r), did = String(r.supDriverId || r.supId || ''), isDrv = !!did && !/^v:/.test(did); t.appOn = isDrv && !!on[did]; t.hasDrv = isDrv; return t; })
+    const on = {}, ids = {};
+    readAll_(SH.DRIVERS).forEach(function (o) {
+      if (str_(o.tiOn) === 'Y') on[String(o.id)] = 1;
+      ids[String(o.id)] = [o.loginId, o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean); // 기사 아이디 (메인 · 서브)
+    });
+    const list = readAll_(SH.TAXINV).filter(function (r) { return r.id; }).map(function (r) {
+      const t = tiOut_(r), did = String(r.supDriverId || r.supId || ''), isDrv = !!did && !/^v:/.test(did);
+      t.appOn = isDrv && !!on[did]; t.hasDrv = isDrv; t.loginIds = isDrv ? (ids[did] || []) : []; return t;
+    })
       .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id), 'en', { numeric: true }); });
     return { ok: true, list: list, suppliers: tiSuppliers_(), buyer: tiBuyer_(), today: todayText_(), kinds: TI_KINDS };
   });
