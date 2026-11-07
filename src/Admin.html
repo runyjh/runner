@@ -1010,7 +1010,7 @@
         <button class="btn ghost" id="tiReload">새로고침</button>
       </div>
     </div>
-    <p class="sub" style="margin:-4px 0 12px;font-size:13px">전자세금계산서 발행을 어려워하는 기사님(공급자) 대신 러너(공급받는자)가 세금계산서를 만듭니다. 기사님께는 <b>공급자 보관용</b> 그림으로 전달되고, 기사 앱 <b>정산서 보기</b>에서도 볼 수 있습니다. 단가는 부가세 포함 금액 (공급가액 = 단가÷1.1 반올림). 데이터: 러너 올인원 DB <b>tax_invoices</b> 탭.</p>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">전자세금계산서 발행을 어려워하는 기사님(공급자) 대신 러너(공급받는자)가 세금계산서를 만듭니다. 기사님께는 <b>공급자 보관용</b> 그림으로 전달되고, 기사 앱 <b>정산서 보기</b>에서는 <b>기사 정보 › 사업자 정보 › 세금계산서 역발행</b>을 '역발행 기사'로 지정한 기사님만 볼 수 있습니다 (공급자 옆 '앱 공개/앱 비공개' 표시). 단가는 부가세 포함 금액 (공급가액 = 단가÷1.1 반올림). 데이터: 러너 올인원 DB <b>tax_invoices</b> 탭.</p>
     <div class="tabs" id="tiTabs"><button class="tab on" data-ti="list">발행내역</button><button class="tab" data-ti="sup">거래처별 현황</button><button class="tab" data-ti="month">월별 발행현황</button></div>
     <div id="tiPane-list">
       <div class="ptools">
@@ -2120,6 +2120,9 @@
         fld('bizCeo', '대표자 (비우면 이름)', d.bizCeo) + fld('bizEmail', '계산서 이메일', d.bizEmail, { type: 'email' }) +
         fld('bizAddr', '사업장 주소', d.bizAddr, { full: true }) +
         fld('bizType', '업태', d.bizType) + fld('bizItem', '종목', d.bizItem) +
+        '<div class="field full"><label class="lb">세금계산서 역발행</label><select class="inp" data-k="tiOn">' +
+          '<option value=""' + (d.tiOn === 'Y' ? '' : ' selected') + '>지정 안 함 — 기사 앱에 세금계산서 안 보임</option>' +
+          '<option value="Y"' + (d.tiOn === 'Y' ? ' selected' : '') + '>역발행 기사 — 기사 앱 정산서에 세금계산서 보임</option></select></div>' +
       '</div></div>' +
       '<div class="sec"><h4>서류</h4><div class="docs">' + docs + '</div>' +
         (d.docFolder ? '<div style="margin-top:8px;font-size:12px"><a href="' + esc(d.docFolder) + '" target="_blank" rel="noopener">서류 폴더 열기 (드라이브)</a></div>' : '') + '</div>' +
@@ -7440,7 +7443,8 @@
     const list = tiFiltered();
     $('#tiCount').textContent = TX.list.length + '장';
     $('#tiRows').innerHTML = list.map((t) => '<tr data-ti="' + esc(t.id) + '"><td class="ck"><input type="checkbox" data-tck="' + esc(t.id) + '"' + (TX.sel.has(t.id) ? ' checked' : '') + '></td><td class="sub">' + esc(t.id) + '</td><td>' + esc(t.date) + '</td>' +
-      '<td><b>' + esc(t.sup.name) + '</b>' + (t.sup.ceo && t.sup.ceo !== t.sup.name ? ' <span class="sub">' + esc(t.sup.ceo) + '</span>' : '') + '</td><td class="sub">' + esc(t.sup.no) + '</td>' +
+      '<td><b>' + esc(t.sup.name) + '</b>' + (t.sup.ceo && t.sup.ceo !== t.sup.name ? ' <span class="sub">' + esc(t.sup.ceo) + '</span>' : '') +
+        (t.hasDrv ? (t.appOn ? ' <span class="badge" style="background:#e8f5e9;color:#1b7a3a" title="기사 정보에서 역발행 기사로 지정됨 · 기사 앱 정산서에 보임">앱 공개</span>' : ' <span class="badge" style="background:#f2f4f6;color:#6b7684" title="기사 정보 › 사업자 정보 › 세금계산서 역발행에서 지정하면 기사 앱에 보임">앱 비공개</span>') : '') + '</td><td class="sub">' + esc(t.sup.no) + '</td>' +
       '<td>' + esc((t.items[0] || {}).name || '') + (t.items.length > 1 ? ' 외 ' + (t.items.length - 1) : '') + '</td><td class="n">' + wn(t.supply) + '</td><td class="n">' + wn(t.tax) + '</td><td class="n"><b>' + wn(t.total) + '</b></td>' +
       '<td>' + esc(t.kind) + '</td><td><span class="badge ti-nts ' + (t.nts === '등록' ? 'b-승인' : 'b-승인대기') + '" data-tnts="' + esc(t.id) + '" title="눌러서 바꾸기">' + esc(t.nts) + '</span></td><td>' + (t.pub ? '<span class="sub">공개</span>' : '<span class="badge b-정지">숨김</span>') + '</td></tr>').join('');
     const sum = (k) => list.reduce((a, t) => a + (t[k] || 0), 0);

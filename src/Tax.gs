@@ -101,7 +101,8 @@ function tiNewId_() {
 function adm_tiList(token) {
   return run_(function () {
     requireAdmin_(token);
-    const list = readAll_(SH.TAXINV).filter(function (r) { return r.id; }).map(tiOut_)
+    const on = {}; readAll_(SH.DRIVERS).forEach(function (o) { if (str_(o.tiOn) === 'Y') on[String(o.id)] = 1; });
+    const list = readAll_(SH.TAXINV).filter(function (r) { return r.id; }).map(function (r) { const t = tiOut_(r); t.appOn = !!(r.supDriverId && on[String(r.supDriverId)]); t.hasDrv = !!r.supDriverId; return t; })
       .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id), 'en', { numeric: true }); });
     return { ok: true, list: list, suppliers: tiSuppliers_(), buyer: tiBuyer_(), today: todayText_(), kinds: TI_KINDS };
   });
@@ -212,6 +213,9 @@ function adm_tiFromSettle(token, month, overwrite) {
 // ───────────────────────── 기사 앱 ─────────────────────────
 /** 내 정산서 화면용: 그 정산월 나(명의자)의 공개된 계산서 (공급자 보관용 그림으로 보여 줌) */
 function tiForDriver_(driverId, month) {
+  // 기사 정보에서 '세금계산서 역발행 대상' 으로 지정한 기사에게만 보여 줌
+  const me = driverById_(String(driverId));
+  if (!me || str_(me.tiOn) !== 'Y') return [];
   return readAll_(SH.TAXINV).filter(function (r) { return r.id && r.month === month && r.pub !== 'N' && (r.supDriverId === driverId || r.supId === driverId); })
     .map(tiOut_).map(function (t) { delete t.createdAt; delete t.updatedAt; delete t.supId; return t; });
 }
