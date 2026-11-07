@@ -2273,14 +2273,14 @@
       '<div class="xas">' + xSel.map((x, i) => {
         const used = new Set([aSel.campId].concat(xSel.filter((_, j) => j !== i).map((y) => y.campId)));
         const xr = x.campId && x.units.length ? composeUnits(x.units, '', x.rots && x.rots.length ? x.rots : campRots(x.campId), campRots(x.campId)) : '';
-        return '<div class="xone"><div class="xhd"><span>추가 배정 ' + (i + 1) + '</span><button type="button" class="btn sm ghost danger-t" data-xdel="' + i + '">빼기</button></div>' +
+        return '<div class="xone"><div class="xhd"><span>추가 배정 ' + (i + 1) + '</span><span style="display:flex;gap:6px"><button type="button" class="btn sm ghost" data-xmain="' + i + '" title="이 캠프·라우트를 기본노선으로 (지금 기본노선은 추가 배정으로 바뀜)">★ 기본노선으로</button><button type="button" class="btn sm ghost danger-t" data-xdel="' + i + '">빼기</button></span></div>' +
           '<select class="inp" data-xcamp="' + i + '" style="margin-bottom:8px"><option value="">(캠프 고르기)</option>' +
           camps.filter((c) => c.id === x.campId || !used.has(c.id)).map((c) => '<option value="' + esc(c.id) + '"' + (c.id === x.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>' +
           (x.campId ? '<div class="xchips" data-xi="' + i + '">' + unitPickerHtml('x' + i, campList(x.campId), x.units, '', '') + '</div>' : '') +
           '<div class="brprev" style="margin-top:6px">' + (xr ? '추가: <b>' + esc(shortCamp((camps.find((c) => c.id === x.campId) || {}).name || '')) + ' ' + esc(xr) + '</b>' : '<span style="color:var(--faint)">캠프와 라우트를 고르면 저장됩니다</span>') + '</div></div>';
       }).join('') +
       '<button type="button" class="btn sm ghost" id="xAdd"' + (!aSel.campId ? ' disabled title="소속 캠프를 먼저 고르세요"' : '') + '>+ 다른 캠프 라우트 추가 배정</button>' +
-      '<div class="sub" style="font-size:12px;margin-top:6px">추가 배정한 캠프는 기사스케줄에 이 기사 줄이 하나 더 생기고(보라색 \'추가\' 표시), 칸은 따로 입력합니다. 기사 앱 내 스케줄에는 \'강서1 527B\'처럼 함께 보입니다.</div></div>';
+      '<div class="sub" style="font-size:12px;margin-top:6px">추가 배정한 캠프는 기사스케줄에 이 기사 줄이 하나 더 생기고(보라색 \'추가\' 표시), 칸은 따로 입력합니다. <b>★ 기본노선으로</b>를 누르면 그 캠프·라우트가 기본노선이 되고 지금 기본은 추가 배정으로 바뀝니다 (저장하면 오늘부터 칸도 서로 바뀜). 기사 앱 내 스케줄에는 \'강서1 527B\'처럼 함께 보입니다.</div></div>';
     if (aSel.q && $('#aQ')) { const i = $('#aQ'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
   }
   function syncAssign() {
@@ -2312,6 +2312,18 @@
     if (!aSel) return;
     if (e.target.id === 'xAdd') { xSel.push({ campId: '', units: [], rots: [] }); return paintAssign(); }
     const del = e.target.closest('[data-xdel]'); if (del) { xSel.splice(+del.dataset.xdel, 1); return syncX(); }
+    // ★ 기본노선으로: 이 추가 배정과 지금 기본(소속 캠프·기본노선)을 맞바꿈 → 저장하면 오늘부터 기사스케줄 칸도 줄끼리 바뀜
+    const mk = e.target.closest('[data-xmain]');
+    if (mk) {
+      const i = +mk.dataset.xmain, x = xSel[i];
+      if (!x || !x.campId || !x.units.length) return toast('이 추가 배정의 캠프와 라우트를 먼저 고르세요.');
+      const old = { campId: aSel.campId, units: aSel.units.slice(), rots: aSel.special ? [] : aSel.rots.slice() };
+      aSel.campId = x.campId; aSel.units = x.units.slice(); aSel.special = ''; aSel.q = '';
+      aSel.rots = x.rots && x.rots.length ? x.rots.slice() : campRots(x.campId);
+      if (old.campId && old.units.length) xSel[i] = old; else xSel.splice(i, 1);
+      syncAssign(); syncX();
+      toast('기본노선을 바꿨습니다. 저장하면 오늘부터 기사스케줄 칸도 서로 바뀝니다.');
+    }
     const box = e.target.closest('.xchips[data-xi]');
     if (box) { const i = +box.dataset.xi, x = xSel[i]; if (x && unitClick(e, 'x' + i, x, campList(x.campId))) syncX(); }
   });

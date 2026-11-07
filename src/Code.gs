@@ -1884,6 +1884,13 @@ function updateDriverCore_(a, id, changes, seenRev) {
       rcTouch_();
     }
   } catch (e) { console.error('노선 변경 이력 기록 실패: ' + (e && e.message)); }
+  // 기본노선을 추가 배정 캠프로 바꿈(서로 맞바꿈) → 오늘부터의 기사스케줄 칸도 줄끼리 맞바꿈
+  try {
+    if (f.schCampId !== undefined && f.extraAssign !== undefined && o.schCampId && f.schCampId && f.schCampId !== o.schCampId) {
+      const oldEx = extraAssignOf_(o).map(function (x) { return x.c; }), newEx = extraAssignOf_({ extraAssign: f.extraAssign }).map(function (x) { return x.c; });
+      if (oldEx.indexOf(f.schCampId) >= 0 && newEx.indexOf(o.schCampId) >= 0) schSwapAssign_(o, f, todayText_());
+    }
+  } catch (e) { console.error('추가 배정 칸 맞바꾸기 실패: ' + (e && e.message)); }
   if (f.loginId) forgetDriver_({ loginId: f.loginId });
   // 단가코드이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가코드도 맞춘다
   if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
@@ -2088,7 +2095,7 @@ function driverFields_(changes, o) {
         f.bizNo = d ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : ''; break;
       }
       case 'bizName': f.bizName = opt(v, '상호', 100); break;
-      case 'extraAssign': f.extraAssign = extraAssignNorm_(v, f.schCampId !== undefined ? f.schCampId : o.schCampId); break;
+      case 'extraAssign': f.extraAssign = extraAssignNorm_(v, changes.schCampId !== undefined ? str_(changes.schCampId) : o.schCampId); break;
       case 'bizCeo': f.bizCeo = opt(v, '대표자', 50); break;
       case 'bizAddr': f.bizAddr = opt(v, '사업장 주소', 200); break;
       case 'bizType': f.bizType = opt(v, '업태', 100); break;
@@ -4487,6 +4494,42 @@ function extraAssignNorm_(v, mainCampId) {
   return out.length ? JSON.stringify(out) : '';
 }
 const schExId_ = function (driverId, campId) { return SCH_EX_PREFIX + driverId + '@' + campId; };
+/** 기본 배정 ↔ 추가 배정 맞바꿈: from 날짜부터 기사 줄 칸 ↔ 추가 배정 줄 칸 (지난 날짜는 그대로) */
+function schSwapAssign_(o, f, from) {
+  if (!props_().SCH_DB_ID) return;
+  const sh = schSheet_(), h = schHeader_(), last = sh.getLastRow();
+  if (last < 2) return;
+  const lock = scriptLock_(); lock.waitLock(20000);
+  try {
+    const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); });
+    const rowOf = function (id) { const i = ids.indexOf(id); return i < 0 ? 0 : i + 2; };
+    const rMain = rowOf(String(o.id)), rOldEx = rowOf(schExId_(o.id, f.schCampId));
+    if (!rMain && !rOldEx) return;
+    const cols = Object.keys(h.dates).filter(function (d) { return d >= from; }).map(function (d) { return h.dates[d]; });
+    if (!cols.length) return;
+    const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols), w = c1 - c0 + 1, on = {};
+    cols.forEach(function (c) { on[c - c0] = 1; });
+    const read = function (r) { return r ? sh.getRange(r, c0 + 1, 1, w).getValues()[0].map(str_) : new Array(w).fill(''); };
+    const vMain = read(rMain), vEx = read(rOldEx);
+    // 예전 소속 캠프 → 새 추가 배정 줄
+    let rNewEx = rowOf(schExId_(o.id, o.schCampId));
+    if (!rNewEx && vMain.some(function (v, i) { return on[i] && v; })) {
+      rNewEx = sh.getLastRow() + 1;
+      const line = new Array(5).fill('');
+      line[h.fixed['행ID']] = schExId_(o.id, o.schCampId); line[h.fixed['구분']] = SCH.KIND_DRIVER;
+      line[h.fixed['캠프']] = o.schCamp || ''; line[h.fixed['이름']] = o.name; line[h.fixed['기본노선']] = o.baseRoute || '';
+      sh.getRange(rNewEx, 1, 1, 5).setNumberFormat('@').setValues([line.map(safeText_)]);
+    }
+    const put = function (r, src, keep) {
+      if (!r) return;
+      const cur = read(r), out = cur.map(function (v, i) { return on[i] ? (src ? src[i] : '') : (keep ? v : v); });
+      sh.getRange(r, c0 + 1, 1, w).setNumberFormat('@').setValues([out.map(safeText_)]);
+    };
+    if (rNewEx) put(rNewEx, vMain);
+    if (rMain) put(rMain, vEx); else if (vEx.some(function (v, i) { return on[i] && v; })) { /* 기사 줄이 없으면 다음 저장 때 생김 */ }
+    if (rOldEx) put(rOldEx, null);
+  } finally { lock.releaseLock(); }
+}
 /** EX행ID → { driverId, campId } (아니면 null) */
 function schExParse_(id) {
   const m = String(id || '').match(/^EX([^@]+)@(.+)$/);
@@ -4601,6 +4644,13 @@ function schRead_(sun, end) {
       drivers.push(Object.assign({}, d, { id: schExId_(d.id, x.c), mainId: d.id, campId: x.c, camp: campName[x.c], baseRoute: x.r, extra: [], ex: true }));
     });
     delete d.extra;
+  });
+  // 지금은 추가 배정이 아니지만 보는 기간에 칸이 남아 있는 줄(예전 추가 배정) → 그대로 보여 줌
+  const haveId = {}; drivers.forEach(function (d) { haveId[d.id] = 1; });
+  Object.keys(cells).forEach(function (id) {
+    const ex = schExParse_(id); if (!ex || haveId[id] || !campName[ex.campId] || !Object.keys(cells[id]).length) return;
+    const d = drivers.filter(function (x) { return x.id === ex.driverId; })[0]; if (!d) return;
+    drivers.push(Object.assign({}, d, { id: id, mainId: d.id, campId: ex.campId, camp: campName[ex.campId], baseRoute: '', extra: [], ex: true, old: true }));
   });
   // 노선 변경 예약: 보는 기간 안에서 캠프·노선이 바뀌는 기사는 구간(segs)을 붙인다 → 적용일부터 새 캠프 쪽에 보인다
   let rcBy = {};
