@@ -5067,8 +5067,9 @@
       if (!tip) { tip = document.createElement('div'); tip.id = 'dupTip'; document.body.appendChild(tip); }
       tip.innerHTML = html; tip.style.display = 'block';
       const rc = td.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
-      tip.style.left = Math.max(8, Math.min(rc.left, innerWidth - w - 8)) + 'px';
-      tip.style.top = (rc.bottom + 6 + h > innerHeight ? Math.max(8, rc.top - h - 6) : rc.bottom + 6) + 'px';
+      // 같은 날짜 열의 상대 칸을 가리지 않게 칸 오른쪽(모자라면 왼쪽)에 띄움
+      tip.style.left = (rc.right + 10 + w < innerWidth ? rc.right + 10 : Math.max(8, rc.left - w - 10)) + 'px';
+      tip.style.top = Math.max(8, Math.min(rc.top - 4, innerHeight - h - 8)) + 'px';
     });
     document.addEventListener('scroll', hide, true);
   })();
