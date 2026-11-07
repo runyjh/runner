@@ -975,7 +975,7 @@
       </div>
     </div>
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">메뉴 · 탭 · 화면 제목 · 설명서 글자를 직접 바꿉니다. <b>기능과 계산은 그대로</b>이고, 바꾼 문구를 비우면 기본 문구가 나옵니다. 화면에서 바로 고치려면 <b>✏️ 문구 편집 모드</b>를 켜세요.</p>
-    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="warn">경고 문구</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
+    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="form">창 · 입력칸</button><button class="tab" data-uit="warn">경고 문구</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
     <div id="uiBody"></div>
    </section>
    <section id="view-taxinv" class="hidden">
@@ -7661,7 +7661,28 @@
     if (sec.id === 'view-settle') { const a = $$('.nav a[data-view="settle"]').find((x) => (x.dataset.stGo === 'pnl') === !!STX.fin); return a ? a.textContent.trim() : '정산관리'; }
     const h = $('.head h2', sec), t = h && uiFirstText(h); return t ? t.nodeValue.trim() : sec.id.slice(5);
   };
-  function uiKeyOf(el) {
+  // 창 · 입력칸 (4차): 칸 제목 · 칸 설명 · 입력칸 이름 · 창 제목 · 표 머리글. 키 = "f:창id:기본 문구"
+  //  선택 버튼·드롭다운 선택지(값이 DB에 저장됨)·정산서 본문·공용 버튼은 넣지 않음. 숫자가 든 글자(건수·날짜)도 제외
+  const UI_FSKIP = '#stSlip, .slip, #uiBody, #uiPop, #uiBar, #login, .nav, .side';
+  const uiCtx = (el) => {
+    const m = el.closest('.modal[id], #drawer, #bdrawer, section[id^="view-"]'); if (!m) return null;
+    if (m.id === 'drawer') return [m.id, '기사 정보 창'];
+    if (m.id === 'bdrawer') return [m.id, '배번호 창'];
+    if (m.classList.contains('modal')) { const h = $('.m-box > h3, h3', m), t = h && uiFirstText(h); const nm = t ? (t.__uiDef || t.nodeValue).trim() : ''; return [m.id, '창 · ' + (nm && !/\d/.test(nm) ? nm : m.id)]; }
+    return [m.id, '화면 · ' + (uiSecTitle(el) || m.id)];
+  };
+  function uiKeyOfF(el, def) {
+    if (el.closest(UI_FSKIP) || /\d/.test(def)) return null;
+    const kind = el.matches('.sec > h4') ? '칸 제목' : el.matches('.sec > h4 > small') ? '칸 설명' : el.matches('.lb') ? '입력칸 이름' : el.matches('th') ? '표 머리글' : '창 제목';
+    if (kind === '창 제목' && !el.closest('.modal')) return null;
+    if (kind === '표 머리글' && def.length > 30) return null;
+    const c = uiCtx(el); if (!c) return null;
+    return ['f:' + c[0] + ':' + def, kind, c[1]];
+  }
+  const UI_FKINDS = ['창 제목', '칸 제목', '칸 설명', '입력칸 이름', '표 머리글'];
+  const UI_FSEL = '.sec > h4, .sec > h4 > small, .lb, .modal .m-box > h3, thead th';
+  function uiKeyOf(el, def) {
+    if (el.matches(UI_FSEL)) return uiKeyOfF(el, String(def || '').replace(/^[\s—–-]+/, '').trim());
     if (el.matches('.nav a[data-view]')) {
       const g = el.closest('.ng'), gt = g && $('.ngt', g);
       return ['nav:' + el.dataset.view + (el.dataset.stGo ? '/' + el.dataset.stGo : ''), '메뉴', '왼쪽 메뉴 · ' + (gt ? gt.textContent.trim() : '')];
@@ -7676,16 +7697,17 @@
     }
     return null;
   }
-  const UI_SEL = '.nav a[data-view], .nav .ngt, section[id^="view-"] > .head h2, .tabs .tab';
+  const UI_SEL = '.nav a[data-view], .nav .ngt, section[id^="view-"] > .head h2, .tabs .tab, ' + UI_FSEL;
   function uiApplyEl(el) {
-    const k = uiKeyOf(el); if (!k) return;
     const tn = uiFirstText(el); if (!tn) return;
     if (tn.__uiSet !== tn.nodeValue) tn.__uiDef = tn.nodeValue; // 처음 보거나 화면이 글자를 새로 넣었음 → 그게 기본 문구
+    const k = uiKeyOf(el, tn.__uiDef); if (!k) return;
     const raw = tn.__uiDef, def = raw.trim();
     if (!def || (k[1] === '탭' && /\d/.test(def))) return; // 숫자가 든 탭(건수 등)은 바꾸지 않음
     el.dataset.uik = k[0];
     UI.defs[k[0]] = { def: def, kind: k[1], where: k[2] };
     const o = UI.map[k[0]], want = o && o.text ? raw.replace(def, o.text) : raw;
+    if (o && o.text) { if (el.dataset.uiov !== o.text) { el.dataset.uidef = def; el.dataset.uiov = o.text; } } else if (el.dataset.uiov) { delete el.dataset.uiov; delete el.dataset.uidef; }
     if (tn.nodeValue !== want) tn.nodeValue = want;
     tn.__uiSet = want;
   }
@@ -7696,6 +7718,9 @@
     const on = $$('.nav a.on'); setT($('#navCur'), on.length ? on[on.length - 1].textContent.trim() : '');
     if (STX.fin != null) { const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!STX.fin); setT($('#stTitle'), na && na.textContent.trim()); }
   }
+  const uiDefsSave = () => { try { localStorage.setItem('runner.uiDefs', JSON.stringify(UI.defs)); } catch (e) {} };
+  window.addEventListener('pagehide', uiDefsSave);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') uiDefsSave(); });
   let uiRaf = 0;
   new MutationObserver(() => { if (!uiRaf) uiRaf = requestAnimationFrame(() => { uiRaf = 0; uiApplyAll(); }); }).observe(document.body, { childList: true, subtree: true });
   uiApplyAll();
@@ -7743,16 +7768,18 @@
       (UI.drv || []).forEach((x) => add(x.key));
       Object.keys(UI.map).forEach((k) => { if (k.startsWith('d:')) add(k); });
     } else {
-      const kinds = kind === 'tab' ? ['탭'] : ['메뉴 묶음', '메뉴', '화면 제목'];
+      const kinds = kind === 'tab' ? ['탭'] : kind === 'form' ? UI_FKINDS : ['메뉴 묶음', '메뉴', '화면 제목'];
       $$('[data-uik]').forEach((el) => { const d = UI.defs[el.dataset.uik]; if (d && kinds.includes(d.kind)) add(el.dataset.uik); });
       Object.keys(UI.defs).forEach((k) => { if (!k.startsWith('warn:') && kinds.includes(UI.defs[k].kind)) add(k); });
       Object.keys(UI.map).forEach((k) => { if (!k.startsWith('d:') && kinds.includes(UI.map[k].kind)) add(k); });
     }
-    return keys.map((k) => {
+    const rows = keys.map((k) => {
       const d = (k.startsWith('d:') ? (UI.drv || []).find((x) => x.key === k) : UI.defs[k]) || {}, o = UI.map[k] || {}, dr = UI.draft[k];
       const g = k.startsWith('guide:') ? k.slice(6) : '';
       return { key: k, kind: g ? '설명서' : d.kind || o.kind, where: g ? uiGuideWhere(g) : d.where || o.where || '', def: g ? uiGuideDef(g) : d.def || o.def || '', text: dr ? dr.text : o.text || '', memo: dr ? dr.memo : o.memo || '' };
     });
+    if (kind === 'form') { const ord = {}; rows.forEach((r, i) => { if (!(r.where in ord)) ord[r.where] = i; }); rows.sort((a, b) => ord[a.where] - ord[b.where]); }
+    return rows;
   }
   function uiRender() {
     $$('#uiTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.uit === UI.tab));
@@ -7778,6 +7805,7 @@
     $('#uiBody').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th style="width:90px">구분</th><th style="width:' + (UI.tab === 'guide' ? '34%' : '220px') + '">기본 문구</th><th>바꾼 문구 (비우면 기본)</th><th style="width:170px">메모</th><th style="width:90px"></th></tr></thead><tbody>' +
       (body || '<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">' + (q ? '"' + esc(q) + '" 에 맞는 문구가 없습니다.' : '없습니다.') + '</td></tr>') + '</tbody></table></div>' +
       (UI.tab === 'tab' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 번도 열어 보지 않은 화면의 탭은 목록에 없을 수 있어요. 그 화면을 열거나 ✏️ 문구 편집 모드로 바로 고치세요. 건수(숫자)가 붙는 탭은 바꿀 수 없습니다.</p>' : '') +
+      (UI.tab === 'form' ? '<p class="sub" style="font-size:12px;margin-top:8px">창(기사 정보 · 배번호 · 각종 등록 창)의 칸 제목 · 설명 · 입력칸 이름 · 표 머리글입니다. <b>한 번 열어 본 창</b>만 목록에 나와요 — 안 보이면 그 창을 열거나 ✏️ 문구 편집 모드로 바로 고치세요. 선택 버튼(승인·정지·재직 등)과 드롭다운 선택지는 저장 값이라 바꿀 수 없습니다.</p>' : '') +
       (UI.tab === 'warn' ? '<p class="sub" style="font-size:12px;margin-top:8px">정산관리 위쪽 경고등 제목입니다. 건수와 아래 명단은 그대로 나오고 제목 글자만 바뀝니다. 정산관리에서 ✏️ 문구 편집 모드로 경고 제목을 눌러 바로 고칠 수도 있어요.</p>' : '') +
       (UI.tab === 'drv' ? '<p class="sub" style="font-size:12px;margin-top:8px">' + (UI.drv ? '기사앱의 홈 메뉴 · 화면 제목 · 마이페이지 메뉴 · 안내 문구입니다. 저장하면 기사님이 앱을 <b>다시 열 때</b> 바뀐 글자가 보여요.' : '기사앱 문구를 불러오는 중…') + '</p>' : '') +
       (UI.tab === 'guide' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 줄 = <b>태그 | 내용</b> (예: <code>주의 | 마감한 달은 **그대로**</code>) · <code>**글자**</code> = 굵게 · 비우면 기본 설명서.</p>' : '');
@@ -7794,7 +7822,7 @@
     if (c) { const k = c.dataset.ucopy, i = $('[data-uk="' + CSS.escape(k) + '"]', $('#uiBody')); if (i) { i.value = uiGuideDef(k.slice(6)); uiDraftOf(k).text = i.value; i.classList.add('ch'); i.focus(); } c.remove(); }
   });
   const uiCollect = () => Object.keys(UI.draft).map((k) => {
-    const d = UI.draft[k], r = uiRows(k.startsWith('guide:') ? 'guide' : k.startsWith('d:') ? 'drv' : k.startsWith('warn:') ? 'warn' : (UI.defs[k] || UI.map[k] || {}).kind === '탭' ? 'tab' : 'menu').find((x) => x.key === k) || { kind: '', where: '', def: '' };
+    const d = UI.draft[k], r = uiRows(k.startsWith('guide:') ? 'guide' : k.startsWith('d:') ? 'drv' : k.startsWith('warn:') ? 'warn' : k.startsWith('f:') ? 'form' : (UI.defs[k] || UI.map[k] || {}).kind === '탭' ? 'tab' : 'menu').find((x) => x.key === k) || { kind: '', where: '', def: '' };
     let text = String(d.text || '').trim(); if (text === r.def) text = '';
     return { key: k, kind: r.kind, where: r.where, def: r.def, text: text, memo: d.memo || '' };
   });
@@ -7808,12 +7836,12 @@
   });
   $('#uiTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-uit]'); if (!b || UI.edit) return; UI.tab = b.dataset.uit; uiRender(); if (UI.tab === 'drv' && !UI.drv) uiDrvLoad(); });
   // 기사앱 문구 목록: 기사앱 페이지(../)를 읽어 같은 규칙(Index.html UID_SEL)으로 뽑는다
-  const UID_SEL = '#v-home .tile b, #v-home .tile > span, section.view > .topbar h2, .mylist button, .mylist .mylab, .pmban, .links a';
+  const UID_SEL = '#v-home .tile b, #v-home .tile > span, section.view > .topbar h2, .mylist button, .mylist .mylab, .pmban, .links a, section.view .lb, section.view .card > h3';
   function uiDrvScan(doc) {
     const out = [], seen = {}, ft = (el) => { for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) return n.nodeValue.trim(); return ''; };
-    const kindOf = (el) => el.matches('.tile b') ? '홈 메뉴' : el.matches('.tile > span') ? '홈 메뉴 설명' : el.matches('.topbar h2') ? '화면 제목' : el.matches('.mylist *') ? '마이페이지 메뉴' : el.matches('.pmban') ? '안내 문구' : '링크';
+    const kindOf = (el) => el.matches('.lb') ? '입력칸 이름' : el.matches('.card > h3') ? '칸 제목' : el.matches('.tile b') ? '홈 메뉴' : el.matches('.tile > span') ? '홈 메뉴 설명' : el.matches('.topbar h2') ? '화면 제목' : el.matches('.mylist *') ? '마이페이지 메뉴' : el.matches('.pmban') ? '안내 문구' : '링크';
     doc.querySelectorAll(UID_SEL).forEach((el) => {
-      const def = ft(el); if (!def) return;
+      const def = ft(el); if (!def || (el.matches('.lb, .card > h3') && /\d/.test(def))) return;
       const sec = el.closest('section.view'), id = sec ? sec.id : '-', key = 'd:' + id + ':' + def;
       if (seen[key]) return; seen[key] = 1;
       const h = sec && sec.querySelector('.topbar h2'), where = '기사앱 · ' + (id === 'v-home' ? '홈' : id === 'v-login' ? '로그인' : h ? ft(h) : id);
@@ -8000,7 +8028,7 @@
     }
     function keyOf(tb, hs) {
       const host = tb.closest('section[id], .modal[id]');
-      return (host ? host.id : 'x') + '|' + (tb.dataset.tkId || tb.id || '') + '|' + hash(hs.map(txt).join('¦'));
+      return (host ? host.id : 'x') + '|' + (tb.dataset.tkId || tb.id || '') + '|' + hash(hs.map((h) => { const t = txt(h); return h.dataset.uiov ? t.replace(h.dataset.uiov, h.dataset.uidef) : t; }).join('¦'));
     }
     const spanRows = (tb) => [...tb.tBodies].some((b) => [...b.rows].some((r) => [...r.cells].some((c) => c.colSpan > 1 || c.rowSpan > 1)));
     // 열 순서·숨김: 원래 열 번호(data-tkc)를 붙여 두고 그 순서대로 다시 놓는다 (다시 그려도 같은 결과)
