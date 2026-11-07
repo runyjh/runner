@@ -1264,7 +1264,7 @@
     </div>
     <div id="stp-drv" class="hidden">
       <div class="tabs sub2" id="stIdTabs2"><button class="tab" data-idt="ids">아이디 목록</button><button class="tab on" data-idt="drv">명의자 사업자 정보</button></div>
-      <p class="sub st-help">정산금·세금계산서를 받는 <b>명의자</b>의 사업자 정보입니다. 러너 올인원 DB 의 기사 정보(drivers 탭)에 저장됩니다. 은행·계좌는 기사 정보관리에서 고칩니다.</p>
+      <p class="sub st-help">정산금·세금계산서를 받는 <b>명의자</b>의 사업자 정보입니다. 사업자 정보·은행·계좌는 <b>기사 정보관리 DB</b> 값을 그대로 보여 줍니다 — 고치려면 <b>이름을 눌러</b> 기사 정보 창의 <b>사업자 정보</b>에서. 이 표에서는 정산 방식 · 산재·고용 제외만 고칩니다.</p>
       <div class="st-tools"><input class="inp search" id="sdQ2" placeholder="이름·쿠팡ID 검색" autocomplete="off"><label class="check" style="margin:0"><input type="checkbox" id="sdActive" checked> 승인 기사만</label><span class="sub" id="sdDirty"></span><button class="btn sm" id="sdSave2" disabled>저장</button></div>
       <div class="table-wrap"><table class="sttbl ed" id="sdTable"></table></div>
     </div>
@@ -2057,6 +2057,7 @@
     if (!force && Object.keys(dirty).length && !confirm('저장하지 않은 변경이 있습니다. 닫을까요?')) return;
     $('#shade').classList.add('hidden'); $('#drawer').classList.add('hidden');
     cur = null; selectedId = ''; setDirty({}); renderRows(); $('#dSave').textContent = '저장';
+    if (!$('#stp-drv').classList.contains('hidden') && currentView === 'settle') loadStDrivers(); // 명의자 사업자 정보 표를 열어 둔 채 고쳤으면 새 값으로
   }
   $('#dClose').addEventListener('click', () => closeDrawer());
   $('#shade').addEventListener('click', () => { if (!$('#bdrawer').classList.contains('hidden')) closeBib(); else closeDrawer(); });
@@ -2093,6 +2094,12 @@
       '</div></div>' +
       '<div class="sec"><h4>정산 계좌</h4><div class="grid2">' +
         fld('bankName', '은행명', d.bankName, { select: BANKS }) + fld('accountHolder', '예금주', d.accountHolder) + sens('account', '계좌번호', d) +
+      '</div></div>' +
+      '<div class="sec"><h4>사업자 정보 <small class="sub" style="font-weight:500">— 명의자 세금계산서에 쓰임 (정산관리 › 아이디 관리 › 명의자 사업자 정보 표는 여기 값을 보여 줌)</small></h4><div class="grid2">' +
+        fld('bizNo', '사업자등록번호', d.bizNo) + fld('bizName', '상호', d.bizName) +
+        fld('bizCeo', '대표자 (비우면 이름)', d.bizCeo) + fld('bizEmail', '계산서 이메일', d.bizEmail, { type: 'email' }) +
+        fld('bizAddr', '사업장 주소', d.bizAddr, { full: true }) +
+        fld('bizType', '업태', d.bizType) + fld('bizItem', '종목', d.bizItem) +
       '</div></div>' +
       '<div class="sec"><h4>서류</h4><div class="docs">' + docs + '</div>' +
         (d.docFolder ? '<div style="margin-top:8px;font-size:12px"><a href="' + esc(d.docFolder) + '" target="_blank" rel="noopener">서류 폴더 열기 (드라이브)</a></div>' : '') + '</div>' +
@@ -6741,7 +6748,8 @@
     (navigator.clipboard ? navigator.clipboard.writeText(tsv) : Promise.reject()).then(() => toast(list.length + '명 복사했습니다 (은행, 계좌번호, 예금주, 금액).')).catch(() => toast('복사하지 못했습니다.'));
   });
   // ── 기사 정산정보 ──
-  const SD_COLS = [['stlMode', '정산 방식', 'mode'], ['insEx', '산재·고용 제외', 'check'], ['bizNo', '사업자등록번호', 'text'], ['bizName', '상호', 'text'], ['bizCeo', '대표자 (비우면 이름)', 'text'], ['bizAddr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'], ['bizEmail', '계산서 이메일', 'text']];
+  // 사업자 정보(ro)는 기사 정보관리 DB 값을 보여 주기만 함 — 고치려면 이름을 눌러 기사 정보 창에서
+  const SD_COLS = [['stlMode', '정산 방식', 'mode'], ['insEx', '산재·고용 제외', 'check'], ['bizNo', '사업자등록번호', 'ro'], ['bizName', '상호', 'ro'], ['bizCeo', '대표자 (비우면 이름)', 'ro'], ['bizAddr', '사업장 주소', 'ro'], ['bizType', '업태', 'ro'], ['bizItem', '종목', 'ro'], ['bizEmail', '계산서 이메일', 'ro']];
   function loadStDrivers() {
     $('#sdTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
     return api('adm_stlDrivers').then((r) => { if (!r.ok) return toast(r.msg); STX.drv = r; STX.drvDirty = {}; renderStDrivers(); }).catch(() => {});
@@ -6758,11 +6766,12 @@
       if (c[2] === 'owner') return '<td><input class="inp' + dirty + '" list="sdOwnDL"' + at + ' value="' + esc(byId[v] ? lab(byId[v]) : v) + '" placeholder="(본인)" style="min-width:150px"></td>';
       if (c[2] === 'mode') return '<td><select class="inp' + dirty + '"' + at + '>' + R.modes.map((m) => '<option value="' + m + '"' + (m === v ? ' selected' : '') + '>' + (m || '기본 (단가코드별 노선 단가)') + '</option>').join('') + '</select></td>';
       if (c[2] === 'check') return '<td style="text-align:center"><input type="checkbox"' + at + (v === 'Y' ? ' checked' : '') + '></td>';
+      if (c[2] === 'ro') return '<td' + (c[0] === 'bizAddr' ? ' style="min-width:180px"' : '') + '>' + (v ? esc(v) : '<span class="sub">—</span>') + '</td>';
       return '<td><input class="inp' + dirty + '" type="' + (c[2] === 'date' ? 'date' : 'text') + '"' + at + ' value="' + esc(v) + '"' + (c[0] === 'fbCut' ? ' placeholder="13% 또는 금액" style="width:110px"' : c[0] === 'tmpPrice' ? ' style="width:90px"' : '') + '></td>';
     };
     $('#sdTable').innerHTML =
       '<thead><tr><th>이름</th><th>쿠팡플렉스 아이디</th><th>상태</th><th>단가코드</th>' + SD_COLS.map((c) => '<th>' + c[1] + '</th>').join('') + '<th>은행 · 계좌 · 예금주</th></tr></thead><tbody>' +
-      list.map((d) => '<tr><td><b>' + esc(d.name) + '</b></td><td class="sub">' + esc(d.loginId) + '</td><td>' + esc(d.status) + '</td><td>' + esc(d.type || '고정') + '</td>' + SD_COLS.map((c) => cell(d, c)).join('') +
+      list.map((d) => '<tr><td><a class="sdopen" data-did="' + esc(d.id) + '" title="기사 정보 창에서 사업자 정보 고치기" style="cursor:pointer;font-weight:700;color:var(--brand)">' + esc(d.name) + '</a></td><td class="sub">' + esc(d.loginId) + '</td><td>' + esc(d.status) + '</td><td>' + esc(d.type || '고정') + '</td>' + SD_COLS.map((c) => cell(d, c)).join('') +
         '<td class="sub">' + esc([d.bank, d.account, d.holder].filter(Boolean).join(' · ') || '-') + '</td></tr>').join('') + '</tbody>';
     tsApply($('#sdTable'));
     const n = Object.keys(STX.drvDirty).length;
@@ -6779,6 +6788,7 @@
     const n = Object.keys(STX.drvDirty).length; $('#sdDirty').textContent = n ? n + '명 바뀜' : ''; $('#sdSave2').disabled = !n;
   };
   $('#sdTable').addEventListener('change', (e) => { const el = e.target.closest('[data-sd]'); if (el) sdSet(el); });
+  $('#sdTable').addEventListener('click', (e) => { const a = e.target.closest('.sdopen'); if (a) openDrawer(a.dataset.did); });
   onSearch($('#sdQ2'), renderStDrivers);
   $('#sdActive').addEventListener('change', renderStDrivers);
   $('#sdSave2').addEventListener('click', () => {
@@ -7356,7 +7366,7 @@
     api('adm_tiFromSettle', m, over).then((r) => {
       if (!r.ok) return toast(r.msg);
       let msg = r.made.length + '장 만들었습니다.';
-      if (r.noBiz.length) msg += '\n\n사업자번호가 없어 건너뜀 (정산관리 → 아이디 관리 → 명의자 사업자 정보에서 넣어 주세요): ' + r.noBiz.join(', ');
+      if (r.noBiz.length) msg += '\n\n사업자번호가 없어 건너뜀 (기사 정보관리 → 기사 정보 창 → 사업자 정보에서 넣어 주세요): ' + r.noBiz.join(', ');
       if (r.skipped.length) msg += '\n\n건너뜀: ' + r.skipped.join(', ');
       alert(msg); $('#tiFMonth').value = ''; loadTax();
     }).catch(() => {}).finally(() => { $('#tiFromStl').disabled = false; });
@@ -7462,7 +7472,7 @@
     if (e.target.id === 'tiSupPick') {
       const s = TX.sups.find((x) => x.id === e.target.value); if (!s) return;
       const t = TX.cur; t.supId = s.id; t.supDriverId = s.driverId; t.sup = { no: tiFmtNo(s.no), name: s.name, ceo: s.ceo, addr: s.addr, type: s.type, item: s.item, email: s.email }; TX.dirty = true; renderTaxEd();
-      if (!s.no) toast('이 기사는 사업자번호가 없습니다. 직접 넣거나 정산관리 → 명의자 사업자 정보에서 넣어 주세요.');
+      if (!s.no) toast('이 기사는 사업자번호가 없습니다. 직접 넣거나 기사 정보관리 → 기사 정보 창 → 사업자 정보에서 넣어 주세요.');
       return;
     }
     if (e.target.tagName === 'SELECT' && e.target.dataset.tf) { tiSet(e.target.dataset.tf, e.target.value); renderTaxEd(); }

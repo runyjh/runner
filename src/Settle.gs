@@ -150,6 +150,7 @@ const STL_CFG = [
   ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임', '기사 앱']
 ];
 
+const STL_DRIVER_EDIT = ['stlMode', 'insEx']; // 명의자 사업자 정보 표에서 고칠 수 있는 칸 (사업자 정보는 읽기만 · 기사 정보관리 DB 값)
 const STL_DRIVER_FIELDS = ['stlMode', 'insEx', 'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem']; // 기사(사람) 정보: 명의자의 세금계산서용
 const STL_ROLES = ['메인', '서브'];
 const STL_ID_STATUS = ['사용', '정지']; // 예전 값 '중지' 도 정지로 읽는다
@@ -3109,7 +3110,7 @@ function adm_stlDriverSave(token, changes) {
         if (!o) fail_('기사를 찾을 수 없습니다. 새로고침해 주세요.');
         const f = {};
         Object.keys(ch.f || {}).forEach(function (k) {
-          if (STL_DRIVER_FIELDS.indexOf(k) < 0) return;
+          if (STL_DRIVER_EDIT.indexOf(k) < 0) return; // 사업자 정보는 기사 정보관리에서만 고침
           let v = str_(ch.f[k]).slice(0, 200);
           if (k === 'stlMode') { if (STL_MODES.indexOf(v) < 0) fail_(o.name + ': 정산 방식은 기본 / 원청단가 / 용차내역'); }
           if (k === 'insEx') v = /^(y|yes|o|예|제외|true|1)$/i.test(v) ? 'Y' : '';

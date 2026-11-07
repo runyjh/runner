@@ -1676,7 +1676,8 @@ const D_EDIT_LABEL = {
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
   schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
   schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
-  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감'
+  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
+  bizNo: '사업자등록번호', bizName: '상호', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목', bizEmail: '계산서 이메일'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
 
@@ -1702,6 +1703,7 @@ function rev_(o) {
 function detailOf_(o) {
   const out = listRow_(o);
   ['birthDate', 'address', 'qualDate', 'qualNo', 'licenseType', 'maxLoad', 'bankName', 'accountHolder',
+    'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail',
     'updatedAt', 'pwChangedAt', 'docFolder'].forEach(function (k) { out[k] = o[k]; });
   out.rrn = o.rrn; out.licenseNo = o.licenseNo; out.account = o.account;
   out.has = { rrn: !!o.rrnEnc, licenseNo: !!o.licenseNoEnc, account: !!o.accountEnc };
@@ -2078,6 +2080,22 @@ function driverFields_(changes, o) {
       case 'carNo': f.carNo = opt(v, '차량번호', 20).replace(/\s/g, ''); break;
       case 'bankName': f.bankName = opt(v, '은행명', 20); break;
       case 'accountHolder': f.accountHolder = opt(v, '예금주', 30); break;
+      // 사업자 정보 (명의자 세금계산서용) — 정산관리 › 아이디 관리 › 명의자 사업자 정보 표는 여기 값을 읽기만 함
+      case 'bizNo': {
+        const d = String(v == null ? '' : v).replace(/\D/g, '');
+        if (d && d.length !== 10) fail_('사업자등록번호는 10자리로 입력해 주세요.');
+        f.bizNo = d ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : ''; break;
+      }
+      case 'bizName': f.bizName = opt(v, '상호', 100); break;
+      case 'bizCeo': f.bizCeo = opt(v, '대표자', 50); break;
+      case 'bizAddr': f.bizAddr = opt(v, '사업장 주소', 200); break;
+      case 'bizType': f.bizType = opt(v, '업태', 100); break;
+      case 'bizItem': f.bizItem = opt(v, '종목', 100); break;
+      case 'bizEmail': {
+        const e = opt(v, '계산서 이메일', 100);
+        if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) fail_('계산서 이메일 형식을 확인해 주세요.');
+        f.bizEmail = e; break;
+      }
     }
     changed.push(D_EDIT_LABEL[k]);
   });
