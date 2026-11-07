@@ -758,6 +758,18 @@
   .k-reg { background: #d9f5ef; color: #0b6b57; }
   .k-other { background: #fff4d6; color: #7a4d00; }
   .k-route { color: var(--ink); }
+  /* 기사스케줄 칸: 흰 바탕 + 위쪽 색 띠 + 색 글씨 (예전 꽉 찬 색 칸 대신) — 되돌리려면 이 블록만 지우면 됨 */
+  .sg td.c[class*="k-"], .slegend span[class*="k-"] { --kb: transparent; background: linear-gradient(var(--kb), var(--kb)) top / 100% 3px no-repeat, #fff; }
+  .sg td.c.k-work, .slegend .k-work { --kb: #4a90d9; color: #1b64da; }
+  .sg td.c.k-off, .slegend .k-off { --kb: #f08c8c; color: #e5484d; }
+  .sg td.c.k-sick, .slegend .k-sick { --kb: #5cb85c; color: #11734b; }
+  .sg td.c.k-mi, .slegend .k-mi { --kb: #d15555; color: #c0392b; font-weight: 800; }
+  .sg td.c.k-yong, .slegend .k-yong { --kb: #a77bd1; color: #6b3fa0; }
+  .sg td.c.k-chg, .slegend .k-chg { --kb: #0a53a8; color: #0a53a8; }
+  .sg td.c.k-reg, .slegend .k-reg { --kb: #2bb39a; color: #0b6b57; }
+  .sg td.c.k-other, .slegend .k-other { --kb: #e0a800; color: #8a5a00; }
+  .sg td.c.k-route { --kb: transparent; color: var(--ink); }
+  .slegend span[class*="k-"] { border: 1px solid var(--line); }
   .sg td.c.sel { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.16); }
   .sg td.c.act { outline: 2px solid var(--brand); outline-offset: -2px; }
   .sg td.c.dup { box-shadow: inset 0 0 0 2px #f59e0b; }
