@@ -175,7 +175,9 @@ function adm_tiFromSettle(token, month, overwrite) {
     tiSuppliers_().forEach(function (s) { sups[s.id] = s; });
     const lock = scriptLock_();
     lock.waitLock(30000);
-    const made = [], skipped = [], noBiz = [];
+    const made = [], skipped = [], noBiz = [], notOn = [];
+    // 역발행은 기사 정보에서 '역발행 기사'로 지정한 기사만 (용차업체는 만들지 않음)
+    const on = {}; readAll_(SH.DRIVERS).forEach(function (o) { if (str_(o.tiOn) === 'Y') on[String(o.id)] = 1; });
     try {
       const old = {};
       readAll_(SH.TAXINV).forEach(function (r) { if (r.month === month && r.supId) old[r.supId] = r; });
@@ -183,6 +185,7 @@ function adm_tiFromSettle(token, month, overwrite) {
       res.summary.drivers.forEach(function (d) {
         if (!(d.invoice > 0)) return;
         const key = d.vendor ? stlVendorKey_(d.vendor) : d.ownerId;
+        if (d.vendor || !on[String(key)]) { notOn.push(d.name); return; }
         const s = sups[key];
         if (!key || !s) { skipped.push(d.name + ' (명의자 없음)'); return; }
         if (str_(s.no).replace(/\D/g, '').length !== 10) { noBiz.push(d.name); return; }
@@ -206,7 +209,7 @@ function adm_tiFromSettle(token, month, overwrite) {
       if (add.length) { appendObjs_(SH.TAXINV, add); next.save(); }
       logAdmin_(a, '세금계산서 정산에서 만들기', month, made.length + '장');
     } finally { lock.releaseLock(); }
-    return { ok: true, made: made, skipped: skipped, noBiz: noBiz };
+    return { ok: true, made: made, skipped: skipped, noBiz: noBiz, notOn: notOn };
   });
 }
 

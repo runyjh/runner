@@ -1005,7 +1005,7 @@
       <h2>세금계산서 역발행 <small id="tiCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
       <div class="tools">
         <input class="inp" type="month" id="tiMonth" title="정산월" style="width:auto">
-        <button class="btn" id="tiFromStl" title="이 정산월의 기사별 세금계산서 발행 금액으로 1장씩 만듭니다">정산서에서 만들기</button>
+        <button class="btn" id="tiFromStl" title="이 정산월의 세금계산서 발행 금액으로, 기사 정보에서 '역발행 기사'로 지정한 기사만 1장씩 만듭니다">정산서에서 만들기</button>
         <button class="btn ghost" id="tiNew">+ 직접 작성</button>
         <button class="btn ghost" id="tiReload">새로고침</button>
       </div>
@@ -7505,7 +7505,8 @@
     $('#tiFromStl').disabled = true;
     api('adm_tiFromSettle', m, over).then((r) => {
       if (!r.ok) return toast(r.msg);
-      let msg = r.made.length + '장 만들었습니다.';
+      let msg = r.made.length + '장 만들었습니다. (역발행 기사로 지정한 기사만)';
+      if (!r.made.length && r.notOn && r.notOn.length && !r.noBiz.length) msg += '\n\n역발행 기사로 지정된 기사가 없습니다. 기사 정보관리 → 기사 정보 창 → 사업자 정보 → 세금계산서 역발행에서 지정해 주세요.';
       if (r.noBiz.length) msg += '\n\n사업자번호가 없어 건너뜀 (기사 정보관리 → 기사 정보 창 → 사업자 정보에서 넣어 주세요): ' + r.noBiz.join(', ');
       if (r.skipped.length) msg += '\n\n건너뜀: ' + r.skipped.join(', ');
       alert(msg); $('#tiFMonth').value = ''; loadTax();
