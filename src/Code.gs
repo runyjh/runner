@@ -54,7 +54,7 @@ const D = {
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
   carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
   schCampId: '소속캠프ID', schCamp: '소속캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무',
-  workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위',
+  workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', extraAssign: '추가 배정',
   // 정산관리: 명의자 세금계산서 정보 (정산 기준인 쿠팡 아이디·단가코드·일시단가는 정산 DB 의 아이디 관리·일시단가 탭)
   bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
@@ -71,7 +71,7 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
-  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut'];
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign'];
 // 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -100,6 +100,7 @@ const D_HIDDEN = ['rrnEnc', 'rrnIndex', 'licenseNoEnc', 'accountEnc', 'pwHash', 
 const D_NOTES = {
   schCamp: '스케줄에서 이 기사가 속한 캠프. camps 탭의 캠프명과 같게 쓰면 소속캠프ID가 자동으로 채워집니다.',
   baseRoute: '평소 맡는 노선. 예: 527B, 530AB (F3), 404D,405AB. 백업 기사는 백업, 용차는 용차',
+  extraAssign: '소속 캠프 말고 추가로 맡는 캠프·노선 (기사 정보관리에서 고침). 예: [{"c":"캠프ID","r":"527B"}] → 기사스케줄에 그 캠프 줄이 하나 더 생김',
   fixedOff: '고정 휴무 요일. 예: 목,금 (스케줄 빈칸 자동 채우기에 사용)',
   subId1: '이 기사가 쓰는 다른 쿠팡플렉스 아이디 (서브). 넣으면 그 아이디로 뛴 건은 이 기사 정산서로 합쳐지고, 그 아이디로 가입한 기사는 앱 사용만 정지됩니다',
   subId2: '두 번째 서브아이디',
@@ -1676,7 +1677,7 @@ const D_EDIT_LABEL = {
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
   schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
   schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
-  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
+  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감', extraAssign: '추가 배정',
   bizNo: '사업자등록번호', bizName: '상호', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목', bizEmail: '계산서 이메일'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
@@ -1703,7 +1704,7 @@ function rev_(o) {
 function detailOf_(o) {
   const out = listRow_(o);
   ['birthDate', 'address', 'qualDate', 'qualNo', 'licenseType', 'maxLoad', 'bankName', 'accountHolder',
-    'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail',
+    'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail', 'extraAssign',
     'updatedAt', 'pwChangedAt', 'docFolder'].forEach(function (k) { out[k] = o[k]; });
   out.rrn = o.rrn; out.licenseNo = o.licenseNo; out.account = o.account;
   out.has = { rrn: !!o.rrnEnc, licenseNo: !!o.licenseNoEnc, account: !!o.accountEnc };
@@ -2087,6 +2088,7 @@ function driverFields_(changes, o) {
         f.bizNo = d ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : ''; break;
       }
       case 'bizName': f.bizName = opt(v, '상호', 100); break;
+      case 'extraAssign': f.extraAssign = extraAssignNorm_(v, f.schCampId !== undefined ? f.schCampId : o.schCampId); break;
       case 'bizCeo': f.bizCeo = opt(v, '대표자', 50); break;
       case 'bizAddr': f.bizAddr = opt(v, '사업장 주소', 200); break;
       case 'bizType': f.bizType = opt(v, '업태', 100); break;
@@ -4458,6 +4460,38 @@ function schSyncCopies_(sh, h, drivers) {
   try { fix.forEach(function (x) { sh.getRange(x[0], x[1]).setNumberFormat('@').setValue(safeText_(x[2])); }); }
   finally { lock.releaseLock(); }
 }
+// ───── 추가 배정: 소속 캠프 말고 다른 캠프의 라우트도 맡는 기사 ─────
+// drivers '추가 배정' 칸 = JSON [{ c: 캠프ID, r: 라우트 }]. 기사스케줄에는 그 캠프 줄이 하나 더 생긴다 (행ID = EX기사ID@캠프ID)
+const SCH_EX_PREFIX = 'EX';
+function extraAssignOf_(o) {
+  try { const a = JSON.parse(str_(o && o.extraAssign) || '[]'); return Array.isArray(a) ? a.filter(function (x) { return x && x.c; }).map(function (x) { return { c: String(x.c), r: String(x.r || '') }; }) : []; }
+  catch (e) { return []; }
+}
+function extraAssignNorm_(v, mainCampId) {
+  let a = v;
+  if (typeof a === 'string') { try { a = JSON.parse(a || '[]'); } catch (e) { fail_('추가 배정 값을 알아볼 수 없습니다.'); } }
+  if (!Array.isArray(a)) a = [];
+  const camps = {}; master_().camps.forEach(function (c) { camps[c.id] = c; });
+  const seen = {}, out = [];
+  a.forEach(function (x) {
+    const c = str_(x && x.c); if (!c) return;
+    if (!camps[c]) fail_('추가 배정: 노선관리에 없는 캠프입니다.');
+    if (c === str_(mainCampId)) fail_('추가 배정: ' + camps[c].name + ' 은(는) 이미 소속 캠프입니다.');
+    if (seen[c]) fail_('추가 배정: ' + camps[c].name + ' 이(가) 두 번 들어갔습니다.');
+    seen[c] = 1;
+    const r = normBaseRoute_(str_(x.r).slice(0, 60));
+    if (!r) fail_('추가 배정: ' + camps[c].name + ' 의 라우트를 골라 주세요.');
+    out.push({ c: c, r: r });
+  });
+  if (out.length > 5) fail_('추가 배정은 5개 캠프까지 할 수 있습니다.');
+  return out.length ? JSON.stringify(out) : '';
+}
+const schExId_ = function (driverId, campId) { return SCH_EX_PREFIX + driverId + '@' + campId; };
+/** EX행ID → { driverId, campId } (아니면 null) */
+function schExParse_(id) {
+  const m = String(id || '').match(/^EX([^@]+)@(.+)$/);
+  return m ? { driverId: m[1], campId: m[2] } : null;
+}
 /** 기사 → 화면용 요약 (스케줄에 필요한 것만, 개인정보 없음) */
 function schDriver_(o) {
   return {
@@ -4558,7 +4592,15 @@ function schRead_(sun, end) {
     const d = schDriver_(o);
     if (d.campId && !campName[d.campId]) { d.campId = ''; d.camp = ''; } // 노선관리에서 지워진 캠프
     else if (d.campId) d.camp = campName[d.campId];
+    d.extra = extraAssignOf_(o).filter(function (x) { return campName[x.c]; });
     return d;
+  });
+  // 추가 배정 → 그 캠프에 한 줄 더 (같은 기사 · 행ID EX기사ID@캠프ID)
+  drivers.slice().forEach(function (d) {
+    (d.extra || []).forEach(function (x) {
+      drivers.push(Object.assign({}, d, { id: schExId_(d.id, x.c), mainId: d.id, campId: x.c, camp: campName[x.c], baseRoute: x.r, extra: [], ex: true }));
+    });
+    delete d.extra;
   });
   // 노선 변경 예약: 보는 기간 안에서 캠프·노선이 바뀌는 기사는 구간(segs)을 붙인다 → 적용일부터 새 캠프 쪽에 보인다
   let rcBy = {};
@@ -4612,7 +4654,7 @@ function adm_schSave(token, changes) {
     });
     // 칸에 '노선변경'이 들어가면 노선 변경 예약으로 바꾸고, 칸은 '출근'으로 저장한다
     const rcExtra = { replaced: [], routeChanges: [], routeWarn: [] };
-    const rcCh = changes.filter(function (x) { return x.value && !/^NOTE\d+$/.test(x.row) && x.row.indexOf(SCH_PM_PREFIX) !== 0 && /노선\s*변경/.test(x.value); });
+    const rcCh = changes.filter(function (x) { return x.value && !/^NOTE\d+$/.test(x.row) && x.row.indexOf(SCH_PM_PREFIX) !== 0 && !schExParse_(x.row) && /노선\s*변경/.test(x.value); });
     if (rcCh.length) {
       const lk = scriptLock_();
       lk.waitLock(20000);
@@ -4665,13 +4707,16 @@ function adm_schSave(token, changes) {
         readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) drv[o.id] = o; });
         let r = last + 1;
         const rows = [];
+        const cn = {}; master_().camps.forEach(function (c) { cn[c.id] = c.name; });
         newIds.forEach(function (id) {
           const pm = id.indexOf(SCH_PM_PREFIX) === 0 && drv[id.slice(SCH_PM_PREFIX.length)];
-          const o = pm || drv[id];
+          const ex = schExParse_(id), exO = ex && drv[ex.driverId], exA = exO && extraAssignOf_(exO).filter(function (x) { return x.c === ex.campId; })[0];
+          if (ex && !exA) return; // 추가 배정이 없어진 캠프 줄은 만들지 않음
+          const o = pm || exO || drv[id];
           if (!o) return; // 없는 기사·비고는 무시
           const line = new Array(5).fill('');
           line[h.fixed['행ID']] = id; line[h.fixed['구분']] = pm ? SCH.KIND_PM : SCH.KIND_DRIVER;
-          line[h.fixed['캠프']] = pm ? SCH.KIND_PM : o.schCamp; line[h.fixed['이름']] = o.name; line[h.fixed['기본노선']] = pm ? '' : o.baseRoute;
+          line[h.fixed['캠프']] = pm ? SCH.KIND_PM : exA ? (cn[exA.c] || '') : o.schCamp; line[h.fixed['이름']] = o.name; line[h.fixed['기본노선']] = pm ? '' : exA ? exA.r : o.baseRoute;
           rows.push(line.map(safeText_)); rowOf[id] = r++;
         });
         if (rows.length) {
@@ -4958,6 +5003,25 @@ function api_mySchedule(token, month) {
       const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
       dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
     }
+    // 추가 배정 캠프 줄: 그 캠프 칸에 적힌 것을 '캠프 노선' 으로 붙여 보여 줌 (예: 출근 → 강서1 527B)
+    try {
+      const me = driverById_(String(s.d)), ex = me ? extraAssignOf_(me) : [];
+      if (ex.length) {
+        const sh = schSheet_(), last = sh.getLastRow(), cn = {};
+        master_().camps.forEach(function (c) { cn[c.id] = String(c.name).replace(/캠프$/, ''); });
+        const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
+        ex.forEach(function (x) {
+          const i = ids.indexOf(schExId_(String(s.d), x.c)); if (i < 0) return;
+          const vals = sh.getRange(i + 2, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
+          dates.forEach(function (d) {
+            const c = h.dates[d]; if (c === undefined) return;
+            const v = str_(vals[c - c0]); if (!v) return;
+            const t = (cn[x.c] || '') + ' ' + (v === '출근' ? x.r : v);
+            out.cells[d] = out.cells[d] && !/휴무|휴가|병가/.test(out.cells[d]) ? out.cells[d] + ', ' + t : (out.cells[d] && /휴무|휴가|병가/.test(out.cells[d]) && v === '출근' ? t : (out.cells[d] ? out.cells[d] + ', ' + t : t));
+          });
+        });
+      }
+    } catch (e) { console.error('추가 배정 줄 읽기 실패: ' + (e && e.message)); }
     // 내 캠프에 들어오는 백업 (기사스케줄 '백업 명단' 과 같은 규칙)
     try {
       const bk = schMyCampBackup_(s.d, dates, h, c0, c1);
@@ -5957,6 +6021,7 @@ function onSchEdit_(e, sh) {
       const id = str_(v[F['행ID']]), kind = str_(v[F['구분']]), camp = str_(v[F['캠프']]), name = str_(v[F['이름']]);
       if (/^NOTE/.test(id)) { if (kind !== SCH.KIND_NOTE) cell(r, '구분').setValue(SCH.KIND_NOTE); noteEdited = true; continue; }
       if (id.indexOf(SCH_PM_PREFIX) === 0 && byId[id.slice(SCH_PM_PREFIX.length)]) { if (kind !== SCH.KIND_PM) cell(r, '구분').setValue(SCH.KIND_PM); cell(r, '행ID').clearNote(); continue; }
+      if (schExParse_(id) && byId[schExParse_(id).driverId]) { if (kind !== SCH.KIND_DRIVER) cell(r, '구분').setValue(SCH.KIND_DRIVER); cell(r, '행ID').clearNote(); continue; } // 추가 배정 줄
       if (id) {
         const o = byId[id];
         if (o) {
