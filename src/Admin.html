@@ -5236,13 +5236,14 @@
   function suggestions(r, text) {
     const t = String(text || '').trim().toUpperCase();
     const d = r.d, myCamp = d ? d.campId : '', out = [];
-    const push = (v, hint) => { if (v && !out.some((x) => x.v === v)) out.push({ v, hint }); };
+    const push = (v, hint, fill) => { if (v && !out.some((x) => x.v === v)) out.push({ v, hint, fill }); };
     if (d && d.baseRoute && !/백업|용차/.test(d.baseRoute)) push('출근', d.baseRoute);
     SOPTS.forEach((o) => push(o));
     // 업무등록 (기본노선으로 업무 등록) · 서브아이디로 뛴 날 = '노선 서브아이디 업무등록' (미입차 계산·정산이 알아보는 모양)
     const brt = d && d.baseRoute && !/백업|용차/.test(d.baseRoute) ? String(d.baseRoute).replace(/\([^)]*\)|\[[^\]]*]/g, '').replace(/\s+/g, '') : '';
-    push('업무등록', brt || '');
-    ((d && d.subIds) || []).forEach((sub) => push(brt ? brt + ' ' + sub + ' 업무등록' : '(' + sub + ') 업무등록', '서브아이디'));
+    // 누르면 저장하지 않고 편집 칸에 '노선 (아이디) 업무등록' 으로 채움 → 확인·수정 뒤 Enter
+    if (d && d.loginId) push('업무등록', d.loginId, { id: d.loginId, rt: brt });
+    ((d && d.subIds) || []).forEach((sub) => push('서브아이디 ' + sub, '업무등록', { id: sub, rt: brt }));
     // 노선: 노선관리에 등록된 노선 + 기사들의 기본노선 + 이 2주에 이미 쓴 값
     const campRoutes = {};
     const addR = (campId, code) => { code = String(code || '').trim(); if (code && /\d/.test(code) && !/백업|용차/.test(code)) (campRoutes[campId] = campRoutes[campId] || new Set()).add(code); };
@@ -5287,7 +5288,7 @@
     // ── 캠프 · 라우트 고르기 (기사 정보관리 '배정 캠프 · 라우트' 와 같은 방식) → 칸 글자를 만든다
     //   내 캠프면 '530AB (D1)', 다른 캠프면 '강서1 527B' · 용차 버튼 = '용차'
     const pkEl = box.querySelector('.spk');
-    let pk = null;
+    let pk = null, pkCompose = null;
     if (pkEl) {
       const myCamp = r.d.campId || '', campOf = (id) => SD.camps.find((c) => c.id === id);
       const v0 = String(ta.value || '').trim(), mc = v0.match(/^([가-힣]+\d)\s+(.+)$/);
@@ -5296,7 +5297,7 @@
       pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: p0.special === '용차' ? '용차' : '', rots: p0.rots };
       if (!pk.rots.length) pk.rots = sdCampRots(pk.campId);
       const list = () => (SD.routes[pk.campId] || []).map((c) => ({ code: c, stopped: false }));
-      const compose = () => {
+      const compose = pkCompose = () => {
         const base = composeUnits(pk.units, pk.special, pk.rots, sdCampRots(pk.campId));
         if (!base || base === '용차') return base;
         const c = campOf(pk.campId);
@@ -5339,7 +5340,7 @@
       else if (e.key === 'Enter' && e.altKey) { e.preventDefault(); const p = ta.selectionStart; ta.value = ta.value.slice(0, p) + '\n' + ta.value.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = p + 1; grow(); }
       else if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        if (sEdit.idx >= 0 && sEdit.list[sEdit.idx]) ta.value = sEdit.list[sEdit.idx].v;
+        if (sEdit.idx >= 0 && sEdit.list[sEdit.idx]) { const it = sEdit.list[sEdit.idx]; ta.value = it.fill ? ((it.fill.rt ? it.fill.rt + ' ' : '') + '(' + it.fill.id + ') 업무등록') : it.v; }
         commitEdit();
         moveAct(e.key === 'Tab' ? 0 : e.shiftKey ? -1 : 1, e.key === 'Tab' ? (e.shiftKey ? -1 : 1) : 0);
         $('#sWrap').focus({ preventScroll: true });
@@ -5348,7 +5349,16 @@
     });
     box.querySelector('.sug').addEventListener('mousedown', (e) => {
       const b = e.target.closest('[data-i]'); if (!b) return;
-      e.preventDefault(); ta.value = sEdit.list[+b.dataset.i].v; commitEdit(); $('#sWrap').focus({ preventScroll: true });
+      e.preventDefault();
+      const it = sEdit.list[+b.dataset.i];
+      if (it.fill) { // 업무등록·서브아이디: 고른 라우트(없으면 기본노선) + (아이디) + 업무등록 → 편집 칸에만 넣음
+        const pv = pk && pkCompose && pk.units.length && !pk.special ? pkCompose() : '';
+        ta.value = ((pv || it.fill.rt) ? (pv || it.fill.rt) + ' ' : '') + '(' + it.fill.id + ') 업무등록';
+        grow(); sEdit.idx = -1; renderSug();
+        setTimeout(() => { ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; }, 0);
+        return;
+      }
+      ta.value = it.v; commitEdit(); $('#sWrap').focus({ preventScroll: true });
     });
     // 고르기 칸(캠프 선택 등)으로 포커스가 옮겨 가면 저장하지 않는다
     ta.addEventListener('blur', () => setTimeout(() => { if (sEdit && sEdit.ta === ta && !box.contains(document.activeElement)) commitEdit(); }, 120));
