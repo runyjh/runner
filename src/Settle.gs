@@ -150,7 +150,7 @@ const STL_CFG = [
   ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임', '기사 앱']
 ];
 
-const STL_DRIVER_FIELDS = ['bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem']; // 기사(사람) 정보: 명의자의 세금계산서용
+const STL_DRIVER_FIELDS = ['stlMode', 'insEx', 'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem']; // 기사(사람) 정보: 명의자의 세금계산서용
 const STL_ROLES = ['메인', '서브'];
 const STL_ID_STATUS = ['사용', '정지']; // 예전 값 '중지' 도 정지로 읽는다
 const STL_TYPES = ['고정', '백업', '품앗이', '외부용차'];
@@ -3111,6 +3111,8 @@ function adm_stlDriverSave(token, changes) {
         Object.keys(ch.f || {}).forEach(function (k) {
           if (STL_DRIVER_FIELDS.indexOf(k) < 0) return;
           let v = str_(ch.f[k]).slice(0, 200);
+          if (k === 'stlMode') { if (STL_MODES.indexOf(v) < 0) fail_(o.name + ': 정산 방식은 기본 / 원청단가 / 용차내역'); }
+          if (k === 'insEx') v = /^(y|yes|o|예|제외|true|1)$/i.test(v) ? 'Y' : '';
           if (k === 'bizNo' && v) { const d = v.replace(/\D/g, ''); if (d.length !== 10) fail_(o.name + ': 사업자등록번호 10자리'); v = d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3'); }
           f[k] = v;
         });

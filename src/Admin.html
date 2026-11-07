@@ -2075,8 +2075,8 @@
       (d.mustChange ? '<div class="warnbox">임시 비밀번호 상태입니다. 기사님이 다음 로그인 때 비밀번호를 바꿉니다.</div>' : '') +
       '<div class="sec"><h4>기사 앱 사용 <small class="sub" style="font-weight:500">— 앱 로그인 허용 여부 (근무와 별개)</small></h4><div class="status-row">' +
         STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
-      '</div></div>' + workSec(d) +
-      typeSec(d) + rankSec(d) + assignSec() +
+      '</div></div>' + workSec(d) + rankSec(d) +
+      typeSec(d) + assignSec() +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디 (앱 로그인용)', d.loginId) +
         fld('phone', '연락처', d.phone) + '<div class="field"><label class="lb">생년월일 (주민번호에서 자동)</label><input class="inp" value="' + esc(d.birthDate) + '" readonly></div>' +
@@ -2265,7 +2265,7 @@
       '<div class="idrow"><span class="k">메인</span><div><b>' + esc(d.loginId || '—') + '</b> <small class="sub">(쿠팡플렉스 아이디 · 아래 기본 정보에서 고침)</small></div><span class="sub" style="font-size:12px">단가코드: ' + esc(d.driverType || '미지정') + '</span></div>' +
       subRow('subId1', 'subType1', '서브 1') + subRow('subId2', 'subType2', '서브 2') +
       '<p class="sub" style="font-size:12px;margin:6px 0 0">서브 단가코드는 비우면 메인과 같음 · 다른 경우만 고름 (예: 서브로 백업 뛸 때). 그 아이디로 가입한 기사는 <b>기사 앱 사용만 정지</b>됩니다.</p></div>' +
-      (d.isNew ? '' : stlSec(d));
+      '';
   }
   /** 정산 설정 (예전 정산관리 아이디 관리 칸): 정산 방식 · 산재·고용 제외 · 프레시백 차감 */
   function stlSec(d) {
@@ -2307,7 +2307,7 @@
       '<div class="warnbox" style="background:var(--brand-weak);color:var(--brand)">관리자가 직접 등록하는 기사는 바로 승인 상태로 만들어집니다. <span class="req">*</span> 표시만 꼭 입력하면 되고, 나머지는 나중에 채워도 됩니다.</div>' +
       '<div class="sec"><h4>기사 앱 사용</h4><div class="status-row">' +
         STATUSES.map((st) => '<button type="button" class="st' + (st === cur.status ? ' on' : '') + '" data-st="' + st + '">' + st + '</button>').join('') + '</div></div>' +
-      workSec(cur) + typeSec(cur) + rankSec(cur) + assignSec() +
+      workSec(cur) + rankSec(cur) + typeSec(cur) + assignSec() +
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         inp('name', '이름', { req: true }) + inp('phone', '연락처') +
         inp('loginId', '쿠팡플렉스 아이디 (앱 로그인용, 선택)') + inp('tempPw', '앱 임시 비밀번호 (선택, 영문+숫자 8자 이상)') +
@@ -6739,7 +6739,7 @@
     (navigator.clipboard ? navigator.clipboard.writeText(tsv) : Promise.reject()).then(() => toast(list.length + '명 복사했습니다 (은행, 계좌번호, 예금주, 금액).')).catch(() => toast('복사하지 못했습니다.'));
   });
   // ── 기사 정산정보 ──
-  const SD_COLS = [['bizNo', '사업자등록번호', 'text'], ['bizName', '상호', 'text'], ['bizCeo', '대표자 (비우면 이름)', 'text'], ['bizAddr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'], ['bizEmail', '계산서 이메일', 'text']];
+  const SD_COLS = [['stlMode', '정산 방식', 'mode'], ['insEx', '산재·고용 제외', 'check'], ['bizNo', '사업자등록번호', 'text'], ['bizName', '상호', 'text'], ['bizCeo', '대표자 (비우면 이름)', 'text'], ['bizAddr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'], ['bizEmail', '계산서 이메일', 'text']];
   function loadStDrivers() {
     $('#sdTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
     return api('adm_stlDrivers').then((r) => { if (!r.ok) return toast(r.msg); STX.drv = r; STX.drvDirty = {}; renderStDrivers(); }).catch(() => {});
