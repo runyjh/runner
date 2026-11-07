@@ -4541,7 +4541,8 @@ function schDriver_(o) {
     id: o.id, name: o.name, loginId: o.loginId, type: o.driverType, code: o.driverCode, status: o.status,
     campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute, fixedOff: o.fixedOff, extraOff: o.extraOff,
     workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
-    workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o)
+    workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o),
+    subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean) // 칸 편집기 '서브아이디 업무등록' 추천용
   };
 }
 

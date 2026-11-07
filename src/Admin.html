@@ -5239,6 +5239,10 @@
     const push = (v, hint) => { if (v && !out.some((x) => x.v === v)) out.push({ v, hint }); };
     if (d && d.baseRoute && !/백업|용차/.test(d.baseRoute)) push('출근', d.baseRoute);
     SOPTS.forEach((o) => push(o));
+    // 업무등록 (기본노선으로 업무 등록) · 서브아이디로 뛴 날 = '노선 서브아이디 업무등록' (미입차 계산·정산이 알아보는 모양)
+    const brt = d && d.baseRoute && !/백업|용차/.test(d.baseRoute) ? String(d.baseRoute).replace(/\([^)]*\)|\[[^\]]*]/g, '').replace(/\s+/g, '') : '';
+    push('업무등록', brt || '');
+    ((d && d.subIds) || []).forEach((sub) => push(brt ? brt + ' ' + sub + ' 업무등록' : '(' + sub + ') 업무등록', '서브아이디'));
     // 노선: 노선관리에 등록된 노선 + 기사들의 기본노선 + 이 2주에 이미 쓴 값
     const campRoutes = {};
     const addR = (campId, code) => { code = String(code || '').trim(); if (code && /\d/.test(code) && !/백업|용차/.test(code)) (campRoutes[campId] = campRoutes[campId] || new Set()).add(code); };
@@ -5251,8 +5255,8 @@
     Array.from(campRoutes[myCamp] || []).sort(koSort).forEach((c) => push(c, '노선'));
     Array.from(used).sort(koSort).forEach((v) => push(v, '이번 2주에 쓴 값'));
     SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).forEach((c) => { if (c.id !== myCamp) Array.from(campRoutes[c.id] || []).sort(koSort).forEach((code) => push(shortCamp(c.name) + ' ' + code, '다른 캠프')); });
-    if (!t) return out.slice(0, 14);
-    return out.filter((x) => x.v.toUpperCase().replace(/\s/g, '').includes(t.replace(/\s/g, ''))).slice(0, 14);
+    if (!t) return out.slice(0, 20);
+    return out.filter((x) => x.v.toUpperCase().replace(/\s/g, '').includes(t.replace(/\s/g, ''))).slice(0, 20);
   }
   function openEdit(initial) {
     if (!sAct || sEdit) return;
