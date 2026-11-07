@@ -1146,6 +1146,33 @@
   }
   function clearSession() { store.del(TOKEN); store.del(USER); }
 
+  // ───── 화면 문구 (관리자앱 → 올인원 설정 → 기사앱 에서 바꿈) ─────
+  // 키 = "d:화면id:기본 문구". 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. ※ 관리자앱 uiDrvScan 과 같은 규칙
+  const UID_SEL = '#v-home .tile b, #v-home .tile > span, section.view > .topbar h2, .mylist button, .mylist .mylab, .pmban, .links a';
+  const UID = { map: {} };
+  try { UID.map = JSON.parse(localStorage.getItem('runner.uiText.d') || '{}') || {}; } catch (e) { UID.map = {}; }
+  const uidFirst = (el) => { for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) return n; return null; };
+  function uidApply() {
+    $$(UID_SEL).forEach((el) => {
+      const tn = uidFirst(el); if (!tn) return;
+      if (tn.__uiSet !== tn.nodeValue) tn.__uiDef = tn.nodeValue;
+      const raw = tn.__uiDef, def = raw.trim(); if (!def) return;
+      const sec = el.closest('section.view'), o = UID.map['d:' + (sec ? sec.id : '-') + ':' + def];
+      const want = o ? raw.replace(def, o) : raw;
+      if (tn.nodeValue !== want) tn.nodeValue = want;
+      tn.__uiSet = want;
+    });
+  }
+  let uidRaf = 0;
+  new MutationObserver(() => { if (!uidRaf) uidRaf = requestAnimationFrame(() => { uidRaf = 0; uidApply(); }); }).observe(document.body, { childList: true, subtree: true });
+  uidApply();
+  api('api_uiText').then((r) => {
+    if (!r || !r.ok) return;
+    UID.map = r.map || {};
+    try { localStorage.setItem('runner.uiText.d', JSON.stringify(UID.map)); } catch (e) {}
+    uidApply();
+  }).catch(() => {});
+
   (function boot() {
     const token = store.get(TOKEN);
     if (!token) { goLogin(); api('api_ping').catch(() => {}); return; }

@@ -100,3 +100,12 @@ function adm_uiTextSave(token, list) {
     return { ok: true, map: uitMap_(), changed: logs.length, log: uitLog_(100) };
   });
 }
+
+/** 기사앱 화면 문구 (로그인 없이 읽음 · 글자만 있으므로 공개해도 됨). 키는 "d:화면id:기본 문구" */
+function api_uiText() {
+  return run_(function () {
+    const m = uitMap_(), out = {};
+    Object.keys(m).forEach(function (k) { if (k.indexOf('d:') === 0 && m[k].text) out[k] = m[k].text; });
+    return { ok: true, map: out };
+  });
+}

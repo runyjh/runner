@@ -975,7 +975,7 @@
       </div>
     </div>
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">메뉴 · 탭 · 화면 제목 · 설명서 글자를 직접 바꿉니다. <b>기능과 계산은 그대로</b>이고, 바꾼 문구를 비우면 기본 문구가 나옵니다. 화면에서 바로 고치려면 <b>✏️ 문구 편집 모드</b>를 켜세요.</p>
-    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="log">변경 기록</button></div>
+    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
     <div id="uiBody"></div>
    </section>
    <section id="view-taxinv" class="hidden">
@@ -1191,6 +1191,7 @@
       <button class="tab" data-st="ids">아이디 관리</button>
       <button class="tab on" data-st="list">정산서</button>
       <button class="tab" data-st="vendors">용차업체</button>
+      <button class="tab" data-st="usage">아이디 사용 기록 (한 아이디 여러 기사)</button>
       <button class="tab" data-st="yongcha">품앗이/용차 지정</button>
       <button class="tab" data-st="advance">가불금 목록</button>
       <button class="tab" data-st="adjust">공제·가감</button>
@@ -1222,7 +1223,6 @@
     <div id="stp-edit" class="hidden">
       <div class="tabs sub2 hidden" id="stIdTabs">
         <button class="tab on" data-idt="ids">아이디 목록</button>
-        <button class="tab" data-idt="usage">아이디 사용 기록 (한 아이디 여러 기사)</button>
         <button class="tab" data-idt="drv">명의자 사업자 정보</button>
       </div>
       <div class="tabs sub2 hidden" id="stCfgTabs">
@@ -1261,7 +1261,7 @@
       <div class="table-wrap"><table class="sttbl" id="payTable"></table></div>
     </div>
     <div id="stp-drv" class="hidden">
-      <div class="tabs sub2" id="stIdTabs2"><button class="tab" data-idt="ids">아이디 목록</button><button class="tab" data-idt="usage">아이디 사용 기록 (한 아이디 여러 기사)</button><button class="tab on" data-idt="drv">명의자 사업자 정보</button></div>
+      <div class="tabs sub2" id="stIdTabs2"><button class="tab" data-idt="ids">아이디 목록</button><button class="tab on" data-idt="drv">명의자 사업자 정보</button></div>
       <p class="sub st-help">정산금·세금계산서를 받는 <b>명의자</b>의 사업자 정보입니다. 러너 올인원 DB 의 기사 정보(drivers 탭)에 저장됩니다. 은행·계좌는 기사 정보관리에서 고칩니다.</p>
       <div class="st-tools"><input class="inp search" id="sdQ2" placeholder="이름·쿠팡ID 검색" autocomplete="off"><label class="check" style="margin:0"><input type="checkbox" id="sdActive" checked> 승인 기사만</label><span class="sub" id="sdDirty"></span><button class="btn sm" id="sdSave2" disabled>저장</button></div>
       <div class="table-wrap"><table class="sttbl ed" id="sdTable"></table></div>
@@ -5988,8 +5988,9 @@
     STX.tab = tab; STX.edDirty = false;
     $$('#stTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.st === tab));
     $('#stp-list').classList.toggle('hidden', tab !== 'list');
+    if (STX.idt === 'usage') STX.idt = 'ids'; // 아이디 사용 기록은 정산관리 탭으로 옮김
     const idSub = tab === 'ids' ? (STX.idt || 'ids') : '';
-    $('#stp-edit').classList.toggle('hidden', !(['adjust', 'advance', 'yongcha', 'vendors', 'tmp', 'cfg', 'pnl'].includes(tab) || (tab === 'ids' && idSub !== 'drv')));
+    $('#stp-edit').classList.toggle('hidden', !(['adjust', 'advance', 'yongcha', 'vendors', 'usage', 'tmp', 'cfg', 'pnl'].includes(tab) || (tab === 'ids' && idSub !== 'drv')));
     setFin(tab === 'pnl');
     if (tab !== 'pnl') $('#stPnl').classList.add('hidden');
     navMark();
@@ -7732,14 +7733,17 @@
     const keys = [], seen = {};
     const add = (k) => { if (!seen[k]) { seen[k] = 1; keys.push(k); } };
     if (kind === 'guide') Object.keys(ST_GUIDE).forEach((n) => add('guide:' + n));
-    else {
+    else if (kind === 'drv') {
+      (UI.drv || []).forEach((x) => add(x.key));
+      Object.keys(UI.map).forEach((k) => { if (k.startsWith('d:')) add(k); });
+    } else {
       const kinds = kind === 'tab' ? ['탭'] : ['메뉴 묶음', '메뉴', '화면 제목'];
       $$('[data-uik]').forEach((el) => { const d = UI.defs[el.dataset.uik]; if (d && kinds.includes(d.kind)) add(el.dataset.uik); });
       Object.keys(UI.defs).forEach((k) => { if (kinds.includes(UI.defs[k].kind)) add(k); });
-      Object.keys(UI.map).forEach((k) => { if (kinds.includes(UI.map[k].kind)) add(k); });
+      Object.keys(UI.map).forEach((k) => { if (!k.startsWith('d:') && kinds.includes(UI.map[k].kind)) add(k); });
     }
     return keys.map((k) => {
-      const d = UI.defs[k] || {}, o = UI.map[k] || {}, dr = UI.draft[k];
+      const d = (k.startsWith('d:') ? (UI.drv || []).find((x) => x.key === k) : UI.defs[k]) || {}, o = UI.map[k] || {}, dr = UI.draft[k];
       const g = k.startsWith('guide:') ? k.slice(6) : '';
       return { key: k, kind: g ? '설명서' : d.kind || o.kind, where: g ? uiGuideWhere(g) : d.where || o.where || '', def: g ? uiGuideDef(g) : d.def || o.def || '', text: dr ? dr.text : o.text || '', memo: dr ? dr.memo : o.memo || '' };
     });
@@ -7768,6 +7772,7 @@
     $('#uiBody').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th style="width:90px">구분</th><th style="width:' + (UI.tab === 'guide' ? '34%' : '220px') + '">기본 문구</th><th>바꾼 문구 (비우면 기본)</th><th style="width:170px">메모</th><th style="width:90px"></th></tr></thead><tbody>' +
       (body || '<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">' + (q ? '"' + esc(q) + '" 에 맞는 문구가 없습니다.' : '없습니다.') + '</td></tr>') + '</tbody></table></div>' +
       (UI.tab === 'tab' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 번도 열어 보지 않은 화면의 탭은 목록에 없을 수 있어요. 그 화면을 열거나 ✏️ 문구 편집 모드로 바로 고치세요. 건수(숫자)가 붙는 탭은 바꿀 수 없습니다.</p>' : '') +
+      (UI.tab === 'drv' ? '<p class="sub" style="font-size:12px;margin-top:8px">' + (UI.drv ? '기사앱의 홈 메뉴 · 화면 제목 · 마이페이지 메뉴 · 안내 문구입니다. 저장하면 기사님이 앱을 <b>다시 열 때</b> 바뀐 글자가 보여요.' : '기사앱 문구를 불러오는 중…') + '</p>' : '') +
       (UI.tab === 'guide' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 줄 = <b>태그 | 내용</b> (예: <code>주의 | 마감한 달은 **그대로**</code>) · <code>**글자**</code> = 굵게 · 비우면 기본 설명서.</p>' : '');
   }
   const uiDraftOf = (k) => { const o = UI.map[k] || {}; return UI.draft[k] || (UI.draft[k] = { text: o.text || '', memo: o.memo || '' }); };
@@ -7782,7 +7787,7 @@
     if (c) { const k = c.dataset.ucopy, i = $('[data-uk="' + CSS.escape(k) + '"]', $('#uiBody')); if (i) { i.value = uiGuideDef(k.slice(6)); uiDraftOf(k).text = i.value; i.classList.add('ch'); i.focus(); } c.remove(); }
   });
   const uiCollect = () => Object.keys(UI.draft).map((k) => {
-    const d = UI.draft[k], r = uiRows(k.startsWith('guide:') ? 'guide' : (UI.defs[k] || UI.map[k] || {}).kind === '탭' ? 'tab' : 'menu').find((x) => x.key === k) || { kind: '', where: '', def: '' };
+    const d = UI.draft[k], r = uiRows(k.startsWith('guide:') ? 'guide' : k.startsWith('d:') ? 'drv' : (UI.defs[k] || UI.map[k] || {}).kind === '탭' ? 'tab' : 'menu').find((x) => x.key === k) || { kind: '', where: '', def: '' };
     let text = String(d.text || '').trim(); if (text === r.def) text = '';
     return { key: k, kind: r.kind, where: r.where, def: r.def, text: text, memo: d.memo || '' };
   });
@@ -7794,7 +7799,27 @@
     rows.forEach((r) => { uiDraftOf(r.key).text = ''; });
     uiSave(uiCollect());
   });
-  $('#uiTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-uit]'); if (!b || UI.edit) return; UI.tab = b.dataset.uit; uiRender(); });
+  $('#uiTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-uit]'); if (!b || UI.edit) return; UI.tab = b.dataset.uit; uiRender(); if (UI.tab === 'drv' && !UI.drv) uiDrvLoad(); });
+  // 기사앱 문구 목록: 기사앱 페이지(../)를 읽어 같은 규칙(Index.html UID_SEL)으로 뽑는다
+  const UID_SEL = '#v-home .tile b, #v-home .tile > span, section.view > .topbar h2, .mylist button, .mylist .mylab, .pmban, .links a';
+  function uiDrvScan(doc) {
+    const out = [], seen = {}, ft = (el) => { for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) return n.nodeValue.trim(); return ''; };
+    const kindOf = (el) => el.matches('.tile b') ? '홈 메뉴' : el.matches('.tile > span') ? '홈 메뉴 설명' : el.matches('.topbar h2') ? '화면 제목' : el.matches('.mylist *') ? '마이페이지 메뉴' : el.matches('.pmban') ? '안내 문구' : '링크';
+    doc.querySelectorAll(UID_SEL).forEach((el) => {
+      const def = ft(el); if (!def) return;
+      const sec = el.closest('section.view'), id = sec ? sec.id : '-', key = 'd:' + id + ':' + def;
+      if (seen[key]) return; seen[key] = 1;
+      const h = sec && sec.querySelector('.topbar h2'), where = '기사앱 · ' + (id === 'v-home' ? '홈' : id === 'v-login' ? '로그인' : h ? ft(h) : id);
+      out.push({ key: key, kind: kindOf(el), where: where, def: def });
+    });
+    return out;
+  }
+  function uiDrvLoad() {
+    fetch(new URL('../', location.href).href + '?ui=' + Date.now(), { cache: 'no-store' }).then((r) => r.text()).then((t) => {
+      UI.drv = uiDrvScan(new DOMParser().parseFromString(t, 'text/html'));
+      if (currentView === 'uiset') uiRender();
+    }).catch(() => { UI.drv = []; toast('기사앱 문구를 불러오지 못했습니다.'); if (currentView === 'uiset') uiRender(); });
+  }
   onSearch($('#uiQ'), uiRender);
   // ── ✏️ 문구 편집 모드: 점선 글자를 눌러 바로 고친다
   function uiEditMode(on) {
