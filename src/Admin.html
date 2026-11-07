@@ -774,11 +774,17 @@
   .sg tr.calc.bk td.cc { color: var(--ink); background: #f8fbff; }
   .sed { position: absolute; z-index: 30; background: #fff; border: 2px solid var(--brand); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
   .sed textarea { display: block; width: 100%; border: 0; outline: none; resize: none; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 8px; min-height: 30px; }
-  .sed .sug { max-height: 260px; overflow: auto; border-top: 1px solid var(--line); }
-  .sed .sug button { display: flex; justify-content: space-between; gap: 8px; width: 100%; border: 0; border-bottom: 1px solid #fff; padding: 5px 8px; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
-  .sed .sug button.k-route, .sed .sug button:not([class]) { background: #fff; }
-  .sed .sug button.on, .sed .sug button:hover { outline: 2px solid var(--brand); outline-offset: -2px; }
-  .sed .sug small { opacity: .7; font-weight: 500; }
+  /* 추천 목록: 흰 바탕 둥근 버튼 (배정 캠프·라우트 버튼과 같은 모양) · 왼쪽 점 색 = 칸 색 */
+  .sed .sug { max-height: 260px; overflow: auto; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: #fff; }
+  .sed .sug:empty { display: none; }
+  .sed .sug button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: #fff !important; color: var(--ink) !important; padding: 6px 11px; font-size: 13px; font-weight: 600; cursor: pointer; line-height: 1.2; }
+  .sed .sug button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #c9cdd2; flex: none; }
+  .sed .sug button.k-work::before { background: #4a90d9; } .sed .sug button.k-off::before { background: #f08c8c; } .sed .sug button.k-sick::before { background: #5cb85c; }
+  .sed .sug button.k-mi::before { background: #d15555; } .sed .sug button.k-yong::before { background: #a77bd1; } .sed .sug button.k-chg::before { background: #0a53a8; }
+  .sed .sug button.k-reg::before { background: #2bb39a; } .sed .sug button.k-other::before { background: #e0a800; }
+  .sed .sug button:hover { background: #f5f7fa !important; border-color: #c9cdd2; }
+  .sed .sug button.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak); }
+  .sed .sug small { color: var(--sub); font-weight: 500; font-size: 11px; }
   .sed .shint { font-size: 10px; color: var(--faint); padding: 3px 8px; border-top: 1px solid var(--line); }
   /* 칸 편집기: 캠프 · 라우트 고르기 */
   .sed .spk { border-top: 1px solid var(--line); padding: 6px 8px; background: #fafbfc; }
