@@ -5150,6 +5150,13 @@ function api_campSchedule(token, month) {
         try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1).list; } catch (e) { out.backup = {}; }
       }
     }
+    // 관리자가 기사스케줄 칸에 적은 지시사항 (그 캠프에서 일하는 날만)
+    try {
+      schIssues_(dates[0], dates[dates.length - 1]).forEach(function (x) {
+        const m = byId[x.driverId];
+        if (x.kind === '지시' && x.reason && m && inCamp[m.id].days[x.date]) (m.inst = m.inst || {})[x.date] = x.reason;
+      });
+    } catch (e) { /* 지시사항 없이 */ }
     out.drivers = Object.keys(byId).map(function (k) { return byId[k]; })
       .sort(function (a, b) { return a.order - b.order || a.name.localeCompare(b.name, 'ko'); })
       .map(function (x) { delete x.order; return x; });
