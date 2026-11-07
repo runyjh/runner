@@ -761,6 +761,11 @@
   .sg td.c.sel { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.16); }
   .sg td.c.act { outline: 2px solid var(--brand); outline-offset: -2px; }
   .sg td.c.dup { box-shadow: inset 0 0 0 2px #f59e0b; }
+  #dupTip { position: fixed; z-index: 60; display: none; background: #fff; border: 1px solid #f5c26b; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.15); padding: 8px 10px; font-size: 12px; min-width: 200px; max-width: 320px; pointer-events: none; }
+  #dupTip .dtip-h { font-weight: 700; color: #b45309; margin-bottom: 4px; }
+  #dupTip .dtip-r { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; border-top: 1px solid #f2f4f6; }
+  #dupTip .dtip-r b { white-space: nowrap; } #dupTip .dtip-r span { color: #333d4b; } #dupTip .dtip-r em { margin-left: auto; font-style: normal; color: var(--sub); white-space: nowrap; }
+  #dupTip .dtip-f { margin-top: 4px; color: var(--sub); font-size: 11px; }
   .sg td.c.pend { font-style: italic; }
   .sg td.ex { color: var(--sub); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
   .sg td.num { text-align: center; font-weight: 700; color: var(--ink); }
@@ -4730,7 +4735,7 @@
       });
 
       // 2) 미입차 + 중복: 날짜마다 (캠프, 노선, 회전) 별로 누가 들어가는지 모은다
-      const missing = [], dups = [], dupCells = new Set();
+      const missing = [], dups = [], dupCells = new Set(), dupInfo = new Map(); // dupInfo: '행|날짜칸' → [{ camp, route, rot, keys }]
       for (let d = 0; d < nDays; d++) {
         const baseRouteSet = new Set(), present = new Map(), explicitMi = [];
         const addPresent = (camp, routeList, rotArr, key) => routeList.forEach((rt) => rotArr.forEach((rot) => {
@@ -4829,12 +4834,13 @@
         present.forEach((who, k) => {
           if (who.size < 2) return;
           const [camp, rt, rot] = k.split('|');
-          dl.push({ camp, route: rt, rot, keys: Array.from(who) });
-          who.forEach((key) => dupCells.add(key + '|' + d));
+          const it = { camp, route: rt, rot, keys: Array.from(who) };
+          dl.push(it);
+          who.forEach((key) => { dupCells.add(key + '|' + d); const dk = key + '|' + d; if (!dupInfo.has(dk)) dupInfo.set(dk, []); dupInfo.get(dk).push(it); });
         });
         dups.push(dl);
       }
-      return { counts, roster, missing, dups, dupCells };
+      return { counts, roster, missing, dups, dupCells, dupInfo };
     }
     return { compute, routeExpand, isWorkDay };
   })();
@@ -5025,6 +5031,37 @@
     const tip = (v.length > 14 ? v : '') + (ins ? (v.length > 14 ? '\n' : '') + '📌 ' + ins.reason : '');
     return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + '</td>';
   }
+  // 중복 칸(주황 테두리)에 마우스를 올리면 어디와 겹치는지 작은 창으로 보여 줌
+  function dupTipHtml(row, ci) {
+    const list = (scalc && scalc.dupInfo && scalc.dupInfo.get(row + '|' + ci)) || [];
+    if (!list.length) return '';
+    const nameOf = (key) => { const d = SD.drivers.find((x) => x.id === key); return d ? d.name + (d.ex ? ' (추가 배정)' : '') : key; };
+    // 같은 상대끼리 노선·회전을 묶음
+    const by = new Map();
+    list.forEach((x) => x.keys.filter((k) => k !== row).forEach((k) => {
+      const g = by.get(k) || { camp: x.camp, items: [] }; g.items.push(x.route + (x.rot ? '(' + x.rot + ')' : '')); by.set(k, g);
+    }));
+    const dt = SD.dates[ci];
+    return '<div class="dtip-h">⚠ 중복 · ' + esc(dt ? Number(dt.slice(5, 7)) + '/' + Number(dt.slice(8)) : '') + '</div>' +
+      Array.from(by.entries()).map(([k, g]) => '<div class="dtip-r"><b>' + esc(nameOf(k)) + '</b><span>' + esc((g.camp ? g.camp + ' ' : '') + Array.from(new Set(g.items)).join(', ')) + '</span><em>' + esc(sget(k, dt) || '') + '</em></div>').join('') +
+      '<div class="dtip-f">같은 날 같은 캠프·노선·회전에 2명 이상</div>';
+  }
+  (function () {
+    let tip = null;
+    const hide = () => { if (tip) tip.style.display = 'none'; };
+    document.addEventListener('mouseover', (e) => {
+      const td = e.target.closest && e.target.closest('#sGrid td.c.dup');
+      if (!td) return hide();
+      const r = srows[+td.dataset.r]; if (!r) return hide();
+      const html = dupTipHtml(r.row, +td.dataset.c); if (!html) return hide();
+      if (!tip) { tip = document.createElement('div'); tip.id = 'dupTip'; document.body.appendChild(tip); }
+      tip.innerHTML = html; tip.style.display = 'block';
+      const rc = td.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+      tip.style.left = Math.max(8, Math.min(rc.left, innerWidth - w - 8)) + 'px';
+      tip.style.top = (rc.bottom + 6 + h > innerHeight ? Math.max(8, rc.top - h - 6) : rc.bottom + 6) + 'px';
+    });
+    document.addEventListener('scroll', hide, true);
+  })();
   /** 칸의 지시사항 (스케줄 이슈 중 구분 '지시') */
   function instOf(row, dt) { return (SD.issues || []).find((x) => x.driverId === row && x.date === dt && x.kind === '지시') || null; }
   function renderCalc() {
