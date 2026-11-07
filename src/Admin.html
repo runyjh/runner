@@ -7661,7 +7661,7 @@
       const g = el.closest('.ng'), gt = g && $('.ngt', g);
       return ['nav:' + el.dataset.view + (el.dataset.stGo ? '/' + el.dataset.stGo : ''), '메뉴', '왼쪽 메뉴 · ' + (gt ? gt.textContent.trim() : '')];
     }
-    if (el.matches('.nav .ngt')) { const g = [...el.parentNode.classList].find((c) => /^g-/.test(c)); return g ? ['ng:' + g, '메뉴 묶음', '왼쪽 메뉴'] : null; }
+    if (el.matches('.nav .ngt')) { const g = [...el.parentNode.classList].find((c) => /^g-/.test(c)); return g ? ['ng:' + g, '메뉴 묶음', '왼쪽 메뉴 · ' + el.textContent.trim()] : null; }
     if (el.matches('section[id^="view-"] > .head h2') && el.id !== 'stTitle') return ['h2:' + el.closest('section').id, '화면 제목', '화면 맨 위'];
     if (el.matches('.tabs .tab')) {
       const box = el.closest('.tabs'), k = Object.keys(el.dataset).find((x) => x !== 'uik');
