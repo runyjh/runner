@@ -142,13 +142,19 @@ function fsDel_(paths) {
 // 앱은 문서 at 이 dirtyAt 보다 나중이고 오늘 만든 것일 때만 씀 (아니면 서버 = 지금처럼).
 // → 시트를 손으로 고쳐도(onSheetEdit / onSchEdit_) dirtyAt 이 바로 올라가 오래된 사본은 안 쓰인다.
 
-/** 데이터가 바뀜: meta.dirtyAt 올리기 + 1분 트리거가 다시 만들도록 표시 */
-function fsDirty_() {
+/** 데이터가 바뀜: meta.dirtyAt 올리기 + 1분 트리거가 다시 만들도록 표시
+ *  area 'nb' = 공지·게시판이 바뀜 → meta.nbAt 도 올림 (기사앱 홈 사본은 nbAt 만 봄 → 다른 저장 때문에 홈 사본을 버리지 않음)
+ *  nbAt 은 스크립트 속성 FS_NB_AT 에 보관 (캐시가 비어도 잃지 않게) */
+function fsDirty_(area) {
   try {
     if (!fsCfg_()) return;
-    const now = Date.now();
+    const now = Date.now(), d = fsDirty_.done || (fsDirty_.done = {});
     cache_().put('fs:dirty', String(now), 21600);
-    if (!fsDirty_.done) { fsDirty_.done = 1; fsPut_([{ path: 'pub/meta', data: { dirtyAt: now } }], now); }
+    let nb = 0;
+    if (area === 'nb') { nb = now; try { PropertiesService.getScriptProperties().setProperty('FS_NB_AT', String(now)); } catch (e) { /* 무시 */ } }
+    else nb = +(PropertiesService.getScriptProperties().getProperty('FS_NB_AT') || 0);
+    const k = area === 'nb' ? 'nb' : 'all';
+    if (!d[k]) { d[k] = 1; fsPut_([{ path: 'pub/meta', data: { dirtyAt: now, nbAt: nb } }], now); }
   } catch (e) { console.error('fsDirty_: ' + (e && e.message)); }
 }
 /** 실행 안에서만 쓰는 임시 세션으로 기사 앱 함수 부르기 (사본 만들기용) */

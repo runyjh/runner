@@ -969,7 +969,8 @@
       const [m, d] = await fsTimeout(Promise.all([FSR.db.doc('pub/meta').get({ source: 'server' }), FSR.db.doc(path()).get({ source: 'server' })]), 4000);
       if (!d.exists) return null;
       const x = d.data(); if (+x.v !== FSV) return null;
-      const dirtyAt = m.exists ? +(JSON.parse(m.data().j || '{}').dirtyAt || 0) : 0;
+      const meta = m.exists ? JSON.parse(m.data().j || '{}') : {};
+      const dirtyAt = +((/^drv\//.test(path()) && meta.nbAt != null ? meta.nbAt : meta.dirtyAt) || 0); // 홈 사본은 공지·게시판이 바뀐 시각만 봄
       if (!(+x.at > dirtyAt)) return null; // 사본을 만든 뒤에 데이터가 바뀜
       const data = JSON.parse(x.j);
       if (!check(data)) return null;
@@ -983,7 +984,7 @@
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_perf', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -991,10 +992,80 @@
     if (apiBusy) { el.classList.add('on'); clearTimeout(busyTimer); busyTimer = setTimeout(() => { if (apiBusy) el.classList.add('spin-on'); }, 300); }
     else { clearTimeout(busyTimer); el.classList.remove('on', 'spin-on'); }
   }
-  const api = (fn, ...args) => {
+  const apiNet = (fn, args) => {
     if (API_BG.includes(fn)) return gsCall(fn, args);
     busy(true);
     return gsCall(fn, args).finally(() => busy(false));
+  };
+  // ───── 빠른 화면: 직전에 받은 내용을 바로 보여 주고(기다림 없음), 뒤에서 새로 받아 바뀌었으면 그 화면만 다시 그림 ─────
+  //  · 읽기 전용 함수만 · 기사(토큰)별로 이 기기에만 보관 · 로그아웃하면 지움 · 7일 넘은 것은 안 씀
+  //  · 내가 저장·지원·글쓰기 등을 하면 2분 동안은 기다려서라도 서버의 새 값을 받음 (방금 한 일이 바로 보이게)
+  //  · 15초 안에 같은 걸 다시 부르면 서버에 다시 묻지 않음
+  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost', 'api_mySettle', 'api_mySlip', 'api_pmJob'];
+  const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만
+  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts']);
+  const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
+  const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
+  const swrAll = () => { try { return JSON.parse(localStorage.getItem(SWR.LS) || '{}') || {}; } catch (e) { return {}; } };
+  function swrSave(k, r) {
+    if (r && typeof r === 'object') delete r._ms;
+    SWR.mem[k] = { t: Date.now(), r: r };
+    try {
+      const all = swrAll(); all[k] = { t: Date.now(), r: r };
+      const ks = Object.keys(all).sort((a, b) => all[b].t - all[a].t); ks.slice(SWR.MAX).forEach((x) => delete all[x]);
+      localStorage.setItem(SWR.LS, JSON.stringify(all));
+    } catch (e) { try { localStorage.removeItem(SWR.LS); } catch (x) {} } // 저장 공간이 꽉 차면 비움
+  }
+  function swrClear() { SWR.mem = {}; try { localStorage.removeItem(SWR.LS); } catch (e) {} }
+  const swrCopy = (r) => JSON.parse(JSON.stringify(r));
+  function apiRead(fn, args) {
+    const k = swrKey(fn, args), now = Date.now(), m = SWR.mem[k];
+    if (m && now - m.t < 15000 && m.t > SWR.writeAt) return Promise.resolve(swrCopy(m.r));
+    const net = (bg) => (bg ? gsCall(fn, args) : apiNet(fn, args)).then((r) => { if (r && typeof r === 'object') delete r._ms; if (r && r.ok) swrSave(k, r); return r; });
+    if (SWR_STALE.includes(fn) && now - SWR.writeAt > 120000) {
+      const c = swrAll()[k];
+      if (c && c.r && now - c.t < 7 * 86400000 && c.t > SWR.writeAt) {
+        const view = curView, old = JSON.stringify(c.r);
+        net(true).then((r) => { if (r && r.ok && JSON.stringify(r) !== old && curView === view) swrRefresh(); }).catch(() => {});
+        const out = swrCopy(c.r); out._c = 1; return Promise.resolve(out);
+      }
+    }
+    return net(false);
+  }
+  // 새 값이 오면 보고 있는 화면만 다시 그림 (입력 중이거나 창이 떠 있으면 건너뜀 · 스크롤 위치 그대로)
+  let swrT = 0;
+  function swrRefresh() {
+    clearTimeout(swrT);
+    swrT = setTimeout(() => {
+      const a = document.activeElement;
+      if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest('section.view.on')) return;
+      if (overlayOpen()) return;
+      const f = {
+        home: () => { loadNotices(true); if (window.bdRecent) window.bdRecent(); },
+        notice: () => loadNotices(true), sched: () => loadSched(), pumasi: () => loadPmList(), pmdetail: () => loadPmDetail(), pmmine: () => loadPmMine(),
+        mypage: () => openMyPage(), settle: () => { const m = $('#slMonth').value; if (m) loadSlip(m); else openSettle(); },
+        board: () => { if (bdPage === 0) loadBoard(false); }, bdpost: () => loadBdPost(true)
+      }[curView];
+      if (!f) return;
+      const y = window.scrollY;
+      try { f(); } catch (e) { return; }
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    }, 200);
+  }
+  // 홈이 뜬 뒤 뒤에서 미리 받아 두기 (자주 여는 화면 · 10분 안에 받은 게 있으면 건너뜀) → 처음 열 때도 바로 보임
+  function swrPrefetch() {
+    const tok = store.get(TOKEN); if (!tok) return;
+    const all = swrAll(), now = Date.now();
+    [['api_mySchedule', [tok]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]]].forEach((x, i) => {
+      const k = swrKey(x[0], x[1]), c = all[k];
+      if (c && now - c.t < 600000) return;
+      setTimeout(() => { if (store.get(TOKEN) === tok) gsCall(x[0], x[1]).then((r) => { if (r && r.ok) swrSave(k, r); }).catch(() => {}); }, i * 1500);
+    });
+  }
+  const api = (fn, ...args) => {
+    if (SWR_STALE.includes(fn) || SWR_FRESH.includes(fn)) return apiRead(fn, args);
+    if (!SWR_NOWRITE.includes(fn)) { SWR.writeAt = Date.now(); SWR.mem = {}; } // 저장·지원 등 → 다음 읽기는 새 값
+    return apiNet(fn, args);
   };
 
   // ───── 저장소 (자동 로그인 = localStorage, 아니면 sessionStorage) ─────
@@ -1138,13 +1209,14 @@
     setTimeout(() => { try { fsReady(); } catch (e) {} }, 0); // Firestore 준비 (홈 사본)
     if (window.pmAlertStart) setTimeout(() => window.pmAlertStart(), 0);
     if (saved) setTimeout(() => restoreView(saved), 0);
+    setTimeout(swrPrefetch, 4000);
   }
   function goLogin() {
     const last = store.get(LAST_ID);
     if (last) $('#lgId').value = last;
     show('login');
   }
-  function clearSession() { store.del(TOKEN); store.del(USER); }
+  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); }
 
   // ───── 화면 문구 (관리자앱 → 올인원 설정 → 기사앱 에서 바꿈) ─────
   // 키 = "d:화면id:기본 문구". 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. ※ 관리자앱 uiDrvScan 과 같은 규칙
@@ -1603,7 +1675,8 @@
     if (!force && Date.now() - ntAt < 30000) { renderNtCard(); return Promise.resolve(); }
     ntAt = Date.now();
     // 홈은 Firestore 사본 먼저 (공지 + 게시판 최근 글 · 오늘 만든 것만) → 없거나 못 읽으면 서버
-    const viaFs = force ? Promise.resolve(null) : fsRead(() => 'drv/' + FSR.uid.slice(2), (d) => d && d.home && d.home.today === ymdOf(new Date())).then((d) => d && d.home);
+    const hasCache = (() => { const c = swrAll()[swrKey('api_notices', [token])]; return !!(c && Date.now() - c.t < 7 * 86400000 && Date.now() - SWR.writeAt > 120000); })(); // 이 기기에 받아 둔 게 있으면 그걸 먼저 (Firestore 도 안 기다림)
+    const viaFs = force || hasCache ? Promise.resolve(null) : fsRead(() => 'drv/' + FSR.uid.slice(2), (d) => d && d.home && d.home.today === ymdOf(new Date())).then((d) => d && d.home);
     window.__homeFs = viaFs;
     return viaFs.then((h) => h ? Object.assign({ ok: true, fs: true, bd: h.bd }, { notices: h.notices }) : api('api_notices', token)).then((r) => {
       if (!r || !r.ok) return;
@@ -1612,7 +1685,7 @@
       if ($('#v-notice').classList.contains('on')) renderNtList();
       const pop = ntGet(NT_POP), first = ntList.find((n) => n.important && !pop.includes(ntKey(n)));
       if (first && $('#v-home').classList.contains('on')) showNtPop(first);
-      return r.fs ? 'fs' : '';
+      return r.fs || r._c ? 'fs' : '';
     }).catch(() => {});
   }
   function renderNtCard() {

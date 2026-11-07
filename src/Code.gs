@@ -417,7 +417,7 @@ function doPost(e) {
       if (out === undefined) out = null;
       // Firestore 사본: 읽기 전용으로 등록된 함수가 아니면(= 새로 만든 기능 포함) '데이터가 바뀌었을 수 있음' 으로 표시
       // → 개발하면서 저장 기능을 추가해도 오래된 사본이 쓰이지 않는다 (안전한 쪽이 기본)
-      if (out && out.ok !== false && FS_READ_FNS.indexOf(fn) < 0) fsMark_();
+      if (out && out.ok !== false && FS_READ_FNS.indexOf(fn) < 0) fsMark_(/^(adm_notice|adm_bd|api_bd)/.test(fn) ? 'nb' : '');
     }
   } catch (err) {
     out = { ok: false, msg: '서버 오류: ' + (err && err.message || err) };
@@ -754,7 +754,7 @@ const FS_READ_FNS = ['adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal',
   'api_changePassword', 'api_myInfo', 'api_mySchedule', 'api_mySettle', 'api_mySlip', 'api_notices', 'api_perf', 'api_ping', 'api_pmAlerts', 'api_pmAlertsRead',
   'api_pmAttach', 'api_pmAvailList', 'api_pmAvailMine', 'api_pmForm', 'api_pmJob', 'api_pmList', 'api_pmMine', 'api_pmPrice', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel'];
 /** Firestore 사본: 데이터가 바뀜 (Firebase.gs · 없으면 아무것도 안 함) */
-function fsMark_() { if (typeof fsDirty_ === 'function') fsDirty_(); }
+function fsMark_(area) { if (typeof fsDirty_ === 'function') fsDirty_(area); }
 function fail_(msg) { const e = new Error(msg); e.userMsg = msg; throw e; }
 
 // ───────────────────────── 값 정리 (사람이 직접 입력한 값도 같은 규칙으로) ─────────────────────────
@@ -1386,7 +1386,7 @@ function onSheetEdit(e) {
   if (name === TOOLS.SHEET) { onToolsEdit_(e, sh); return; }
   if (name === SCH.SHEET) { onSchEdit_(e, sh); return; }
   if (!SCHEMA[name] || name === SH.ALOG) return;
-  if (name !== SH.PERF && name !== SH.SESSIONS) fsMark_(); // 시트를 손으로 고침 → Firestore 사본은 다시 만들 때까지 안 씀
+  if (name !== SH.PERF && name !== SH.SESSIONS) fsMark_('nb'); // 시트를 손으로 고침 → Firestore 사본은 다시 만들 때까지 안 씀
   _sheets[name] = sh;
   _ss = sh.getParent();
   const r0 = e.range.getRow(), n = e.range.getNumRows();
@@ -2505,7 +2505,7 @@ function adm_noticeList(token) {
 /** 공지 추가(id 없음)·수정 */
 function adm_noticeSave(token, n) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('nb');
     n = n || {};
     const f = {
       title: str_(n.title), body: String(n.body == null ? '' : n.body).replace(/\r\n?/g, '\n').trim(),
@@ -2542,7 +2542,7 @@ function adm_noticeSave(token, n) {
 
 function adm_noticeDelete(token, id) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('nb');
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
