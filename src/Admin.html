@@ -975,7 +975,7 @@
       </div>
     </div>
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">메뉴 · 탭 · 화면 제목 · 설명서 글자를 직접 바꿉니다. <b>기능과 계산은 그대로</b>이고, 바꾼 문구를 비우면 기본 문구가 나옵니다. 화면에서 바로 고치려면 <b>✏️ 문구 편집 모드</b>를 켜세요.</p>
-    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
+    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="warn">경고 문구</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
     <div id="uiBody"></div>
    </section>
    <section id="view-taxinv" class="hidden">
@@ -5947,7 +5947,7 @@
       const tip = { drv: '기사 정보 열기', vendor: '용차업체 탭으로', slip: '정산서 열기', route: '노선관리 → 구분별 단가로' }[l.t] || '';
       return esc(m[1]) + '<a class="wlink" data-wk="' + esc(w.key) + '" data-wi="' + i + '" title="' + tip + '">' + esc(m[2]) + '</a>' + esc(m[3] || '');
     };
-    $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count +
+    $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary><span data-uik="warn:' + esc(w.key) + '">' + esc(uiWarn(w)) + '</span> · ' + w.count +
       (w.acts && w.acts.filter(Boolean).length > 1 ? ' ' + (WACT[w.key] ? wsel(w, 'all') : vsel(w.key, 'all').replace('🚚 용차업체로 지정…', '🚚 전부 한 업체로…')) : '') + '</summary><ul>' +
       w.items.map((x, i) => '<li' + (/✓ \d+월 퇴사 등록됨$/.test(x) ? ' class="wdone"' : '') + '>' + wname(w, i, x) + (w.acts && w.acts[i] ? ' ' + asel(w, i) : '') + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
     const q = $('#stQ').value.trim().toLowerCase();
@@ -7651,6 +7651,10 @@
   const UI = { map: {}, defs: {}, edit: false, tab: 'menu', draft: {}, log: null, lastHelp: '' };
   try { UI.map = JSON.parse(localStorage.getItem('runner.uiText') || '{}') || {}; } catch (e) { UI.map = {}; }
   try { UI.defs = JSON.parse(localStorage.getItem('runner.uiDefs') || '{}') || {}; } catch (e) { UI.defs = {}; }
+  // 정산관리 경고등 (Settle.gs 의 W(키, 문구) 와 같은 키) — 바꾼 문구가 있으면 그 글자로 보임
+  const ST_WARN_DEF = [['yongNoP', '품앗이 단가 없음 (노선관리 품앗이단가가 비어 있어 원래 단가로만 지급 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)'], ['yongNoP5', '외부용차단가 없음 (용차업체·외부 수행 노선의 노선관리 외부용차단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)'], ['advPrepaid', '이번 정산에 상계할 가불금인데 상환금이 이미 적혀 있어 자동 공제 안 됨 (아직 안 받은 돈이면 가불금 목록에서 상환금을 지우거나 받은 만큼만 남겨 주세요)'], ['advManual', '수기 가불금 상환 있음 · 자동 공제 건너뜀 (마감하면 가불금 목록 상환금에 기록)'], ['unreg', '기사 정보관리에 없는 쿠팡 ID (지급 계산 안 됨 — [기사에 연결] 또는 [용차업체로 지정])'], ['noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정 · 용차업체 아이디면 [용차업체로 지정])'], ['vendorNo', '용차업체 목록에 없는 업체 (아이디 관리 → 용차업체에 추가)'], ['badSub', '서브인데 메인 아이디를 찾을 수 없음 (따로 정산됨)'], ['moveNo', '아이디 사용 기록의 기사에게 본인 정산 아이디가 없음 (명의자 정산에 남김 — 서브 인원이면 [서브 인원], 따로 정산하면 [본인 정산 아이디 만들기])'], ['stopped', '정지된 아이디에 배송 기록 (퇴사자면 [퇴사 처리]로 퇴사 보류금 등록)'], ['idle', '사용 중인 아이디인데 10일 이상 배송 없음 (퇴사·휴직이면 [정지] · 퇴사면 [퇴사 처리])'], ['stoppedSub', '정지 상태인 서브 아이디에 배송 기록 (메인 아이디 정산에 합산됨 · 확인만)'], ['noCamp', '노선관리에 없는 캠프'], ['noRtPrice', '단가 미반영 — 노선이 비어 있는 줄 (기사 지급 0원 · 쿠팡 정산 파일의 수기반영 등. 아이디 사용 기록·조정으로 처리해 주세요)'], ['manual', '쿠팡 수기반영 — 반영할 줄을 골라 주세요'], ['noPrice', '단가 미입력 (노선관리 → 구분별 단가)'], ['kind', '분류 안 된 쿠팡 구분값 (stl_kinds 에 추가)'], ['adjBad', '공제·가감의 기사명을 찾을 수 없음'], ['noAcc', '계좌 미입력'], ['noBiz', '사업자번호 미입력'], ['minus', '실입금 마이너스'], ['round', '이번 차수 변동 ID'], ['yong', '용차내역 방식인데 이 달 용차 기록 없음'], ['adv', '가불금 미상계 (상계일 지남)']];
+  ST_WARN_DEF.forEach((x) => { UI.defs['warn:' + x[0]] = { def: x[1], kind: '경고 문구', where: '정산관리 → 경고등' }; });
+  const uiWarn = (w) => { const o = UI.map['warn:' + w.key]; return o && o.text ? o.text : w.label; };
   const uiFirstText = (el) => { for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) return n; return null; };
   const uiSecTitle = (el) => {
     const sec = el.closest('section[id^="view-"]'); if (!sec) return '';
@@ -7709,6 +7713,7 @@
     uiApplyAll();
     if (UI.lastHelp && $('#stEditHelp') && $('#stEditHelp').dataset.uig === UI.lastHelp) paintHelp(UI.lastHelp);
     if (currentView === 'uiset') uiRender();
+    if (currentView === 'settle' && STX.sum && STX.tab === 'list') renderStList();
   }
   function uiLoad() {
     return api('adm_uiText', false).then((r) => { if (r && r.ok) { UI.map = r.map || {}; uiRepaint(); } }).catch(() => {});
@@ -7733,13 +7738,14 @@
     const keys = [], seen = {};
     const add = (k) => { if (!seen[k]) { seen[k] = 1; keys.push(k); } };
     if (kind === 'guide') Object.keys(ST_GUIDE).forEach((n) => add('guide:' + n));
+    else if (kind === 'warn') { ST_WARN_DEF.forEach((x) => add('warn:' + x[0])); Object.keys(UI.map).forEach((k) => { if (k.startsWith('warn:')) add(k); }); }
     else if (kind === 'drv') {
       (UI.drv || []).forEach((x) => add(x.key));
       Object.keys(UI.map).forEach((k) => { if (k.startsWith('d:')) add(k); });
     } else {
       const kinds = kind === 'tab' ? ['탭'] : ['메뉴 묶음', '메뉴', '화면 제목'];
       $$('[data-uik]').forEach((el) => { const d = UI.defs[el.dataset.uik]; if (d && kinds.includes(d.kind)) add(el.dataset.uik); });
-      Object.keys(UI.defs).forEach((k) => { if (kinds.includes(UI.defs[k].kind)) add(k); });
+      Object.keys(UI.defs).forEach((k) => { if (!k.startsWith('warn:') && kinds.includes(UI.defs[k].kind)) add(k); });
       Object.keys(UI.map).forEach((k) => { if (!k.startsWith('d:') && kinds.includes(UI.map[k].kind)) add(k); });
     }
     return keys.map((k) => {
@@ -7772,6 +7778,7 @@
     $('#uiBody').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th style="width:90px">구분</th><th style="width:' + (UI.tab === 'guide' ? '34%' : '220px') + '">기본 문구</th><th>바꾼 문구 (비우면 기본)</th><th style="width:170px">메모</th><th style="width:90px"></th></tr></thead><tbody>' +
       (body || '<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">' + (q ? '"' + esc(q) + '" 에 맞는 문구가 없습니다.' : '없습니다.') + '</td></tr>') + '</tbody></table></div>' +
       (UI.tab === 'tab' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 번도 열어 보지 않은 화면의 탭은 목록에 없을 수 있어요. 그 화면을 열거나 ✏️ 문구 편집 모드로 바로 고치세요. 건수(숫자)가 붙는 탭은 바꿀 수 없습니다.</p>' : '') +
+      (UI.tab === 'warn' ? '<p class="sub" style="font-size:12px;margin-top:8px">정산관리 위쪽 경고등 제목입니다. 건수와 아래 명단은 그대로 나오고 제목 글자만 바뀝니다. 정산관리에서 ✏️ 문구 편집 모드로 경고 제목을 눌러 바로 고칠 수도 있어요.</p>' : '') +
       (UI.tab === 'drv' ? '<p class="sub" style="font-size:12px;margin-top:8px">' + (UI.drv ? '기사앱의 홈 메뉴 · 화면 제목 · 마이페이지 메뉴 · 안내 문구입니다. 저장하면 기사님이 앱을 <b>다시 열 때</b> 바뀐 글자가 보여요.' : '기사앱 문구를 불러오는 중…') + '</p>' : '') +
       (UI.tab === 'guide' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 줄 = <b>태그 | 내용</b> (예: <code>주의 | 마감한 달은 **그대로**</code>) · <code>**글자**</code> = 굵게 · 비우면 기본 설명서.</p>' : '');
   }
@@ -7787,7 +7794,7 @@
     if (c) { const k = c.dataset.ucopy, i = $('[data-uk="' + CSS.escape(k) + '"]', $('#uiBody')); if (i) { i.value = uiGuideDef(k.slice(6)); uiDraftOf(k).text = i.value; i.classList.add('ch'); i.focus(); } c.remove(); }
   });
   const uiCollect = () => Object.keys(UI.draft).map((k) => {
-    const d = UI.draft[k], r = uiRows(k.startsWith('guide:') ? 'guide' : k.startsWith('d:') ? 'drv' : (UI.defs[k] || UI.map[k] || {}).kind === '탭' ? 'tab' : 'menu').find((x) => x.key === k) || { kind: '', where: '', def: '' };
+    const d = UI.draft[k], r = uiRows(k.startsWith('guide:') ? 'guide' : k.startsWith('d:') ? 'drv' : k.startsWith('warn:') ? 'warn' : (UI.defs[k] || UI.map[k] || {}).kind === '탭' ? 'tab' : 'menu').find((x) => x.key === k) || { kind: '', where: '', def: '' };
     let text = String(d.text || '').trim(); if (text === r.def) text = '';
     return { key: k, kind: r.kind, where: r.where, def: r.def, text: text, memo: d.memo || '' };
   });
