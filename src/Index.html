@@ -511,6 +511,11 @@
           <label class="lb" for="suPhone">연락처<span class="req">*</span></label>
           <input type="tel" id="suPhone" inputmode="numeric" maxlength="13" placeholder="010-0000-0000" autocomplete="tel">
         </div>
+        <div class="field">
+          <label class="lb" for="suBiz">사업자등록번호<span class="req">*</span></label>
+          <input type="tel" id="suBiz" inputmode="numeric" maxlength="12" placeholder="000-00-00000" autocomplete="off">
+          <div class="hint">세금계산서 발행에 쓰입니다. 아래에 사업자등록증 사진도 올려 주세요.</div>
+        </div>
       </div>
 
       <div class="card">
@@ -1174,6 +1179,7 @@
   }
   const bindMask = (sel, fn) => $(sel).addEventListener('input', (e) => { e.target.value = fn(e.target.value); });
   bindMask('#suPhone', maskPhone); bindMask('#rsPhone', maskPhone);
+  bindMask('#suBiz', (v) => { const d = onlyDigits(v).slice(0, 10); return d.length > 5 ? d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5) : d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d; });
   bindMask('#suRrn', maskRrn); bindMask('#suLicNo', maskLicense);
   bindMask('#suAcc', (v) => onlyDigits(v).slice(0, 16));
   bindMask('#rsBirth', (v) => onlyDigits(v).slice(0, 6));
@@ -1392,7 +1398,7 @@
     const addr = v('#suAddr') + (v('#suAddr2') ? ' ' + v('#suAddr2') : '');
     return {
       loginId: v('#suId'), password: $('#suPw').value, name: v('#suName'), rrn: v('#suRrn'),
-      address: addr, phone: v('#suPhone'), qualDate: v('#suQualDate'), qualNo: v('#suQualNo'),
+      address: addr, phone: v('#suPhone'), bizNo: v('#suBiz'), qualDate: v('#suQualDate'), qualNo: v('#suQualNo'),
       licenseNo: v('#suLicNo'), licenseType: v('#suLicType'), carName: v('#suCar'), carYear: v('#suYear'),
       maxLoad: v('#suLoad'), bankName: v('#suBank'), account: v('#suAcc'), accountHolder: v('#suHolder'),
       agree: $('#suAgree').checked
@@ -1413,6 +1419,7 @@
     for (const [sel, val, label] of need) if (!val) return bad(sel, label + '을(를) 입력해 주세요.');
     if (onlyDigits(f.rrn).length !== 13) return bad('#suRrn', '주민등록번호 13자리를 입력해 주세요.');
     if (!/^01\d{8,9}$/.test(onlyDigits(f.phone))) return bad('#suPhone', '연락처를 확인해 주세요.');
+    if (onlyDigits(f.bizNo).length !== 10) return bad('#suBiz', '사업자등록번호 10자리를 입력해 주세요.');
     if (onlyDigits(f.licenseNo).length !== 12) return bad('#suLicNo', '운전면허 번호 12자리를 입력해 주세요.');
     if (f.account.length < 8) return bad('#suAcc', '계좌번호를 확인해 주세요.');
     const names = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };

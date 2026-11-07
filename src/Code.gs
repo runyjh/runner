@@ -1082,6 +1082,9 @@ function validateSignup_(f) {
   out.birthDate = rrn.birth;
   out.address = req_(f.address, '주소', 200);
   out.phone = fmtPhone_(f.phone);
+  const biz = digits_(req_(f.bizNo, '사업자등록번호', 20));
+  if (biz.length !== 10) fail_('사업자등록번호 10자리를 입력해 주세요.');
+  out.bizNo = biz.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3');
   out.qualDate = req_(f.qualDate, '화물운송 종사자격 취득일', 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(out.qualDate)) fail_('자격 취득일을 확인해 주세요.');
   out.qualNo = req_(f.qualNo, '화물운송 종사자격증 번호', 30);
@@ -1247,7 +1250,7 @@ function api_signup(form, files) {
       const now = nowText_();
       const pw = passwordFields_(f.password);
       const row = appendObj_(SH.DRIVERS, {
-        id: driverId, loginId: f.loginId, name: f.name, phone: f.phone, status: ST.PENDING,
+        id: driverId, loginId: f.loginId, name: f.name, phone: f.phone, bizNo: f.bizNo, status: ST.PENDING,
         birthDate: f.birthDate, rrn: maskRrn_(f.rrnDigits), address: f.address,
         qualDate: f.qualDate, qualNo: f.qualNo,
         licenseNo: maskLicense_(f.licenseDigits), licenseType: f.licenseType,
