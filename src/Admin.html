@@ -761,6 +761,8 @@
   .sg td.c.sel { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.16); }
   .sg td.c.act { outline: 2px solid var(--brand); outline-offset: -2px; }
   .sg td.c.dup { box-shadow: inset 0 0 0 2px #f59e0b; }
+  .sg td.c.duphl0 { box-shadow: inset 0 0 0 3px #f59e0b, inset 0 0 0 9999px rgba(245,158,11,.22); }
+  .sg td.c.duphl { box-shadow: inset 0 0 0 3px #e8590c, inset 0 0 0 9999px rgba(232,89,12,.28); }
   #dupTip { position: fixed; z-index: 60; display: none; background: #fff; border: 1px solid #f5c26b; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.15); padding: 8px 10px; font-size: 12px; min-width: 200px; max-width: 320px; pointer-events: none; }
   #dupTip .dtip-h { font-weight: 700; color: #b45309; margin-bottom: 4px; }
   #dupTip .dtip-r { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; border-top: 1px solid #f2f4f6; }
@@ -5047,13 +5049,21 @@
       '<div class="dtip-f">같은 날 같은 캠프·노선·회전에 2명 이상</div>';
   }
   (function () {
-    let tip = null;
-    const hide = () => { if (tip) tip.style.display = 'none'; };
+    let tip = null, cur = null;
+    // 겹치는 상대 칸들도 같은 날짜 칸에 색으로 표시 (마우스를 올린 동안)
+    const clearHl = () => { $$('#sGrid td.c.duphl, #sGrid td.c.duphl0').forEach((x) => x.classList.remove('duphl', 'duphl0')); cur = null; };
+    const hide = () => { if (tip) tip.style.display = 'none'; if (cur) clearHl(); };
     document.addEventListener('mouseover', (e) => {
       const td = e.target.closest && e.target.closest('#sGrid td.c.dup');
       if (!td) return hide();
       const r = srows[+td.dataset.r]; if (!r) return hide();
       const html = dupTipHtml(r.row, +td.dataset.c); if (!html) return hide();
+      if (cur !== td) {
+        clearHl(); cur = td; td.classList.add('duphl0');
+        const ci = +td.dataset.c, keys = new Set();
+        ((scalc.dupInfo && scalc.dupInfo.get(r.row + '|' + ci)) || []).forEach((x) => x.keys.forEach((k) => { if (k !== r.row) keys.add(k); }));
+        srows.forEach((x, i) => { if (keys.has(x.row)) { const c = $('#sGrid td.c[data-r="' + i + '"][data-c="' + ci + '"]'); if (c) c.classList.add('duphl'); } });
+      }
       if (!tip) { tip = document.createElement('div'); tip.id = 'dupTip'; document.body.appendChild(tip); }
       tip.innerHTML = html; tip.style.display = 'block';
       const rc = td.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
