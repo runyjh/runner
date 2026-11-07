@@ -5213,7 +5213,8 @@
     const box = document.createElement('div'); box.className = 'sed';
     box.style.left = (rc.left - wc.left + wrap.scrollLeft) + 'px'; box.style.top = (rc.top - wc.top + wrap.scrollTop) + 'px';
     const isDrv = r.kind === 'd';
-    box.style.minWidth = Math.max(rc.width, isDrv ? 330 : 170) + 'px';
+    if (isDrv) box.style.width = '330px'; // 기사 칸 편집기는 크기 고정 (칸 너비와 상관없이)
+    else box.style.minWidth = Math.max(rc.width, 170) + 'px';
     box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea>' + (isDrv ? '<div class="spk"></div>' : '') + '<div class="sug"></div>' +
       (isDrv ? '<div class="sinst"><label>📌 지시사항 <small>기사스케줄 칸에 표시 (마우스를 올리면 보임)</small></label><textarea class="instta" rows="2" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량"></textarea></div>' : '') +
       '<div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
