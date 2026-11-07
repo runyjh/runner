@@ -123,7 +123,9 @@
   .uitbl td { vertical-align: middle; } .uitbl td.w { color: var(--sub); font-size: 12px; white-space: nowrap; } .uitbl td.d { color: #8b95a1; }
   .uitbl input.inp, .uitbl textarea.inp { height: 34px; } .uitbl textarea.inp { height: auto; min-height: 90px; padding: 8px 10px; line-height: 1.55; font-size: 12.5px; resize: vertical; }
   .uitbl .ch { border-color: var(--brand); background: var(--brand-weak); font-weight: 600; }
-  .uitbl tr.grp td { background: #fafbfc; font-weight: 700; font-size: 12px; color: #4e5968; }
+  .uitbl tr.grp td { background: #fafbfc; font-weight: 700; font-size: 13px; color: #333d4b; cursor: pointer; user-select: none; padding: 10px 12px; } .uitbl tr.grp:hover td { background: #f2f4f6; }
+  .uitbl tr.grp .car { display: inline-block; width: 14px; color: var(--sub); } .uitbl tr.grp small { color: var(--sub); font-weight: 500; margin-left: 6px; } .uitbl tr.grp small b { color: var(--brand); }
+  .uitools { margin: 0 0 8px; font-size: 12px; } .uitools .rs { color: var(--brand); background: none; border: 0; padding: 0; cursor: pointer; font-size: 12px; } .uitools .sub { margin-left: 8px; }
   .uitbl .rs { color: var(--brand); font-size: 12px; white-space: nowrap; cursor: pointer; background: none; border: 0; padding: 0; }
   .uitbl pre { margin: 0; white-space: pre-wrap; font: inherit; font-size: 12px; color: #6b7684; line-height: 1.55; }
   body.ui-edit [data-uik], body.ui-edit [data-uig] { outline: 1.5px dashed #f59f00; outline-offset: 2px; border-radius: 4px; cursor: text !important; }
@@ -7793,16 +7795,23 @@
       return;
     }
     const rows = uiRows(UI.tab).filter((r) => !q || (r.def + ' ' + r.text + ' ' + r.where + ' ' + r.memo).toLowerCase().includes(q));
+    // 무리(위치)별로 접기 — 기본은 접힘, 검색 중이면 모두 펼침
+    const open = UI.open || (UI.open = new Set()), gk = (w) => UI.tab + '|' + w, gs = {};
+    rows.forEach((r) => { const g = gs[r.where] || (gs[r.where] = { n: 0, ch: 0 }); g.n++; if (r.text) g.ch++; });
+    const isOpen = (w) => !!q || open.has(gk(w));
     let last = '';
     const body = rows.map((r) => {
-      const grp = r.where !== last ? '<tr class="grp"><td colspan="5">' + esc(r.where) + '</td></tr>' : ''; last = r.where;
+      const g = gs[r.where], op = isOpen(r.where);
+      const grp = r.where !== last ? '<tr class="grp' + (op ? ' op' : '') + '" data-ug="' + esc(r.where) + '"><td colspan="5"><span class="car">' + (op ? '▾' : '▸') + '</span> ' + esc(r.where) + ' <small>' + g.n + '개' + (g.ch ? ' · <b>바꾼 것 ' + g.ch + '</b>' : '') + '</small></td></tr>' : ''; last = r.where;
+      if (!op) return grp;
       const inp = r.kind === '설명서'
         ? '<textarea class="inp' + (r.text ? ' ch' : '') + '" data-uk="' + esc(r.key) + '" rows="' + Math.max(4, r.def.split('\n').length + 1) + '" placeholder="비우면 기본 설명서 · 한 줄 = 태그 | 내용 · **굵게**">' + esc(r.text) + '</textarea>'
         : '<input class="inp' + (r.text ? ' ch' : '') + '" data-uk="' + esc(r.key) + '" value="' + esc(r.text) + '" placeholder="' + esc(r.def) + '">';
       return grp + '<tr data-row="' + esc(r.key) + '"><td class="w">' + esc(r.kind) + '</td><td class="d">' + (r.kind === '설명서' ? '<pre>' + esc(r.def) + '</pre>' : esc(r.def)) + '</td><td>' + inp + '</td>' +
         '<td><input class="inp" data-um="' + esc(r.key) + '" value="' + esc(r.memo) + '" placeholder="메모"></td><td>' + (r.text ? '<button class="rs" data-ur="' + esc(r.key) + '">↺ 기본값</button>' : '') + (r.kind === '설명서' && !r.text ? '<button class="rs" data-ucopy="' + esc(r.key) + '">기본 내용 복사해 고치기</button>' : '') + '</td></tr>';
     }).join('');
-    $('#uiBody').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th style="width:90px">구분</th><th style="width:' + (UI.tab === 'guide' ? '34%' : '220px') + '">기본 문구</th><th>바꾼 문구 (비우면 기본)</th><th style="width:170px">메모</th><th style="width:90px"></th></tr></thead><tbody>' +
+    const ng = Object.keys(gs).length;
+    $('#uiBody').innerHTML = (ng > 1 && !q ? '<div class="uitools"><button class="rs" data-uall="1">모두 펼치기</button> · <button class="rs" data-uall="0">모두 접기</button> <span class="sub">' + ng + '개 무리 · 줄을 누르면 펼쳐집니다</span></div>' : '') + '<div class="table-wrap"><table class="uitbl"><thead><tr><th style="width:90px">구분</th><th style="width:' + (UI.tab === 'guide' ? '34%' : '220px') + '">기본 문구</th><th>바꾼 문구 (비우면 기본)</th><th style="width:170px">메모</th><th style="width:90px"></th></tr></thead><tbody>' +
       (body || '<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">' + (q ? '"' + esc(q) + '" 에 맞는 문구가 없습니다.' : '없습니다.') + '</td></tr>') + '</tbody></table></div>' +
       (UI.tab === 'tab' ? '<p class="sub" style="font-size:12px;margin-top:8px">한 번도 열어 보지 않은 화면의 탭은 목록에 없을 수 있어요. 그 화면을 열거나 ✏️ 문구 편집 모드로 바로 고치세요. 건수(숫자)가 붙는 탭은 바꿀 수 없습니다.</p>' : '') +
       (UI.tab === 'form' ? '<p class="sub" style="font-size:12px;margin-top:8px">창(기사 정보 · 배번호 · 각종 등록 창)의 칸 제목 · 설명 · 입력칸 이름 · 표 머리글입니다. <b>한 번 열어 본 창</b>만 목록에 나와요 — 안 보이면 그 창을 열거나 ✏️ 문구 편집 모드로 바로 고치세요. 선택 버튼(승인·정지·재직 등)과 드롭다운 선택지는 저장 값이라 바꿀 수 없습니다.</p>' : '') +
@@ -7817,6 +7826,13 @@
     if (t.dataset.uk) { d.text = t.value; t.classList.toggle('ch', !!t.value.trim()); } else d.memo = t.value;
   });
   $('#uiBody').addEventListener('click', (e) => {
+    const gr = e.target.closest('tr[data-ug]'), al = e.target.closest('[data-uall]');
+    if (gr || al) {
+      const open = UI.open || (UI.open = new Set());
+      if (gr) { const k = UI.tab + '|' + gr.dataset.ug; if (open.has(k)) open.delete(k); else open.add(k); }
+      else $$('#uiBody tr[data-ug]').forEach((t) => { const k = UI.tab + '|' + t.dataset.ug; if (al.dataset.uall === '1') open.add(k); else open.delete(k); });
+      return uiRender();
+    }
     const r = e.target.closest('[data-ur]'), c = e.target.closest('[data-ucopy]');
     if (r) { uiDraftOf(r.dataset.ur).text = ''; const i = $('[data-uk="' + CSS.escape(r.dataset.ur) + '"]', $('#uiBody')); if (i) { i.value = ''; i.classList.remove('ch'); } r.remove(); }
     if (c) { const k = c.dataset.ucopy, i = $('[data-uk="' + CSS.escape(k) + '"]', $('#uiBody')); if (i) { i.value = uiGuideDef(k.slice(6)); uiDraftOf(k).text = i.value; i.classList.add('ch'); i.focus(); } c.remove(); }
