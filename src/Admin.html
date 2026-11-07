@@ -5329,12 +5329,12 @@
     }
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
     const renderSug = () => {
-      const list = suggestions(r, ta.value === sget(r.row, dt) && initial == null ? '' : ta.value);
+      const list = suggestions(r, sEdit.noFilter || (ta.value === sget(r.row, dt) && initial == null) ? '' : ta.value);
       sEdit.list = list; sEdit.idx = Math.min(sEdit.idx, list.length - 1);
       box.querySelector('.sug').innerHTML = list.map((x, i) => '<button type="button" data-i="' + i + '" class="' + cellKind(x.v) + (i === sEdit.idx ? ' on' : '') + '">' +
         esc(x.v) + (x.hint ? '<small>' + esc(x.hint) + '</small>' : '') + '</button>').join('');
     };
-    ta.addEventListener('input', () => { grow(); sEdit.idx = -1; renderSug(); });
+    ta.addEventListener('input', () => { grow(); sEdit.idx = -1; sEdit.noFilter = false; renderSug(); });
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); closeEdit(); $('#sWrap').focus({ preventScroll: true }); }
       else if (e.key === 'Enter' && e.altKey) { e.preventDefault(); const p = ta.selectionStart; ta.value = ta.value.slice(0, p) + '\n' + ta.value.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = p + 1; grow(); }
@@ -5354,7 +5354,7 @@
       if (it.fill) { // 업무등록·서브아이디: 고른 라우트(없으면 기본노선) + (아이디) + 업무등록 → 편집 칸에만 넣음
         const pv = pk && pkCompose && pk.units.length && !pk.special ? pkCompose() : '';
         ta.value = ((pv || it.fill.rt) ? (pv || it.fill.rt) + ' ' : '') + '(' + it.fill.id + ') 업무등록';
-        grow(); sEdit.idx = -1; renderSug();
+        grow(); sEdit.idx = -1; sEdit.noFilter = true; renderSug(); // 채운 뒤에도 버튼 목록은 그대로 (다른 아이디로 바꿔 고를 수 있게)
         setTimeout(() => { ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; }, 0);
         return;
       }
