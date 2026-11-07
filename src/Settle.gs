@@ -163,7 +163,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261107f';
+const STL_CALC_VER = '20261107g';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -1330,7 +1330,7 @@ function stlCompute_(month) {
     let pay = 0;
     const mkey = kind === '수기반영' ? [stlLogin_(r.cid), r.date, stlShort_(camp), normCode_(r.route), qty, total].join('|') : '';
     if (kind === '수기반영' && !manualOn[mkey]) {
-      warn.manual.push({ on: false, key: mkey, label: '⬜ 미반영 · ' + s.name + ' · ' + String(r.date).slice(5) + ' · ' + (camp || '') + ' ' + (normCode_(r.route) || '노선 없음') + ' · ' + won_(qty) + '건 (쿠팡 ' + won_(sales) + '원)' });
+      warn.manual.push({ on: false, key: mkey, sid: s.id, label: '⬜ 미반영 · ' + s.name + ' · ' + String(r.date).slice(5) + ' · ' + (camp || '') + ' ' + (normCode_(r.route) || '노선 없음') + ' · ' + won_(qty) + '건 (쿠팡 ' + won_(sales) + '원)' });
     } else if (kind === '배송' || kind === '수기반영') {
       const u = stlUnit_(ctx, uIdx, r, worker);
       const wk = s.workers[worker || '_'] || (s.workers[worker || '_'] = { qty: 0, amt: 0, dates: {}, cids: {} });
@@ -1340,6 +1340,7 @@ function stlCompute_(month) {
         w.qty += qty; s.noPriceQty += qty; if (kind === '수기반영') w.manual += qty;
       } else if (qty && !r.route && !(u.u > 0)) {
         // 노선이 비어 단가를 못 찾은 줄 (쿠팡 수기반영에 흔함) → 기사 지급 0원 · 경고
+        (warn.noRtPriceL = warn.noRtPriceL || []).push({ t: 'slip', id: s.id });
         warn.noRtPrice.push(s.name + ' · ' + String(r.date).slice(5) + ' · ' + (camp || '캠프 없음') + ' · ' + kind + ' ' + won_(qty) + '건 (쿠팡 ' + won_(sales) + '원)');
         s.noPriceQty += qty;
       }
@@ -1348,7 +1349,7 @@ function stlCompute_(month) {
       const base = stlR0_(qty * u.u), inc = stlR0_(qty * incU);
       s.base += base; s.inc += inc; s.qty += qty; pay = base + inc;
       // 쿠팡 수기반영: 배송 기본에 그대로 합침 (정산서에 따로 안 보임) · 관리자 확인용 목록만
-      if (kind === '수기반영') warn.manual.push({ on: true, key: mkey, label: '✅ 반영 · ' + s.name + ' · ' + String(r.date).slice(5) + ' · ' + (camp || '') + ' ' + (normCode_(r.route) || '노선 없음') + ' · ' + won_(qty) + '건 × ' + won_(u.u + incU) + ' = ' + won_(pay) + '원 (쿠팡 ' + won_(sales) + '원)' });
+      if (kind === '수기반영') warn.manual.push({ on: true, key: mkey, sid: s.id, label: '✅ 반영 · ' + s.name + ' · ' + String(r.date).slice(5) + ' · ' + (camp || '') + ' ' + (normCode_(r.route) || '노선 없음') + ' · ' + won_(qty) + '건 × ' + won_(u.u + incU) + ' = ' + won_(pay) + '원 (쿠팡 ' + won_(sales) + '원)' });
       wk.qty += qty; wk.amt += pay; wk.dates[r.date] = 1; wk.cids[r.cid] = 1;
       if (qty && r.date >= P.from && r.date <= P.to) ((s.cidDays[login] = s.cidDays[login] || {}))[r.date] = 1;
       const rk = camp + '|' + normCode_(r.route) + '|' + u.u + '|' + incU;
@@ -1699,7 +1700,9 @@ function stlCompute_(month) {
     const nm = x && x.ownerName ? x.ownerName : d ? d.name : '';
     return c + ' (' + (nm || '이름 미확인') + ')';
   };
-  const W = function (key, label, list, level, acts) { const n = key === 'manual' ? 1000 : 50; if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, n), level: level || 'warn', acts: acts ? acts.slice(0, n) : null }); };
+  // links[i] = 그 줄 이름을 누르면 갈 곳 { t: 'drv'(기사 정보), id } · { t: 'vendor' } (용차업체) · { t: 'slip', id } (정산서) · { t: 'route' } (노선관리)
+  const W = function (key, label, list, level, acts, links) { const n = key === 'manual' ? 1000 : 50; if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, n), level: level || 'warn', acts: acts ? acts.slice(0, n) : null, links: links ? links.slice(0, n) : null }); };
+  const lnk = function (d) { return d.vendor ? { t: 'vendor' } : d.ownerId ? { t: 'drv', id: d.ownerId } : { t: 'slip', id: d.id }; };
   W('yongNoP', '품앗이 단가 없음 (노선관리 품앗이단가가 비어 있어 원래 단가로만 지급 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP, 'warn');
   W('yongNoP5', '외부용차단가 없음 (용차업체·외부 수행 노선의 노선관리 외부용차단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP5, 'warn');
   W('advPrepaid', '이번 정산에 상계할 가불금인데 상환금이 이미 적혀 있어 자동 공제 안 됨 (아직 안 받은 돈이면 가불금 목록에서 상환금을 지우거나 받은 만큼만 남겨 주세요)', advPrepaid, 'warn');
@@ -1754,17 +1757,18 @@ function stlCompute_(month) {
     return cidNm(c) + ' → 메인 ' + (g ? String(g.cid).replace(/@.*$/, '') + (g.ownerId && D.byId[g.ownerId] ? ' (' + D.byId[g.ownerId].name + ')' : '') : '');
   }), 'sub');
   W('noCamp', '노선관리에 없는 캠프', Object.keys(warn.noCamp), 'bad');
-  W('noRtPrice', '단가 미반영 — 노선이 비어 있는 줄 (기사 지급 0원 · 쿠팡 정산 파일의 수기반영 등. 아이디 사용 기록·조정으로 처리해 주세요)', warn.noRtPrice, 'warn');
+  W('noRtPrice', '단가 미반영 — 노선이 비어 있는 줄 (기사 지급 0원 · 쿠팡 정산 파일의 수기반영 등. 아이디 사용 기록·조정으로 처리해 주세요)', warn.noRtPrice, 'warn', null, warn.noRtPriceL);
   W('manual', '쿠팡 수기반영 — 반영할 줄을 골라 주세요 (반영하면 배송 기본에 포함 · 정산서에는 따로 안 보임 · 미반영 ' + warn.manual.filter(function (x) { return !x.on; }).length + '줄)',
     warn.manual.map(function (x) { return x.label; }), warn.manual.some(function (x) { return !x.on; }) ? 'warn' : 'info',
-    warn.manual.map(function (x) { return { kind: 'manual', key: x.key, on: x.on, label: x.label.replace(/^[✅⬜] /, '') }; }));
+    warn.manual.map(function (x) { return { kind: 'manual', key: x.key, on: x.on, label: x.label.replace(/^[✅⬜] /, '') }; }), warn.manual.map(function (x) { return { t: 'slip', id: x.sid }; }));
   W('noPrice', '단가 미입력 (노선관리 → 구분별 단가)', Object.keys(warn.noPrice).map(function (k) {
     const w = warn.noPrice[k]; return w.camp + ' ' + w.route + (w.type ? ' · ' + w.type + '단가' : '') + ' · ' + won_(w.qty) + '건' + (w.manual ? ' (수기반영 ' + won_(w.manual) + '건)' : '') + (w.routeKnown ? '' : ' (노선 미등록)');
-  }), 'bad');
+  }), 'bad', null, Object.keys(warn.noPrice).map(function (k) { return { t: 'route', camp: warn.noPrice[k].camp, route: warn.noPrice[k].route }; }));
   W('kind', '분류 안 된 쿠팡 구분값 (stl_kinds 에 추가)', Object.keys(warn.kind).map(function (k) { return k + ' ' + warn.kind[k] + '줄'; }));
   W('adjBad', '공제·가감의 기사명을 찾을 수 없음', adjBad);
-  W('noAcc', '계좌 미입력', drivers.filter(function (d) { return d.net > 0 && !d.hasAccount; }).map(function (d) { return d.name; }));
-  W('noBiz', '사업자번호 미입력', drivers.filter(function (d) { return d.invoice > 0 && !d.bizNo && d.mode !== '용차내역'; }).map(function (d) { return d.name; }), 'info');
+  const noAcc = drivers.filter(function (d) { return d.net > 0 && !d.hasAccount; }), noBiz = drivers.filter(function (d) { return d.invoice > 0 && !d.bizNo && d.mode !== '용차내역'; });
+  W('noAcc', '계좌 미입력', noAcc.map(function (d) { return d.name; }), 'warn', null, noAcc.map(lnk));
+  W('noBiz', '사업자번호 미입력', noBiz.map(function (d) { return d.name; }), 'info', null, noBiz.map(lnk));
   W('minus', '실입금 마이너스', drivers.filter(function (d) { return d.net < 0; }).map(function (d) { return d.name + ' ' + won_(d.net); }), 'bad');
   W('round', '이번 차수 변동 ID', rounds.changed.map(function (x) { return cidNm(x.cid) + ' ' + (x.diff > 0 ? '+' : '') + won_(x.diff); }), 'info');
   W('yong', '용차내역 방식인데 이 달 용차 기록 없음', drivers.filter(function (d) { return d.mode === '용차내역' && !S[d.id].yongLines.length && S[d.id].qty; }).map(function (d) { return d.name + ' ' + won_(S[d.id].qty) + '건'; }));

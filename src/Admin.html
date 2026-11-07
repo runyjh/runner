@@ -5903,9 +5903,16 @@
         opts.filter((o) => !(a && a.leave && /^leave/.test(o[0]))).map((o) => '<option value="' + o[0] + '">' + esc(o[0] === 'sub' && a && a.owner ? '서브 인원 · 명의자(' + a.owner + ') 정산에 그대로 포함' : o[0] === 'ownId' && a ? '본인 정산 아이디 만들기 · ' + a.name + ' 정산서로 옮김' : o[1]) + '</option>').join('') + '</select>';
     };
     const asel = (w, i) => (WACT[w.key] ? wsel(w, i) : vsel(w.key, i));
+    // 경고 줄의 이름(앞부분)을 눌러 바로 입력하는 곳으로 간다 — 기사 정보 · 용차업체 · 정산서 · 노선관리
+    const wname = (w, i, x) => {
+      const l = w.links && w.links[i]; if (!l) return esc(x);
+      const m = String(x).match(/^((?:[✅⬜] [^·]+· )?)([^·(]+?)(\s*[·(].*)?$/) || ['', '', String(x), ''];
+      const tip = { drv: '기사 정보 열기', vendor: '용차업체 탭으로', slip: '정산서 열기', route: '노선관리 → 구분별 단가로' }[l.t] || '';
+      return esc(m[1]) + '<a class="wlink" data-wk="' + esc(w.key) + '" data-wi="' + i + '" title="' + tip + '">' + esc(m[2]) + '</a>' + esc(m[3] || '');
+    };
     $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary>' + esc(w.label) + ' · ' + w.count +
       (w.acts && w.acts.filter(Boolean).length > 1 ? ' ' + (WACT[w.key] ? wsel(w, 'all') : vsel(w.key, 'all').replace('🚚 용차업체로 지정…', '🚚 전부 한 업체로…')) : '') + '</summary><ul>' +
-      w.items.map((x, i) => '<li' + (/✓ \d+월 퇴사 등록됨$/.test(x) ? ' class="wdone"' : '') + '>' + esc(x) + (w.acts && w.acts[i] ? ' ' + asel(w, i) : '') + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
+      w.items.map((x, i) => '<li' + (/✓ \d+월 퇴사 등록됨$/.test(x) ? ' class="wdone"' : '') + '>' + wname(w, i, x) + (w.acts && w.acts[i] ? ' ' + asel(w, i) : '') + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
     const q = $('#stQ').value.trim().toLowerCase();
     const list = s.drivers.filter((d) => !q || d.name.toLowerCase().includes(q) || d.cids.some((x) => x.toLowerCase().includes(q)) || (d.workers || []).some((x) => x.toLowerCase().includes(q)));
     STX.slipIds = list.map((d) => d.id);
@@ -6959,7 +6966,31 @@
   onSearch($('#stQ'), renderStList);
   $('#stKpi').addEventListener('click', (e) => { if (e.target.closest('#stKpiNet')) stShowTab('pnl'); });
   // 경고창: 미등록·명의자 없는 아이디 → 용차업체 아이디로 한 번에 지정
-  $('#stWarn').addEventListener('click', (e) => { if (e.target.closest('.vset')) e.preventDefault(); });
+  $('#stWarn').addEventListener('click', (e) => {
+    if (e.target.closest('.vset')) e.preventDefault();
+    const a = e.target.closest('.wlink'); if (!a) return;
+    e.preventDefault();
+    const w = ((STX.sum || {}).warnings || []).find((x) => x.key === a.dataset.wk), l = w && w.links && w.links[+a.dataset.wi];
+    if (!l) return;
+    if (l.t === 'drv') openDrawer(l.id);
+    else if (l.t === 'vendor') stShowTab('vendors');
+    else if (l.t === 'slip') { if (STX.slipIds.indexOf(l.id) < 0) STX.slipIds.push(l.id); openSlip(l.id); }
+    else if (l.t === 'route') goRoutePrice(l.camp, l.route);
+  });
+  // 노선관리 → 그 캠프의 구분별 단가 탭으로 (노선 코드로 검색해 둔다)
+  function goRoutePrice(camp, route) {
+    rtab = 'prices'; $('#campQ').value = '';
+    switchView('route');
+    let n = 0;
+    const t = setInterval(() => {
+      if (!RT.camps.length && ++n < 40) return;
+      clearInterval(t);
+      const c = RT.camps.find((x) => x.name === camp) || RT.camps.find((x) => normCode(x.name).includes(normCode(camp)) || normCode(camp).includes(normCode(x.name)));
+      if (c && c.id !== curCamp) { curCamp = c.id; resetFilters(); rsel.clear(); pdirty = {}; }
+      if (route) rtf.q = normCode(route);
+      renderCampList(); renderCampMain();
+    }, 250);
+  }
   $('#stWarn').addEventListener('change', (e) => {
     const t0 = e.target.closest('.wact');
     if (t0) {
