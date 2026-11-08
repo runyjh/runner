@@ -483,7 +483,13 @@ function adm_lineageSuggest(token) {
         Object.keys(camps).forEach(function (camp) {
           const A = Object.keys(a.camps[camp] || {}), Bc = Object.keys(b.camps[camp] || {});
           const gone = A.filter(function (x) { return Bc.indexOf(x) < 0; }), fresh = Bc.filter(function (x) { return A.indexOf(x) < 0; });
-          if (!gone.length || !fresh.length) return;
+          const grp0 = function (list) { const g = {}; list.forEach(function (x) { const m = x.match(/^(\d+)([A-Z]*)$/); if (!m) return; (g[m[1]] = g[m[1]] || []).push(m[2]); }); Object.keys(g).forEach(function (k) { g[k].sort(); }); return g; };
+          if (!gone.length || !fresh.length) { // 한쪽만 있으면 다른 캠프와 맞춰 볼 후보로만 둔다 (캠프 간 이관)
+            const G0 = grp0(gone), F0 = grp0(fresh);
+            Object.keys(G0).forEach(function (gn) { leftover.gone.push({ camp: camp, num: gn, L: G0[gn] }); });
+            Object.keys(F0).forEach(function (fn) { leftover.fresh.push({ camp: camp, num: fn, L: F0[fn] }); });
+            return;
+          }
           const grp = function (list) { const g = {}; list.forEach(function (x) { const m = x.match(/^(\d+)([A-Z]*)$/); if (!m) return; (g[m[1]] = g[m[1]] || []).push(m[2]); }); Object.keys(g).forEach(function (k) { g[k].sort(); }); return g; };
           const G = grp(gone), F = grp(fresh), usedF = {};
           const pairs = [];
