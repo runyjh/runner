@@ -88,7 +88,8 @@
   .db-list { margin: 0; padding: 0; list-style: none; font-size: 13px; } .db-list li { display: flex; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); min-width: 0; }
   .db-list li:first-child { border-top: 0; } .db-list .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .db-list .m { color: var(--faint); font-size: 12px; white-space: nowrap; }
   .db-list li.done .t { color: var(--faint); text-decoration: line-through; }
-  .db-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .db-tbl { width: 100%; min-width: 0; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .db-card { overflow: hidden; }
   .db-tbl th, .db-tbl td { padding: 4px 6px; text-align: right; border-top: 1px solid var(--line); white-space: nowrap; }
   .db-tbl th:first-child, .db-tbl td:first-child { text-align: left; } .db-tbl thead th { border-top: 0; color: var(--sub); font-weight: 600; font-size: 11.5px; }
   .db-tbl tr.today td { background: var(--cw); font-weight: 700; } .db-tbl td.sun { color: var(--danger); } .db-tbl td.neg { color: var(--danger); }
@@ -2784,7 +2785,7 @@
       const c = a.sched; if (!c || c.err) return '<div class="db-empty">' + esc((c && c.err) || '스케줄을 읽지 못했습니다.') + '</div>';
       const t = c.days[0] || {};
       return '<div class="db-kpis">' + dbKpi('오늘 업무', dbN(t.work), 'hot') + dbKpi('휴무·휴가', dbN(t.off)) + dbKpi('병가', dbN(t.sick)) + dbKpi('미입차', dbN(t.mi), t.mi ? 'bad' : '') + dbKpi('용차', dbN(t.yong)) + dbKpi('빈 칸', dbN(t.empty), t.empty ? 'bad' : '') + '</div>' +
-        '<table class="db-tbl"><thead><tr><th>날짜</th><th>업무</th><th>휴무·휴가</th><th>병가</th><th>미입차</th><th>용차</th><th>빈 칸</th></tr></thead><tbody>' +
+        '<table class="db-tbl" data-tk-off><thead><tr><th>날짜</th><th>업무</th><th>휴무·휴가</th><th>병가</th><th>미입차</th><th>용차</th><th>빈 칸</th></tr></thead><tbody>' +
         c.days.map((x, i) => { const dd = dbDay(x.date); return '<tr' + (i === 0 ? ' class="today"' : '') + '><td class="' + (dd.sun || x.holiday ? 'sun' : '') + '">' + dd.t + (x.holiday ? ' ' + esc(x.holiday) : '') + '</td><td>' + x.work + '</td><td>' + x.off + '</td><td>' + x.sick + '</td><td>' + x.mi + '</td><td>' + x.yong + '</td><td' + (x.empty ? ' class="neg"' : '') + '>' + x.empty + '</td></tr>'; }).join('') +
         '</tbody></table><div class="db-chips">' + (c.issues ? '<span class="warn">다가오는 이슈 ' + c.issues + '건</span>' : '') + (c.rcWait ? '<span>노선 이관 예약 ' + c.rcWait + '건</span>' : '') + '<span><i>빈 칸</i>배정 캠프가 있는 재직 기사 중 칸이 비어 있는 수</span></div>';
     }
@@ -2802,7 +2803,7 @@
     if (v === 'route') {
       const r = a.route;
       return '<div class="db-kpis">' + dbKpi('캠프', dbN(r.camps), 'hot') + dbKpi('사용 노선', dbN(r.routes)) + dbKpi('정지 노선', dbN(r.routesOff)) + dbKpi('노선 변경 예약', dbN(r.rcWait), r.rcWait ? 'hot' : '') + '</div>' +
-        '<table class="db-tbl"><thead><tr><th>캠프</th><th>사용 노선</th><th>배정 기사</th></tr></thead><tbody>' +
+        '<table class="db-tbl" data-tk-off><thead><tr><th>캠프</th><th>사용 노선</th><th>배정 기사</th></tr></thead><tbody>' +
         r.byCamp.slice(0, 8).map((c) => '<tr><td>' + esc(c.name) + '</td><td>' + c.routes + '</td><td>' + c.drivers + '</td></tr>').join('') + '</tbody></table>' +
         (r.byCamp.length > 8 ? '<div class="db-note">외 ' + (r.byCamp.length - 8) + '개 캠프</div>' : '');
     }
@@ -2822,7 +2823,7 @@
     if (v === 'settle' && go === 'pnl') {
       const rows = [['쿠팡 매출 (공급가)', 'salesSupply'], ['기사 매입 (공급가)', 'drvSupply'], ['정산 수익', 'profit'], ['직원 급여', 'staff'], ['운영비', 'cost'], ['순이익', 'net']];
       const ms = s.months.slice().reverse();
-      return '<table class="db-tbl"><thead><tr><th></th>' + ms.map((m) => '<th>' + dbMon(m.month) + (m.closed ? ' (마감)' : m.hasData ? ' (진행 중)' : '') + '</th>').join('') + '</tr></thead><tbody>' +
+      return '<table class="db-tbl" data-tk-off><thead><tr><th></th>' + ms.map((m) => '<th>' + dbMon(m.month) + (m.closed ? ' (마감)' : m.hasData ? ' (진행 중)' : '') + '</th>').join('') + '</tr></thead><tbody>' +
         rows.map(([l, k]) => '<tr' + (k === 'net' ? ' class="today"' : '') + '><td>' + l + '</td>' + ms.map((m) => '<td class="' + (m[k] < 0 ? 'neg' : '') + '">' + (m.hasData ? dbWon(m[k]) : '—') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' +
         '<div class="db-note">진행 중인 달은 지금까지 올린 정산서 기준 추정치입니다. 자세한 내용은 손익 화면에서.</div>';
     }
