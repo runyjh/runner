@@ -5882,9 +5882,9 @@
     return upRes.dups;
   }
   function upTabsRender() {
-    // 주차(일~토) 탭: '1주차 (11/2~11/8) 출근 170건' — 한 주 시작은 항상 일요일
+    // 주차(일~토) 탭: '2주차 (11/8~11/14) 출근 170건' — 한 주 시작은 항상 일요일 · 그 주 일요일이 든 달의 N주차 (표 머리글과 같은 셈법)
     const md = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
-    const t = (upRes.weeks || []).map((rows, i) => { const ds = upRes.dates.slice(i * 7, i * 7 + 7); return ['w' + (i + 1), (i + 1) + '주차 (' + md(ds[0]) + '~' + md(ds[ds.length - 1]) + ') 출근', '건']; })
+    const t = (upRes.weeks || []).map((rows, i) => { const ds = upRes.dates.slice(i * 7, i * 7 + 7); return ['w' + (i + 1), (ds[0] ? weekOfMonth(ds[0]) : i + 1) + '주차 (' + md(ds[0]) + '~' + md(ds[ds.length - 1]) + ') 출근', '건']; })
       .filter((x, i) => (upRes.weeks[i] || []).length || i < 2)
       .concat([['mi', '미입차', '건'], ['dup', '중복', '건']]);
     $('#upTabs').innerHTML = t.map(([k, l, u]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
