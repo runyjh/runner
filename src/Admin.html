@@ -2747,6 +2747,8 @@
 
   // ───── 대시보드: 메뉴별 요약 (카드를 누르면 그 메뉴로) ─────
   const DB = { a: null, s: null, busy: 0, at: '' };
+  // 지난번 요약을 먼저 보여 주고(이 기기에 기억) 뒤에서 새로 받아 바꾼다
+  try { const c = JSON.parse(localStorage.getItem('runner.dash') || 'null'); if (c) { DB.a = c.a; DB.s = c.s; DB.at = c.at; } } catch (e) {}
   const DB_CARDS = [
     ['drivers', '', 'g-drv'], ['sched', '', 'g-drv', 1], ['pumasi', '', 'g-drv'], ['bib', '', 'g-drv'],
     ['route', '', 'g-ops'], ['memo', '', 'g-ops'],
@@ -2814,7 +2816,7 @@
         const st = m.closed ? '<span>마감 ' + esc(String(m.closed).slice(5, 16)) + '</span>' : m.hasData ? '<span class="warn">진행 중' + (m.round ? ' · ' + esc(m.round) + '회차' : '') + '</span>' : '<span>정산서 아직 없음</span>';
         return '<div><div class="db-note" style="margin-bottom:5px"><b style="color:var(--ink)">' + dbMon(m.month) + ' 정산</b>' + (m.period ? ' · ' + esc(String(m.period.from || '').slice(5)) + ' ~ ' + esc(String(m.period.to || '').slice(5)) : '') + '</div>' +
           '<div class="db-kpis">' + dbKpi('정산 기사', dbN(m.drivers), 'sm') + dbKpi('물량', dbN(m.qty), 'sm') + dbKpi('경고', dbN(m.warnN), 'sm' + (m.warnN ? ' bad' : '')) + '</div>' +
-          '<div class="db-chips" style="margin-top:6px">' + st + m.warnKinds.map((w) => '<span class="bad">' + esc(w) + '</span>').join('') + '</div></div>';
+          '<div class="db-chips" style="margin-top:6px">' + st + m.warnKinds.map((w) => '<span class="bad" title="' + esc(w) + '">' + esc(String(w).split(/ — | \(/)[0].slice(0, 28)) + ' ' + esc(String(w).match(/\d+$/) ? String(w).match(/\d+$/)[0] : '') + '</span>').join('') + '</div></div>';
       }).join('<hr style="border:0;border-top:1px solid var(--line);margin:2px 0">');
     }
     if (v === 'settle' && go === 'pnl') {
@@ -2847,14 +2849,16 @@
       const a = dbNav(v, go); if (!a) return '';
       return '<div class="db-card ' + g + (wide ? ' wide' : '') + '"><div class="db-top"><span class="grp">' + esc(dbGrp(a)) + '</span><b>' + esc(a.textContent.trim()) + '</b><a data-dbgo="' + v + '|' + (go || '') + '">열기 →</a></div>' + dbBody(v, go) + '</div>';
     }).join('');
-    $('#dbAt').textContent = DB.at ? DB.at + ' 기준' : '';
+    $('#dbAt').textContent = (DB.at ? DB.at + ' 기준' : '') + (DB.busy ? ' · 새로 받는 중…' : '');
   }
   function loadDash() {
-    paintDash();
-    if (DB.busy) return;
-    DB.busy = 2;
+    if (DB.busy) return paintDash();
+    DB.busy = 2; paintDash();
     const stamp = () => { const d = new Date(); DB.at = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
-    const done = () => { DB.busy--; stamp(); if (currentView === 'dash') paintDash(); };
+    const done = () => {
+      DB.busy--; if (!DB.busy) { stamp(); try { localStorage.setItem('runner.dash', JSON.stringify({ a: DB.a, s: DB.s && !DB.s.err ? DB.s : null, at: DB.at })); } catch (e) {} }
+      if (currentView === 'dash') paintDash();
+    };
     api('adm_dash').then((r) => { if (r && r.ok) DB.a = r; else if (r) toast(r.msg); }).catch(() => {}).finally(done);
     api('adm_dashStl').then((r) => { DB.s = r && r.ok ? r : { err: (r && r.msg) || '정산 요약을 읽지 못했습니다.' }; }).catch(() => {}).finally(done);
   }
