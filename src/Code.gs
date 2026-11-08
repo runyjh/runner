@@ -5270,9 +5270,15 @@ function adm_schUploadTable(token, start, scope) {
     const today = new Date(), tmr = ymd_(addDays_(today, 1));
     let base = parseYmd_(start) || today;
     if (scope === 'nextweek') base = addDays_(sundayOf_(new Date(today.getFullYear(), today.getMonth(), today.getDate())), 7);
-    if (scope === 'thisweek' || scope === 'month') base = addDays_(today, 1);
+    if (scope === 'thisweek' || (scope === 'month' && !parseYmd_(start))) base = addDays_(today, 1);
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
-    const nDays = scope === 'month' ? 35 : SCH_DAYS;
+    // 한 달: 그 달(start 가 있으면 그 날짜의 달)을 덮는 주(일~토)들 → 1주차 ~ 5·6주차 (한 주 시작은 항상 일요일)
+    let nDays = SCH_DAYS;
+    if (scope === 'month') {
+      const m0 = parseYmd_(start) || base, last = new Date(m0.getFullYear(), m0.getMonth() + 1, 0);
+      const satEnd = addDays_(last, 6 - last.getDay());
+      nDays = Math.max(7, Math.round((satEnd - sun) / 86400000) + 1);
+    }
     const data = schRead_(sun, addDays_(sun, nDays - 1));
     const co = companyInfo_();
     const res = schBuildUpload_(data, {
