@@ -196,8 +196,8 @@ function api_myPerf(token) {
     const has = function (r) { return r.weeks.some(function (w) { return w.grade; }); };
     const out = { ok: true, on: true, camp: camp, backup: !base.length, weeks: weeks, routes: [], recent: [], campAll: [] };
     if (camp && base.length) out.routes = base.map(function (c) { return series(camp, c); }).filter(has);
-    // 최근 4주 스케줄에서 뛴 라우트 (백업 기사 · 고정 기사도 다른 노선을 뛰었으면 같이)
-    try {
+    // 최근 4주 스케줄에서 뛴 라우트 — 백업 기사(기본노선 없음)만. 고정 기사는 기본노선 기준으로만 본다
+    if (!base.length) try {
       const today = parseYmd_(todayText_()), rec = {};
       const s = schRead_(sundayOf_(addDays_(today, -27)), today);
       const cells = s.cells[u.id] || {}, campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
