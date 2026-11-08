@@ -148,6 +148,15 @@
   .idrow { display: grid; grid-template-columns: 56px 1fr 150px; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--line); } .idrow .k { color: var(--sub); font-size: 12px; padding-top: 9px; } .idrow:last-of-type { border-bottom: 0; }
   .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } @media (max-width: 640px) { .grid3 { grid-template-columns: 1fr; } .idrow { grid-template-columns: 48px 1fr; } .idrow > select { grid-column: 2; } }
   body { word-break: keep-all; overflow-wrap: break-word; }
+  .ms-mode { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+  .ms-mode .on { background: var(--pri, #1b64da); color: #fff; border-color: transparent; }
+  .ms-who { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; } .ms-who .grow { flex: 1; }
+  .ms-list { border: 1px solid #e5e8eb; border-radius: 8px; max-height: 190px; overflow: auto; padding: 6px 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 8px; margin-bottom: 12px; font-size: 13px; }
+  .ms-list label { display: flex; gap: 5px; align-items: center; padding: 3px 2px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ms-list small { color: #8b95a1; } .ms-list .np { color: #c0c6cc; font-size: 11px; }
+  .ms-lb { display: block; font-size: 13px; font-weight: 600; margin-bottom: 10px; } .ms-lb .inp { display: block; width: 100%; margin-top: 4px; font-weight: 400; }
+  .ms-log .it { border-top: 1px solid #f0f1f3; padding: 8px 2px; font-size: 13px; } .ms-log .it b { display: block; }
+  .ms-log .it p { margin: 3px 0; white-space: pre-wrap; color: #4e5968; } .ms-log .it small { color: #8b95a1; }
   .modal .m-box { overflow-wrap: anywhere; } .modal .m-box table th, .modal .m-box table td { overflow-wrap: normal; }
   .tkbar { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; }
   .up-bar + .tkbar, .m-top + .tkbar, .tkbar { padding: 0 2px; } .modal .tkbar { padding: 6px 16px 0; margin: 0; }
@@ -947,6 +956,7 @@
         <input class="inp search" id="q" placeholder="이름, 아이디·서브아이디, 연락처, 차량 검색">
         <button class="btn ghost" id="reloadBtn" title="시트의 최신 내용 불러오기">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="drivers">데이터 초기화</button>
+        <button class="btn ghost" type="button" id="msOpen" title="기사 앱 알림 · 휴대폰 알림 · 앱 아이콘 숫자로 전달">📢 전달사항 보내기</button>
         <button class="btn" id="drvNew">+ 새 기사 등록</button>
       </div>
     </div>
@@ -1324,6 +1334,23 @@
     <input class="inp" id="pickQ" placeholder="이름, 아이디, 연락처 검색">
     <div class="pick-list" id="pickList"></div>
     <div class="m-actions"><button type="button" class="btn ghost" id="pickCancel">닫기</button></div>
+  </div>
+</div>
+
+<!-- ───────────── 전달사항 보내기 ───────────── -->
+<div class="modal hidden" id="msModal">
+  <div class="m-box" style="width:min(760px,100%);max-height:92vh;overflow:auto">
+    <h3>📢 전달사항 보내기</h3>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사 앱 알림 목록에 들어가고, 알림을 켠 휴대폰에는 휴대폰 알림과 러너 아이콘 숫자로 뜹니다. (품앗이 · 정산 마감 알림과 같은 방식)</p>
+    <div class="ms-mode" id="msMode"></div>
+    <div class="ms-who"><input class="inp" id="msQ" placeholder="받는 사람 검색" style="max-width:220px"><span class="grow"></span><span id="msCnt" class="sub"></span>
+      <button type="button" class="btn sm ghost" id="msAllOn">모두 체크</button><button type="button" class="btn sm ghost" id="msAllOff">모두 해제</button></div>
+    <div class="ms-list" id="msList"></div>
+    <label class="ms-lb">제목<input class="inp" id="msTitle" maxlength="60" placeholder="예) 내일 캠프 출근 시간 변경 안내"></label>
+    <label class="ms-lb">내용<textarea class="inp" id="msBody" rows="6" maxlength="1000" placeholder="기사님들께 전할 내용을 적어 주세요."></textarea></label>
+    <div class="m-actions"><span class="sub" id="msLen" style="margin-right:auto"></span><button type="button" class="btn ghost" id="msCancel">닫기</button><button type="button" class="btn" id="msSend">보내기</button></div>
+    <h4 style="margin:18px 0 6px">최근 보낸 전달사항</h4>
+    <div id="msLog" class="ms-log"><div class="sub">불러오는 중…</div></div>
   </div>
 </div>
 
@@ -2430,6 +2457,68 @@
     $('[data-k="name"]', $('#dBody')).focus();
   }
   $('#drvNew').addEventListener('click', openCreate);
+  // ── 전달사항 보내기 (기사 앱 알림 + 휴대폰 알림 + 아이콘 숫자) ──
+  const MS = { mode: 'all', camp: '', off: new Set(), push: null, q: '' };
+  const msActive = (r) => r.status === '승인' && r.workStatus !== '퇴사';
+  function msPool() {
+    const act = all.filter(msActive);
+    if (MS.mode === 'sel') return act.filter((r) => dsel.has(r.id));
+    if (MS.mode === 'camp') return act.filter((r) => (r.schCampId || '') === MS.camp);
+    return act;
+  }
+  const msTargets = () => msPool().filter((r) => !MS.off.has(r.id));
+  function paintMs() {
+    const act = all.filter(msActive), camps = {};
+    act.forEach((r) => { if (r.schCampId) camps[r.schCampId] = r.schCamp || r.schCampId; });
+    const nSel = act.filter((r) => dsel.has(r.id)).length;
+    if (MS.mode === 'sel' && !nSel) MS.mode = 'all';
+    $('#msMode').innerHTML = '<b style="font-size:13px;margin-right:4px">받는 사람</b>' +
+      '<button type="button" class="btn sm ghost' + (MS.mode === 'all' ? ' on' : '') + '" data-msm="all">앱 사용 중 전체 (' + act.length + ')</button>' +
+      (nSel ? '<button type="button" class="btn sm ghost' + (MS.mode === 'sel' ? ' on' : '') + '" data-msm="sel">표에서 체크한 기사 (' + nSel + ')</button>' : '') +
+      '<select class="inp" id="msCamp" style="width:auto;height:30px' + (MS.mode === 'camp' ? ';outline:2px solid var(--pri,#1b64da)' : '') + '"><option value="">캠프별 ▾</option>' +
+      Object.keys(camps).sort((x, y) => koSort(camps[x], camps[y])).map((id) => '<option value="' + esc(id) + '"' + (MS.mode === 'camp' && MS.camp === id ? ' selected' : '') + '>' + esc(camps[id]) + ' (' + act.filter((r) => r.schCampId === id).length + ')</option>').join('') + '</select>';
+    const q = nfc(MS.q.trim()), pool = msPool().slice().sort((x, y) => koSort(x.name, y.name));
+    const vis = q ? pool.filter((r) => nfc(r.name || '').includes(q) || String(r.loginId || '').toLowerCase().includes(q.toLowerCase())) : pool;
+    $('#msList').innerHTML = vis.length ? vis.map((r) => '<label title="' + esc((r.schCamp || '') + ' ' + (r.loginId || '')) + '"><input type="checkbox" data-msid="' + esc(r.id) + '"' + (MS.off.has(r.id) ? '' : ' checked') + '>' + esc(r.name) +
+      (r.schCamp ? ' <small>' + esc(r.schCamp) + '</small>' : '') + (MS.push && !MS.push.has(r.id) ? ' <span class="np" title="휴대폰 알림을 켜지 않아 앱 안에서만 보입니다">앱만</span>' : '') + '</label>').join('')
+      : '<div class="sub" style="grid-column:1/-1;padding:6px">받을 기사가 없습니다.</div>';
+    const t = msTargets(), np = MS.push ? t.filter((r) => MS.push.has(r.id)).length : null;
+    $('#msCnt').textContent = t.length + '명에게 보냄' + (np == null ? '' : ' · 휴대폰 알림 ' + np + '명');
+    $('#msSend').textContent = t.length ? t.length + '명에게 보내기' : '보내기';
+    $('#msLen').textContent = $('#msBody').value.length + ' / 1000자';
+  }
+  function paintMsLog(log) {
+    $('#msLog').innerHTML = (log || []).length ? log.map((x) => '<div class="it"><b>' + esc(x.title) + '</b><p>' + esc(x.body) + '</p><small>' + esc(String(x.at).slice(0, 16)) + ' · ' + esc(x.by) + ' · ' + x.n + '명 (' + esc(String(x.to).slice(0, 80)) + ')</small></div>').join('')
+      : '<div class="sub">아직 보낸 전달사항이 없습니다.</div>';
+  }
+  function openMs() {
+    MS.off.clear(); MS.q = ''; $('#msQ').value = '';
+    MS.mode = all.some((r) => msActive(r) && dsel.has(r.id)) ? 'sel' : 'all';
+    paintMs(); $('#msModal').classList.remove('hidden'); $('#msTitle').focus();
+    api('adm_msgInfo').then((r) => { if (!r || !r.ok) return; MS.push = new Set(r.pushIds || []); paintMsLog(r.log); paintMs(); }).catch(() => {});
+  }
+  $('#msOpen').addEventListener('click', openMs);
+  $('#msCancel').addEventListener('click', () => $('#msModal').classList.add('hidden'));
+  $('#msMode').addEventListener('click', (e) => { const b = e.target.closest('[data-msm]'); if (!b) return; MS.mode = b.dataset.msm; MS.off.clear(); paintMs(); });
+  $('#msMode').addEventListener('change', (e) => { if (e.target.id !== 'msCamp') return; MS.camp = e.target.value; MS.mode = MS.camp ? 'camp' : 'all'; MS.off.clear(); paintMs(); });
+  $('#msList').addEventListener('change', (e) => { const c = e.target.closest('[data-msid]'); if (!c) return; if (c.checked) MS.off.delete(c.dataset.msid); else MS.off.add(c.dataset.msid); paintMs(); });
+  $('#msQ').addEventListener('input', (e) => { MS.q = e.target.value; paintMs(); });
+  $('#msAllOn').addEventListener('click', () => { MS.off.clear(); paintMs(); });
+  $('#msAllOff').addEventListener('click', () => { msPool().forEach((r) => MS.off.add(r.id)); paintMs(); });
+  $('#msBody').addEventListener('input', () => { $('#msLen').textContent = $('#msBody').value.length + ' / 1000자'; });
+  $('#msSend').addEventListener('click', () => {
+    const t = msTargets(), title = $('#msTitle').value.trim(), body = $('#msBody').value.trim();
+    if (!t.length) return toast('받을 기사를 골라 주세요.');
+    if (!title) { $('#msTitle').focus(); return toast('제목을 입력해 주세요.'); }
+    if (!body) { $('#msBody').focus(); return toast('내용을 입력해 주세요.'); }
+    if (!confirm(t.length + '명에게 전달사항을 보낼까요?\n\n제목: ' + title)) return;
+    const btn = $('#msSend'); btn.disabled = true; btn.textContent = '보내는 중…';
+    api('adm_msgSend', t.map((r) => r.id), title, body).then((r) => {
+      if (!r || !r.ok) return toast((r && r.msg) || '보내지 못했습니다.');
+      toast(r.n + '명에게 보냈습니다. (휴대폰 알림 ' + (r.pushN || 0) + '명)');
+      $('#msTitle').value = ''; $('#msBody').value = ''; paintMsLog(r.log);
+    }).catch(() => {}).finally(() => { btn.disabled = false; paintMs(); });
+  });
 
   // 입력 변경 추적
   function setDirty(d) {
