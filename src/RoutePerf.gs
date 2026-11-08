@@ -377,9 +377,15 @@ function rlnFromMoves_() {
   const out = [];
   try {
     const campName = rcCampNames_();
+    // 글자 없는 코드(110 → 212)는 자료에 있는 글자(110A·110B…)로 펼친다
+    const letters = {};
+    rpfAll_().concat(slaAll_()).forEach(function (r) { const m = String(r.code || '').match(/^(\d+)([A-Z])$/); if (m) (letters[r.camp + '|' + m[1]] = letters[r.camp + '|' + m[1]] || {})[m[2]] = 1; });
+    const expand = function (camp, codes) { const o = []; codes.forEach(function (c) { if (/[A-Z]$/.test(c)) { o.push(c); return; } const L = Object.keys(letters[camp + '|' + c] || {}).sort(); if (L.length) L.forEach(function (x) { o.push(c + x); }); else o.push(c); }); return o; };
     rcRows_().filter(function (c) { return c.kind === RCK.MOVE && (c.status === RCS.DONE || c.status === RCS.WAIT); }).forEach(function (c) {
       const v = rcView_(c, campName);
-      const fc = rpfCamp_(v.fromCamp), tc = rpfCamp_(v.toCamp), a = rpfBaseCodes_(v.fromRoute), b = rpfBaseCodes_(v.toRoute);
+      const fc = rpfCamp_(v.fromCamp), tc = rpfCamp_(v.toCamp);
+      let a = expand(fc, rpfBaseCodes_(v.fromRoute)), b = rpfBaseCodes_(v.toRoute);
+      if (b.length === 1 && !/[A-Z]$/.test(b[0]) && a.length) b = a.map(function (x) { return b[0] + (x.match(/[A-Z]$/) || [''])[0]; }); // 212 → 212A·212B (이전 글자 따라)
       if (!a.length || !b.length) return;
       if (a.length === b.length) a.forEach(function (x, i) { out.push({ id: 'MV-' + c.id + '-' + i, date: v.date, kind: RLK.MOVE, fromCamp: fc, fromCode: x, toCamp: tc, toCode: b[i], memo: '노선 이관' + (c.status === RCS.WAIT ? ' (예약)' : ''), src: 'move' }); });
       else a.forEach(function (x) { b.forEach(function (y) { out.push({ id: 'MV-' + c.id + '-' + x + y, date: v.date, kind: a.length > b.length ? RLK.MERGE : RLK.SPLIT, fromCamp: fc, fromCode: x, toCamp: tc, toCode: y, memo: '노선 이관', src: 'move' }); }); });
@@ -465,7 +471,7 @@ function adm_lineageSuggest(token) {
       rows.forEach(function (r) { if (r.code === '영업점') return; (byP[r[pk]] = byP[r[pk]] || { p: r[pk], date: dateOf(r), camps: {} }).camps[r.camp] = (byP[r[pk]].camps[r.camp] || {}); byP[r[pk]].camps[r.camp][r.code] = 1; });
       return Object.keys(byP).sort().map(function (k) { return byP[k]; });
     };
-    seqs.push({ src: 'SLA', list: build(slaAll_(), 'period', function (r) { return r.from || r.period; }) });
+    seqs.push({ src: 'SLA', list: build(slaAll_(), 'period', function (r) { return r.period; }) });
     seqs.push({ src: '주간', list: build(rpfAll_(), 'week', function (r) { return r.from; }) });
     const sug = [], seen = {};
     seqs.forEach(function (sq) {
@@ -479,10 +485,16 @@ function adm_lineageSuggest(token) {
           const grp = function (list) { const g = {}; list.forEach(function (x) { const m = x.match(/^(\d+)([A-Z]*)$/); if (!m) return; (g[m[1]] = g[m[1]] || []).push(m[2]); }); Object.keys(g).forEach(function (k) { g[k].sort(); }); return g; };
           const G = grp(gone), F = grp(fresh), usedF = {};
           const pairs = [];
-          Object.keys(G).sort().forEach(function (gn) {
-            const sig = G[gn].join('');
-            const cand = Object.keys(F).filter(function (fn) { return !usedF[fn] && F[fn].join('') === sig; }).sort();
-            if (cand.length) { usedF[cand[0]] = 1; G[gn].forEach(function (L) { pairs.push({ kind: RLK.RENAME, f: gn + L, t: cand[0] + L }); }); delete G[gn]; }
+          // 글자 구성(sig)이 같은 묶음끼리: 개수가 같으면 번호 순서대로 1:1 개명, 사라진 쪽이 많으면 병합·새 쪽이 많으면 분할 (같은 글자끼리 모두 후보)
+          const sigs = {};
+          Object.keys(G).forEach(function (gn) { const sg = G[gn].join(''); (sigs[sg] = sigs[sg] || { g: [], f: [] }).g.push(gn); });
+          Object.keys(F).forEach(function (fn) { const sg = F[fn].join(''); (sigs[sg] = sigs[sg] || { g: [], f: [] }).f.push(fn); });
+          Object.keys(sigs).forEach(function (sg) {
+            const S = sigs[sg]; if (!S.g.length || !S.f.length) return;
+            S.g.sort(); S.f.sort();
+            if (S.g.length === S.f.length) S.g.forEach(function (gn, i) { G[gn].forEach(function (L) { pairs.push({ kind: RLK.RENAME, f: gn + L, t: S.f[i] + L }); }); });
+            else { const kind = S.g.length > S.f.length ? RLK.MERGE : RLK.SPLIT; S.g.forEach(function (gn) { S.f.forEach(function (fn) { G[gn].forEach(function (L) { pairs.push({ kind: kind, f: gn + L, t: fn + L }); }); }); }); }
+            S.g.forEach(function (gn) { delete G[gn]; }); S.f.forEach(function (fn) { usedF[fn] = 1; });
           });
           const restG = Object.keys(G), restF = Object.keys(F).filter(function (fn) { return !usedF[fn]; });
           if (restG.length && restF.length) {
