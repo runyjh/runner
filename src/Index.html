@@ -674,6 +674,11 @@
     <span class="nimp" style="background:#e8f3ff;color:#1b64da">정산 안내</span><b id="slPopTitle"></b><div class="ntpop-body" id="slPopBody"></div>
     <div style="display:flex;gap:8px;margin-top:4px"><button class="btn ghost" type="button" id="slPopNo" style="flex:1">나중에</button><button class="btn" type="button" id="slPopGo" style="flex:2">정산서 보기</button></div></div></div>
 
+  <div class="ihelp hidden" id="pushPop" role="dialog" aria-modal="true"><div class="ibox ntpop">
+    <span class="nimp" style="background:#e8f3ff;color:#1b64da">휴대폰 알림</span><b id="pushPopT"></b><div class="ntpop-body" id="pushPopB"></div>
+    <button class="btn" type="button" id="pushPopGo" style="width:100%">알림 허용하기</button>
+    <button class="btn ghost hidden" type="button" id="pushPopNo" style="width:100%;margin-top:8px">확인</button></div></div>
+
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
     <div class="topbar"><button class="back" id="scBack" aria-label="뒤로">←</button><h2>내 스케줄</h2>
@@ -757,7 +762,6 @@
     <div class="card" id="myCard"><div style="text-align:center;color:var(--sub)">불러오는 중…</div></div>
     <div class="mylist">
       <button type="button" data-my="alerts">🔔 알림<em id="myAlertCnt"></em></button>
-      <button type="button" data-my="push">📲 휴대폰 알림 받기<em class="pushst" id="myPushSt"></em></button>
     </div>
     <div class="mylist">
       <button type="button" data-my="give">🙋 품앗이 주세요 (내 근무 가능일)<em id="myGive"></em></button>
@@ -1225,7 +1229,7 @@
     homeGate([new Promise((res) => setTimeout(() => res(loadNotices()), 0)).then((v) => (v === 'fs' ? null : sp))]);
     setTimeout(() => { if (window.bdRecent) window.bdRecent(); }, 0); // (공지 함수는 뒤에서 선언되므로 한 박자 뒤에)
     setTimeout(() => { try { fsReady(); } catch (e) {} }, 0); // Firestore 준비 (홈 사본)
-    if (window.pmAlertStart) setTimeout(() => window.pmAlertStart(), 0);
+    setTimeout(() => { if (window.pmAlertStart) window.pmAlertStart(); }, 0); // (알림 함수는 뒤에서 선언되므로 한 박자 뒤에)
     if (saved) setTimeout(() => restoreView(saved), 0);
     setTimeout(swrPrefetch, 4000);
   }
@@ -2241,7 +2245,7 @@
 
   // 마이페이지
   function openMyPage() {
-    show('mypage'); paintAlertBadges(); paintPushState();
+    show('mypage'); paintAlertBadges();
     const token = pmTok(); if (!token) return;
     api('api_myInfo', token).then((r) => {
       if (!pmOk(r)) return;
@@ -2268,7 +2272,6 @@
     if (k === 'find') return openGive('find', 'mypage');
     if (k === 'info') return show('myinfo');
     if (k === 'alerts') return openPmAlerts();
-    if (k === 'push') return pushToggle();
     if (k === 'pw') return openChangePw(false, '');
     if (k === 'logout') return $('#logoutBtn').click();
     pmMineKind = k; ssSet('runner.pmKind', k); show('pmmine'); loadPmMine();
@@ -2610,7 +2613,7 @@
     if (!paTimer) paTimer = setInterval(() => pollAlerts(false), 30000);
     clearShownNotifications();
     pollAlerts(true);
-    pushRefresh();
+    pushAuto();
   };
   window.pmAlertStop = function (token) {
     clearInterval(paTimer); paTimer = 0; paVer = ''; paList = []; paUnread = 0; paTok = ''; paintAlertBadges();
@@ -2670,58 +2673,61 @@
     return fbMsg.getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: reg });
   }
   const deviceName = () => { const u = navigator.userAgent; return (/iPhone/.test(u) ? '아이폰' : /iPad/.test(u) ? '아이패드' : /Android/.test(u) ? '안드로이드' : 'PC') + (/SamsungBrowser/.test(u) ? ' 삼성인터넷' : /CriOS|Chrome/.test(u) ? ' 크롬' : /Safari/.test(u) ? ' 사파리' : ''); };
-  function paintPushState() {
-    const el = $('#myPushSt'); if (!el) return;
-    el.className = 'pushst';
-    if (!pushCapable()) { el.textContent = window.RUNNER_CONFIG ? '이 기기 미지원' : '앱에서만'; return; }
-    if (isIOS && !standalone()) { el.textContent = '홈 화면 설치 필요'; return; }
-    if (Notification.permission === 'denied') { el.textContent = '차단됨'; return; }
-    if (lsGet(PUSH_TOK) && Notification.permission === 'granted') { el.textContent = '켜짐'; el.classList.add('on'); return; }
-    el.textContent = '꺼짐';
-    // 서버 설정을 미리 받아 둔다 (누른 순간 바로 '허용' 창을 띄우기 위해 — 아이폰은 누른 직후에만 창을 띄울 수 있음)
-    getPushCfg().then((c) => { if (!c.on && el.textContent === '꺼짐') el.textContent = '준비 안 됨'; }).catch(() => {});
+  /**
+   * 휴대폰 알림은 항상 켠다 (끄는 메뉴 없음).
+   *  - 이미 허용된 기기: 앱을 열 때마다 조용히 기기를 등록·갱신
+   *  - 아직 안 물어본 기기: 앱을 열 때마다 '알림 허용하기' 창 (브라우저 규칙상 기사가 한 번 눌러야 허용 창이 뜸)
+   *  - 차단한 기기 / 홈 화면에 설치 안 한 아이폰: 켜는 방법 안내 (앱을 열 때마다)
+   */
+  let pushBusy = false, pushShown = false;
+  async function pushRegister(cfg) {
+    const t = await fbToken(cfg);
+    if (!t) throw new Error('기기 등록에 실패했습니다.');
+    const r = await api('api_pmPushSave', store.get(TOKEN), t, deviceName());
+    if (!r || !r.ok) throw new Error((r && r.msg) || '기기 등록에 실패했습니다.');
+    lsSet(PUSH_TOK, t);
   }
-  /** 앱을 열 때: 이미 켠 기기면 토큰을 새로 받아 서버와 맞춘다 (바뀌었을 수 있음) */
-  function pushRefresh() {
-    if (!pushCapable() || !lsGet(PUSH_TOK) || Notification.permission !== 'granted') return;
+  function pushPop(title, body, canAllow) {
+    $('#pushPopT').textContent = title; $('#pushPopB').textContent = body;
+    $('#pushPopGo').classList.toggle('hidden', !canAllow); $('#pushPopNo').classList.toggle('hidden', canAllow);
+    $('#pushPop').classList.add('center'); $('#pushPop').classList.remove('hidden');
+  }
+  function pushAuto() {
+    if (pushBusy || !store.get(TOKEN) || !pushCapable()) return;
+    if (isIOS && !standalone()) {
+      if (!pushShown) { pushShown = true; pushPop('홈 화면에 러너 앱을 설치해 주세요', '아이폰은 홈 화면에 설치한 러너 앱에서만 휴대폰 알림을 받을 수 있습니다 (iOS 16.4 이상).\n\n사파리 아래쪽 공유 버튼(□↑) → 홈 화면에 추가 → 설치한 아이콘으로 열어 주세요.', false); }
+      return;
+    }
     getPushCfg().then((cfg) => {
-      if (!cfg.on) return;
-      return fbToken(cfg).then((t) => { if (t) { lsSet(PUSH_TOK, t); return api('api_pmPushSave', store.get(TOKEN), t, deviceName()); } });
+      if (!cfg.on) return; // 사무실 설정 전
+      const perm = Notification.permission;
+      if (perm === 'granted') { pushBusy = true; return pushRegister(cfg).catch((e) => console.warn('푸시 등록 실패', e && e.message)).finally(() => { pushBusy = false; }); }
+      if (pushShown) return;
+      pushShown = true;
+      if (perm === 'denied') return pushPop('휴대폰 알림이 꺼져 있습니다', '품앗이 · 정산 마감 소식을 받으려면 알림을 켜야 합니다.\n\n휴대폰 설정 → 앱(또는 크롬·사파리) → 알림에서 러너 알림을 허용한 뒤 앱을 다시 열어 주세요.', false);
+      setTimeout(() => {
+        if (!$('#ntPop').classList.contains('hidden') || !$('#slPop').classList.contains('hidden')) { pushShown = false; return setTimeout(pushAuto, 1500); } // 다른 안내 창 먼저
+        pushPop('휴대폰 알림을 켜 주세요', '품앗이 배차 · 정산서 마감 소식을 휴대폰 알림과 러너 아이콘 숫자로 알려 드립니다.\n\n아래 버튼을 누른 뒤 나오는 창에서 "허용"을 눌러 주세요.', true);
+      }, 1200);
     }).catch(() => {});
   }
-  async function pushToggle() {
-    if (!pushCapable()) return toast(window.RUNNER_CONFIG ? '이 휴대폰·브라우저는 알림을 받을 수 없습니다. 크롬이나 사파리로 열어 주세요.' : '설치한 러너 앱(깃허브 주소)에서 켤 수 있습니다.');
-    if (isIOS && !standalone()) return pmAsk('홈 화면에 먼저 설치해 주세요', '아이폰은 러너 앱을 홈 화면에 설치한 뒤에만 알림을 받을 수 있습니다 (iOS 16.4 이상).\n\n사파리 아래쪽 공유 버튼(□↑) → 홈 화면에 추가 → 설치한 아이콘으로 열고 다시 켜 주세요.', '확인');
-    const token = store.get(TOKEN); if (!token) return;
-    const cur = lsGet(PUSH_TOK);
-    if (cur && Notification.permission === 'granted') {
-      const v = await pmAsk('휴대폰 알림을 끌까요?', '앱을 열어 둔 동안의 화면 알림은 계속 받습니다.', '끄기');
-      if (v === null) return;
-      try { if (fbMsg) await fbMsg.deleteToken(); } catch (e) {}
-      api('api_pmPushDel', token, cur).catch(() => {}); lsSet(PUSH_TOK, null); paintPushState(); return toast('휴대폰 알림을 껐습니다.');
-    }
-    if (Notification.permission === 'denied') return toast('이 기기에서 알림이 차단되어 있습니다. 휴대폰 설정 → 앱(브라우저) → 알림에서 러너를 허용한 뒤 다시 눌러 주세요.');
-    // '허용' 창은 누른 직후 바로 띄워야 한다 (서버를 먼저 기다리면 아이폰·일부 크롬에서 창이 안 뜸)
+  $('#pushPopNo').addEventListener('click', () => $('#pushPop').classList.add('hidden'));
+  $('#pushPopGo').addEventListener('click', async () => {
+    // '허용' 창은 누른 직후 바로 띄워야 한다 (아이폰·일부 크롬)
     const permP = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
-    loading(true, '알림 켜는 중…');
-    try {
-      const [perm, cfg] = await Promise.all([permP, getPushCfg()]);
-      if (!cfg.on) { loading(false); paintPushState(); return toast(cfg.err ? '서버에 연결하지 못했습니다. 잠시 후 다시 눌러 주세요.' : '아직 휴대폰 알림 설정이 안 되어 있습니다. 사무실(관리자)에서 파이어베이스 설정을 마치면 켤 수 있습니다.'); }
-      if (perm !== 'granted') { loading(false); paintPushState(); return toast(perm === 'denied' ? '알림을 차단하셨습니다. 휴대폰 설정 → 앱(브라우저) → 알림에서 허용해 주세요.' : '알림 허용 창에서 "허용"을 눌러야 받을 수 있습니다.'); }
-      const t = await fbToken(cfg);
-      if (!t) throw new Error('기기 등록에 실패했습니다.');
-      const r = await api('api_pmPushSave', token, t, deviceName());
-      if (!pmOk(r)) return;
-      lsSet(PUSH_TOK, t); paintPushState(); toast('휴대폰 알림을 켰습니다. 앱을 닫아도 배차 소식이 옵니다.');
-    } catch (e) {
-      const code = String((e && e.code) || ''), msg = String((e && e.message) || '');
-      console.error('푸시 켜기 실패', code, msg);
-      toast(/permission-blocked|permission-default/.test(code) ? '알림 허용이 필요합니다. 휴대폰 설정에서 러너 알림을 허용해 주세요.'
-        : /token-subscribe-failed|invalid-vapid|bad-sender|api-key|installations/.test(code + msg) ? '알림 서버 설정이 맞지 않습니다 (' + (code || msg).slice(0, 60) + '). 사무실에 알려 주세요.'
-        : /unsupported|not supported/i.test(code + msg) ? '이 브라우저는 휴대폰 알림을 지원하지 않습니다. 크롬(안드로이드)이나 홈 화면에 설치한 앱(아이폰)에서 켜 주세요.'
-        : '알림을 켜지 못했습니다: ' + (msg || code || '알 수 없는 오류').slice(0, 80));
-    } finally { loading(false); }
-  }
+    $('#pushPop').classList.add('hidden');
+    let perm = 'default';
+    try { perm = await permP; } catch (e) {}
+    if (perm !== 'granted') {
+      return pushPop('알림을 허용해야 합니다', perm === 'denied'
+        ? '알림이 차단되었습니다. 휴대폰 설정 → 앱(또는 크롬·사파리) → 알림에서 러너 알림을 허용한 뒤 앱을 다시 열어 주세요.'
+        : '허용 창에서 "허용"을 눌러 주세요.', perm !== 'denied');
+    }
+    loading(true, '알림 켜는 중…'); pushBusy = true;
+    try { await pushRegister(await getPushCfg()); toast('휴대폰 알림이 켜졌습니다.'); }
+    catch (e) { console.error('푸시 켜기 실패', e && (e.code || e.message)); toast('알림 기기 등록에 실패했습니다. 앱을 다시 열면 다시 시도합니다.'); }
+    finally { pushBusy = false; loading(false); }
+  });
   // 알림을 눌러 앱이 열렸을 때 (?pm=일감ID) / 앱이 열려 있을 때 서비스 워커가 보낸 소식
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => {
     const d = e.data || {};
