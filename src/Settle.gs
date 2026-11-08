@@ -2636,6 +2636,7 @@ function adm_stlImport(token, p) {
       const changed = hist.filter(function (h) { return h.diff; }).length;
       const totalAmt = Object.keys(after).reduce(function (s, k) { return s + after[k]; }, 0);
       logAdmin_(a, '쿠팡 정산서 반영', month + ' ' + round + '차', rawObjs.length + '줄 · 분실 ' + lossObjs.length + '줄 · 변동 ID ' + changed);
+      try { uploadMemo_(a, Number(month.slice(5, 7)) + '월 정산서 업로드', round > 1 ? round + '차' : '', false); } catch (e) { /* 메모 실패는 무시 */ }
       return { ok: true, month: month, round: round, rows: rawObjs.length, loss: lossObjs.length, ids: Object.keys(after).length, changed: changed, total: Math.round(totalAmt), newIds: addIds.map(function (x) { return x.cid + (x.owner ? ' → ' + x.owner : ' (명의자 없음)'); }) };
     } finally {
       lock.releaseLock();

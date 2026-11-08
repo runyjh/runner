@@ -4517,7 +4517,7 @@
     const other = box.id === 'slaBox' ? $('#perfBox') : $('#slaBox'); if (other.innerHTML) other.innerHTML = ''; // 두 메뉴가 같은 id 를 쓰므로 안 보이는 쪽은 비운다
     const onBtn = (id, on, lab) => '<span class="rp-on">' + lab + ' <b class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-rpset="' + id + '">' + (on ? '끄기' : '켜기') + '</button></span>';
     box.innerHTML = '<div class="sec rp-top"><div class="xp-head"><div class="tabs rp-tabs">' + rpTabs().map((t) => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" data-rptab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
-      '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 때 업무스케줄 메모') : '') + '</span></div></div>';
+      '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 기록을 업무스케줄에') : '') + '</span></div></div>';
     if (tab === 'sla') return slaRender(box);
     if (tab === 'ln') { if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; } if (!SL.loaded) loadSla(); return lnRender(box); }
     if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; }
@@ -4698,7 +4698,7 @@
       (bad.length ? '<div><b>3~4등급:</b> ' + bad.map((r) => esc(r.camp + ' ' + r.code) + ' ' + grBadge(+String(r.grade).replace(/\D/g, '')) + ' <small>' + esc(rpPctTxt(r.perf)) + '</small>').join(', ') + '</div>' : '') +
       (imp.length ? '<div style="margin-top:4px"><b>개선 요청(위탁 협의):</b> ' + imp.map((r) => esc(r.camp + ' ' + r.code + ' (' + r.improve + ')')).join(', ') + '</div>' : '') +
       (unknown.length ? '<div style="margin-top:6px;color:var(--danger)">노선관리에 없는 라우트 ' + unknown.length + '개: ' + unknown.map((r) => esc(r.camp + ' ' + r.code)).join(', ') + ' — 저장은 되지만 노선 표에는 표시되지 않습니다. 노선관리에 노선을 추가하거나 캠프명을 맞춰 주세요.</div>' : '') +
-      (RP.memoOn && (bad.length || imp.length) ? '<div style="margin-top:6px" class="sub">저장하면 업무스케줄에 [수행률 WK' + wk + '] 메모가 한 줄 적힙니다 (처음 한 번만).</div>' : '');
+      (RP.memoOn ? '<div style="margin-top:6px" class="sub">저장하면 업무스케줄에 "' + wk + '주차 수행률 업로드' + (bad.length || imp.length ? ' (' + [bad.length ? '3~4등급 ' + bad.length : '', imp.length ? '개선 요청 ' + imp.length : ''].filter(Boolean).join(' · ') + ')' : '') + '" 한 줄이 적힙니다.</div>' : '');
   }
   $('#rpUpWk').addEventListener('input', rpUpPreview); $('#rpUpYear').addEventListener('input', rpUpPreview);
   $('#rpUpCancel').addEventListener('click', () => { $('#rpUpModal').classList.add('hidden'); rpUp = null; });
@@ -4891,7 +4891,7 @@
         '<div class="rp-sum" style="margin-top:6px"><span>우수<b>' + rs.filter((r) => r.t >= th.good).length + '</b></span><span>주의<b>' + warn.length + '</b></span><span class="' + (low.length ? 'bad' : '') + '">위험<b>' + low.length + '</b></span></div>' +
         (low.length ? '<div><b>위험(' + th.warn + '점 미만):</b> ' + low.map((r) => esc(r.camp + ' ' + r.route.replace('_', '')) + ' <span class="sla bad">' + r.t + '</span><small> 고객만족 ' + esc(r.cs) + '</small>').join(', ') + '</div>' : '') +
         (unk.length ? '<div style="margin-top:6px;color:var(--danger)">캠프코드 매핑이 없는 캠프: ' + unk.map(esc).join(', ') + ' — 코드 그대로 저장됩니다. 노선관리 → 캠프 정보 수정에서 "쿠팡 캠프코드"를 넣고 다시 올리면 맞춰집니다.</div>' : '') + '</div>';
-    }).join('') + (RP.memoOn ? '<div style="margin-top:6px" class="sub">저장하면 위험 라우트가 있을 때 업무스케줄에 [SLA ~기간] 메모가 한 줄 적힙니다 (기간마다 한 번).</div>' : '');
+    }).join('') + (RP.memoOn ? '<div style="margin-top:6px" class="sub">저장하면 업무스케줄에 "' + U.blocks.map((b) => Number(b.to.slice(5, 7)) + '월 SLA 업로드').join(', ') + '" 한 줄이 적힙니다 (위험 라우트가 있으면 개수 표시).</div>' : '');
   }
   async function slaUpSave() {
     const U = rpUp; if (!U || U.kind !== 'sla') return;

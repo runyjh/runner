@@ -103,33 +103,33 @@ function adm_perfSave(token, p) {
       const wkList = Object.keys(weeks).sort(), latest = wkList[wkList.length - 1];
       let memo = null;
       if (latest && perfMemoOn_()) {
-        const lrows = add.concat(upd.map(function (u) { return u.o; })).filter(function (o) { return o.week === latest; });
-        // 이번에 바뀐 게 없더라도(재업로드) 메모는 이미 있을 것이므로 새로 적지 않는다
-        const bad = lrows.filter(function (o) { return o.grade === '3' || o.grade === '4'; }), imp = lrows.filter(function (o) { return o.improve === 'Y'; });
-        if (bad.length || imp.length) memo = rpfMemo_(a, latest, lrows[0].wk, bad, imp);
+        // 업무스케줄에 짧게: '44주차 수행률 업로드 (3~4등급 4 · 개선 요청 1)'
+        const lrows = rpfAll_().filter(function (o) { return o.week === latest; });
+        const bad = lrows.filter(function (o) { return o.grade === '3' || o.grade === '4'; }).length, imp = lrows.filter(function (o) { return o.improve === 'Y'; }).length;
+        memo = uploadMemo_(a, Number(latest.slice(6)) + '주차 수행률 업로드', [bad ? '3~4등급 ' + bad : '', imp ? '개선 요청 ' + imp : ''].filter(Boolean).join(' · '), !!(bad || imp));
       }
       logAdmin_(a, '수행률 업로드', wkList.join(', '), '새로 ' + add.length + ' · 바뀜 ' + upd.length + ' · 같음 ' + unchanged + (file ? ' · ' + file : ''));
       return { ok: true, added: add.length, changed: upd.length, unchanged: unchanged, weeks: wkList, memo: memo };
     } finally { lock.releaseLock(); }
   });
 }
-/** 업무스케줄 메모: '[수행률 WK44] 3~4등급 …' — 같은 주차 메모가 이미 있으면 다시 적지 않는다 */
-function rpfMemo_(a, week, wk, bad, imp) {
-  const tag = '[수행률 ' + wk + ']';
+/**
+ * 업무 파일을 올렸을 때 업무스케줄에 남기는 짧은 한 줄 — '10월 정산서 업로드' · '44주차 수행률 업로드 (3~4등급 4)' · '9월 SLA 업로드 (위험 24)'
+ *  같은 날 같은 제목이 이미 있으면 다시 적지 않는다 (괄호 안 숫자만 바뀌면 그 줄을 고친다).
+ *  확인할 것이 있으면(needAction) 미완료, 없으면 완료로 적는다 (할 일 목록에 쌓이지 않게).
+ */
+function uploadMemo_(a, title, extra, needAction) {
   try {
-    const dup = readAll_(SH.MEMO).some(function (m) { return str_(m.content).indexOf(tag) === 0; });
-    if (dup) return null;
-  } catch (e) { /* 메모 탭 없음 */ }
-  const fmt = function (o) { return o.camp + ' ' + o.code + '(' + (o.perf === '' ? '-' : o.perf + '%') + '·' + o.grade + '등급)'; };
-  const today = todayText_(), t0 = parseYmd_(today);
-  const lines = [];
-  if (bad.length) lines.push('3~4등급 ' + bad.length + '개: ' + bad.map(fmt).join(', '));
-  if (imp.length) lines.push('개선 요청(위탁 협의) ' + imp.length + '개: ' + imp.map(function (o) { return o.camp + ' ' + o.code; }).join(', ') +
-    ' → 입차 기한 ' + ymd_(addDays_(t0, 5)).slice(5).replace('-', '/') + ' · 개선 기한 ' + ymd_(addDays_(t0, 12)).slice(5).replace('-', '/') + ' (수행률 95%·반품 90%)');
-  const content = tag + ' ' + lines.join(' / ');
-  const now = nowText_();
-  appendObj_(SH.MEMO, { id: newMemoId_(), date: today, time: '', content: content.slice(0, 2000), done: '', cat: '', author: a.name, createdAt: now, updatedAt: now });
-  return content;
+    const today = todayText_(), now = nowText_();
+    const content = title + (extra ? ' (' + extra + ')' : '');
+    const same = readAll_(SH.MEMO).filter(function (m) { return (normDate_(m.date) || m.date) === today && (str_(m.content) === title || str_(m.content).indexOf(title + ' (') === 0); })[0];
+    if (same) {
+      if (str_(same.content) !== content) writeFields_(SH.MEMO, same._row, { content: content, done: needAction ? '' : 'Y', updatedAt: now });
+      return content;
+    }
+    appendObj_(SH.MEMO, { id: newMemoId_(), date: today, time: '', content: content, done: needAction ? '' : 'Y', cat: '', author: a.name, createdAt: now, updatedAt: now });
+    return content;
+  } catch (e) { return null; }
 }
 
 /** 관리자: 최근 N주 전체 (라우트별 이력은 화면에서 묶는다) */
@@ -315,23 +315,14 @@ function adm_slaSave(token, p) {
       // 메모: 위험(총점 < warn) 라우트가 있고 이 기간 메모가 아직 없으면 한 줄
       let memo = null;
       const th = slaThresholds_();
-      if (perfMemoOn_() && (add.length || upd.length)) {
-        const bad = list.filter(function (o) { return o.code !== '영업점' && o.total !== '' && Number(o.total) < th.warn; });
-        if (bad.length) memo = slaMemo_(a, to, bad, th);
+      if (perfMemoOn_()) {
+        const bad = list.filter(function (o) { return o.code !== '영업점' && o.total !== '' && Number(o.total) < th.warn; }).length;
+        memo = uploadMemo_(a, Number(to.slice(5, 7)) + '월 SLA 업로드', bad ? '위험 ' + bad : '', !!bad);
       }
       logAdmin_(a, 'SLA 점수 업로드', (from || '') + '~' + to, '새로 ' + add.length + ' · 바뀜 ' + upd.length + ' · 같음 ' + unchanged + (file ? ' · ' + file : ''));
       return { ok: true, added: add.length, changed: upd.length, unchanged: unchanged, period: to, unknownCamps: Object.keys(unknownCamps), memo: memo };
     } finally { lock.releaseLock(); }
   });
-}
-function slaMemo_(a, period, bad, th) {
-  const tag = '[SLA ~' + period.slice(5).replace('-', '/') + ']';
-  try { if (readAll_(SH.MEMO).some(function (m) { return str_(m.content).indexOf(tag) === 0; })) return null; } catch (e) { /* 없음 */ }
-  const content = tag + ' 총점 ' + th.warn + '점 미만 ' + bad.length + '개: ' + bad.sort(function (x, y) { return Number(x.total) - Number(y.total); })
-    .map(function (o) { return o.camp + ' ' + o.code + '(' + o.total + '점·고객만족 ' + (o.cs || '-') + ')'; }).join(', ') + ' — 고객만족(50점) 항목 확인';
-  const now = nowText_();
-  appendObj_(SH.MEMO, { id: newMemoId_(), date: todayText_(), time: '', content: content.slice(0, 2000), done: '', cat: '', author: a.name, createdAt: now, updatedAt: now });
-  return content;
 }
 /** 관리자: SLA 전체 (최근 N기간) — adm_perfList 와 따로 (수행률 패널 'SLA 점수' 탭) */
 function adm_slaList(token, periodsN) {
