@@ -42,6 +42,7 @@ function walk(dir) {
 
 walk(path.join(ROOT, 'src'));
 walk(path.join(ROOT, 'site'));
+walk(path.join(ROOT, 'extension'));
 checkJs('scripts/build-pages.js', fs.readFileSync(path.join(ROOT, 'scripts', 'build-pages.js'), 'utf8').replace(/^#!.*\n/, ''));
 
 if (failed) {

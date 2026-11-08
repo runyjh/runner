@@ -109,6 +109,30 @@
   .ds-scroll { overflow-x: auto; } .ds-sch td.c { min-width: 58px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; font-size: 12px; text-align: center !important; }
   .ds-sch th { text-align: center !important; font-size: 11.5px; } .ds-sch th.sun { color: var(--danger); } .ds-sch th.sat { color: #2f6fed; } .ds-sch .today { box-shadow: inset 0 0 0 2px var(--brand); }
   .ds-memo-card { position: sticky; top: 12px; }
+  /* 대시보드 오른쪽: 업무스케줄 + 팀즈 소식 */
+  .ds-side { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .ds-side .ds-memo-card { position: static; }
+  .tm-hb { font-size: 12.5px; color: var(--sub); line-height: 1.5; } .tm-hb .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 5px; vertical-align: 1px; }
+  .tm-hb.bad { color: var(--danger); font-weight: 600; } .tm-hb.bad .dot { background: var(--danger); } .tm-hb.none .dot { background: var(--faint); }
+  .tm-list { margin: 0; padding: 0; list-style: none; } #tmCardList .tm-list { max-height: 48vh; overflow: auto; }
+  .tm-list li { padding: 8px 2px; border-top: 1px solid var(--line); cursor: pointer; min-width: 0; }
+  .tm-list li:first-child { border-top: 0; }
+  .tm-list .h { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--sub); flex-wrap: wrap; }
+  .tm-list .h b { color: var(--ink); font-size: 12.5px; }
+  .tm-list li.new .h::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+  .tm-list .x { font-size: 13px; white-space: pre-wrap; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 3px; line-height: 1.55; }
+  .tm-list li.open .x { display: block; -webkit-line-clamp: unset; }
+  .tm-list li.seen .x { color: var(--sub); } .tm-list li.hid { opacity: .55; }
+  .tm-kw { background: var(--warn-weak); color: var(--warn); border-radius: 6px; padding: 0 6px; font-size: 11.5px; font-weight: 700; }
+  .tm-ch { background: var(--gray-weak); border-radius: 6px; padding: 0 6px; font-size: 11.5px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  mark.tm-m { background: #ffec99; color: inherit; border-radius: 2px; padding: 0 1px; }
+  .tm-act { margin-left: auto; display: flex; gap: 4px; } .tm-act .btn { height: 24px; padding: 0 8px; font-size: 12px; }
+  .tm-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; } .tm-bar .inp { flex: 1; min-width: 160px; height: 34px; }
+  .tm-fchips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; } .tm-fchips button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; } .tm-fchips button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .tm-set h4 { margin: 18px 0 8px; font-size: 14px; } .tm-set h4:first-child { margin-top: 0; }
+  .tm-set ol { margin: 6px 0; padding-left: 20px; font-size: 13px; line-height: 1.8; color: var(--ink); }
+  .tm-code { width: 100%; box-sizing: border-box; font: 12px monospace; height: 70px; }
+  .tm-tabs td, .tm-tabs th { font-size: 12.5px; padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; } .tm-tabs { border-collapse: collapse; width: 100%; }
   .ds-mnav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .ds-mnav b { font-size: 15px; min-width: 96px; text-align: center; }
   .ds-memo li { align-items: flex-start; } .ds-memo .tm { min-width: 40px; color: var(--brand); font-weight: 700; font-size: 12.5px; } .ds-memo .t { white-space: normal !important; overflow: visible !important; }
   .ds-memo li.note .tm { color: var(--sub); } .ds-memo .ok { color: var(--ok); font-size: 12px; font-weight: 700; white-space: nowrap; }
@@ -1083,11 +1107,19 @@
         <div class="ds-search"><input class="inp" id="dsQ" placeholder="🔍 기사 이름 · 아이디 · 연락처 · 캠프 · 노선 코드 (여러 개는 콤마로)" autocomplete="off"><div class="chips" id="dsScope"></div></div>
         <div id="dsRes"></div>
       </div>
-      <aside class="db-card ds-memo-card">
-        <div class="db-top"><b>러너 업무스케줄</b><a id="dsMemoGo">열기 →</a></div>
-        <div class="ds-mnav"><button class="btn sm ghost" id="dsMemoPrev" type="button" aria-label="전날">◀</button><b id="dsMemoT"></b><button class="btn sm ghost" id="dsMemoNext" type="button" aria-label="다음날">▶</button><span class="grow"></span><button class="btn sm ghost" id="dsMemoToday" type="button">오늘</button><input class="inp" type="date" id="dsMemoDay" style="width:140px;height:30px"></div>
-        <div id="dsMemoList"></div>
-      </aside>
+      <div class="ds-side">
+        <aside class="db-card ds-memo-card">
+          <div class="db-top"><b>러너 업무스케줄</b><a id="dsMemoGo">열기 →</a></div>
+          <div class="ds-mnav"><button class="btn sm ghost" id="dsMemoPrev" type="button" aria-label="전날">◀</button><b id="dsMemoT"></b><button class="btn sm ghost" id="dsMemoNext" type="button" aria-label="다음날">▶</button><span class="grow"></span><button class="btn sm ghost" id="dsMemoToday" type="button">오늘</button><input class="inp" type="date" id="dsMemoDay" style="width:140px;height:30px"></div>
+          <div id="dsMemoList"></div>
+        </aside>
+        <aside class="db-card" id="tmCard">
+          <div class="db-top"><b>팀즈 소식</b><span class="ds-n" id="tmNewN"></span><a id="tmOpen">전체 · 설정 →</a></div>
+          <div class="tm-hb none" id="tmHb"></div>
+          <div id="tmCardList"><div class="db-load">불러오는 중…</div></div>
+          <div class="hidden" id="tmCardBtns" style="display:flex;gap:6px"><button class="btn sm ghost" id="tmCardAllOk" type="button">새 글 모두 확인</button></div>
+        </aside>
+      </div>
     </div>
    </section>
 
@@ -1540,6 +1572,49 @@
 </div>
 
 <!-- ───────────── 공지 작성·수정 ───────────── -->
+<!-- ───────────── 팀즈 소식 (전체 · 설정) ───────────── -->
+<div class="modal hidden" id="tmModal">
+  <div class="m-box" style="width:min(860px,100%);height:min(92vh,900px);display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div class="m-top"><b>팀즈 소식</b><div class="seg" id="tmTab"><button type="button" data-tt="list" class="on">소식</button><button type="button" data-tt="set">설정 · 수집기</button></div><button type="button" class="btn sm ghost" id="tmClose">닫기</button></div>
+    <div id="tmPaneList" style="flex:1;overflow:auto;padding:12px 16px">
+      <div class="tm-bar">
+        <div class="seg" id="tmSt"><button type="button" data-ts="새 글">새 글 <span id="tmCntNew"></span></button><button type="button" data-ts="" class="on">전체</button><button type="button" data-ts="숨김">숨김 <span id="tmCntHide"></span></button></div>
+        <input class="inp" id="tmQ" placeholder="🔍 내용 · 작성자 · 채널 검색" autocomplete="off">
+        <button type="button" class="btn sm ghost" id="tmAllOk">새 글 모두 확인</button>
+        <button type="button" class="btn sm ghost" id="tmReload">새로고침</button>
+      </div>
+      <div class="tm-fchips" id="tmKwF"></div>
+      <ul class="tm-list" id="tmList"></ul>
+    </div>
+    <div id="tmPaneSet" class="hidden tm-set" style="flex:1;overflow:auto;padding:14px 18px">
+      <h4>가져올 내용</h4>
+      <div class="field"><span class="lb">수집</span><div class="seg" id="tmOn"><button type="button" data-on="1" class="on">켬</button><button type="button" data-on="0">끔</button></div></div>
+      <div class="grid2">
+        <div class="field"><label class="lb" for="tmKw">키워드 (한 줄에 하나 · 비우면 볼 채널의 모든 메시지)</label><textarea class="inp" id="tmKw" style="height:150px;line-height:1.6" placeholder="예:&#10;수행률&#10;프로모션&#10;입차&#10;긴급"></textarea></div>
+        <div class="field"><label class="lb" for="tmCh">볼 채널 (채널·채팅 이름 일부 · 비우면 모든 채널)</label><textarea class="inp" id="tmCh" style="height:150px;line-height:1.6" placeholder="예:&#10;강서1&#10;공지"></textarea></div>
+      </div>
+      <div class="db-note">키워드는 내용과 작성자 이름에서 찾습니다 (대소문자 구분 없음). 채널 이름은 크롬 탭 제목에 보이는 이름으로 맞춥니다.</div>
+      <div class="m-actions" style="justify-content:flex-start"><button type="button" class="btn" id="tmSave">설정 저장</button></div>
+
+      <h4>수집기 상태</h4>
+      <div id="tmTabs"></div>
+
+      <h4>수집기 설치 · 연결 (처음 한 번)</h4>
+      <ol>
+        <li>팀즈를 볼 PC의 크롬에서 <a id="tmDl" target="_blank" rel="noopener">러너 팀즈 수집기 내려받기</a> → 압축을 풀어 둡니다 (폴더를 지우지 마세요).</li>
+        <li>크롬 주소창에 <b>chrome://extensions</b> → 오른쪽 위 <b>개발자 모드</b> 켜기 → <b>압축해제된 확장 프로그램을 로드합니다</b> → 푼 폴더(teams-collector) 선택.</li>
+        <li>아래 <b>[연결 코드 만들기]</b> → [복사] → 크롬 오른쪽 위 퍼즐 아이콘 → 러너 팀즈 수집기 → 코드 붙여 넣기 → <b>연결</b>.</li>
+        <li>크롬에 팀즈 웹(teams.microsoft.com)을 열고, 볼 채널을 <b>탭마다 하나씩</b> 열어 둡니다.</li>
+        <li>크롬 <b>설정 → 성능 → 항상 활성 상태로 유지할 사이트</b>에 teams.microsoft.com 과 teams.cloud.microsoft 추가 (안 하면 오래된 탭을 크롬이 잠재워 수집이 멈춤).</li>
+        <li>PC 절전 모드는 끄거나 길게 두세요. 팀즈 로그인이 풀리면 수집도 멈춥니다 — 위 상태가 <b>멈춤</b>으로 바뀝니다.</li>
+      </ol>
+      <div class="m-actions" style="justify-content:flex-start"><button type="button" class="btn" id="tmKeyBtn">연결 코드 만들기</button><span class="db-note" id="tmKeyNote"></span></div>
+      <div id="tmCodeBox" class="hidden"><textarea class="inp tm-code" id="tmCode" readonly></textarea>
+        <div class="m-actions" style="justify-content:flex-start"><button type="button" class="btn ghost" id="tmCopy">복사</button><span class="db-note">이 코드는 지금 한 번만 보입니다. 다른 사람에게 보내지 마세요. 새로 만들면 예전 코드는 바로 막힙니다.</span></div></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal hidden" id="ntModal">
   <form class="m-box" id="ntForm" novalidate style="width:min(640px,100%);max-height:92vh;overflow:auto">
     <h3 id="ntTitleH">새 공지</h3>
@@ -1909,11 +1984,12 @@
   //  · 기사스케줄: 품앗이 확정·취소, 다른 관리자의 칸 편집, 노선 변경 적용, 기사 캠프 변경 → 표를 다시 받아 바뀐 칸만 노랗게 표시 (입력 중·저장 대기 칸은 그대로)
   //  · 품앗이 관리: 지원·확정·취소 → 목록 다시 받음 · 대시보드: 무엇이든 바뀌면 1분에 한 번까지 새로 받음
   //  · Firestore 를 못 쓰면 60초마다 서버(adm_live)에 묻는다
-  const LIVE = { schAt: 0, pmAt: 0, dirtyAt: 0, first: true, t: {}, dashAt: 0, on: false, poll: 0, unsub: null };
+  const LIVE = { schAt: 0, pmAt: 0, tmAt: 0, dirtyAt: 0, first: true, t: {}, dashAt: 0, on: false, poll: 0, unsub: null };
   function liveDot(on) { LIVE.on = on; $$('.live-dot').forEach((d) => { d.classList.toggle('on', on); d.title = on ? '실시간 갱신 켜짐 (품앗이·다른 관리자 변경이 바로 반영)' : '실시간 갱신 대기 (60초마다 확인)'; }); }
   function liveApply(m) {
-    const schAt = +m.schAt || 0, pmAt = +m.pmAt || 0, dirtyAt = +m.dirtyAt || 0;
-    if (LIVE.first) { LIVE.first = false; LIVE.schAt = schAt; LIVE.pmAt = pmAt; LIVE.dirtyAt = dirtyAt; return; }
+    const schAt = +m.schAt || 0, pmAt = +m.pmAt || 0, tmAt = +m.tmAt || 0, dirtyAt = +m.dirtyAt || 0;
+    if (LIVE.first) { LIVE.first = false; LIVE.schAt = schAt; LIVE.pmAt = pmAt; LIVE.tmAt = tmAt; LIVE.dirtyAt = dirtyAt; return; }
+    if (tmAt > LIVE.tmAt) { LIVE.tmAt = tmAt; liveLater('tm', liveTeams, 1500); }
     if (schAt > LIVE.schAt) {
       LIVE.schAt = schAt;
       const mine = m.schBy && me && m.schBy === me.loginId && Date.now() - schAt < 20000; // 내가 방금 저장한 것은 다시 받지 않음
@@ -1952,6 +2028,12 @@
     if (currentView !== 'dash' || document.hidden) return;
     if (Date.now() - LIVE.dashAt < 60000) return liveLater('dash', liveDash, 60000 - (Date.now() - LIVE.dashAt) + 500);
     LIVE.dashAt = Date.now(); DSB.memos = null; dsMemo();
+  }
+  function liveTeams() { // 팀즈 소식: 대시보드를 보고 있거나 팀즈 소식 창이 열려 있을 때 새로 받고, 새 글이 늘면 알림
+    const open = !$('#tmModal').classList.contains('hidden');
+    if ((currentView !== 'dash' && !open) || document.hidden) return;
+    const before = TM.counts.new || 0;
+    tmLoad().then(() => { const n = (TM.counts.new || 0) - before; if (n > 0) toast('팀즈 새 소식 ' + n + '건'); });
   }
   async function liveStart() {
     if (LIVE.unsub || LIVE.poll) return;
@@ -3097,10 +3179,142 @@
   $('#dsMemoToday').addEventListener('click', () => dsMemo(ymdLocal(new Date())));
   $('#dsMemoDay').addEventListener('change', (e) => { if (e.target.value) dsMemo(e.target.value); });
   $('#dsMemoGo').addEventListener('click', () => { const a = $('.nav a[data-view="memo"]'); if (a) a.click(); });
+  // ───── 대시보드: 팀즈 소식 (크롬 확장 '러너 팀즈 수집기'가 보낸 메시지 중 키워드에 걸린 것) ─────
+  const TM = { rows: null, counts: {}, cfg: null, hb: null, keySet: false, st: '', q: '', kw: '', seq: 0, open: {}, tab: 'list' };
+  const tmAgo = (ms) => { if (!ms) return ''; const m = Math.floor((Date.now() - ms) / 60000); return m < 1 ? '방금' : m < 60 ? m + '분 전' : m < 1440 ? Math.floor(m / 60) + '시간 ' + (m % 60) + '분 전' : Math.floor(m / 1440) + '일 전'; };
+  const tmWhen = (s) => { s = String(s || ''); if (!s) return ''; const d = s.slice(0, 10), t = s.slice(11, 16); return d === ymdLocal(new Date()) ? t : +d.slice(5, 7) + '/' + +d.slice(8, 10) + ' ' + t; };
+  const tmRx = () => { const ks = ((TM.cfg && TM.cfg.keywords) || []).filter(Boolean).map((k) => esc(k).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); return ks.length ? new RegExp('(' + ks.join('|') + ')', 'gi') : null; };
+  const tmHl = (t, rx) => { const h = esc(t); return rx ? h.replace(rx, '<mark class="tm-m">$1</mark>') : h; };
+  function tmLoad() {
+    const seq = ++TM.seq;
+    return api('adm_teamsList', { status: TM.st === '숨김' ? '숨김' : '', limit: 500 }).then((r) => {
+      if (seq !== TM.seq) return;
+      if (!r.ok) { $('#tmCardList').innerHTML = '<div class="db-empty">' + esc(r.msg || '불러오지 못했습니다.') + '</div>'; return; }
+      Object.assign(TM, { rows: r.rows || [], counts: r.counts || {}, cfg: r.cfg, hb: r.hb, keySet: r.keySet });
+      tmPaint();
+    }).catch(() => {});
+  }
+  function tmHbHtml() {
+    const hb = TM.hb || {}, last = hb.last || 0;
+    if (TM.cfg && !TM.cfg.on) return ['none', '<span class="dot"></span>수집 꺼 둠 (설정에서 켜기)'];
+    if (!last) return ['none', '<span class="dot"></span>' + (TM.keySet ? '수집기 신호 없음 — 팀즈 탭이 열린 PC를 확인하세요' : '수집기 연결 전 — <a data-tmset style="cursor:pointer;color:var(--brand)">설치·연결하기</a>')];
+    const live = (hb.tabs || []).filter((t) => Date.now() - t.at < 30 * 60000);
+    const stale = Date.now() - last > (hb.staleMin || 10) * 60000;
+    const warn = live.map((t) => t.warn).filter(Boolean)[0];
+    if (stale) return ['bad', '<span class="dot"></span>멈춤 — 마지막 수집 ' + tmAgo(last) + ' · 팀즈 탭·PC 절전·로그인 확인'];
+    return [warn ? 'bad' : '', '<span class="dot"></span>수집 중 · 탭 ' + live.length + '개 · ' + tmAgo(last) + (warn ? '<br>⚠ ' + esc(warn) : '')];
+  }
+  function tmItem(m, rx, big) {
+    const cls = (m.status === '새 글' ? 'new' : m.status === '숨김' ? 'hid' : 'seen') + (TM.open[m.id] ? ' open' : '');
+    const kws = (m.keywords || []).filter((k) => k !== '(전체)').map((k) => '<span class="tm-kw">' + esc(k) + '</span>').join('');
+    const act = big ? '<span class="tm-act">' + (m.status === '새 글' ? '<button type="button" class="btn ghost" data-tmst="확인">확인</button>' : m.status === '확인' ? '<button type="button" class="btn ghost" data-tmst="새 글">새 글로</button>' : '') +
+      (m.status === '숨김' ? '<button type="button" class="btn ghost" data-tmst="확인">보이기</button>' : '<button type="button" class="btn ghost" data-tmst="숨김">숨김</button>') + '</span>' : '';
+    return '<li class="' + cls + '" data-tmid="' + esc(m.id) + '"><div class="h"><b>' + esc(m.author || '(작성자 모름)') + '</b><span>' + esc(tmWhen(m.postedAt || m.collectedAt)) + '</span><span class="tm-ch" title="' + esc(m.channel) + '">' + esc(m.channel) + '</span>' + kws + act + '</div>' +
+      '<div class="x">' + tmHl(m.text, rx) + '</div>' + (big && TM.open[m.id] && m.by ? '<div class="db-note">' + esc(m.status) + ' · ' + esc(m.by) + ' · ' + esc(m.checkedAt || '') + '</div>' : '') + '</li>';
+  }
+  function tmPaint() {
+    const rows = TM.rows || [], rx = tmRx(), nNew = TM.counts.new || 0;
+    $('#tmNewN').textContent = nNew ? '새 글 ' + nNew : '';
+    const h = tmHbHtml(), hb = $('#tmHb'); hb.className = 'tm-hb ' + h[0]; hb.innerHTML = h[1];
+    // 카드: 새 글 먼저 (최대 15) · 없으면 최근 5건을 흐리게
+    if (TM.st !== '숨김') {
+      const fresh = rows.filter((m) => m.status === '새 글' || TM.open[m.id]).slice(0, 15), list = fresh.length ? fresh : rows.slice(0, 5); // 방금 펼쳐 읽은 글은 확인으로 바뀌어도 카드에 남김
+      $('#tmCardList').innerHTML = !rows.length ? '<div class="db-empty">' + (TM.cfg && TM.cfg.keywords && TM.cfg.keywords.length ? '키워드에 걸린 팀즈 메시지가 아직 없습니다.' : '키워드를 정하면 걸린 메시지만 모아 보여 줍니다.') + '</div>' :
+        (fresh.length ? '' : '<div class="db-note">새 글 없음 · 최근 소식</div>') + '<ul class="tm-list">' + list.map((m) => tmItem(m, rx, false)).join('') + '</ul>';
+      $('#tmCardBtns').classList.toggle('hidden', !nNew);
+    }
+    if ($('#tmModal').classList.contains('hidden')) return;
+    $('#tmCntNew').textContent = nNew ? '(' + nNew + ')' : '';
+    $('#tmCntHide').textContent = TM.counts.hide ? '(' + TM.counts.hide + ')' : '';
+    $$('#tmSt [data-ts]').forEach((b) => b.classList.toggle('on', b.dataset.ts === TM.st));
+    const kwAll = {}; rows.forEach((m) => (m.keywords || []).forEach((k) => { if (k !== '(전체)') kwAll[k] = (kwAll[k] || 0) + 1; }));
+    $('#tmKwF').innerHTML = Object.keys(kwAll).length ? ['<button type="button" data-tmkw="" class="' + (TM.kw ? '' : 'on') + '">전체</button>'].concat(Object.keys(kwAll).sort().map((k) => '<button type="button" data-tmkw="' + esc(k) + '" class="' + (TM.kw === k ? 'on' : '') + '">' + esc(k) + ' ' + kwAll[k] + '</button>')).join('') : '';
+    const q = nfc(TM.q.trim());
+    const shown = rows.filter((m) => (TM.st !== '새 글' || m.status === '새 글') && (!TM.kw || (m.keywords || []).indexOf(TM.kw) >= 0) &&
+      (!q || [m.text, m.author, m.channel].some((v) => nfc(v).indexOf(q) >= 0)));
+    $('#tmList').innerHTML = shown.length ? shown.map((m) => tmItem(m, rx, true)).join('') : '<li class="db-empty" style="cursor:default">보일 소식이 없습니다.</li>';
+    tmPaintSet();
+  }
+  function tmPaintSet() {
+    const hb = TM.hb || {}, tabs = hb.tabs || [];
+    $('#tmTabs').innerHTML = (() => { const h = tmHbHtml(); return '<div class="tm-hb ' + h[0] + '" style="margin-bottom:6px">' + h[1] + '</div>'; })() +
+      (tabs.length ? '<table class="tm-tabs"><thead><tr><th>채널·채팅 (탭)</th><th>마지막 신호</th><th>화면 메시지</th><th>버전</th><th>경고</th></tr></thead><tbody>' +
+        tabs.map((t) => '<tr><td>' + esc(t.channel || '-') + '</td><td>' + esc(tmAgo(t.at)) + '</td><td>' + (t.found || 0) + '</td><td>' + esc(t.ver || '') + '</td><td>' + esc(t.warn || '') + '</td></tr>').join('') + '</tbody></table>' : '');
+    $('#tmKeyBtn').textContent = TM.keySet ? '연결 코드 새로 만들기' : '연결 코드 만들기';
+    $('#tmKeyNote').textContent = TM.keySet ? '이미 연결 코드가 있습니다. 새로 만들면 지금 쓰는 수집기는 새 코드를 넣을 때까지 멈춥니다.' : '';
+  }
+  function tmFillSet() {
+    const c = TM.cfg || { on: true, keywords: [], channels: [] };
+    $$('#tmOn [data-on]').forEach((b) => b.classList.toggle('on', (b.dataset.on === '1') === !!c.on));
+    $('#tmKw').value = (c.keywords || []).join('\n'); $('#tmCh').value = (c.channels || []).join('\n');
+    const dl = $('#tmDl'); dl.href = window.RUNNER_CONFIG ? new URL('../download/runner-teams-collector.zip', location.href).href : 'https://github.com/runyjh/runner-allinone/tree/main/extension/teams-collector';
+  }
+  function tmModalOpen(tab) {
+    TM.tab = tab || 'list';
+    $('#tmModal').classList.remove('hidden');
+    $$('#tmTab [data-tt]').forEach((b) => b.classList.toggle('on', b.dataset.tt === TM.tab));
+    $('#tmPaneList').classList.toggle('hidden', TM.tab !== 'list'); $('#tmPaneSet').classList.toggle('hidden', TM.tab !== 'set');
+    $('#tmCodeBox').classList.add('hidden'); $('#tmCode').value = '';
+    tmFillSet(); tmPaint(); tmLoad().then(() => { if (TM.tab === 'set') tmFillSet(); });
+  }
+  const tmClose = () => { $('#tmModal').classList.add('hidden'); $('#tmCode').value = ''; if (TM.st === '숨김') { TM.st = ''; tmLoad(); } };
+  function tmMark(ids, status, all) {
+    (TM.rows || []).forEach((m) => { if (all ? m.status === '새 글' : ids.indexOf(m.id) >= 0) { if (m.status === '새 글' && status !== '새 글') TM.counts.new = Math.max(0, (TM.counts.new || 0) - 1); if (status === '새 글' && m.status !== '새 글') TM.counts.new = (TM.counts.new || 0) + 1; m.status = status; } });
+    if (TM.st === '숨김' && status !== '숨김') TM.rows = TM.rows.filter((m) => ids.indexOf(m.id) < 0);
+    if (TM.st !== '숨김' && status === '숨김') TM.rows = TM.rows.filter((m) => ids.indexOf(m.id) < 0);
+    tmPaint();
+    return api('adm_teamsMark', { ids, status, all: !!all }).then((r) => { if (!r.ok) { toast(r.msg); tmLoad(); } }).catch(() => tmLoad());
+  }
+  $('#tmOpen').addEventListener('click', () => tmModalOpen('list'));
+  $('#tmHb').addEventListener('click', (e) => { if (e.target.closest('[data-tmset]')) tmModalOpen('set'); });
+  $('#tmCardAllOk').addEventListener('click', () => tmMark([], '확인', true));
+  $('#tmAllOk').addEventListener('click', () => tmMark([], '확인', true));
+  $('#tmReload').addEventListener('click', () => tmLoad());
+  $('#tmClose').addEventListener('click', tmClose);
+  $('#tmModal').addEventListener('click', (e) => { if (e.target.id === 'tmModal') tmClose(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#tmModal').classList.contains('hidden')) tmClose(); });
+  $('#tmTab').addEventListener('click', (e) => { const b = e.target.closest('[data-tt]'); if (b) tmModalOpen(b.dataset.tt); });
+  $('#tmSt').addEventListener('click', (e) => { const b = e.target.closest('[data-ts]'); if (!b) return; const was = TM.st; TM.st = b.dataset.ts; if ((was === '숨김') !== (TM.st === '숨김')) { TM.rows = []; tmPaint(); tmLoad(); } else tmPaint(); });
+  $('#tmKwF').addEventListener('click', (e) => { const b = e.target.closest('[data-tmkw]'); if (!b) return; TM.kw = b.dataset.tmkw; tmPaint(); });
+  onSearch($('#tmQ'), () => { TM.q = $('#tmQ').value; tmPaint(); });
+  const tmClick = (e, big) => {
+    const li = e.target.closest('[data-tmid]'); if (!li) return;
+    const id = li.dataset.tmid, st = e.target.closest('[data-tmst]');
+    if (st) return tmMark([id], st.dataset.tmst);
+    if (window.getSelection && String(window.getSelection())) return; // 글자를 고르는 중이면 접지 않음
+    TM.open[id] = !TM.open[id];
+    const m = (TM.rows || []).find((x) => x.id === id);
+    if (m && m.status === '새 글' && TM.open[id]) tmMark([id], '확인'); else tmPaint();
+  };
+  $('#tmCardList').addEventListener('click', (e) => tmClick(e, false));
+  $('#tmList').addEventListener('click', (e) => tmClick(e, true));
+  $('#tmOn').addEventListener('click', (e) => { const b = e.target.closest('[data-on]'); if (!b) return; $$('#tmOn [data-on]').forEach((x) => x.classList.toggle('on', x === b)); });
+  $('#tmSave').addEventListener('click', () => {
+    const on = !!$('#tmOn [data-on="1"].on');
+    api('adm_teamsSet', { on, keywords: $('#tmKw').value, channels: $('#tmCh').value }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      TM.cfg = r.cfg; tmFillSet(); tmPaint(); toast('저장했습니다. 수집기는 1~2분 안에 새 설정을 받습니다.');
+    }).catch(() => {});
+  });
+  $('#tmKeyBtn').addEventListener('click', () => {
+    if (TM.keySet && !confirm('연결 코드를 새로 만들까요?\n지금 쓰는 수집기는 새 코드를 넣을 때까지 멈춥니다.')) return;
+    api('adm_teamsKey').then((r) => {
+      if (!r.ok) return toast(r.msg);
+      const url = RUNNER_API || r.url;
+      if (!url) return toast('웹앱 주소를 알 수 없습니다. 깃허브 페이지의 관리자 화면에서 다시 해 주세요.');
+      const b64 = btoa(unescape(encodeURIComponent(JSON.stringify({ a: url, k: r.key })))).replace(/\+/g, '-').replace(/\//g, '_');
+      $('#tmCode').value = 'RTC1.' + b64; $('#tmCodeBox').classList.remove('hidden'); TM.keySet = true; tmPaintSet();
+    }).catch(() => {});
+  });
+  $('#tmCopy').addEventListener('click', () => { const v = $('#tmCode').value; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast('복사했습니다. 수집기 창에 붙여 넣으세요.')).catch(() => { $('#tmCode').select(); document.execCommand('copy'); toast('복사했습니다.'); }); });
+  // 마지막 수집 시각 글자를 1분마다 다시 (서버에 묻지 않음)
+  setInterval(() => { if (currentView === 'dash' && TM.hb && !document.hidden) { const h = tmHbHtml(), hb = $('#tmHb'); hb.className = 'tm-hb ' + h[0]; hb.innerHTML = h[1]; } }, 60000);
+
   function loadDash(fresh) {
     if (fresh) { DSB.drv = null; DSB.sched = null; DSB.stl = null; DSB.pmQ = null; DSB.memos = null; RP.loaded = false; SL.loaded = false; }
     dsNeed('drv'); dsNeed('route');
     dsMemo(DSB.memoDay || ymdLocal(new Date()));
+    tmLoad();
     if (dsTerms().length) dsSearch(); else dsRender();
     setTimeout(() => { if (currentView === 'dash') $('#dsQ').focus(); }, 50);
   }

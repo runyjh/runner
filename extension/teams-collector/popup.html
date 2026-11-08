@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>러너 팀즈 수집기</title>
+<style>
+  body { margin: 0; width: 340px; font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: #191f28; background: #f5f6f8; }
+  header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: #fff; border-bottom: 1px solid #e5e8eb; }
+  header img { width: 22px; height: 22px; border-radius: 5px; }
+  header b { font-size: 14px; flex: 1; }
+  header small { color: #8b95a1; }
+  section { margin: 10px; padding: 12px; background: #fff; border-radius: 10px; border: 1px solid #e5e8eb; }
+  h4 { margin: 0 0 8px; font-size: 13px; }
+  .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+  .row span:first-child { color: #6b7684; white-space: nowrap; }
+  .row span:last-child { text-align: right; word-break: break-all; }
+  textarea { width: 100%; box-sizing: border-box; height: 64px; font: 12px monospace; border: 1px solid #d1d6db; border-radius: 8px; padding: 6px; resize: none; }
+  button { border: 0; border-radius: 8px; background: #1b64da; color: #fff; font-weight: 700; padding: 8px 10px; cursor: pointer; font-size: 12.5px; }
+  button.ghost { background: #f2f4f6; color: #333d4b; }
+  .btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .ok { color: #2f9e44; font-weight: 700; } .bad { color: #e03131; font-weight: 700; } .sub { color: #8b95a1; font-size: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; } .chip { background: #e8f3ff; color: #1b64da; border-radius: 99px; padding: 1px 8px; font-size: 12px; }
+  .smp { border-top: 1px solid #f2f4f6; padding: 5px 0; font-size: 12px; } .smp b { font-size: 12px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header><img src="icons/icon-32.png" alt=""><b>러너 팀즈 수집기</b><small id="ver"></small></header>
+
+<section id="connBox">
+  <h4>러너 올인원 연결</h4>
+  <div id="connState" class="sub"></div>
+  <div id="connForm">
+    <textarea id="code" placeholder="관리자 화면 → 대시보드 → 팀즈 소식 → 설정 → [연결 코드 만들기] 에서 복사한 코드를 붙여 넣으세요 (RTC1. 으로 시작)"></textarea>
+    <div class="btns"><button id="connect">연결</button></div>
+  </div>
+  <div class="btns hidden" id="connBtns"><button class="ghost" id="reconnect">다른 코드로 다시 연결</button></div>
+</section>
+
+<section id="stBox" class="hidden">
+  <h4>수집 상태</h4>
+  <div class="row"><span>수집</span><span id="on"></span></div>
+  <div class="row"><span>마지막 서버 연결</span><span id="lastOk"></span></div>
+  <div class="row"><span>지금까지 저장된 메시지</span><span id="sentTotal"></span></div>
+  <div class="row"><span>오류</span><span id="lastErr"></span></div>
+  <div style="margin-top:6px"><span class="sub">키워드</span><div class="chips" id="kw"></div></div>
+  <div style="margin-top:6px"><span class="sub">볼 채널</span><div class="chips" id="ch"></div></div>
+  <div class="btns"><button class="ghost" id="reloadCfg">설정 다시 받기</button></div>
+</section>
+
+<section id="tabBox" class="hidden">
+  <h4>이 탭 (팀즈)</h4>
+  <div class="row"><span>채널·채팅</span><span id="tCh"></span></div>
+  <div class="row"><span>화면에서 찾은 메시지</span><span id="tFound"></span></div>
+  <div class="row"><span>키워드에 맞은 메시지</span><span id="tMatched"></span></div>
+  <div class="row"><span>보낼 대기</span><span id="tPending"></span></div>
+  <div class="row"><span>경고</span><span id="tWarn"></span></div>
+  <div id="tSample" style="margin-top:6px"></div>
+  <div class="btns"><button id="sendNow">지금 보내기</button><button class="ghost" id="forget" title="이 PC가 기억한 '보낸 메시지' 목록을 비우고 화면의 메시지를 다시 보냅니다 (서버는 같은 메시지를 두 번 저장하지 않음)">다시 보내기</button></div>
+</section>
+<section id="noTab" class="hidden sub">이 탭은 팀즈가 아닙니다. 팀즈 웹(teams.microsoft.com)을 연 탭에서 아이콘을 누르면 그 탭의 상태가 보입니다.</section>
+
+<script src="popup.js"></script>
+</body>
+</html>

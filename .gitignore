@@ -19,3 +19,6 @@ _site/
 
 node_modules/
 .DS_Store
+
+# 크롬 확장 아이콘
+!extension/teams-collector/icons/*.png
