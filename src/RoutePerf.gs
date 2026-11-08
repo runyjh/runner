@@ -216,6 +216,18 @@ function api_myPerf(token) {
       out.campAll = all.filter(function (r) { return r.camp === camp && r.week === latest; }).sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; })
         .map(function (r) { return { code: r.code, wk: r.wk, perf: r.perf === '' ? null : Number(r.perf), grade: r.grade ? Number(r.grade) : null, improve: r.improve === 'Y' }; });
     }
+    // 월간 SLA 점수 (최신 집계기간) 를 라우트마다 붙인다
+    try {
+      const sla = slaAll_(), ps = Object.keys(sla.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort(), lp = ps[ps.length - 1];
+      if (lp) {
+        const lrows = sla.filter(function (o) { return o.period === lp; }), th = slaThresholds_();
+        const of = function (cp, code) { const r = lrows.filter(function (o) { return o.camp === cp && o.code === code; })[0]; return r ? { total: r.total === '' ? null : Number(r.total), cs: r.cs === '' ? null : Number(r.cs), cx: r.cx === '' ? null : Number(r.cx) } : null; };
+        out.routes.concat(out.recent).forEach(function (r) { r.sla = of(r.camp || camp, r.code); });
+        out.campAll.forEach(function (x) { x.sla = of(camp, x.code); });
+        const v = lrows.filter(function (o) { return o.code === '영업점'; })[0];
+        out.sla = { period: lp, from: lrows[0].from, vendor: v ? Number(v.total) : null, th: th };
+      }
+    } catch (e) { /* SLA 없음 */ }
     try { const j = JSON.stringify(out); if (j.length < 90000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
     return out;
   });
@@ -229,4 +241,123 @@ function rpfBaseCodes_(br) {
     m[2].split('').forEach(function (L) { out.push(m[1] + L); });
   });
   return out.filter(function (x, i, a) { return a.indexOf(x) === i; });
+}
+
+// ───────────────────────── SLA 점수 (쿠팡 '[QF] Vendor SLA' 월간 파일 · route_sla) ─────────────────────────
+// 총점 100 = 미수행률 15 + 반품 미회수율 15 + 고객만족 50 + 고객불만 20. 집계기간이 누적(예 6/1~9/25)이라 기간 끝 날짜(period)로 구분한다.
+const SLA_CAMP_DEFAULT = { AYG_1: '안양1', GSO_1: '강서1', GNP_1: '군포1', ICH_7: '인천7', ICH_8: '인천8', ISN_5: '일산5', SCH_1: '서초1', SHG_1: '시흥1', SHG_2: '시흥2', SWN_1: '수원1', HWS_1: '화성1' };
+const SLA_GOOD = 95, SLA_WARN = 90; // 총점 색 기준 (설정 slaGood / slaWarn 로 바꿀 수 있음)
+function slaThresholds_() { const a = appSet_(); return { good: Number(a.slaGood) || SLA_GOOD, warn: Number(a.slaWarn) || SLA_WARN }; }
+/** 쿠팡 캠프코드 → 짧은 캠프 이름 (camps 탭 '쿠팡 캠프코드' 우선, 없으면 기본표) */
+function slaCampMap_() {
+  const m = Object.assign({}, SLA_CAMP_DEFAULT);
+  try { readAll_(SH.CAMPS).forEach(function (c) { const k = str_(c.cpCode).toUpperCase(); if (k && c.name) m[k] = rpfCamp_(c.name); }); } catch (e) { /* 없음 */ }
+  return m;
+}
+function slaNum_(v) { if (v === '' || v == null) return ''; const n = Number(String(v).replace(/[^\d.\-]/g, '')); return isNaN(n) ? '' : String(Math.round(n * 10) / 10); }
+function slaAll_() { let rows = []; try { rows = readAll_(SH.RSLA).filter(function (o) { return o.key && o.period; }); } catch (e) { rows = []; } return rows; }
+function slaView_(o) {
+  const n = function (v) { return v === '' ? null : Number(v); };
+  return { key: o.key, period: o.period, from: o.from, to: o.to, wave: o.wave, cpCamp: o.cpCamp, camp: o.camp, code: o.code, type: o.type,
+    total: n(o.total), miss: n(o.miss), ret: n(o.ret), cs: n(o.cs), cx: n(o.cx), file: o.file, uploadedAt: o.uploadedAt };
+}
+/**
+ * 관리자: SLA 파일 한 블록 저장. p = { from:'yyyy-MM-dd', to:'yyyy-MM-dd', file, vendor:{total,miss,ret,cs,cx}, rows:[{ wave, cpCamp, route, type, total, miss, ret, cs, cx }] }
+ *  같은 기간(끝 날짜)·라우트는 덮어쓴다. 캠프코드 → 캠프 이름은 slaCampMap_.
+ */
+function adm_slaSave(token, p) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    p = p || {};
+    const from = normDate_(p.from), to = normDate_(p.to);
+    if (!to) fail_('집계기간(Data End Date)을 확인해 주세요.');
+    const rows = Array.isArray(p.rows) ? p.rows : [];
+    if (!rows.length && !p.vendor) fail_('저장할 줄이 없습니다.');
+    const file = str_(p.file).slice(0, 120), now = nowText_(), map = slaCampMap_();
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    try {
+      const sh = sheet_(SH.RSLA), c = cols_(SH.RSLA, true);
+      const cur = slaAll_(), byKey = {};
+      cur.forEach(function (o) { byKey[o.key] = o; });
+      const mk = function (cpCamp, camp, code, r, wave, type) {
+        return { key: to + '|' + camp + '|' + code, period: to, from: from || '', to: to, wave: str_(wave).slice(0, 10), cpCamp: cpCamp, camp: camp, code: code, type: str_(type).slice(0, 20),
+          total: slaNum_(r.total), miss: slaNum_(r.miss), ret: slaNum_(r.ret), cs: slaNum_(r.cs), cx: slaNum_(r.cx), file: file, uploadedAt: now, by: a.name };
+      };
+      const list = [], unknownCamps = {};
+      if (p.vendor) list.push(mk('', '', '영업점', p.vendor, '', '영업점'));
+      rows.forEach(function (r) {
+        const cp = str_(r.cpCamp).toUpperCase(), code = rpfCode_(r.route); if (!code) return;
+        const camp = map[cp] || rpfCamp_(r.camp || '') || cp;
+        if (!map[cp] && cp) unknownCamps[cp] = 1;
+        list.push(mk(cp, camp, code, r, r.wave, r.type));
+      });
+      const seen = {}, upd = [], add = []; let unchanged = 0;
+      list.forEach(function (o) {
+        if (seen[o.key]) return; seen[o.key] = 1;
+        const old = byKey[o.key];
+        if (old) {
+          if (['total', 'miss', 'ret', 'cs', 'cx', 'from'].every(function (k) { return str_(old[k]) === o[k]; })) { unchanged++; return; }
+          upd.push({ row: old._row, o: o });
+        } else add.push(o);
+      });
+      const toArr = function (o) { const arr = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { if (c[k] !== undefined) arr[c[k]] = safeText_(o[k]); }); return arr; };
+      upd.forEach(function (u) { sh.getRange(u.row, 1, 1, c.__w).setNumberFormat('@').setValues([toArr(u.o)]); });
+      if (add.length) {
+        const r0 = sh.getLastRow() + 1;
+        if (r0 + add.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(500, add.length));
+        sh.getRange(r0, 1, add.length, c.__w).setNumberFormat('@').setValues(add.map(toArr));
+      }
+      SpreadsheetApp.flush();
+      rpfBump_();
+      // 메모: 위험(총점 < warn) 라우트가 있고 이 기간 메모가 아직 없으면 한 줄
+      let memo = null;
+      const th = slaThresholds_();
+      if (perfMemoOn_() && (add.length || upd.length)) {
+        const bad = list.filter(function (o) { return o.code !== '영업점' && o.total !== '' && Number(o.total) < th.warn; });
+        if (bad.length) memo = slaMemo_(a, to, bad, th);
+      }
+      logAdmin_(a, 'SLA 점수 업로드', (from || '') + '~' + to, '새로 ' + add.length + ' · 바뀜 ' + upd.length + ' · 같음 ' + unchanged + (file ? ' · ' + file : ''));
+      return { ok: true, added: add.length, changed: upd.length, unchanged: unchanged, period: to, unknownCamps: Object.keys(unknownCamps), memo: memo };
+    } finally { lock.releaseLock(); }
+  });
+}
+function slaMemo_(a, period, bad, th) {
+  const tag = '[SLA ~' + period.slice(5).replace('-', '/') + ']';
+  try { if (readAll_(SH.MEMO).some(function (m) { return str_(m.content).indexOf(tag) === 0; })) return null; } catch (e) { /* 없음 */ }
+  const content = tag + ' 총점 ' + th.warn + '점 미만 ' + bad.length + '개: ' + bad.sort(function (x, y) { return Number(x.total) - Number(y.total); })
+    .map(function (o) { return o.camp + ' ' + o.code + '(' + o.total + '점·고객만족 ' + (o.cs || '-') + ')'; }).join(', ') + ' — 고객만족(50점) 항목 확인';
+  const now = nowText_();
+  appendObj_(SH.MEMO, { id: newMemoId_(), date: todayText_(), time: '', content: content.slice(0, 2000), done: '', cat: '', author: a.name, createdAt: now, updatedAt: now });
+  return content;
+}
+/** 관리자: SLA 전체 (최근 N기간) — adm_perfList 와 따로 (수행률 패널 'SLA 점수' 탭) */
+function adm_slaList(token, periodsN) {
+  return run_(function () {
+    requireAdmin_(token);
+    const n = Math.max(3, Math.min(36, Number(periodsN) || 18));
+    const ck = cache_(), key = 'sla:l:' + rpfVer_() + ':' + n, hit = ck.get(key);
+    if (hit) { try { const o = JSON.parse(hit); o.th = slaThresholds_(); return o; } catch (e) { /* 다시 */ } }
+    const all = slaAll_();
+    const periods = Object.keys(all.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort().slice(-n);
+    const pset = {}; periods.forEach(function (x) { pset[x] = 1; });
+    const out = { ok: true, periods: periods, rows: all.filter(function (o) { return pset[o.period]; }).map(slaView_), th: slaThresholds_(), campMap: slaCampMap_() };
+    try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
+    return out;
+  });
+}
+/** 대시보드용 SLA 요약 (최신 기간) */
+function slaSummary_() {
+  const all = slaAll_();
+  if (!all.length) return null;
+  const periods = Object.keys(all.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort();
+  const latest = periods[periods.length - 1], prevP = periods[periods.length - 2] || '';
+  const rows = all.filter(function (o) { return o.period === latest; }), th = slaThresholds_();
+  const vendor = rows.filter(function (o) { return o.code === '영업점'; })[0];
+  const prevVendor = prevP ? all.filter(function (o) { return o.period === prevP && o.code === '영업점'; })[0] : null;
+  const routes = rows.filter(function (o) { return o.code !== '영업점' && o.total !== ''; });
+  const low = routes.filter(function (o) { return Number(o.total) < th.warn; }).sort(function (x, y) { return Number(x.total) - Number(y.total); });
+  return { period: latest, from: rows[0].from, vendor: vendor ? Number(vendor.total) : null, vendorPrev: prevVendor ? Number(prevVendor.total) : null, vendorCs: vendor ? Number(vendor.cs) : null,
+    routes: routes.length, low: low.length, warn: routes.filter(function (o) { return Number(o.total) >= th.warn && Number(o.total) < th.good; }).length,
+    lowList: low.slice(0, 6).map(function (o) { return o.camp + ' ' + o.code + ' ' + o.total + '점'; }), th: th };
 }

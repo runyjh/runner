@@ -296,6 +296,8 @@
   .mp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
   .mp-grid span { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: #f7f8fa; font-size: 13px; }
   .mp-grid span small { margin-left: auto; color: var(--sub); font-size: 11px; } .mp-grid span.bad { background: #fff6e8; } .mp-grid span.imp { background: #fdecec; }
+  .mp-grid em { font-style: normal; font-weight: 800; } .mp-grid em.ok { color: #12a150; } .mp-grid em.warn { color: #d97706; } .mp-grid em.bad { color: #c62828; }
+  .mpr .slat { display: block; font-size: 11px; font-weight: 700; margin-top: 2px; } .mpr .slat.ok { color: #12a150; } .mpr .slat.warn { color: #d97706; } .mpr .slat.bad { color: #c62828; }
   .day .pmx { font-size: 12.5px; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; cursor: pointer; border: 0; text-align: left; font: inherit; font-size: 12.5px; }
   .day .pmx b { margin-right: 4px; }
   .day .pmx.r-수행 { background: #fff4d6; color: #8a5a00; } .day .pmx.r-맡김 { background: #e8f0fd; color: #0a53a8; } .day .pmx.r-지원 { background: #f2f4f6; color: #4e5968; }
@@ -2314,10 +2316,12 @@
       const lastOf = (list) => { const rt = list[0]; return rt ? rt.weeks[rt.weeks.length - 1] : null; };
       const last = lastOf(routes) || lastOf(recent) || (campAll[0] ? { wk: campAll[0].wk } : null);
       const gr = (g) => '<i class="gr g' + (g || 0) + '">' + (g || '-') + '</i>';
+      const th = (r.sla && r.sla.th) || { good: 95, warn: 90 }, slaCls = (t) => t >= th.good ? 'ok' : t >= th.warn ? 'warn' : 'bad';
       const row = (rt, sub) => {
         const l = rt.weeks[rt.weeks.length - 1] || {};
         return '<div class="mpr"><b class="code">' + escH(rt.code) + (sub ? '<small>' + escH(sub) + '</small>' : '') + '</b><div class="wks">' + rt.weeks.map((w) => '<span>' + gr(w.grade) + escH(String(w.wk || '').replace('WK', 'W')) + '</span>').join('') + '</div>' +
-          '<div class="now"><b>' + gr(l.grade) + ' ' + (l.perf != null ? l.perf + '%' : '') + '</b>' + (l.improve ? '<span class="imp">개선 요청</span>' : (l.grade >= 3 ? '95% 미만' : l.grade ? '우수' : '')) + '</div></div>';
+          '<div class="now"><b>' + gr(l.grade) + ' ' + (l.perf != null ? l.perf + '%' : '') + '</b>' + (l.improve ? '<span class="imp">개선 요청</span>' : (l.grade >= 3 ? '95% 미만' : l.grade ? '우수' : '')) +
+          (rt.sla && rt.sla.total != null ? '<span class="slat ' + slaCls(rt.sla.total) + '">SLA ' + rt.sla.total + '점' + (rt.sla.cs != null ? ' · 고객만족 ' + rt.sla.cs : '') + '</span>' : '') + '</div></div>';
       };
       const openAll = !routes.length && !recent.length;
       box.innerHTML = '<h4>📈 내 라우트 수행률 <small class="sub">' + escH(last ? last.wk + (last.from ? ' (' + md(last.from) + '~' + md(last.to) + ')' : '') : '') + ' · 쿠팡 주간 안내 기준</small></h4>' +
@@ -2325,7 +2329,8 @@
         (recent.length ? '<div class="mp-sec">최근 4주에 뛴 라우트' + (r.backup ? ' (백업)' : '') + '</div>' + recent.map((rt) => row(rt, (rt.camp && rt.camp !== r.camp ? rt.camp + ' · ' : '') + rt.days + '일')).join('') : '') +
         (!routes.length && !recent.length && r.backup ? '<div class="sub" style="margin:4px 0 6px">최근 4주 스케줄에 라우트가 적힌 날이 없어 캠프 전체 등급만 보여 드립니다.</div>' : '') +
         (campAll.length ? '<details class="mp-all"' + (openAll ? ' open' : '') + '><summary>' + escH(r.camp || '내 캠프') + ' 캠프 전체 라우트 ' + campAll.length + '개 · 3~4등급 ' + campAll.filter((x) => x.grade >= 3).length + '개</summary><div class="mp-grid">' +
-          campAll.map((x) => '<span class="' + (x.improve ? 'imp' : x.grade >= 3 ? 'bad' : '') + '">' + gr(x.grade) + ' <b>' + escH(x.code) + '</b><small>' + (x.perf != null ? x.perf + '%' : '-') + (x.improve ? ' · 개선 요청' : '') + '</small></span>').join('') + '</div></details>' : '') +
+          campAll.map((x) => '<span class="' + (x.improve ? 'imp' : x.grade >= 3 ? 'bad' : '') + '">' + gr(x.grade) + ' <b>' + escH(x.code) + '</b><small>' + (x.perf != null ? x.perf + '%' : '-') + (x.improve ? ' · 개선 요청' : '') + (x.sla && x.sla.total != null ? ' · SLA <em class="' + slaCls(x.sla.total) + '">' + x.sla.total + '</em>' : '') + '</small></span>').join('') + '</div></details>' : '') +
+        (r.sla && r.sla.vendor != null ? '<div class="sub" style="margin-top:6px">월간 SLA (' + escH((r.sla.from ? md(r.sla.from) + '~' : '') + md(r.sla.period)) + ' 누적) · 러너 영업점 총점 <b>' + r.sla.vendor + '점</b> / 100 — 총점은 미수행 15 · 반품 15 · 고객만족 50 · 고객불만 20</div>' : '') +
         '<div class="sub" style="margin-top:6px">1~2등급 우수(95% 초과) · 3~4등급은 위탁 조정 대상(95% 미만)입니다. 안전 운전과 함께 꾸준한 완료 부탁드립니다.</div>';
       box.classList.remove('hidden');
     }).catch(() => {});

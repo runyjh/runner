@@ -96,6 +96,7 @@ function dashMain_() {
         .sort(function (a, b) { return b.routes - a.routes; })
     };
     try { out.route.perf = rpfSummary_(); } catch (e) { out.route.perf = null; }
+    try { out.route.sla = slaSummary_(); } catch (e) { out.route.sla = null; }
 
     // ── 업무스케줄 (메모)
     const memos = readAll_(SH.MEMO).map(function (o) { o.date = normDate_(o.date) || o.date; return o; }).filter(function (o) { return o.id && o.date; })
