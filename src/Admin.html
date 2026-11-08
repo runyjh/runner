@@ -804,6 +804,11 @@
   .sg td.ex { color: var(--sub); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
   .sg td.num { text-align: center; font-weight: 700; color: var(--ink); }
   .sg tr.note td.lab, .sg tr.calc td.lab { color: var(--sub); font-weight: 700; background: #f7f8fa; }
+  /* 품앗이 줄(대신 뛰는 기사 · 배차 확정 때 자동) · 품앗이 표시 칸: 준 기사 = 품▶ 받은 기사, 받은 기사 = 품◀ 준 기사 */
+  .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
+  .sg tr.pmr td.c { background: #fffbef; }
+  .sg td.c.pmk { box-shadow: inset 0 -3px 0 #12a150; }
+  .sg td.c.pmk::after { content: attr(data-pm); display: block; font-size: 10px; font-weight: 800; color: #0b6b3a; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nlab { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--sub); cursor: pointer; }
   .nlab:hover { color: var(--brand); text-decoration: underline; }
   .sg tr.note td.c { font-weight: 500; text-align: left; background: #fffdf5; color: var(--ink); } /* 비고 줄은 글에 휴무·휴가가 들어가도 검정 글씨 */
@@ -5255,6 +5260,13 @@
         (Number(a.order) || 9999) - (Number(b.order) || 9999) || koSort(a.name, b.name);
     });
     const rows = list.map((d) => ({ kind: 'd', row: d.id, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
+    // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트 (배차 확정 때 서버가 적음 · 직접 고쳐도 됨)
+    const campShort = sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
+    (SD.pmRows || []).filter((pr) => {
+      if (q && ![pr.name, pr.loginId].some((x) => String(x || '').toLowerCase().includes(q))) return false;
+      if (campShort && !SD.dates.some((dt) => sget(pr.id, dt).replace(/\s/g, '').includes(campShort))) return false;
+      return true;
+    }).forEach((pr) => rows.push({ kind: 'p', row: pr.id, p: pr }));
     SD.notes.forEach((n) => rows.push({ kind: 'n', row: n.id, note: n }));
     return rows;
   }
@@ -5298,8 +5310,14 @@
       '<tr class="h2">' + dates.map(hcell).join('') + '</tr></thead>';
     let prevCamp = null;
     const body = srows.map((r, ri) => {
+      if (r.kind === 'p') {
+        const first = !ri || srows[ri - 1].kind !== 'p';
+        return '<tr class="pmr' + (first ? ' gtop' : '') + '"><td class="fx f1 lab" title="품앗이 배차 확정 때 자동으로 적힙니다. 직접 고쳐도 됩니다.">품앗이</td>' +
+          '<td class="fx f2 lab">' + esc(r.p.name) + '</td><td class="fx f3">' + esc(r.p.loginId || '') + '</td><td class="fx f4"></td>' +
+          dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex num">' + dates.filter((dt) => sget(r.row, dt)).length + '</td><td class="ex" colspan="4"></td></tr>';
+      }
       if (r.kind === 'n') {
-        return '<tr class="note' + (ri && srows[ri - 1].kind === 'd' ? ' gtop' : '') + '"><td class="fx f1 lab">비고</td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
+        return '<tr class="note' + (ri && srows[ri - 1].kind !== 'n' ? ' gtop' : '') + '"><td class="fx f1 lab">비고</td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="5"></td></tr>';
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp;
@@ -5327,9 +5345,13 @@
     if (sepCol(ci)) cls.push('wk2');
     const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
     if (ins) cls.push('inst');
-    const tip = (v.length > 14 ? v : '') + (ins ? (v.length > 14 ? '\n' : '') + '📌 ' + ins.reason : '');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + '</td>';
+    const pm = r.kind === 'd' ? pmMark(r.row, dt) : '';
+    if (pm) cls.push('pmk');
+    const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', pm ? '품앗이 ' + pm : ''].filter(Boolean).join('\n');
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="품' + esc(pm) + '"' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + '</td>';
   }
+  /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
+  function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || ''; }
   // 중복 칸(주황 테두리)에 마우스를 올리면 어디와 겹치는지 작은 창으로 보여 줌
   function dupTipHtml(row, ci) {
     const list = (scalc && scalc.dupInfo && scalc.dupInfo.get(row + '|' + ci)) || [];
@@ -5396,12 +5418,12 @@
     $$('td.c', tb).forEach((td) => {
       const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
       const v = sget(r.row, dt), k = r.row + '|' + dt;
-      const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
-      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '']
+      const ins = r.kind === 'd' ? instOf(r.row, dt) : null, pm = r.kind === 'd' ? pmMark(r.row, dt) : '';
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has(r.row + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', pm ? 'pmk' : '']
         .filter(Boolean).join(' ');
-      const selCls = ['sel', 'act'].filter((x) => td.classList.contains(x));
+      const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
       if (td.textContent !== v) td.textContent = v;
-      const tip = (v.length > 14 ? v : '') + (ins ? (v.length > 14 ? '\n' : '') + '📌 ' + ins.reason : '');
+      const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', pm ? '품앗이 ' + pm : ''].filter(Boolean).join('\n');
       if (tip) td.title = tip; else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
