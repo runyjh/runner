@@ -54,7 +54,7 @@ function pmUser_(token) {
   if (info.mustChange) { const e = new Error('x'); e.userMsg = '비밀번호를 먼저 바꿔 주세요.'; e.code = 'MUST_CHANGE'; throw e; }
   return { id: String(s.d), info: info };
 }
-function pmTouch_() { fsMark_(); try { cache_().put('pm:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
+function pmTouch_() { flushBeforeBump_(); fsMark_(); try { cache_().put('pm:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
 function pmVer_() { return cache_().get('pm:v') || '0'; }
 /** 일감·지원 전체 (1분 캐시, 쓰면 바로 버림) */
 function pmData_() {
@@ -527,7 +527,10 @@ function api_myInfo(token) {
         posted: d.jobs.filter(function (j) { return j.posterId === u.id && j.status !== PST.CANCEL; }).length,
         helped: d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date < today; }).length,
         giveDays: (d.avail || []).filter(function (a) { return a.driverId === u.id && a.date >= today; }).length,
-        offers: d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OFFER && a.date >= today; }).length
+        offers: d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OFFER && a.date >= today; }).length,
+        // 내 일감에 온 지원 중 아직 답하지 않은 수 (api_pmList 의 waiting 과 같은 셈 · 마이페이지가 목록을 따로 부르지 않게)
+        waiting: d.jobs.filter(function (j) { return j.posterId === u.id && (j.status === PST.OPEN || j.status === PST.TALK) && j.date >= today; })
+          .reduce(function (n, j) { return n + d.apps.filter(function (a) { return a.jobId === j.id && a.status === PAST.APPLY; }).length; }, 0)
       }, postOn: pmPostOn_(), offerOn: pmOfferOn_()
     };
   });
@@ -652,8 +655,11 @@ function pmAvailDrivers_(me, d, today, withMe) {
       if (a.memo) x.memo = a.memo;
       x.dates.push({ date: a.date, kind: PM_AVAIL_KINDS.indexOf(a.kind) >= 0 ? a.kind : '무관', offered: offered[a.driverId + '|' + a.date] || 0 });
     });
-    const list = Object.keys(by).map(function (id) {
-      const x = by[id], o = driverById_(id) || {};
+    // 기사가 여럿이면 기사 탭을 한 번만 읽는다 (기사마다 driverById_ 로 한 줄씩 읽으면 그 수만큼 시트 호출)
+    const idsNeed = Object.keys(by), dmap = {};
+    if (idsNeed.length > 2) readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) dmap[o.id] = o; });
+    const list = idsNeed.map(function (id) {
+      const x = by[id], o = (idsNeed.length > 2 ? dmap[id] : driverById_(id)) || {};
       if (o.status && o.status !== ST.ACTIVE) return null;
       x.name = o.name || x.name; x.camp = o.schCamp || ''; x.type = o.driverType || ''; x.me = id === me;
       x.dates.sort(function (a, b) { return a.date.localeCompare(b.date); });
@@ -740,6 +746,7 @@ function pmAlertAdd_(list) {
 }
 function pmAlertBump_(driverId) {
   if (!driverId) return;
+  flushBeforeBump_(); // 알림 줄이 시트에 반영된 뒤 버전을 올린다 (앱이 새 버전으로 읽었는데 줄이 아직 없는 일이 없게)
   try { cache_().put('pmn:' + driverId, String(Date.now()), CFG.CACHE_MAX); } catch (e) { /* 무시 */ }
 }
 function pmAlertVer_(driverId) {
@@ -757,16 +764,21 @@ function api_pmAlerts(token, ver) {
     const u = pmUser_(token);
     const v = pmAlertVer_(u.id);
     if (ver && ver === v) return { ok: true, same: true, ver: v };
+    // 같은 버전이면 결과가 같다 → 기사별로 10분 캐시 (앱을 열 때마다 알림 탭 전체를 읽지 않게 · 버전이 바뀌면 키도 바뀜)
+    const ck = 'pml:' + u.id + ':' + v, hit = cache_().get(ck);
+    if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 읽는다 */ } }
     const from = ymd_(addDays_(new Date(), -30));
     const list = readAll_(SH.PALERT).filter(function (a) { return a.driverId === u.id && a.id && String(a.createdAt).slice(0, 10) >= from; })
       .sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
-    return {
+    const out = {
       ok: true, ver: v, unread: list.filter(function (a) { return !a.readAt; }).length,
       alerts: list.slice(0, 50).map(function (a) {
         const i = String(a.text).indexOf(' · ');
         return { id: a.id, jobId: a.jobId, kind: a.kind, title: i > 0 ? a.text.slice(0, i) : a.text, text: i > 0 ? a.text.slice(i + 3) : '', at: a.createdAt, read: !!a.readAt };
       })
     };
+    try { const j = JSON.stringify(out); if (j.length < 95000) cache_().put(ck, j, 600); } catch (e) { /* 무시 */ }
+    return out;
   });
 }
 /** 읽음 표시: ids 배열, 또는 'all' */
@@ -841,9 +853,10 @@ function api_pmPushSave(token, fcmToken, device) {
     try {
       const row = findRow_(SH.PPUSH, 'token', fcmToken), now = nowText_();
       const f = { driverId: u.id, name: u.info.name, device: String(device || '').slice(0, 60) };
-      if (row) writeFields_(SH.PPUSH, row, f);
+      let prev = '';
+      if (row) { prev = String(readObj_(SH.PPUSH, row).driverId || ''); writeFields_(SH.PPUSH, row, f); }
       else appendObj_(SH.PPUSH, Object.assign({ token: fcmToken, createdAt: now, lastOk: '' }, f));
-      try { cache_().remove('pmt:' + u.id); } catch (e) { /* 무시 */ }
+      try { cache_().remove('pmt:' + u.id); if (prev && prev !== u.id) cache_().remove('pmt:' + prev); } catch (e) { /* 무시 */ } // 전 주인의 기기 목록 캐시도 비움 (그 기사 알림이 이 폰으로 오지 않게)
       return { ok: true };
     } finally {
       lock.releaseLock();
@@ -855,14 +868,14 @@ function api_pmPushDel(token, fcmToken) {
   return run_(function () {
     const s = getSession_(token);
     fcmToken = String(fcmToken || '').trim();
-    if (!fcmToken) return { ok: true };
+    if (!fcmToken || !s) return { ok: true }; // 로그인한 사람이 자기 기기만 지울 수 있다
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const row = findRow_(SH.PPUSH, 'token', fcmToken);
       if (row) {
         const o = readObj_(SH.PPUSH, row);
-        if (!s || o.driverId === String(s.d)) { sheet_(SH.PPUSH).deleteRow(row); try { cache_().remove('pmt:' + o.driverId); } catch (e) { /* 무시 */ } }
+        if (o.driverId === String(s.d)) { sheet_(SH.PPUSH).deleteRow(row); try { cache_().remove('pmt:' + o.driverId); } catch (e) { /* 무시 */ } }
       }
     } finally { lock.releaseLock(); }
     return { ok: true };
@@ -924,11 +937,16 @@ function pmPushSend_(list) {
       else if (code === 404 || (code === 400 && /UNREGISTERED|INVALID_ARGUMENT/.test(x.getContentText()))) dead.push(meta[i]);
       else if (code === 401) cache_().remove('fcm:at');
     });
-    if (dead.length) {
+    if (dead.length) { // 없어진 기기 토큰 지우기: 잠금 안에서 줄을 다시 찾는다 (다른 기기 등록·삭제로 줄이 밀렸을 수 있음)
       const gone = {};
       dead.forEach(function (d) { gone[d.token] = 1; });
-      const rows = readAll_(SH.PPUSH).filter(function (o) { return gone[o.token]; }).map(function (o) { return o._row; }).sort(function (a, b) { return b - a; });
-      delRows_(sheet_(SH.PPUSH), rows);
+      const lock = scriptLock_();
+      if (lock.tryLock(5000)) {
+        try {
+          const rows = readAll_(SH.PPUSH).filter(function (o) { return gone[o.token]; }).map(function (o) { return o._row; }).sort(function (a, b) { return b - a; });
+          delRows_(sheet_(SH.PPUSH), rows);
+        } finally { lock.releaseLock(); }
+      }
       dead.forEach(function (d) { cache_().remove('pmt:' + d.driverId); });
     }
     return sent;
@@ -1259,13 +1277,22 @@ function adm_pushCheck(token, testId) {
 /** 앱: 휴대폰 알림 등록 실패 사유를 남긴다 (관리자 점검용 · 최근 30건) */
 function api_pmPushLog(token, info) {
   return run_(function () {
+    const s = getSession_(token); // 로그인한 기사만 (아무나 써서 속성 쓰기 한도를 쓰지 못하게)
+    if (!s) return { ok: false, code: 'EXPIRED' };
+    const c = cache_(), rk = 'pfl:' + s.th, n = +(c.get(rk) || 0);
+    if (n >= 3) return { ok: true, skipped: true }; // 한 기기 10분에 3번까지
+    c.put(rk, String(n + 1), 600);
     let who = '';
-    try { who = pmUser_(token).info.name; } catch (e) { who = '?'; }
-    const p = PropertiesService.getScriptProperties();
-    let list = [];
-    try { list = JSON.parse(p.getProperty('PUSH_ERRS') || '[]'); } catch (e) { list = []; }
-    list.unshift({ at: nowText_(), who: who, info: String(info || '').slice(0, 300) });
-    p.setProperty('PUSH_ERRS', JSON.stringify(list.slice(0, 30)));
+    try { who = (driverInfo_(s.d) || {}).name || String(s.d); } catch (e) { who = String(s.d); }
+    const lock = scriptLock_();
+    if (!lock.tryLock(5000)) return { ok: true, skipped: true };
+    try {
+      const p = PropertiesService.getScriptProperties();
+      let list = [];
+      try { list = JSON.parse(p.getProperty('PUSH_ERRS') || '[]'); } catch (e) { list = []; }
+      list.unshift({ at: nowText_(), who: who, info: String(info || '').slice(0, 300) });
+      p.setProperty('PUSH_ERRS', JSON.stringify(list.slice(0, 30)));
+    } finally { lock.releaseLock(); }
     return { ok: true };
   });
 }

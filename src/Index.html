@@ -1018,9 +1018,9 @@
   //  · 내가 저장·지원·글쓰기 등을 하면 2분 동안은 기다려서라도 서버의 새 값을 받음 (방금 한 일이 바로 보이게)
   //  · 15초 안에 같은 걸 다시 부르면 서버에 다시 묻지 않음
   // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
-  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost', 'api_pmJob'];
-  const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만
-  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts']);
+  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
+  const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
+  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
   const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
   // 자동 로그인이면 이 기기(localStorage), 아니면 이 창에만(sessionStorage · 창을 닫으면 사라짐) — 로그인 토큰과 같은 곳
@@ -1133,7 +1133,7 @@
     signup: '#v-signup .back', reset: '#v-reset .back', notice: '#ntBack', sched: '#scBack', changepw: '#cpBack', pumasi: '#pmBack', pmdetail: '#pdBack',
     pmform: '#pfBack', pmgive: '#gvBack', board: '#bdBack', bdpost: '#bpBack', bdform: '#bfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack'
   };
-  const OVERLAYS = ['#pmAsk', '#instHelp', '#ntPop'];
+  const OVERLAYS = ['#pmAsk', '#instHelp', '#ntPop', '#slPop', '#pushPop']; // 뒤로가기로 닫히는 팝업 (없으면 홈에서 뒤로가기 = 앱 종료)
   let backGuard = false, backSkip = false;
   const overlayOpen = () => OVERLAYS.find((sel) => { const el = document.querySelector(sel); return el && !el.classList.contains('hidden'); }) || (document.getElementById('postLayer') && document.getElementById('postLayer').classList.contains('on') ? '#postLayer' : '');
   function syncBack() {
@@ -1147,6 +1147,7 @@
     const ov = overlayOpen();
     if (ov === '#pmAsk') document.getElementById('pmAskNo').click();
     else if (ov === '#ntPop') document.getElementById('ntPopOk').click();
+    else if (ov === '#slPop') document.getElementById('slPopNo').click();
     else if (ov === '#postLayer') document.getElementById('postLayer').classList.remove('on');
     else if (ov) document.querySelector(ov).classList.add('hidden');
     else {
@@ -1285,7 +1286,9 @@
         else if (cached && curView !== 'splash' && curView !== 'login') $('#homeName').textContent = (r.user && r.user.name ? r.user.name + ' 기사님' : '기사님') + ', 안녕하세요'; // 이미 홈(또는 새로고침 전 화면)을 보여 주는 중
         else goHome(r.user);
       }
-      else { clearSession(); goLogin(); if (cached) toast('다시 로그인해 주세요.'); }
+      else if (!r || r.code === 'EXPIRED' || r.code === 'UNKNOWN_FN') { clearSession(); goLogin(); if (cached) toast('다시 로그인해 주세요.'); }
+      else if (!cached) { goLogin(); toast(r.msg || '연결이 원활하지 않습니다.'); } // 서버 일시 오류(시트 지연 등)는 로그인을 지우지 않는다 → 저장된 로그인으로 그대로 쓰고 다음에 다시 확인
+      else netErr();
     }).catch(() => { if (!cached) { goLogin(); netErr(); } });
   })();
 
@@ -1519,36 +1522,50 @@
     if (scMode === 'month' && !scMonth) { const t = new Date(); scMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // PDD(내일)가 있는 달
     paintScMode(); loadSched();
   });
-  let scCamp = null, scCampDay = '', scCampMonth = '';
+  let scCamp = null, scCampDay = '', scCampMonth = '', scSeq = 0;
+  // 달 이동은 앞뒤 12개월까지 (서버와 같은 규칙 · 넘어가면 화면이 멈추지 않게 미리 막음)
+  const scMonthShift = (ym, by) => {
+    const [y, m] = ym.split('-').map(Number), d = new Date(y, m - 1 + by, 1), t = new Date();
+    if (Math.abs((d.getFullYear() - t.getFullYear()) * 12 + d.getMonth() - t.getMonth()) > 12) { toast('앞뒤 12개월까지 볼 수 있습니다.'); return null; }
+    return ymdOf(d).slice(0, 7);
+  };
+  const scFailBox = (msg) => '<div class="card" style="text-align:center;color:var(--sub)">' + escH(msg || '스케줄을 불러오지 못했습니다.') + '<br><button type="button" class="btn ghost" id="scRetry" style="margin-top:10px">다시 시도</button></div>';
   function loadSched() {
     const token = store.get(TOKEN);
     if (!token) { clearSession(); goLogin(); return; }
+    // 늦게 온 응답은 버린다: 2주 응답이 '한 달'로 바꾼 뒤에 도착해 달력 자리에 그려지는 일이 없게
+    const seq = ++scSeq, mode = scMode;
+    const stale = () => seq !== scSeq;
     $('#scBody').innerHTML = '<div class="card" style="text-align:center;color:var(--sub)">불러오는 중…</div>';
-    if (scMode === 'camp') {
+    if (mode === 'camp') {
       if (!scCampMonth) { const t = new Date(); scCampMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // PDD(내일)가 있는 달
       return api('api_campSchedule', token, scCampMonth).then((r) => {
+        if (stale()) return;
         if (!r.ok) {
           toast(r.msg || '스케줄을 불러오지 못했습니다.');
           if (r.code === 'EXPIRED') { clearSession(); goLogin(); } else if (r.code === 'MUST_CHANGE') openChangePw(true, '');
+          else $('#scBody').innerHTML = scFailBox(r.msg);
           return;
         }
         scCamp = r; if (!scCampDay || !r.dates.includes(scCampDay)) scCampDay = r.dates.includes(pddOf(r.today)) ? pddOf(r.today) : r.dates[0];
         renderCampSched();
-      }).catch(() => { $('#scBody').innerHTML = ''; netErr(); });
+      }).catch(() => { if (stale()) return; $('#scBody').innerHTML = scFailBox('인터넷 연결을 확인해 주세요.'); netErr(); });
     }
-    const args = scMode === 'month' ? [token, scMonth] : [token];
+    const args = mode === 'month' ? [token, scMonth] : [token];
     api('api_mySchedule', ...args).then((r) => {
+      if (stale()) return;
       if (!r.ok) {
         toast(r.msg || '스케줄을 불러오지 못했습니다.');
         if (r.code === 'EXPIRED') { clearSession(); goLogin(); }
         else if (r.code === 'MUST_CHANGE') openChangePw(true, '');
+        else $('#scBody').innerHTML = scFailBox(r.msg);
         return;
       }
-      if (scMode === 'month') return renderMonth(r);
+      if (mode === 'month') return renderMonth(r);
       // PDD(배송 예정일) = 오늘 기준 내일 → 파란색 강조
       const week = (list, title, cls, tag) => '<div class="wk"><h3>' + title + '<small class="' + cls + '">' + tag + '</small></h3>' + list.map((d) => dayRow(r, d)).join('') + '</div>';
       $('#scBody').innerHTML = rcNote(r) + week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
-    }).catch(() => { $('#scBody').innerHTML = ''; netErr(); });
+    }).catch(() => { if (stale()) return; $('#scBody').innerHTML = scFailBox('인터넷 연결을 확인해 주세요.'); netErr(); });
   }
   function renderCampSched() {
     const r = scCamp, pdd = pddOf(r.today);
@@ -1645,8 +1662,9 @@
   $('#scBody').addEventListener('click', (e) => {
     const px = e.target.closest('[data-pm]');
     if (px) return openPmDetail(px.dataset.pm, 'sched');
+    if (e.target.closest('#scRetry')) return loadSched();
     const cmv = e.target.closest('[data-cmv]');
-    if (cmv && scMode === 'camp') { const [y, m] = scCampMonth.split('-').map(Number); scCampMonth = ymdOf(new Date(y, m - 1 + +cmv.dataset.cmv, 1)).slice(0, 7); scCampDay = ''; return loadSched(); }
+    if (cmv && scMode === 'camp') { const nm = scMonthShift(scCampMonth, +cmv.dataset.cmv); if (!nm) return; scCampMonth = nm; scCampDay = ''; return loadSched(); }
     const cd = e.target.closest('[data-cd]');
     if (cd && scCamp) {
       scCampDay = cd.dataset.cd; const y = window.scrollY; renderCampSched(); window.scrollTo(0, y);
@@ -1656,8 +1674,8 @@
     if (scMode !== 'month') return;
     const mv = e.target.closest('[data-mv]');
     if (mv) {
-      const [y, m] = scMonth.split('-').map(Number), d = new Date(y, m - 1 + +mv.dataset.mv, 1);
-      scMonth = ymdOf(d).slice(0, 7); scSel = ''; return loadSched();
+      const nm = scMonthShift(scMonth, +mv.dataset.mv); if (!nm) return;
+      scMonth = nm; scSel = ''; return loadSched();
     }
     const c = e.target.closest('.mc[data-d]');
     if (c && scLast) {
@@ -1845,10 +1863,13 @@
   }
   // 목록
   function openPumasi(from) { pmFrom = from || 'home'; show('pumasi'); loadPmList(); }
+  let pmListSeq = 0;
   function loadPmList() {
     const token = pmTok(); if (!token) return;
+    const seq = ++pmListSeq; // 필터를 바꾼 뒤 늦게 온 이전 응답은 버린다
     $('#pmList').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     api('api_pmList', token, { onlyAvail: $('#pmAvail').checked, q: $('#pmQ').value.trim() }).then((r) => {
+      if (seq !== pmListSeq) return;
       if (!pmOk(r, '품앗이 목록을 불러오지 못했습니다.')) { $('#pmList').innerHTML = ''; return; }
       r.jobs = pmShown(r.jobs);
       pmPostOn = r.postOn !== false; pmOfferOn = r.offerOn !== false; paintPostOn();
@@ -1865,7 +1886,7 @@
       setTimeout(paintPostOn, 0);
       $('#pmList').innerHTML = items.length ? items.map((x) => x.h).join('')
         : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : (pmPostOn ? '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 일감 올리기</b>로 첫 일감을 올려 보세요.' : '아직 올라온 일감이 없습니다.')) + '</div>';
-    }).catch(() => { $('#pmList').innerHTML = ''; netErr(); });
+    }).catch(() => { if (seq !== pmListSeq) return; $('#pmList').innerHTML = ''; netErr(); });
   }
   $('#mPm').addEventListener('click', () => openPumasi('home'));
   $('#pmBack').addEventListener('click', () => { if (pmFrom === 'mypage') return openMyPage(); let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
@@ -2146,6 +2167,7 @@
     return h;
   }
   let gvFrom = 'pumasi';
+  let gvSeq = 0;
   function openGive(mode, from) {
     if (from) gvFrom = from;
     if (mode) gvMode = mode;
@@ -2154,18 +2176,21 @@
     show('pmgive');
     $('#gvBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     const token = pmTok(); if (!token) return;
+    const seq = ++gvSeq; // 보기(내 가능일 ↔ 기사 찾기)를 바꾼 뒤 늦게 온 이전 응답은 버린다
     if (gvMode === 'me') {
       api('api_pmAvailMine', token).then((r) => {
+        if (seq !== gvSeq) return;
         if (!pmOk(r)) { $('#gvBody').innerHTML = ''; return; }
         gvMine = r; gvSel = {}; r.list.forEach((x) => { gvSel[x.date] = x.kind; }); gvMemo = r.memo || ''; gvInfo = Object.assign({}, r.info || {}); gvDirty = false;
         renderGiveMe();
-      }).catch(() => { $('#gvBody').innerHTML = ''; netErr(); });
+      }).catch(() => { if (seq !== gvSeq) return; $('#gvBody').innerHTML = ''; netErr(); });
     } else {
       api('api_pmAvailList', token).then((r) => {
+        if (seq !== gvSeq) return;
         if (!pmOk(r)) { $('#gvBody').innerHTML = ''; return; }
         gvFind = r; if (gvDay && !r.drivers.some((x) => x.dates.some((d) => d.date === gvDay))) gvDay = '';
         renderGiveFind();
-      }).catch(() => { $('#gvBody').innerHTML = ''; netErr(); });
+      }).catch(() => { if (seq !== gvSeq) return; $('#gvBody').innerHTML = ''; netErr(); });
     }
   }
   function renderGiveMe() {
@@ -2249,7 +2274,7 @@
     show('mypage'); paintAlertBadges();
     const token = pmTok(); if (!token) return;
     api('api_myInfo', token).then((r) => {
-      if (!pmOk(r)) return;
+      if (!pmOk(r)) { myCardFail(); return; }
       const i = r.info;
       $('#myCard').innerHTML = '<div class="myhd"><div class="av">' + escH(String(i.name || '?').slice(0, 1)) + '</div><div><b>' + escH(i.name) + ' 기사님</b><small>' +
         escH([i.type, i.camp].filter(Boolean).join(' · ') || '러너 기사') + '</small></div></div>' +
@@ -2258,9 +2283,10 @@
       const gv = $('#myGive'); if (gv) gv.textContent = [r.stats.giveDays ? r.stats.giveDays + '일' : '', r.stats.offers ? '제안 ' + r.stats.offers : ''].filter(Boolean).join(' · ');
       $('#miBody').innerHTML = '<dl>' + [['이름', i.name], ['쿠팡 아이디', i.loginId], ['연락처', i.phone], ['단가코드', i.type], ['소속 캠프', i.camp], ['기본노선', i.baseRoute], ['차량번호', i.carNo],
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';
-    }).catch(netErr);
-    api('api_pmList', token, {}).then((r) => { $('#myNew').innerHTML = r && r.ok && r.waiting ? '<span class="bdg nw">새 지원 ' + r.waiting + '</span>' : ''; }).catch(() => {});
+      $('#myNew').innerHTML = r.stats.waiting ? '<span class="bdg nw">새 지원 ' + r.stats.waiting + '</span>' : ''; // (예전엔 품앗이 목록을 한 번 더 불렀음)
+    }).catch(() => { myCardFail(); netErr(); });
   }
+  const myCardFail = () => { if (/불러오는 중/.test($('#myCard').textContent)) $('#myCard').innerHTML = '<div class="sub" style="padding:14px;text-align:center">내 정보를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>'; };
   $('#mMy').addEventListener('click', openMyPage);
   $('#myBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
   $('#miBack').addEventListener('click', openMyPage);
@@ -2538,7 +2564,7 @@
 
 
   // ───── 품앗이 알림: ① 앱을 켜 둔 동안 30초마다 확인해 화면 위에 띄움 ② 휴대폰 푸시(앱을 닫아도) ─────
-  const PM_SEEN = 'runner.pmSeen', PUSH_TOK = 'runner.fcmTok';
+  const PM_SEEN = 'runner.pmSeen', PUSH_TOK = 'runner.fcmTok', PUSH_AT = 'runner.fcmAt', PUSH_CFG = 'runner.pushCfg';
   let paVer = '', paList = [], paUnread = 0, paTimer = 0, paBusy = false, paTok = '', paFirst = true;
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
@@ -2602,6 +2628,7 @@
       paVer = r.ver;
       if (r.same) return;
       paList = r.alerts || []; paUnread = r.unread || 0; paintAlertBadges();
+      if ($('#v-pmalerts').classList.contains('on')) renderPmAlerts(); // 알림 목록을 보고 있으면 새 알림이 없어도(읽음 상태만 바뀌어도) 다시 그린다
       // 배너는 아직 안 띄운 '안 읽은' 알림만 (처음 열 때는 최근 하루 것만)
       const seen = seenGet(), dayAgo = Date.now() - 86400000;
       const fresh = paList.filter((a) => !a.read && !seen.includes(a.id) && (!paFirst || new Date(String(a.at).replace(' ', 'T')).getTime() > dayAgo));
@@ -2618,8 +2645,9 @@
   };
   window.pmAlertStop = function (token) {
     clearInterval(paTimer); paTimer = 0; paVer = ''; paList = []; paUnread = 0; paTok = ''; paintAlertBadges();
+    pushDone = false; pushShown = false; // 다음 로그인(다른 기사일 수 있음)에서 기기 등록을 다시 한다
     const t = lsGet(PUSH_TOK);
-    if (t && token) { api('api_pmPushDel', token, t).catch(() => {}); lsSet(PUSH_TOK, null); }
+    if (t && token) { api('api_pmPushDel', token, t).catch(() => {}); lsSet(PUSH_TOK, null); lsSet(PUSH_AT, null); }
   };
   document.addEventListener('visibilitychange', () => { if (!document.hidden && paTimer) { clearShownNotifications(); pollAlerts(true); } });
   function markAlerts(ids) {
@@ -2660,8 +2688,13 @@
   }
   function getPushCfg() {
     if (pushCfg) return Promise.resolve(pushCfg);
+    // 알림 설정(공개값)은 이 기기에 하루 보관 → 앱을 열 때마다 서버에 묻지 않음
+    try { const c = JSON.parse(lsGet(PUSH_CFG) || 'null'); if (c && c.on && c.web && Date.now() - (c._at || 0) < 864e5) return Promise.resolve(pushCfg = c); } catch (e) {}
     // 준비 안 됨(on:false)은 기억하지 않는다 → 사무실에서 설정하면 바로 켤 수 있게
-    return api('api_pmPushConfig', store.get(TOKEN)).then((r) => { if (r && r.ok && r.on) pushCfg = r; return (r && r.ok) ? r : { on: false, err: true }; });
+    return api('api_pmPushConfig', store.get(TOKEN)).then((r) => {
+      if (r && r.ok && r.on) { pushCfg = r; lsSet(PUSH_CFG, JSON.stringify(Object.assign({ _at: Date.now() }, r))); }
+      return (r && r.ok) ? r : { on: false, err: true };
+    });
   }
   async function fbToken(cfg) {
     // Firestore(읽기 사본)가 firebase 앱을 먼저 불러 둘 수 있다 → 알림(messaging) 도구는 따로 확인해서 불러온다
@@ -2682,13 +2715,17 @@
    *  - 아직 안 물어본 기기: 앱을 열 때마다 '알림 허용하기' 창 (브라우저 규칙상 기사가 한 번 눌러야 허용 창이 뜸)
    *  - 차단한 기기 / 홈 화면에 설치 안 한 아이폰: 켜는 방법 안내 (앱을 열 때마다)
    */
-  let pushBusy = false, pushShown = false;
+  let pushBusy = false, pushShown = false, pushDone = false, pushOff = false; // pushDone = 이번에 연 앱에서 기기 등록을 마침(홈에 올 때마다 다시 하지 않음) · pushOff = 사무실 설정 전
   async function pushRegister(cfg) {
     const t = await Promise.race([fbToken(cfg), new Promise((_, rej) => setTimeout(() => rej(new Error('기기 토큰 받기 20초 초과')), 20000))]);
     if (!t) throw new Error('기기 토큰이 비어 있음');
+    // 같은 기사가 같은 기기 토큰을 3일 안에 이미 서버에 등록했으면 다시 보내지 않는다 (앱을 열 때마다 시트에 쓰지 않게)
+    let me = ''; try { me = (JSON.parse(store.get(USER) || '{}') || {}).loginId || ''; } catch (e) { me = ''; }
+    const seen = lsGet(PUSH_AT) || '', seenAt = +seen.split('|')[0] || 0, seenWho = seen.split('|')[1] || '';
+    if (t === lsGet(PUSH_TOK) && me && seenWho === me && Date.now() - seenAt < 3 * 864e5) return;
     const r = await api('api_pmPushSave', store.get(TOKEN), t, deviceName());
     if (!r || !r.ok) throw new Error((r && r.msg) || '기기 등록에 실패했습니다.');
-    lsSet(PUSH_TOK, t);
+    lsSet(PUSH_TOK, t); lsSet(PUSH_AT, Date.now() + '|' + me);
   }
   function pushFail(e) {
     const info = [deviceName(), standalone() ? '설치앱' : '브라우저', 'perm=' + (window.Notification ? Notification.permission : '-'), String((e && e.code) || ''), String((e && e.message) || e || '')].join(' | ');
@@ -2701,16 +2738,16 @@
     $('#pushPop').classList.add('center'); $('#pushPop').classList.remove('hidden');
   }
   function pushAuto() {
-    if (pushBusy || !store.get(TOKEN)) return;
+    if (pushBusy || pushDone || pushOff || !store.get(TOKEN)) return;
     if (!pushCapable()) { if (!pushShown) { pushShown = true; pushFail(new Error('이 브라우저는 휴대폰 알림 미지원')); } return; }
     if (isIOS && !standalone()) {
       if (!pushShown) { pushShown = true; pushPop('홈 화면에 러너 앱을 설치해 주세요', '아이폰은 홈 화면에 설치한 러너 앱에서만 휴대폰 알림을 받을 수 있습니다 (iOS 16.4 이상).\n\n사파리 아래쪽 공유 버튼(□↑) → 홈 화면에 추가 → 설치한 아이콘으로 열어 주세요.', false); }
       return;
     }
     getPushCfg().then((cfg) => {
-      if (!cfg.on) { if (cfg.err) pushFail(new Error('알림 설정을 서버에서 못 받음')); return; }
+      if (!cfg.on) { if (cfg.err) pushFail(new Error('알림 설정을 서버에서 못 받음')); else pushOff = true; return; }
       const perm = Notification.permission;
-      if (perm === 'granted') { pushBusy = true; return pushRegister(cfg).catch(pushFail).finally(() => { pushBusy = false; }); }
+      if (perm === 'granted') { pushBusy = true; return pushRegister(cfg).then(() => { pushDone = true; }).catch(pushFail).finally(() => { pushBusy = false; }); }
       if (pushShown) return;
       pushShown = true;
       if (perm === 'denied') return pushPop('휴대폰 알림이 꺼져 있습니다', '품앗이 · 정산 마감 소식을 받으려면 알림을 켜야 합니다.\n\n휴대폰 설정 → 앱(또는 크롬·사파리) → 알림에서 러너 알림을 허용한 뒤 앱을 다시 열어 주세요.', false);
@@ -2733,7 +2770,7 @@
         : '허용 창에서 "허용"을 눌러 주세요.', perm !== 'denied');
     }
     loading(true, '알림 켜는 중…'); pushBusy = true;
-    try { await pushRegister(await getPushCfg()); toast('휴대폰 알림이 켜졌습니다.'); }
+    try { await pushRegister(await getPushCfg()); pushDone = true; toast('휴대폰 알림이 켜졌습니다.'); }
     catch (e) { pushFail(e); toast('알림 기기 등록에 실패했습니다: ' + String((e && (e.code || e.message)) || '').slice(0, 60)); }
     finally { pushBusy = false; loading(false); }
   });

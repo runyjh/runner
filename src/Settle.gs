@@ -231,7 +231,10 @@ function stlTv_() {
   return (_stlTv = v);
 }
 function stlVerOf_(name) { const v = stlTv_(); return v._ + '.' + (v[name] || 0); }
+/** 잠금을 잡은 직후: 잠금을 기다리는 동안 다른 실행이 고친 탭을 다시 읽도록 이 실행의 탭 메모와 버전 메모를 비운다 */
+function stlFreshIn_(names) { _stlTv = null; [].concat(names).forEach(function (n) { delete _stlTab[n]; Object.keys(_stlMon).forEach(function (k) { if (k.indexOf(n + '|') === 0) delete _stlMon[k]; }); }); }
 function stlTouch_(names) {
+  flushBeforeBump_(); // 시트 쓰기를 먼저 반영한 뒤 버전을 올린다
   // 다른 실행이 그 사이 올린 번호를 덮어써 옛 캐시가 되살아나지 않도록, 최신 번호를 다시 읽어 합친다
   let cur = null;
   try { cur = JSON.parse(cache_().get('stl:tv') || 'null'); } catch (e) { cur = null; }
@@ -2389,6 +2392,7 @@ function adm_stlTaxSave(token, month, key, f) {
       const lock0 = scriptLock_();
       lock0.waitLock(20000);
       try {
+        stlFreshIn_('stl_taxpay');
         const hit0 = stlRead_('stl_taxpay').filter(function (r) { return r.key === key; })[0], o0 = hit0 ? Object.assign({}, hit0) : { key: key, kind: '이전 실적', due: '' };
         if (f.amt !== undefined) { const v = str_(f.amt).replace(/[\s,원]/g, ''); if (v && !/^-?\d+$/.test(v)) fail_('금액은 숫자로 넣어 주세요.'); o0.amt = v; }
         if (f.months !== undefined) { const n0 = parseInt(str_(f.months), 10) || 0; if (n0 < 0 || n0 > 11) fail_('개월 수는 0~11'); o0.period = n0 ? n0 + '개월' : ''; }
@@ -2403,6 +2407,7 @@ function adm_stlTaxSave(token, month, key, f) {
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
+      stlFreshIn_('stl_taxpay');
       const hit = stlRead_('stl_taxpay').filter(function (r) { return r.key === key; })[0];
       const o = hit ? Object.assign({}, hit) : { key: key };
       o.kind = it.kind; o.period = it.period; o.due = it.due;
@@ -2440,6 +2445,7 @@ function adm_stlFundSave(token, month, key, f) {
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
+      stlFreshIn_('stl_fund');
       const rows = stlRead_('stl_fund'), hit = rows.filter(function (r) { return r.month === month && r.item === it[1]; })[0];
       const o = hit ? Object.assign({}, hit) : { month: month, item: it[1] };
       if (f.amt !== undefined) { const v = str_(f.amt).replace(/[\s,원]/g, ''); if (v && !/^-?\d+$/.test(v)) fail_('금액은 숫자로 넣어 주세요.'); o.amt = v; }
@@ -3063,6 +3069,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     const lock = scriptLock_();
     lock.waitLock(30000);
     try {
+      stlFreshIn_(E.sheet); // 잠금을 기다리는 사이 다른 관리자가 저장했으면 그 내용을 본다
       if (E.scope !== 'all') stlAssertOpen_(month);
       const cur = stlEditRows_(name, month);
       if (seen && seen !== stlRowsHash_(cur, E.cols)) fail_('다른 곳(시트 또는 다른 관리자)에서 먼저 고쳤습니다. 새로고침 후 다시 저장해 주세요.');

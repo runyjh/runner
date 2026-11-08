@@ -1736,7 +1736,9 @@
     }
     if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = setTimeout(() => { if (ctl) ctl.abort(); }, 60000);
+    // 오래 걸리는 작업(이관·정산서 올리기·초기화·마감·사본 다시 만들기)은 60초에 끊지 않는다 — 끊으면 서버는 계속 도는데 화면은 "다시 시도"라 해서 두 번 처리될 수 있음
+    const LONG_MS = { adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
+    const timer = setTimeout(() => { if (ctl) ctl.abort(); }, LONG_MS[fn] || 60000);
     return fetch(RUNNER_API, {
       method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: ctl ? ctl.signal : undefined
@@ -1860,7 +1862,7 @@
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
     driversLoaded = false;
     uiLoad();
-    setTimeout(() => { try { fsReady(); } catch (e) {} }, 2000); // Firestore 미리 준비
+    // (Firestore 읽기 사본은 관리자 화면에서 지금 쓰는 곳이 없어 미리 준비하지 않는다 → 로그인 때 파이어베이스 스크립트 3개·토큰 발급이 빠짐. 쓰는 화면이 생기면 fsReady() 를 그때 부른다)
     // 새로고침하면 보던 메뉴 그대로 (이 창을 닫으면 잊음)
     try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv; } catch (e) {}
     switchView(currentView);
@@ -1952,7 +1954,7 @@
   }
   // 위임 방식 검색칸(노선 필터 등): 조합이 끝나면 input 을 한 번 더 보내 결과를 그린다
   document.addEventListener('compositionend', (e) => {
-    if (e.target.matches && e.target.matches('[data-rf], #pfQ, #xpQ')) e.target.dispatchEvent(new Event('input', { bubbles: true }));
+    if (e.target.matches && e.target.matches('[data-rf], #pfQ, #xpQ, #fbQ, #paQ, #bmQ')) e.target.dispatchEvent(new Event('input', { bubbles: true }));
   });
   const nfc = (v) => String(v == null ? '' : v).normalize('NFC').toLowerCase();
   onSearch($('#q'), () => renderRows());
@@ -2118,18 +2120,27 @@
     '<button type="button" class="btn sm ghost" data-edit="' + key + '">변경</button></div></div>';
 
   function openDrawer(id) {
+    // 다른 기사를 고치던 중(저장 안 함)이면 먼저 묻는다 — 표·찾기(Ctrl+K)·정산 경고 링크 어디서 열어도 같음
+    if (!$('#drawer').classList.contains('hidden') && selectedId && selectedId !== id && Object.keys(dirty).length && !confirm('저장하지 않은 변경이 있습니다. 닫을까요?')) return;
     selectedId = id; renderRows();
     $('#shade').classList.remove('hidden'); $('#drawer').classList.remove('hidden');
     $('#dBody').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     $('#dTitle').textContent = '불러오는 중…'; $('#dBadge').innerHTML = '';
     setDirty({});
-    api('adm_getDriver', id).then((r) => { if (!r.ok) { toast(r.msg); return closeDrawer(true); } renderDetail(r.driver); }).catch(() => {});
+    // 기사 목록(all)이 아직 없으면(정산·배번호 화면에서 바로 열 때) 같이 받아 둔다 → 서브아이디 안내가 빠지지 않게
+    const pAll = all.length ? Promise.resolve() : loadList(true).catch(() => {});
+    Promise.all([api('adm_getDriver', id), pAll]).then(([r]) => {
+      if (selectedId !== id || $('#drawer').classList.contains('hidden')) return; // 그 사이 다른 기사를 열었거나 닫았으면 늦은 응답은 버림
+      if (!r.ok) { toast(r.msg); return closeDrawer(true); }
+      renderDetail(r.driver);
+    }).catch(() => {});
   }
   function closeDrawer(force) {
     if (!force && Object.keys(dirty).length && !confirm('저장하지 않은 변경이 있습니다. 닫을까요?')) return;
     $('#shade').classList.add('hidden'); $('#drawer').classList.add('hidden');
     cur = null; selectedId = ''; setDirty({}); renderRows(); $('#dSave').textContent = '저장';
-    if (!$('#stp-drv').classList.contains('hidden') && currentView === 'settle') loadStDrivers(); // 명의자 사업자 정보 표를 열어 둔 채 고쳤으면 새 값으로
+    // 명의자 사업자 정보 표를 열어 둔 채 고쳤으면 새 값으로 (로그인 화면으로 나갈 때(force)는 안 함 → 만료 → 다시 요청 → 만료… 반복을 막음)
+    if (!force && store.get() && !$('#stp-drv').classList.contains('hidden') && currentView === 'settle') loadStDrivers();
   }
   $('#dClose').addEventListener('click', () => closeDrawer());
   $('#shade').addEventListener('click', () => { if (!$('#bdrawer').classList.contains('hidden')) closeBib(); else closeDrawer(); });
@@ -2214,9 +2225,11 @@
 
   // ── 배정 캠프 · 라우트 (노선관리 데이터에서 고르기) ──
   let CR = null, aSel = null;
+  let CRat = 0;
   function loadCR(force) {
-    if (CR && !force) return Promise.resolve(CR);
-    return api('adm_campRoutes').then((r) => { if (r.ok) CR = r; return CR; });
+    // force 여도 3분 안에 받은 게 있으면 그대로 쓴다 (기사 창을 열 때마다 캠프·노선 목록을 다시 받지 않게 · 노선 관리에서 고치면 CR = null 로 비워져 새로 받음)
+    if (CR && (!force || Date.now() - CRat < 180000)) return Promise.resolve(CR);
+    return api('adm_campRoutes').then((r) => { if (r.ok) { CR = r; CRat = Date.now(); } return CR; });
   }
   // 라우트는 구분1(숫자) 아래 A·B·C·D 한 글자씩 고른다. 예: 110ABCD → 110A, 110B, 110C, 110D
   // 저장할 때는 운영 표기대로 묶는다: 404D + 405A + 405B → '404D,405AB'
@@ -2748,6 +2761,7 @@
     if (a.dataset.stGo) STX.tab = a.dataset.stGo;
     else if (a.dataset.view === 'settle' && STX.tab === 'pnl') STX.tab = 'list';
     if (currentView === 'route' && (!pricesLeaveOk() || !xpLeaveOk())) return;
+    if (currentView === 'route') CR = null; // 노선 관리에서 나오면 기사 창의 캠프·노선 목록을 새로 받는다
     if (currentView === 'settle' && !stLeaveOk()) return;
     if (currentView === 'sched') { if (sEdit) commitEdit(); if (Object.keys(sPending).length) flushSave(); }
     if (!$('#drawer').classList.contains('hidden')) closeDrawer();
@@ -2761,7 +2775,8 @@
   // ───── 대시보드: 메뉴별 요약 (카드를 누르면 그 메뉴로) ─────
   const DB = { a: null, s: null, busy: 0, at: '' };
   // 지난번 요약을 먼저 보여 주고(이 기기에 기억) 뒤에서 새로 받아 바꾼다
-  try { const c = JSON.parse(localStorage.getItem('runner.dash') || 'null'); if (c) { DB.a = c.a; DB.s = c.s; DB.at = c.at; } } catch (e) {}
+  const DB_CK = 'runner.dash.v2'; // 요약 모양이 바뀌면 이름을 올린다 (예전 저장분은 안 씀)
+  try { const c = JSON.parse(localStorage.getItem(DB_CK) || 'null'); if (c) { DB.a = c.a; DB.s = c.s; DB.at = c.at; } } catch (e) {}
   const DB_CARDS = [
     ['drivers', '', 'g-drv'], ['sched', '', 'g-drv', 1], ['pumasi', '', 'g-drv'], ['bib', '', 'g-drv'],
     ['route', '', 'g-ops'], ['memo', '', 'g-ops'],
@@ -2860,22 +2875,25 @@
   function paintDash() {
     $('#dbGrid').innerHTML = DB_CARDS.map(([v, go, g, wide]) => {
       const a = dbNav(v, go); if (!a) return '';
-      return '<div class="db-card ' + g + (wide ? ' wide' : '') + '"><div class="db-top"><span class="grp">' + esc(dbGrp(a)) + '</span><b>' + esc(a.textContent.trim()) + '</b><a data-dbgo="' + v + '|' + (go || '') + '">열기 →</a></div>' + dbBody(v, go) + '</div>';
+      let body = '';
+      try { body = dbBody(v, go); } catch (e) { body = '<div class="db-empty">요약을 그리지 못했습니다. 새로고침을 눌러 주세요.</div>'; } // 카드 하나가 깨져도 나머지는 보이게
+      return '<div class="db-card ' + g + (wide ? ' wide' : '') + '"><div class="db-top"><span class="grp">' + esc(dbGrp(a)) + '</span><b>' + esc(a.textContent.trim()) + '</b><a data-dbgo="' + v + '|' + (go || '') + '">열기 →</a></div>' + body + '</div>';
     }).join('');
     $('#dbAt').textContent = (DB.at ? DB.at + ' 기준' : '') + (DB.busy ? ' · 새로 받는 중…' : '');
   }
-  function loadDash() {
+  function loadDash(fresh) {
     if (DB.busy) return paintDash();
     DB.busy = 2; paintDash();
+    fresh = fresh === true;
     const stamp = () => { const d = new Date(); DB.at = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
     const done = () => {
-      DB.busy--; if (!DB.busy) { stamp(); try { localStorage.setItem('runner.dash', JSON.stringify({ a: DB.a, s: DB.s && !DB.s.err ? DB.s : null, at: DB.at })); } catch (e) {} }
+      DB.busy--; if (!DB.busy) { stamp(); try { localStorage.setItem(DB_CK, JSON.stringify({ a: DB.a, s: DB.s && !DB.s.err ? DB.s : null, at: DB.at })); } catch (e) {} }
       if (currentView === 'dash') paintDash();
     };
-    api('adm_dash').then((r) => { if (r && r.ok) DB.a = r; else if (r) toast(r.msg); }).catch(() => {}).finally(done);
-    api('adm_dashStl').then((r) => { DB.s = r && r.ok ? r : { err: (r && r.msg) || '정산 요약을 읽지 못했습니다.' }; }).catch(() => {}).finally(done);
+    api('adm_dash', fresh).then((r) => { if (r && r.ok) DB.a = r; else if (r) toast(r.msg); }).catch(() => {}).finally(done);
+    api('adm_dashStl', fresh).then((r) => { DB.s = r && r.ok ? r : { err: (r && r.msg) || '정산 요약을 읽지 못했습니다.' }; }).catch(() => {}).finally(done);
   }
-  $('#dbReload').addEventListener('click', loadDash);
+  $('#dbReload').addEventListener('click', () => loadDash(true));
   $('#dbGrid').addEventListener('click', (e) => {
     const b = e.target.closest('[data-dbgo]'); if (!b) return;
     const [v, go] = b.dataset.dbgo.split('|'), a = dbNav(v, go); if (a) a.click();
@@ -2959,7 +2977,7 @@
     api('adm_pmPostSet', on, 'offer').then((r) => { if (!r.ok) return toast(r.msg); paintPostSw(r.postOn, r.offerOn); toast('일감 제안을 ' + (r.offerOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {});
   });
   $('#paFrom').addEventListener('change', loadPumasi); $('#paTo').addEventListener('change', loadPumasi);
-  let paQT = 0; $('#paQ').addEventListener('input', () => { clearTimeout(paQT); paQT = setTimeout(loadPumasi, 400); });
+  let paQT = 0; $('#paQ').addEventListener('input', (e) => { if (e.isComposing) return; clearTimeout(paQT); paQT = setTimeout(loadPumasi, 400); }); // 한글 조합 중엔 서버를 부르지 않음
   $('#paRows').addEventListener('click', (e) => {
     const ck = e.target.closest('[data-pck]');
     if (ck) { if (ck.checked) paSel.add(ck.dataset.pck); else paSel.delete(ck.dataset.pck); return paPaintBulk(); }
@@ -4482,16 +4500,36 @@
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     return URL.createObjectURL(new Blob([arr], { type: mime }));
   }
+  // 목록용 썸네일은 이 PC(IndexedDB)에 30일 보관 → 다음에 노선 관리를 열 때 서버(한 장에 4~5초)에서 다시 받지 않는다. 파일이 바뀌면 파일ID도 바뀌므로 파일ID가 열쇠.
+  const IDB = {
+    db: undefined,
+    open() {
+      if (this.db !== undefined) return Promise.resolve(this.db);
+      return new Promise((res) => {
+        try {
+          const rq = indexedDB.open('runner-admin', 1);
+          rq.onupgradeneeded = () => { rq.result.createObjectStore('img'); };
+          rq.onsuccess = () => res(this.db = rq.result); rq.onerror = rq.onblocked = () => res(this.db = null);
+        } catch (e) { res(this.db = null); }
+      });
+    },
+    get(k) { return this.open().then((db) => db ? new Promise((res) => { try { const r = db.transaction('img').objectStore('img').get(k); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch (e) { res(null); } }) : null).catch(() => null); },
+    set(k, v) { return this.open().then((db) => { if (!db) return; try { db.transaction('img', 'readwrite').objectStore('img').put(v, k); } catch (e) {} }).catch(() => {}); }
+  };
+  const IMG_KEEP = 30 * 864e5;
   function getImg(im, full) {
     const key = im.fileId || im.id, have = imgCache[key];
     if (have && (!full || !have.thumb)) return Promise.resolve(have);
     const pk = key + (full ? ':f' : ':t');
     if (imgPending[pk]) return imgPending[pk];
-    return (imgPending[pk] = queued(() => api('adm_campImage', im.id, !!full)).then((r) => {
-      delete imgPending[pk];
+    const fromServer = () => queued(() => api('adm_campImage', im.id, !!full)).then((r) => {
       if (!r.ok) throw new Error(r.msg);
+      if (!full) IDB.set(key, { mime: r.mime, data: r.data, thumb: !!r.thumb, at: Date.now() });
       return (imgCache[key] = { src: b64Url(r.data, r.mime), thumb: !!r.thumb });
-    }, (e) => { delete imgPending[pk]; throw e; }));
+    });
+    const p = (full ? Promise.resolve(null) : IDB.get(key)).then((c) => (c && c.data && c.mime && Date.now() - (c.at || 0) < IMG_KEEP)
+      ? (imgCache[key] = { src: b64Url(c.data, c.mime), thumb: !!c.thumb }) : fromServer());
+    return (imgPending[pk] = p.finally(() => { delete imgPending[pk]; }));
   }
   function loadThumbs() {
     $$('[data-ph]', $('#campMain')).forEach((ph) => {
@@ -5104,10 +5142,13 @@
     const dt = SD.dates[ci]; if (!dt || ci === 0) return false;
     const p = dt.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getDay() === 0;
   }
+  let sLoadSeq = 0;
   function loadSched(start) {
     if (!SD.dates.length) $('#sWrap').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     paintModeUi();
+    const seq = ++sLoadSeq; // ◀▶ 를 빠르게 누르거나 2주↔한 달을 바꾼 뒤 늦게 온 이전 응답은 버린다
     return fetchSched(start).then((r) => {
+      if (seq !== sLoadSeq) return;
       if (!r.ok) return toast(r.msg);
       Object.assign(SD, r);
       Object.keys(sBase).forEach((k) => delete sBase[k]);
@@ -5164,7 +5205,11 @@
     return ymdLocal(new Date(+p[0], +p[1] - 1, +p[2] + 1));
   }
   function renderSched() {
+    // 줄 구성이 바뀌어도(정지·대기 보기, 캠프·검색, 이슈 저장 뒤 다시 그리기) 선택 칸이 다른 기사 줄로 옮겨 가지 않게: 줄 ID로 다시 찾고, 없으면 선택을 푼다
+    const keyOf = (p) => (p && srows[p.r] ? srows[p.r].row : null), actId = keyOf(sAct), ancId = keyOf(sAnchor);
     srows = buildRows(); recalc();
+    const reIx = (p, id) => { if (!p) return null; const r = id == null ? -1 : srows.findIndex((x) => x.row === id); return r >= 0 && p.c < SD.dates.length ? { r, c: p.c } : null; };
+    sAct = reIx(sAct, actId); sAnchor = sAct ? reIx(sAnchor, ancId) : null;
     const today = pddDate(), dates = SD.dates;
     const hcell = (dt, i) => {
       const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
@@ -6168,7 +6213,9 @@
   }
   function loadSettle(month, fresh) {
     if (!STX.sum) $('#stTable').innerHTML = '<tr><td style="padding:40px"><div class="spin"></div></td></tr>';
+    const seq = STX.seq = (STX.seq || 0) + 1; // 다시 계산(느림) 뒤 다른 달로 바꾸면(빠름) 먼저 것의 늦은 응답은 버린다
     return api('adm_stlMonth', month || STX.month || '', !!fresh).then((r) => {
+      if (seq !== STX.seq) return;
       if (!r.ok) return toast(r.msg);
       STX.month = r.month; STX.months = r.months; STX.sum = r.summary; STX.pnl = r.pnl || null; STX.items = r.items || [];
       const sel = $('#stMonth');
@@ -6272,7 +6319,10 @@
       const tip = { drv: '기사 정보 열기', vendor: '용차업체 탭으로', slip: '정산서 열기', route: '노선관리 → 구분별 단가로' }[l.t] || '';
       return esc(m[1]) + '<a class="wlink" data-wk="' + esc(w.key) + '" data-wi="' + i + '" title="' + tip + '">' + esc(m[2]) + '</a>' + esc(m[3] || '');
     };
-    $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '"' + (w.level === 'bad' ? ' open' : '') + '><summary><span data-uik="warn:' + esc(w.key) + '">' + esc(uiWarn(w)) + '</span> · ' + w.count +
+    // 검색칸을 칠 때마다 다시 그려도 열어 둔 경고는 열린 채로 (처음엔 '빨강'만 열림)
+    const wasOpen = {}, hadAny = $$('#stWarn details').length > 0;
+    $$('#stWarn details').forEach((d) => { if (d.open) wasOpen[d.dataset.wk] = 1; });
+    $('#stWarn').innerHTML = (s.warnings || []).map((w) => '<details class="stw ' + w.level + '" data-wk="' + esc(w.key) + '"' + ((hadAny ? wasOpen[w.key] : w.level === 'bad') ? ' open' : '') + '><summary><span data-uik="warn:' + esc(w.key) + '">' + esc(uiWarn(w)) + '</span> · ' + w.count +
       (w.acts && w.acts.filter(Boolean).length > 1 ? ' ' + (WACT[w.key] ? wsel(w, 'all') : vsel(w.key, 'all').replace('🚚 용차업체로 지정…', '🚚 전부 한 업체로…')) : '') + '</summary><ul>' +
       w.items.map((x, i) => '<li' + (/✓ \d+월 퇴사 등록됨$/.test(x) ? ' class="wdone"' : '') + '>' + wname(w, i, x) + (w.acts && w.acts[i] ? ' ' + asel(w, i) : '') + '</li>').join('') + (w.count > w.items.length ? '<li>… 외 ' + (w.count - w.items.length) + '</li>' : '') + '</ul></details>').join('');
     const q = $('#stQ').value.trim().toLowerCase();
@@ -6310,6 +6360,7 @@
   }
   function stShowTab(tab, keep) {
     if (STX.tab !== tab && (STX.edDirty || Object.keys(STX.drvDirty).length) && !stLeaveOk()) return;
+    STX.paneSeq = (STX.paneSeq || 0) + 1; // 탭을 옮기면 이전 탭의 늦은 응답은 버린다 (표가 뒤바뀌거나 입력 중인 줄이 지워지지 않게)
     STX.tab = tab; STX.edDirty = false;
     $$('#stTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.st === tab));
     $('#stp-list').classList.toggle('hidden', tab !== 'list');
@@ -6348,6 +6399,7 @@
   // ── 손익·운영비 ──
   function stPnlTab(name) {
     if (STX.pnlT !== name && STX.edDirty && !confirm('저장하지 않은 변경이 있습니다. 버리고 넘어갈까요?')) return;
+    STX.paneSeq = (STX.paneSeq || 0) + 1;
     STX.pnlT = name; STX.edDirty = false;
     $$('#stPnlTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.pnl === name));
     $('#stMigrate').classList.add('hidden');
@@ -6363,10 +6415,11 @@
   }
   // 세금 일정 (부가세 · 원천세 · 산재고용 · 종합소득세)
   function loadTaxPlan() {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     const el = $('#stPnl');
     el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
     const seq = STX.taxSeq = (STX.taxSeq || 0) + 1;
-    api('adm_stlTax', STX.month).then((r) => {
+    api('adm_stlTax', STX.month).then((r) => { if (ps !== STX.paneSeq) return;
       if (seq !== STX.taxSeq) return;
       if (!r.ok) { el.innerHTML = ''; return toast(r.msg); }
       STX.taxp = r; renderTaxPlan();
@@ -6411,10 +6464,11 @@
   });
   // 자금배분: 쿠팡 입금 → 통장별
   function loadFund() {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     const el = $('#stPnl');
     el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
     const seq = STX.fundSeq = (STX.fundSeq || 0) + 1;
-    api('adm_stlFund', STX.month).then((r) => {
+    api('adm_stlFund', STX.month).then((r) => { if (ps !== STX.paneSeq) return;
       if (seq !== STX.fundSeq) return;
       if (!r.ok) { el.innerHTML = ''; return toast(r.msg); }
       STX.fund = r; renderFund();
@@ -6461,9 +6515,10 @@
   });
   // 통장 잔액
   function loadBal() {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     const el = $('#stPnl');
     el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
-    api('adm_stlBank').then((r) => { if (!r.ok) { el.innerHTML = ''; return toast(r.msg); } STX.bank = r; renderBal(); }).catch(() => {});
+    api('adm_stlBank').then((r) => { if (ps !== STX.paneSeq) return; if (!r.ok) { el.innerHTML = ''; return toast(r.msg); } STX.bank = r; renderBal(); }).catch(() => {});
   }
   function renderBal() {
     const B = STX.bank; if (!B) return;
@@ -6484,10 +6539,11 @@
     STX.balSel = STX.balSel === c.dataset.bsel ? '' : c.dataset.bsel; renderBal();
   });
   function loadPnl() {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     const el = $('#stPnl');
     el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
     const seq = STX.pnlSeq = (STX.pnlSeq || 0) + 1;
-    api('adm_stlPnl', STX.month).then((r) => {
+    api('adm_stlPnl', STX.month).then((r) => { if (ps !== STX.paneSeq) return;
       if (seq !== STX.pnlSeq) return;
       if (!r.ok) { el.innerHTML = ''; return toast(r.msg); }
       STX.pnlYear = r; renderPnl();
@@ -6535,6 +6591,7 @@
   $$('#stPnlTabs .tab').forEach((b) => b.addEventListener('click', () => stPnlTab(b.dataset.pnl)));
   function stCfgTab(name) {
     if (STX.cfg !== name && STX.edDirty && !confirm('저장하지 않은 변경이 있습니다. 버리고 넘어갈까요?')) return;
+    STX.paneSeq = (STX.paneSeq || 0) + 1;
     STX.cfg = name; STX.edDirty = false;
     $$('#stCfgTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.cfg === name));
     $('#stMigrate').classList.toggle('hidden', name !== 'migrate');
@@ -6637,15 +6694,16 @@
       renderFbView();
     }
   });
-  $('#stEditor').addEventListener('input', (e) => { if (STX.cfg === 'fbcut' && e.target.id === 'fbQ') { FB.q = e.target.value; const p = e.target.selectionStart; renderFbView(); const i = $('#fbQ'); i.focus(); i.setSelectionRange(p, p); } });
+  $('#stEditor').addEventListener('input', (e) => { if (STX.cfg === 'fbcut' && e.target.id === 'fbQ') { if (e.isComposing) return; FB.q = e.target.value; const p = e.target.selectionStart; renderFbView(); const i = $('#fbQ'); i.focus(); i.setSelectionRange(p, p); } });
 
   // ── 표 편집 ──
   /** 아이디 관리 = 보기 전용 (기사 정보관리 · 용차업체에서 자동으로) */
   function loadIdsView() {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     STX.table = null;
     const help = $('#stEditHelp'); help.className = 'sub st-help'; help.textContent = '';
     $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
-    return api('adm_stlIdsView', STX.month).then((r) => {
+    return api('adm_stlIdsView', STX.month).then((r) => { if (ps !== STX.paneSeq) return;
       if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
       if (r.legacy) { STX.idLegacy = true; return loadEditor('ids'); }
       STX.idv = r; renderIdsView();
@@ -6697,12 +6755,13 @@
     api('adm_stlSetVendor', [cid], name).then((r) => { if (!r.ok) { el.value = ''; return toast(r.msg); } toast(name + ' 아이디로 지정했습니다.'); STX.sum = null; loadIdsView(); }).catch(() => {});
   });
   function loadEditor(name) {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     if (name === 'ids' && !STX.idLegacy) return loadIdsView();
     STX.idv = null;
     if (!STX.table || STX.table.name !== name) STX.edQ = ''; // 다른 표로 바꾸면 검색어 비움
     paintHelp(name);
     $('#stEditor').innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
-    return api('adm_stlTable', name, STX.month).then((r) => {
+    return api('adm_stlTable', name, STX.month).then((r) => { if (ps !== STX.paneSeq) return;
       if (STX.cfg === 'fbcut' && !$('#stCfgTabs').classList.contains('hidden') && name !== 'fbcut') return; // 그새 다른 탭(프레시백)으로 옮김
       if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
       STX.table = r; STX.edRows = r.rows.map((x) => Object.assign({}, x)); STX.edDirty = false;
@@ -7021,8 +7080,9 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#stSlipModal').classList.contains('hidden')) $('#stSlipModal').classList.add('hidden'); });
   // ── 입금목록 ──
   function loadPay() {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     $('#payTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
-    return api('adm_stlPayList', STX.month).then((r) => { if (!r.ok) return toast(r.msg); STX.pay = r; renderPay(); }).catch(() => {});
+    return api('adm_stlPayList', STX.month).then((r) => { if (ps !== STX.paneSeq) return; if (!r.ok) return toast(r.msg); STX.pay = r; renderPay(); }).catch(() => {});
   }
   function renderPay() {
     const P = STX.pay; if (!P) return;
@@ -7067,8 +7127,9 @@
   // 사업자 정보(ro)는 기사 정보관리 DB 값을 보여 주기만 함 — 고치려면 이름을 눌러 기사 정보 창에서
   const SD_COLS = [['stlMode', '정산 방식', 'mode'], ['insEx', '산재·고용 제외', 'check'], ['bizNo', '사업자등록번호', 'ro'], ['bizName', '상호', 'ro'], ['bizCeo', '대표자 (비우면 이름)', 'ro'], ['bizAddr', '사업장 주소', 'ro'], ['bizType', '업태', 'ro'], ['bizItem', '종목', 'ro'], ['bizEmail', '계산서 이메일', 'ro']];
   function loadStDrivers() {
+    const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     $('#sdTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
-    return api('adm_stlDrivers').then((r) => { if (!r.ok) return toast(r.msg); STX.drv = r; STX.drvDirty = {}; renderStDrivers(); }).catch(() => {});
+    return api('adm_stlDrivers').then((r) => { if (ps !== STX.paneSeq) return; if (!r.ok) return toast(r.msg); STX.drv = r; STX.drvDirty = {}; renderStDrivers(); }).catch(() => {});
   }
   function renderStDrivers() {
     const R = STX.drv; if (!R) return;
@@ -7331,6 +7392,7 @@
   $('#stRecalc').addEventListener('click', () => { if (stLeaveOk()) loadSettle(STX.month, true); });
   $('#stCloseBtn').addEventListener('click', () => {
     const s = STX.sum; if (!s) { loadSettle(STX.month); return toast('정산을 다시 불러왔습니다. 한 번 더 눌러 주세요.'); }
+    if (!stLeaveOk()) return; // 공제·가불 등 표에 저장 안 한 줄이 있으면 먼저 묻는다 (마감하면 표를 다시 불러와 지워짐)
     const close = !s.closed;
     if (!confirm(close ? ymTitle(STX.month) + ' 정산을 마감할까요?\n지금 계산 결과가 고정되고, 이 달의 쿠팡 정산서·공제·용차는 고칠 수 없게 됩니다 (입금체크는 계속 가능).' : ymTitle(STX.month) + ' 마감을 풀까요?\n다시 지금 데이터로 계산됩니다.')) return;
     api('adm_stlClose', STX.month, close).then((r) => { if (!r.ok) return toast(r.msg); toast(close ? '마감했습니다.' : '마감을 풀었습니다.'); STX.sum = null; loadSettle(STX.month, true); }).catch(() => {});
@@ -7375,6 +7437,7 @@
     if (t0) {
       let act = t0.value; t0.value = '';
       if (!act) return;
+      if (!STX.sum) return toast('다시 계산하는 중입니다. 잠시 뒤 다시 눌러 주세요.');
       const w = (STX.sum.warnings || []).find((x) => x.key === t0.dataset.wk); if (!w || !w.acts) return;
       const list = t0.dataset.wi === 'all' ? w.acts.filter(Boolean) : [w.acts[+t0.dataset.wi]].filter(Boolean);
       if (!list.length) return;
@@ -7406,6 +7469,7 @@
     let v = t.value; t.value = '';
     if (!v) return;
     if (v === '__new') { v = (prompt('용차업체 이름을 입력해 주세요.') || '').trim(); if (!v) return; }
+    if (!STX.sum) return toast('다시 계산하는 중입니다. 잠시 뒤 다시 눌러 주세요.');
     const w = (STX.sum.warnings || []).find((x) => x.key === t.dataset.vw); if (!w || !w.acts) return;
     const cids = t.dataset.vi === 'all' ? w.acts.flatMap((a) => a.cids) : (w.acts[+t.dataset.vi] || {}).cids || [];
     if (!cids.length) return;
@@ -7782,8 +7846,10 @@
     if (b) t[a][b] = v; else if (a === 'pub') t.pub = v === '1'; else if (['cash', 'check', 'bill', 'credit'].includes(a)) t[a] = Number(v) || 0; else t[a] = v;
     TX.dirty = true;
   }
-  let tiRT = 0;
-  const tiRe = () => { clearTimeout(tiRT); tiRT = setTimeout(() => { const f = document.activeElement, key = f && (f.dataset.tf || f.dataset.it), pos = f && f.selectionStart; renderTaxEd(); if (key) { const n = $('#tiEd [data-tf="' + key + '"], #tiEd [data-it="' + key + '"]'); if (n) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (e) {} } } }, 350); };
+  let tiRT = 0, tiComp = false; // 한글 조합 중에는 다시 그리지 않는다 (그리면 조합 중인 글자가 끊김)
+  $('#tiEd').addEventListener('compositionstart', () => { tiComp = true; });
+  $('#tiEd').addEventListener('compositionend', () => { tiComp = false; tiRe(); });
+  const tiRe = () => { clearTimeout(tiRT); tiRT = setTimeout(() => { if (tiComp) return tiRe(); const f = document.activeElement, key = f && (f.dataset.tf || f.dataset.it), pos = f && f.selectionStart; renderTaxEd(); if (key) { const n = $('#tiEd [data-tf="' + key + '"], #tiEd [data-it="' + key + '"]'); if (n) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (e) {} } } }, 350); };
   $('#tiEd').addEventListener('input', (e) => {
     const el = e.target;
     if (el.dataset.tf) { tiSet(el.dataset.tf, el.value); return tiRe(); }
@@ -7845,7 +7911,7 @@
   }
   $('#bmTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-bms]'); if (b) { BM.status = b.dataset.bms; loadBoardAdm(); } });
   $('#bmReload').addEventListener('click', loadBoardAdm);
-  let bmQT = 0; $('#bmQ').addEventListener('input', () => { clearTimeout(bmQT); bmQT = setTimeout(loadBoardAdm, 400); });
+  let bmQT = 0; $('#bmQ').addEventListener('input', (e) => { if (e.isComposing) return; clearTimeout(bmQT); bmQT = setTimeout(loadBoardAdm, 400); });
   $('#bmRows').addEventListener('click', (e) => { const tr = e.target.closest('[data-bm]'); if (tr) openBoardAdm(tr.dataset.bm); });
   $('#bmClose').addEventListener('click', () => { BM.cur = ''; $('#bmModal').classList.add('hidden'); });
   $('#bmBanBtn').addEventListener('click', () => {
@@ -8061,7 +8127,10 @@
   window.addEventListener('pagehide', uiDefsSave);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') uiDefsSave(); });
   let uiRaf = 0;
-  new MutationObserver(() => { if (!uiRaf) uiRaf = requestAnimationFrame(() => { uiRaf = 0; uiApplyAll(); }); }).observe(document.body, { childList: true, subtree: true });
+  // 표 본문(tbody) 안의 변화(기사스케줄 칸 편집 등)는 바꿀 문구가 없으므로 건너뛴다 → 칸을 고칠 때마다 화면 전체를 훑지 않음
+  const UI_IN_TB = '.lb, .sec, h3, h4, thead, th';
+  const uiNeeds = (m) => { const t = m.target; if (!t || !t.closest || !t.closest('tbody')) return true; return [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches(UI_IN_TB) || n.querySelector(UI_IN_TB))); };
+  new MutationObserver((ms) => { if (!uiRaf && ms.some(uiNeeds)) uiRaf = requestAnimationFrame(() => { uiRaf = 0; uiApplyAll(); }); }).observe(document.body, { childList: true, subtree: true });
   uiApplyAll();
   // 설명서: "태그 | 내용" 한 줄씩, **굵게**
   const uiMd = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
@@ -8073,7 +8142,7 @@
   }
   const uiGuideWhere = (name) => { const b = $('#stCfgTabs [data-cfg="' + name + '"], #stPnlTabs [data-pnl="' + name + '"], #stIdTabs [data-idt="' + name + '"]'); return b ? (b.closest('#stPnlTabs') ? '러너 손익·통장 → ' : '정산 설정 → ') + b.textContent.trim() : name === 'pnlSum' ? '러너 손익·통장 → 월별 손익' : name; };
   function uiRepaint() {
-    localStorage.setItem('runner.uiText', JSON.stringify(UI.map));
+    try { localStorage.setItem('runner.uiText', JSON.stringify(UI.map)); } catch (e) { /* 저장소가 막혀도 화면은 바꾼다 */ }
     uiApplyAll();
     if (UI.lastHelp && $('#stEditHelp') && $('#stEditHelp').dataset.uig === UI.lastHelp) paintHelp(UI.lastHelp);
     if (currentView === 'uiset') uiRender();
@@ -8290,7 +8359,7 @@
           out.push({ kind: 'menu', d: 0, group: gname, col, label, path: label, steps: [a] });
           SUB.filter((x) => x[0] === view && x[1] === go).forEach((x) => x[2].forEach(([sel, tag, kids]) => {
             $$(sel).forEach((b) => {
-              const bl = tx(b).replace(/^[⬆📅⚠📖+\s]+/, '').replace(/\s*\d+$/, '').trim(); if (!bl) return;
+              const bl = tx(b).replace(/^[⬆📅⚠📖+\s]+/u, '').replace(/\s*\d+$/, '').trim(); if (!bl) return;
               const steps = [a].concat(tag === '더보기' ? [$('#sMoreBtn'), b] : [b]);
               out.push({ kind: 'sub', d: 1, group: gname, col, label: bl, path: label + ' › ' + bl, tag: tag === '탭' || tag === '보기' ? '' : tag, steps, kw: b.title || '' });
               const k = kids && kids[b.dataset.st];
@@ -8511,10 +8580,26 @@
       if (!hs.some((c) => c.classList.contains('dsrt')) && !tb.dataset.tsb && !spanRows(tb)) { tsBind(tb.id); if (TSORT[tb.id]) tsApply(tb); else hs.forEach((th) => { if (!th.querySelector('input')) { th.classList.add('tsrt'); th.title = th.title || '눌러서 정렬'; } }); }
       refresh(tb);
     }
-    let timer = 0;
-    function scan() { timer = 0; document.querySelectorAll(SEL).forEach((tb) => { if (ok(tb)) enhance(tb); }); }
-    new MutationObserver((ms) => { if (ms.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && !(n.classList && (n.classList.contains('tkbar') || n.classList.contains('tk-row')))))) { if (!timer) timer = setTimeout(scan, 60); } })
-      .observe(document.body, { childList: true, subtree: true });
+    let timer = 0, touched = new Set(), scanAll = true;
+    // 바뀐 표만 다시 손본다 (예전엔 화면 어디에 무엇이 추가돼도 문서의 모든 표를 다시 훑었다 → 기사스케줄 칸 편집기 글자마다 느려짐)
+    function scan() {
+      timer = 0;
+      const list = scanAll ? document.querySelectorAll(SEL) : [...touched].filter((tb) => tb.isConnected && tb.matches(SEL));
+      scanAll = false; touched = new Set();
+      list.forEach((tb) => { if (ok(tb)) enhance(tb); });
+    }
+    const skipNode = (n) => n.nodeType !== 1 || (n.classList && (n.classList.contains('tkbar') || n.classList.contains('tk-row')));
+    new MutationObserver((ms) => {
+      let any = false;
+      ms.forEach((m) => {
+        const added = [...m.addedNodes].filter((n) => !skipNode(n));
+        if (!added.length) return;
+        const host = m.target.nodeType === 1 ? m.target.closest('table') : null;
+        if (host) { touched.add(host); any = true; }
+        added.forEach((n) => { if (n.matches && n.matches('table')) { touched.add(n); any = true; } if (n.querySelectorAll) n.querySelectorAll('table').forEach((t) => { touched.add(t); any = true; }); });
+      });
+      if (any && !timer) timer = setTimeout(scan, 60);
+    }).observe(document.body, { childList: true, subtree: true });
     setTimeout(scan, 300);
     document.addEventListener('input', (e) => {
       const qi = e.target.closest && e.target.closest('.tk-q'); if (!qi) return;

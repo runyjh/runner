@@ -176,11 +176,13 @@ function fsSaveAdmSched_(start, res, t0) {
   const r = JSON.parse(JSON.stringify(res)); fsClean_(r);
   fsPut_([{ path: 'adm/sched', data: { start: start, res: r } }], t0);
 }
-/** 다시 만들기: 이번 주 관리자 표 + 로그인 중인 기사들의 홈 (공지 · 게시판 최근 글) */
-function fsBuildSched_() {
+/** 다시 만들기: 이번 주 관리자 표 + (withHome) 로그인 중인 기사들의 홈 (공지 · 게시판 최근 글)
+ *  기사 홈 사본은 공지·게시판이 바뀌었을 때(nbAt)와 날이 바뀌었을 때만 다시 만든다 — 기사앱이 nbAt 만 보므로 그 밖의 저장 때는 만들어도 쓰이지 않음 */
+function fsBuildSched_(withHome) {
   const sun = sundayOf_(new Date()), start = Utilities.formatDate(sun, CFG.TZ, 'yyyy-MM-dd');
   const t0 = Date.now(), docs = [];
   try { const a = schRead_(sun, addDays_(sun, SCH_DAYS - 1)); fsClean_(a); docs.push({ path: 'adm/sched', data: { start: start, res: a } }); } catch (e) { console.error('fs adm/sched: ' + e); }
+  if (withHome === false) return fsPut_(docs, t0);
   // 로그인(세션)이 살아 있는 기사만 — 나머지는 앱을 열 때 서버에서 읽으며 사본이 생김
   const now = Date.now(), live = {};
   readAll_(SH.SESSIONS).forEach(function (s) { const d = str_(s.driverId); if (d && d.indexOf(ADMIN_SESSION) !== 0 && toMs_(s.expiresAt) > now) live[d] = 1; });
@@ -213,14 +215,18 @@ function fsSync() {
   const c = cache_(), dirty = +c.get('fs:dirty') || 0, built = +c.get('fs:built') || 0;
   const today = todayText_(), day = c.get('fs:day');
   if (!(dirty > built) && day === today) return;
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(1000)) return;
+  // 겹침 방지는 캐시 표시로만: 전체 잠금(LockService)을 잡으면 사본을 만드는 몇 분 동안 앱의 모든 저장이 "다른 저장 작업이 처리 중"으로 막힌다
+  if (c.get('fs:busy')) return;
+  c.put('fs:busy', '1', 330);
   try {
+    const nb = +(PropertiesService.getScriptProperties().getProperty('FS_NB_AT') || 0), nbBuilt = +c.get('fs:nbBuilt') || 0;
+    const withHome = day !== today || !nbBuilt || nb > nbBuilt;
     const t = Date.now();
-    const n = fsBuildSched_();
+    const n = fsBuildSched_(withHome);
     c.put('fs:built', String(t), 21600); c.put('fs:day', today, 21600);
-    c.put('fs:last', JSON.stringify({ at: nowText_(), n: n, ms: Date.now() - t }), 21600);
-  } finally { lock.releaseLock(); }
+    if (withHome) c.put('fs:nbBuilt', String(Math.max(nb, 1)), 21600);
+    c.put('fs:last', JSON.stringify({ at: nowText_(), n: n, ms: Date.now() - t, home: withHome }), 21600);
+  } finally { c.remove('fs:busy'); }
 }
 /** 1분 트리거 설치 (없으면 · 관리자 로그인 때 확인) */
 function fsEnsureTrigger_() {

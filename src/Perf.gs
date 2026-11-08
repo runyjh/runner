@@ -54,7 +54,7 @@ function adm_perfDrv(token, fn, args, driverId) {
     requireAdmin_(token);
     if (PERF_DRV_FNS.indexOf(fn) < 0) fail_('측정할 수 없는 함수입니다.');
     let d = driverId ? driverById_(driverId) : null;
-    if (!d) d = readAll_(SH.DRIVERS).filter(function (o) { return o.status === ST.ACTIVE && o.loginId && !o.mustChange && o.workStatus !== '퇴사'; })[0];
+    if (!d) d = readAll_(SH.DRIVERS).filter(function (o) { return o.status === ST.ACTIVE && o.loginId && !mustChange_(o) && o.workStatus !== '퇴사'; })[0];
     if (!d) fail_('측정에 쓸 승인된 기사가 없습니다.');
     PERF_BENCH_ = { tok: Utilities.getUuid() + Utilities.getUuid(), s: { d: String(d.id), c: Date.now(), e: Date.now() + 60000, a: 0, th: 'bench' } };
     const t0 = Date.now();

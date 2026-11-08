@@ -612,7 +612,7 @@ function installSheetTriggers_(book) {
 
 // ───────────────────────── 공용 핸들 (실행당 1회) ─────────────────────────
 let _props = null, _ss = null;
-const _sheets = {}, _cols = {};
+const _sheets = {}, _cols = {}, _colsFresh = {}; // _colsFresh: 이번 실행에서 시트 머리글을 직접 읽어 확인한 열 위치 (쓰기마다 다시 읽지 않게)
 function props_() { return _props || (_props = PropertiesService.getScriptProperties().getProperties()); }
 function ss_() {
   if (_ss) return _ss;
@@ -640,6 +640,7 @@ function cache_() { return CacheService.getScriptCache(); }
  */
 function cols_(name, fresh) {
   if (_cols[name] && !fresh) return _cols[name];
+  if (fresh && _colsFresh[name]) return _colsFresh[name];
   const ck = 'hc:' + name;
   let head = fresh ? null : cache_().get(ck);
   if (head) head = JSON.parse(head);
@@ -677,6 +678,7 @@ function cols_(name, fresh) {
     fail_('DB 시트(' + name + ')에 머리글이 없습니다: ' + missing.join(', ') +
       '. 머리글 이름은 바꾸지 말고, 편집기에서 setup 을 다시 실행해 주세요.');
   }
+  if (fresh) _colsFresh[name] = c;
   return (_cols[name] = c);
 }
 /** 빈 열을 오른쪽 끝에 추가 (안전한 새 열만 자동 추가에 사용) */
@@ -708,7 +710,7 @@ function delRows_(sh, rows) {
   }
   return rs.length;
 }
-function clearHeadCache_(name) { delete _cols[name]; cache_().remove('hc:' + name); }
+function clearHeadCache_(name) { delete _cols[name]; delete _colsFresh[name]; cache_().remove('hc:' + name); }
 
 // ───────────────────────── 잠금 (겹쳐 잡아도 안전) ─────────────────────────
 /**
@@ -723,7 +725,8 @@ function scriptLock_() {
     waitLock: function (ms) { if (mine) return; if (_lockN === 0) real().waitLock(ms); _lockN++; mine = true; },
     tryLock: function (ms) { if (mine) return true; if (_lockN === 0 && !real().tryLock(ms)) return false; _lockN++; mine = true; return true; },
     hasLock: function () { return mine; },
-    releaseLock: function () { if (!mine) return; mine = false; _lockN = Math.max(0, _lockN - 1); if (_lockN === 0) real().releaseLock(); }
+    // 풀기 전에 시트 쓰기를 먼저 반영(flush)한다: 반영 전에 풀면 다음 실행이 잠금을 잡고도 아직 안 써진 줄을 못 봐 같은 줄에 덮어쓸 수 있다
+    releaseLock: function () { if (!mine) return; mine = false; _lockN = Math.max(0, _lockN - 1); if (_lockN === 0) { try { SpreadsheetApp.flush(); } catch (e) { /* 무시 */ } real().releaseLock(); } }
   };
 }
 
@@ -802,7 +805,8 @@ var _usedIds = {};
 var _driverIdSet = null; // 이번 실행에서 drivers 탭 기사ID 목록 (처음 한 번만 읽음)
 function uniqId_(prefix, taken) {
   for (let i = 0; i < 50; i++) {
-    const id = prefix + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
+    // 시각(초) + 무작위 5자리: 같은 초에 두 실행이 동시에 만들어도 겹치지 않게 (3자리 때는 1/900 확률로 같은 ID가 날 수 있었음)
+    const id = prefix + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90000 + 10000);
     if (_usedIds[id] || (taken && taken[id])) continue;
     _usedIds[id] = 1;
     return id;
@@ -1400,12 +1404,17 @@ function onSheetEdit(e) {
     if (n === 1) return;
   }
   const lock = scriptLock_();
-  if (!lock.tryLock(15000)) return;
+  // 다른 저장이 길어져 잠금을 못 잡으면(드묾) 그냥 넘기지 않고 첫 칸에 메모를 남긴다 — 주민번호·계좌 같은 값이 가린 글자로 바뀌지 않은 채 남지 않게
+  try { lock.waitLock(40000); } catch (e) {
+    try { sh.getRange(Math.max(2, r0), 1).setNote('⚠ ' + nowText_() + ' 다른 저장 작업 중이라 자동 정리(가리기·검사)를 못 했습니다. 이 줄의 칸을 한 번 더 고쳐 주세요.'); } catch (x) { /* 무시 */ }
+    return;
+  }
   try {
     const c = cols_(name, true);
-    const start = Math.max(2, r0), end = Math.min(r0 + n - 1, start + 199);
+    const start = Math.max(2, r0), end = Math.min(r0 + n - 1, start + 1999); // 한 번에 2000줄까지 (200줄씩 끊어 읽음)
     if (end < start) return;
-    const block = sh.getRange(start, 1, end - start + 1, c.__w).getValues();
+    const block = [];
+    for (let b0 = start; b0 <= end; b0 += 200) block.push.apply(block, sh.getRange(b0, 1, Math.min(200, end - b0 + 1), c.__w).getValues());
     let campRenamed = false;
     _campIdx = null; _routeList = null;
     block.forEach(function (v, i) {
@@ -1600,6 +1609,7 @@ function adm_login(loginId, password, auto) {
 function adm_check(token) {
   return run_(function () {
     const a = requireAdmin_(token);
+    try { if (typeof fsEnsureTrigger_ === 'function') fsEnsureTrigger_(); } catch (e) { /* 사본 트리거 확인 (6시간에 한 번만 실제 확인) */ }
     return { ok: true, admin: { name: a.name, loginId: a.loginId } };
   });
 }
@@ -3425,11 +3435,10 @@ function cleanupSessions() {
     if (last < 2) return;
     const now = Date.now();
     const rows = sh.getRange(2, 1, last - 1, c.__w).getValues();
-    const keep = rows.filter(function (r) { return toMs_(r[c.expiresAt]) > now; })
-      .map(function (r) { return r.map(str_); });
-    if (keep.length === rows.length) return;
-    sh.getRange(2, 1, last - 1, c.__w).clearContent();
-    if (keep.length) sh.getRange(2, 1, keep.length, c.__w).setNumberFormat('@').setValues(keep);
+    // 지난 줄만 아래쪽부터 지운다 (전체를 지웠다 다시 쓰면 그 사이 appendRow 로 들어온 새 로그인 줄이 덮일 수 있음)
+    const gone = [];
+    rows.forEach(function (r, i) { if (!(toMs_(r[c.expiresAt]) > now)) gone.push(i + 2); });
+    if (gone.length) delRows_(sh, gone);
   } finally {
     lock.releaseLock();
     try { pmAlertCleanup_(); } catch (e) { console.error('품앗이 알림 정리 실패: ' + (e && e.message)); } // 60일 지난 품앗이 알림 정리
@@ -3532,8 +3541,10 @@ function masterVer_() {
   if (!v) { v = String(Date.now()); cache_().put('mst:v', v, CFG.CACHE_MAX); }
   return v;
 }
+/** 캐시 버전을 올리기 전에 시트 쓰기를 먼저 반영한다 → 새 버전으로 읽는 다른 실행이 아직 안 써진 값을 캐시에 넣지 않게 */
+function flushBeforeBump_() { try { SpreadsheetApp.flush(); } catch (e) { /* 무시 */ } }
 function bumpMaster_() {
-  fsMark_();
+  flushBeforeBump_(); fsMark_();
   try { cache_().put('mst:v', Date.now() + Math.random().toString(36).slice(2, 6), CFG.CACHE_MAX); } catch (e) { /* 캐시 오류는 무시 */ }
 }
 function master_() {
@@ -4458,11 +4469,11 @@ function schEnsureDates_(from, to) {
 }
 
 /** schedule 시트의 캠프·이름·기본노선 사본을 기사 정보에 맞춘다 (다를 때만, 바쁘면 다음에) */
-function schSyncCopies_(sh, h, drivers) {
+function schSyncCopies_(sh, h, drivers, fixedRows) {
   const by = {};
   drivers.forEach(function (d) { by[d.id] = d; });
-  const last = sh.getLastRow();
-  const fixed = sh.getRange(2, 1, last - 1, 5).getValues();
+  let fixed = fixedRows;
+  if (!fixed) { const last = sh.getLastRow(); if (last < 2) return; fixed = sh.getRange(2, 1, last - 1, 5).getValues(); }
   const fix = [];
   fixed.forEach(function (f, i) {
     const d = by[str_(f[h.fixed['행ID']])];
@@ -4592,8 +4603,9 @@ function schRead_(sun, end) {
   const cols = dates.map(function (d) { return h.dates[d]; });
   const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
   const cells = {}, notes = [], rowIds = {};
+  let fixed = null, touched = false; // fixed = 행ID·구분·캠프·이름·기본노선 열 (아래 schSyncCopies_ 가 다시 읽지 않게 넘김 · 줄을 지웠으면 안 넘김)
   if (last >= 2) {
-    const fixed = sh.getRange(2, 1, last - 1, 5).getValues();
+    fixed = sh.getRange(2, 1, last - 1, 5).getValues();
     const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
     fixed.forEach(function (f, i) {
       const id = str_(f[h.fixed['행ID']]);
@@ -4617,7 +4629,7 @@ function schRead_(sun, end) {
       all.forEach(function (f, i) { if (extra.some(function (n) { return n.id === str_(f[h.fixed['행ID']]); }) && str_(f[h.fixed['구분']]) === SCH.KIND_NOTE) rows.push(i + 2); });
       rows.sort(function (a, b) { return b - a; }).forEach(function (r) { sh.deleteRow(r); });
       extra.forEach(function (n) { if (n.label) schNoteRelabel_(n.label, ''); });
-      notes.splice(1);
+      notes.splice(1); touched = true;
       }
       // 한 번만: 이후 '+ 비고 줄'로 새로 만든 줄은 지우지 않는다
       PropertiesService.getScriptProperties().setProperty('SCH_NOTE_TRIM', '1');
@@ -4628,7 +4640,7 @@ function schRead_(sun, end) {
   if (notes.length && (!cache_().get('sch:nmig') || notes.some(function (n) { return Object.keys(n.cells).length; }))) {
     const lock = scriptLock_();
     lock.waitLock(30000);
-    try { schMigrateNotes_(sh, schHeader_(true)); cache_().put('sch:nmig', '1', 600); } finally { lock.releaseLock(); }
+    try { schMigrateNotes_(sh, schHeader_(true)); cache_().put('sch:nmig', '1', 600); touched = true; } finally { lock.releaseLock(); }
   }
   const nm = schNoteMemos_(notes, dates[0], dates[dates.length - 1]);
   notes.forEach(function (n) {
@@ -4676,7 +4688,7 @@ function schRead_(sun, end) {
     if (show.length) d.changes = show.map(function (c) { return rcView_(c, campName); });
   });
   try { rcRows_().forEach(function (c) { if (c.kind === RCK.MOVE && c.status === RCS.WAIT) rcMoves.push(rcView_(c, campName)); }); } catch (e) { /* 무시 */ }
-  if (last >= 2) schSyncCopies_(sh, h, drivers);
+  if (last >= 2) schSyncCopies_(sh, h, drivers, touched ? null : fixed);
   const holidays = {};
   dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
   let issues = [];
@@ -4804,7 +4816,7 @@ function adm_schSave(token, changes) {
         sh.getRange(r, c).setNumberFormat('@').setValue(safeText_(x.value));
         saved++;
       });
-      if (saved) logSchChange_(a, ok, saved);
+      if (saved) { logSchChange_(a, ok, saved); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } } // 정산서 근무일수는 기사스케줄에서 세므로 정산 캐시도 새로
       return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts) }, rcExtra);
     } finally {
       lock.releaseLock();
@@ -5158,7 +5170,7 @@ function api_campSchedule(token, month) {
           x.order = i;
           dates.forEach(function (d) { if (!inCamp[x.id].days[d]) return; const c = h.dates[d]; if (c !== undefined) { const v = str_(block[i][c - c0]); if (v) x.cells[d] = v; } });
         });
-        try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1).list; } catch (e) { out.backup = {}; }
+        try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1, { drivers: all, ids: ids, block: block }).list; } catch (e) { out.backup = {}; }
       }
     }
     // 관리자가 기사스케줄 칸에 적은 지시사항 (그 캠프에서 일하는 날만)
@@ -5181,21 +5193,25 @@ function api_campSchedule(token, month) {
  * 백업 기사 = 기본노선에 백업·예비·용차, 또는 단가코드이 백업·외부용차.
  * 그 기사의 칸에서 '캠프명 + 노선' 을 찾고, 캠프명이 없으면 그 기사 소속 캠프로 본다.
  */
-function schMyCampBackup_(myId, dates, h, c0, c1) {
+function schMyCampBackup_(myId, dates, h, c0, c1, pre) {
   const m = master_(), campName = {};
   m.camps.forEach(function (c) { campName[c.id] = c.name; });
   const short = function (n) { return str_(n).replace(/\s*캠프\s*$/, '').trim(); };
-  const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
+  // 같은 캠프 기사들은 명단이 똑같다 → 캠프·기간별로 60초 캐시 (기사마다 기사 전체·스케줄 전체를 다시 읽지 않게)
+  const info = driverInfo_(myId), ck = info && info.campId && campName[info.campId] ? 'schbk:' + info.campId + ':' + dates[0] + ':' + dates[dates.length - 1] + ':' + (c1 - c0) : '';
+  if (ck) { const hit = cache_().get(ck); if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 만든다 */ } } }
+  pre = pre || {};
+  const drivers = (pre.drivers || readAll_(SH.DRIVERS)).filter(function (o) { return o.id; });
   const me = drivers.filter(function (o) { return o.id === myId; })[0];
   const myCamp = me && campName[me.schCampId] ? short(campName[me.schCampId]) : '';
   const res = { camp: myCamp, list: {} };
   if (!myCamp) return res;
   const byId = {};
   drivers.forEach(function (o) { byId[o.id] = o; });
-  const sh = schSheet_(), last = sh.getLastRow();
+  const sh = schSheet_(), last = pre.ids ? pre.ids.length + 1 : sh.getLastRow();
   if (last < 2) return res;
-  const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues();
-  const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+  const ids = pre.ids || sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues();
+  const block = pre.block || sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
   const campNames = m.camps.map(function (c) { return short(c.name); }).filter(Boolean).sort(function (a, b) { return b.length - a.length; });
   const esc = function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
   const seen = {};
@@ -5229,6 +5245,7 @@ function schMyCampBackup_(myId, dates, h, c0, c1) {
       hits.forEach(function (x) { if (l.indexOf(x) < 0) l.push(x); });
     });
   });
+  if (ck) { try { cache_().put(ck, JSON.stringify(res), 60); } catch (e) { /* 무시 */ } }
   return res;
 }
 
@@ -5308,12 +5325,12 @@ function schIssueSheet_() {
 function schIssues_(from, to) {
   const sh = schSS_().getSheetByName(SCH_ISSUE.SHEET); // 아직 없으면 (처음 기록할 때 만든다)
   if (!sh) return [];
-  const last = sh.getLastRow();
-  if (last < 2) return [];
-  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(str_);
+  const vals = sh.getDataRange().getValues(); // 머리글 + 내용을 한 번에 (시트 호출 4번 → 1번)
+  if (vals.length < 2) return [];
+  const head = vals[0].map(str_);
   const ix = {}; SCH_ISSUE.HEAD.forEach(function (h) { ix[h] = head.indexOf(h); });
   const g = function (r, h) { const v = ix[h] >= 0 ? r[ix[h]] : ''; return v instanceof Date ? ymd_(v) : str_(v); };
-  return sh.getRange(2, 1, last - 1, head.length).getValues().map(function (r, i) {
+  return vals.slice(1).map(function (r, i) {
     return { row: i + 2, id: g(r, '이슈ID'), date: g(r, '날짜'), driverId: g(r, '기사ID'), name: g(r, '이름'), kind: g(r, '구분'), reason: g(r, '사유'), action: g(r, '조치'), by: g(r, '작성자'), at: g(r, '작성일시') };
   }).filter(function (x) { return x.date && (x.driverId || x.name) && (!from || x.date >= from) && (!to || x.date <= to); });
 }
@@ -6066,7 +6083,7 @@ function onSchEdit_(e, sh) {
   const r0 = e.range.getRow(), n = e.range.getNumRows();
   if (r0 === 1) { cache_().remove('sch:h'); if (n === 1) return; }
   const lock = scriptLock_();
-  if (!lock.tryLock(15000)) return;
+  try { lock.waitLock(40000); } catch (err) { return; } // 스케줄 시트는 가릴 값이 없어 못 잡으면 그냥 넘긴다 (다음 편집 때 정리)
   try {
     const h = schHeader_(true);
     const start = Math.max(2, r0), end = Math.min(r0 + n - 1, start + 199);
@@ -6129,6 +6146,7 @@ function onSchEdit_(e, sh) {
     }
     // 시트에서 비고 줄 칸을 직접 고치면 업무스케줄 메모로 옮긴다
     if (noteEdited) { try { schMigrateNotes_(sh, h); } catch (err) { console.error(err); } }
+    try { stlBump_(); } catch (err) { /* 정산 캐시 */ } // 정산서 근무일수(기사스케줄 기준) 캐시도 새로
   } finally {
     lock.releaseLock();
   }

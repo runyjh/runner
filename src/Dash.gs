@@ -14,9 +14,21 @@ function dashCellKind_(v) {
   return 'work';
 }
 
-function adm_dash(token) {
+/** 요약 결과는 2~5분 캐시 (여러 관리자·탭이 열어도 시트를 다시 읽지 않음). 화면의 [새로고침]은 fresh=true 로 바로 다시 읽는다 */
+function dashCached_(key, ttl, fresh, make) {
+  const c = cache_();
+  if (!fresh) { const hit = c.get(key); if (hit) { try { const o = JSON.parse(hit); o.cached = true; return o; } catch (e) { /* 다시 만든다 */ } } }
+  const out = make();
+  try { const j = JSON.stringify(out); if (j.length < 95000) c.put(key, j, ttl); } catch (e) { /* 무시 */ }
+  return out;
+}
+function adm_dash(token, fresh) {
   return run_(function () {
     requireAdmin_(token);
+    return dashCached_('dash:a', 120, fresh, dashMain_);
+  });
+}
+function dashMain_() {
     const today = todayText_(), t0 = parseYmd_(today), out = { ok: true, today: today };
     const drvAll = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; });
     const isWork = function (o) { return o.status === ST.ACTIVE && o.workStatus !== '퇴사'; };
@@ -116,13 +128,16 @@ function adm_dash(token) {
       };
     } catch (e) { out.board = { err: '게시판 없음' }; }
     return out;
-  });
 }
 
 /** 정산 · 매입매출 · 세금계산서 요약 (지금 정산월 + 지난달) */
-function adm_dashStl(token) {
+function adm_dashStl(token, fresh) {
   return run_(function () {
     requireAdmin_(token);
+    return dashCached_('dash:s', 300, fresh, dashStl_);
+  });
+}
+function dashStl_() {
     const cur = stlMonthNow_(), prev = stlAddMonth_(cur, -1), out = { ok: true, cur: cur, prev: prev, months: [] };
     [prev, cur].forEach(function (m) {
       let sum = null, err = '';
@@ -149,5 +164,4 @@ function adm_dashStl(token) {
       out.tax = { prev: by(prev), cur: by(cur), targets: tiOn };
     } catch (e) { out.tax = { err: String(e && e.message || e).slice(0, 120) }; }
     return out;
-  });
 }
