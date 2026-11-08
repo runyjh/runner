@@ -999,7 +999,7 @@
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -2681,11 +2681,16 @@
    */
   let pushBusy = false, pushShown = false;
   async function pushRegister(cfg) {
-    const t = await fbToken(cfg);
-    if (!t) throw new Error('기기 등록에 실패했습니다.');
+    const t = await Promise.race([fbToken(cfg), new Promise((_, rej) => setTimeout(() => rej(new Error('기기 토큰 받기 20초 초과')), 20000))]);
+    if (!t) throw new Error('기기 토큰이 비어 있음');
     const r = await api('api_pmPushSave', store.get(TOKEN), t, deviceName());
     if (!r || !r.ok) throw new Error((r && r.msg) || '기기 등록에 실패했습니다.');
     lsSet(PUSH_TOK, t);
+  }
+  function pushFail(e) {
+    const info = [deviceName(), standalone() ? '설치앱' : '브라우저', 'perm=' + (window.Notification ? Notification.permission : '-'), String((e && e.code) || ''), String((e && e.message) || e || '')].join(' | ');
+    console.warn('푸시 등록 실패', info);
+    api('api_pmPushLog', store.get(TOKEN), info).catch(() => {});
   }
   function pushPop(title, body, canAllow) {
     $('#pushPopT').textContent = title; $('#pushPopB').textContent = body;
@@ -2693,15 +2698,16 @@
     $('#pushPop').classList.add('center'); $('#pushPop').classList.remove('hidden');
   }
   function pushAuto() {
-    if (pushBusy || !store.get(TOKEN) || !pushCapable()) return;
+    if (pushBusy || !store.get(TOKEN)) return;
+    if (!pushCapable()) { if (!pushShown) { pushShown = true; pushFail(new Error('이 브라우저는 휴대폰 알림 미지원')); } return; }
     if (isIOS && !standalone()) {
       if (!pushShown) { pushShown = true; pushPop('홈 화면에 러너 앱을 설치해 주세요', '아이폰은 홈 화면에 설치한 러너 앱에서만 휴대폰 알림을 받을 수 있습니다 (iOS 16.4 이상).\n\n사파리 아래쪽 공유 버튼(□↑) → 홈 화면에 추가 → 설치한 아이콘으로 열어 주세요.', false); }
       return;
     }
     getPushCfg().then((cfg) => {
-      if (!cfg.on) return; // 사무실 설정 전
+      if (!cfg.on) { if (cfg.err) pushFail(new Error('알림 설정을 서버에서 못 받음')); return; }
       const perm = Notification.permission;
-      if (perm === 'granted') { pushBusy = true; return pushRegister(cfg).catch((e) => console.warn('푸시 등록 실패', e && e.message)).finally(() => { pushBusy = false; }); }
+      if (perm === 'granted') { pushBusy = true; return pushRegister(cfg).catch(pushFail).finally(() => { pushBusy = false; }); }
       if (pushShown) return;
       pushShown = true;
       if (perm === 'denied') return pushPop('휴대폰 알림이 꺼져 있습니다', '품앗이 · 정산 마감 소식을 받으려면 알림을 켜야 합니다.\n\n휴대폰 설정 → 앱(또는 크롬·사파리) → 알림에서 러너 알림을 허용한 뒤 앱을 다시 열어 주세요.', false);
@@ -2725,7 +2731,7 @@
     }
     loading(true, '알림 켜는 중…'); pushBusy = true;
     try { await pushRegister(await getPushCfg()); toast('휴대폰 알림이 켜졌습니다.'); }
-    catch (e) { console.error('푸시 켜기 실패', e && (e.code || e.message)); toast('알림 기기 등록에 실패했습니다. 앱을 다시 열면 다시 시도합니다.'); }
+    catch (e) { pushFail(e); toast('알림 기기 등록에 실패했습니다: ' + String((e && (e.code || e.message)) || '').slice(0, 60)); }
     finally { pushBusy = false; loading(false); }
   });
   // 알림을 눌러 앱이 열렸을 때 (?pm=일감ID) / 앱이 열려 있을 때 서비스 워커가 보낸 소식

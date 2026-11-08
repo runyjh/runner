@@ -1241,6 +1241,7 @@ function adm_pushCheck(token, testId) {
       const d = drv[o.driverId] || {};
       return { driverId: o.driverId, name: d.name || o.name, status: d.status || '', device: o.device, createdAt: o.createdAt, lastOk: o.lastOk, tok: o.token.slice(0, 12) };
     });
+    try { out.errs = JSON.parse(PropertiesService.getScriptProperties().getProperty('PUSH_ERRS') || '[]'); } catch (e) { out.errs = []; }
     if (testId && cfg.sa && cfg.web && out.auth === 'ok') {
       const toks = out.devices.filter(function (d) { return d.driverId === String(testId); }).length
         ? readAll_(SH.PPUSH).filter(function (o) { return o.driverId === String(testId) && o.token; }).map(function (o) { return o.token; }) : [];
@@ -1253,5 +1254,18 @@ function adm_pushCheck(token, testId) {
       logAdmin_(a, '휴대폰 알림 시험', String(testId), toks.length + '대');
     }
     return out;
+  });
+}
+/** 앱: 휴대폰 알림 등록 실패 사유를 남긴다 (관리자 점검용 · 최근 30건) */
+function api_pmPushLog(token, info) {
+  return run_(function () {
+    let who = '';
+    try { who = pmUser_(token).info.name; } catch (e) { who = '?'; }
+    const p = PropertiesService.getScriptProperties();
+    let list = [];
+    try { list = JSON.parse(p.getProperty('PUSH_ERRS') || '[]'); } catch (e) { list = []; }
+    list.unshift({ at: nowText_(), who: who, info: String(info || '').slice(0, 300) });
+    p.setProperty('PUSH_ERRS', JSON.stringify(list.slice(0, 30)));
+    return { ok: true };
   });
 }
