@@ -366,10 +366,10 @@ function slaSummary_() {
 
 // ───────────────────────── 라우트 계보 (route_lineage) ─────────────────────────
 // 코드가 바뀐 라우트(605A → 723A · 안양1 110A → 군포1 212A)를 이어 붙인다. 1:1(개명·이관)만 이력을 잇고, 분할·병합은 나란히 보여 주기만 한다(점수는 합치지 않음).
-const RLK = { RENAME: '개명', MOVE: '이관', SPLIT: '분할', MERGE: '병합' };
+const RLK = { RENAME: '개명', MOVE: '이관', SPLIT: '분할', MERGE: '병합', END: '종료' }; // 종료 = 더 이상 운영하지 않는 라우트 (이후 라우트 없음)
 function rlnAll_() {
   let rows = [];
-  try { rows = readAll_(SH.RLIN).filter(function (o) { return o.id && o.fromCode && o.toCode; }); } catch (e) { rows = []; }
+  try { rows = readAll_(SH.RLIN).filter(function (o) { return o.id && o.fromCode && (o.toCode || o.kind === RLK.END); }); } catch (e) { rows = []; }
   return rows;
 }
 /** 노선 이관 기록(route_changes · 노선이관 · 적용/예약)에서 만든 계보 — 저장하지 않고 합쳐서 보여 준다. 110AB → 212AB 는 글자 자리끼리 110A→212A, 110B→212B */
@@ -404,7 +404,7 @@ function rlnEdges_() {
 function rlnChain_(edges, camp, code) {
   const key = function (c, x) { return c + '|' + x; };
   const inTo = {}, outFrom = {};
-  edges.forEach(function (e) { const f = key(e.fromCamp, e.fromCode), t = key(e.toCamp, e.toCode); (inTo[t] = inTo[t] || []).push(f); (outFrom[f] = outFrom[f] || []).push(t); });
+  edges.forEach(function (e) { if (e.kind === RLK.END || !e.toCode) return; const f = key(e.fromCamp, e.fromCode), t = key(e.toCamp, e.toCode); (inTo[t] = inTo[t] || []).push(f); (outFrom[f] = outFrom[f] || []).push(t); });
   const out = []; let cur = key(camp, code), guard = 0;
   while (guard++ < 20) {
     const prev = inTo[cur]; if (!prev || prev.length !== 1) break;
@@ -414,7 +414,7 @@ function rlnChain_(edges, camp, code) {
   return out.map(function (k) { const i = k.indexOf('|'); return { camp: k.slice(0, i), code: k.slice(i + 1) }; });
 }
 function adm_lineageList(token) {
-  return run_(function () { requireAdmin_(token); return { ok: true, edges: rlnEdges_(), kinds: [RLK.RENAME, RLK.MOVE, RLK.SPLIT, RLK.MERGE] }; });
+  return run_(function () { requireAdmin_(token); return { ok: true, edges: rlnEdges_(), kinds: [RLK.RENAME, RLK.MOVE, RLK.SPLIT, RLK.MERGE, RLK.END] }; });
 }
 /** 관리자: 계보 여러 줄 저장 rows = [{ date, kind, fromCamp, fromCode, toCamp, toCode, memo }] (같은 이전→이후는 덮어쓰기) */
 function adm_lineageSave(token, rows) {
@@ -429,10 +429,11 @@ function adm_lineageSave(token, rows) {
       cur.forEach(function (o) { byKey[o.fromCamp + '|' + o.fromCode + '>' + o.toCamp + '|' + o.toCode] = o; });
       const now = nowText_(); let added = 0, changed = 0;
       rows.forEach(function (r) {
-        const fc = rpfCamp_(r.fromCamp), tc = rpfCamp_(r.toCamp || r.fromCamp), f = rpfCode_(r.fromCode), t = rpfCode_(r.toCode);
-        if (!fc || !f || !t) return;
+        const end = str_(r.kind) === RLK.END;
+        const fc = rpfCamp_(r.fromCamp), tc = end ? fc : rpfCamp_(r.toCamp || r.fromCamp), f = rpfCode_(r.fromCode), t = end ? '' : rpfCode_(r.toCode);
+        if (!fc || !f || (!t && !end)) return;
         if (fc === tc && f === t) return;
-        const kind = [RLK.RENAME, RLK.MOVE, RLK.SPLIT, RLK.MERGE].indexOf(str_(r.kind)) >= 0 ? str_(r.kind) : (fc !== tc ? RLK.MOVE : RLK.RENAME);
+        const kind = end ? RLK.END : ([RLK.RENAME, RLK.MOVE, RLK.SPLIT, RLK.MERGE].indexOf(str_(r.kind)) >= 0 ? str_(r.kind) : (fc !== tc ? RLK.MOVE : RLK.RENAME));
         const o = { date: normDate_(r.date) || todayText_(), kind: kind, fromCamp: fc, fromCode: f, toCamp: tc, toCode: t, memo: str_(r.memo).slice(0, 100), by: a.name };
         const old = byKey[fc + '|' + f + '>' + tc + '|' + t];
         if (old) { writeFields_(SH.RLIN, old._row, o); changed++; }
@@ -520,7 +521,16 @@ function adm_lineageSuggest(token) {
         });
         leftover.gone.forEach(function (g) {
           const cand = leftover.fresh.filter(function (f) { return f.camp !== g.camp && f.L.join('') === g.L.join(''); });
-          if (cand.length !== 1) return;
+          if (cand.length !== 1) {
+            // 이어받는 라우트가 없고 그 뒤 기간에도 다시 안 나오면 '종료' 후보
+            const later = sq.list.slice(i + 1).some(function (x) { return g.L.some(function (L) { return (x.camps[g.camp] || {})[g.num + L]; }); });
+            if (!later && sq.src === 'SLA') g.L.forEach(function (L) {
+              const k = g.camp + '|' + g.num + L + '>' + g.camp + '|';
+              if (has[k] || seen[k]) return; seen[k] = 1;
+              sug.push({ date: b.date, kind: RLK.END, fromCamp: g.camp, fromCode: g.num + L, toCamp: g.camp, toCode: '', src: sq.src, memo: sq.src + ' ' + String(b.p).slice(0, 10) + ' 부터 없음 · 이어받은 라우트 없음' });
+            });
+            return;
+          }
           g.L.forEach(function (L) {
             const k = g.camp + '|' + g.num + L + '>' + cand[0].camp + '|' + cand[0].num + L;
             if (has[k] || seen[k]) return; seen[k] = 1;
@@ -529,6 +539,12 @@ function adm_lineageSuggest(token) {
         });
       }
     });
-    return { ok: true, suggestions: sug };
+    // 이미 변경이력이 있는 이전 라우트는 빼고, 그 결과 병합·분할 후보가 1:1 이 되면 개명으로 바꾼다
+    const fromHas = {}; edges.forEach(function (e) { fromHas[e.fromCamp + '|' + e.fromCode] = 1; });
+    const left = sug.filter(function (x) { return !fromHas[x.fromCamp + '|' + x.fromCode]; });
+    const inCnt = {}, outCnt = {};
+    left.forEach(function (x) { if (x.kind === RLK.END) return; const t = x.toCamp + '|' + x.toCode, f = x.fromCamp + '|' + x.fromCode; inCnt[t] = (inCnt[t] || 0) + 1; outCnt[f] = (outCnt[f] || 0) + 1; });
+    left.forEach(function (x) { if ((x.kind === RLK.MERGE || x.kind === RLK.SPLIT) && inCnt[x.toCamp + '|' + x.toCode] === 1 && outCnt[x.fromCamp + '|' + x.fromCode] === 1) x.kind = x.fromCamp === x.toCamp ? RLK.RENAME : RLK.MOVE; });
+    return { ok: true, suggestions: left };
   });
 }

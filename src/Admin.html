@@ -987,6 +987,8 @@
       </div>
       <div class="ng g-ops"><p class="ngt">운영</p>
         <a data-view="route">노선관리</a>
+        <a data-view="perf">노선 수행률</a>
+        <a data-view="sla">SLA 점수</a>
         <a data-view="memo">업무스케줄</a>
       </div>
       <div class="ng g-fin"><p class="ngt">정산 · 회계</p>
@@ -1256,9 +1258,6 @@
       <h2>노선관리</h2>
       <div class="tools">
         <button class="btn ghost" id="xpOpen" title="모든 캠프의 정산코드별 단가를 한 표로 봅니다">전체 단가표</button>
-        <button class="btn ghost" id="rpOpen" title="쿠팡 주간 수행률 (등급 · 개선 요청) 이력">수행률</button>
-        <button class="btn ghost" id="rpUpBtn" title="쿠팡 주간 '수행률 안내' 또는 월간 SLA 점수 엑셀을 올립니다 (파일 종류 자동 인식 · 같은 기간은 덮어씀)">수행률 업로드</button>
-        <input type="file" id="rpFile" accept=".xlsx" class="hidden">
         <button class="btn ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button>
         <button class="btn ghost" id="rtReload">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="route">데이터 초기화</button>
@@ -1273,7 +1272,20 @@
       <div id="campMain"></div>
     </div>
     <div id="allPrices" class="hidden"></div>
-    <div id="perfPanel" class="hidden"></div>
+   </section>
+   <section id="view-perf" class="hidden">
+    <div class="head">
+      <h2>노선 수행률 <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 '수행률 안내' 파일</small></h2>
+      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 주간 '수행률 안내' 또는 월간 SLA 점수 엑셀 (파일 종류 자동 인식 · 같은 기간은 덮어씀)">수행률·SLA 업로드</button><input type="file" id="rpFile" accept=".xlsx" class="hidden"></div>
+    </div>
+    <div class="rp-box" id="perfBox"></div>
+   </section>
+   <section id="view-sla" class="hidden">
+    <div class="head">
+      <h2>SLA 점수 <small class="sub" style="font-size:13px;font-weight:500">쿠팡 월간 Vendor SLA 파일 · 총점 100</small></h2>
+      <div class="tools"><button class="btn ghost" id="slReload">새로고침</button><button class="btn" id="slUpBtn" title="쿠팡 월간 SLA 점수 엑셀 (주간 수행률 파일도 같은 버튼)">수행률·SLA 업로드</button></div>
+    </div>
+    <div class="rp-box" id="slaBox"></div>
    </section>
    <section id="view-settle" class="hidden">
     <div class="head">
@@ -2870,6 +2882,9 @@
     if (v === 'notice') loadNotices();
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
     $('#view-route').classList.toggle('hidden', v !== 'route');
+    $('#view-perf').classList.toggle('hidden', v !== 'perf');
+    $('#view-sla').classList.toggle('hidden', v !== 'sla');
+    if (v === 'perf' || v === 'sla') { RP.tab = v === 'sla' ? 'sla' : 'wk'; rpRender(); loadPerf(); if (v === 'sla') loadSla(); }
     $('#view-sched').classList.toggle('hidden', v !== 'sched');
     $('#view-pumasi').classList.toggle('hidden', v !== 'pumasi');
     if (v === 'pumasi') loadPumasi();
@@ -4084,7 +4099,7 @@
       renderCampList(); renderCampMain();
     }).catch(() => {});
   }
-  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk() || !xpLeaveOk()) return; pdirty = {}; adirty = {}; RVOL = null; RP.loaded = false; loadRoutes().then(() => { if (xpOn) xpRender(); if (rpOn) loadPerf(true); toast('새로 불러왔습니다.'); }); });
+  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk() || !xpLeaveOk()) return; pdirty = {}; adirty = {}; RVOL = null; RP.loaded = false; loadRoutes().then(() => { if (xpOn) xpRender(); toast('새로 불러왔습니다.'); }); });
 
   // 왼쪽 캠프 목록
   function renderCampList() {
@@ -4240,7 +4255,6 @@
   function xpShow(on) {
     if (on && !pricesLeaveOk()) return;
     if (!on && !xpLeaveOk()) return;
-    if (on && rpOn) { rpOn = false; $('#perfPanel').classList.add('hidden'); $('#rpOpen').textContent = '수행률'; }
     xpOn = on;
     $('.rt-wrap', $('#view-route')).classList.toggle('hidden', on);
     $('#allPrices').classList.toggle('hidden', !on);
@@ -4405,17 +4419,20 @@
     });
   });
   // ───── 라우트 계보: 코드가 바뀐 라우트 이어 붙이기 (1:1 개명·이관만 합침 · 분할·병합은 나란히 보기) ─────
-  const LN = { edges: [], head: new Map(), prev: new Map(), other: new Map(), loaded: false };
+  const LN = { edges: [], head: new Map(), prev: new Map(), other: new Map(), ended: new Map(), loaded: false };
+  const lnEnded = (k) => LN.ended.has(k) ? LN.ended.get(k) || '종료' : '';
+  const lnEndTag = (k) => (LN.ended.has(k) ? '<small class="lnt" style="color:#c62828">종료 ' + esc(String(LN.ended.get(k) || '').slice(2, 7).replace('-', '/')) + '</small>' : '');
   function lnSet(edges) {
     LN.edges = edges || []; LN.loaded = true;
     const out = new Map(), inn = new Map();
-    LN.edges.forEach((e) => { const f = rpKey(e.fromCamp, e.fromCode), t = rpKey(e.toCamp, e.toCode); if (f === t) return; (out.get(f) || out.set(f, []).get(f)).push(e); (inn.get(t) || inn.set(t, []).get(t)).push(e); });
+    LN.ended = new Map();
+    LN.edges.forEach((e) => { if (e.kind === '종료' || !e.toCode) { LN.ended.set(rpKey(e.fromCamp, e.fromCode), e.date || ''); return; } const f = rpKey(e.fromCamp, e.fromCode), t = rpKey(e.toCamp, e.toCode); if (f === t) return; (out.get(f) || out.set(f, []).get(f)).push(e); (inn.get(t) || inn.set(t, []).get(t)).push(e); });
     const one = (e) => (out.get(rpKey(e.fromCamp, e.fromCode)) || []).length === 1 && (inn.get(rpKey(e.toCamp, e.toCode)) || []).length === 1;
     LN.head = new Map(); LN.prev = new Map(); LN.other = new Map();
     const headOf = (k) => { let cur = k, g = 0; while (g++ < 20) { const es = out.get(cur); if (!es || es.length !== 1 || !one(es[0])) break; const t = rpKey(es[0].toCamp, es[0].toCode); if (t === k) break; cur = t; } return cur; };
     const keys = new Set(); LN.edges.forEach((e) => { keys.add(rpKey(e.fromCamp, e.fromCode)); keys.add(rpKey(e.toCamp, e.toCode)); });
     keys.forEach((k) => { const h = headOf(k); LN.head.set(k, h); if (h !== k) { const p = LN.prev.get(h) || []; p.push(k); LN.prev.set(h, p); } });
-    LN.edges.forEach((e) => { if (one(e)) return; const f = rpKey(e.fromCamp, e.fromCode), t = rpKey(e.toCamp, e.toCode); (LN.other.get(f) || LN.other.set(f, []).get(f)).push(e); (LN.other.get(t) || LN.other.set(t, []).get(t)).push(e); });
+    LN.edges.forEach((e) => { if (e.kind === '종료' || !e.toCode || one(e)) return; const f = rpKey(e.fromCamp, e.fromCode), t = rpKey(e.toCamp, e.toCode); (LN.other.get(f) || LN.other.set(f, []).get(f)).push(e); (LN.other.get(t) || LN.other.set(t, []).get(t)).push(e); });
   }
   const lnHead = (k) => LN.head.get(k) || k;
   const lnPrevOf = (k) => (LN.prev.get(k) || []).slice().sort((a, b) => { const ea = LN.edges.find((e) => rpKey(e.fromCamp, e.fromCode) === a), eb = LN.edges.find((e) => rpKey(e.fromCamp, e.fromCode) === b); return koSort((eb && eb.date) || '', (ea && ea.date) || ''); });
@@ -4447,7 +4464,7 @@
       if (r.lineage) lnSet(r.lineage);
       rpIndex();
       if ($('#rRows')) renderRoutes();
-      if (rpOn) rpRender();
+      if (rpViewOn()) rpRender();
       return RP;
     }).catch(() => RP).finally(() => { RP.loading = null; });
     return RP.loading;
@@ -4476,35 +4493,33 @@
     return '<td class="rc" data-rpc="' + esc(parts.map((p) => cs + '|' + p.c).join(',')) + '">' + parts.map((p) => (p.L ? '<small>' + esc(p.L) + '</small>' : '') +
       grBadge(p.v.grade, p.c + ' ' + p.v.wk + (p.v.perf != null ? ' ' + p.v.perf + '%' : '') + (p.v.stale ? ' (최신 주차 자료 없음)' : '')) + (p.v.improve ? '<span class="gr-imp">개선 요청</span>' : '')).join(' ') + '</td>';
   }
-  // 수행률 패널 (전체 단가표처럼 노선관리 안에서 화면을 바꿔 보여 줌)
-  let rpOn = false;
-  function rpShow(on) {
-    if (on && (!pricesLeaveOk() || !xpLeaveOk())) return;
-    if (on && xpOn) xpShow(false);
-    rpOn = on;
-    $('.rt-wrap', $('#view-route')).classList.toggle('hidden', on);
-    $('#perfPanel').classList.toggle('hidden', !on);
-    $('#rpOpen').textContent = on ? '캠프별 보기' : '수행률';
-    if (on) { rpRender(); loadPerf(); if (RP.tab === 'sla') loadSla(); } else renderCampMain();
-  }
-  $('#rpOpen').addEventListener('click', () => rpShow(!rpOn));
+  // 수행률·SLA 는 각각 독립 메뉴 (view-perf / view-sla). 같은 그리기 함수를 쓰고, 메뉴에 따라 탭이 다르다
+  const rpViewOn = () => currentView === 'perf' || currentView === 'sla';
+  const rpBox = () => (currentView === 'sla' ? $('#slaBox') : $('#perfBox'));
+  const rpTabs = () => (currentView === 'sla' ? [['sla', 'SLA 점수 (월간)'], ['ln', '라우트 변경이력']] : [['wk', '주간 수행률 (등급)'], ['ln', '라우트 변경이력']]);
+  const rpTabNow = () => { const ts = rpTabs().map((t) => t[0]); if (ts.indexOf(RP.tab) < 0) RP.tab = ts[0]; return RP.tab; };
+  $('#rpReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
+  $('#slReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadSla(true).then(() => loadPerf(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
+  $('#slUpBtn').addEventListener('click', () => $('#rpFile').click());
   function rpList() {
     const f = RP.f, q = normCode(f.q);
     return Array.from(RP.map.values()).map((e) => {
       const latest = rpLatestOf(e.camp, e.code), prev = (() => { const i = RP.weeks.indexOf(latest ? latest.week : ''); return i > 0 ? e.byWeek[RP.weeks[i - 1]] : null; })();
       return Object.assign({ e, latest, prev }, e);
-    }).filter((x) => (!f.camp || x.camp === f.camp) && (!q || (x.camp + x.code).toUpperCase().includes(q)) &&
+    }).filter((x) => (f.ended || !LN.ended.has(rpKey(x.camp, x.code))) && (!f.camp || x.camp === f.camp) && (!q || (x.camp + x.code).toUpperCase().includes(q)) &&
       (!f.mode || (f.mode === 'bad' && x.latest && x.latest.grade >= 3) || (f.mode === 'imp' && x.latest && x.latest.improve) ||
         (f.mode === 'chg' && x.latest && x.prev && x.latest.grade !== x.prev.grade)))
       .sort((a, b) => koSort(a.camp, b.camp) || koSort(a.code, b.code));
   }
   function rpRender() {
-    const box = $('#perfPanel');
+    if (!rpViewOn()) return;
+    const box = rpBox(), tab = rpTabNow();
+    const other = box.id === 'slaBox' ? $('#perfBox') : $('#slaBox'); if (other.innerHTML) other.innerHTML = ''; // 두 메뉴가 같은 id 를 쓰므로 안 보이는 쪽은 비운다
     const onBtn = (id, on, lab) => '<span class="rp-on">' + lab + ' <b class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-rpset="' + id + '">' + (on ? '끄기' : '켜기') + '</button></span>';
-    box.innerHTML = '<div class="sec rp-top"><div class="xp-head"><h3>노선 수행률</h3><div class="tabs rp-tabs"><button class="tab' + (RP.tab === 'wk' ? ' on' : '') + '" data-rptab="wk">주간 수행률 (등급)</button><button class="tab' + (RP.tab === 'sla' ? ' on' : '') + '" data-rptab="sla">SLA 점수 (월간)</button><button class="tab' + (RP.tab === 'ln' ? ' on' : '') + '" data-rptab="ln">라우트 계보</button></div>' +
+    box.innerHTML = '<div class="sec rp-top"><div class="xp-head"><div class="tabs rp-tabs">' + rpTabs().map((t) => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" data-rptab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
       '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 때 업무스케줄 메모') : '') + '</span></div></div>';
-    if (RP.tab === 'sla') return slaRender(box);
-    if (RP.tab === 'ln') { if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; } if (!SL.loaded) loadSla(); return lnRender(box); }
+    if (tab === 'sla') return slaRender(box);
+    if (tab === 'ln') { if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; } if (!SL.loaded) loadSla(); return lnRender(box); }
     if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; }
     const wks = RP.weeks.slice(-8), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw);
     const camps = [...new Set(RP.rows.map((r) => r.camp))].sort(koSort);
@@ -4517,9 +4532,8 @@
       '<div class="ptools">' +
         '<select class="inp" id="rpCamp" aria-label="캠프">' + opt('', '캠프 전체', RP.f.camp) + camps.map((c) => opt(c, c, RP.f.camp)).join('') + '</select>' +
         '<select class="inp" id="rpMode" aria-label="보기">' + opt('', '전체', RP.f.mode) + opt('bad', '3~4등급만', RP.f.mode) + opt('imp', '개선 요청만', RP.f.mode) + opt('chg', '등급 바뀐 라우트', RP.f.mode) + '</select>' +
-        '<input class="inp" id="rpQ" placeholder="캠프·라우트 검색" value="' + esc(RP.f.q) + '" autocomplete="off" style="width:150px">' +
-        '<div class="grow"><button class="btn sm" id="rpUpBtn2">수행률·SLA 업로드</button></div>' +
-      '</div>' +
+        '<input class="inp" id="rpQ" placeholder="캠프·라우트 검색" value="' + esc(RP.f.q) + '" autocomplete="off" style="width:150px">' + '<label class="check" style="align-self:center"><input type="checkbox" id="rpEnded"' + (RP.f.ended ? ' checked' : '') + '> 종료 포함</label>' +
+        '</div>' +
       '<div class="table-wrap rt-table rp-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>최신 등급</th><th>추세 (8주)</th><th>개선 요청</th>' +
         wks.map((w) => '<th title="' + esc(w) + '">' + esc(rpWkLabel(w)) + '</th>').join('') + '</tr></thead><tbody id="rpRows"></tbody></table><div class="empty hidden" id="rpEmpty"></div></div>' +
       '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">등급: <span class="gr g1">1</span> <span class="gr g2">2</span> 95% 초과 · <span class="gr g3">3</span> <span class="gr g4">4</span> 95% 미만(위탁 조정 대상). 칸의 작은 숫자는 배송 수행률(%). 라우트를 누르면 전체 이력. 매주 쿠팡 파일을 [수행률 업로드]로 올리면 이력이 쌓입니다 (같은 주차는 덮어씀 · 한 주 시작은 일요일).</p></div>');
@@ -4531,7 +4545,7 @@
     tb.innerHTML = list.map((x) => {
       const l = x.latest;
       const hk = rpKey(x.camp, x.code);
-      return '<tr class="' + (l && l.improve ? 'imp' : l && l.grade >= 3 ? 'bad' : '') + '"><td>' + esc(x.camp) + '</td><td class="rc" data-rpc="' + esc(hk) + '"><b class="code">' + esc(x.code) + '</b>' + lnTail(hk) + '</td>' +
+      return '<tr class="' + (l && l.improve ? 'imp' : l && l.grade >= 3 ? 'bad' : '') + '"><td>' + esc(x.camp) + '</td><td class="rc" data-rpc="' + esc(hk) + '"><b class="code">' + esc(x.code) + '</b>' + lnTail(hk) + lnEndTag(hk) + '</td>' +
         '<td>' + (l ? grBadge(l.grade) + (l.perf != null ? ' <small>' + l.perf + '%</small>' : '') + (l.stale ? ' <small class="sub" title="최신 주차 파일에 없는 라우트">(' + esc(l.wk) + ')</small>' : '') : '-') + '</td>' +
         '<td>' + rpTrend(x.camp, x.code, 8) + '</td><td>' + (l && l.improve ? '<span class="gr-imp">개선 요청</span>' : '') + '</td>' +
         wks.map((w) => { const r = x.byWeek[w]; return '<td class="wkc">' + (r ? lnMark(r, hk) + grBadge(r.grade) + (r.perf != null ? '<small>' + r.perf + '%</small>' : '') : '<span class="sub">-</span>') + '</td>'; }).join('') + '</tr>';
@@ -4539,9 +4553,9 @@
     const em = $('#rpEmpty'); em.classList.toggle('hidden', !!list.length);
     em.textContent = RP.rows.length ? '조건에 맞는 라우트가 없습니다.' : '올린 수행률 자료가 없습니다. [수행률 업로드]로 쿠팡 파일을 올려 주세요.';
   }
-  $('#perfPanel').addEventListener('input', (e) => { if (e.isComposing) return; if (e.target.id === 'rpQ') { RP.f.q = e.target.value; rpRenderRows(); } if (e.target.id === 'slQ') { SL.f.q = e.target.value; slaRenderRows(); } });
-  $('#perfPanel').addEventListener('change', (e) => { const m = { rpCamp: 'camp', rpMode: 'mode' }[e.target.id]; if (m) { RP.f[m] = e.target.value; rpRenderRows(); } const m2 = { slCamp: 'camp', slMode: 'mode' }[e.target.id]; if (m2) { SL.f[m2] = e.target.value; slaRenderRows(); } if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); } });
-  $('#perfPanel').addEventListener('click', (e) => {
+  $$('.rp-box').forEach((bx) => bx.addEventListener('input', (e) => { if (e.isComposing) return; if (e.target.id === 'rpQ') { RP.f.q = e.target.value; rpRenderRows(); } if (e.target.id === 'slQ') { SL.f.q = e.target.value; slaRenderRows(); } }));
+  $$('.rp-box').forEach((bx) => bx.addEventListener('change', (e) => { const m = { rpCamp: 'camp', rpMode: 'mode' }[e.target.id]; if (m) { RP.f[m] = e.target.value; rpRenderRows(); } const m2 = { slCamp: 'camp', slMode: 'mode' }[e.target.id]; if (m2) { SL.f[m2] = e.target.value; slaRenderRows(); } if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); } if (e.target.id === 'rpEnded') { RP.f.ended = e.target.checked; rpRenderRows(); } if (e.target.id === 'slEnded') { SL.f.ended = e.target.checked; slaRenderRows(); } }));
+  $$('.rp-box').forEach((bx) => bx.addEventListener('click', (e) => {
     const sb = e.target.closest('[data-rpset]');
     if (sb) {
       const k = sb.dataset.rpset, f = k === 'drv' ? { drvOn: !RP.drvOn } : { memoOn: !RP.memoOn };
@@ -4561,16 +4575,17 @@
     }
     if (e.target.id === 'lnAdd') {
       const fc = $('#lnFc').value.trim(), f = $('#lnF').value.trim(), tc = $('#lnTc').value.trim() || fc, t = $('#lnT').value.trim();
-      if (!fc || !f || !t) return toast('이전 캠프·이전 라우트·이후 라우트를 입력해 주세요.');
-      return lnSaveRows([{ fromCamp: fc, fromCode: f, toCamp: tc, toCode: t, date: $('#lnD').value, kind: $('#lnK').value, memo: '직접 등록' }]);
+      const kk = $('#lnK').value;
+      if (!fc || !f || (!t && kk !== '종료')) return toast('이전 캠프·이전 라우트·이후 라우트를 입력해 주세요. (종료는 이후 라우트를 비웁니다)');
+      return lnSaveRows([{ fromCamp: fc, fromCode: f, toCamp: tc, toCode: kk === '종료' ? '' : t, date: $('#lnD').value, kind: kk, memo: '직접 등록' }]);
     }
     const del = e.target.closest('[data-lndel]');
     if (del) {
-      if (!confirm('이 계보 줄을 지울까요? 이어 붙였던 이력이 다시 따로 보입니다.')) return;
+      if (!confirm('이 변경이력 줄을 지울까요? 이어 붙였던 이력이 다시 따로 보입니다.')) return;
       del.disabled = true;
       return api('adm_lineageDel', del.dataset.lndel).then((r) => { if (!r.ok) return toast(r.msg); lnSet(r.edges || []); RP.loaded = false; SL.loaded = false; return loadPerf(true).then(() => loadSla(true)).then(() => rpRender()); }).catch(() => {});
     }
-  });
+  }));
   // 라우트 이력 창 (노선 표 · 수행률 패널 공용)
   document.addEventListener('click', (e) => {
     const td = e.target.closest('td.rc[data-rpc]'); if (!td || !RP.loaded) return;
@@ -4700,7 +4715,7 @@
       if (!r.ok) return toast(r.msg);
       $('#rpUpModal').classList.add('hidden'); rpUp = null;
       toast('수행률을 저장했습니다. 새로 ' + r.added + '줄 · 바뀜 ' + r.changed + '줄 · 같음 ' + r.unchanged + '줄 (' + (r.weeks || []).map(rpWkLabel).join(', ') + ')' + (r.memo ? ' · 업무스케줄에 메모를 적었습니다' : ''));
-      return loadPerf(true).then(() => { if (!rpOn) rpShow(true); });
+      return loadPerf(true).then(() => { if (!rpViewOn()) switchView('perf'); else { RP.tab = 'wk'; rpRender(); } });
     }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
   });
   // ───── SLA 점수 (쿠팡 '[QF] Vendor SLA' 월간 파일 · route_sla) ─────
@@ -4718,7 +4733,7 @@
       if (!r.ok) { toast(r.msg); return SL; }
       SL.rows = r.rows || []; SL.periods = r.periods || []; SL.th = r.th || SL.th; SL.campMap = r.campMap || {}; SL.loaded = true;
       if (r.lineage) { lnSet(r.lineage); if (RP.loaded) rpIndex(); }
-      if (rpOn && RP.tab === 'sla') rpRender();
+      if (rpViewOn() && (RP.tab === 'sla' || RP.tab === 'ln')) rpRender();
       return SL;
     }).catch(() => SL).finally(() => { SL.loading = null; });
     return SL.loading;
@@ -4738,7 +4753,7 @@
       const d1 = l && p && l.total != null && p.total != null ? Math.round((l.total - p.total) * 10) / 10 : null;
       const d0 = l && first && first !== l && l.total != null && first.total != null ? Math.round((l.total - first.total) * 10) / 10 : null;
       return Object.assign({ e, l, p, first, d1, d0 }, e);
-    }).filter((x) => (!f.camp || x.camp === f.camp) && (!q || (x.camp + x.code).toUpperCase().includes(q)) &&
+    }).filter((x) => (f.ended || !LN.ended.has(rpKey(x.camp, x.code))) && (!f.camp || x.camp === f.camp) && (!q || (x.camp + x.code).toUpperCase().includes(q)) &&
       (!f.mode || (f.mode === 'bad' && x.l && x.l.total != null && x.l.total < SL.th.warn) || (f.mode === 'warn' && x.l && x.l.total != null && x.l.total < SL.th.good) ||
         (f.mode === 'down' && x.d1 != null && x.d1 <= -1) || (f.mode === 'cs' && x.l && x.l.cs != null && x.l.cs < 40)))
       .sort((a, b) => koSort(a.camp, b.camp) || koSort(a.code, b.code));
@@ -4760,8 +4775,8 @@
       '<div class="ptools">' +
         '<select class="inp" id="slCamp" aria-label="캠프">' + opt('', '캠프 전체', SL.f.camp) + camps.map((c) => opt(c, c, SL.f.camp)).join('') + '</select>' +
         '<select class="inp" id="slMode" aria-label="보기">' + opt('', '전체', SL.f.mode) + opt('bad', '위험만 (' + SL.th.warn + '점 미만)', SL.f.mode) + opt('warn', '주의 이상 (' + SL.th.good + '점 미만)', SL.f.mode) + opt('down', '전 기간보다 1점↑ 하락', SL.f.mode) + opt('cs', '고객만족 40점 미만', SL.f.mode) + '</select>' +
-        '<input class="inp" id="slQ" placeholder="캠프·라우트 검색" value="' + esc(SL.f.q) + '" autocomplete="off" style="width:150px">' +
-        '<div class="grow"><button class="btn sm" id="rpUpBtn3">수행률·SLA 업로드</button></div></div>' +
+        '<input class="inp" id="slQ" placeholder="캠프·라우트 검색" value="' + esc(SL.f.q) + '" autocomplete="off" style="width:150px">' + '<label class="check" style="align-self:center"><input type="checkbox" id="slEnded"' + (SL.f.ended ? ' checked' : '') + '> 종료 포함</label>' +
+        '</div>' +
       '<div class="table-wrap rt-table rp-table sla-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>총점 (최신)</th><th title="미수행률 15 · 반품 미회수 15 · 고객만족 50 · 고객불만 20 (만점 대비 높이)">항목</th><th>고객만족<br><small>/50</small></th><th>고객불만<br><small>/20</small></th><th title="직전 집계기간 대비">전 기간 대비</th><th title="이 라우트의 가장 오래된 기록 대비 (지표개선표)">최초 대비</th>' +
         show.map((p) => '<th title="' + esc(p) + '">~' + slaPd(p) + '</th>').join('') + '</tr></thead><tbody id="slRows"></tbody></table><div class="empty hidden" id="slEmpty"></div></div>' +
       '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">총점 100 = 미수행률 15 + 반품 미회수율 15 + 고객만족 50 + 고객불만 20. 색: <span class="sla ok">' + SL.th.good + '↑</span> 우수 · <span class="sla warn">' + SL.th.warn + '~</span> 주의 · <span class="sla bad">' + SL.th.warn + '↓</span> 위험. 쿠팡 집계기간은 누적(예 6/1~9/25)이라 열은 기간 끝 날짜입니다. 라우트를 누르면 주간 등급과 월별 점수를 함께 봅니다.</p></div>');
@@ -4774,7 +4789,7 @@
     tb.innerHTML = list.map((x) => {
       const l = x.l;
       const hk = rpKey(x.camp, x.code);
-      return '<tr class="' + (l && l.total != null ? (l.total < SL.th.warn ? 'bad' : '') : '') + '"><td>' + esc(x.camp) + '</td><td class="rc" data-rpc="' + esc(hk) + '"><b class="code">' + esc(x.code) + '</b>' + lnTail(hk) + '</td>' +
+      return '<tr class="' + (l && l.total != null ? (l.total < SL.th.warn ? 'bad' : '') : '') + '"><td>' + esc(x.camp) + '</td><td class="rc" data-rpc="' + esc(hk) + '"><b class="code">' + esc(x.code) + '</b>' + lnTail(hk) + lnEndTag(hk) + '</td>' +
         '<td>' + (l ? slaBadge(l.total) : '<span class="sub">최신 기간 없음</span>') + '</td><td>' + (l ? slaBars(l) : '') + '</td>' +
         '<td class="num' + (l && l.cs != null && l.cs < 40 ? ' lowcs' : '') + '">' + (l && l.cs != null ? l.cs : '-') + '</td><td class="num">' + (l && l.cx != null ? l.cx : '-') + '</td>' +
         '<td>' + dcell(x.d1) + '</td><td>' + dcell(x.d0) + '</td>' +
@@ -4824,40 +4839,40 @@
   let lnSug = null;
   function lnRender(box) {
     const camps = [...new Set(RP.rows.map((r) => r.camp).concat(SL.rows.map((r) => r.camp)).filter(Boolean))].sort(koSort);
-    const kinds = ['개명', '이관', '분할', '병합'];
+    const kinds = ['개명', '이관', '분할', '병합', '종료'];
     const edges = LN.edges.slice().sort((a, b) => koSort(b.date || '', a.date || '') || koSort(a.fromCamp, b.fromCamp) || koSort(a.fromCode, b.fromCode));
-    box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">라우트 계보 <small class="sub">코드가 바뀐 라우트를 이어 붙입니다</small></h4><span class="grow"></span><button class="btn sm" id="lnSugBtn">자동 제안 확인</button></div>' +
-      '<p class="sub" style="margin:6px 0 10px;font-size:12.5px"><b>개명·이관(1:1)</b>은 이전 코드의 주간 등급·SLA 점수를 새 코드 줄에 그대로 이어 붙입니다 (보라 점 = 이전 코드 시절). <b>분할·병합</b>은 숫자를 합치지 않고 이력 창에서 관련 라우트를 나란히 보여 줍니다. 노선 이관(노선관리 → 노선 이관)으로 바꾼 것은 자동으로 들어옵니다.</p>' +
+    box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">라우트 변경이력 <small class="sub">코드가 바뀐 라우트를 이어 붙입니다 · 없어진 라우트는 종료</small></h4><span class="grow"></span><button class="btn sm" id="lnSugBtn">자동 제안 확인</button></div>' +
+      '<p class="sub" style="margin:6px 0 10px;font-size:12.5px"><b>개명·이관(1:1)</b>은 이전 코드의 주간 등급·SLA 점수를 새 코드 줄에 그대로 이어 붙입니다 (보라 점 = 이전 코드 시절). <b>분할·병합</b>은 숫자를 합치지 않고 이력 창에서 관련 라우트를 나란히 보여 줍니다. 노선 이관(노선관리 → 노선 이관)으로 바꾼 것은 자동으로 들어옵니다. <b>종료</b>는 더 이상 운영하지 않는 라우트(이후 라우트 없음) — 목록에서 숨겨지고 \'종료 포함\'을 켜면 보입니다.</p>' +
       '<div id="lnSugBox"></div>' +
       '<div class="ptools" style="align-items:flex-end;flex-wrap:wrap"><b style="align-self:center">직접 등록</b>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이전 캠프<input class="inp" id="lnFc" list="lnCamps" placeholder="안양1" style="width:90px"></label>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이전 라우트<input class="inp" id="lnF" placeholder="605A" style="width:90px"></label><span style="align-self:center">→</span>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이후 캠프<input class="inp" id="lnTc" list="lnCamps" placeholder="(같으면 비움)" style="width:110px"></label>' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이후 라우트<input class="inp" id="lnT" placeholder="723A" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이후 라우트<input class="inp" id="lnT" placeholder="723A (종료면 비움)" style="width:120px"></label>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">적용일<input class="inp" id="lnD" type="date" style="width:150px"></label>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">종류<select class="inp" id="lnK">' + kinds.map((k) => '<option>' + k + '</option>').join('') + '</select></label>' +
         '<button class="btn sm" id="lnAdd">추가</button><datalist id="lnCamps">' + camps.map((c) => '<option value="' + esc(c) + '">').join('') + '</datalist></div>' +
       '<div class="table-wrap rt-table ln-table"><table><thead><tr><th>적용일</th><th>종류</th><th>이전</th><th></th><th>이후</th><th>출처·메모</th><th></th></tr></thead><tbody>' +
-      (edges.length ? edges.map((e) => '<tr><td>' + esc(e.date || '') + '</td><td>' + esc(e.kind) + '</td><td class="k">' + esc(e.fromCamp + ' ' + e.fromCode) + '</td><td>→</td><td class="k">' + esc(e.toCamp + ' ' + e.toCode) + '</td><td class="sub">' + esc((e.src === 'move' ? '노선 이관 기록' : e.by || '') + (e.memo ? ' · ' + e.memo : '')) + '</td>' +
-        '<td>' + (e.src === 'saved' ? '<button class="btn sm ghost danger-t" data-lndel="' + esc(e.id) + '">지우기</button>' : '') + '</td></tr>').join('') : '<tr><td colspan="7" class="sub" style="text-align:center;padding:16px">등록된 계보가 없습니다. [자동 제안 확인]을 눌러 보세요.</td></tr>') +
+      (edges.length ? edges.map((e) => '<tr><td>' + esc(e.date || '') + '</td><td>' + esc(e.kind) + '</td><td class="k">' + esc(e.fromCamp + ' ' + e.fromCode) + '</td><td>→</td><td class="k">' + (e.kind === '종료' ? '<span class="sub">(종료)</span>' : esc(e.toCamp + ' ' + e.toCode)) + '</td><td class="sub">' + esc((e.src === 'move' ? '노선 이관 기록' : e.by || '') + (e.memo ? ' · ' + e.memo : '')) + '</td>' +
+        '<td>' + (e.src === 'saved' ? '<button class="btn sm ghost danger-t" data-lndel="' + esc(e.id) + '">지우기</button>' : '') + '</td></tr>').join('') : '<tr><td colspan="7" class="sub" style="text-align:center;padding:16px">등록된 변경이력이 없습니다. [자동 제안 확인]을 눌러 보세요.</td></tr>') +
       '</tbody></table></div></div>');
     if (lnSug) lnSugRender();
   }
   function lnSugRender() {
     const box = $('#lnSugBox'); if (!box) return;
-    const kinds = ['개명', '이관', '분할', '병합'];
+    const kinds = ['개명', '이관', '분할', '병합', '종료'];
     if (!lnSug.length) { box.innerHTML = '<div class="empty" style="margin-bottom:10px">새로 제안할 코드 변경이 없습니다.</div>'; return; }
     box.innerHTML = '<div class="sec" style="background:#f7f9ff;margin-bottom:12px"><div class="xp-head"><h4 style="margin:0">자동 제안 ' + lnSug.length + '건 <small class="sub">이전 기간에 있다가 사라진 코드 ↔ 새로 생긴 코드 (같은 캠프). 맞는 것만 체크해서 저장하세요. 개명은 기본 체크, 분할·병합은 기본 해제.</small></h4><span class="grow"></span><button class="btn sm" id="lnSugSave">체크한 것 저장</button></div>' +
       '<div class="table-wrap rt-table ln-sug"><table><thead><tr><th></th><th>적용일</th><th>종류</th><th>이전</th><th></th><th>이후</th><th>근거</th></tr></thead><tbody>' +
       lnSug.map((s2, i) => '<tr' + (s2.on ? '' : ' class="off"') + '><td><input type="checkbox" data-lns="' + i + '"' + (s2.on ? ' checked' : '') + '></td><td><input class="inp" type="date" data-lnsd="' + i + '" value="' + esc(s2.date || '') + '" style="width:140px;height:30px"></td>' +
         '<td><select class="inp" data-lnsk="' + i + '" style="height:30px">' + kinds.map((k) => '<option' + (k === s2.kind ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></td>' +
-        '<td class="k"><b>' + esc(s2.fromCamp + ' ' + s2.fromCode) + '</b></td><td>→</td><td class="k"><b>' + esc(s2.toCamp + ' ' + s2.toCode) + '</b></td><td class="sub">' + esc(s2.memo || s2.src) + '</td></tr>').join('') + '</tbody></table></div></div>';
+        '<td class="k"><b>' + esc(s2.fromCamp + ' ' + s2.fromCode) + '</b></td><td>→</td><td class="k"><b>' + (s2.kind === '종료' ? '<span class="sub">(종료)</span>' : esc(s2.toCamp + ' ' + s2.toCode)) + '</b></td><td class="sub">' + esc(s2.memo || s2.src) + '</td></tr>').join('') + '</tbody></table></div></div>';
   }
   async function lnSaveRows(rows) {
     const r = await api('adm_lineageSave', rows);
     if (!r.ok) return toast(r.msg);
     lnSet(r.edges || []); RP.loaded = false; SL.loaded = false;
-    toast('계보를 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + '. 이력을 다시 불러옵니다.');
+    toast('변경이력을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + '. 이력을 다시 불러옵니다.');
     lnSug = null;
     await loadPerf(true); await loadSla(true);
     rpRender();
@@ -4890,9 +4905,8 @@
       }
       $('#rpUpModal').classList.add('hidden'); rpUp = null;
       toast('SLA 점수를 저장했습니다. ' + out.join(' / '));
-      RP.tab = 'sla';
       await loadSla(true); await loadPerf(true);
-      if (!rpOn) rpShow(true); else rpRender();
+      if (currentView !== 'sla') switchView('sla'); else { RP.tab = 'sla'; rpRender(); }
     } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
   }
   function renderBulk() {
@@ -9045,6 +9059,8 @@
       ['pumasi', '', [['#paPostSw', '버튼']]],
       ['bib', '', [['#bibNew', '버튼'], ['#coBtn', '버튼']]],
       ['route', '', [['#xpOpen', '버튼'], ['[data-rcopen="move"]', '버튼'], ['#campNew', '버튼']]],
+      ['perf', '', [['#rpUpBtn', '버튼']]],
+      ['sla', '', [['#slUpBtn', '버튼']]],
       ['settle', '', [['#stTabs .tab', '탭', { ids: '#stIdTabs .tab', cfg: '#stCfgTabs .tab' }], ['#stUpBtn', '버튼'], ['#stRecalc', '버튼'], ['#stCloseBtn', '버튼']]],
       ['settle', 'pnl', [['#stPnlTabs .tab', '탭']]],
       ['taxinv', '', [['#tiTabs .tab', '탭'], ['#tiFromStl', '버튼'], ['#tiNew', '버튼']]],
