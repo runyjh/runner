@@ -1139,7 +1139,7 @@ function api_login(loginId, password, auto) {
     if (o.status !== ST.ACTIVE) fail_('사용이 중지된 계정입니다. 관리자에게 문의해 주세요.');
 
     const s = createSession_(o.id, auto === true);
-    return { ok: true, token: s.token, expiresAt: s.expiresAt, mustChange: mustChange_(o), user: { name: o.name, loginId: id } };
+    return { ok: true, token: s.token, expiresAt: s.expiresAt, mustChange: mustChange_(o), user: { name: o.name, loginId: id }, slipClose: stlLastClose_() };
   });
 }
 
@@ -1185,7 +1185,7 @@ function api_checkSession(token) {
     if (!s) return { ok: false, code: 'EXPIRED' };
     const info = driverInfo_(s.d);
     if (!info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED' };
-    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId } };
+    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId }, slipClose: stlLastClose_() };
   });
 }
 

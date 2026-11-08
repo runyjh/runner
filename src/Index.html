@@ -670,6 +670,10 @@
     <span class="nimp">중요 공지</span><b id="ntPopTitle"></b><div class="ntpop-body" id="ntPopBody"></div>
     <button class="btn" type="button" id="ntPopOk">확인했습니다</button></div></div>
 
+  <div class="ihelp hidden" id="slPop" role="dialog" aria-modal="true"><div class="ibox ntpop">
+    <span class="nimp" style="background:#e8f3ff;color:#1b64da">정산 안내</span><b id="slPopTitle"></b><div class="ntpop-body" id="slPopBody"></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn ghost" type="button" id="slPopNo" style="flex:1">나중에</button><button class="btn" type="button" id="slPopGo" style="flex:2">정산서 보기</button></div></div></div>
+
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
     <div class="topbar"><button class="back" id="scBack" aria-label="뒤로">←</button><h2>내 스케줄</h2>
@@ -1271,6 +1275,7 @@
         let persist = false;
         try { persist = !!localStorage.getItem(TOKEN); } catch (e) {}
         store.set(USER, JSON.stringify(r.user), persist);
+        slipPop(r.slipClose);
         if (r.mustChange) openChangePw(true, '');
         else if (cached && curView !== 'splash' && curView !== 'login') $('#homeName').textContent = (r.user && r.user.name ? r.user.name + ' 기사님' : '기사님') + ', 안녕하세요'; // 이미 홈(또는 새로고침 전 화면)을 보여 주는 중
         else goHome(r.user);
@@ -1293,6 +1298,7 @@
       store.set(LAST_ID, id, true);
       $('#lgPw').value = '';
       if (r.mustChange) openChangePw(true, pw); else goHome(r.user);
+      slipPop(r.slipClose);
       fsSignOut(); setTimeout(fsReady, 1500); // 다른 기사로 로그인했을 수 있으니 새로
     }).catch(netErr).finally(() => { btn.disabled = false; btn.textContent = '로그인'; });
   });
@@ -1729,6 +1735,22 @@
     show('notice'); renderNtList();
     loadNotices(true);
   }
+  // 관리자가 정산서를 마감하면 앱을 열 때 한 번 안내 (달·마감 시각마다 한 번 · 이 기기에 기억)
+  function slipPop(x) {
+    if (!x || !x.month) return;
+    const k = 'runner.slipPop.' + x.month + '.' + x.at;
+    try { if (localStorage.getItem(k)) return; } catch (e) { return; }
+    const m = Number(String(x.month).slice(5, 7));
+    setTimeout(() => {
+      if (!$('#ntPop').classList.contains('hidden')) return setTimeout(() => slipPop(x), 1500); // 중요 공지 먼저
+      $('#slPopTitle').textContent = m + '월 정산서가 마감되었습니다';
+      $('#slPopBody').textContent = m + '월 정산이 확정되었습니다. 정산서 보기에서 지급 금액과 내역을 확인해 주세요.';
+      $('#slPop').dataset.k = k; $('#slPop').dataset.m = x.month; $('#slPop').classList.add('center'); $('#slPop').classList.remove('hidden');
+    }, 800);
+  }
+  const slipPopDone = () => { try { localStorage.setItem($('#slPop').dataset.k, '1'); } catch (e) {} $('#slPop').classList.add('hidden'); };
+  $('#slPopNo').addEventListener('click', slipPopDone);
+  $('#slPopGo').addEventListener('click', () => { slipPopDone(); openSettle(); });
   function showNtPop(n) {
     $('#ntPopTitle').textContent = n.title; $('#ntPopBody').textContent = n.body || '';
     $('#ntPop').dataset.k = ntKey(n); $('#ntPop').classList.add('center'); $('#ntPop').classList.remove('hidden');

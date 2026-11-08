@@ -2593,6 +2593,26 @@ function adm_stlImport(token, p) {
 }
 
 /** 마감 / 마감 해제 */
+// ───── 기사 앱 '정산서 마감' 팝업: 가장 최근 마감한 달 (스크립트 속성 STL_LAST_CLOSE = { month, at }) ─────
+function stlLastCloseSet_(month, rows) {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    if (month) { p.setProperty('STL_LAST_CLOSE', JSON.stringify({ month: month, at: Date.now() })); return; }
+    // 마감 해제: 남은 마감 중 가장 최근 달로 (팝업은 이미 본 기사에게 다시 뜨지 않음 — 기사 앱이 month+at 으로 기억)
+    const cur = JSON.parse(p.getProperty('STL_LAST_CLOSE') || 'null');
+    const left = (rows || []).map(function (r) { return r.month; }).sort();
+    if (!left.length) p.deleteProperty('STL_LAST_CLOSE');
+    else if (!cur || left.indexOf(cur.month) < 0) p.setProperty('STL_LAST_CLOSE', JSON.stringify({ month: left[left.length - 1], at: cur ? cur.at : Date.now(), old: true }));
+  } catch (e) { console.error('STL_LAST_CLOSE: ' + (e && e.message)); }
+}
+/** 기사 앱용: 최근 20일 안에 마감한 달 (없으면 null) */
+function stlLastClose_() {
+  try {
+    const x = JSON.parse(PropertiesService.getScriptProperties().getProperty('STL_LAST_CLOSE') || 'null');
+    if (!x || x.old || !x.month || Date.now() - (+x.at || 0) > 20 * 86400000) return null;
+    return { month: x.month, at: +x.at };
+  } catch (e) { return null; }
+}
 function adm_stlClose(token, month, close) {
   return run_(function () {
     const a = requireAdmin_(token);
@@ -2612,11 +2632,13 @@ function adm_stlClose(token, month, close) {
         stlReplaceMonth_('stl_closed', month, snap);
         stlWriteAll_('stl_close', others.concat([{ month: month, at: nowText_(), admin: a.name }]));
         stlAdvMark_(month, res.summary.advAuto || [], true);
+        stlLastCloseSet_(month);
         logAdmin_(a, '정산 마감', month, res.summary.drivers.length + '명');
       } else {
         stlWriteAll_('stl_close', others);
         stlReplaceMonth_('stl_closed', month, []);
         stlAdvMark_(month, [], false);
+        stlLastCloseSet_(null, others);
         logAdmin_(a, '정산 마감 해제', month, '');
       }
       stlBump_();
