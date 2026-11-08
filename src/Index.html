@@ -652,7 +652,7 @@
       <button class="tile" id="mSettle" type="button"><i class="ti">💰</i><b>정산서 보기</b><span>월별 정산서·계산서 →</span></button>
       <button class="tile" id="mPm" type="button"><i class="ti">🤝</i><b>품앗이</b><span>일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><i class="ti">👤</i><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
-      <div class="tile wide bdtile" id="mBoard" role="button" tabindex="0"><b><i class="ti">💬</i>자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
+      <div class="tile wide bdtile hidden" id="mBoard" role="button" tabindex="0"><b><i class="ti">💬</i>자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
     </div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
@@ -770,7 +770,7 @@
       <button type="button" data-my="posted"><span class="mylab">품앗이 관리 (지원자 보기)</span><em id="myNew"></em></button>
       <button type="button" data-my="applied"><span class="mylab">지원한 품앗이</span></button>
       <button type="button" data-my="done">완료한 품앗이</button>
-      <button type="button" data-my="board">💬 내가 쓴 게시글</button>
+      <button type="button" data-my="board" class="hidden">💬 내가 쓴 게시글</button>
     </div>
     <div class="mylist">
       <button type="button" data-my="info">내 정보</button>
@@ -2783,6 +2783,7 @@
       box.classList.remove('hidden');
   };
   window.bdRecent = function () {
+    if ($('#mBoard').classList.contains('hidden')) return; // 자유게시판 가림 (홈 타일에 hidden 을 빼면 다시 보임)
     const token = store.get(TOKEN); if (!token) return;
     // 홈 사본을 Firestore 에서 읽었으면 게시판 최근 글도 거기서 (서버 호출 없음)
     Promise.resolve(window.__homeFs).catch(() => null).then((h) => h ? null : api('api_bdRecent', token).then((r) => { if (r && r.ok) window.bdPaint(r.posts); else window.bdPaint([]); })).catch(() => {});
