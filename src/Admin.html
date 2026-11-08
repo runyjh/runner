@@ -94,6 +94,23 @@
   .db-tbl th:first-child, .db-tbl td:first-child { text-align: left; } .db-tbl thead th { border-top: 0; color: var(--sub); font-weight: 600; font-size: 11.5px; }
   .db-tbl tr.today td { background: var(--cw); font-weight: 700; } .db-tbl td.sun { color: var(--danger); } .db-tbl td.neg { color: var(--danger); }
   .db-note { font-size: 12px; color: var(--sub); } .db-empty { font-size: 13px; color: var(--faint); }
+  .ds-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: start; }
+  @media (max-width: 1100px) { .ds-wrap { grid-template-columns: 1fr; } }
+  .ds-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .ds-search { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ds-search #dsQ { height: 46px; font-size: 16px; }
+  .ds-search .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ds-search .chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; color: var(--ink); }
+  .ds-search .chip.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+  .ds-hint { color: var(--sub); font-size: 13.5px; line-height: 1.7; padding: 18px; background: var(--card); border: 1px dashed var(--line); border-radius: 14px; }
+  .ds-sec { --c: var(--brand); } .ds-sec .ds-n { font-size: 12px; font-weight: 700; color: var(--brand); background: var(--brand-weak); border-radius: 999px; padding: 1px 8px; }
+  .ds-tbl td, .ds-tbl th { text-align: left !important; } .ds-tbl tr.clk { cursor: pointer; } .ds-tbl tr.clk:hover td { background: var(--gray-weak); }
+  .ds-scroll { overflow-x: auto; } .ds-sch td.c { min-width: 58px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; font-size: 12px; text-align: center !important; }
+  .ds-sch th { text-align: center !important; font-size: 11.5px; } .ds-sch th.sun { color: var(--danger); } .ds-sch th.sat { color: #2f6fed; } .ds-sch .today { box-shadow: inset 0 0 0 2px var(--brand); }
+  .ds-memo-card { position: sticky; top: 12px; }
+  .ds-mnav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .ds-mnav b { font-size: 15px; min-width: 96px; text-align: center; }
+  .ds-memo li { align-items: flex-start; } .ds-memo .tm { min-width: 40px; color: var(--brand); font-weight: 700; font-size: 12.5px; } .ds-memo .t { white-space: normal !important; overflow: visible !important; }
+  .ds-memo li.note .tm { color: var(--sub); } .ds-memo .ok { color: var(--ok); font-size: 12px; font-weight: 700; white-space: nowrap; }
   .db-load { color: var(--faint); font-size: 13px; padding: 8px 0; }
   .ngt { margin: 0 0 3px; padding: 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .02em; color: var(--c); display: flex; align-items: center; gap: 6px; }
   .ngt::after { content: ''; flex: 1; height: 1px; background: var(--cw); }
@@ -1059,10 +1076,20 @@
 
    <section id="view-dash" class="hidden">
     <div class="head">
-      <h2>대시보드<i class="live-dot" title="실시간 갱신"></i></h2>
-      <div class="tools"><span class="sub" id="dbAt"></span><button class="btn ghost" id="dbReload" type="button">새로고침</button></div>
+      <h2>대시보드</h2>
+      <div class="tools"><button class="btn ghost" id="dbReload" type="button">새로고침</button></div>
     </div>
-    <div class="db-grid" id="dbGrid"></div>
+    <div class="ds-wrap">
+      <div class="ds-main">
+        <div class="ds-search"><input class="inp" id="dsQ" placeholder="🔍 기사 이름 · 아이디 · 연락처 · 캠프 · 노선 코드 (여러 개는 콤마로)" autocomplete="off"><div class="chips" id="dsScope"></div></div>
+        <div id="dsRes"></div>
+      </div>
+      <aside class="db-card ds-memo-card">
+        <div class="db-top"><b>러너 업무스케줄</b><a id="dsMemoGo">열기 →</a></div>
+        <div class="ds-mnav"><button class="btn sm ghost" id="dsMemoPrev" type="button" aria-label="전날">◀</button><b id="dsMemoT"></b><button class="btn sm ghost" id="dsMemoNext" type="button" aria-label="다음날">▶</button><span class="grow"></span><button class="btn sm ghost" id="dsMemoToday" type="button">오늘</button><input class="inp" type="date" id="dsMemoDay" style="width:140px;height:30px"></div>
+        <div id="dsMemoList"></div>
+      </aside>
+    </div>
    </section>
 
    <section id="view-uiset" class="hidden">
@@ -1922,11 +1949,10 @@
     if (document.hidden || $$('.modal').some((m) => !m.classList.contains('hidden'))) return liveLater('pumasi', livePumasi, 3000);
     loadPumasi();
   }
-  function liveDash() {
+  function liveDash() { // 대시보드: 업무스케줄 일별만 새로 (검색 결과는 사용자가 새로고침)
     if (currentView !== 'dash' || document.hidden) return;
     if (Date.now() - LIVE.dashAt < 60000) return liveLater('dash', liveDash, 60000 - (Date.now() - LIVE.dashAt) + 500);
-    if (DB.busy) return liveLater('dash', liveDash, 5000);
-    LIVE.dashAt = Date.now(); loadDash(true);
+    LIVE.dashAt = Date.now(); DSB.memos = null; dsMemo();
   }
   async function liveStart() {
     if (LIVE.unsub || LIVE.poll) return;
@@ -2923,136 +2949,173 @@
   }));
 
 
-  // ───── 대시보드: 메뉴별 요약 (카드를 누르면 그 메뉴로) ─────
-  const DB = { a: null, s: null, busy: 0, at: '' };
-  // 지난번 요약을 먼저 보여 주고(이 기기에 기억) 뒤에서 새로 받아 바꾼다
-  const DB_CK = 'runner.dash.v2'; // 요약 모양이 바뀌면 이름을 올린다 (예전 저장분은 안 씀)
-  try { const c = JSON.parse(localStorage.getItem(DB_CK) || 'null'); if (c) { DB.a = c.a; DB.s = c.s; DB.at = c.at; } } catch (e) {}
-  const DB_CARDS = [
-    ['drivers', '', 'g-drv'], ['sched', '', 'g-drv', 1], ['pumasi', '', 'g-drv'], ['bib', '', 'g-drv'],
-    ['route', '', 'g-ops'], ['memo', '', 'g-ops'],
-    ['settle', '', 'g-fin'], ['settle', 'pnl', 'g-fin', 1],
-    ['notice', '', 'g-com'], ['board', '', 'g-com']
-  ];
-  const dbNav = (v, go) => $$('.nav a[data-view="' + v + '"]').find((a) => (a.dataset.stGo || '') === (go || ''));
-  const dbGrp = (a) => { const g = a && a.closest('.ng'), t = g && g.querySelector('.ngt'); return t ? t.textContent.trim() : ''; };
-  const dbN = (n) => Number(n || 0).toLocaleString('ko-KR');
-  const dbWon = (n) => { n = Math.round(Number(n) || 0); const a = Math.abs(n); return (n < 0 ? '−' : '') + (a >= 1e8 ? (a / 1e8).toFixed(2).replace(/\.?0+$/, '') + '억' : a >= 1e4 ? dbN(Math.round(a / 1e4)) + '만' : dbN(a)) + '원'; };
-  const dbKpi = (label, v, cls) => '<div class="db-kpi' + (cls ? ' ' + cls : '') + '"><small>' + esc(label) + '</small><strong>' + v + '</strong></div>';
-  const dbChips = (obj, order) => {
-    const ks = Object.keys(obj || {}); if (!ks.length) return '';
-    ks.sort((x, y) => (order ? ((order.indexOf(x) + 1 || 99) - (order.indexOf(y) + 1 || 99)) : 0) || obj[y] - obj[x]);
-    return '<div class="db-chips">' + ks.map((k) => '<span><i>' + esc(k) + '</i>' + dbN(obj[k]) + '</span>').join('') + '</div>';
-  };
-  const dbDay = (d) => { const p = String(d).split('-'), w = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return { t: +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[w] + ')', sun: w === 0 }; };
-  const dbMon = (m) => +String(m).slice(5, 7) + '월';
-  function dbBody(v, go) {
-    const a = DB.a, s = DB.s, L = '<div class="db-load">불러오는 중…</div>';
-    if (['settle', 'taxinv'].includes(v)) { if (!s) return L; if (s.err) return '<div class="db-empty">' + esc(s.err) + '</div>'; }
-    else { if (!a) return L; }
-    if (v === 'drivers') {
-      const d = a.drivers, bw = d.byWork || {}, bs = d.byStatus || {};
-      const work = (bw['재직'] || 0);
-      return '<div class="db-kpis">' + dbKpi('재직 (앱 사용)', dbN(work), 'hot') + dbKpi('휴직', dbN(bw['휴직'] || 0)) + dbKpi('승인대기', dbN(bs['승인대기'] || 0), bs['승인대기'] ? 'bad' : '') + dbKpi('이번 달 가입', dbN(d.newThisMonth)) + '</div>' +
-        '<div class="db-note">단가코드 (재직)</div>' + dbChips(d.byType, ['고정', '백업', '품앗이', '외부용차']) +
-        '<div class="db-note">앱 사용 상태 · 전체 ' + dbN(d.total) + '명</div>' + dbChips(bs, ['승인', '승인대기', '정지', '반려']) +
-        (d.noCamp.length ? '<div class="db-chips"><span class="warn" title="' + esc(d.noCamp.join(', ')) + '">배정 캠프 없는 재직 기사 ' + d.noCamp.length + '명</span></div>' : '') +
-        (d.pending.length ? '<div class="db-note">승인 기다리는 기사: ' + esc(d.pending.slice(0, 8).join(', ')) + (d.pending.length > 8 ? ' 외 ' + (d.pending.length - 8) + '명' : '') + '</div>' : '');
-    }
-    if (v === 'sched') {
-      const c = a.sched; if (!c || c.err) return '<div class="db-empty">' + esc((c && c.err) || '스케줄을 읽지 못했습니다.') + '</div>';
-      const t = c.days[0] || {};
-      return '<div class="db-kpis">' + dbKpi('오늘 업무', dbN(t.work), 'hot') + dbKpi('휴무·휴가', dbN(t.off)) + dbKpi('병가', dbN(t.sick)) + dbKpi('미입차', dbN(t.mi), t.mi ? 'bad' : '') + dbKpi('용차', dbN(t.yong)) + dbKpi('빈 칸', dbN(t.empty), t.empty ? 'bad' : '') + '</div>' +
-        '<table class="db-tbl" data-tk-off><thead><tr><th>날짜</th><th>업무</th><th>휴무·휴가</th><th>병가</th><th>미입차</th><th>용차</th><th>빈 칸</th></tr></thead><tbody>' +
-        c.days.map((x, i) => { const dd = dbDay(x.date); return '<tr' + (i === 0 ? ' class="today"' : '') + '><td class="' + (dd.sun || x.holiday ? 'sun' : '') + '">' + dd.t + (x.holiday ? ' ' + esc(x.holiday) : '') + '</td><td>' + x.work + '</td><td>' + x.off + '</td><td>' + x.sick + '</td><td>' + x.mi + '</td><td>' + x.yong + '</td><td' + (x.empty ? ' class="neg"' : '') + '>' + x.empty + '</td></tr>'; }).join('') +
-        '</tbody></table><div class="db-chips">' + (c.issues ? '<span class="warn">다가오는 이슈 ' + c.issues + '건</span>' : '') + (c.rcWait ? '<span>노선 이관 예약 ' + c.rcWait + '건</span>' : '') + '<span><i>빈 칸</i>배정 캠프가 있는 재직 기사 중 칸이 비어 있는 수</span></div>';
-    }
-    if (v === 'pumasi') {
-      const p = a.pumasi;
-      return '<div class="db-kpis">' + dbKpi('모집 중', dbN(p.open), p.open ? 'hot' : '') + dbKpi('배차 협의중', dbN(p.talk)) + dbKpi('확정 (예정)', dbN(p.done)) + dbKpi('답 기다리는 지원', dbN(p.waitApps), p.waitApps ? 'bad' : '') + '</div>' +
-        '<div class="db-note">이번 달 배차 확정 ' + dbN(p.monthDone) + '건</div>' +
-        (p.next.length ? '<ul class="db-list">' + p.next.map((j) => '<li><span class="m">' + dbDay(j.date).t + '</span><span class="t">' + esc([j.camp, j.route].filter(Boolean).join(' ')) + ' · ' + esc(j.who || '') + '</span><span class="m">' + esc(j.status) + '</span></li>').join('') + '</ul>' : '<div class="db-empty">다가오는 일감이 없습니다.</div>');
-    }
-    if (v === 'bib') {
-      const b = a.bib, st = b.byStatus || {};
-      return '<div class="db-kpis">' + dbKpi('진행 중', dbN((st['작성'] || 0) + (st['출력'] || 0) + (st['제출'] || 0)), 'hot') + dbKpi('제출 (허가 대기)', dbN(st['제출'] || 0)) + dbKpi('허가', dbN(st['허가'] || 0)) + dbKpi('반려', dbN(st['반려'] || 0), st['반려'] ? 'bad' : '') + '</div>' +
-        '<div class="db-note">전체 신청 ' + dbN(b.total) + '건</div>' + dbChips(st, ['작성', '출력', '제출', '허가', '반려']);
-    }
-    if (v === 'route') {
-      const r = a.route;
-      const pf = r.perf;
-      return '<div class="db-kpis">' + dbKpi('캠프', dbN(r.camps), 'hot') + dbKpi('사용 노선', dbN(r.routes)) + dbKpi('정지 노선', dbN(r.routesOff)) + dbKpi('노선 변경 예약', dbN(r.rcWait), r.rcWait ? 'hot' : '') +
-        (pf ? dbKpi('3~4등급 (' + esc(pf.wk) + ')', dbN(pf.bad), pf.bad ? 'hot' : '') + dbKpi('개선 요청', dbN(pf.improve), pf.improve ? 'hot' : '') : '') + '</div>' +
-        (pf && pf.badList.length ? '<div class="db-chips">' + pf.badList.map((t) => '<span class="warn">' + esc(t) + '</span>').join('') + '</div>' : '') +
-        (r.sla ? '<div class="db-kpis">' + dbKpi('SLA 영업점 총점 (~' + esc(String(r.sla.period).slice(5).replace('-', '/')) + ')', r.sla.vendor == null ? '-' : r.sla.vendor + (r.sla.vendorPrev != null ? (r.sla.vendor - r.sla.vendorPrev >= 0 ? ' ▲' : ' ▼') + Math.abs(Math.round((r.sla.vendor - r.sla.vendorPrev) * 10) / 10) : ''), r.sla.vendor != null && r.sla.vendor < r.sla.th.warn ? 'hot' : '') + dbKpi('SLA 위험 (' + r.sla.th.warn + '점 미만)', dbN(r.sla.low), r.sla.low ? 'hot' : '') + dbKpi('SLA 주의', dbN(r.sla.warn)) + '</div>' +
-          (r.sla.lowList.length ? '<div class="db-chips">' + r.sla.lowList.map((t) => '<span class="warn">' + esc(t) + '</span>').join('') + '</div>' : '') : '') +
-        '<table class="db-tbl" data-tk-off><thead><tr><th>캠프</th><th>사용 노선</th><th>배정 기사</th></tr></thead><tbody>' +
-        r.byCamp.slice(0, 8).map((c) => '<tr><td>' + esc(c.name) + '</td><td>' + c.routes + '</td><td>' + c.drivers + '</td></tr>').join('') + '</tbody></table>' +
-        (r.byCamp.length > 8 ? '<div class="db-note">외 ' + (r.byCamp.length - 8) + '개 캠프</div>' : '');
-    }
-    if (v === 'memo') {
-      const m = a.memo;
-      return '<div class="db-kpis">' + dbKpi('오늘', dbN(m.today.length), 'hot') + dbKpi('이번 주 남은 일', dbN(m.week)) + dbKpi('지난 미완료', dbN(m.overdue), m.overdue ? 'bad' : '') + '</div>' +
-        (m.today.length ? '<ul class="db-list">' + m.today.slice(0, 6).map((x) => '<li' + (x.done ? ' class="done"' : '') + '><span class="m">' + esc(x.time || '종일') + '</span><span class="t">' + esc(x.text) + '</span>' + (x.done ? '<span class="m">완료</span>' : '') + '</li>').join('') + '</ul>' : '<div class="db-empty">오늘 적힌 업무가 없습니다.</div>');
-    }
-    if (v === 'settle' && !go) {
-      return s.months.slice().reverse().map((m) => {
-        const st = m.closed ? '<span>마감 ' + esc(String(m.closed).slice(5, 16)) + '</span>' : m.hasData ? '<span class="warn">진행 중' + (m.round ? ' · ' + esc(m.round) + '회차' : '') + '</span>' : '<span>정산서 아직 없음</span>';
-        return '<div><div class="db-note" style="margin-bottom:5px"><b style="color:var(--ink)">' + dbMon(m.month) + ' 정산</b>' + (m.period ? ' · ' + esc(String(m.period.from || '').slice(5)) + ' ~ ' + esc(String(m.period.to || '').slice(5)) : '') + '</div>' +
-          '<div class="db-kpis">' + dbKpi('정산 기사', dbN(m.drivers), 'sm') + dbKpi('물량', dbN(m.qty), 'sm') + dbKpi('경고', dbN(m.warnN), 'sm' + (m.warnN ? ' bad' : '')) + '</div>' +
-          '<div class="db-chips" style="margin-top:6px">' + st + m.warnKinds.map((w) => '<span class="bad" title="' + esc(w) + '">' + esc(String(w).split(/ — | \(/)[0].slice(0, 28)) + ' ' + esc(String(w).match(/\d+$/) ? String(w).match(/\d+$/)[0] : '') + '</span>').join('') + '</div></div>';
-      }).join('<hr style="border:0;border-top:1px solid var(--line);margin:2px 0">');
-    }
-    if (v === 'settle' && go === 'pnl') {
-      const rows = [['쿠팡 매출 (공급가)', 'salesSupply'], ['기사 매입 (공급가)', 'drvSupply'], ['정산 수익', 'profit'], ['직원 급여', 'staff'], ['운영비', 'cost'], ['순이익', 'net']];
-      const ms = s.months.slice().reverse();
-      return '<table class="db-tbl" data-tk-off><thead><tr><th></th>' + ms.map((m) => '<th>' + dbMon(m.month) + (m.closed ? ' (마감)' : m.hasData ? ' (진행 중)' : '') + '</th>').join('') + '</tr></thead><tbody>' +
-        rows.map(([l, k]) => '<tr' + (k === 'net' ? ' class="today"' : '') + '><td>' + l + '</td>' + ms.map((m) => '<td class="' + (m[k] < 0 ? 'neg' : '') + '">' + (m.hasData ? dbWon(m[k]) : '—') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' +
-        '<div class="db-note">진행 중인 달은 지금까지 올린 정산서 기준 추정치입니다. 자세한 내용은 손익 화면에서.</div>';
-    }
-    if (v === 'taxinv') {
-      const t = s.tax; if (!t || t.err) return '<div class="db-empty">' + esc((t && t.err) || '읽지 못했습니다.') + '</div>';
-      const p = t.prev;
-      return '<div class="db-kpis">' + dbKpi(dbMon(s.prev) + ' 발행', dbN(p.n), 'hot') + dbKpi('기사 앱 공개', dbN(p.pub)) + dbKpi('국세청 등록', dbN(p.nts)) + dbKpi('미등록', dbN(p.n - p.nts), p.n - p.nts ? 'bad' : '') + '</div>' +
-        '<div class="db-chips"><span><i>합계금액</i>' + dbWon(p.total) + '</span><span><i>역발행 대상 기사</i>' + dbN(t.targets) + '명</span>' + (t.cur.n ? '<span><i>' + dbMon(s.cur) + '</i>' + dbN(t.cur.n) + '장</span>' : '') + '</div>';
-    }
-    if (v === 'notice') {
-      const n = a.notice;
-      return '<div class="db-kpis">' + dbKpi('게시 중', dbN(n.showing), 'hot') + dbKpi('중요', dbN(n.important)) + dbKpi('숨김·기간 밖', dbN(n.hidden)) + '</div>' +
-        (n.latest.length ? '<ul class="db-list">' + n.latest.map((x) => '<li><span class="t">' + esc(x.title) + '</span><span class="m">' + esc(x.at.slice(5).replace('-', '/')) + '</span></li>').join('') + '</ul>' : '<div class="db-empty">공지가 없습니다.</div>');
-    }
-    if (v === 'board') {
-      const b = a.board; if (!b || b.err) return '<div class="db-empty">' + esc((b && b.err) || '') + '</div>';
-      return '<div class="db-kpis">' + dbKpi('글', dbN(b.posts), 'hot') + dbKpi('최근 7일 새 글', dbN(b.week)) + dbKpi('처리 안 한 신고', dbN(b.reports), b.reports ? 'bad' : '') + '</div>' +
-        (b.latest.length ? '<ul class="db-list">' + b.latest.map((x) => '<li><span class="t">' + esc(x.title) + (x.cmts ? ' <span class="m">[' + x.cmts + ']</span>' : '') + '</span><span class="m">' + esc(x.author) + ' · ' + esc(x.at.slice(5).replace('-', '/')) + '</span></li>').join('') + '</ul>' : '<div class="db-empty">글이 없습니다.</div>');
-    }
-    return '';
+  // ───── 대시보드: 통합 검색(기사·노선·단가·수행률·스케줄·품앗이·정산서) + 러너 업무스케줄 일별 ─────
+  const DSB = { drv: null, sched: null, stl: null, pm: null, pmQ: null, scope: '', q: '', memoDay: '', memoYm: '', memos: null, busy: {}, seq: 0 };
+  const DSB_SC = [['', '전체'], ['drv', '기사'], ['route', '노선'], ['price', '노선 단가'], ['perf', '노선 수행률'], ['sched', '기사 스케줄'], ['pm', '품앗이 기사'], ['stl', '정산서']];
+  const dsN = (n) => Number(n || 0).toLocaleString('ko-KR');
+  const dsDay = (d) => { const p = String(d).split('-'), w = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[w] + ')'; };
+  const dsYmd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const dsTerms = () => nfc(DSB.q).split(/[,，、]/).map((x) => x.trim()).filter(Boolean);
+  const dsHas = (v, t) => nfc(String(v || '')).toUpperCase().indexOf(t.toUpperCase()) >= 0;
+  const dsCode = (t) => normCode(t).replace(/[^0-9A-Z]/g, '');
+  /** 필요한 자료만 처음 한 번 받는다 (기사·노선은 화면을 열 때, 나머지는 검색할 때) */
+  function dsNeed(k) {
+    if (DSB.busy[k]) return DSB.busy[k];
+    const done = (p) => (DSB.busy[k] = p.catch(() => {}).finally(() => { DSB.busy[k] = null; if (currentView === 'dash') dsRender(); }));
+    if (k === 'drv' && !DSB.drv) return done(api('adm_listDrivers').then((r) => { if (r.ok) DSB.drv = r.rows || []; }));
+    if (k === 'route' && !RT.camps.length) return done(loadRoutes());
+    if (k === 'perf' && !RP.loaded) return done(loadPerf().then(() => loadSla()));
+    if (k === 'sched' && !DSB.sched) return done(api('adm_schWeek', ymdLocal(new Date())).then((r) => { if (r.ok) DSB.sched = r; }));
+    if (k === 'stl' && !DSB.stl) return done(api('adm_stlMonth', '', false).then((r) => { if (r.ok) DSB.stl = r; }));
+    return null;
   }
-  function paintDash() {
-    $('#dbGrid').innerHTML = DB_CARDS.map(([v, go, g, wide]) => {
-      const a = dbNav(v, go); if (!a) return '';
-      let body = '';
-      try { body = dbBody(v, go); } catch (e) { body = '<div class="db-empty">요약을 그리지 못했습니다. 새로고침을 눌러 주세요.</div>'; } // 카드 하나가 깨져도 나머지는 보이게
-      return '<div class="db-card ' + g + (wide ? ' wide' : '') + '"><div class="db-top"><span class="grp">' + esc(dbGrp(a)) + '</span><b>' + esc(a.textContent.trim()) + '</b><a data-dbgo="' + v + '|' + (go || '') + '">열기 →</a></div>' + body + '</div>';
-    }).join('');
-    $('#dbAt').textContent = (DB.at ? DB.at + ' 기준' : '') + (DB.busy ? ' · 새로 받는 중…' : '');
+  function dsWants() { return DSB.scope ? [DSB.scope] : DSB_SC.slice(1).map((x) => x[0]); }
+  function dsSearch() {
+    DSB.q = $('#dsQ').value;
+    const terms = dsTerms();
+    if (terms.length) {
+      const w = dsWants();
+      if (w.some((k) => ['drv', 'perf', 'sched', 'pm', 'stl'].indexOf(k) >= 0)) dsNeed('drv');
+      if (w.some((k) => ['route', 'price', 'perf'].indexOf(k) >= 0)) dsNeed('route');
+      w.forEach((k) => { if (k === 'perf' || k === 'sched' || k === 'stl') dsNeed(k); });
+      if (w.indexOf('pm') >= 0) dsPm();
+    }
+    dsRender();
   }
+  /** 품앗이: 서버 검색 (최근 60일 ~ 앞으로 30일 · 일을 준/받은 기사 이름) */
+  function dsPm() {
+    const q = DSB.q.trim(); if (DSB.pmQ === q) return;
+    DSB.pmQ = q; DSB.pm = null;
+    const terms = dsTerms(), seq = ++DSB.seq, t = new Date();
+    const from = dsYmd(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 60)), to = dsYmd(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30));
+    Promise.all(terms.map((x) => api('adm_pmList', { from, to, q: x }))).then((rs) => {
+      if (seq !== DSB.seq) return;
+      const seen = {}; DSB.pm = [];
+      rs.forEach((r) => (r && r.ok ? r.jobs : []).forEach((j) => { if (!seen[j.id]) { seen[j.id] = 1; DSB.pm.push(j); } }));
+      DSB.pm.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+      if (currentView === 'dash') dsRender();
+    }).catch(() => {});
+  }
+  const dsSec = (k, title, n, body, more) => '<div class="db-card ds-sec" data-dssec="' + k + '"><div class="db-top"><b>' + esc(title) + '</b>' + (n != null ? '<span class="ds-n">' + n + '</span>' : '') + (more ? '<a data-dsgo="' + more + '">열기 →</a>' : '') + '</div>' + body + '</div>';
+  const dsLoad = '<div class="db-load">불러오는 중…</div>', dsNone = '<div class="db-empty">찾은 결과가 없습니다.</div>';
+  function dsDrivers() { const terms = dsTerms(); return (DSB.drv || []).filter((d) => terms.some((t) => [d.name, d.loginId, d.subId1, d.subId2, d.phone, d.carNo, d.baseRoute, d.schCamp, d.driverCode].some((v) => dsHas(v, t)))); }
+  /** 검색어가 기사 이름이면 그 기사의 기본노선 정산코드들 (수행률·노선 검색에 같이) */
+  function dsDrvCodes() {
+    const out = [];
+    dsDrivers().forEach((d) => { const camp = shortCamp(d.schCamp || '').replace(/\s/g, ''); String(d.baseRoute || '').toUpperCase().split(/[,\s/]+/).forEach((tk) => { const m = tk.match(/^(\d{2,4})([A-Z]*)/); if (!m) return; (m[2] ? m[2].split('') : ['']).forEach((L) => out.push({ camp, code: m[1] + L, who: d.name })); }); });
+    return out;
+  }
+  function dsRender() {
+    if (currentView !== 'dash') return;
+    $$('#dsScope [data-dssc]').forEach((b) => b.classList.toggle('on', b.dataset.dssc === DSB.scope));
+    const box = $('#dsRes'), terms = dsTerms();
+    if (!terms.length) { box.innerHTML = '<div class="ds-hint">기사 이름·아이디·연락처, 캠프·노선 코드(예: 110A, 안양1)를 입력하세요. 여러 개는 콤마로 (전광성,이현모).<br>위 버튼으로 찾을 범위를 고를 수 있습니다.</div>'; return; }
+    const w = dsWants(), out = [];
+    const drv = DSB.drv ? dsDrivers() : null;
+    if (w.indexOf('drv') >= 0) {
+      out.push(dsSec('drv', '기사', drv ? drv.length : null, !drv ? dsLoad : !drv.length ? dsNone :
+        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>이름</th><th>상태</th><th>단가코드</th><th>캠프</th><th>기본노선</th><th>아이디</th><th>연락처</th></tr></thead><tbody>' +
+        drv.slice(0, 30).map((d) => '<tr class="clk" data-dsdrv="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b></td><td>' + esc(d.status) + (d.workStatus && d.workStatus !== '재직' ? ' · ' + esc(d.workStatus) : '') + '</td><td>' + esc(d.driverType || '') + '</td><td>' + esc(shortCamp(d.schCamp || '')) + '</td><td>' + esc(d.baseRoute || '') + '</td><td>' + esc(d.loginId || '') + '</td><td>' + esc(d.phone || '') + '</td></tr>').join('') + '</tbody></table>', 'drivers'));
+    }
+    const camps = RT.camps.length ? RT.camps : null;
+    const codeTerms = terms.map(dsCode).filter(Boolean);
+    const routeHit = (campName, code) => terms.some((t) => dsHas(campName, t)) || codeTerms.some((c) => code.indexOf(c) >= 0);
+    if (w.indexOf('route') >= 0) {
+      let rows = null;
+      if (camps) { rows = []; sortedCamps().forEach((c) => routesOf(c.id).forEach((r) => { if (routeHit(c.name, normCode(r.code))) rows.push({ c, r }); })); }
+      const codesOf = (txt) => { const o = []; String(txt || '').toUpperCase().split(/[,\s/]+/).forEach((tk) => { const m = tk.match(/^(\d{2,4})([A-Z]*)/); if (m) (m[2] ? m[2].split('') : ['']).forEach((L) => o.push(m[1] + L)); }); return o; };
+      const who = (c, r) => { const rc = codesOf(r.code); return (DSB.drv || []).filter((d) => d.schCampId === c.id && d.status === '승인' && d.workStatus !== '퇴사' && codesOf(d.baseRoute).some((x) => rc.indexOf(x) >= 0)).map((d) => d.name).join(', '); };
+      out.push(dsSec('route', '노선', rows ? rows.length : null, !rows ? dsLoad : !rows.length ? dsNone :
+        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>캠프</th><th>노선</th><th>상태</th><th>기본노선 기사</th><th>메모</th></tr></thead><tbody>' +
+        rows.slice(0, 40).map((x) => '<tr class="clk" data-dsrt="' + esc(x.c.id) + '"><td>' + esc(x.c.name) + '</td><td><b>' + esc(x.r.code) + '</b></td><td>' + esc(x.r.status || '') + '</td><td>' + esc(who(x.c, x.r)) + '</td><td class="sub">' + esc(String(x.r.memo || '').slice(0, 40)) + '</td></tr>').join('') + '</tbody></table>', 'route'));
+    }
+    if (w.indexOf('price') >= 0) {
+      let rows = null;
+      if (camps) rows = xpRows().filter((x) => routeHit(x.c.name, x.code));
+      out.push(dsSec('price', '노선 단가', rows ? rows.length : null, !rows ? dsLoad : !rows.length ? dsNone :
+        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>캠프</th><th>정산코드</th>' + PKEYS.map((k) => '<th>' + PLABEL[k] + '</th>').join('') + '<th>사용</th></tr></thead><tbody>' +
+        rows.slice(0, 40).map((x) => '<tr class="clk" data-dsrt="' + esc(x.c.id) + '"><td>' + esc(shortCamp(x.c.name)) + '</td><td><b>' + esc(x.code) + '</b></td>' + PKEYS.map((k) => { const v = xpOrig(x, k); return '<td>' + (v === '' || v == null ? '<span class="sub">-</span>' : won(v)) + '</td>'; }).join('') + '<td>' + esc(x.st) + '</td></tr>').join('') + '</tbody></table>', 'route'));
+    }
+    if (w.indexOf('perf') >= 0) {
+      let rows = null;
+      if (RP.loaded) {
+        const keys = new Map();
+        RP.map.forEach((e, k) => { if (routeHit(e.camp, e.code)) keys.set(k, ''); });
+        if (SL.loaded) slaMap().forEach((e, k) => { if (e.code !== '영업점' && routeHit(e.camp, e.code) && !keys.has(k)) keys.set(k, ''); });
+        dsDrvCodes().forEach((x) => { const k = lnHead(rpKey(x.camp, x.code)); keys.set(k, (keys.get(k) ? keys.get(k) + ', ' : '') + x.who); });
+        const sm = SL.loaded ? slaMap() : new Map(), lp = SL.periods[SL.periods.length - 1];
+        rows = [...keys.entries()].map(([k, who]) => ({ k, who, camp: lnCampOf(k), code: lnCodeOf(k), l: rpLatestOf(lnCampOf(k), lnCodeOf(k)), s: sm.get(k) ? sm.get(k).by[lp] : null }))
+          .filter((x) => x.l || x.s).sort((a, b) => koSort(a.camp, b.camp) || koSort(a.code, b.code));
+      }
+      out.push(dsSec('perf', '노선 수행률 · SLA', rows ? rows.length : null, !rows ? dsLoad : !rows.length ? dsNone :
+        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>캠프</th><th>라우트</th><th>최신 등급</th><th>추세</th><th>SLA 총점</th><th>고객만족</th><th>기사</th></tr></thead><tbody>' +
+        rows.slice(0, 40).map((x) => '<tr class="clk" data-dsperf="' + esc(x.k) + '"><td>' + esc(x.camp) + '</td><td><b>' + esc(x.code) + '</b>' + (x.l && x.l.improve ? ' <span class="gr-imp">개선 요청</span>' : '') + '</td><td>' + (x.l ? grBadge(x.l.grade) + (x.l.perf != null ? ' <small>' + x.l.perf + '%</small>' : '') + ' <small class="sub">' + esc(x.l.wk) + '</small>' : '-') + '</td>' +
+          '<td>' + rpTrend(x.camp, x.code, 8) + '</td><td>' + (x.s ? slaBadge(x.s.total) : '<span class="sub">-</span>') + '</td><td>' + (x.s && x.s.cs != null ? x.s.cs : '-') + '</td><td class="sub">' + esc(x.who) + '</td></tr>').join('') + '</tbody></table>', 'perf'));
+    }
+    if (w.indexOf('sched') >= 0) {
+      const S = DSB.sched;
+      let rows = null;
+      if (S && drv) { const ids = new Set(drv.map((d) => d.id)); rows = (S.drivers || []).filter((d) => ids.has(d.id) || (d.mainId && ids.has(d.mainId))); }
+      out.push(dsSec('sched', '기사 스케줄', rows ? rows.length : null, !rows ? dsLoad : !rows.length ? dsNone :
+        '<div class="ds-scroll"><table class="db-tbl ds-tbl ds-sch" data-tk-off><thead><tr><th>이름</th>' + S.dates.map((dt) => { const p = dt.split('-'), wd = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return '<th class="' + (wd === 0 ? 'sun' : wd === 6 ? 'sat' : '') + (dt === S.today ? ' today' : '') + '">' + +p[1] + '/' + +p[2] + '<br><small>' + '일월화수목금토'[wd] + '</small></th>'; }).join('') + '</tr></thead><tbody>' +
+        rows.map((d) => '<tr><td><b>' + esc(d.name) + '</b>' + (d.ex ? ' <small class="sub">추가</small>' : '') + '<br><small class="sub">' + esc(shortCamp(d.camp || '') + ' ' + (d.baseRoute || '')) + '</small></td>' + S.dates.map((dt) => { const v = ((S.cells || {})[d.id] || {})[dt] || ''; return '<td class="c ' + cellKind(v) + (dt === S.today ? ' today' : '') + '" title="' + esc(v) + '">' + esc(v) + '</td>'; }).join('') + '</tr>').join('') + '</tbody></table></div>', 'sched'));
+    }
+    if (w.indexOf('pm') >= 0) {
+      const L = DSB.pmQ === DSB.q.trim() ? DSB.pm : null;
+      out.push(dsSec('pm', '품앗이 기사 (최근 60일 ~ 30일 뒤)', L ? L.length : null, !L ? dsLoad : !L.length ? dsNone :
+        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>날짜</th><th>상태</th><th>캠프·노선</th><th>준 기사</th><th>받은 기사</th><th>단가</th></tr></thead><tbody>' +
+        L.slice(0, 40).map((j) => '<tr><td>' + esc(dsDay(j.date)) + (j.time ? ' <small class="sub">' + esc(j.time) + '</small>' : '') + '</td><td>' + paBadge(j.status) + '</td><td>' + esc([j.camp, j.route].filter(Boolean).join(' ')) + '</td><td>' + esc(j.poster || '') + '</td><td>' + esc(j.accepted || '') + '</td><td>' + (j.price ? won(j.price) : '') + '</td></tr>').join('') + '</tbody></table>', 'pumasi'));
+    }
+    if (w.indexOf('stl') >= 0) {
+      const R = DSB.stl;
+      let rows = null;
+      if (R && R.summary) rows = (R.summary.drivers || []).filter((d) => terms.some((t) => dsHas(d.name, t) || (d.cids || []).some((x) => dsHas(x, t)) || (d.workers || []).some((x) => dsHas(x, t))));
+      out.push(dsSec('stl', '정산서' + (R ? ' · ' + ymTitle(R.month) : ''), rows ? rows.length : null, !rows ? dsLoad : !rows.length ? dsNone :
+        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>명의자</th><th>정산 아이디</th><th>근무일</th><th>배송건수</th><th>세금계산서</th><th>실입금</th><th>입금</th></tr></thead><tbody>' +
+        rows.map((d) => '<tr class="clk" data-dsslip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b></td><td class="sub">' + esc((d.cids || []).map((x) => x.replace(/@.*/, '')).join(', ')) + '</td><td>' + (d.workDays || '-') + '</td><td>' + dsN(d.qty) + '</td><td>' + dsN(d.invoice) + '</td><td><b>' + dsN(d.net) + '</b></td><td>' + (d.checked ? '<span style="color:var(--ok)">✓</span>' : '') + '</td></tr>').join('') + '</tbody></table>' +
+        '<div class="db-note">줄을 누르면 정산서가 열립니다.</div>', 'settle'));
+    }
+    box.innerHTML = out.join('');
+  }
+  // 러너 업무스케줄: 하루씩 (◀ 오늘 ▶ · 날짜 고르기)
+  function dsMemo(day) {
+    DSB.memoDay = day || DSB.memoDay || ymdLocal(new Date());
+    const ym = DSB.memoDay.slice(0, 7);
+    $('#dsMemoDay').value = DSB.memoDay;
+    $('#dsMemoT').textContent = dsDay(DSB.memoDay) + (DSB.memoDay === ymdLocal(new Date()) ? ' · 오늘' : '');
+    if (DSB.memoYm === ym && DSB.memos) return dsMemoPaint();
+    $('#dsMemoList').innerHTML = dsLoad;
+    const seq = DSB.memoSeq = (DSB.memoSeq || 0) + 1;
+    api('adm_memoMonth', ym).then((r) => { if (seq !== DSB.memoSeq) return; if (!r.ok) return toast(r.msg); DSB.memoYm = ym; DSB.memos = r.memos || []; dsMemoPaint(); }).catch(() => {});
+  }
+  function dsMemoPaint() {
+    const list = (DSB.memos || []).filter((m) => m.date === DSB.memoDay);
+    $('#dsMemoList').innerHTML = list.length ? '<ul class="db-list ds-memo">' + list.map((m) => '<li class="' + (m.done ? 'done' : '') + (m.note ? ' note' : '') + '"><span class="tm">' + esc(m.time || (m.note ? '비고' : '')) + '</span><span class="t">' + esc(m.content).replace(/\n/g, '<br>') + '</span>' + (m.done ? '<span class="ok">완료</span>' : '') + '</li>').join('') + '</ul>' : '<div class="db-empty">이날 적힌 업무가 없습니다.</div>';
+  }
+  const dsShift = (n) => { const p = (DSB.memoDay || ymdLocal(new Date())).split('-'); dsMemo(dsYmd(new Date(+p[0], +p[1] - 1, +p[2] + n))); };
+  $('#dsMemoPrev').addEventListener('click', () => dsShift(-1));
+  $('#dsMemoNext').addEventListener('click', () => dsShift(1));
+  $('#dsMemoToday').addEventListener('click', () => dsMemo(ymdLocal(new Date())));
+  $('#dsMemoDay').addEventListener('change', (e) => { if (e.target.value) dsMemo(e.target.value); });
+  $('#dsMemoGo').addEventListener('click', () => { const a = $('.nav a[data-view="memo"]'); if (a) a.click(); });
   function loadDash(fresh) {
-    if (DB.busy) return paintDash();
-    DB.busy = 2; paintDash();
-    fresh = fresh === true;
-    const stamp = () => { const d = new Date(); DB.at = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
-    const done = () => {
-      DB.busy--; if (!DB.busy) { stamp(); try { localStorage.setItem(DB_CK, JSON.stringify({ a: DB.a, s: DB.s && !DB.s.err ? DB.s : null, at: DB.at })); } catch (e) {} }
-      if (currentView === 'dash') paintDash();
-    };
-    api('adm_dash', fresh).then((r) => { if (r && r.ok) DB.a = r; else if (r) toast(r.msg); }).catch(() => {}).finally(done);
-    api('adm_dashStl', fresh).then((r) => { DB.s = r && r.ok ? r : { err: (r && r.msg) || '정산 요약을 읽지 못했습니다.' }; }).catch(() => {}).finally(done);
+    if (fresh) { DSB.drv = null; DSB.sched = null; DSB.stl = null; DSB.pmQ = null; DSB.memos = null; RP.loaded = false; SL.loaded = false; }
+    dsNeed('drv'); dsNeed('route');
+    dsMemo(DSB.memoDay || ymdLocal(new Date()));
+    if (dsTerms().length) dsSearch(); else dsRender();
+    setTimeout(() => { if (currentView === 'dash') $('#dsQ').focus(); }, 50);
   }
-  $('#dbReload').addEventListener('click', () => loadDash(true));
-  $('#dbGrid').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-dbgo]'); if (!b) return;
-    const [v, go] = b.dataset.dbgo.split('|'), a = dbNav(v, go); if (a) a.click();
+  $('#dbReload').addEventListener('click', () => { loadDash(true); toast('새로 불러옵니다.'); });
+  onSearch($('#dsQ'), () => dsSearch());
+  $('#dsScope').innerHTML = DSB_SC.map((x) => '<button type="button" class="chip" data-dssc="' + x[0] + '">' + x[1] + '</button>').join('');
+  $('#dsScope').addEventListener('click', (e) => { const b = e.target.closest('[data-dssc]'); if (!b) return; DSB.scope = b.dataset.dssc; dsSearch(); });
+  $('#dsRes').addEventListener('click', (e) => {
+    const go = e.target.closest('[data-dsgo]'); if (go) { const a = $('.nav a[data-view="' + go.dataset.dsgo + '"]'); if (a) a.click(); return; }
+    const d = e.target.closest('[data-dsdrv]'); if (d) return openDrawer(d.dataset.dsdrv);
+    const r = e.target.closest('[data-dsrt]'); if (r) { curCamp = r.dataset.dsrt; const a = $('.nav a[data-view="route"]'); if (a) a.click(); return; }
+    const pf = e.target.closest('[data-dsperf]'); if (pf) { const td = document.createElement('td'); td.className = 'rc'; td.dataset.rpc = pf.dataset.dsperf; td.style.display = 'none'; document.body.appendChild(td); td.click(); td.remove(); return; }
+    const sl = e.target.closest('[data-dsslip]');
+    if (sl && DSB.stl) { STX.month = DSB.stl.month; STX.slipIds = [...$$('#dsRes [data-dsslip]')].map((x) => x.dataset.dsslip); openSlip(sl.dataset.dsslip); }
   });
 
   // ───── 품앗이 관리 (기사 앱 품앗이 일감) ─────
@@ -4243,7 +4306,7 @@
         const code = n.num + n.value, gk = GK[n.level - 1];
         const use = rs.filter((r) => r.g1 === n.num && r[gk] === n.value);
         const on = use.filter((r) => r.status !== '정지').length;
-        const v = RVOL ? RVOL.vol[cs + '|' + code] : null;
+        const v = RVOL && RVOL.vol ? RVOL.vol[cs + '|' + code] : null;
         out.push({ ak: xpKey(c.id, n.key), c, n, code, routes: use.length, on, st: !use.length ? '노선 없음' : on ? '사용' : '정지', vol: v ? Number(v.avg) || 0 : null, volv: v });
       });
     });
