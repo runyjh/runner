@@ -381,7 +381,9 @@ function rlnFromMoves_() {
     const letters = {};
     rpfAll_().concat(slaAll_()).forEach(function (r) { const m = String(r.code || '').match(/^(\d+)([A-Z])$/); if (m) (letters[r.camp + '|' + m[1]] = letters[r.camp + '|' + m[1]] || {})[m[2]] = 1; });
     const expand = function (camp, codes) { const o = []; codes.forEach(function (c) { if (/[A-Z]$/.test(c)) { o.push(c); return; } const L = Object.keys(letters[camp + '|' + c] || {}).sort(); if (L.length) L.forEach(function (x) { o.push(c + x); }); else o.push(c); }); return o; };
-    rcRows_().filter(function (c) { return c.kind === RCK.MOVE && (c.status === RCS.DONE || c.status === RCS.WAIT); }).forEach(function (c) {
+    const today = todayText_();
+    // 적용일이 아직 안 온 예약 이관은 계보에 넣지 않는다 (적용되는 날부터 이어 붙임)
+    rcRows_().filter(function (c) { return c.kind === RCK.MOVE && (c.status === RCS.DONE || (c.status === RCS.WAIT && c.date <= today)); }).forEach(function (c) {
       const v = rcView_(c, campName);
       const fc = rpfCamp_(v.fromCamp), tc = rpfCamp_(v.toCamp);
       let a = expand(fc, rpfBaseCodes_(v.fromRoute)), b = rpfBaseCodes_(v.toRoute);
