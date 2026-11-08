@@ -956,7 +956,8 @@
       const tok = FSTOK(); if (!tok) return false;
       const saved = fsLs();
       if (saved && saved.off && saved.off > Date.now()) return false; // 서버에 설정이 없다고 했으면 1시간 동안 묻지 않음
-      if (!window.firebase || !firebase.auth) { await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js'); await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js'); }
+      if (!window.firebase) await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+      if (!firebase.auth) await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js'); // (알림이 앱을 먼저 불렀어도 다시 부르지 않음)
       if (!firebase.firestore) await fsLoad('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
       let app = firebase.apps.find((a) => a.name === 'rfs');
       if (!app && saved && saved.web) app = firebase.initializeApp(saved.web, 'rfs');
@@ -2663,11 +2664,13 @@
     return api('api_pmPushConfig', store.get(TOKEN)).then((r) => { if (r && r.ok && r.on) pushCfg = r; return (r && r.ok) ? r : { on: false, err: true }; });
   }
   async function fbToken(cfg) {
-    if (!window.firebase) {
-      await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-app-compat.js');
-      await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-messaging-compat.js');
+    // Firestore(읽기 사본)가 firebase 앱을 먼저 불러 둘 수 있다 → 알림(messaging) 도구는 따로 확인해서 불러온다
+    if (!window.firebase) await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-app-compat.js');
+    if (typeof firebase.messaging !== 'function') await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-messaging-compat.js');
+    if (!fbMsg) {
+      let app; try { app = firebase.app('push'); } catch (e) { app = firebase.initializeApp(cfg.web, 'push'); } // 알림 전용 앱 (Firestore 앱과 분리)
+      fbMsg = app.messaging();
     }
-    if (!fbMsg) { if (!firebase.apps.length) firebase.initializeApp(cfg.web); fbMsg = firebase.messaging(); }
     const reg = await navigator.serviceWorker.register('sw.js');
     await navigator.serviceWorker.ready;
     return fbMsg.getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: reg });
