@@ -170,22 +170,54 @@ function rpfSummary_() {
     badList: bad.slice(0, 8).map(function (o) { return o.camp + ' ' + o.code + ' ' + o.grade + '등급' + (o.perf !== '' ? ' ' + o.perf + '%' : ''); }), uploadedAt: rows[0].uploadedAt };
 }
 
-/** 기사 앱: 내 기본노선 라우트의 최근 8주 등급 (관리자가 켜 두었을 때만) */
+/**
+ * 기사 앱: 내 라우트 수행률 (관리자가 켜 두었을 때만)
+ *  - 고정 기사: 기본노선 라우트(mine) · 백업 기사(기본노선 없음): 최근 4주 기사스케줄에서 실제로 뛴 라우트(recent)
+ *  - 그 아래 소속 캠프 전체 라우트의 최신 등급(campAll · 접힌 상태로)
+ */
 function api_myPerf(token) {
   return run_(function () {
     const u = pmUser_(token);
     if (!perfDrvOn_()) return { ok: true, on: false, routes: [] };
+    const ck = cache_(), key = 'myperf:' + u.id + ':' + rpfVer_(), hit = ck.get(key);
+    if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 */ } }
     const o = driverById_(u.id) || {};
     const camp = rpfCamp_(o.schCamp || '');
-    const codes = rpfBaseCodes_(o.baseRoute || '');
-    if (!camp || !codes.length) return { ok: true, on: true, camp: camp, routes: [], weeks: [] };
-    const all = rpfAll_().filter(function (r) { return r.camp === camp && codes.indexOf(r.code) >= 0; });
-    const weeks = Object.keys(all.reduce(function (m, r) { m[r.week] = 1; return m; }, {})).sort().slice(-8);
-    const routes = codes.map(function (code) {
-      const mine = all.filter(function (r) { return r.code === code && weeks.indexOf(r.week) >= 0; });
-      return { code: code, weeks: weeks.map(function (w) { const r = mine.filter(function (x) { return x.week === w; })[0]; return r ? { wk: r.wk, from: r.from, to: r.to, perf: r.perf === '' ? null : Number(r.perf), grade: r.grade ? Number(r.grade) : null, improve: r.improve === 'Y' } : { wk: 'WK' + Number(w.slice(6)), perf: null, grade: null }; }) };
-    }).filter(function (r) { return r.weeks.some(function (w) { return w.grade; }); });
-    return { ok: true, on: true, camp: camp, routes: routes, weeks: weeks };
+    const base = rpfBaseCodes_(o.baseRoute || '');
+    const all = rpfAll_();
+    const weeksAll = Object.keys(all.reduce(function (m, r) { m[r.week] = 1; return m; }, {})).sort();
+    const weeks = weeksAll.slice(-8), latest = weeksAll[weeksAll.length - 1] || '';
+    const series = function (cp, code) {
+      const mine = all.filter(function (r) { return r.camp === cp && r.code === code && weeks.indexOf(r.week) >= 0; });
+      return { code: code, camp: cp, weeks: weeks.map(function (w) { const r = mine.filter(function (x) { return x.week === w; })[0]; return r ? { wk: r.wk, from: r.from, to: r.to, perf: r.perf === '' ? null : Number(r.perf), grade: r.grade ? Number(r.grade) : null, improve: r.improve === 'Y' } : { wk: 'WK' + Number(w.slice(6)), perf: null, grade: null }; }) };
+    };
+    const has = function (r) { return r.weeks.some(function (w) { return w.grade; }); };
+    const out = { ok: true, on: true, camp: camp, backup: !base.length, weeks: weeks, routes: [], recent: [], campAll: [] };
+    if (camp && base.length) out.routes = base.map(function (c) { return series(camp, c); }).filter(has);
+    // 최근 4주 스케줄에서 뛴 라우트 (백업 기사 · 고정 기사도 다른 노선을 뛰었으면 같이)
+    try {
+      const today = parseYmd_(todayText_()), rec = {};
+      const s = schRead_(sundayOf_(addDays_(today, -27)), today);
+      const cells = s.cells[u.id] || {}, campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
+      Object.keys(cells).forEach(function (d) {
+        const v = String(cells[d] || '').toUpperCase();
+        if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
+        let cp = camp;
+        campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
+        rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) {
+          if (!/^\d/.test(code)) return;
+          const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++;
+        });
+      });
+      out.recent = Object.keys(rec).map(function (k) { return rec[k]; }).filter(function (x) { return !(x.camp === camp && base.indexOf(x.code) >= 0); })
+        .sort(function (a, b) { return b.days - a.days; }).slice(0, 8).map(function (x) { const r = series(x.camp, x.code); r.days = x.days; return r; }).filter(has);
+    } catch (e) { out.recent = []; }
+    if (camp && latest) {
+      out.campAll = all.filter(function (r) { return r.camp === camp && r.week === latest; }).sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; })
+        .map(function (r) { return { code: r.code, wk: r.wk, perf: r.perf === '' ? null : Number(r.perf), grade: r.grade ? Number(r.grade) : null, improve: r.improve === 'Y' }; });
+    }
+    try { const j = JSON.stringify(out); if (j.length < 90000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
+    return out;
   });
 }
 /** 기본노선 글자 → 정산코드 목록. '110AB' → [110A, 110B] · '110A,116C' → [110A, 116C] · '백업' → [] */

@@ -290,6 +290,12 @@
   .gr.g1 { background: #12a150; } .gr.g2 { background: #2f6fed; } .gr.g3 { background: #f59e0b; } .gr.g4 { background: #e5484d; } .gr.g0 { background: #d9dde3; color: #666; }
   .mpr .now { text-align: right; font-size: 12px; color: var(--sub); white-space: nowrap; } .mpr .now b { display: block; font-size: 15px; color: var(--ink); }
   .mpr .imp { color: #c62828; font-weight: 800; font-size: 11px; }
+  .mpr b.code small { display: block; font-size: 10.5px; color: var(--sub); font-weight: 600; }
+  .mp-sec { font-size: 12px; font-weight: 700; color: var(--sub); margin: 8px 0 2px; }
+  .mp-all { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; } .mp-all summary { font-size: 13px; font-weight: 700; cursor: pointer; }
+  .mp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .mp-grid span { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: #f7f8fa; font-size: 13px; }
+  .mp-grid span small { margin-left: auto; color: var(--sub); font-size: 11px; } .mp-grid span.bad { background: #fff6e8; } .mp-grid span.imp { background: #fdecec; }
   .day .pmx { font-size: 12.5px; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; cursor: pointer; border: 0; text-align: left; font: inherit; font-size: 12.5px; }
   .day .pmx b { margin-right: 4px; }
   .day .pmx.r-수행 { background: #fff4d6; color: #8a5a00; } .day .pmx.r-맡김 { background: #e8f0fd; color: #0a53a8; } .day .pmx.r-지원 { background: #f2f4f6; color: #4e5968; }
@@ -2298,19 +2304,28 @@
     }).catch(() => { myCardFail(); netErr(); });
     loadMyPerf(token);
   }
-  /** 내 기본노선의 쿠팡 주간 수행률 등급 — 사무실에서 켜 두었을 때만 보임 */
+  /** 내 라우트의 쿠팡 주간 수행률 등급 — 사무실에서 켜 두었을 때만 보임. 고정: 기본노선 · 백업: 최근 4주 뛴 라우트 · 아래에 캠프 전체(접힘) */
   function loadMyPerf(token) {
     const box = $('#myPerf'); if (!box) return;
     api('api_myPerf', token).then((r) => {
-      if (!r || !r.ok || !r.on || !(r.routes || []).length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+      const routes = (r && r.routes) || [], recent = (r && r.recent) || [], campAll = (r && r.campAll) || [];
+      if (!r || !r.ok || !r.on || (!routes.length && !recent.length && !campAll.length)) { box.classList.add('hidden'); box.innerHTML = ''; return; }
       const md = (d) => d ? +String(d).slice(5, 7) + '/' + +String(d).slice(8, 10) : '';
-      const last = r.routes[0].weeks[r.routes[0].weeks.length - 1];
+      const lastOf = (list) => { const rt = list[0]; return rt ? rt.weeks[rt.weeks.length - 1] : null; };
+      const last = lastOf(routes) || lastOf(recent) || (campAll[0] ? { wk: campAll[0].wk } : null);
+      const gr = (g) => '<i class="gr g' + (g || 0) + '">' + (g || '-') + '</i>';
+      const row = (rt, sub) => {
+        const l = rt.weeks[rt.weeks.length - 1] || {};
+        return '<div class="mpr"><b class="code">' + escH(rt.code) + (sub ? '<small>' + escH(sub) + '</small>' : '') + '</b><div class="wks">' + rt.weeks.map((w) => '<span>' + gr(w.grade) + escH(String(w.wk || '').replace('WK', 'W')) + '</span>').join('') + '</div>' +
+          '<div class="now"><b>' + gr(l.grade) + ' ' + (l.perf != null ? l.perf + '%' : '') + '</b>' + (l.improve ? '<span class="imp">개선 요청</span>' : (l.grade >= 3 ? '95% 미만' : l.grade ? '우수' : '')) + '</div></div>';
+      };
+      const openAll = !routes.length && !recent.length;
       box.innerHTML = '<h4>📈 내 라우트 수행률 <small class="sub">' + escH(last ? last.wk + (last.from ? ' (' + md(last.from) + '~' + md(last.to) + ')' : '') : '') + ' · 쿠팡 주간 안내 기준</small></h4>' +
-        r.routes.map((rt) => {
-          const l = rt.weeks[rt.weeks.length - 1] || {};
-          return '<div class="mpr"><b class="code">' + escH(rt.code) + '</b><div class="wks">' + rt.weeks.map((w) => '<span><i class="gr g' + (w.grade || 0) + '">' + (w.grade || '-') + '</i>' + escH(String(w.wk || '').replace('WK', 'W')) + '</span>').join('') + '</div>' +
-            '<div class="now"><b><i class="gr g' + (l.grade || 0) + '">' + (l.grade || '-') + '</i> ' + (l.perf != null ? l.perf + '%' : '') + '</b>' + (l.improve ? '<span class="imp">개선 요청</span>' : (l.grade >= 3 ? '95% 미만' : l.grade ? '우수' : '')) + '</div></div>';
-        }).join('') +
+        (routes.length ? '<div class="mp-sec">내 기본노선</div>' + routes.map((rt) => row(rt, '')).join('') : '') +
+        (recent.length ? '<div class="mp-sec">최근 4주에 뛴 라우트' + (r.backup ? ' (백업)' : '') + '</div>' + recent.map((rt) => row(rt, (rt.camp && rt.camp !== r.camp ? rt.camp + ' · ' : '') + rt.days + '일')).join('') : '') +
+        (!routes.length && !recent.length && r.backup ? '<div class="sub" style="margin:4px 0 6px">최근 4주 스케줄에 라우트가 적힌 날이 없어 캠프 전체 등급만 보여 드립니다.</div>' : '') +
+        (campAll.length ? '<details class="mp-all"' + (openAll ? ' open' : '') + '><summary>' + escH(r.camp || '내 캠프') + ' 캠프 전체 라우트 ' + campAll.length + '개 · 3~4등급 ' + campAll.filter((x) => x.grade >= 3).length + '개</summary><div class="mp-grid">' +
+          campAll.map((x) => '<span class="' + (x.improve ? 'imp' : x.grade >= 3 ? 'bad' : '') + '">' + gr(x.grade) + ' <b>' + escH(x.code) + '</b><small>' + (x.perf != null ? x.perf + '%' : '-') + (x.improve ? ' · 개선 요청' : '') + '</small></span>').join('') + '</div></details>' : '') +
         '<div class="sub" style="margin-top:6px">1~2등급 우수(95% 초과) · 3~4등급은 위탁 조정 대상(95% 미만)입니다. 안전 운전과 함께 꾸준한 완료 부탁드립니다.</div>';
       box.classList.remove('hidden');
     }).catch(() => {});
