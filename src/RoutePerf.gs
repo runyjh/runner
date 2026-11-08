@@ -143,7 +143,7 @@ function adm_perfList(token, weeksN) {
     const weeks = Object.keys(all.reduce(function (m, o) { m[o.week] = 1; return m; }, {})).sort().reverse().slice(0, n);
     const wset = {}; weeks.forEach(function (w) { wset[w] = 1; });
     const rows = all.filter(function (o) { return wset[o.week]; }).map(rpfView_);
-    const out = { ok: true, weeks: weeks.reverse(), rows: rows, totalWeeks: Object.keys(all.reduce(function (m, o) { m[o.week] = 1; return m; }, {})).length, drvOn: perfDrvOn_(), memoOn: perfMemoOn_() };
+    const out = { ok: true, weeks: weeks.reverse(), rows: rows, totalWeeks: Object.keys(all.reduce(function (m, o) { m[o.week] = 1; return m; }, {})).length, drvOn: perfDrvOn_(), memoOn: perfMemoOn_(), lineage: rlnEdges_() };
     try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
     return out;
   });
@@ -187,8 +187,10 @@ function api_myPerf(token) {
     const all = rpfAll_();
     const weeksAll = Object.keys(all.reduce(function (m, r) { m[r.week] = 1; return m; }, {})).sort();
     const weeks = weeksAll.slice(-8), latest = weeksAll[weeksAll.length - 1] || '';
+    const edges = rlnEdges_();
     const series = function (cp, code) {
-      const mine = all.filter(function (r) { return r.camp === cp && r.code === code && weeks.indexOf(r.week) >= 0; });
+      const keys = [cp + '|' + code].concat(rlnChain_(edges, cp, code).map(function (x) { return x.camp + '|' + x.code; })); // 이전 코드(개명·이관)의 이력도 이어 붙임
+      const mine = all.filter(function (r) { return keys.indexOf(r.camp + '|' + r.code) >= 0 && weeks.indexOf(r.week) >= 0; });
       return { code: code, camp: cp, weeks: weeks.map(function (w) { const r = mine.filter(function (x) { return x.week === w; })[0]; return r ? { wk: r.wk, from: r.from, to: r.to, perf: r.perf === '' ? null : Number(r.perf), grade: r.grade ? Number(r.grade) : null, improve: r.improve === 'Y' } : { wk: 'WK' + Number(w.slice(6)), perf: null, grade: null }; }) };
     };
     const has = function (r) { return r.weeks.some(function (w) { return w.grade; }); };
@@ -221,7 +223,7 @@ function api_myPerf(token) {
       const sla = slaAll_(), ps = Object.keys(sla.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort(), lp = ps[ps.length - 1];
       if (lp) {
         const lrows = sla.filter(function (o) { return o.period === lp; }), th = slaThresholds_();
-        const of = function (cp, code) { const r = lrows.filter(function (o) { return o.camp === cp && o.code === code; })[0]; return r ? { total: r.total === '' ? null : Number(r.total), cs: r.cs === '' ? null : Number(r.cs), cx: r.cx === '' ? null : Number(r.cx) } : null; };
+        const of = function (cp, code) { const keys = [cp + '|' + code].concat(rlnChain_(edges, cp, code).map(function (x) { return x.camp + '|' + x.code; })); const r = lrows.filter(function (o) { return keys.indexOf(o.camp + '|' + o.code) >= 0; })[0]; return r ? { total: r.total === '' ? null : Number(r.total), cs: r.cs === '' ? null : Number(r.cs), cx: r.cx === '' ? null : Number(r.cx) } : null; };
         out.routes.concat(out.recent).forEach(function (r) { r.sla = of(r.camp || camp, r.code); });
         out.campAll.forEach(function (x) { x.sla = of(camp, x.code); });
         const v = lrows.filter(function (o) { return o.code === '영업점'; })[0];
@@ -341,7 +343,7 @@ function adm_slaList(token, periodsN) {
     const all = slaAll_();
     const periods = Object.keys(all.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort().slice(-n);
     const pset = {}; periods.forEach(function (x) { pset[x] = 1; });
-    const out = { ok: true, periods: periods, rows: all.filter(function (o) { return pset[o.period]; }).map(slaView_), th: slaThresholds_(), campMap: slaCampMap_() };
+    const out = { ok: true, periods: periods, rows: all.filter(function (o) { return pset[o.period]; }).map(slaView_), th: slaThresholds_(), campMap: slaCampMap_(), lineage: rlnEdges_() };
     try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
     return out;
   });
@@ -360,4 +362,141 @@ function slaSummary_() {
   return { period: latest, from: rows[0].from, vendor: vendor ? Number(vendor.total) : null, vendorPrev: prevVendor ? Number(prevVendor.total) : null, vendorCs: vendor ? Number(vendor.cs) : null,
     routes: routes.length, low: low.length, warn: routes.filter(function (o) { return Number(o.total) >= th.warn && Number(o.total) < th.good; }).length,
     lowList: low.slice(0, 6).map(function (o) { return o.camp + ' ' + o.code + ' ' + o.total + '점'; }), th: th };
+}
+
+// ───────────────────────── 라우트 계보 (route_lineage) ─────────────────────────
+// 코드가 바뀐 라우트(605A → 723A · 안양1 110A → 군포1 212A)를 이어 붙인다. 1:1(개명·이관)만 이력을 잇고, 분할·병합은 나란히 보여 주기만 한다(점수는 합치지 않음).
+const RLK = { RENAME: '개명', MOVE: '이관', SPLIT: '분할', MERGE: '병합' };
+function rlnAll_() {
+  let rows = [];
+  try { rows = readAll_(SH.RLIN).filter(function (o) { return o.id && o.fromCode && o.toCode; }); } catch (e) { rows = []; }
+  return rows;
+}
+/** 노선 이관 기록(route_changes · 노선이관 · 적용/예약)에서 만든 계보 — 저장하지 않고 합쳐서 보여 준다. 110AB → 212AB 는 글자 자리끼리 110A→212A, 110B→212B */
+function rlnFromMoves_() {
+  const out = [];
+  try {
+    const campName = rcCampNames_();
+    rcRows_().filter(function (c) { return c.kind === RCK.MOVE && (c.status === RCS.DONE || c.status === RCS.WAIT); }).forEach(function (c) {
+      const v = rcView_(c, campName);
+      const fc = rpfCamp_(v.fromCamp), tc = rpfCamp_(v.toCamp), a = rpfBaseCodes_(v.fromRoute), b = rpfBaseCodes_(v.toRoute);
+      if (!a.length || !b.length) return;
+      if (a.length === b.length) a.forEach(function (x, i) { out.push({ id: 'MV-' + c.id + '-' + i, date: v.date, kind: RLK.MOVE, fromCamp: fc, fromCode: x, toCamp: tc, toCode: b[i], memo: '노선 이관' + (c.status === RCS.WAIT ? ' (예약)' : ''), src: 'move' }); });
+      else a.forEach(function (x) { b.forEach(function (y) { out.push({ id: 'MV-' + c.id + '-' + x + y, date: v.date, kind: a.length > b.length ? RLK.MERGE : RLK.SPLIT, fromCamp: fc, fromCode: x, toCamp: tc, toCode: y, memo: '노선 이관', src: 'move' }); }); });
+    });
+  } catch (e) { /* 없음 */ }
+  return out;
+}
+function rlnEdges_() {
+  const saved = rlnAll_().map(function (o) { return { id: o.id, date: o.date, kind: o.kind, fromCamp: o.fromCamp, fromCode: o.fromCode, toCamp: o.toCamp, toCode: o.toCode, memo: o.memo, by: o.by, src: 'saved' }; });
+  const has = {}; saved.forEach(function (e) { has[e.fromCamp + '|' + e.fromCode + '>' + e.toCamp + '|' + e.toCode] = 1; });
+  return saved.concat(rlnFromMoves_().filter(function (e) { return !has[e.fromCamp + '|' + e.fromCode + '>' + e.toCamp + '|' + e.toCode]; }));
+}
+/** (캠프|코드) 의 1:1 이전 코드들 (가장 가까운 것부터) — 분할·병합에 닿으면 멈춤 */
+function rlnChain_(edges, camp, code) {
+  const key = function (c, x) { return c + '|' + x; };
+  const inTo = {}, outFrom = {};
+  edges.forEach(function (e) { const f = key(e.fromCamp, e.fromCode), t = key(e.toCamp, e.toCode); (inTo[t] = inTo[t] || []).push(f); (outFrom[f] = outFrom[f] || []).push(t); });
+  const out = []; let cur = key(camp, code), guard = 0;
+  while (guard++ < 20) {
+    const prev = inTo[cur]; if (!prev || prev.length !== 1) break;
+    const p = prev[0]; if ((outFrom[p] || []).length !== 1 || out.indexOf(p) >= 0 || p === key(camp, code)) break;
+    out.push(p); cur = p;
+  }
+  return out.map(function (k) { const i = k.indexOf('|'); return { camp: k.slice(0, i), code: k.slice(i + 1) }; });
+}
+function adm_lineageList(token) {
+  return run_(function () { requireAdmin_(token); return { ok: true, edges: rlnEdges_(), kinds: [RLK.RENAME, RLK.MOVE, RLK.SPLIT, RLK.MERGE] }; });
+}
+/** 관리자: 계보 여러 줄 저장 rows = [{ date, kind, fromCamp, fromCode, toCamp, toCode, memo }] (같은 이전→이후는 덮어쓰기) */
+function adm_lineageSave(token, rows) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) fail_('저장할 줄이 없습니다.');
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const cur = rlnAll_(), byKey = {};
+      cur.forEach(function (o) { byKey[o.fromCamp + '|' + o.fromCode + '>' + o.toCamp + '|' + o.toCode] = o; });
+      const now = nowText_(); let added = 0, changed = 0;
+      rows.forEach(function (r) {
+        const fc = rpfCamp_(r.fromCamp), tc = rpfCamp_(r.toCamp || r.fromCamp), f = rpfCode_(r.fromCode), t = rpfCode_(r.toCode);
+        if (!fc || !f || !t) return;
+        if (fc === tc && f === t) return;
+        const kind = [RLK.RENAME, RLK.MOVE, RLK.SPLIT, RLK.MERGE].indexOf(str_(r.kind)) >= 0 ? str_(r.kind) : (fc !== tc ? RLK.MOVE : RLK.RENAME);
+        const o = { date: normDate_(r.date) || todayText_(), kind: kind, fromCamp: fc, fromCode: f, toCamp: tc, toCode: t, memo: str_(r.memo).slice(0, 100), by: a.name };
+        const old = byKey[fc + '|' + f + '>' + tc + '|' + t];
+        if (old) { writeFields_(SH.RLIN, old._row, o); changed++; }
+        else { o.id = uniqId_('L'); o.createdAt = now; appendObj_(SH.RLIN, o); added++; }
+      });
+      SpreadsheetApp.flush(); rpfBump_();
+      logAdmin_(a, '라우트 계보 저장', '', '새로 ' + added + ' · 바뀜 ' + changed);
+      return { ok: true, added: added, changed: changed, edges: rlnEdges_() };
+    } finally { lock.releaseLock(); }
+  });
+}
+function adm_lineageDel(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const row = findRow_(SH.RLIN, 'id', str_(id));
+    if (!row) fail_('계보 줄을 찾을 수 없습니다.');
+    const lock = scriptLock_(); lock.waitLock(20000);
+    try { delRows_(sheet_(SH.RLIN), [row]); SpreadsheetApp.flush(); rpfBump_(); } finally { lock.releaseLock(); }
+    logAdmin_(a, '라우트 계보 삭제', str_(id), '');
+    return { ok: true, edges: rlnEdges_() };
+  });
+}
+/**
+ * 자동 제안: 주간 수행률·SLA 이력에서 "이전 기간엔 있었는데 다음 기간에 사라진 코드"와 "새로 생긴 코드"를 같은 캠프 안에서 짝지음.
+ *  - 숫자(구분1) 묶음끼리 글자 구성이 같으면 번호 순서대로 1:1 개명 (605ABCD→723ABCD, 606→724)
+ *  - 글자 구성이 다르면 분할/병합 후보 (507CD+515CD → 205CD)
+ *  이미 계보에 있는 짝은 뺀다. 관리자가 확인하고 저장한다.
+ */
+function adm_lineageSuggest(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const edges = rlnEdges_(), has = {};
+    edges.forEach(function (e) { has[e.fromCamp + '|' + e.fromCode + '>' + e.toCamp + '|' + e.toCode] = 1; });
+    const seqs = [];
+    // SLA: 기간 순 · 주간: 주차 순 (각각 캠프별 코드 집합)
+    const build = function (rows, pk, dateOf) {
+      const byP = {};
+      rows.forEach(function (r) { if (r.code === '영업점') return; (byP[r[pk]] = byP[r[pk]] || { p: r[pk], date: dateOf(r), camps: {} }).camps[r.camp] = (byP[r[pk]].camps[r.camp] || {}); byP[r[pk]].camps[r.camp][r.code] = 1; });
+      return Object.keys(byP).sort().map(function (k) { return byP[k]; });
+    };
+    seqs.push({ src: 'SLA', list: build(slaAll_(), 'period', function (r) { return r.from || r.period; }) });
+    seqs.push({ src: '주간', list: build(rpfAll_(), 'week', function (r) { return r.from; }) });
+    const sug = [], seen = {};
+    seqs.forEach(function (sq) {
+      for (let i = 1; i < sq.list.length; i++) {
+        const a = sq.list[i - 1], b = sq.list[i];
+        const camps = {}; Object.keys(a.camps).concat(Object.keys(b.camps)).forEach(function (c) { camps[c] = 1; });
+        Object.keys(camps).forEach(function (camp) {
+          const A = Object.keys(a.camps[camp] || {}), Bc = Object.keys(b.camps[camp] || {});
+          const gone = A.filter(function (x) { return Bc.indexOf(x) < 0; }), fresh = Bc.filter(function (x) { return A.indexOf(x) < 0; });
+          if (!gone.length || !fresh.length) return;
+          const grp = function (list) { const g = {}; list.forEach(function (x) { const m = x.match(/^(\d+)([A-Z]*)$/); if (!m) return; (g[m[1]] = g[m[1]] || []).push(m[2]); }); Object.keys(g).forEach(function (k) { g[k].sort(); }); return g; };
+          const G = grp(gone), F = grp(fresh), usedF = {};
+          const pairs = [];
+          Object.keys(G).sort().forEach(function (gn) {
+            const sig = G[gn].join('');
+            const cand = Object.keys(F).filter(function (fn) { return !usedF[fn] && F[fn].join('') === sig; }).sort();
+            if (cand.length) { usedF[cand[0]] = 1; G[gn].forEach(function (L) { pairs.push({ kind: RLK.RENAME, f: gn + L, t: cand[0] + L }); }); delete G[gn]; }
+          });
+          const restG = Object.keys(G), restF = Object.keys(F).filter(function (fn) { return !usedF[fn]; });
+          if (restG.length && restF.length) {
+            const kind = gone.length > fresh.length ? RLK.MERGE : gone.length < fresh.length ? RLK.SPLIT : RLK.RENAME;
+            restG.forEach(function (gn) { G[gn].forEach(function (L) { restF.forEach(function (fn) { F[fn].forEach(function (L2) { if (kind !== RLK.RENAME || L === L2) pairs.push({ kind: kind, f: gn + L, t: fn + L2 }); }); }); }); });
+          }
+          pairs.forEach(function (p) {
+            const k = camp + '|' + p.f + '>' + camp + '|' + p.t;
+            if (has[k] || seen[k]) return; seen[k] = 1;
+            sug.push({ date: b.date, kind: p.kind, fromCamp: camp, fromCode: p.f, toCamp: camp, toCode: p.t, src: sq.src, memo: sq.src + ' ' + String(a.p).slice(0, 10) + ' → ' + String(b.p).slice(0, 10) });
+          });
+        });
+      }
+    });
+    return { ok: true, suggestions: sug };
+  });
 }
