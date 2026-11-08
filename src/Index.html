@@ -280,6 +280,16 @@
   .mystat { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
   .mystat div { background: #f7f8fa; border-radius: 10px; padding: 10px; text-align: center; font-size: 12.5px; color: var(--sub); }
   .mystat b { display: block; font-size: 18px; color: var(--ink); }
+  /* 내 라우트 수행률 (관리자가 켜 두었을 때만) */
+  #myPerf h4 { margin: 0 0 6px; font-size: 14px; } #myPerf .sub { font-size: 12px; }
+  .mpr { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .mpr:first-of-type { border-top: 0; } .mpr b.code { min-width: 54px; font-size: 15px; }
+  .mpr .wks { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+  .mpr .wks span { display: inline-flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--sub); }
+  .gr { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 5px; border-radius: 6px; font-size: 12px; font-weight: 800; color: #fff; }
+  .gr.g1 { background: #12a150; } .gr.g2 { background: #2f6fed; } .gr.g3 { background: #f59e0b; } .gr.g4 { background: #e5484d; } .gr.g0 { background: #d9dde3; color: #666; }
+  .mpr .now { text-align: right; font-size: 12px; color: var(--sub); white-space: nowrap; } .mpr .now b { display: block; font-size: 15px; color: var(--ink); }
+  .mpr .imp { color: #c62828; font-weight: 800; font-size: 11px; }
   .day .pmx { font-size: 12.5px; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; cursor: pointer; border: 0; text-align: left; font: inherit; font-size: 12.5px; }
   .day .pmx b { margin-right: 4px; }
   .day .pmx.r-수행 { background: #fff4d6; color: #8a5a00; } .day .pmx.r-맡김 { background: #e8f0fd; color: #0a53a8; } .day .pmx.r-지원 { background: #f2f4f6; color: #4e5968; }
@@ -760,6 +770,7 @@
     <div class="topbar"><button class="back" id="myBack" aria-label="뒤로">←</button><h2>마이페이지</h2></div>
     <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.</div>
     <div class="card" id="myCard"><div style="text-align:center;color:var(--sub)">불러오는 중…</div></div>
+    <div class="card hidden" id="myPerf"></div>
     <div class="mylist">
       <button type="button" data-my="alerts">🔔 알림<em id="myAlertCnt"></em></button>
     </div>
@@ -1018,7 +1029,7 @@
   //  · 내가 저장·지원·글쓰기 등을 하면 2분 동안은 기다려서라도 서버의 새 값을 받음 (방금 한 일이 바로 보이게)
   //  · 15초 안에 같은 걸 다시 부르면 서버에 다시 묻지 않음
   // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
-  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
+  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
   const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
   const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
@@ -2285,6 +2296,24 @@
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';
       $('#myNew').innerHTML = r.stats.waiting ? '<span class="bdg nw">새 지원 ' + r.stats.waiting + '</span>' : ''; // (예전엔 품앗이 목록을 한 번 더 불렀음)
     }).catch(() => { myCardFail(); netErr(); });
+    loadMyPerf(token);
+  }
+  /** 내 기본노선의 쿠팡 주간 수행률 등급 — 사무실에서 켜 두었을 때만 보임 */
+  function loadMyPerf(token) {
+    const box = $('#myPerf'); if (!box) return;
+    api('api_myPerf', token).then((r) => {
+      if (!r || !r.ok || !r.on || !(r.routes || []).length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+      const md = (d) => d ? +String(d).slice(5, 7) + '/' + +String(d).slice(8, 10) : '';
+      const last = r.routes[0].weeks[r.routes[0].weeks.length - 1];
+      box.innerHTML = '<h4>📈 내 라우트 수행률 <small class="sub">' + escH(last ? last.wk + (last.from ? ' (' + md(last.from) + '~' + md(last.to) + ')' : '') : '') + ' · 쿠팡 주간 안내 기준</small></h4>' +
+        r.routes.map((rt) => {
+          const l = rt.weeks[rt.weeks.length - 1] || {};
+          return '<div class="mpr"><b class="code">' + escH(rt.code) + '</b><div class="wks">' + rt.weeks.map((w) => '<span><i class="gr g' + (w.grade || 0) + '">' + (w.grade || '-') + '</i>' + escH(String(w.wk || '').replace('WK', 'W')) + '</span>').join('') + '</div>' +
+            '<div class="now"><b><i class="gr g' + (l.grade || 0) + '">' + (l.grade || '-') + '</i> ' + (l.perf != null ? l.perf + '%' : '') + '</b>' + (l.improve ? '<span class="imp">개선 요청</span>' : (l.grade >= 3 ? '95% 미만' : l.grade ? '우수' : '')) + '</div></div>';
+        }).join('') +
+        '<div class="sub" style="margin-top:6px">1~2등급 우수(95% 초과) · 3~4등급은 위탁 조정 대상(95% 미만)입니다. 안전 운전과 함께 꾸준한 완료 부탁드립니다.</div>';
+      box.classList.remove('hidden');
+    }).catch(() => {});
   }
   const myCardFail = () => { if (/불러오는 중/.test($('#myCard').textContent)) $('#myCard').innerHTML = '<div class="sub" style="padding:14px;text-align:center">내 정보를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>'; };
   $('#mMy').addEventListener('click', openMyPage);

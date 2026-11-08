@@ -665,6 +665,20 @@
   .rt-table tr.off td { color: var(--faint); }
   .rt-table .memo-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
   .b-ron { background: var(--ok-weak); color: var(--ok); }
+  /* 수행률 등급 1~4 */
+  .gr { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 6px; font-size: 12px; font-weight: 800; color: #fff; line-height: 1; }
+  .gr.g1 { background: #12a150; } .gr.g2 { background: #2f6fed; } .gr.g3 { background: #f59e0b; } .gr.g4 { background: #e5484d; } .gr.g0 { background: #cfd4dc; color: #555; }
+  .gr-imp { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 6px; background: #fde8e8; color: #c62828; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .rp-trend { display: inline-flex; gap: 2px; align-items: flex-end; height: 18px; vertical-align: middle; }
+  .rp-trend i { display: block; width: 6px; border-radius: 2px 2px 0 0; background: #cfd4dc; }
+  .rp-trend i.g1 { height: 18px; background: #12a150; } .rp-trend i.g2 { height: 14px; background: #2f6fed; } .rp-trend i.g3 { height: 9px; background: #f59e0b; } .rp-trend i.g4 { height: 5px; background: #e5484d; } .rp-trend i.g0 { height: 3px; }
+  .rp-table td.wkc { text-align: center; white-space: nowrap; } .rp-table td.wkc small { display: block; font-size: 10px; color: var(--sub); margin-top: 1px; }
+  .rp-table tr.bad td { background: #fff8f0; } .rp-table tr.imp td { background: #fff1f1; }
+  .rp-table td.rc { cursor: pointer; } .rp-table td.rc:hover b { text-decoration: underline; }
+  .rp-sum { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; } .rp-sum span { padding: 4px 10px; border-radius: 8px; background: var(--gray-weak); font-size: 13px; } .rp-sum span b { margin-left: 4px; }
+  .rp-sum span.bad { background: #fde8e8; color: #c62828; }
+  .rp-on { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .rp-on b.on { color: var(--ok); } .rp-on b.off { color: var(--sub); }
   .b-roff { background: var(--gray-weak); color: var(--sub); }
   .danger-t { color: var(--danger) !important; }
   .gchips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: -4px 0 12px; }
@@ -1231,6 +1245,9 @@
       <h2>노선관리</h2>
       <div class="tools">
         <button class="btn ghost" id="xpOpen" title="모든 캠프의 정산코드별 단가를 한 표로 봅니다">전체 단가표</button>
+        <button class="btn ghost" id="rpOpen" title="쿠팡 주간 수행률 (등급 · 개선 요청) 이력">수행률</button>
+        <button class="btn ghost" id="rpUpBtn" title="쿠팡 '수행률 안내' 엑셀 파일을 올립니다 (같은 주차는 덮어씀)">수행률 업로드</button>
+        <input type="file" id="rpFile" accept=".xlsx" class="hidden">
         <button class="btn ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button>
         <button class="btn ghost" id="rtReload">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="route">데이터 초기화</button>
@@ -1245,6 +1262,7 @@
       <div id="campMain"></div>
     </div>
     <div id="allPrices" class="hidden"></div>
+    <div id="perfPanel" class="hidden"></div>
    </section>
    <section id="view-settle" class="hidden">
     <div class="head">
@@ -1634,6 +1652,24 @@
     </div>
     <p class="sub" id="stUpNote" style="font-size:13px"></p>
     <div class="m-actions"><button type="button" class="btn ghost" id="stUpCancel">닫기</button><button class="btn" id="stUpOk">반영</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="rpUpModal">
+  <div class="m-box" style="width:min(640px,100%)">
+    <h3>수행률 업로드</h3>
+    <div id="rpUpInfo" class="up-sum"></div>
+    <div class="grid2">
+      <div class="field"><label class="lb" for="rpUpYear">연도</label><input class="inp" id="rpUpYear" inputmode="numeric" maxlength="4"></div>
+      <div class="field"><label class="lb" for="rpUpWk">주차 (쿠팡 WK)</label><input class="inp" id="rpUpWk" inputmode="numeric" maxlength="2"></div>
+    </div>
+    <div id="rpUpDetail" class="sub" style="font-size:13px;max-height:40vh;overflow:auto"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="rpUpCancel">닫기</button><button class="btn" id="rpUpOk">저장</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="rpHistModal">
+  <div class="m-box" style="width:min(760px,100%)">
+    <div class="m-top"><b id="rpHistTitle">라우트 수행률 이력</b><span style="flex:1"></span><button class="btn ghost sm" id="rpHistClose">닫기</button></div>
+    <div id="rpHistBody" style="padding:12px 16px;overflow:auto;max-height:70vh"></div>
   </div>
 </div>
 <!-- ───────────── 정산: 명세서 ───────────── -->
@@ -2912,7 +2948,10 @@
     }
     if (v === 'route') {
       const r = a.route;
-      return '<div class="db-kpis">' + dbKpi('캠프', dbN(r.camps), 'hot') + dbKpi('사용 노선', dbN(r.routes)) + dbKpi('정지 노선', dbN(r.routesOff)) + dbKpi('노선 변경 예약', dbN(r.rcWait), r.rcWait ? 'hot' : '') + '</div>' +
+      const pf = r.perf;
+      return '<div class="db-kpis">' + dbKpi('캠프', dbN(r.camps), 'hot') + dbKpi('사용 노선', dbN(r.routes)) + dbKpi('정지 노선', dbN(r.routesOff)) + dbKpi('노선 변경 예약', dbN(r.rcWait), r.rcWait ? 'hot' : '') +
+        (pf ? dbKpi('3~4등급 (' + esc(pf.wk) + ')', dbN(pf.bad), pf.bad ? 'hot' : '') + dbKpi('개선 요청', dbN(pf.improve), pf.improve ? 'hot' : '') : '') + '</div>' +
+        (pf && pf.badList.length ? '<div class="db-chips">' + pf.badList.map((t) => '<span class="warn">' + esc(t) + '</span>').join('') + '</div>' : '') +
         '<table class="db-tbl" data-tk-off><thead><tr><th>캠프</th><th>사용 노선</th><th>배정 기사</th></tr></thead><tbody>' +
         r.byCamp.slice(0, 8).map((c) => '<tr><td>' + esc(c.name) + '</td><td>' + c.routes + '</td><td>' + c.drivers + '</td></tr>').join('') + '</tbody></table>' +
         (r.byCamp.length > 8 ? '<div class="db-note">외 ' + (r.byCamp.length - 8) + '개 캠프</div>' : '');
@@ -4024,13 +4063,14 @@
       if (!r.ok) return toast(r.msg);
       RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images; RT.addresses = r.addresses || []; RT.prices = r.prices || [];
       if (!RVOL) loadVolumes();
+      if (!RP.loaded) loadPerf();
       if (curCamp && curCamp !== ORPHAN && !campById(curCamp)) curCamp = null;
       if (curCamp === ORPHAN && !routesOf(ORPHAN).length) curCamp = null;
       if (!curCamp && RT.camps.length) curCamp = sortedCamps()[0].id;
       renderCampList(); renderCampMain();
     }).catch(() => {});
   }
-  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk() || !xpLeaveOk()) return; pdirty = {}; adirty = {}; RVOL = null; loadRoutes().then(() => { if (xpOn) xpRender(); toast('새로 불러왔습니다.'); }); });
+  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk() || !xpLeaveOk()) return; pdirty = {}; adirty = {}; RVOL = null; RP.loaded = false; loadRoutes().then(() => { if (xpOn) xpRender(); if (rpOn) loadPerf(true); toast('새로 불러왔습니다.'); }); });
 
   // 왼쪽 캠프 목록
   function renderCampList() {
@@ -4094,7 +4134,7 @@
           (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
         '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
         '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
-        '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th title="쿠팡 정산서 최근 2개월 · 라우트별 배송건수 ÷ 배송한 날 수">1일 평균물량</th><th>메모</th><th>수정일시</th></tr></thead>' +
+        '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th title="쿠팡 정산서 최근 2개월 · 라우트별 배송건수 ÷ 배송한 날 수">1일 평균물량</th><th title="쿠팡 주간 수행률 최신 등급 (1~2 우수 · 3~4 위탁 조정 대상) · 누르면 이력">수행률</th><th>메모</th><th>수정일시</th></tr></thead>' +
         '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div></div>' +
         (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div>') +
       '</div>';
@@ -4130,7 +4170,7 @@
       '<tr data-rid="' + esc(r.id) + '"' + (r.status === '정지' ? ' class="off"' : '') + '>' +
       '<td class="ck"><input type="checkbox" data-rck="' + esc(r.id) + '"' + (rsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
       '<td><b class="code">' + esc(r.code) + '</b></td>' + GK.map((k) => '<td class="g">' + esc(r[k]) + '</td>').join('') +
-      '<td><span class="badge ' + (r.status === '정지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' + volCell(r) +
+      '<td><span class="badge ' + (r.status === '정지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' + volCell(r) + perfCell(r) +
       '<td class="sub memo-cell" title="' + esc(r.memo) + '">' + esc(r.memo) + '</td><td class="sub">' + esc(String(r.updatedAt || '').slice(0, 16)) + '</td></tr>').join('');
     const em = $('#rEmpty');
     em.classList.toggle('hidden', !!list.length);
@@ -4186,6 +4226,7 @@
   function xpShow(on) {
     if (on && !pricesLeaveOk()) return;
     if (!on && !xpLeaveOk()) return;
+    if (on && rpOn) { rpOn = false; $('#perfPanel').classList.add('hidden'); $('#rpOpen').textContent = '수행률'; }
     xpOn = on;
     $('.rt-wrap', $('#view-route')).classList.toggle('hidden', on);
     $('#allPrices').classList.toggle('hidden', !on);
@@ -4348,6 +4389,231 @@
       xpRenderRows();
       toast(fail ? fail : '단가를 저장했습니다. (' + changed + '줄)');
     });
+  });
+  // ───── 수행률 (쿠팡 주간 '수행률 안내' 파일 · route_perf) ─────
+  const RP = { rows: [], weeks: [], map: new Map(), latest: '', loaded: false, loading: null, drvOn: true, memoOn: true, f: { camp: '', mode: '', q: '' } };
+  const rpKey = (camp, code) => camp + '|' + code;
+  const rpCamp = (name) => shortCamp(name).replace(/\s/g, '');
+  const rpWkLabel = (w) => 'WK' + Number(String(w).slice(6));
+  const rpMd = (d) => d ? Number(String(d).slice(5, 7)) + '/' + Number(String(d).slice(8, 10)) : '';
+  function rpIndex() {
+    RP.map = new Map();
+    RP.rows.forEach((r) => { const k = rpKey(r.camp, r.code); if (!RP.map.has(k)) RP.map.set(k, { camp: r.camp, code: r.code, wave: r.wave, byWeek: {} }); RP.map.get(k).byWeek[r.week] = r; });
+    RP.latest = RP.weeks.length ? RP.weeks[RP.weeks.length - 1] : '';
+  }
+  function loadPerf(force) {
+    if (RP.loading) return RP.loading;
+    if (RP.loaded && !force) return Promise.resolve(RP);
+    RP.loading = api('adm_perfList', 16).then((r) => {
+      if (!r.ok) { toast(r.msg); return RP; }
+      RP.rows = r.rows || []; RP.weeks = r.weeks || []; RP.drvOn = !!r.drvOn; RP.memoOn = !!r.memoOn; RP.totalWeeks = r.totalWeeks || 0; RP.loaded = true;
+      rpIndex();
+      if ($('#rRows')) renderRoutes();
+      if (rpOn) rpRender();
+      return RP;
+    }).catch(() => RP).finally(() => { RP.loading = null; });
+    return RP.loading;
+  }
+  /** 라우트(정산코드)의 가장 최근 기록 (최신 주차에 없으면 그 전 주차 · stale 표시) */
+  function rpLatestOf(camp, code) {
+    const e = RP.map.get(rpKey(camp, code)); if (!e) return null;
+    for (let i = RP.weeks.length - 1; i >= 0; i--) { const r = e.byWeek[RP.weeks[i]]; if (r) return Object.assign({ stale: RP.weeks[i] !== RP.latest }, r); }
+    return null;
+  }
+  const grBadge = (g, title) => '<span class="gr g' + (g || 0) + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + (g || '-') + '</span>';
+  function rpTrend(camp, code, n) {
+    const e = RP.map.get(rpKey(camp, code)); if (!e) return '';
+    const wks = RP.weeks.slice(-(n || 8));
+    return '<span class="rp-trend" title="' + esc(wks.map((w) => { const r = e.byWeek[w]; return rpWkLabel(w) + ' ' + (r && r.grade ? r.grade + '등급' + (r.perf != null ? ' ' + r.perf + '%' : '') : '-'); }).join('\n')) + '">' +
+      wks.map((w) => { const r = e.byWeek[w]; return '<i class="g' + (r && r.grade ? r.grade : 0) + '"></i>'; }).join('') + '</span>';
+  }
+  /** 노선관리 노선 표의 '수행률' 칸: 노선 줄(110ABCD)의 글자마다 정산코드(110A…) 최신 등급 */
+  function perfCell(r) {
+    if (!RP.loaded) return '<td class="sub">' + (RP.loading ? '…' : '-') + '</td>';
+    const camp = campById(r.campId), cs = camp ? rpCamp(camp.name) : '';
+    const letters = GK.slice(1).map((k) => r[k]).filter(Boolean);
+    const codes = letters.length ? letters.map((L) => [L, r.g1 + L]) : [['', r.code]];
+    const parts = codes.map(([L, c]) => { const v = rpLatestOf(cs, c); return v ? { L, c, v } : null; }).filter(Boolean);
+    if (!parts.length) return '<td class="sub">-</td>';
+    return '<td class="rc" data-rpc="' + esc(parts.map((p) => cs + '|' + p.c).join(',')) + '">' + parts.map((p) => (p.L ? '<small>' + esc(p.L) + '</small>' : '') +
+      grBadge(p.v.grade, p.c + ' ' + p.v.wk + (p.v.perf != null ? ' ' + p.v.perf + '%' : '') + (p.v.stale ? ' (최신 주차 자료 없음)' : '')) + (p.v.improve ? '<span class="gr-imp">개선 요청</span>' : '')).join(' ') + '</td>';
+  }
+  // 수행률 패널 (전체 단가표처럼 노선관리 안에서 화면을 바꿔 보여 줌)
+  let rpOn = false;
+  function rpShow(on) {
+    if (on && (!pricesLeaveOk() || !xpLeaveOk())) return;
+    if (on && xpOn) xpShow(false);
+    rpOn = on;
+    $('.rt-wrap', $('#view-route')).classList.toggle('hidden', on);
+    $('#perfPanel').classList.toggle('hidden', !on);
+    $('#rpOpen').textContent = on ? '캠프별 보기' : '수행률';
+    if (on) { rpRender(); loadPerf(); } else renderCampMain();
+  }
+  $('#rpOpen').addEventListener('click', () => rpShow(!rpOn));
+  function rpList() {
+    const f = RP.f, q = normCode(f.q);
+    return Array.from(RP.map.values()).map((e) => {
+      const latest = rpLatestOf(e.camp, e.code), prev = (() => { const i = RP.weeks.indexOf(latest ? latest.week : ''); return i > 0 ? e.byWeek[RP.weeks[i - 1]] : null; })();
+      return Object.assign({ e, latest, prev }, e);
+    }).filter((x) => (!f.camp || x.camp === f.camp) && (!q || (x.camp + x.code).toUpperCase().includes(q)) &&
+      (!f.mode || (f.mode === 'bad' && x.latest && x.latest.grade >= 3) || (f.mode === 'imp' && x.latest && x.latest.improve) ||
+        (f.mode === 'chg' && x.latest && x.prev && x.latest.grade !== x.prev.grade)))
+      .sort((a, b) => koSort(a.camp, b.camp) || koSort(a.code, b.code));
+  }
+  function rpRender() {
+    const box = $('#perfPanel');
+    if (!RP.loaded) { box.innerHTML = '<div class="sec"><div class="spin"></div></div>'; return; }
+    const wks = RP.weeks.slice(-8), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw);
+    const camps = [...new Set(RP.rows.map((r) => r.camp))].sort(koSort);
+    const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
+    const cnt = (g) => lrows.filter((r) => r.grade === g).length;
+    const bad = lrows.filter((r) => r.grade >= 3).length, imp = lrows.filter((r) => r.improve).length;
+    const onBtn = (id, on, lab) => '<span class="rp-on">' + lab + ' <b class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-rpset="' + id + '">' + (on ? '끄기' : '켜기') + '</button></span>';
+    box.innerHTML = '<div class="sec"><div class="xp-head"><h3>노선 수행률</h3><span class="xp-sum">' + (lw ? esc(rpWkLabel(lw)) + ' (' + rpMd(lrows[0].from) + '~' + rpMd(lrows[0].to) + ') · 이력 ' + RP.totalWeeks + '주' : '아직 올린 자료가 없습니다') + '</span></div>' +
+      (lw ? '<div class="rp-sum"><span>라우트<b>' + lrows.length + '</b></span><span>1등급<b>' + cnt(1) + '</b></span><span>2등급<b>' + cnt(2) + '</b></span><span class="' + (bad ? 'bad' : '') + '">3~4등급<b>' + bad + '</b></span><span class="' + (imp ? 'bad' : '') + '">개선 요청<b>' + imp + '</b></span>' +
+        '<span>업로드<b>' + esc(String(lrows[0].uploadedAt || '').slice(0, 16)) + '</b></span></div>' : '') +
+      '<div class="ptools">' +
+        '<select class="inp" id="rpCamp" aria-label="캠프">' + opt('', '캠프 전체', RP.f.camp) + camps.map((c) => opt(c, c, RP.f.camp)).join('') + '</select>' +
+        '<select class="inp" id="rpMode" aria-label="보기">' + opt('', '전체', RP.f.mode) + opt('bad', '3~4등급만', RP.f.mode) + opt('imp', '개선 요청만', RP.f.mode) + opt('chg', '등급 바뀐 라우트', RP.f.mode) + '</select>' +
+        '<input class="inp" id="rpQ" placeholder="캠프·라우트 검색" value="' + esc(RP.f.q) + '" autocomplete="off" style="width:150px">' +
+        '<div class="grow">' + onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 등급 표시') + onBtn('memo', RP.memoOn, '업로드 때 업무스케줄 메모') + '<button class="btn sm" id="rpUpBtn2">수행률 업로드</button></div>' +
+      '</div>' +
+      '<div class="table-wrap rt-table rp-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>최신 등급</th><th>추세 (8주)</th><th>개선 요청</th>' +
+        wks.map((w) => '<th title="' + esc(w) + '">' + esc(rpWkLabel(w)) + '</th>').join('') + '</tr></thead><tbody id="rpRows"></tbody></table><div class="empty hidden" id="rpEmpty"></div></div>' +
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">등급: <span class="gr g1">1</span> <span class="gr g2">2</span> 95% 초과 · <span class="gr g3">3</span> <span class="gr g4">4</span> 95% 미만(위탁 조정 대상). 칸의 작은 숫자는 배송 수행률(%). 라우트를 누르면 전체 이력. 매주 쿠팡 파일을 [수행률 업로드]로 올리면 이력이 쌓입니다 (같은 주차는 덮어씀 · 한 주 시작은 일요일).</p></div>';
+    rpRenderRows();
+  }
+  function rpRenderRows() {
+    const tb = $('#rpRows'); if (!tb) return;
+    const wks = RP.weeks.slice(-8), list = rpList();
+    tb.innerHTML = list.map((x) => {
+      const l = x.latest;
+      return '<tr class="' + (l && l.improve ? 'imp' : l && l.grade >= 3 ? 'bad' : '') + '"><td>' + esc(x.camp) + '</td><td class="rc" data-rpc="' + esc(rpKey(x.camp, x.code)) + '"><b class="code">' + esc(x.code) + '</b></td>' +
+        '<td>' + (l ? grBadge(l.grade) + (l.perf != null ? ' <small>' + l.perf + '%</small>' : '') + (l.stale ? ' <small class="sub" title="최신 주차 파일에 없는 라우트">(' + esc(l.wk) + ')</small>' : '') : '-') + '</td>' +
+        '<td>' + rpTrend(x.camp, x.code, 8) + '</td><td>' + (l && l.improve ? '<span class="gr-imp">개선 요청</span>' : '') + '</td>' +
+        wks.map((w) => { const r = x.byWeek[w]; return '<td class="wkc">' + (r ? grBadge(r.grade) + (r.perf != null ? '<small>' + r.perf + '%</small>' : '') : '<span class="sub">-</span>') + '</td>'; }).join('') + '</tr>';
+    }).join('');
+    const em = $('#rpEmpty'); em.classList.toggle('hidden', !!list.length);
+    em.textContent = RP.rows.length ? '조건에 맞는 라우트가 없습니다.' : '올린 수행률 자료가 없습니다. [수행률 업로드]로 쿠팡 파일을 올려 주세요.';
+  }
+  $('#perfPanel').addEventListener('input', (e) => { if (e.target.id === 'rpQ') { if (e.isComposing) return; RP.f.q = e.target.value; rpRenderRows(); } });
+  $('#perfPanel').addEventListener('change', (e) => { const m = { rpCamp: 'camp', rpMode: 'mode' }[e.target.id]; if (m) { RP.f[m] = e.target.value; rpRenderRows(); } });
+  $('#perfPanel').addEventListener('click', (e) => {
+    const sb = e.target.closest('[data-rpset]');
+    if (sb) {
+      const k = sb.dataset.rpset, f = k === 'drv' ? { drvOn: !RP.drvOn } : { memoOn: !RP.memoOn };
+      sb.disabled = true;
+      return api('adm_perfSet', f).then((r) => { if (!r.ok) return toast(r.msg); RP.drvOn = !!r.drvOn; RP.memoOn = !!r.memoOn; rpRender(); toast(k === 'drv' ? '기사 앱 표시를 ' + (r.drvOn ? '켰습니다. (기사 앱 마이페이지에 내 라우트 등급이 보입니다)' : '껐습니다.') : '메모 자동을 ' + (r.memoOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { sb.disabled = false; });
+    }
+    if (e.target.id === 'rpUpBtn2') return $('#rpFile').click();
+  });
+  // 라우트 이력 창 (노선 표 · 수행률 패널 공용)
+  document.addEventListener('click', (e) => {
+    const td = e.target.closest('td.rc[data-rpc]'); if (!td || !RP.loaded) return;
+    const keys = td.dataset.rpc.split(',');
+    $('#rpHistTitle').textContent = keys.map((k) => k.replace('|', ' ')).join(' · ') + ' — 수행률 이력';
+    $('#rpHistBody').innerHTML = keys.map((k) => {
+      const e2 = RP.map.get(k); if (!e2) return '';
+      const rows = RP.weeks.slice().reverse().map((w) => e2.byWeek[w]).filter(Boolean);
+      return (keys.length > 1 ? '<h4 style="margin:8px 0 4px">' + esc(k.replace('|', ' ')) + '</h4>' : '') +
+        '<table class="rt rp-table" data-tk-off style="min-width:0;width:100%"><thead><tr><th>주차</th><th>기간</th><th>배송 등급</th><th>배송 수행률</th><th>반품 등급</th><th>반품 회수율</th><th>개선 요청</th><th>플래그</th><th>업로드</th></tr></thead><tbody>' +
+        rows.map((r) => '<tr class="' + (r.improve ? 'imp' : r.grade >= 3 ? 'bad' : '') + '"><td>' + esc(r.wk) + '</td><td>' + rpMd(r.from) + '~' + rpMd(r.to) + '</td><td>' + grBadge(r.grade) + '</td><td>' + (r.perf != null ? r.perf + '%' : '-') + '</td>' +
+          '<td>' + (r.retGrade ? grBadge(r.retGrade) : '-') + '</td><td>' + (r.ret != null ? r.ret + '%' : '-') + '</td><td>' + (r.improve ? '<span class="gr-imp">개선 요청</span>' : '') + '</td>' +
+          '<td class="sub">' + esc([r.f1 && '배송수행률1:' + r.f1, r.f2 && '반품:' + r.f2, r.f3 && '인접:' + r.f3].filter(Boolean).join(' · ')) + '</td><td class="sub">' + esc(String(r.uploadedAt || '').slice(0, 16)) + '</td></tr>').join('') + '</tbody></table>';
+    }).join('');
+    $('#rpHistModal').classList.remove('hidden');
+  });
+  $('#rpHistClose').addEventListener('click', () => $('#rpHistModal').classList.add('hidden'));
+  // ── 업로드: 쿠팡 파일 읽기 → 미리보기 → 저장 ──
+  $('#rpUpBtn').addEventListener('click', () => $('#rpFile').click());
+  let rpUp = null;
+  /** 쿠팡 '수행률 안내' 시트 → { wk, rows:[{wk, wave, camp, code, perf, grade, ret, retGrade, improve, f1, f2, f3, parcel, zip, partial}] } */
+  function parsePerfSheet(sheets, fileName) {
+    const txt = (v) => (v == null ? '' : String(v)).trim();
+    let best = null;
+    for (const sh of sheets) {
+      const hi = sh.rows.findIndex((r) => r && r.some((v) => /^wave$/i.test(txt(v))) && r.some((v) => /^camp$/i.test(txt(v))) && r.some((v) => /^route$/i.test(txt(v))));
+      if (hi >= 0) { best = { sh, hi }; break; }
+    }
+    if (!best) throw new Error('Wave / Camp / Route 머리글이 있는 시트를 찾지 못했습니다. 쿠팡 수행률 안내 파일(.xlsx)인지 확인해 주세요.');
+    const { sh, hi } = best, head = sh.rows[hi], grp = sh.rows[hi - 1] || [];
+    const title = sh.rows.slice(0, hi).map((r) => (r || []).map(txt).join(' ')).join(' ');
+    const tm = title.match(/WK\s*(\d{1,2})/i), fm = String(fileName || '').match(/(20\d{2})(\d{2})(\d{2})/);
+    const wkTitle = tm ? +tm[1] : 0, year = fm ? +fm[1] : new Date().getFullYear();
+    const ci = {}; head.forEach((v, i) => { const t = txt(v); if (/^wave$/i.test(t)) ci.wave = i; else if (/^camp$/i.test(t)) ci.camp = i; else if (/^route$/i.test(t)) ci.code = i; else if (/위탁\s*협의/.test(t)) ci.improve = i; else if (/배송\s*수행률\s*1/.test(t.replace(/\n/g, ''))) ci.f1 = i; else if (/^반품\s*수행률/.test(t.replace(/\n/g, ''))) ci.f2 = i; else if (/^인접/.test(t)) ci.f3 = i; else if (/^parcel$/i.test(t)) ci.parcel = i; else if (/zip/i.test(t)) ci.zip = i; });
+    // WKnn 열: 바로 위 줄에서 왼쪽으로 가장 가까운 묶음 이름으로 종류 판단 (등급 / 수행률 / Return 등급 / Return 수행률)
+    const wkCols = [];
+    head.forEach((v, i) => {
+      const m = txt(v).match(/^WK\s*(\d{1,2})$/i); if (!m) return;
+      let g = ''; for (let j = i; j >= 0; j--) { if (txt(grp[j])) { g = txt(grp[j]); break; } }
+      const ret = /return/i.test(g), grade = /등급/.test(g);
+      wkCols.push({ i, wk: +m[1], kind: (ret ? 'ret' : 'perf') + (grade ? 'G' : '') });
+    });
+    if (!wkCols.length) throw new Error('WK 주차 열을 찾지 못했습니다.');
+    const wks = [...new Set(wkCols.map((c) => c.wk))];
+    const latest = wkTitle || Math.max(...wks);
+    const rows = [];
+    for (let r = hi + 1; r < sh.rows.length; r++) {
+      const row = sh.rows[r] || []; const camp = txt(row[ci.camp]), code = txt(row[ci.code]);
+      if (!camp || !code || !/\d/.test(code)) continue;
+      wks.forEach((wk) => {
+        const pick = (kind) => { const c = wkCols.find((x) => x.wk === wk && x.kind === kind); return c ? row[c.i] : ''; };
+        const grade = pick('perfG'), perf = pick('perf');
+        if (txt(grade) === '' && txt(perf) === '') return;
+        const isLatest = wk === latest;
+        rows.push({ wk, wave: txt(row[ci.wave]), camp, code, perf, grade, ret: pick('ret'), retGrade: pick('retG'),
+          improve: isLatest ? txt(row[ci.improve]) : '', f1: isLatest ? txt(row[ci.f1]) : '', f2: isLatest ? txt(row[ci.f2]) : '', f3: isLatest ? txt(row[ci.f3]) : '',
+          parcel: isLatest ? txt(row[ci.parcel]) : '', zip: isLatest ? txt(row[ci.zip]) : '', partial: !isLatest });
+      });
+    }
+    return { wk: latest, year, wks: wks.sort((a, b) => a - b), rows, sheet: sh.name };
+  }
+  $('#rpFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    toast('파일 읽는 중…');
+    try {
+      const sheets = await readXlsx(await f.arrayBuffer());
+      const P = parsePerfSheet(sheets, f.name);
+      rpUp = { file: f.name, P };
+      $('#rpUpYear').value = P.year; $('#rpUpWk').value = P.wk;
+      rpUpPreview();
+      $('#rpUpModal').classList.remove('hidden');
+    } catch (err) { toast('파일을 읽지 못했습니다: ' + (err && err.message || err)); }
+  });
+  const rpPctTxt = (v) => { if (v === '' || v == null) return '-'; const s = String(v).trim(); if (/%$/.test(s)) return s; const n = Number(s); return isNaN(n) ? s : Math.round((n <= 1.5 ? n * 100 : n) * 10) / 10 + '%'; };
+  function rpUpPreview() {
+    const U = rpUp; if (!U) return;
+    const P = U.P, wk = +$('#rpUpWk').value || P.wk, year = +$('#rpUpYear').value || P.year;
+    const shift = wk - P.wk; // 주차를 손으로 고치면 과거 주차도 같이 밀린다
+    const lrows = P.rows.filter((r) => r.wk === P.wk), g = (n) => lrows.filter((r) => String(r.grade).replace(/\D/g, '') === String(n)).length;
+    const bad = lrows.filter((r) => /^[34]$/.test(String(r.grade).replace(/\D/g, ''))), imp = lrows.filter((r) => r.improve);
+    const known = new Set(); RT.camps.forEach((c) => routesOf(c.id).forEach((rt) => { const L = GK.slice(1).map((k) => rt[k]).filter(Boolean); (L.length ? L.map((x) => rt.g1 + x) : [rt.code]).forEach((cd) => known.add(rpCamp(c.name) + '|' + cd)); }));
+    const unknown = lrows.filter((r) => !known.has(rpCamp(r.camp) + '|' + normCode(r.code).replace(/[^0-9A-Z]/g, '')));
+    $('#rpUpInfo').innerHTML = '<b>' + esc(U.file) + '</b><br>시트 "' + esc(P.sheet) + '" · 라우트 ' + lrows.length + '개 · 주차 ' + P.wks.map((w) => 'WK' + (w + shift)).join(', ') + ' (파일 기준 WK' + P.wk + (shift ? ' → WK' + wk : '') + ')' +
+      '<br>저장 주차: <b>' + year + '년 WK' + wk + '</b> · 과거 주차 열도 같이 저장되어 이력이 채워집니다 (과거 주차의 개선 요청·플래그는 기존 값 유지)';
+    $('#rpUpDetail').innerHTML = '<div class="rp-sum" style="margin-top:8px"><span>1등급<b>' + g(1) + '</b></span><span>2등급<b>' + g(2) + '</b></span><span class="' + (bad.length ? 'bad' : '') + '">3~4등급<b>' + bad.length + '</b></span><span class="' + (imp.length ? 'bad' : '') + '">개선 요청<b>' + imp.length + '</b></span></div>' +
+      (bad.length ? '<div><b>3~4등급:</b> ' + bad.map((r) => esc(r.camp + ' ' + r.code) + ' ' + grBadge(+String(r.grade).replace(/\D/g, '')) + ' <small>' + esc(rpPctTxt(r.perf)) + '</small>').join(', ') + '</div>' : '') +
+      (imp.length ? '<div style="margin-top:4px"><b>개선 요청(위탁 협의):</b> ' + imp.map((r) => esc(r.camp + ' ' + r.code + ' (' + r.improve + ')')).join(', ') + '</div>' : '') +
+      (unknown.length ? '<div style="margin-top:6px;color:var(--danger)">노선관리에 없는 라우트 ' + unknown.length + '개: ' + unknown.map((r) => esc(r.camp + ' ' + r.code)).join(', ') + ' — 저장은 되지만 노선 표에는 표시되지 않습니다. 노선관리에 노선을 추가하거나 캠프명을 맞춰 주세요.</div>' : '') +
+      (RP.memoOn && (bad.length || imp.length) ? '<div style="margin-top:6px" class="sub">저장하면 업무스케줄에 [수행률 WK' + wk + '] 메모가 한 줄 적힙니다 (처음 한 번만).</div>' : '');
+  }
+  $('#rpUpWk').addEventListener('input', rpUpPreview); $('#rpUpYear').addEventListener('input', rpUpPreview);
+  $('#rpUpCancel').addEventListener('click', () => { $('#rpUpModal').classList.add('hidden'); rpUp = null; });
+  $('#rpUpOk').addEventListener('click', () => {
+    const U = rpUp; if (!U) return;
+    const wk = +$('#rpUpWk').value, year = +$('#rpUpYear').value;
+    if (!(wk >= 1 && wk <= 53)) return toast('주차(1~53)를 확인해 주세요.');
+    if (!(year >= 2020 && year <= 2100)) return toast('연도를 확인해 주세요.');
+    const shift = wk - U.P.wk;
+    const rows = U.P.rows.map((r) => Object.assign({}, r, { wk: r.wk + shift, year: r.wk + shift < 1 ? year - 1 : year, perf: r.perf === '' ? '' : String(r.perf), ret: r.ret === '' ? '' : String(r.ret) }));
+    const b = $('#rpUpOk'); b.disabled = true; b.textContent = '저장 중…';
+    api('adm_perfSave', { year, wk, file: U.file, rows }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      $('#rpUpModal').classList.add('hidden'); rpUp = null;
+      toast('수행률을 저장했습니다. 새로 ' + r.added + '줄 · 바뀜 ' + r.changed + '줄 · 같음 ' + r.unchanged + '줄 (' + (r.weeks || []).map(rpWkLabel).join(', ') + ')' + (r.memo ? ' · 업무스케줄에 메모를 적었습니다' : ''));
+      return loadPerf(true).then(() => { if (!rpOn) rpShow(true); });
+    }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
   });
   function renderBulk() {
     const have = new Set(RT.routes.map((r) => r.id));

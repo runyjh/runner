@@ -95,6 +95,7 @@ function dashMain_() {
       byCamp: camps.map(function (c) { return { name: c.name, routes: routes.filter(function (r) { return r.campId === c.id && r.status !== RST.OFF && r.status !== '중지'; }).length, drivers: assigned[c.id] || 0 }; })
         .sort(function (a, b) { return b.routes - a.routes; })
     };
+    try { out.route.perf = rpfSummary_(); } catch (e) { out.route.perf = null; }
 
     // ── 업무스케줄 (메모)
     const memos = readAll_(SH.MEMO).map(function (o) { o.date = normDate_(o.date) || o.date; return o; }).filter(function (o) { return o.id && o.date; })
