@@ -1088,7 +1088,7 @@ function validateSignup_(f) {
   out.bizNo = biz.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3');
   out.qualDate = req_(f.qualDate, '화물운송 종사자격 취득일', 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(out.qualDate)) fail_('자격 취득일을 확인해 주세요.');
-  out.qualNo = req_(f.qualNo, '화물운송 종사자격증 번호', 30);
+  out.qualNo = qualFmt_(req_(f.qualNo, '화물운송 종사자격증 번호', 30));
   out.licenseDigits = digits_(req_(f.licenseNo, '자동차운전면허 번호', 30));
   if (out.licenseDigits.length !== 12) fail_('운전면허 번호 12자리를 확인해 주세요. (예: 11-10-123456-12)');
   out.licenseType = req_(f.licenseType, '운전면허 종류', 20);
@@ -1700,12 +1700,21 @@ function listRow_(o) {
 function rev_(o) {
   return sha256b64_(Object.keys(D).map(function (k) { return k === 'pwReset' ? '' : o[k]; }).join('\u0001')).slice(0, 16);
 }
+/** 화물운송 종사자격증 번호 양식: 숫자 9자리 → 1-19-055113 (지역-연도-일련번호 6자리), 10자리 → 01-19-055113. 그 밖의 자리 수는 적은 그대로 */
+function qualFmt_(v) {
+  const s = String(v == null ? '' : v).trim(), d = s.replace(/\D/g, '');
+  if (/[^\d\s\-]/.test(s)) return s;
+  if (d.length === 9) return d.slice(0, 1) + '-' + d.slice(1, 3) + '-' + d.slice(3);
+  if (d.length === 10) return d.slice(0, 2) + '-' + d.slice(2, 4) + '-' + d.slice(4);
+  return s;
+}
 /** 상세용 (민감정보는 가린 값만) */
 function detailOf_(o) {
   const out = listRow_(o);
   ['birthDate', 'address', 'qualDate', 'qualNo', 'licenseType', 'maxLoad', 'bankName', 'accountHolder',
     'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail', 'extraAssign', 'tiOn',
     'updatedAt', 'pwChangedAt', 'docFolder'].forEach(function (k) { out[k] = o[k]; });
+  out.qualNo = qualFmt_(o.qualNo);
   out.rrn = o.rrn; out.licenseNo = o.licenseNo; out.account = o.account;
   out.has = { rrn: !!o.rrnEnc, licenseNo: !!o.licenseNoEnc, account: !!o.accountEnc };
   out.rev = rev_(o);
@@ -2083,7 +2092,7 @@ function driverFields_(changes, o) {
       }
       case 'memo': f.memo = opt(v, '관리자 메모', 2000); break;
       case 'address': f.address = opt(v, '주소', 200); break;
-      case 'qualNo': f.qualNo = opt(v, '자격증 번호', 30); break;
+      case 'qualNo': f.qualNo = qualFmt_(opt(v, '자격증 번호', 30)); break;
       case 'carName': f.carName = opt(v, '차명', 40); break;
       case 'carNo': f.carNo = opt(v, '차량번호', 20).replace(/\s/g, ''); break;
       case 'bankName': f.bankName = opt(v, '은행명', 20); break;
@@ -2963,7 +2972,7 @@ function bibDetail_(app) {
     app: bibView_(app),
     driver: d ? {
       id: d.id, name: d.name, phone: d.phone, address: d.address, birthDate: d.birthDate, rrn: d.rrn,
-      licenseNo: d.licenseNo, licenseType: d.licenseType, qualNo: d.qualNo, qualDate: d.qualDate,
+      licenseNo: d.licenseNo, licenseType: d.licenseType, qualNo: qualFmt_(d.qualNo), qualDate: d.qualDate,
       carNo: d.carNo, carName: d.carName, carYear: d.carYear, maxLoad: d.maxLoad, status: d.status
     } : null,
     missing: bibMissing_(d, app, co)
@@ -3149,7 +3158,7 @@ function adm_bibPrint(token, id, allowMissing) {
       careerStart: app.careerStart, careerEnd: app.careerEnd, careerYears: app.careerYears,
       fuel: app.fuel, fuelEtc: app.fuelEtc, bodyType: app.bodyType, carNo: app.carNo,
       carName: d.carName, carYear: d.carYear, maxLoad: d.maxLoad,
-      licenseNo: lic, licenseType: d.licenseType, qualNo: d.qualNo, qualDate: d.qualDate,
+      licenseNo: lic, licenseType: d.licenseType, qualNo: qualFmt_(d.qualNo), qualDate: d.qualDate,
       manageMethod: app.manageMethod, optConsent: String(app.optConsent).toUpperCase() === 'Y',
       company: co
     };

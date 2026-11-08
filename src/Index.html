@@ -528,7 +528,7 @@
         </div>
         <div class="field">
           <label class="lb" for="suQualNo">화물운송 종사자격증 번호<span class="req">*</span></label>
-          <input type="text" id="suQualNo" placeholder="예: 1-25-000000">
+          <input type="text" id="suQualNo" inputmode="numeric" maxlength="14" placeholder="예: 1-25-000000">
         </div>
         <div class="field">
           <label class="lb" for="suLicNo">자동차운전면허 번호<span class="req">*</span></label>
@@ -2962,6 +2962,14 @@
     }).catch(netErr).finally(() => { btn.disabled = false; });
   });
 })();
+  // 화물운송 종사자격증 번호: 숫자만 쳐도 1-19-055113 모양으로 하이픈 (10자리면 01-19-055113)
+  (function () {
+    const el = document.getElementById('suQualNo'); if (!el) return;
+    const f = (v) => { if (/[^\d\s\-]/.test(v)) return v; const d = v.replace(/\D/g, '').slice(0, 10);
+      return (d.length === 10 ? [d.slice(0, 2), d.slice(2, 4), d.slice(4)] : [d.slice(0, 1), d.slice(1, 3), d.slice(3)]).filter(Boolean).join('-'); };
+    el.addEventListener('input', (e) => { if ((e.inputType || '').indexOf('delete') === 0) return; const nv = f(el.value); if (nv !== el.value) el.value = nv; });
+    el.addEventListener('blur', () => { el.value = f(el.value); });
+  })();
 </script>
 </body>
 </html>
