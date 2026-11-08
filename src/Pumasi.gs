@@ -1223,3 +1223,35 @@ function adm_pmPostSet(token, on, which) {
     return { ok: true, postOn: pmPostOn_(), offerOn: pmOfferOn_() };
   });
 }
+
+/**
+ * 관리자: 휴대폰 알림 점검 — 설정·인증·등록된 기기를 보고, testId(기사ID)를 주면 그 기사 기기로 시험 알림을 보낸다.
+ */
+function adm_pushCheck(token, testId) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const p = props_(), cfg = pmPushCfg_();
+    const out = { ok: true, webOk: !!cfg.web, saOk: !!cfg.sa, saSet: !!p.FCM_SA, project: cfg.sa ? cfg.sa.project_id : '', webProject: cfg.web ? cfg.web.projectId : '' };
+    if (cfg.sa) {
+      try { cache_().remove('fcm:at'); pmFcmToken_(cfg.sa); out.auth = 'ok'; } catch (e) { out.auth = String(e && e.message).slice(0, 300); }
+    }
+    const drv = {};
+    readAll_(SH.DRIVERS).forEach(function (o) { drv[o.id] = o; });
+    out.devices = readAll_(SH.PPUSH).filter(function (o) { return o.token; }).map(function (o) {
+      const d = drv[o.driverId] || {};
+      return { driverId: o.driverId, name: d.name || o.name, status: d.status || '', device: o.device, createdAt: o.createdAt, lastOk: o.lastOk, tok: o.token.slice(0, 12) };
+    });
+    if (testId && cfg.sa && cfg.web && out.auth === 'ok') {
+      const toks = out.devices.filter(function (d) { return d.driverId === String(testId); }).length
+        ? readAll_(SH.PPUSH).filter(function (o) { return o.driverId === String(testId) && o.token; }).map(function (o) { return o.token; }) : [];
+      const at = pmFcmToken_(cfg.sa), url = 'https://fcm.googleapis.com/v1/projects/' + (cfg.sa.project_id || cfg.web.projectId) + '/messages:send';
+      out.test = toks.map(function (t) {
+        const r = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + at },
+          payload: JSON.stringify({ message: { token: t, data: { title: '🔔 러너 알림 시험', body: '휴대폰 알림이 잘 옵니다. (사무실 점검)', jobId: '', kind: 'test' }, webpush: { headers: { Urgency: 'high', TTL: '600' } } } }) });
+        return { tok: t.slice(0, 12), code: r.getResponseCode(), body: r.getContentText().slice(0, 300) };
+      });
+      logAdmin_(a, '휴대폰 알림 시험', String(testId), toks.length + '대');
+    }
+    return out;
+  });
+}
