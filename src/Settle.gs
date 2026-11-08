@@ -187,7 +187,9 @@ const STL_FUND_ITEMS = [
   ['owner', '대표 인출', '대표', '대표가 가져가는 돈 · 금액 규칙에 금액 또는 % (당기순이익 기준, 비우면 0)'],
   ['rest', '유보금 (나머지)', '유보금', '쿠팡 입금 − 위 항목 합계']
 ];
-const STL_COST_CATS = ['사무실', '세무·회계', '차량', '통신', '보험·공과', '이자·수수료', '소모품', '유류비', '수리·정비', '식대·접대', '기타'];
+const STL_COST_CATS = ['사무실', '세무·회계', '법률·자문', '차량', '통신', '보험·공과', '이자·수수료', '소모품', '유류비', '수리·정비', '식대·접대', '기타', '세금 납부 (손익 제외)', '산재·고용 납부 (손익 제외)'];
+// 지출 기록에 남기되 손익(운영비)에는 넣지 않는 분류: 부가세·소득세 납부(비용 아님 · 부가세는 따로 계산), 산재·고용 납부(보험료는 손익에서 따로 계산)
+const STL_NOPNL_CATS = ['세금 납부 (손익 제외)', '산재·고용 납부 (손익 제외)'];
 const STL_PROOFS = ['', '세금계산서', '카드', '현금영수증', '면세·없음'];
 function stlSS_() {
   if (_stlSS) return _stlSS;
@@ -2223,8 +2225,10 @@ function stlPnl_(month, sum) {
     const x = stlSplitVat_(r.amt, r.proof);
     o.fixed += x.supply; o.fixedVat += x.vat; o.fixedN++; cat(r.cat, x.supply);
   });
+  o.taxPaid = 0;
   stlRead_('stl_expense').forEach(function (r) {
     if (r.month !== month || !stlNum_(r.amt)) return;
+    if (STL_NOPNL_CATS.indexOf(r.cat) >= 0) { o.taxPaid += stlNum_(r.amt); return; } // 세금·보험 납부: 기록만 (손익 제외)
     const x = stlSplitVat_(r.amt, r.proof);
     o.varCost += x.supply; o.varVat += x.vat; o.varN++; cat(r.cat, x.supply);
   });
@@ -3652,5 +3656,40 @@ function adm_stlFbSave(token, list) {
     } finally { lock.releaseLock(); }
     logAdmin_(a, '기사별 프레시백 차감 저장', list.length + '줄', list.slice(0, 20).map(function (x) { return x.id + '=' + (x.cut || '없음'); }).join(', '));
     return { ok: true };
+  });
+}
+
+/**
+ * 관리자: 지출 기록 여러 줄 한 번에 추가 (예전 납부 이력 옮겨 넣기)
+ *  rows = [{ date:'yyyy-MM-dd', cat, name, vendor, amt, proof, bank, memo, month? }] · 귀속월을 비우면 날짜의 달
+ *  같은 날짜·내용·금액 줄이 이미 있으면 건너뜀 (두 번 눌러도 중복 안 됨)
+ */
+function adm_stlExpenseAdd(token, rows) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length || rows.length > 500) fail_('넣을 줄을 확인해 주세요 (최대 500줄).');
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      stlFreshIn_('stl_expense');
+      const have = {};
+      stlRead_('stl_expense').forEach(function (r) { have[stlYmd_(r.date) + '|' + str_(r.name) + '|' + stlNum_(r.amt)] = 1; });
+      const add = [], skipped = [];
+      rows.forEach(function (r) {
+        const date = stlYmd_(r.date), amt = stlNum_(r.amt), name = str_(r.name).slice(0, 200);
+        if (!date || !amt || !name) { skipped.push(name || '(빈 줄)'); return; }
+        const month = stlMonthOk_(str_(r.month)) ? str_(r.month) : date.slice(0, 7);
+        const k = date + '|' + name + '|' + amt;
+        if (have[k]) { skipped.push(name); return; }
+        have[k] = 1;
+        add.push({ month: month, date: date, cat: STL_COST_CATS.indexOf(str_(r.cat)) >= 0 ? str_(r.cat) : '기타', name: name, vendor: str_(r.vendor).slice(0, 100),
+          amt: String(amt), proof: STL_PROOFS.indexOf(str_(r.proof)) >= 0 ? str_(r.proof) : '', bank: str_(r.bank).slice(0, 60), memo: str_(r.memo).slice(0, 300) });
+      });
+      stlAppend_('stl_expense', add);
+      stlTouch_(['stl_expense']);
+      logAdmin_(a, '지출 기록 일괄 추가', '', add.length + '줄 추가 · ' + skipped.length + '줄 건너뜀');
+      return { ok: true, added: add.length, skipped: skipped };
+    } finally { lock.releaseLock(); }
   });
 }

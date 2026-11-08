@@ -7584,6 +7584,7 @@
       step('지출 기록', c.varCost, '− ', '', c.varN ? c.varN + '건 (공급가)' : '이 달 지출 기록 없음') +
       step('당기순이익', c.net, '', 'net' + (c.net < 0 ? ' neg' : ''), '매출 대비 ' + pct(c.rate)) +
       '<div class="pnl-ref"><b>참고 · 부가세 예상</b> 매출세액 ' + wn(c.salesVat) + ' − 기사 매입세액 ' + wn(c.drvVat) + ' − 운영비 매입세액 ' + wn((c.fixedVat || 0) + (c.varVat || 0)) + ' = <b>' + wn(c.vatDue) + '</b></div>' +
+      (c.taxPaid ? '<div class="pnl-ref"><b>세금·보험 납부 (손익 제외)</b> ' + wn(c.taxPaid) + ' — 지출 기록에서 "세금 납부" · "산재·고용 납부" 분류는 기록만 하고 당기순이익에서는 빼지 않습니다</div>' : '') +
       (Object.keys(c.byCat || {}).length ? '<div class="pnl-ref"><b>운영비 분류</b> ' + Object.keys(c.byCat).sort((a, b) => c.byCat[b] - c.byCat[a]).map((k) => esc(k) + ' ' + wn(c.byCat[k])).join(' · ') + '</div>' : '') + '</div>';
     // 산재·고용 신고 (기존 운영정산 시트와 같은 계산) — 합계 = 공단 신고액 = 매달 빼둘 돈
     const I = c.ins, rp = (v) => (Math.round(v * 10000) / 100) + '%';
