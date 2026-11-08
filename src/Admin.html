@@ -65,7 +65,7 @@
   .ng.g-fin { --c: #c45d0a; --cw: #fdf0e3; }
   .ng.g-com { --c: #7048d0; --cw: #f0ebfb; }
   .ng.g-set { --c: #6b7684; --cw: #eef0f3; }
-  .nav a.dashnav { --c: var(--brand); --cw: var(--brand-weak); font-weight: 700; margin-bottom: 8px; }
+  .nav a.dashnav { --c: var(--brand); --cw: var(--brand-weak); font-weight: 700; margin-bottom: 8px; color: var(--brand); }
   .nav a.dashnav::before { display: none; }
   /* 대시보드 */
   .db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; padding-bottom: 24px; }
@@ -116,10 +116,10 @@
   .ngt { margin: 0 0 3px; padding: 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .02em; color: var(--c); display: flex; align-items: center; gap: 6px; }
   .ngt::after { content: ''; flex: 1; height: 1px; background: var(--cw); }
   .nav a { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; color: #4e5968; text-decoration: none; margin-bottom: 1px; font-size: 14px; }
-  .nav a::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--c); opacity: .45; flex: none; }
+  .nav a::before { content: ''; width: 4px; height: 1em; border-radius: 1px; background: var(--brand); opacity: .45; flex: none; } /* 메뉴 앞 표시: 글자 높이만큼의 사각형 · 메인 파란색 */
   .nav a:hover { background: var(--gray-weak); color: var(--ink); }
   .nav a:hover::before { opacity: .8; }
-  .nav a.on { background: var(--cw); color: var(--c); font-weight: 700; box-shadow: inset 3px 0 0 var(--c); }
+  .nav a.on { background: var(--cw); color: var(--c); font-weight: 700; }
   .nav a.on::before { opacity: 1; }
   .nav a small { margin-left: auto; }
   .up-sig { margin: 8px 0; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
@@ -998,7 +998,7 @@
     <button type="button" class="gsbtn" id="gsBtn" title="메뉴 · 탭 · 기사 바로 찾기 (Ctrl+K)"><span class="gsi">🔍</span><span class="gst">찾기 · 목차</span><kbd>Ctrl K</kbd></button>
     <button type="button" class="navbtn" id="navBtn" aria-label="메뉴 열기" aria-expanded="false"><span id="navCur">기사 정보관리</span><i>☰</i></button>
     <nav class="nav">
-      <a class="dashnav" data-view="dash">📊 대시보드</a>
+      <a class="dashnav" data-view="dash">대시보드</a>
       <div class="ng g-drv"><p class="ngt">기사</p>
         <a data-view="drivers">기사 정보관리</a>
         <a data-view="sched">기사스케줄</a>
