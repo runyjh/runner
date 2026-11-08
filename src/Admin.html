@@ -1015,7 +1015,7 @@
     <div class="head">
       <h2>기사 정보관리</h2>
       <div class="tools">
-        <input class="inp search" id="q" placeholder="이름, 아이디·서브아이디, 연락처, 차량 검색">
+        <input class="inp search" id="q" placeholder="이름, 아이디, 연락처, 차량 (여러 명은 콤마로: 전광성,이현모)">
         <button class="btn ghost" id="reloadBtn" title="시트의 최신 내용 불러오기">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="drivers">데이터 초기화</button>
         <button class="btn" id="drvNew">+ 새 기사 등록</button>
@@ -2116,15 +2116,18 @@
     paintDSort(); renderRows();
   });
   function visibleRows() {
-    const q = nfc($('#q').value.trim()), qd = q.replace(/\D/g, '');
+    const q = nfc($('#q').value.trim());
+    // 콤마(,)로 여러 개를 한 번에: '전광성,이현모' → 둘 중 하나라도 맞으면 보임
+    const qs = q.split(/[,，、]/).map((x) => x.trim()).filter(Boolean);
+    const hit = (r, t) => { const td = t.replace(/\D/g, ''); return [r.name, r.driverCode, r.loginId, r.subId1, r.subId2, r.carName, r.carNo, r.schCamp, r.baseRoute, r.phone].some((v) => nfc(v).indexOf(t) >= 0) ||
+      (td.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(td) >= 0); };
     const out = all.filter((r) => {
       // 검색할 때는 상태·구분 탭과 상관없이 전체에서 찾는다 (승인대기 탭에 있어도 승인된 기사가 나오도록)
-      if (!q && filter !== '전체' && r.status !== filter) return false;
-      if (!q && tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
-      if (!q && wfilter && (r.workStatus || '재직') !== wfilter) return false;
-      if (!q) return true;
-      return [r.name, r.driverCode, r.loginId, r.subId1, r.subId2, r.carName, r.carNo, r.schCamp, r.baseRoute, r.phone].some((v) => nfc(v).indexOf(q) >= 0) ||
-        (qd.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(qd) >= 0);
+      if (!qs.length && filter !== '전체' && r.status !== filter) return false;
+      if (!qs.length && tfilter && (tfilter === '미지정' ? r.driverType : r.driverType !== tfilter)) return false;
+      if (!qs.length && wfilter && (r.workStatus || '재직') !== wfilter) return false;
+      if (!qs.length) return true;
+      return qs.some((t) => hit(r, t));
     });
     if (dsort.k && dsort.d) {
       const k = dsort.k;
