@@ -2634,6 +2634,13 @@ function adm_stlClose(token, month, close) {
         stlAdvMark_(month, res.summary.advAuto || [], true);
         stlLastCloseSet_(month);
         logAdmin_(a, '정산 마감', month, res.summary.drivers.length + '명');
+        // 휴대폰 알림(앱 아이콘 숫자) — 기사 앱 사용 중인 기사 전원. 알림을 누르면 앱이 열리고 '정산서 마감' 안내 창이 뜸
+        try {
+          const mm = Number(month.slice(5, 7));
+          pmPushSend_(readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.status === ST.ACTIVE; }).map(function (o) {
+            return { driverId: String(o.id), title: mm + '월 정산서가 마감되었습니다', text: '정산서 보기에서 지급 금액과 내역을 확인해 주세요.', jobId: '', kind: 'slip' };
+          }));
+        } catch (e) { console.error('마감 알림 실패: ' + (e && e.message)); }
       } else {
         stlWriteAll_('stl_close', others);
         stlReplaceMonth_('stl_closed', month, []);
