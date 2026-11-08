@@ -54,7 +54,7 @@ function pmUser_(token) {
   if (info.mustChange) { const e = new Error('x'); e.userMsg = '비밀번호를 먼저 바꿔 주세요.'; e.code = 'MUST_CHANGE'; throw e; }
   return { id: String(s.d), info: info };
 }
-function pmTouch_() { flushBeforeBump_(); fsMark_(); try { cache_().put('pm:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
+function pmTouch_() { flushBeforeBump_(); fsMark_('pm'); try { cache_().put('pm:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
 function pmVer_() { return cache_().get('pm:v') || '0'; }
 /** 일감·지원 전체 (1분 캐시, 쓰면 바로 버림) */
 function pmData_() {
@@ -1109,6 +1109,7 @@ function pmSchApply_(ops) {
       });
     } finally {
       lock.releaseLock();
+      fsMark_('sch'); // 품앗이 줄이 바뀜 → 관리자 기사스케줄 실시간 갱신
     }
   } catch (e) {
     console.error('기사스케줄 품앗이 반영 실패: ' + (e && e.message));

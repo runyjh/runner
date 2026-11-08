@@ -749,7 +749,7 @@ function run_(fn) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_dash', 'adm_dashStl', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_live', 'adm_dash', 'adm_dashStl', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
@@ -758,7 +758,7 @@ const FS_READ_FNS = ['adm_dash', 'adm_dashStl', 'api_pmPushLog', 'adm_pushCheck'
   'api_changePassword', 'api_myInfo', 'api_mySchedule', 'api_mySettle', 'api_mySlip', 'api_notices', 'api_perf', 'api_ping', 'api_pmAlerts', 'api_pmAlertsRead',
   'api_pmAttach', 'api_pmAvailList', 'api_pmAvailMine', 'api_pmForm', 'api_pmJob', 'api_pmList', 'api_pmMine', 'api_pmPrice', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel'];
 /** Firestore 사본: 데이터가 바뀜 (Firebase.gs · 없으면 아무것도 안 함) */
-function fsMark_(area) { if (typeof fsDirty_ === 'function') fsDirty_(area); }
+function fsMark_(area, extra) { if (typeof fsDirty_ === 'function') fsDirty_(area, extra); }
 function fail_(msg) { const e = new Error(msg); e.userMsg = msg; throw e; }
 
 // ───────────────────────── 값 정리 (사람이 직접 입력한 값도 같은 규칙으로) ─────────────────────────
@@ -956,7 +956,7 @@ function sessionAfterPw_(sessionCreated, pwChangedMs) {
 }
 function mustChange_(o) { return String(o.pwMustChange || '').trim().toUpperCase() === 'Y'; }
 function forgetDriver_(o) {
-  fsMark_();
+  fsMark_('sch'); // 기사 정보(캠프·노선 등)가 바뀌면 기사스케줄 줄도 바뀐다
   try { stlBump_(); } catch (e) { /* 기사 정보가 바뀌면 정산 계산 결과도 다시 */ }
   const keys = [];
   if (o.id) keys.push('dv:' + o.id, 'ir:' + o.id);
@@ -4716,7 +4716,7 @@ function schRead_(sun, end) {
  */
 function adm_schSave(token, changes) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     changes = (changes || []).filter(function (x) { return x && x.row && parseYmd_(x.date); });
     if (!changes.length) return { ok: true, saved: 0, conflicts: [] };
     if (changes.length > 3000) fail_('한 번에 3000칸까지 저장할 수 있습니다.');
@@ -4944,7 +4944,7 @@ function logSchChange_(a, list, saved) {
 /** 비고 줄: action = add / rename / delete */
 function adm_schNote(token, action, id, label) {
   return run_(function () {
-    requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     const h = schHeader_();
     const lock = scriptLock_();
     lock.waitLock(20000);
@@ -4992,7 +4992,7 @@ function adm_schNote(token, action, id, label) {
  */
 function adm_schOrder(token, list) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     if (!Array.isArray(list) || !list.length) return { ok: true, saved: 0 };
     if (list.length > 1000) fail_('한 번에 너무 많습니다.');
     const want = {};
@@ -5337,7 +5337,7 @@ function schIssues_(from, to) {
 /** 이슈 저장. o = { id(있으면 고침), date, driverId, kind, reason, action } */
 function adm_schIssueSave(token, o) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     o = o || {};
     const date = ymd_(parseYmd_(o.date) || new Date(NaN));
     if (!parseYmd_(o.date)) fail_('날짜를 확인해 주세요.');
@@ -5362,7 +5362,7 @@ function adm_schIssueSave(token, o) {
 }
 function adm_schIssueDel(token, id) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     const sh = schIssueSheet_();
     const lock = scriptLock_();
     lock.waitLock(20000);
@@ -6079,7 +6079,7 @@ function adm_campRoutes(token) {
  *   캠프는 노선관리의 캠프명, 이름·기본노선은 기사 정보 그대로. 못 찾거나 여러 명이면 칸 메모로 알려 준다.
  */
 function onSchEdit_(e, sh) {
-  fsMark_();
+  fsMark_('sch');
   const r0 = e.range.getRow(), n = e.range.getNumRows();
   if (r0 === 1) { cache_().remove('sch:h'); if (n === 1) return; }
   const lock = scriptLock_();
@@ -6252,6 +6252,7 @@ function rcApply_(c, now) {
   }
   if (c._row) writeFields_(SH.RCHG, c._row, { status: RCS.DONE, appliedAt: now });
   c.status = RCS.DONE; c.appliedAt = now;
+  fsMark_('sch'); // 적용일이 되어 캠프·노선이 바뀜 → 열려 있는 기사스케줄이 바로 새로 받는다
 }
 
 /** 기본노선 글자 → 노선 조각들. '110AB, 116C (F3) [B01]' → [{num:'110', letters:'AB'}, {num:'116', letters:'C'}] (백업·용차는 special) */
@@ -6366,7 +6367,7 @@ function adm_rcList(token) {
 /** 관리자: 기사 한 명 노선 변경 예약. f = { driverId, date, toCampId, toRoute, memo } (적용일이 오늘 이전이면 바로 적용) */
 function adm_rcSave(token, f) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     f = f || {};
     const date = normDate_(f.date);
     if (!date) fail_('적용일을 확인해 주세요.');
@@ -6386,7 +6387,7 @@ function adm_rcSave(token, f) {
 /** 관리자: 예약 취소 (적용 전만). 노선 이관이면 같이 만든 기사 예약도 취소 */
 function adm_rcCancel(token, id) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
@@ -6406,7 +6407,7 @@ function adm_rcCancel(token, id) {
 /** 관리자: '바로 변경'으로 남은 노선 변경 이력 지우기 (정정이었을 때 · 줄이 나뉘지 않게). 기사 정보는 그대로 */
 function adm_rcDropHistory(token, id) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
@@ -6426,7 +6427,7 @@ function adm_rcDropHistory(token, id) {
  */
 function adm_rcMove(token, f, dry) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_();
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
     f = f || {};
     const date = normDate_(f.date);
     if (!date) fail_('적용일을 확인해 주세요.');

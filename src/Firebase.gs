@@ -145,16 +145,27 @@ function fsDel_(paths) {
 /** 데이터가 바뀜: meta.dirtyAt 올리기 + 1분 트리거가 다시 만들도록 표시
  *  area 'nb' = 공지·게시판이 바뀜 → meta.nbAt 도 올림 (기사앱 홈 사본은 nbAt 만 봄 → 다른 저장 때문에 홈 사본을 버리지 않음)
  *  nbAt 은 스크립트 속성 FS_NB_AT 에 보관 (캐시가 비어도 잃지 않게) */
-function fsDirty_(area) {
+function fsDirty_(area, extra) {
   try {
     if (!fsCfg_()) return;
-    const now = Date.now(), d = fsDirty_.done || (fsDirty_.done = {});
+    const now = Date.now(), d = fsDirty_.done || (fsDirty_.done = { areas: {}, ar: null });
     cache_().put('fs:dirty', String(now), 21600);
-    let nb = 0;
-    if (area === 'nb') { nb = now; try { PropertiesService.getScriptProperties().setProperty('FS_NB_AT', String(now)); } catch (e) { /* 무시 */ } }
-    else nb = +(PropertiesService.getScriptProperties().getProperty('FS_NB_AT') || 0);
-    const k = area === 'nb' ? 'nb' : 'all';
-    if (!d[k]) { d[k] = 1; fsPut_([{ path: 'pub/meta', data: { dirtyAt: now, nbAt: nb } }], now); }
+    const sp = PropertiesService.getScriptProperties();
+    // 영역별 마지막 변경 시각 (관리자앱이 실시간으로 구독: sch = 기사스케줄 · pm = 품앗이 · nb = 공지·게시판) — 속성 FS_AREAS 에 보관
+    if (!d.ar) {
+      try { d.ar = JSON.parse(sp.getProperty('FS_AREAS') || '{}') || {}; } catch (e) { d.ar = {}; }
+      if (!d.ar.nb) d.ar.nb = +(sp.getProperty('FS_NB_AT') || 0);
+    }
+    const ar = d.ar, key = area || 'all';
+    if (area) {
+      ar[area] = now;
+      if (extra && extra.by) ar[area + 'By'] = String(extra.by).slice(0, 40);
+      if (area === 'nb') { try { sp.setProperty('FS_NB_AT', String(now)); } catch (e) { /* 무시 */ } }
+      try { sp.setProperty('FS_AREAS', JSON.stringify(ar)); } catch (e) { /* 무시 */ }
+    }
+    if (d.areas[key] || (!area && d.areas.any)) return; // 이번 실행에서 이미 알렸음 (영역 알림이 있었으면 일반 알림은 생략)
+    d.areas[key] = 1; d.areas.any = 1;
+    fsPut_([{ path: 'pub/meta', data: { dirtyAt: now, nbAt: ar.nb || 0, schAt: ar.sch || 0, schBy: ar.schBy || '', pmAt: ar.pm || 0, pmBy: ar.pmBy || '' } }], now);
   } catch (e) { console.error('fsDirty_: ' + (e && e.message)); }
 }
 /** 실행 안에서만 쓰는 임시 세션으로 기사 앱 함수 부르기 (사본 만들기용) */
@@ -261,3 +272,13 @@ function adm_fsRebuild(token) {
 
 /** 기사를 지우면 그 기사 사본도 지움 */
 function fsDropDriver_(ids) { try { if (fsCfg_() && ids && ids.length) fsDel_(ids.map(function (id) { return 'drv/' + id; })); } catch (e) { /* 무시 */ } }
+
+/** 관리자: 영역별 마지막 변경 시각 (Firestore 구독을 못 쓸 때 60초마다 묻는 대비용) */
+function adm_live(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    let ar = {};
+    try { ar = JSON.parse(PropertiesService.getScriptProperties().getProperty('FS_AREAS') || '{}') || {}; } catch (e) { ar = {}; }
+    return { ok: true, dirtyAt: +(cache_().get('fs:dirty') || 0), schAt: ar.sch || 0, schBy: ar.schBy || '', pmAt: ar.pm || 0, pmBy: ar.pmBy || '', nbAt: ar.nb || 0 };
+  });
+}

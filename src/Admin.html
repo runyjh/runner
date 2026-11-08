@@ -136,6 +136,8 @@
   .gs-i.d1 { padding-left: 26px; } .gs-i.d2 { padding-left: 42px; } .gs-i .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--brand)); flex: none; opacity: .7; }
   .gs-i.on { background: var(--brand-weak); } .gs-i mark { background: #fff3bf; color: inherit; border-radius: 2px; }
   .gs-foot { font-size: 11.5px; color: var(--faint); padding: 8px 14px; border-top: 1px solid var(--line); }
+  td.c.live-chg { animation: livechg 4s ease-out; } @keyframes livechg { 0%, 30% { box-shadow: inset 0 0 0 2px #f59e0b; background: #fff3d6 !important; } 100% { box-shadow: inset 0 0 0 0 transparent; } }
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #c0c6cc; margin-left: 6px; vertical-align: middle; } .live-dot.on { background: #12a150; box-shadow: 0 0 0 3px rgba(18,161,80,.18); }
   .gs-flash { animation: gsflash 1.6s ease-out; } @keyframes gsflash { 0%, 40% { box-shadow: 0 0 0 4px rgba(27,100,218,.45); } 100% { box-shadow: 0 0 0 0 rgba(27,100,218,0); } }
   .side .me { flex: none; margin-top: 10px; padding: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--sub); }
   .side .me b { color: var(--ink); display: block; font-size: 13px; }
@@ -1019,7 +1021,7 @@
 
    <section id="view-dash" class="hidden">
     <div class="head">
-      <h2>대시보드</h2>
+      <h2>대시보드<i class="live-dot" title="실시간 갱신"></i></h2>
       <div class="tools"><span class="sub" id="dbAt"></span><button class="btn ghost" id="dbReload" type="button">새로고침</button></div>
     </div>
     <div class="db-grid" id="dbGrid"></div>
@@ -1114,7 +1116,7 @@
    </section>
    <section id="view-pumasi" class="hidden">
     <div class="head">
-      <h2>품앗이 관리 <small id="paCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <h2>품앗이 관리 <small id="paCount" style="font-size:13px;color:var(--sub);font-weight:600"></small><i class="live-dot" title="실시간 갱신"></i></h2>
       <div class="tools">
         <input class="inp" type="date" id="paFrom" title="배차일 시작"><input class="inp" type="date" id="paTo" title="배차일 끝">
         <input class="inp search" id="paQ" placeholder="기사·배송지·센터·라우트 검색" style="width:220px">
@@ -1187,7 +1189,7 @@
    </section>
    <section id="view-sched" class="hidden">
     <div class="head">
-      <h2>기사스케줄 <small id="sCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <h2>기사스케줄 <small id="sCount" style="font-size:13px;color:var(--sub);font-weight:600"></small><i class="live-dot" title="실시간 갱신"></i></h2>
       <div class="tools"><span class="ssave ok" id="sSave">모두 저장됨</span></div>
     </div>
     <div class="stools">
@@ -1804,6 +1806,76 @@
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
 
+  // ───── 실시간 갱신: 서버가 데이터를 바꾸면 Firestore pub/meta 의 영역별 시각(schAt·pmAt·dirtyAt)이 바뀐다 → 구독해서 보고 있는 화면만 새로 받는다 ─────
+  //  · 기사스케줄: 품앗이 확정·취소, 다른 관리자의 칸 편집, 노선 변경 적용, 기사 캠프 변경 → 표를 다시 받아 바뀐 칸만 노랗게 표시 (입력 중·저장 대기 칸은 그대로)
+  //  · 품앗이 관리: 지원·확정·취소 → 목록 다시 받음 · 대시보드: 무엇이든 바뀌면 1분에 한 번까지 새로 받음
+  //  · Firestore 를 못 쓰면 60초마다 서버(adm_live)에 묻는다
+  const LIVE = { schAt: 0, pmAt: 0, dirtyAt: 0, first: true, t: {}, dashAt: 0, on: false, poll: 0, unsub: null };
+  function liveDot(on) { LIVE.on = on; $$('.live-dot').forEach((d) => { d.classList.toggle('on', on); d.title = on ? '실시간 갱신 켜짐 (품앗이·다른 관리자 변경이 바로 반영)' : '실시간 갱신 대기 (60초마다 확인)'; }); }
+  function liveApply(m) {
+    const schAt = +m.schAt || 0, pmAt = +m.pmAt || 0, dirtyAt = +m.dirtyAt || 0;
+    if (LIVE.first) { LIVE.first = false; LIVE.schAt = schAt; LIVE.pmAt = pmAt; LIVE.dirtyAt = dirtyAt; return; }
+    if (schAt > LIVE.schAt) {
+      LIVE.schAt = schAt;
+      const mine = m.schBy && me && m.schBy === me.loginId && Date.now() - schAt < 20000; // 내가 방금 저장한 것은 다시 받지 않음
+      if (!mine) liveLater('sched', liveSched, 1500);
+    }
+    if (pmAt > LIVE.pmAt) { LIVE.pmAt = pmAt; liveLater('pumasi', livePumasi, 1500); }
+    if (dirtyAt > LIVE.dirtyAt) { LIVE.dirtyAt = dirtyAt; liveLater('dash', liveDash, 3000); }
+  }
+  function liveLater(k, fn, ms) { clearTimeout(LIVE.t[k]); LIVE.t[k] = setTimeout(fn, ms); }
+  function liveSched() {
+    if (currentView !== 'sched') return;
+    if (sEdit || document.hidden) return liveLater('sched', liveSched, 3000); // 칸을 입력 중이면 끝난 뒤에
+    const prev = JSON.parse(JSON.stringify(SD.cells || {})), y = window.scrollY, wrap = $('#sWrap'), x = wrap ? wrap.scrollLeft : 0;
+    loadSched(SD.start).then(() => {
+      if (currentView !== 'sched') return;
+      const tb = $('#sGrid'); if (!tb) return;
+      let n = 0;
+      srows.forEach((row, r) => {
+        SD.dates.forEach((d, c) => {
+          const k = row.row + '|' + d; if (sPending[k]) return;
+          const a = (prev[row.row] || {})[d] || '', b = (SD.cells[row.row] || {})[d] || '';
+          if (a === b) return;
+          n++; const td = tb.querySelector('td.c[data-r="' + r + '"][data-c="' + c + '"]'); if (td) { td.classList.remove('live-chg'); void td.offsetWidth; td.classList.add('live-chg'); }
+        });
+      });
+      window.scrollTo(0, y); if (wrap) wrap.scrollLeft = x;
+      if (n) toast('기사스케줄이 바뀌었습니다 (' + n + '칸 · 노란 칸)');
+    }).catch(() => {});
+  }
+  function livePumasi() {
+    if (currentView !== 'pumasi') return;
+    if (document.hidden || $$('.modal').some((m) => !m.classList.contains('hidden'))) return liveLater('pumasi', livePumasi, 3000);
+    loadPumasi();
+  }
+  function liveDash() {
+    if (currentView !== 'dash' || document.hidden) return;
+    if (Date.now() - LIVE.dashAt < 60000) return liveLater('dash', liveDash, 60000 - (Date.now() - LIVE.dashAt) + 500);
+    if (DB.busy) return liveLater('dash', liveDash, 5000);
+    LIVE.dashAt = Date.now(); loadDash(true);
+  }
+  async function liveStart() {
+    if (LIVE.unsub || LIVE.poll) return;
+    const ok = await fsReady().catch(() => false);
+    if (ok && FSR.db) {
+      try {
+        LIVE.unsub = FSR.db.doc('pub/meta').onSnapshot((d) => {
+          if (!d.exists) return; let j = {}; try { j = JSON.parse(d.data().j || '{}'); } catch (e) { j = {}; }
+          liveDot(true); liveApply(j);
+        }, (e) => { console.warn('실시간 구독 끊김 → 60초 확인으로', e && e.message); try { LIVE.unsub(); } catch (x) {} LIVE.unsub = null; liveDot(false); livePollStart(); });
+        return;
+      } catch (e) { /* 아래 폴링으로 */ }
+    }
+    livePollStart();
+  }
+  function livePollStart() {
+    if (LIVE.poll) return;
+    const tick = () => { if (document.hidden || !['sched', 'pumasi', 'dash'].includes(currentView) || !store.get()) return; api('adm_live').then((r) => { if (r && r.ok) liveApply(r); }).catch(() => {}); };
+    LIVE.poll = setInterval(tick, 60000); tick();
+  }
+  function liveStop() { try { if (LIVE.unsub) LIVE.unsub(); } catch (e) {} LIVE.unsub = null; clearInterval(LIVE.poll); LIVE.poll = 0; LIVE.first = true; liveDot(false); }
+
   /** 관리자 API 호출: 로그인 만료면 로그인 화면으로 */
   // 화면 맨 위 로딩바: 서버와 주고받는 동안 표시
   let apiPending = 0, lbarTimer = 0;
@@ -1850,7 +1922,7 @@
 
   // ───── 로그인 ─────
   function showLogin() {
-    $('#app').classList.add('hidden'); closeDrawer(true);
+    $('#app').classList.add('hidden'); closeDrawer(true); try { liveStop(); } catch (e) {}
     try { closeBib(true); } catch (e) {}
     $$('.modal').forEach((m) => m.classList.add('hidden')); // 로그인 만료 때 열려 있던 창이 로그인 화면 위에 남지 않게
     $('#login').classList.remove('hidden'); $('#lgId').focus();
@@ -1862,7 +1934,7 @@
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
     driversLoaded = false;
     uiLoad();
-    // (Firestore 읽기 사본은 관리자 화면에서 지금 쓰는 곳이 없어 미리 준비하지 않는다 → 로그인 때 파이어베이스 스크립트 3개·토큰 발급이 빠짐. 쓰는 화면이 생기면 fsReady() 를 그때 부른다)
+    setTimeout(() => { try { liveStart(); } catch (e) {} }, 3000); // 실시간 갱신 구독 (Firestore pub/meta)
     // 새로고침하면 보던 메뉴 그대로 (이 창을 닫으면 잊음)
     try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv; } catch (e) {}
     switchView(currentView);
