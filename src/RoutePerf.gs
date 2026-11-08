@@ -479,7 +479,7 @@ function adm_lineageSuggest(token) {
     seqs.forEach(function (sq) {
       for (let i = 1; i < sq.list.length; i++) {
         const a = sq.list[i - 1], b = sq.list[i];
-        const camps = {}; Object.keys(a.camps).concat(Object.keys(b.camps)).forEach(function (c) { camps[c] = 1; });
+        const camps = {}, leftover = { gone: [], fresh: [] }; Object.keys(a.camps).concat(Object.keys(b.camps)).forEach(function (c) { camps[c] = 1; });
         Object.keys(camps).forEach(function (camp) {
           const A = Object.keys(a.camps[camp] || {}), Bc = Object.keys(b.camps[camp] || {});
           const gone = A.filter(function (x) { return Bc.indexOf(x) < 0; }), fresh = Bc.filter(function (x) { return A.indexOf(x) < 0; });
@@ -503,10 +503,22 @@ function adm_lineageSuggest(token) {
             const kind = gone.length > fresh.length ? RLK.MERGE : gone.length < fresh.length ? RLK.SPLIT : RLK.RENAME;
             restG.forEach(function (gn) { G[gn].forEach(function (L) { restF.forEach(function (fn) { F[fn].forEach(function (L2) { if (kind !== RLK.RENAME || L === L2) pairs.push({ kind: kind, f: gn + L, t: fn + L2 }); }); }); }); });
           }
+          // 짝이 안 맞은 묶음은 다른 캠프와 맞춰 본다 (이관 후보): 같은 시점에 다른 캠프에 같은 글자 구성이 새로 생겼으면
+          Object.keys(G).forEach(function (gn) { if (!pairs.some(function (p) { return p.f.indexOf(gn) === 0; })) leftover.gone.push({ camp: camp, num: gn, L: G[gn] }); });
+          Object.keys(F).forEach(function (fn) { if (!usedF[fn] && !pairs.some(function (p) { return p.t.indexOf(fn) === 0; })) leftover.fresh.push({ camp: camp, num: fn, L: F[fn] }); });
           pairs.forEach(function (p) {
             const k = camp + '|' + p.f + '>' + camp + '|' + p.t;
             if (has[k] || seen[k]) return; seen[k] = 1;
             sug.push({ date: b.date, kind: p.kind, fromCamp: camp, fromCode: p.f, toCamp: camp, toCode: p.t, src: sq.src, memo: sq.src + ' ' + String(a.p).slice(0, 10) + ' → ' + String(b.p).slice(0, 10) });
+          });
+        });
+        leftover.gone.forEach(function (g) {
+          const cand = leftover.fresh.filter(function (f) { return f.camp !== g.camp && f.L.join('') === g.L.join(''); });
+          if (cand.length !== 1) return;
+          g.L.forEach(function (L) {
+            const k = g.camp + '|' + g.num + L + '>' + cand[0].camp + '|' + cand[0].num + L;
+            if (has[k] || seen[k]) return; seen[k] = 1;
+            sug.push({ date: b.date, kind: RLK.MOVE, fromCamp: g.camp, fromCode: g.num + L, toCamp: cand[0].camp, toCode: cand[0].num + L, src: sq.src, memo: sq.src + ' ' + String(a.p).slice(0, 10) + ' → ' + String(b.p).slice(0, 10) + ' · 다른 캠프에 같은 구성이 새로 생김' });
           });
         });
       }

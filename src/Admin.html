@@ -4732,8 +4732,9 @@
     const f = SL.f, q = normCode(f.q), ps = SL.periods, lp = ps[ps.length - 1], pp = ps[ps.length - 2], fp = ps[0];
     return Array.from(slaMap().values()).filter((e) => e.code !== '영업점').map((e) => {
       const l = e.by[lp] || null, p = pp ? e.by[pp] : null;
-      // 최초 = 이 라우트 기록 중 가장 오래된 기간 (누적 집계가 다시 시작되면 그 뒤 첫 기간)
-      const first = e.by[fp] || e.by[ps.find((x) => e.by[x])] || null;
+      // 최초 = 지금 누적 집계가 시작된 뒤(같은 시작일) 가장 오래된 기간 (지표개선표 셈법) · 없으면 전체에서 가장 오래된 기간
+      const cyc = l ? ps.find((x) => e.by[x] && e.by[x].from === l.from) : '';
+      const first = (cyc && e.by[cyc]) || e.by[fp] || e.by[ps.find((x) => e.by[x])] || null;
       const d1 = l && p && l.total != null && p.total != null ? Math.round((l.total - p.total) * 10) / 10 : null;
       const d0 = l && first && first !== l && l.total != null && first.total != null ? Math.round((l.total - first.total) * 10) / 10 : null;
       return Object.assign({ e, l, p, first, d1, d0 }, e);
