@@ -183,15 +183,25 @@ function stlPeriodOfToday_() {
 function rpfRanRoutes_(driverId, camp, limit) {
   const pd = stlPeriodOfToday_(), today = todayText_(), rec = {};
   const s = schRead_(parseYmd_(pd.from), parseYmd_(today < pd.to ? today : pd.to));
-  const cells = s.cells[driverId] || {}, campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
-  Object.keys(cells).forEach(function (d) {
-    if (d < pd.from || d > pd.to) return;
-    const v = String(cells[d] || '').toUpperCase();
-    if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
-    let cp = camp;
-    campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
-    rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++; });
-  });
+  const campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); }), campName = {};
+  (s.camps || []).forEach(function (c) { campName[c.id] = rpfCamp_(c.name); });
+  const scan = function (cells, defCamp, defRoute) {
+    Object.keys(cells || {}).forEach(function (d) {
+      if (d < pd.from || d > pd.to) return;
+      let v = String(cells[d] || '').toUpperCase();
+      if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
+      if (v === '출근' && defRoute) v = defRoute.toUpperCase(); // 추가 배정 줄의 '출근' = 그 캠프 배정 노선
+      let cp = defCamp;
+      campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
+      rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++; });
+    });
+  };
+  scan(s.cells[driverId], camp, '');
+  // 추가 배정 줄(EX기사ID@캠프ID): 다른 캠프 칸에 적힌 것도 입차로 본다
+  try {
+    const me = driverById_(driverId), ex = me ? extraAssignOf_(me) : [];
+    ex.forEach(function (x) { scan(s.cells[schExId_(driverId, x.c)], campName[x.c] || camp, x.r); });
+  } catch (e) { /* 추가 배정 없음 */ }
   const list = Object.keys(rec).map(function (k) { return rec[k]; }).sort(function (a, b) { return b.days - a.days; });
   return { period: pd, routes: limit ? list.slice(0, limit) : list };
 }
