@@ -2553,6 +2553,8 @@ function adm_stlBank(token) {
 function stlMonths_() {
   const set = {};
   try { Object.keys(stlIndex_('stl_raw').m).forEach(function (m) { if (stlMonthOk_(m)) set[m] = 1; }); } catch (e) { /* 정산 DB 가 아직 없으면 빈 목록 */ }
+  // 마감된 달 (쿠팡 정산서 없이 기존 정산 이식으로 마감한 달 포함)
+  try { stlRead_('stl_close').forEach(function (r) { if (stlMonthOk_(r.month)) set[r.month] = 1; }); } catch (e) { /* 무시 */ }
   const withData = Object.keys(set).sort();
   const cur = stlMonthNow_();
   set[cur] = 1; set[stlAddMonth_(cur, -1)] = 1;
