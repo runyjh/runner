@@ -3823,3 +3823,163 @@ function adm_stlTaxPack(token, months, extraTo) {
     return out;
   });
 }
+
+// ───────────────────────── 기존 정산 결과 이식 (#300) ─────────────────────────
+/**
+ * 기존 급여정산서(PDF)에서 읽은 기사별 결과를 그 달 올인원 계산 위에 덮어써서 마감한다 (1~10월 이식용).
+ *  - 금액은 기존 정산서 그대로: 지급 항목·노선별·일자별·분실·공제·산재·고용·세금계산서·실지급액
+ *  - 기존 숫자끼리 합이 안 맞으면 '기타공제(기존 정산 차액)' 줄로 맞춘다
+ *  - 짝: 기존 정산서의 쿠팡 아이디(메인·서브)가 겹치는 올인원 정산 묶음. 없으면 새 줄 (아이디 = 첫 아이디)
+ *  - 올인원 계산에만 있고 기존 정산서에 없는 묶음은 0원 (메모: 기존 정산서 없음 / 다른 정산서에 합침)
+ * 자료: 화면에서 고른 JSON 파일의 그 달 몫(객체) 또는 드라이브 JSON 파일(fileId) — { months: { 'YYYY-MM': { drivers: [ {name, ids[], pay, invoice, supply, tax, san, goy, workDays, net, items[{name,qty,amt}], routes[{camp,route,qty,inc,base,unit,amt,worker}], daily[{date,camp,qty,ret,worker}], loss[{qty,amt,note}], deds[{name,qty,amt,note}], file} ] } } }
+ */
+function stlLegacyLoad_(fileId) {
+  if (fileId && typeof fileId === 'object') return fileId; // 화면에서 읽은 자료 (그 달 몫)
+  const f = DriveApp.getFileById(str_(fileId).replace(/^.*\/d\//, '').replace(/[/?#].*$/, ''));
+  return JSON.parse(f.getBlob().getDataAsString('UTF-8'));
+}
+const STL_LEG_ITEM = [
+  [/프레시백/, '프레시백', '프레시백'], [/미계약/, '미계약 라우트', '미계약'], [/직접.*프로모션|프로모션.*직접/, '프로모션 (직접 신청)', '프로모션'],
+  [/프로모션|소급/, '기타 (프로모션)', '기타프로모션'], [/용차/, '용차(지급)', '용차수행']
+];
+const STL_LEG_DED = [[/가불/, '가불금 상환'], [/용차/, '용차(지출)'], [/보류/, '퇴사 보류금'], [/분할/, '매출 분할 이전']];
+function stlLegacyMerge_(month, leg) {
+  const res = stlCompute_(month), sum = res.summary, slips = res.slips;
+  const legs = (leg && leg.drivers) || [];
+  const byCid = {};
+  sum.drivers.forEach(function (d) { (d.cids || []).concat(d.usedCids || []).forEach(function (c) { byCid[stlLogin_(c)] = d.id; }); byCid[stlLogin_(d.id)] = d.id; });
+  const used = {}, rep = { matched: 0, added: 0, zeroed: 0, adj: [], legTotal: { invoice: 0, net: 0 } };
+  const D = stlDrivers_();
+  legs.forEach(function (L) {
+    const ids = (L.ids || []).map(stlLogin_).filter(Boolean);
+    let gid = ''; ids.some(function (c) { if (byCid[c] && !used[byCid[c]]) { gid = byCid[c]; return true; } return false; });
+    let row, slip;
+    if (gid) { slip = slips[gid]; row = slip.row; rep.matched++; }
+    else {
+      gid = ids[0] || ('legacy:' + L.name); rep.added++;
+      const owner = (D.byName[L.name] || [])[0];
+      row = { id: gid, cid: ids[0] || '', name: L.name, ownerId: owner ? owner.id : '', cids: ids.slice(), usedCids: ids.slice(), ids: ids.length, workers: [], qty: 0, sales: 0, bank: '', holder: '', account: '', bizNo: '', bizName: '', movedIn: [], movedOut: [] };
+      slip = { row: row, lines: [], ins: {}, routes: [], daily: {}, sched: {}, idUse: {}, loss: [], yong: [], members: ids.slice(), workers: [], movedIn: [], movedOut: [] };
+      slips[gid] = slip; sum.drivers.push(row);
+    }
+    used[gid] = 1;
+    // 이 기존 정산서에 같이 들어 있는 다른 올인원 묶음 → 0원 (합침)
+    ids.forEach(function (c) { const g = byCid[c]; if (g && g !== gid && !used[g]) { used[g] = 'merged:' + L.name; } });
+    // 지급 항목
+    const lines = [];
+    const routeAmt = L.routeAmt != null ? Number(L.routeAmt) || 0 : (L.routes || []).reduce(function (a, r) { return a + (Number(r.amt) || 0); }, 0);
+    lines.push({ name: '배송 기본', side: '지급', method: '배송기본', taxCut: false, amt: routeAmt, memo: '기존 정산서', unknown: false });
+    (L.items || []).forEach(function (it) {
+      if (!Number(it.amt)) return;
+      const m = STL_LEG_ITEM.filter(function (x) { return x[0].test(it.name); })[0];
+      lines.push({ name: m ? m[1] : it.name, side: '지급', method: m ? m[2] : '직접입력', taxCut: false, amt: Number(it.amt), memo: (it.qty ? it.qty + '건' : '') + (m && m[1] !== it.name ? ' (' + it.name + ')' : ''), unknown: false });
+    });
+    const pay = lines.reduce(function (a, l) { return a + l.amt; }, 0);
+    // 세금계산서: 기존 매출 합계와 지급 합계 차이 = 계산서 차감(또는 지급 차액)
+    const invoice = Number(L.invoice) || (Number(L.supply) || 0) + (Number(L.tax) || 0);
+    if (Number(L.pay) && Number(L.pay) !== pay) lines.push({ name: '기타 (기존 정산 차액)', side: '지급', method: '직접입력', taxCut: false, amt: Number(L.pay) - pay, memo: '기존 정산서 매출 합계에 맞춤', unknown: false });
+    const pay2 = Number(L.pay) || pay;
+    // 기존 정산서의 세금계산서가 매출 합계와 다르면 (예: 소급분만 있어 계산서 0원) 계산서 금액만 기존 그대로 두고, 지급·공제 줄은 매출 합계 기준
+    // 공제: 분실 · 공제 내역
+    let ded = 0;
+    const lossAmt = (L.loss || []).reduce(function (a, x) { return a + (Number(x.amt) || 0); }, 0);
+    if (lossAmt) { lines.push({ name: '분실파손 부담', side: '차감', method: '분실파손', taxCut: false, amt: lossAmt, memo: (L.loss || []).length + '건', unknown: false }); ded += lossAmt; }
+    (L.deds || []).forEach(function (x) {
+      if (!Number(x.amt)) return;
+      const m = STL_LEG_DED.filter(function (y) { return y[0].test(x.name); })[0];
+      lines.push({ name: m ? m[1] : (x.name || '기타 공제'), side: '차감', method: m && m[1] === '용차(지출)' ? '용차지출' : '직접입력', taxCut: false, amt: Number(x.amt), memo: [x.name !== (m && m[1]) ? x.name : '', x.qty ? x.qty + '건' : '', x.note || ''].filter(Boolean).join(' · '), unknown: false });
+      ded += Number(x.amt);
+    });
+    const san = Number(L.san) || 0, goy = Number(L.goy) || 0, net = Number(L.net) || 0;
+    const gap = pay2 - san - goy - ded - net;
+    if (gap) { lines.push({ name: '기타 공제', side: '차감', method: '직접입력', taxCut: false, amt: gap, memo: '기존 정산 차액', unknown: false }); ded += gap; rep.adj.push({ name: L.name, amt: gap }); }
+    lines.push({ name: '산재보험', side: '차감', method: '산재보험', taxCut: false, amt: san, memo: '', unknown: false });
+    lines.push({ name: '고용보험', side: '차감', method: '고용보험', taxCut: false, amt: goy, memo: '', unknown: false });
+    slip.lines = lines;
+    const supply = Number(L.supply) || Math.round(invoice / 1.1);
+    Object.assign(row, {
+      name: row.name || L.name, pay: pay2, taxDed: 0, invoice: invoice, supply: supply, tax: invoice - supply, san: san, goy: goy, depDed: ded, depAdd: pay2 - invoice, net: net,
+      loss: lossAmt, lossInc: lossAmt, yongInc: (L.deds || []).filter(function (x) { return /용차/.test(x.name); }).reduce(function (a, x) { return a + (Number(x.amt) || 0); }, 0),
+      workDays: Number(L.workDays) || row.workDays || 0, workDaysSrc: '기존 정산서', ceo: false, ceoView: null, legacy: L.file || true,
+      qty: (L.routes || []).reduce(function (a, r) { return a + (Number(r.qty) || 0); }, 0) || row.qty
+    });
+    row.otherInc = row.lossInc + row.yongInc;
+    row.profit = Math.round((row.supplyCpRaw || 0)); // 아래에서 다시 계산
+    // 노선별 · 일자별 (기존 정산서 그대로)
+    if ((L.routes || []).length) slip.routes = L.routes.map(function (r) { return { camp: r.camp || '', route: r.route || '', how: '기존', unit: Number(r.unit) || 0, inc: Number(r.inc) || 0, base: Number(r.base) || 0, qty: Number(r.qty) || 0, amt: Number(r.amt) || 0, worker: r.worker || '' }; });
+    if ((L.daily || []).length) {
+      const old = slip.daily || {}, nd = {};
+      L.daily.forEach(function (x) { const o = nd[x.date] || (nd[x.date] = { qty: 0, amt: (old[x.date] || {}).amt || 0, rt: (old[x.date] || {}).rt }); o.qty += Number(x.qty) || 0; if (x.worker) o.who = x.worker; });
+      slip.daily = nd;
+    }
+    slip.loss = (L.loss || []).map(function (x) { return { date: x.date || '', type: '분실파손', item: x.note || '', waybill: x.waybill || '', amt: Number(x.amt) || 0, qty: Number(x.qty) || 0 }; });
+    slip.ins = Object.assign({}, slip.ins || {}, { legacy: true, workDays: Number(L.workDays) || 0 });
+    rep.legTotal.invoice += invoice; rep.legTotal.net += net;
+  });
+  // 기존 정산서에 없는 묶음 → 0원
+  sum.drivers.forEach(function (row) {
+    if (used[row.id] === 1) return;
+    const why = typeof used[row.id] === 'string' ? used[row.id].replace(/^merged:/, '') + ' 정산서에 합침' : '기존 정산서 없음';
+    ['pay', 'taxDed', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'lossInc', 'yongInc', 'otherInc', 'runnerIns', 'insGain'].forEach(function (k) { row[k] = 0; });
+    row.legacyNote = why; rep.zeroed++;
+    if (slips[row.id]) slips[row.id].lines = [{ name: '(' + why + ')', side: '지급', method: '직접입력', taxCut: false, amt: 0, memo: '', unknown: false }];
+  });
+  // 회사이익금 (기사별) · 합계 다시
+  sum.drivers.forEach(function (row) {
+    const s = slips[row.id];
+    const cpSup = Math.round((row.sales || 0) / 1.1);
+    row.profit = Math.round(cpSup - (row.lossCp ? Math.round(row.lossCp / 1.1) : 0) - (row.supply || 0) + (row.otherInc || 0));
+    if (s) s.row = row;
+  });
+  const keys = ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'lossCp', 'lossInc', 'yongInc', 'otherInc', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales', 'taxDed'];
+  const tot = {}; keys.forEach(function (k) { tot[k] = 0; });
+  sum.drivers.forEach(function (row) { keys.forEach(function (k) { tot[k] += Number(row[k]) || 0; }); });
+  sum.total = Object.assign({}, sum.total, tot);
+  sum.legacy = { at: nowText_(), matched: rep.matched, added: rep.added, zeroed: rep.zeroed, adj: rep.adj };
+  sum.drivers.sort(function (a, b) { return (b.net || 0) - (a.net || 0) || koCmp_(a.name, b.name); });
+  return { res: res, rep: rep };
+}
+/** 미리보기: 달마다 기존 합계 · 올인원 계산 합계 · 짝 맞춘 수 · 차액 줄 */
+function adm_stlLegacyPreview(token, fileId, months) {
+  return run_(function () {
+    requireAdmin_(token);
+    const data = stlLegacyLoad_(fileId), all = Object.keys(data.months || {}).sort();
+    if (months === 'list') return { ok: true, months: [], all: all };
+    const pick = (Array.isArray(months) && months.length ? months : all).filter(function (m) { return data.months[m]; });
+    const out = pick.map(function (m) {
+      const closed = !!stlClosedInfo_(m);
+      let calc = null, merged = null, err = '';
+      try {
+        if (!closed) { const r0 = stlResult_(m, false); calc = { invoice: r0.summary.total.invoice || 0, net: r0.summary.total.net || 0, n: r0.summary.drivers.length }; }
+        const mg = stlLegacyMerge_(m, data.months[m]);
+        merged = { invoice: mg.res.summary.total.invoice, net: mg.res.summary.total.net, n: mg.res.summary.drivers.filter(function (d) { return d.net; }).length, matched: mg.rep.matched, added: mg.rep.added, zeroed: mg.rep.zeroed, adj: mg.rep.adj, legInvoice: mg.rep.legTotal.invoice, legNet: mg.rep.legTotal.net };
+      } catch (e) { err = String(e && e.message || e); }
+      return { month: m, closed: closed, legN: (data.months[m].drivers || []).length, calc: calc, merged: merged, err: err };
+    });
+    return { ok: true, months: out, all: all };
+  });
+}
+/** 실행: 달마다 (마감돼 있으면 풀고) 기존 결과로 덮어써서 마감 */
+function adm_stlLegacyClose(token, fileId, month) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const data = stlLegacyLoad_(fileId), leg = (data.months || {})[month];
+    if (!leg) fail_(month + ' 기존 정산 자료가 파일에 없습니다.');
+    const lock = scriptLock_(); lock.waitLock(30000);
+    try {
+      const rows = stlRead_('stl_close'), others = rows.filter(function (r) { return r.month !== month; });
+      const mg = stlLegacyMerge_(month, leg), res = mg.res;
+      res.summary.computedAt = nowText_();
+      const snap = [{ month: month, acct: '_summary', data: JSON.stringify(res.summary) }];
+      Object.keys(res.slips).forEach(function (id) { snap.push({ month: month, acct: id, data: JSON.stringify(res.slips[id]) }); });
+      if (snap.some(function (s) { return s.data.length > 49000; })) fail_('결과가 너무 커서 마감 기록을 저장할 수 없습니다.');
+      stlReplaceMonth_('stl_closed', month, snap);
+      stlWriteAll_('stl_close', others.concat([{ month: month, at: nowText_(), admin: a.name + ' (기존 정산 이식)' }]));
+      stlLastCloseSet_(month);
+      stlBump_();
+      logAdmin_(a, '기존 정산 이식·마감', month, '짝 ' + mg.rep.matched + ' · 새 줄 ' + mg.rep.added + ' · 0원 ' + mg.rep.zeroed + ' · 차액 ' + mg.rep.adj.length);
+      return { ok: true, month: month, total: { invoice: res.summary.total.invoice, net: res.summary.total.net }, rep: mg.rep };
+    } finally { lock.releaseLock(); }
+  });
+}
