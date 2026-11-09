@@ -8937,7 +8937,7 @@
         if (!P.rows.length) {
           try { console.log('[통장 내역] 읽은 글자 줄', pdfDbg); } catch (e2) { /* 무시 */ }
           const peek = (pdfDbg.lines || []).filter((l) => /\d{4}/.test(l)).slice(0, 2).map((l) => l.slice(0, 70)).join(' | ');
-          throw new Error('거래 줄을 찾지 못했습니다. 카카오뱅크 거래내역서(PDF/엑셀) · 우리은행 거래실적증명서(PDF/엑셀)인지 확인해 주세요.' + (peek ? ' (읽은 글자: ' + peek + ')' : ''));
+          throw new Error('거래 줄을 찾지 못했습니다. ' + (peek ? '(읽은 글자: ' + peek + ') ' : 'PDF 글자를 꺼내지 못하는 파일입니다. ') + 'PDF 를 열어 Ctrl+A → Ctrl+C 한 뒤 [글자 붙여넣기]로 넣어 주세요.');
         }
         const r = await api('adm_bankPreview', { bank: P.bank, acct: P.acct, rows: P.rows, file: f.name });
         if (!r.ok) return toast(r.msg);
@@ -9015,7 +9015,7 @@
       el.innerHTML = '<div class="bk-head"><select class="inp" id="bkMonth" style="width:auto;height:34px">' + months.map((m) => '<option value="' + m + '"' + (m === S.month ? ' selected' : '') + '>' + esc(ymTitle(m)) + (S.months.includes(m) ? '' : ' (없음)') + '</option>').join('') + '</select>' +
           '<button class="btn" id="bkUp">통장 내역 올리기 (PDF·엑셀)</button><input type="file" id="bkFile" accept=".pdf,.xlsx,.csv" class="hidden">' +
           '<button class="btn ghost" id="bkPaste">글자 붙여넣기</button>' +
-          '<span class="sub">카카오뱅크 거래내역서 · 우리은행 거래실적증명서. 비밀번호 걸린 엑셀은 암호를 풀어 저장한 뒤 올려 주세요. 계좌번호는 끝 4자리만 저장합니다.</span></div>' +
+          '<span class="sub">카카오뱅크 거래내역서 · 우리은행 거래실적증명서. <b>PDF 가 안 읽히면 [글자 붙여넣기]</b>(PDF 열고 Ctrl+A → Ctrl+C). 비밀번호 걸린 엑셀은 암호를 풀어 저장한 뒤 올려 주세요. 계좌번호는 끝 4자리만 저장합니다.</span></div>' +
         '<div class="bk-sum">' + (S.sum || []).sort((a, b) => b.n - a.n).map((x) => '<span>' + esc(x.cat) + ' <b>' + x.n + '</b> <small>' + (x.in ? '+' + wn(x.in) : '') + (x.out ? ' −' + wn(x.out) : '') + '</small></span>').join('') + (Object.keys(by).length ? '<span style="background:none">' + Object.keys(by).map((k) => esc(k) + ' ' + by[k] + '줄').join(' · ') + '</span>' : '') + '</div>' +
         (S.rows.length ? '<div class="bk-wrap"><table class="bk-table" data-tk-off><thead><tr><th>통장</th><th>날짜</th><th>입/출</th><th class="n">금액</th><th>거래내용</th><th>거래구분</th><th>분류</th><th>연결 · 이름</th><th>메모</th><th></th></tr></thead><tbody id="bkListRows">' +
           S.rows.map((x, i) => '<tr class="' + (x.status === '미분류' ? 'bk-none' : '') + '" data-bkli="' + i + '"><td>' + esc(x.bankName || x.bank || '') + '</td><td>' + esc(x.date) + '</td><td class="' + (x.io === '입금' ? 'in' : 'out') + '">' + esc(x.io) + '</td><td class="n">' + wn(x.amt) + '</td><td class="bkm" title="' + esc(x.memo) + '">' + esc(x.memo) + '</td><td><small>' + esc(x.kind) + '</small></td>' +
