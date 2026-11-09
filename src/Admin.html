@@ -6480,14 +6480,15 @@
   function rcBadge(r) {
     const d = r.d, out = [];
     const multi = d._grp && d._grp.length > 1; // 같은 캠프 안에서 노선·회전만 바뀜
-    if (multi) {
+    const tdy = ymdLocal(new Date()), ahead = (dt) => dt > tdy; // 적용일이 된(지난) 변경은 표시 안 함 — 이미 기사 정보에 반영됨 (칸 흐림으로 구간은 그대로 보임)
+    if (multi && ahead(d._grp[d._grp.length - 1].from)) {
       const lastSeg = d._grp[d._grp.length - 1], prevSeg = d._grp[d._grp.length - 2];
       out.push('<small class="rcb new" title="' + esc(mdOf(lastSeg.from) + '부터 ' + (lastSeg.baseRoute || '') + ' (이전 ' + (prevSeg.baseRoute || '') + ')') + '">' + mdOf(lastSeg.from) + '~ 노선</small>');
     }
     if (r.seg && d._segs) {
       const prev = d._segs[(d._si0 !== undefined ? d._si0 : d._si) - 1], next = d._segs[d._si + 1];
-      if (next) out.push('<small class="rcb" title="' + esc(mdOf(next.from) + '부터 ' + (next.camp || '') + ' ' + (next.baseRoute || '')) + '">~' + mdOf(r.seg.to) + '</small>');
-      if (prev) out.push('<small class="rcb new" title="' + esc(mdOf(r.seg.from) + '부터 (이전 ' + (prev.camp || '') + ' ' + (prev.baseRoute || '') + ')') + '">' + mdOf(r.seg.from) + '~</small>');
+      if (next && ahead(next.from)) out.push('<small class="rcb" title="' + esc(mdOf(next.from) + '부터 ' + (next.camp || '') + ' ' + (next.baseRoute || '')) + '">~' + mdOf(r.seg.to) + '</small>');
+      if (prev && ahead(r.seg.from)) out.push('<small class="rcb new" title="' + esc(mdOf(r.seg.from) + '부터 (이전 ' + (prev.camp || '') + ' ' + (prev.baseRoute || '') + ')') + '">' + mdOf(r.seg.from) + '~</small>');
     } else if (!multi) (d.changes || []).filter((c) => c.status === '예약').forEach((c) => {
       out.push('<small class="rcb" title="' + esc(mdOf(c.date) + '부터 ' + c.toCamp + ' ' + c.toRoute + ' (노선 변경 예약)') + '">' + mdOf(c.date) + '~ ' + esc(shortCamp(c.toCamp) + ' ' + c.toRoute) + '</small>');
     });
