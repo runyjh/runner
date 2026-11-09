@@ -1296,7 +1296,7 @@
       <b id="sTitle" style="font-size:14px;white-space:nowrap"></b>
       <input class="inp" type="date" id="sDate" title="날짜 검색 (그 주 일요일부터 2주)">
       <select class="inp" id="sCamp" aria-label="캠프"></select>
-      <input class="inp" id="sQ" placeholder="이름·캠프·노선 (여러 개는 콤마)" style="width:200px" title="콤마로 여러 개: 계동희,수원1캠프,백업 · 검색하면 캠프 선택과 상관없이 전체에서 찾습니다">
+      <input class="inp" id="sQ" placeholder="이름·캠프·노선·코드·전화 (여러 개는 콤마)" style="width:220px" title="콤마로 여러 개: 계동희,수원1캠프,백업 · 기사 정보관리의 기사코드·서브아이디·차량번호·전화번호로도 찾습니다 · 검색하면 캠프 선택과 상관없이 전체에서">
       <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
       <label class="check" id="sStaffAllWrap" title="관리자·운영자·대표 줄은 고른 캠프 기사들 다음에 이어서 나옵니다. 캠프를 고르면 그 기간에 그 캠프 노선을 뛴 사람만 — 체크하면 전원"><input type="checkbox" id="sStaffAll"> 관리자·운영자·대표 전원</label>
       <div class="grow">
@@ -6144,7 +6144,10 @@
     const q = qs.length ? 1 : 0;
     const camps = {};
     SD.camps.forEach((c) => { camps[c.id] = c; });
-    const qHit = (vals) => qs.some((t) => vals.some((x) => nfc(String(x || '')).toLowerCase().replace(/\s/g, '').includes(t.replace(/\s/g, ''))));
+    const qHit = (vals) => qs.some((t) => vals.some((x) => nfc(String(x || '')).toLowerCase().replace(/\s/g, '').includes(t.replace(/\s/g, ''))) ||
+      (t.replace(/\D/g, '').length >= 3 && vals.some((x) => /^01\d/.test(String(x || '').replace(/\D/g, '')) && String(x).replace(/\D/g, '').includes(t.replace(/\D/g, '')))));
+    // 기사 정보관리의 기사 정보로도 찾는다 (기사코드·서브아이디·차량·차량번호·전화번호) — 기사스케줄 데이터에 없는 항목
+    const infoOf = (id) => { const r = (typeof all !== 'undefined' && Array.isArray(all) ? all : []).find((x) => x.id === id) || {}; return [r.driverCode, r.subId1, r.subId2, r.carName, r.carNo, r.phone]; };
     const campShort = !q && sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
     const ranCamp = (id) => SD.dates.some((dt) => sget(id, dt).replace(/\s/g, '').includes(campShort));
     const list = schSegDrivers().filter((d) => {
@@ -6154,7 +6157,7 @@
       if (isStaffRow(d) && !d.ex) { if (campShort && !sf.staffAll && !ranCamp(d.id)) return false; }
       else if (!q && sf.camp && d.campId !== sf.camp) return false;
       const cn = camps[d.campId] ? camps[d.campId].name : (d.camp || '');
-      if (q && !qHit([d.name, d.loginId, d.code, d.baseRoute, d.type, cn, shortCamp(cn)])) return false;
+      if (q && !qHit([d.name, d.loginId, d.code, d.baseRoute, d.type, d.title, cn, shortCamp(cn)].concat(d.subIds || [], infoOf(d.id)))) return false;
       return true;
     }).sort((a, b) => {
       const sa = isStaffRow(a) && !a.ex ? 1 : 0, sb = isStaffRow(b) && !b.ex ? 1 : 0;
@@ -6167,7 +6170,7 @@
     const rows = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, staff: isStaffRow(d) && !d.ex, camp: isStaffRow(d) && !d.ex ? STAFF_GROUP : (camps[d.campId] ? camps[d.campId].name : '') }));
     // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트 (배차 확정 때 서버가 적음 · 직접 고쳐도 됨)
     (SD.pmRows || []).filter((pr) => {
-      if (q && !qHit([pr.name, pr.loginId])) return false;
+      if (q && !qHit([pr.name, pr.loginId].concat(infoOf(pr.driverId || pr.id)))) return false;
       if (campShort && !SD.dates.some((dt) => sget(pr.id, dt).replace(/\s/g, '').includes(campShort))) return false;
       return true;
     }).forEach((pr) => rows.push({ kind: 'p', row: pr.id, key: pr.id, p: pr }));
@@ -6701,7 +6704,10 @@
     sMonth = monthOf(ref); schedGo();
   });
   $('#sCamp').addEventListener('change', (e) => { sf.camp = e.target.value; sAct = null; sAnchor = null; renderSched(); });
-  onSearch($('#sQ'), () => { sf.q = $('#sQ').value; sAct = null; sAnchor = null; renderSched(); });
+  onSearch($('#sQ'), () => {
+    sf.q = $('#sQ').value; sAct = null; sAnchor = null; renderSched();
+    if (sf.q.trim() && !all.length) loadList(true).then(() => { if (sf.q.trim()) renderSched(); }); // 기사 정보관리 목록이 아직 없으면 불러와서 코드·전화로도 찾게
+  });
   $('#sAll').addEventListener('change', (e) => { sf.all = e.target.checked; renderSched(); });
   $('#sStaffAll').addEventListener('change', (e) => { sf.staffAll = e.target.checked; renderSched(); });
   $('#sReload').addEventListener('click', () => schedGo(SD.start));
