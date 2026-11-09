@@ -7674,9 +7674,9 @@
         (d.workers && d.workers.length ? '<br><small>일한 기사: ' + esc(d.workers.join(', ')) + '</small>' : '') +
         (d.movedIn && d.movedIn.length ? '<br><small style="color:var(--ok)">' + esc(d.movedIn.join(', ')) + '</small>' : '') +
         (d.movedOut && d.movedOut.length ? '<br><small style="color:#b45309">' + esc(d.movedOut.join(', ')) + '</small>' : '') + '</td>' +
-      '<td class="n">' + (d.workDays || '-') + '</td>' + num(d.qty) + num(d.pay) + num(d.lossCp) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
+      '<td class="n">' + (d.workDays || '-') + '</td>' + num(d.qty) + num(d.pay) + num(d.lossCp != null ? d.lossCp : d.loss) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
       '<td>' + (d.checked ? '<span style="color:var(--ok);font-weight:700">✓ ' + esc(mdTxt(d.payDate)) + '</span>' : '') + '</td></tr>';
-    const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + num(t.lossCp) + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';
+    const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + num(t.lossCp != null ? t.lossCp : t.loss) + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';
     $('#stTable').innerHTML = '<thead><tr>' + H.map((h, i) => '<th' + (i > 2 && i < 14 ? ' class="n"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + totRow + list.map(tr).join('') + '</tbody>';
     // 모바일: 카드 (명의자 · 실입금 크게 · 계산서 · 배송 · 공제) — 누르면 정산서
     const card = (d) => '<div class="st-card" data-slip="' + esc(d.id) + '"><div class="ch"><b>' + esc(d.name) + '</b><span class="ids">' + esc(d.cids.map((x) => x.replace(/@.*/, '')).join(' · ')) + '</span></div>' +

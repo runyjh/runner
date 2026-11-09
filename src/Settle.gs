@@ -167,7 +167,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261108b';
+const STL_CALC_VER = '20261109a';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
