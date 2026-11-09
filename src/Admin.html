@@ -8702,7 +8702,7 @@
     return [{ name: 'csv', rows }];
   }
   const ST_RAW_MAP = { kind: ['구분'], cid: ['ID 및 영업점 수수료', 'ID', '아이디', '배송원ID'], route: ['라우트', '노선', 'route'], date: ['배송일자', '일자', '날짜', '배송일'], camp: ['캠프명', '캠프'],
-    dtype: ['배송유형(주간/심야)', '배송유형'], vendor: ['업체명', '업체'], qty: ['배송건수', '배송수량'], ret: ['반품건수', '반품수량'], price: ['단가(반품동일)', '단가', '기본단가'],
+    dtype: ['배송유형(주간/심야)', '배송유형'], vendor: ['업체명', '업체'], qty: ['배송건수', '배송수량'], ret: ['반품건수', '반품수량', '반품'], price: ['단가(반품동일)', '단가', '기본단가'],
     inc: ['추가 인센티브', '추가인센티브', '추가인센티브(건당)', '인센티브단가'], base: ['기본 배송단가 금액', '기본배송금액', '기본금액'], incAmt: ['추가 인센티브 가중요인 금액', '추가인센티브금액', '인센티브금액'],
     total: ['총금액', '합계금액'], fresh: ['프레시백 회수 인센티브', '프레쉬백 회수 인센티브', '재사용포장재 회수 인센티브', '프레시백'] };
   const ST_RAW_KEYS = ['kind', 'cid', 'route', 'date', 'camp', 'dtype', 'vendor', 'qty', 'ret', 'price', 'inc', 'base', 'incAmt', 'total', 'fresh'];
@@ -8713,6 +8713,9 @@
   function mapHeader(row, MAP) {
     const h = row.map(hk), out = {};
     Object.keys(MAP).forEach((k) => { for (const cand of MAP[k]) { const i = h.indexOf(hk(cand)); if (i >= 0 && !Object.values(out).includes(i)) { out[k] = i; break; } } });
+    // 예전 쿠팡 양식: '배송건수(파슬)' · '반품(운송장)' 처럼 괄호 설명이 붙은 머리글 → 괄호 빼고 한 번 더
+    const np = (x) => x.replace(/\([^)]*\)/g, ''), h2 = h.map(np);
+    Object.keys(MAP).forEach((k) => { if (out[k] != null) return; for (const cand of MAP[k]) { const i = h2.indexOf(np(hk(cand))); if (i >= 0 && h2[i] && !Object.values(out).includes(i)) { out[k] = i; break; } } });
     return out;
   }
   const xlDate = (v) => {
