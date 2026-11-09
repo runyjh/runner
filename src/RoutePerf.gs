@@ -541,7 +541,7 @@ function adm_lineageSuggest(token) {
 }
 
 // ───────────────────────── 프레시백 가중요인 (쿠팡 Weekly·월간 '가중요인 해당여부' 파일 · route_fb) ─────────────────────────
-// 가중요인1 = 누적 수행률(배송완료율) 95% 이상 → 공급가 14원/건 (부가세 포함 15원) · 가중요인2 = 누적 프레시백 회수율 75% 이상 → 공급가 9원/건 (10원)
+// 가중요인1(연계건) = 누적 수행률 95% 이상 → 공급가 14원/건 (부가세 포함 15원) · 가중요인2(단독건) = 누적 프레시백 회수율 75% 이상 → 공급가 9원/건 (10원)
 // 둘 다 해당 = 23원(25원). 정산기간(전월 26일~당월 25일) 누적으로 정해지며 월간 파일이 확정값. 기준·단가는 설정(app_settings fbTh1/fbTh2/fbWon1/fbWon2)에서 바꿀 수 있다.
 const FBK = { CUM: '누적', DAY: '일별', MONTH: '월간' };
 function fbSettings_() {
@@ -651,8 +651,8 @@ function adm_fbSet(token, f) {
     const a = requireAdmin_(token);
     f = f || {};
     const num = function (k, label, lo, hi) { if (f[k] === undefined) return; const v = Number(f[k]); if (isNaN(v) || v < lo || v > hi) fail_(label + ' 값을 확인해 주세요. (' + lo + '~' + hi + ')'); appSetPut_('fb' + k.charAt(0).toUpperCase() + k.slice(1), String(v), '프레시백 가중요인 ' + label); logAdmin_(a, '가중요인 설정', label, String(v)); };
-    num('th1', '요인1 기준 % (수행률)', 50, 120); num('th2', '요인2 기준 % (프레시백 회수율)', 10, 120);
-    num('won1', '요인1 단가 (공급가, 원/건)', 0, 1000); num('won2', '요인2 단가 (공급가, 원/건)', 0, 1000);
+    num('th1', '연계건 기준 % (수행률)', 50, 120); num('th2', '단독건 기준 % (프레시백 회수율)', 10, 120);
+    num('won1', '연계건 단가 (공급가, 원/건)', 0, 1000); num('won2', '단독건 단가 (공급가, 원/건)', 0, 1000);
     if (f.drvOn !== undefined) { appSetPut_('fbDrvOn', f.drvOn ? 'ON' : 'OFF', '기사 앱에 프레시백 가중요인 카드 (ON/OFF)'); logAdmin_(a, '가중요인 설정', '기사 앱 표시', f.drvOn ? 'ON' : 'OFF'); }
     rpfBump_();
     return { ok: true, set: fbSettings_() };
@@ -697,14 +697,15 @@ function api_myFb(token) {
       const c = lp ? pick(cum.filter(function (r) { return r.period === lp; }), keys) : null;
       if (!c) return null;
       const won = (c.f1 === '해당' ? set.won1 : 0) + (c.f2 === '해당' ? set.won2 : 0);
-      const v = vol[cp + '|' + code], perMonthDays = v && volMonths.length ? Math.round(v.days / volMonths.length) : 0;
-      const est = v ? Math.round(won * v.avg * perMonthDays) : null, estMax = v ? Math.round((set.won1 + set.won2) * v.avg * perMonthDays) : null;
+      // 예상 금액 = 단가 × 전월(가장 최근 쿠팡 정산서 달) 이 라우트 배송수량
+      const v = vol[cp + '|' + code], lm = volMonths[volMonths.length - 1] || '', prevQty = v && v.m && lm ? Number(v.m[lm]) || 0 : 0;
+      const est = prevQty ? Math.round(won * prevQty) : null, estMax = prevQty ? Math.round((set.won1 + set.won2) * prevQty) : null;
       const mp = mps.filter(function (p) { return p < lp; }).pop() || '';
       const m = mp ? pick(months.filter(function (r) { return r.period === mp; }), keys) : null;
       return { camp: cp, code: code, period: lp, cum: { to: c.to, from: c.from, f1pct: c.f1pct, f1: c.f1, f2pct: c.f2pct, f2: c.f2 },
         days: dayList.map(function (d) { const r = pick(all.filter(function (x) { return x.kind === FBK.DAY && x.date === d; }), keys); return { date: d, f1: r ? r.f1 : '', f2: r ? r.f2 : '', f1pct: r ? r.f1pct : null, f2pct: r ? r.f2pct : null }; }),
         month: m ? { period: mp, f1: m.f1, f2: m.f2, won: (m.f1 === '해당' ? set.won1 : 0) + (m.f2 === '해당' ? set.won2 : 0) } : null,
-        won: won, est: est, estMax: estMax, vol: v ? { avg: v.avg, days: perMonthDays } : null };
+        won: won, est: est, estMax: estMax, vol: prevQty ? { qty: prevQty, month: lm } : null };
     };
     let codes = [];
     if (camp && base.length) codes = base.map(function (c) { return { camp: camp, code: c }; });

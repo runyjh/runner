@@ -5327,7 +5327,7 @@
     $('#rpUpDetail').innerHTML = '<div style="margin-top:8px"><b>' + esc(main.kind + ' ' + (main.kind === '일별' ? slaPd(main.date) : slaPd(main.from) + '~' + slaPd(main.to))) + '</b> · 라우트 ' + main.rows.length + '개' +
       '<div class="rp-sum" style="margin-top:6px"><span>둘 다 해당 (+' + fbWonV(S.won1 + S.won2) + '원)<b>' + both.length + '</b></span><span>하나만 해당<b>' + one.length + '</b></span><span class="' + (none.length ? 'bad' : '') + '">둘 다 미해당 (0원)<b>' + none.length + '</b></span><span>경계 (±5%p)<b>' + edge.length + '</b></span></div>' +
       (none.length ? '<div><b>둘 다 미해당:</b> ' + none.map((r) => esc(r.camp + ' ' + r.code) + (r.f1pct ? ' <small>' + esc(r.f1pct) + ' / ' + esc(r.f2pct) + '</small>' : '')).join(', ') + '</div>' : '') +
-      (one.length ? '<div style="margin-top:4px"><b>하나만 미해당:</b> ' + one.map((r) => esc(r.camp + ' ' + r.code) + ' <small>' + (fbYes(r.f1) ? '회수 ' + esc(r.f2pct || '미해당') : '수행률 ' + esc(r.f1pct || '미해당')) + '</small>').join(', ') + '</div>' : '') + '</div>' +
+      (one.length ? '<div style="margin-top:4px"><b>하나만 미해당:</b> ' + one.map((r) => esc(r.camp + ' ' + r.code) + ' <small>' + (fbYes(r.f1) ? '단독건(회수) ' + esc(r.f2pct || '미해당') : '연계건(수행률) ' + esc(r.f1pct || '미해당')) + '</small>').join(', ') + '</div>' : '') + '</div>' +
       (RP.memoOn ? '<div style="margin-top:6px" class="sub">저장하면 업무스케줄에 "' + (main.kind === '월간' ? Number(fbPeriodOf(main.to).slice(5, 7)) + '월 가중요인 확정 업로드' : '가중요인 업로드 (' + slaPd(main.to) + ' 기준)') + '" 한 줄이 적힙니다.</div>' : '');
   }
   async function fbUpSave() {
@@ -5348,8 +5348,8 @@
     const pick = (rows) => rows.find((r) => keys.includes(rpKey(r.camp, r.code))) || null;
     const c = pick(FW.cum.filter((r) => r.period === lp)); if (!c) return null;
     const S = FW.set, won = (fbYes(c.f1) ? S.won1 : 0) + (fbYes(c.f2) ? S.won2 : 0);
-    const v = FW.vol[camp + '|' + code], pmd = v && FW.volMonths.length ? Math.round(v.days / FW.volMonths.length) : 0;
-    const est = v ? won * v.avg * pmd : null, estMax = v ? (S.won1 + S.won2) * v.avg * pmd : null;
+    const lm = FW.volMonths[FW.volMonths.length - 1] || '', v = FW.vol[camp + '|' + code], pmd = v && v.m && lm ? Number(v.m[lm]) || 0 : 0; // pmd = 전월(최근 정산서 달) 배송수량
+    const est = pmd ? won * pmd : null, estMax = pmd ? (S.won1 + S.won2) * pmd : null;
     const mp = FW.month.map((r) => r.period).filter((p) => p < lp).sort().pop() || '';
     const m = mp ? pick(FW.month.filter((r) => r.period === mp)) : null;
     const days = FW.days.filter((d) => fbPeriodOf(d) === lp).slice(-7).map((d) => { const r = pick(FW.day.filter((x) => x.date === d)); return { date: d, f1: r ? r.f1 : '', f2: r ? r.f2 : '', f2pct: r ? r.f2pct : null, f1pct: r ? r.f1pct : null }; });
@@ -5375,15 +5375,16 @@
     const listAll = (() => { const f0 = Object.assign({}, FW.f); FW.f = { camp: '', mode: '', q: '' }; const l = fbList(); FW.f = f0; return l; })();
     const both = listAll.filter((x) => fbYes(x.c.f1) && fbYes(x.c.f2)).length, none = listAll.filter((x) => x.none).length, estSum = listAll.reduce((a, x) => a + (x.est || 0), 0), estMaxSum = listAll.reduce((a, x) => a + (x.estMax || 0), 0);
     const mp = FW.month.map((r) => r.period).sort().pop() || '', mRows = mp ? FW.month.filter((r) => r.period === mp) : [];
-    const mWon = mRows.reduce((a, r) => { const v = FW.vol[r.camp + '|' + r.code], pmd = v && FW.volMonths.length ? Math.round(v.days / FW.volMonths.length) : 0; return a + ((fbYes(r.f1) ? S.won1 : 0) + (fbYes(r.f2) ? S.won2 : 0)) * (v ? v.avg * pmd : 0); }, 0);
+    const lmv = FW.volMonths[FW.volMonths.length - 1] || '';
+    const mWon = mRows.reduce((a, r) => { const v = FW.vol[r.camp + '|' + r.code], q = v && v.m && lmv ? Number(v.m[lmv]) || 0 : 0; return a + ((fbYes(r.f1) ? S.won1 : 0) + (fbYes(r.f2) ? S.won2 : 0)) * q; }, 0);
     const daysLeft = (() => { if (!lp || !to) return ''; const a = new Date(lp), b = new Date(to); return Math.max(0, Math.round((a - b) / 864e5)); })();
     const today = ymdLocal(new Date()), closed = lp && lp < today;
     box.insertAdjacentHTML('beforeend', '<div class="sec">' +
       (lp ? '<div class="xp-head"><h4 style="margin:0">' + esc(fbPdLabel(lp)) + ' <span class="fbb ' + (closed ? 'ok' : 'wn') + '">' + (closed ? '기간 종료' : '진행 중') + '</span></h4><span class="xp-sum">기준일 ' + esc(slaPd(to)) + (daysLeft !== '' && !closed ? ' · 25일까지 ' + daysLeft + '일 남음' : '') + ' · 업로드 ' + esc(String(lrows[0].uploadedAt || '').slice(0, 16)) + '</span></div>' +
-        '<div class="rp-sum"><span>라우트<b>' + listAll.length + '</b></span><span>요인1 해당 (수행률 ' + S.th1 + '%↑)<b>' + listAll.filter((x) => fbYes(x.c.f1)).length + '</b></span><span>요인2 해당 (프레시백 ' + S.th2 + '%↑)<b>' + listAll.filter((x) => fbYes(x.c.f2)).length + '</b></span>' +
+        '<div class="rp-sum"><span>라우트<b>' + listAll.length + '</b></span><span>연계건 해당 (수행률 ' + S.th1 + '%↑)<b>' + listAll.filter((x) => fbYes(x.c.f1)).length + '</b></span><span>단독건 해당 (프레시백 ' + S.th2 + '%↑)<b>' + listAll.filter((x) => fbYes(x.c.f2)).length + '</b></span>' +
         '<span class="hi">둘 다 해당 (+' + fbWonV(S.won1 + S.won2) + '원/건)<b>' + both + '</b></span><span class="' + (none ? 'bad' : '') + '">둘 다 미해당 (0원)<b>' + none + '</b></span>' +
         (estSum ? '<span class="hi">이달 예상 추가금 (공급가)<b>약 ' + wn(Math.round(estSum / 1000) * 1000) + '원</b><small class="sub">모두 해당이면 ' + wn(Math.round(estMaxSum / 1000) * 1000) + '원</small></span>' : '') +
-        (mp ? '<span>전월 확정 (' + Number(mp.slice(5, 7)) + '월)<b>둘 다 ' + mRows.filter((r) => fbYes(r.f1) && fbYes(r.f2)).length + ' · 0원 ' + mRows.filter((r) => !fbYes(r.f1) && !fbYes(r.f2)).length + '</b>' + (mWon ? '<small class="sub">약 ' + wn(Math.round(mWon / 1000) * 1000) + '원 (물량 기준 추정)</small>' : '') + '</span>' : '') + '</div>'
+        (mp ? '<span>전월 확정 (' + Number(mp.slice(5, 7)) + '월)<b>둘 다 ' + mRows.filter((r) => fbYes(r.f1) && fbYes(r.f2)).length + ' · 0원 ' + mRows.filter((r) => !fbYes(r.f1) && !fbYes(r.f2)).length + '</b>' + (mWon ? '<small class="sub">약 ' + wn(Math.round(mWon / 1000) * 1000) + '원 (전월 수량 기준 추정)</small>' : '') + '</span>' : '') + '</div>'
         : '<div class="empty">아직 올린 가중요인 자료가 없습니다. [수행률·SLA 업로드]에 쿠팡 메일의 Weekly 가중요인 파일(xlsx)을 올려 주세요. (파일 종류는 자동 인식)</div>') +
       '<div class="ptools">' +
         '<select class="inp" id="fbCamp" aria-label="캠프">' + opt('', '캠프 전체', FW.f.camp) + camps.map((c) => opt(c, c, FW.f.camp)).join('') + '</select>' +
@@ -5392,13 +5393,13 @@
         '<span class="grow"></span><span class="rp-on">기사 앱에 가중요인 카드 <b class="' + (S.drvOn ? 'on' : 'off') + '">' + (S.drvOn ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-fbset="drvOn">' + (S.drvOn ? '끄기' : '켜기') + '</button></span>' +
         '<button class="btn sm ghost" id="fbSetBtn">기준·단가 설정</button></div>' +
       '<div id="fbSetBox" class="hidden" style="background:#f7f9ff;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인1 기준 (수행률 %)<input class="inp" id="fbTh1" value="' + S.th1 + '" style="width:90px"></label>' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인2 기준 (프레시백 회수율 %)<input class="inp" id="fbTh2" value="' + S.th2 + '" style="width:90px"></label>' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인1 단가 (공급가 원/건)<input class="inp" id="fbWon1" value="' + S.won1 + '" style="width:90px"></label>' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인2 단가 (공급가 원/건)<input class="inp" id="fbWon2" value="' + S.won2 + '" style="width:90px"></label>' +
-        '<button class="btn sm" id="fbSetSave">저장</button><small class="sub" style="flex-basis:100%">공급가 기준(쿠팡 정산서와 같음). 부가세 포함 실지급은 ×1.1 → 요인1 ' + fbWonV(S.won1) + '원 · 요인2 ' + fbWonV(S.won2) + '원 · 둘 다 ' + fbWonV(S.won1 + S.won2) + '원. 기준 %는 쿠팡 파일의 해당/미해당에서 역산한 값(95 / 75)입니다.</small></div>' +
-      '<div class="table-wrap rt-table rp-table fb-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>요인1 수행률 (누적)</th><th>요인2 프레시백 (누적)</th><th title="최근 7일 일별 해당 여부 (위 요인1 · 아래 요인2)">최근 7일</th><th>예상 단가</th><th title="예상 단가 × 1일 평균물량 × 한 달 배송일 (쿠팡 정산서 최근 2개월 기준)">이달 예상 (공급가)</th><th>전월 확정</th></tr></thead><tbody id="fbRows"></tbody></table><div class="empty hidden" id="fbEmpty"></div></div>' +
-      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">쿠팡이 메일로 보내는 <b>Weekly 가중요인 해당여부</b>(정산기간 누적 + 일별)와 <b>월간 Freshbag 해당여부</b>(확정) 파일을 올리면 쌓입니다. 요인1 = 누적 수행률 ' + S.th1 + '% 이상 → 공급가 ' + S.won1 + '원/건(실지급 ' + fbWonV(S.won1) + '원), 요인2 = 누적 프레시백 회수율 ' + S.th2 + '% 이상 → ' + S.won2 + '원/건(' + fbWonV(S.won2) + '원). 정산기간(전월 26일~당월 25일) 누적으로 정해지고 이달 전체 배송건에 붙습니다. 노란 줄 = 경계(±5%p) · 빨간 줄 = 둘 다 미해당.</p></div>');
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">연계건 기준 (수행률 %)<input class="inp" id="fbTh1" value="' + S.th1 + '" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">단독건 기준 (프레시백 회수율 %)<input class="inp" id="fbTh2" value="' + S.th2 + '" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">연계건 단가 (공급가 원/건)<input class="inp" id="fbWon1" value="' + S.won1 + '" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">단독건 단가 (공급가 원/건)<input class="inp" id="fbWon2" value="' + S.won2 + '" style="width:90px"></label>' +
+        '<button class="btn sm" id="fbSetSave">저장</button><small class="sub" style="flex-basis:100%">공급가 기준(쿠팡 정산서와 같음). 부가세 포함 실지급은 ×1.1 → 연계건 ' + fbWonV(S.won1) + '원 · 단독건 ' + fbWonV(S.won2) + '원 · 둘 다 ' + fbWonV(S.won1 + S.won2) + '원. 기준 %는 쿠팡 파일의 해당/미해당에서 역산한 값(95 / 75)입니다.</small></div>' +
+      '<div class="table-wrap rt-table rp-table fb-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>연계건 ' + S.th1 + '% — 수행률 (누적)</th><th>단독건 ' + S.th2 + '% — 프레시백 회수 (누적)</th><th title="최근 7일 일별 해당 여부 (위 연계건 · 아래 단독건)">최근 7일</th><th>예상 단가</th><th title="예상 단가 × 전월(가장 최근 쿠팡 정산서 달) 이 라우트 배송수량">이달 예상 (공급가)</th><th>전월 확정</th></tr></thead><tbody id="fbRows"></tbody></table><div class="empty hidden" id="fbEmpty"></div></div>' +
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">쿠팡이 메일로 보내는 <b>Weekly 가중요인 해당여부</b>(정산기간 누적 + 일별)와 <b>월간 Freshbag 해당여부</b>(확정) 파일을 올리면 쌓입니다. <b>연계건 ' + S.th1 + '%</b> = 누적 수행률 ' + S.th1 + '% 이상 → 공급가 ' + S.won1 + '원/건(실지급 ' + fbWonV(S.won1) + '원), <b>단독건 ' + S.th2 + '%</b> = 누적 프레시백 회수율 ' + S.th2 + '% 이상 → ' + S.won2 + '원/건(' + fbWonV(S.won2) + '원). 정산기간(전월 26일~당월 25일) 누적으로 정해지고 이달 전체 배송건에 붙습니다. 이달 예상 = 단가 × 전월 정산서 배송수량. 노란 줄 = 경계(±5%p) · 빨간 줄 = 둘 다 미해당.</p></div>');
     fbRenderRows();
   }
   function fbRenderRows() {
@@ -5412,8 +5413,8 @@
         '<td>' + pcell(x.c.f1pct, x.c.f1, S.th1, x.gap1) + '</td><td>' + pcell(x.c.f2pct, x.c.f2, S.th2, x.gap2) + '</td>' +
         '<td class="fbd"><div>' + dots(x.days, 'f1') + '</div><div>' + dots(x.days, 'f2') + '</div></td>' +
         '<td class="num"><b class="' + (x.won ? 'plus' : 'sub') + '">' + (x.won ? '+' + x.won + '원' : '0원') + '</b><small class="sub"> (' + fbWonV(x.won) + ')</small></td>' +
-        '<td class="num">' + (x.est == null ? '<span class="sub" title="정산서에 이 라우트 배송 기록이 없어 물량을 모릅니다">-</span>' : '<b>' + (x.won ? '약 ' + wn(Math.round(x.est / 1000) * 1000) : '0') + '</b>' + (x.won < S.won1 + S.won2 && x.estMax ? '<small class="sub"> (모두 해당 시 ' + wn(Math.round(x.estMax / 1000) * 1000) + ')</small>' : '') + (x.v ? '<small class="sub" title="1일 평균 ' + x.v.avg + '건 × ' + x.pmd + '일"> ' + x.v.avg + '건×' + x.pmd + '일</small>' : '')) + '</td>' +
-        '<td>' + (x.m ? '<span class="fbb ' + ((fbYes(x.m.f1) && fbYes(x.m.f2)) ? 'ok' : (fbYes(x.m.f1) || fbYes(x.m.f2)) ? 'wn' : 'no') + '" title="' + esc(Number(x.mp.slice(5, 7)) + '월 정산 · 요인1 ' + x.m.f1 + ' · 요인2 ' + x.m.f2) + '">' + ((fbYes(x.m.f1) ? S.won1 : 0) + (fbYes(x.m.f2) ? S.won2 : 0)) + '원</span>' : '<span class="sub">-</span>') + '</td></tr>';
+        '<td class="num">' + (x.est == null ? '<span class="sub" title="정산서에 이 라우트 배송 기록이 없어 물량을 모릅니다">-</span>' : '<b>' + (x.won ? '약 ' + wn(Math.round(x.est / 1000) * 1000) : '0') + '</b>' + (x.won < S.won1 + S.won2 && x.estMax ? '<small class="sub"> (모두 해당 시 ' + wn(Math.round(x.estMax / 1000) * 1000) + ')</small>' : '') + (x.pmd ? '<small class="sub" title="전월(' + esc(FW.volMonths[FW.volMonths.length - 1] || '') + ' 정산) 배송 ' + wn(x.pmd) + '건 기준"> ' + wn(x.pmd) + '건</small>' : '')) + '</td>' +
+        '<td>' + (x.m ? '<span class="fbb ' + ((fbYes(x.m.f1) && fbYes(x.m.f2)) ? 'ok' : (fbYes(x.m.f1) || fbYes(x.m.f2)) ? 'wn' : 'no') + '" title="' + esc(Number(x.mp.slice(5, 7)) + '월 정산 · 연계건 ' + x.m.f1 + ' · 단독건 ' + x.m.f2) + '">' + ((fbYes(x.m.f1) ? S.won1 : 0) + (fbYes(x.m.f2) ? S.won2 : 0)) + '원</span>' : '<span class="sub">-</span>') + '</td></tr>';
     }).join('');
     const em = $('#fbEmpty'); em.classList.toggle('hidden', !!list.length);
     em.textContent = FW.cum.length ? '조건에 맞는 라우트가 없습니다.' : '올린 가중요인 자료가 없습니다.';

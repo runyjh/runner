@@ -3583,12 +3583,12 @@ function routeVolumes_() {
         const qty = stlNum_(r.qty) + stlNum_(r.ret);
         if (!qty) return;
         const k = stlShort_(r.camp) + '|' + normCode_(r.route);
-        const a = acc[k] || (acc[k] = { qty: 0, dates: {} });
-        a.qty += qty; a.dates[stlYmd_(r.date)] = 1;
+        const a = acc[k] || (acc[k] = { qty: 0, dates: {}, m: {} });
+        a.qty += qty; a.dates[stlYmd_(r.date)] = 1; a.m[m] = (a.m[m] || 0) + qty;
       });
     });
     const vol = {};
-    Object.keys(acc).forEach(function (k) { const d = Object.keys(acc[k].dates).length; vol[k] = { avg: d ? Math.round(acc[k].qty / d) : 0, days: d, qty: acc[k].qty }; });
+    Object.keys(acc).forEach(function (k) { const d = Object.keys(acc[k].dates).length; vol[k] = { avg: d ? Math.round(acc[k].qty / d) : 0, days: d, qty: acc[k].qty, m: acc[k].m }; }); // m = 정산월별 배송수량 (가중요인 예상 = 전월 수량 기준)
     const out = { ok: true, months: months, vol: vol };
     stlCachePut_(key, out, 1800);
     return out;
