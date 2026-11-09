@@ -1669,7 +1669,7 @@
   <div class="m-box" style="width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column">
     <h3 style="margin-bottom:4px">통장 내역 미리보기 <small class="sub" id="bkTitle"></small></h3>
     <div class="bk-opts">
-      <label>올인원 통장 <select class="inp" id="bkBank" style="height:32px;width:auto"></select></label>
+      <span id="bkBanks" style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center"></span>
       <label class="check"><input type="checkbox" id="bkLearn" checked> 고른 분류 기억 (다음부터 자동)</label>
       <label class="check"><input type="checkbox" id="bkPay" checked> 기사 정산 입금체크</label>
       <label class="check"><input type="checkbox" id="bkDep" checked> 쿠팡 입금 확인</label>
@@ -1684,7 +1684,7 @@
 <div class="modal hidden" id="bkPasteModal">
   <div class="m-box" style="width:min(720px,100%)">
     <h3>통장 내역 글자 붙여넣기</h3>
-    <p class="sub" style="font-size:13px;margin:0 0 8px">은행 PDF 를 열고 <b>Ctrl+A(전체 선택) → Ctrl+C(복사)</b> 한 뒤 아래 칸에 <b>Ctrl+V</b>. 은행 앱·인터넷뱅킹 거래내역 화면의 글자를 그대로 복사해 붙여도 됩니다 (날짜 · 입금/출금 · 금액 · 잔액 · 내용 순서).</p>
+    <p class="sub" style="font-size:13px;margin:0 0 8px">은행 PDF 를 열고 <b>Ctrl+A(전체 선택) → Ctrl+C(복사)</b> 한 뒤 아래 칸에 <b>Ctrl+V</b>. <b>여러 통장 PDF 를 이어서 붙여 넣어도</b> 계좌번호 줄을 보고 통장별로 나눕니다. 은행 앱·인터넷뱅킹 거래내역 글자를 그대로 붙여도 됩니다.</p>
     <textarea class="inp" id="bkText" style="width:100%;height:260px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px" placeholder="2026.10.24 05:36:00 입금 731 17,427 입출금통장이자 예금이자&#10;2026.10.20 10:47:53 출금 -100,000,000 16,696 기사정산금이체 일반이체"></textarea>
     <div class="m-actions"><button type="button" class="btn ghost" id="bkPasteCancel">닫기</button><button type="button" class="btn" id="bkPasteGo">읽기</button></div>
   </div>
@@ -8831,9 +8831,9 @@
     }
     /** 글자 줄 → 거래 줄 (카카오뱅크 거래내역서 · 우리은행 거래실적증명서) */
     function parseLines(lines) {
-      let bank = '', acct = '';
+      // 여러 통장을 이어 붙여 넣어도 된다: '계좌번호 …' 줄이 나올 때마다 그 뒤 거래 줄은 그 계좌로
+      let bank = '', acct = '', curBank = '', curAcct = '';
       const rows = [];
-      lines.forEach((l) => { const m = l.match(/계좌번호\s*:?\s*([\d-]{8,})/); if (m && !acct) acct = m[1]; });
       if (lines.some((l) => /카카오뱅크|거래내역서/.test(l)) && lines.some((l) => /거래후잔액|거래내용/.test(l))) bank = '카카오뱅크';
       else if (lines.some((l) => /우리은행|우리SUPER|거래 ?실적 ?증명서/.test(l)) || lines.some((l) => /지급금액\s+입금금액\s+잔액/.test(l))) bank = '우리은행';
       const kk = /^(\d{4})[.\-/](\d{2})[.\-/](\d{2})\s*(\d{2}:\d{2}:\d{2})?\s+(입금|출금)\s+(-?[\d,]+)\s+([\d,]+)\s+(.*)$/;
@@ -8842,13 +8842,15 @@
       const isHead = (l) => /거래일시|거래내역서|예금주|계좌번호|조회기간|Page|실적|증명서|^\d+\/\d+$|거래금액|지급금액/.test(l);
       const seq = [];
       lines.forEach((l) => {
+        const am = l.match(/계좌번호\s*:?\s*([\d-]{8,})/); if (am) { curAcct = am[1]; if (!acct) acct = curAcct; }
+        if (/카카오뱅크|거래후잔액|거래내용\(메모\)/.test(l)) curBank = '카카오뱅크'; else if (/우리은행|우리SUPER|실적 ?증명서|지급금액\s+입금금액/.test(l)) curBank = '우리은행';
         let m = l.match(kk);
         if (m) {
           let memo = m[8].trim(), kind = '';
           const parts = memo.split(/\s+/);
           if (parts.length > 1 && KIND_RX.test(parts[parts.length - 1])) { kind = parts.pop(); memo = parts.join(' '); }
           else if (parts.length === 1 && KIND_RX.test(parts[0]) && !/[가-힣]{2,}\(|이자$/.test(parts[0])) { kind = parts[0]; memo = ''; }
-          seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: m[5], amt: Math.abs(num(m[6])), bal: num(m[7]), memo, kind } });
+          seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: m[5], amt: Math.abs(num(m[6])), bal: num(m[7]), memo, kind, acct: curAcct || acct, bank: curBank || '카카오뱅크' } });
           if (!bank) bank = '카카오뱅크';
           return;
         }
@@ -8856,7 +8858,7 @@
         if (m) {
           const out = num(m[7]), inn = num(m[8]);
           if (!out && !inn) return;
-          seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: inn ? '입금' : '출금', amt: inn || out, bal: num(m[9]), memo: m[6].trim(), kind: m[5] } });
+          seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: inn ? '입금' : '출금', amt: inn || out, bal: num(m[9]), memo: m[6].trim(), kind: m[5], acct: curAcct || acct, bank: curBank || '우리은행' } });
           if (!bank) bank = '우리은행';
           return;
         }
@@ -8870,12 +8872,12 @@
         while ((m = re.exec(flat))) {
           let memo = m[8].trim(), kind = '';
           const parts = memo.split(/\s+/); if (parts.length > 1 && KIND_RX.test(parts[parts.length - 1])) { kind = parts.pop(); memo = parts.join(' '); }
-          seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: m[5], amt: Math.abs(num(m[6])), bal: num(m[7]), memo, kind } });
+          seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: m[5], amt: Math.abs(num(m[6])), bal: num(m[7]), memo, kind, acct, bank: '카카오뱅크' } });
         }
         if (seq.some((x) => x.row) && !bank) bank = '카카오뱅크';
         if (!seq.some((x) => x.row)) {
           const re2 = /(\d{4})[.\-/](\d{2})[.\-/](\d{2}) ?(\d{2}:\d{2}:\d{2})? (\S+) (.*?) ([\d,]+|-) ([\d,]+|-) ([\d,]{5,})(?= |$)/g;
-          while ((m = re2.exec(flat))) { const out = num(m[7]), inn = num(m[8]); if (!out && !inn) continue; seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: inn ? '입금' : '출금', amt: inn || out, bal: num(m[9]), memo: m[6].trim(), kind: m[5] } }); }
+          while ((m = re2.exec(flat))) { const out = num(m[7]), inn = num(m[8]); if (!out && !inn) continue; seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: inn ? '입금' : '출금', amt: inn || out, bal: num(m[9]), memo: m[6].trim(), kind: m[5], acct, bank: '우리은행' } }); }
           if (seq.some((x) => x.row) && !bank) bank = '우리은행';
         }
       }
@@ -8922,6 +8924,9 @@
         }
         if (rows.length) return { bank: bank || sh.name, acct, rows };
       }
+      // 표 머리글이 없으면(글자를 엑셀에 그대로 붙여 넣은 경우) 줄 글자로 읽는다
+      const lines = []; sheets.forEach((sh) => sh.rows.forEach((r) => { const t = (r || []).map((v) => v == null ? '' : typeof v === 'number' ? String(v) : String(v)).join(' ').replace(/\s+/g, ' ').trim(); if (t) lines.push(t); }));
+      const P = parseLines(lines); if (P.rows.length) return P;
       return { bank, acct, rows: [] };
     }
     async function onFile(f) {
@@ -8947,9 +8952,11 @@
     }
     function openPreview() {
       const r = S.pv;
-      $('#bkTitle').textContent = (r.bank || '') + (r.acct4 ? ' ···' + r.acct4 : '') + ' · ' + r.rows.length + '줄 · ' + r.months.map(ymTitle).join(', ') + (r.file ? ' · ' + r.file : '');
-      const sel = $('#bkBank');
-      sel.innerHTML = '<option value="">(통장 선택 안 함)</option>' + (r.banks || []).map((b) => '<option value="' + esc(b.name) + '"' + (b.name === r.bankName ? ' selected' : '') + '>' + esc(b.name) + (b.role ? ' · ' + esc(b.role) : '') + (b.acct4 ? ' (···' + b.acct4 + ')' : '') + '</option>').join('');
+      $('#bkTitle').textContent = ((r.accts && r.accts.length > 1) ? '통장 ' + r.accts.length + '개' : (r.bank || '') + (r.acct4 ? ' ···' + r.acct4 : '')) + ' · ' + r.rows.length + '줄 · ' + r.months.map(ymTitle).join(', ') + (r.file ? ' · ' + r.file : '');
+      const opts = (cur) => '<option value="">(통장 선택 안 함)</option>' + (r.banks || []).map((b) => '<option value="' + esc(b.name) + '"' + (b.name === cur ? ' selected' : '') + '>' + esc(b.name) + (b.role ? ' · ' + esc(b.role) : '') + (b.acct4 ? ' (···' + b.acct4 + ')' : '') + '</option>').join('');
+      const accts = r.accts && r.accts.length ? r.accts : [{ acct4: r.acct4, bank: r.bank, n: r.rows.length, bankName: r.bankName }];
+      $('#bkBanks').innerHTML = accts.map((a) => '<label>' + esc((a.bank || '') + (a.acct4 ? ' ···' + a.acct4 : '')) + ' <small class="sub">' + a.n + '줄</small> → <select class="inp" data-bkacct="' + esc(a.acct4) + '" style="height:30px;width:auto">' + opts(a.bankName) + '</select></label>').join('');
+      $$('[data-bkacct]', $('#bkBanks')).forEach((sel) => sel.addEventListener('change', () => { r.rows.forEach((x) => { if (x.acct4 === sel.dataset.bkacct) x.bankName = sel.value; }); }));
       $$('[data-bkf]').forEach((b) => b.classList.toggle('on', b.dataset.bkf === S.f));
       paintSum(); paintRows();
       $('#bkModal').classList.remove('hidden');
@@ -8995,7 +9002,7 @@
       const none = r.rows.filter((x) => x.status === '미분류').length;
       if (none && !confirm('미분류 ' + none + '줄이 있습니다. 그대로 저장할까요? (나중에 통장 내역 탭에서 분류를 고칠 수 있습니다)')) return;
       const b = $('#bkSave'); b.disabled = true; b.textContent = '저장 중…';
-      api('adm_bankSave', { rows: r.rows, bankName: $('#bkBank').value, opt: { learn: $('#bkLearn').checked, payCheck: $('#bkPay').checked, deposit: $('#bkDep').checked, expense: $('#bkExp').checked } }).then((x) => {
+      api('adm_bankSave', { rows: r.rows, bankName: '', opt: { learn: $('#bkLearn').checked, payCheck: $('#bkPay').checked, deposit: $('#bkDep').checked, expense: $('#bkExp').checked } }).then((x) => {
         if (!x.ok) return toast(x.msg);
         toast('저장했습니다. 새로 ' + x.saved + '줄 · 덮어씀 ' + x.replaced + '줄' + (x.rules ? ' · 분류 기억 ' + x.rules : '') + (x.pay ? ' · 기사 입금체크 ' + x.pay : '') + (x.deposit ? ' · 쿠팡 입금 확인 ' + x.deposit : '') + (x.expense ? ' · 지출 기록 ' + x.expense + '줄' : ''));
         $('#bkModal').classList.add('hidden');

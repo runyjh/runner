@@ -127,22 +127,25 @@ function adm_bankPreview(token, p) {
   return run_(function () {
     requireAdmin_(token);
     const rows = (p && Array.isArray(p.rows) ? p.rows : []).map(function (r) {
-      return { bank: str_(p.bank || r.bank), acct4: str_(p.acct || r.acct).replace(/\D/g, '').slice(-4), date: stlYmd_(r.date), time: str_(r.time), io: r.io === '입금' || stlNum_(r.amt) > 0 && r.io !== '출금' ? '입금' : '출금', amt: Math.abs(stlNum_(r.amt)), bal: stlNum_(r.bal), memo: str_(r.memo).slice(0, 60), kind: str_(r.kind).slice(0, 20) };
+      return { bank: str_(r.bank || p.bank), acct4: str_(r.acct || p.acct).replace(/\D/g, '').slice(-4), date: stlYmd_(r.date), time: str_(r.time), io: r.io === '입금' || stlNum_(r.amt) > 0 && r.io !== '출금' ? '입금' : '출금', amt: Math.abs(stlNum_(r.amt)), bal: stlNum_(r.bal), memo: str_(r.memo).slice(0, 60), kind: str_(r.kind).slice(0, 20) };
     }).filter(function (r) { return r.date && r.amt; });
     if (!rows.length) fail_('읽은 거래 줄이 없습니다.');
     const ctx = bkContext_(rows);
     const months = {}; rows.forEach(function (r) { months[bkMonth_(r.date)] = 1; });
     const saved = {};
     Object.keys(months).forEach(function (m) { stlReadMonth_('stl_bankrows', m).forEach(function (x) { saved[x.key] = x; }); });
+    // 한 번에 여러 통장을 붙여 넣을 수 있다 → 계좌 끝4자리마다 올인원 통장 추정
+    const accts = {};
+    rows.forEach(function (r) { const a = accts[r.acct4] || (accts[r.acct4] = { acct4: r.acct4, bank: r.bank, n: 0, bankName: (ctx.banks[r.acct4] || {}).name || '', from: r.date, to: r.date }); a.n++; if (r.date < a.from) a.from = r.date; if (r.date > a.to) a.to = r.date; });
     const bankName = (ctx.banks[rows[0].acct4] || {}).name || '';
     const out = rows.map(function (r) {
       const k = bkKey_(r), old = saved[k];
       const c = old && old.cat && old.status !== '미분류' ? { cat: old.cat, ref: old.ref, refName: old.refName, status: old.status, hint: '' } : bkClassify_(r, ctx);
-      return Object.assign({}, r, { key: k, cat: c.cat, ref: c.ref, refName: c.refName, status: c.status, hint: c.hint, saved: !!old, bankName: bankName });
+      return Object.assign({}, r, { key: k, cat: c.cat, ref: c.ref, refName: c.refName, status: c.status, hint: c.hint, saved: !!old, bankName: accts[r.acct4].bankName });
     });
     const cnt = { total: out.length, auto: 0, check: 0, none: 0, saved: 0 };
     out.forEach(function (r) { if (r.saved) cnt.saved++; if (r.status === '자동') cnt.auto++; else if (r.status === '확인') cnt.check++; else cnt.none++; });
-    return { ok: true, rows: out, cnt: cnt, bankName: bankName, acct4: rows[0].acct4, months: Object.keys(months).sort(), cats: BK_CATS, banks: stlBanks_().map(function (b) { return { name: b.name, role: b.role, acct4: str_(b.account).replace(/\D/g, '').slice(-4) }; }) };
+    return { ok: true, rows: out, cnt: cnt, bankName: bankName, acct4: rows[0].acct4, accts: Object.keys(accts).map(function (k) { return accts[k]; }), months: Object.keys(months).sort(), cats: BK_CATS, banks: stlBanks_().map(function (b) { return { name: b.name, role: b.role, acct4: str_(b.account).replace(/\D/g, '').slice(-4) }; }) };
   });
 }
 /**
@@ -165,7 +168,7 @@ function adm_bankSave(token, p) {
         const cur = {}; stlReadMonth_('stl_bankrows', m).forEach(function (x) { cur[x.key] = x; });
         byM[m].forEach(function (r) {
           if (cur[r.key]) res.replaced++; else res.saved++;
-          cur[r.key] = { month: m, key: r.key, bank: str_(r.bank), acct4: str_(r.acct4), bankName: bankName || str_(r.bankName), date: r.date, time: str_(r.time), io: r.io, amt: stlNum_(r.amt), bal: stlNum_(r.bal), memo: str_(r.memo), kind: str_(r.kind),
+          cur[r.key] = { month: m, key: r.key, bank: str_(r.bank), acct4: str_(r.acct4), bankName: str_(r.bankName) || bankName, date: r.date, time: str_(r.time), io: r.io, amt: stlNum_(r.amt), bal: stlNum_(r.bal), memo: str_(r.memo), kind: str_(r.kind),
             cat: BK_CATS.indexOf(r.cat) >= 0 ? r.cat : '미분류', ref: str_(r.ref), refName: str_(r.refName), status: r.cat && r.cat !== '미분류' ? (r.status === '자동' ? '자동' : '확인됨') : '미분류', note: str_(r.note), at: now };
         });
         const list = Object.keys(cur).map(function (k) { return cur[k]; }).sort(function (a, b) { return koCmp_(a.date + a.time, b.date + b.time); });
@@ -207,7 +210,7 @@ function adm_bankSave(token, p) {
           const fund = stlRead_('stl_fund');
           let row = fund.filter(function (x) { return x.month === r.ref && x.item === '쿠팡 입금'; })[0];
           if (row) { row.amt = stlNum_(r.amt); row.date = r.date; row.done = 'Y'; row.memo = str_(row.memo) || '통장 내역 자동'; }
-          else fund.push({ month: r.ref, item: '쿠팡 입금', bank: bankName, plan: '', amt: stlNum_(r.amt), done: 'Y', date: r.date, memo: '통장 내역 자동' });
+          else fund.push({ month: r.ref, item: '쿠팡 입금', bank: str_(r.bankName) || bankName, plan: '', amt: stlNum_(r.amt), done: 'Y', date: r.date, memo: '통장 내역 자동' });
           stlWriteAll_('stl_fund', fund.map(function (x) { return { month: x.month, item: x.item, bank: x.bank, plan: x.plan, amt: x.amt, done: x.done, date: x.date, memo: x.memo }; }));
           res.deposit++;
         });
@@ -219,7 +222,7 @@ function adm_bankSave(token, p) {
         const add = [];
         rows.forEach(function (r) {
           const cat = BK_EXPENSE_CAT[r.cat]; if (!cat || r.io !== '출금' || have[r.key]) return;
-          add.push({ month: bkMonth_(r.date), date: r.date, cat: cat, name: str_(r.refName || r.memo).slice(0, 40), vendor: str_(r.memo).slice(0, 30), amt: stlNum_(r.amt), proof: /체크카드/.test(str_(r.kind)) ? '카드' : '', bank: bankName, memo: '[통장:' + r.key + ']' + (r.note ? ' ' + r.note : '') });
+          add.push({ month: bkMonth_(r.date), date: r.date, cat: cat, name: str_(r.refName || r.memo).slice(0, 40), vendor: str_(r.memo).slice(0, 30), amt: stlNum_(r.amt), proof: /체크카드/.test(str_(r.kind)) ? '카드' : '', bank: str_(r.bankName) || bankName, memo: '[통장:' + r.key + ']' + (r.note ? ' ' + r.note : '') });
           have[r.key] = 1;
         });
         if (add.length) { stlAppend_('stl_expense', add); res.expense = add.length; }
