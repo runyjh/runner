@@ -453,7 +453,8 @@
   .dsel .dwork { margin-top: 6px; font-size: 12.5px; color: var(--sub); background: #f7f8fa; border-radius: 8px; padding: 5px 9px; } .dsel .dwork b { color: var(--ink); }
   .dsel.pdd .dwork { background: #fff; }
   .dsel .inst { margin-top: 8px; font-size: 13px; color: #8a4b00; background: #fff4d6; border: 1px solid #f5d38a; border-radius: 8px; padding: 6px 10px; line-height: 1.5; } .dsel .inst b { display: block; font-size: 12px; }
-  .cmate .dt b { display: block; font-size: 15px; } .cmate .dt small.rt { color: var(--brand); font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .cmate .dt b.rt { display: block; font-size: 19px; line-height: 1.1; color: var(--brand); font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2px; } .cmate .dt b.rt.none { color: #b0b8c1; }
+  .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .cbk { font-size: 14px; line-height: 1.7; color: #5a3286; }
   .cbk div { background: #f5eefb; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-weight: 600; }
@@ -1683,8 +1684,10 @@
     const work = r.drivers.filter((x) => { const v = x.cells[d] || ''; return v && !/휴무|휴가|병가|퇴사/.test(v); }).length;
     const rows = r.drivers.map((x) => {
       const v = x.cells[d] || '';
-      return '<div class="day cmate' + (x.me ? ' me' : '') + '"><div class="dt"><b>' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</b>' +
-        (x.route ? '<small class="rt">' + escH(x.route) + '</small>' : '') + (x.type ? '<small>' + escH(x.type) + '</small>' : '') + '</div>' +
+      // 왼쪽: 노선(크게) → 이름 → 단가코드. 노선이 눈에 먼저 들어오게
+      const pc = v ? schParse(v, x.route || '') : null, rtTxt = pc && pc.routes ? pc.routes : (x.route ? schParse(x.route, '').routes || x.route : '');
+      return '<div class="day cmate' + (x.me ? ' me' : '') + '"><div class="dt">' + (rtTxt ? '<b class="rt">' + escH(rtTxt) + '</b>' : '<b class="rt none">—</b>') +
+        '<span class="nm">' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</span>' + (x.type ? '<small>' + escH(x.type) + '</small>' : '') + '</div>' +
         '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' +
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
