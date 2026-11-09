@@ -5084,6 +5084,7 @@ function api_mySchedule(token, month) {
     }
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
+    try { const me0 = driverById_(String(s.d)); out.baseRoute = me0 ? str_(me0.baseRoute) : ''; } catch (e) { out.baseRoute = ''; } // '출근' 칸을 기본노선 코드로 보여 주기 위해
     // 노선 변경 예약 안내: '11/11부터 군포1캠프 212AB'
     try {
       rcApplyDue_();

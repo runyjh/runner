@@ -1689,10 +1689,11 @@
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
     const bk = (r.backup || {})[d] || [];
-    $('#scBody').innerHTML = picker + chips +
-      '<div class="wk"><h3>' + escH(r.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
-        '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
-        '<p class="hint" style="margin:-2px 0 6px">기사 ' + r.drivers.length + '명 · 근무 ' + work + '명</p>' +
+    const mv = me ? me.cells[d] || '' : '';
+    const dsel = dselCard({ d, pdd, today: r.today, holiday: r.holidays[d], est, cell: mv, baseRoute: me ? me.route : '', camp: r.camp, inst: me ? (me.inst || {})[d] || '' : '',
+      sum: escH(r.camp) + ' 캠프 · 기사 ' + r.drivers.length + '명 · 근무 <b>' + work + '</b>명 · 백업 <b>' + bk.length + '</b>명' });
+    $('#scBody').innerHTML = picker + chips + dsel +
+      '<div class="wk"><h3>' + escH(r.camp) + ' 캠프 기사 <small class="fix">' + r.drivers.length + '명</small></h3>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(r.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>';
@@ -1737,7 +1738,7 @@
     return '<div class="dsel' + (d === o.pdd ? ' pdd' : '') + '">' +
       '<div class="dd"><b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b>' + (d === o.pdd ? '<em class="pddt">PDD · 내일 배송</em>' : d === o.today ? '<em class="today">오늘</em>' : '') + (o.holiday ? '<em class="hol">' + escH(o.holiday) + '</em>' : '') +
         (o.est != null ? '<span class="st ' + (o.est ? 'est' : 'fix') + '">' + (o.est ? '예상 · 변동 있음' : '확정') + '</span>' : '') + '</div>' +
-      '<div class="dwork">🚚 배송(PDD) <b>' + (+p[1]) + '/' + (+p[2]) + '</b> · 실제 출근(상차) <b>' + prevTxt + ' 밤</b></div>' +
+      '<div class="dwork">PDD 기준일 <b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b> · 실제 출근일 <b>' + prevTxt + ' 저녁 입차</b></div>' +
       '<div class="dmy">' + myLine + '</div>' +
       (o.sum ? '<div class="dsum">' + o.sum + '</div>' : '') +
       (o.inst ? '<div class="inst"><b>📌 지시사항</b>' + escH(o.inst) + '</div>' : '') + (o.extra || '') + '</div>';
@@ -1754,9 +1755,9 @@
     r.dates.forEach((d) => {
       const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', np = ((r.pumasi || {})[d] || []);
       // 칸에는 내 노선(줄임 표기)만. 지시·품앗이·확정완료는 작은 아이콘, 백업/근무 인원 글자는 없음 (아래 요약·상세에)
-      const pc = v ? schParse(v, '') : null;
+      const pc = v ? schParse(v, r.baseRoute || '') : null;
       const chip = !pc ? '' : pc.routes
-        ? '<span class="v ' + schKind(v) + (pc.routes.length > 5 ? ' long' : '') + '">' + (pc.camp && pc.camp !== r.camp ? '<i class="cp">' + escH(pc.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        ? '<span class="v ' + schKind(v) + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || r.camp) ? '<i class="cp">' + escH(pc.camp || r.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
         : '<span class="v ' + schKind(v) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const icons = ((r.inst || {})[d] ? '<span title="지시사항">📌</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
@@ -1771,8 +1772,8 @@
   function monthDsel(r) {
     const d = scSel, bk = (r.backup || {})[d] || [];
     const pm = ((r.pumasi || {})[d] || []).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : '') + '</b>' + escH(x.text) + '</button>').join('');
-    const extra = pmDoneRow(r, d) + pm + (r.camp && bk.length ? '<div class="bk" style="margin-top:8px"><b>' + escH(r.camp) + ' 백업</b>' + bk.map(escH).join(', ') + '</div>' : '');
-    return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', camp: r.camp || '', inst: (r.inst || {})[d] || '',
+    const extra = pmDoneRow(r, d) + pm;
+    return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', baseRoute: r.baseRoute || '', camp: r.camp || '', inst: (r.inst || {})[d] || '',
       sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk.length ? ' · 들어오는 백업 <b>' + bk.length + '</b>명' : ' · 이 날 들어오는 백업 없음') : ''), extra });
   }
   $('#scBody').addEventListener('change', (e) => {
