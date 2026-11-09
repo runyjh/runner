@@ -71,7 +71,10 @@ const STL_TABS = {
   stl_banktx: { date: '날짜', kind: '구분', from: '출금 통장', to: '입금 통장', amt: '금액', memo: '내용', month: '정산월' },
   // 세금 일정: 세금마다 낸 금액 · 납부일 · 출금 통장 (키 = 세목|기간)
   stl_taxpay: { key: '키', kind: '세금', period: '기간', due: '납부기한', amt: '낸 금액', date: '납부일', bank: '출금 통장', memo: '메모' },
-  stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' }
+  stl_closed: { month: '정산월', acct: '정산 아이디', data: '결과(자동)' },
+  // 통장 내역 올리기 (#291): 은행 거래내역(PDF·엑셀) 한 줄 = 한 줄. month = 거래 날짜의 달. cat = 분류, ref = 연결(기사 정산·쿠팡 입금·직원 급여 …)
+  stl_bankrows: { month: '월', key: '키', bank: '은행', acct4: '계좌 끝4', bankName: '통장(올인원)', date: '날짜', time: '시각', io: '입출금', amt: '금액', bal: '잔액', memo: '거래내용', kind: '거래구분', cat: '분류', ref: '연결', refName: '연결 이름', status: '상태', note: '메모', at: '올린 시각' },
+  stl_bankrules: { pattern: '거래내용 패턴', cat: '분류', refName: '연결 이름', at: '등록 시각' }
 };
 const STL_TAB_NOTES = {
   stl_ids: '정산의 기준. 쿠팡 아이디 한 줄 = 하나. 구분: 메인 / 서브(메인 아이디 칸에 메인 쿠팡ID). 명의자 = 정산금·세금계산서를 받는 기사(이름). 단가코드: 고정 / 백업 / 품앗이 / 외부용차 (메인 아이디는 기사 정보관리의 단가코드이 우선, 서브 아이디는 이 칸이 우선). 정산 방식: 비우면 구분별 단가 / 원청단가 / 용차내역. 쿠팡 정산서를 올릴 때 처음 보는 아이디는 자동으로 추가됩니다.',
@@ -168,10 +171,10 @@ let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
 const STL_CALC_VER = '20261109b';
-const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
-const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
+const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed', 'stl_bankrows']; // 정산월 묶음으로만 읽는 큰 탭
+const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay', 'stl_bankrules'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
-const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1, stl_bank: 1, stl_alloc: 1, stl_fund: 1, stl_banktx: 1, stl_taxpay: 1 };
+const STL_NO_RECALC = { stl_pay: 1, stl_cost: 1, stl_staff: 1, stl_expense: 1, stl_bank: 1, stl_alloc: 1, stl_fund: 1, stl_banktx: 1, stl_taxpay: 1, stl_bankrows: 1, stl_bankrules: 1 };
 // 통장 용도 · 기본 통장 (기존 운영시트 통장 8개)
 const STL_BANK_ROLES = ['쿠팡 입금', '기사정산', '부가세', '산재고용', '운영비', '인건비', '대표', '유보금', '기타'];
 const STL_BANK_DEFAULT = [['운영 통장', '쿠팡 입금'], ['기사정산 통장', '기사정산'], ['부가세 통장', '부가세'], ['산재고용 통장', '산재고용'], ['운영고정비 통장', '운영비'], ['인건비 통장', '인건비'], ['대표 통장', '대표'], ['유보금 통장', '유보금']];
@@ -3779,6 +3782,15 @@ function adm_stlTaxPack(token, months, extraTo) {
       stlRead_('stl_expense').forEach(function (r) { const d = stlYmd_(r.date); if (!d || d < from || d > extraTo || !stlNum_(r.amt)) return; const x = stlSplitVat_(r.amt, r.proof), noPnl = STL_NOPNL_CATS.indexOf(r.cat) >= 0; out.costs.push({ month: r.month || from.slice(0, 7), date: d, kind: noPnl ? '세금·보험 납부' : '지출 기록 (추가 기간)', cat: r.cat || '', name: r.name || '', vendor: r.vendor || '', amt: stlNum_(r.amt), supply: noPnl ? stlNum_(r.amt) : x.supply, vat: noPnl ? 0 : x.vat, proof: r.proof || '', bank: r.bank || '', pnl: !noPnl, memo: r.memo || '' }); });
       out.extraFrom = from;
     }
+    // 통장 내역 (분류 완료 · 거래 달 = 고른 정산월 + 추가 기간의 달)
+    out.bankRows = [];
+    const bm = {}; months.forEach(function (m) { bm[m] = 1; }); if (out.extraFrom) bm[out.extraFrom.slice(0, 7)] = 1;
+    Object.keys(bm).sort().forEach(function (m) {
+      stlReadMonth_('stl_bankrows', m).forEach(function (x) {
+        if (extraTo && m === (out.extraFrom || '').slice(0, 7) && str_(x.date) > extraTo) return;
+        out.bankRows.push({ bank: x.bankName || x.bank, acct4: x.acct4, date: x.date, time: x.time, io: x.io, amt: stlNum_(x.amt), bal: stlNum_(x.bal), memo: x.memo, kind: x.kind, cat: x.cat, refName: x.refName, note: x.note });
+      });
+    });
     // 가불 대장 (전체 · 지급일 순)
     stlRead_('stl_advance').forEach(function (a) { if (!stlNum_(a.amt)) return; out.advances.push({ name: a.name || '', acct: a.acct || '', date: stlYmd_(a.date) || '', amt: stlNum_(a.amt), due: stlYmd_(a.due) || '', paid: stlNum_(a.paid) || 0, left: Math.max(0, stlNum_(a.amt) - stlNum_(a.paid)), memo: a.memo || '' }); });
     out.advances.sort(function (a, b) { return koCmp_(a.date, b.date); });
