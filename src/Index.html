@@ -362,6 +362,16 @@
   .sl-line b { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .sl-line.tot { border-top: 2px solid var(--ink); font-weight: 800; font-size: 15.5px; }
   .sl-line .neg { color: var(--danger); }
+  .sl-invh { background: linear-gradient(160deg, #1b64da, #2f7cf6); color: #fff; padding: 16px 18px; }
+  .sl-invh .sl-hm { align-items: center; } .sl-invh .sl-hm b { font-size: 15px; } .sl-invh .sl-dd { white-space: nowrap; flex: none; } .sl-invh .sl-dd { background: #fff; color: var(--brand); } .sl-invh .sl-dd.hot { color: var(--danger); }
+  .sl-invh .sl-hn { font-size: 36px; } .sl-invh .sl-hs b { font-weight: 800; }
+  .sl-inv2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; } .sl-inv2 div { background: rgba(255,255,255,.14); border-radius: 10px; padding: 8px 9px; min-width: 0; display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 6px; }
+  .sl-inv2 span { grid-column: 1 / -1; font-size: 11.5px; opacity: .85; } .sl-inv2 b { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; } .sl-inv2 .sl-cp { border: 0; padding: 3px 8px; min-height: 26px; font-size: 11.5px; }
+  .sl-meta { margin-top: 10px; background: rgba(255,255,255,.14); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; line-height: 1.8; } .sl-meta b { font-weight: 800; } .sl-meta .sl-cp { margin-left: 6px; border: 0; padding: 2px 7px; min-height: 22px; font-size: 11px; } .sl-meta .sl-due { color: #ffe9a8; }
+  .sl-steps { margin-top: 10px; font-size: 12.5px; line-height: 1.6; opacity: .95; } .sl-steps b { font-weight: 800; }
+  .sl-netc .sl-netrow { display: flex; justify-content: space-between; align-items: baseline; } .sl-netrow span { font-size: 13px; color: var(--sub); font-weight: 700; } .sl-netrow span small { font-weight: 600; } .sl-netrow b { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; } .sl-netrow b small { font-size: 14px; margin-left: 2px; } .sl-netrow b.neg { color: var(--danger); }
+  .sl-hs2 { font-size: 12.5px; color: var(--sub); margin-top: 4px; } .sl-hs2 b { color: var(--ink); }
+  .sl-stats2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; } .sl-stats2 div { background: #f7f8fa; border-radius: 10px; padding: 8px 9px; min-width: 0; } .sl-stats2 span { display: block; font-size: 11.5px; color: var(--sub); } .sl-stats2 b { display: block; font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sl-stats2 b.neg { color: var(--danger); }
   .sl-inv { border: 2px solid var(--brand); background: #f3f7ff; }
   .sl-inv h3 { color: var(--brand); }
   .sl-amt { background: var(--brand); color: #fff; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
@@ -2754,19 +2764,20 @@
     const dd = (() => { if (!/^\d{4}-\d{2}-\d{2}$/.test(D.invoice || '')) return ''; const t = new Date(); t.setHours(0, 0, 0, 0); const n = Math.round((new Date(+D.invoice.slice(0, 4), +D.invoice.slice(5, 7) - 1, +D.invoice.slice(8, 10)) - t) / 864e5); return n > 0 ? 'D-' + n : n === 0 ? '오늘까지' : '기한 지남'; })();
     const cp = (v, lab) => '<button type="button" class="sl-cp" data-copy="' + escH(String(v).replace(/[^\d]/g, '')) + '" data-lab="' + escH(lab) + '">복사</button>';
     const fold = (title, sub, body, open) => '<details class="sl-card sl-fold"' + (open ? ' open' : '') + '><summary><b>' + title + '</b><span>' + sub + '</span></summary>' + body + '</details>';
-    return '<div class="sl-card sl-hero"><div class="sl-hm"><b>' + escH(slMonthTxt(r.month)) + '</b><span>' + slMd(P.from) + ' ~ ' + slMd(P.to) + '</span></div>' +
-      '<div class="sl-hl">실 입금액</div><div class="sl-hn' + (d.net < 0 ? ' neg' : '') + '">' + slWon(d.net) + '<small>원</small></div>' +
-      '<div class="sl-hs">' + (D.pay ? '지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
-      '<div class="sl-stats"><div><span>지급 합계</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
-      // 공급자 이름: 사업자 상호 → 기사 이름 → '기사님'
-      '<div class="sl-card sl-inv"><h3>📄 세금계산서 발행' + (dd ? '<span class="sl-dd' + (dd === '기한 지남' || dd === '오늘까지' || /^D-[1-3]$/.test(dd) ? ' hot' : '') + '">' + dd + '</span>' : '') + '</h3>' +
-      '<p class="sl-who">' + escH(d.bizName || (d.name && !/^\(명의자 없음\)/.test(d.name) ? d.name : '') || '기사님') + ' → ' + escH(co.name || '러너') + '</p>' +
-      '<div class="sl-amt"><span>발행 금액 (합계)</span><b>' + slWon(d.invoice) + '원</b></div><div class="sl-kv sl-kv3">' +
-      '<span>공급가액</span><b>' + slWon(d.supply) + '</b>' + cp(d.supply, '공급가액') + '<span>세액</span><b>' + slWon(d.tax) + '</b>' + cp(d.tax, '세액') +
-      '<span>공급받는자</span><b>' + escH((co.name || '') + (co.ceo ? ' / 대표 ' + co.ceo : '')) + '</b><i></i>' +
-      '<span>사업자번호</span><b>' + escH(co.bizNo || '') + '</b>' + (co.bizNo ? cp(co.bizNo, '사업자번호') : '<i></i>') + (co.email ? '<span>이메일</span><b>' + escH(co.email) + '</b><i></i>' : '') +
-      '<span>작성일자</span><b>' + escH(D.writeDate || '') + '</b><i></i><span>품목</span><b>배송(' + escH(r.month) + ')</b><i></i>' +
-      '<span class="sl-due">발행기한</span><b class="sl-due">' + escH(D.invoice || '') + ' 까지</b><i></i></div></div>' +
+    // 맨 위: 세금계산서 발행 카드 (기사가 직접 발행하므로 금액이 가장 먼저 보이게) → 실 입금액 → 지급·공제
+    const supName = d.bizName || (d.name && !/^\(명의자 없음\)/.test(d.name) ? d.name : '') || '기사님';
+    const hot = dd === '기한 지남' || dd === '오늘까지' || /^D-[1-3]$/.test(dd);
+    const invCard = '<div class="sl-card sl-invh"><div class="sl-hm"><b>📄 세금계산서, 이 금액으로 발행</b>' + (dd ? '<span class="sl-dd' + (hot ? ' hot' : '') + '">' + dd + '</span>' : '') + '</div>' +
+      '<div class="sl-hl">발행 금액 (합계 · 부가세 포함) · ' + escH(slMonthTxt(r.month)) + ' ' + slMd(P.from) + '~' + slMd(P.to) + '</div><div class="sl-hn">' + slWon(d.invoice) + '<small>원</small></div>' +
+      '<div class="sl-hs">공급자 <b>' + escH(supName) + '</b> → 공급받는자 <b>' + escH(co.name || '러너') + (co.ceo ? ' (대표 ' + escH(co.ceo) + ')' : '') + '</b></div>' +
+      '<div class="sl-inv2"><div><span>공급가액</span><b>' + slWon(d.supply) + '</b>' + cp(d.supply, '공급가액') + '</div><div><span>세액 (10%)</span><b>' + slWon(d.tax) + '</b>' + cp(d.tax, '세액') + '</div></div>' +
+      '<div class="sl-meta">공급받는자 사업자번호 <b>' + escH(co.bizNo || '-') + '</b>' + (co.bizNo ? cp(co.bizNo, '사업자번호') : '') + '<br>작성일자 <b>' + escH(D.writeDate || '-') + '</b> · 품목 <b>배송(' + escH(r.month) + ')</b> · 구분 <b>청구</b>' +
+        (co.email ? '<br>이메일 <b>' + escH(co.email) + '</b>' + cp(co.email, '이메일') : '') + (D.invoice ? '<br>발행기한 <b class="sl-due">' + escH(D.invoice) + ' 까지</b>' : '') + '</div>' +
+      '<div class="sl-steps">① 홈택스 → 전자세금계산서 발급 ② 공급받는자 사업자번호 입력 ③ <b>공급가액·세액을 위 숫자 그대로</b> ④ 작성일자 ' + escH(String(D.writeDate || '').slice(5)) + ' · 청구 ⑤ 발급</div></div>';
+    return invCard +
+      '<div class="sl-card sl-netc"><div class="sl-netrow"><span>실 입금액 <small>(지급 − 공제)</small></span><b' + (d.net < 0 ? ' class="neg"' : '') + '>' + slWon(d.net) + '<small>원</small></b></div>' +
+      '<div class="sl-hs2">' + (D.pay ? '지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
+      '<div class="sl-stats2"><div><span>지급 합계</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
       '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
       '<div class="sl-card"><h3>차감 · 공제</h3>' + (deds.length ? deds.map((l) => line(l, '−')).join('') : '<div class="sl-line"><div class="hint">없음</div></div>') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +
       (moved.length ? fold('다른 아이디 사용', moved.length + '건', '<table class="sl-tbl"><thead><tr><th>내용</th><th>기간</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' +
