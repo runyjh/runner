@@ -1296,7 +1296,7 @@
       <b id="sTitle" style="font-size:14px;white-space:nowrap"></b>
       <input class="inp" type="date" id="sDate" title="날짜 검색 (그 주 일요일부터 2주)">
       <select class="inp" id="sCamp" aria-label="캠프"></select>
-      <input class="inp" id="sQ" placeholder="이름·아이디·노선 검색" style="width:160px">
+      <input class="inp" id="sQ" placeholder="이름·캠프·노선 (여러 개는 콤마)" style="width:200px" title="콤마로 여러 개: 계동희,수원1캠프,백업 · 검색하면 캠프 선택과 상관없이 전체에서 찾습니다">
       <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
       <div class="grow">
         <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
@@ -6133,14 +6133,18 @@
   }
   /** 표에 나올 줄: 승인된 기사 (+ 이 2주에 기록이 있는 다른 기사) → 캠프·구분·순서·이름 순 */
   function buildRows() {
-    const q = sf.q.trim().toLowerCase();
+    // 검색: 콤마로 여러 개 (계동희,수원1캠프,백업 → 하나라도 맞으면 보임) · 이름·아이디·코드·기본노선·단가코드·캠프 · 검색어가 있으면 캠프 선택과 상관없이 전체에서
+    const qs = nfc(sf.q).toLowerCase().split(/[,，、]/).map((x) => x.trim()).filter(Boolean);
+    const q = qs.length ? 1 : 0;
     const camps = {};
     SD.camps.forEach((c) => { camps[c.id] = c; });
+    const qHit = (vals) => qs.some((t) => vals.some((x) => nfc(String(x || '')).toLowerCase().replace(/\s/g, '').includes(t.replace(/\s/g, ''))));
     const list = schSegDrivers().filter((d) => {
       const has = Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k) && segIn(d._seg, k));
       if (d.status !== '승인' && !has && !sf.all) return false;
-      if (sf.camp && d.campId !== sf.camp) return false;
-      if (q && ![d.name, d.loginId, d.code, d.baseRoute].some((x) => String(x || '').toLowerCase().includes(q))) return false;
+      if (!q && sf.camp && d.campId !== sf.camp) return false;
+      const cn = camps[d.campId] ? camps[d.campId].name : (d.camp || '');
+      if (q && !qHit([d.name, d.loginId, d.code, d.baseRoute, d.type, cn, shortCamp(cn)])) return false;
       return true;
     }).sort((a, b) => {
       const ca = camps[a.campId] ? camps[a.campId].name : '￿', cb = camps[b.campId] ? camps[b.campId].name : '￿';
@@ -6149,9 +6153,9 @@
     });
     const rows = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
     // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트 (배차 확정 때 서버가 적음 · 직접 고쳐도 됨)
-    const campShort = sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
+    const campShort = !q && sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
     (SD.pmRows || []).filter((pr) => {
-      if (q && ![pr.name, pr.loginId].some((x) => String(x || '').toLowerCase().includes(q))) return false;
+      if (q && !qHit([pr.name, pr.loginId])) return false;
       if (campShort && !SD.dates.some((dt) => sget(pr.id, dt).replace(/\s/g, '').includes(campShort))) return false;
       return true;
     }).forEach((pr) => rows.push({ kind: 'p', row: pr.id, key: pr.id, p: pr }));
