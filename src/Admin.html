@@ -1372,6 +1372,7 @@
         <button class="btn ghost" id="stRecalc" title="시트에서 직접 고친 내용까지 다시 계산">다시 계산</button>
         <button class="btn ghost" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기</button>
         <button class="btn ghost" id="stCloseBtn">마감</button>
+        <button class="btn ghost" id="stDrvBtn" title="드라이브 폴더의 쿠팡 정산서 엑셀을 여러 달 한 번에">드라이브에서 가져오기</button>
         <button class="btn" id="stUpBtn">쿠팡 정산서 올리기</button>
         <input type="file" id="stFile" accept=".xlsx,.csv" class="hidden">
       </div>
@@ -1681,6 +1682,15 @@
     <div class="m-actions"><button type="button" class="btn ghost" id="bkCancel">닫기</button><button type="button" class="btn" id="bkSave">저장</button></div>
   </div>
 </div>
+<div class="modal hidden" id="sdrModal">
+  <div class="m-box" style="width:min(720px,100%);max-height:90vh;display:flex;flex-direction:column">
+    <h3>드라이브에서 쿠팡 정산서 가져오기</h3>
+    <div class="field" style="display:flex;gap:6px"><input class="inp" id="sdrFolder" placeholder="드라이브 폴더 주소 또는 ID (비우면 올인원 '쿠팡 정산서' 폴더)" style="flex:1"><button class="btn ghost" id="sdrLoad">목록</button></div>
+    <div id="sdrList" style="flex:1;overflow:auto;font-size:13px"></div>
+    <p class="sub" style="font-size:12.5px;margin:6px 0 0">체크한 파일을 차례로 읽어 정산월마다 다음 차수로 반영합니다. 정산월은 파일 안 배송일로 정하고, 모르면 파일명(2026년 09월)으로. 마감된 달은 건너뜁니다.</p>
+    <div class="m-actions"><button type="button" class="btn ghost" id="sdrCancel">닫기</button><button type="button" class="btn" id="sdrGo">가져오기</button></div>
+  </div>
+</div>
 <!-- ───────────── 정산관리: 세무자료 내보내기 ───────────── -->
 <div class="modal hidden" id="tpModal">
   <div class="m-box" style="width:min(560px,100%)">
@@ -1959,7 +1969,7 @@
     if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     // 오래 걸리는 작업(이관·정산서 올리기·초기화·마감·사본 다시 만들기)은 60초에 끊지 않는다 — 끊으면 서버는 계속 도는데 화면은 "다시 시도"라 해서 두 번 처리될 수 있음
-    const LONG_MS = { adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
+    const LONG_MS = { adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
     const timer = setTimeout(() => { if (ctl) ctl.abort(); }, LONG_MS[fn] || 60000);
     return fetch(RUNNER_API, {
       method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',
@@ -6109,6 +6119,7 @@
     else if (vis('#routeModal')) $('#routeModal').classList.add('hidden');
     else if (vis('#campModal')) $('#campModal').classList.add('hidden');
     else if (vis('#tpModal')) $('#tpModal').classList.add('hidden');
+    else if (vis('#sdrModal')) $('#sdrModal').classList.add('hidden');
     else if (vis('#bkModal')) $('#bkModal').classList.add('hidden');
   });
 
@@ -7775,7 +7786,7 @@
     const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!on);
     $('#stTitle').textContent = na ? na.textContent.trim() : on ? '러너 손익·통장' : '정산관리';
     $('#stTabs').classList.toggle('hidden', on);
-    ['#stRecalc', '#stCloseBtn', '#stUpBtn', '#stTaxPack'].forEach((id) => $(id).classList.toggle('hidden', on));
+    ['#stRecalc', '#stCloseBtn', '#stUpBtn', '#stTaxPack', '#stDrvBtn'].forEach((id) => $(id).classList.toggle('hidden', on));
     $('#stPnlTabs').classList.toggle('hidden', !on);
   }
   /** 사이드바: 정산관리 / 러너 손익·통장 중 지금 보는 쪽 표시 */
@@ -8771,6 +8782,49 @@
       STX.sum = null; loadSettle(month, true);
     }).catch((err) => { if (err && err.message && err.message !== 'EXPIRED') toast(err.message); })
       .finally(() => { b.disabled = false; b.textContent = '반영'; });
+  });
+  // ── 드라이브에서 가져오기 (여러 달) ──
+  const SDR = { files: [] };
+  const b64ToBuf = (b) => { const bin = atob(b), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+  function sdrLoad() {
+    $('#sdrList').innerHTML = '<div class="spin"></div>';
+    const fid = $('#sdrFolder').value.trim(); try { localStorage.setItem('runner.stl.drvFolder', fid); } catch (e) { /* 무시 */ }
+    api('adm_stlDriveList', fid).then((r) => {
+      if (!r.ok) { $('#sdrList').innerHTML = ''; return toast(r.msg); }
+      SDR.files = r.files;
+      $('#sdrList').innerHTML = '<div class="sub" style="margin-bottom:6px">폴더: ' + esc(r.folder) + ' · 엑셀 ' + r.files.length + '개 <label class="check" style="display:inline-flex;margin:0 0 0 10px"><input type="checkbox" id="sdrAll" checked> 전체</label></div>' +
+        r.files.map((f, i) => '<label class="check" style="margin:3px 0"><input type="checkbox" data-sdr="' + i + '" checked> <b>' + esc(f.month ? ymTitle(f.month) : '(달 모름)') + '</b> ' + esc(f.name) + ' <small class="sub">' + Math.round(f.size / 1024) + 'KB · ' + esc(f.at) + '</small> <span class="sub" data-sdrst="' + i + '"></span></label>').join('');
+      $('#sdrAll').addEventListener('change', (e) => $$('[data-sdr]').forEach((x) => { x.checked = e.target.checked; }));
+    }).catch(() => {});
+  }
+  $('#stDrvBtn').addEventListener('click', () => { try { if (!$('#sdrFolder').value) $('#sdrFolder').value = localStorage.getItem('runner.stl.drvFolder') || ''; } catch (e) { /* 무시 */ } $('#sdrModal').classList.remove('hidden'); if (!SDR.files.length) sdrLoad(); });
+  $('#sdrLoad').addEventListener('click', sdrLoad);
+  $('#sdrCancel').addEventListener('click', () => $('#sdrModal').classList.add('hidden'));
+  $('#sdrGo').addEventListener('click', async () => {
+    const pick = $$('[data-sdr]').filter((x) => x.checked).map((x) => +x.dataset.sdr);
+    if (!pick.length) return toast('가져올 파일을 골라 주세요.');
+    const b = $('#sdrGo'); b.disabled = true;
+    const done = [];
+    for (const i of pick) {
+      const f = SDR.files[i], st = $('[data-sdrst="' + i + '"]'), say = (t) => { if (st) st.textContent = t; };
+      try {
+        say('읽는 중…');
+        const g = await api('adm_stlDriveGet', f.id); if (!g.ok) throw new Error(g.msg);
+        const P = parseCoupang(await readXlsx(b64ToBuf(g.b64)));
+        const month = P.month || f.month; if (!month) throw new Error('정산월을 알 수 없습니다');
+        const ri = await api('adm_stlRoundInfo', month); if (!ri.ok) throw new Error(ri.msg);
+        if (ri.closed) { say('⏭ ' + month + ' 마감됨 — 건너뜀'); continue; }
+        const round = Math.min(9, (ri.latest || 0) + 1);
+        say(month + ' ' + round + '차 반영 중…');
+        const r = await api('adm_stlImport', { month, round, file: g.name, url: g.url, raw: P.raw, loss: P.loss });
+        if (!r.ok) throw new Error(r.msg);
+        say('✓ ' + month + ' ' + round + '차 · ' + wn(r.rows) + '줄 · ID ' + r.ids + (r.newIds && r.newIds.length ? ' · 새 아이디 ' + r.newIds.length : ''));
+        done.push(month);
+      } catch (err) { say('✗ ' + (err && err.message || err)); }
+    }
+    b.disabled = false;
+    toast('드라이브에서 ' + done.length + '개 반영했습니다.');
+    if (done.length) { STX.sum = null; loadSettle(done[done.length - 1], true); }
   });
   // ── 상단 ──
   $('#stMonth').addEventListener('change', () => { if (!stLeaveOk()) { $('#stMonth').value = STX.month; return; } STX.sum = null; loadSettle($('#stMonth').value); });

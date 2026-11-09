@@ -2580,6 +2580,32 @@ function adm_stlSlip(token, month, id) {
 }
 
 /** 쿠팡 정산 엑셀 원본을 드라이브에 저장 → { url, name } */
+/** 드라이브 폴더의 쿠팡 정산서 엑셀 목록 (드라이브에서 가져오기). folderId 비우면 정산 파일 폴더 */
+function adm_stlDriveList(token, folderId) {
+  return run_(function () {
+    requireAdmin_(token);
+    let folder;
+    try { folder = folderId ? DriveApp.getFolderById(str_(folderId).replace(/^.*folders\//, '').replace(/[?#].*$/, '')) : stlFileFolder_(); } catch (e) { fail_('폴더를 열 수 없습니다. 주소(ID)와 공유 권한을 확인해 주세요.'); }
+    const out = [], it = folder.getFiles();
+    while (it.hasNext()) {
+      const f = it.next(), n = f.getName();
+      if (!/\.(xlsx|csv)$/i.test(n)) continue;
+      const m = n.match(/(20\d{2})\D{0,3}(\d{1,2})\s*월/);
+      out.push({ id: f.getId(), name: n, size: f.getSize(), url: f.getUrl(), at: Utilities.formatDate(f.getLastUpdated(), CFG.TZ, 'yyyy-MM-dd HH:mm'), month: m ? m[1] + '-' + ('0' + m[2]).slice(-2) : '' });
+    }
+    out.sort(function (a, b) { return koCmp_(a.month + a.name, b.month + b.name); });
+    return { ok: true, folder: folder.getName(), files: out };
+  });
+}
+/** 드라이브 파일 내용 (base64) — 관리자 화면이 엑셀을 직접 읽는다 */
+function adm_stlDriveGet(token, id) {
+  return run_(function () {
+    requireAdmin_(token);
+    const f = DriveApp.getFileById(str_(id));
+    if (f.getSize() > 25 * 1024 * 1024) fail_('파일이 너무 큽니다.');
+    return { ok: true, name: f.getName(), url: f.getUrl(), b64: Utilities.base64Encode(f.getBlob().getBytes()) };
+  });
+}
 function adm_stlSaveFile(token, month, round, name, b64) {
   return run_(function () {
     const a = requireAdmin_(token);
