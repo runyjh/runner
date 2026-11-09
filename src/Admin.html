@@ -1302,7 +1302,7 @@
       <div class="grow">
         <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
         <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
-        <button class="btn ghost" id="sFill" title="고정·품앗이 기사의 오늘 이후 빈칸을 출근/고정휴무로">빈칸 자동 채우기</button>
+        <button class="btn ghost" id="sFill" title="오늘 이후 빈칸: 고정·품앗이 기사는 출근/고정휴무, 백업 기사는 고정휴무 요일만">빈칸 자동 채우기</button>
         <button class="btn ghost" id="sReload">새로고침</button>
         <button class="btn ghost danger-t" type="button" data-reset="sched">데이터 초기화</button>
       </div>
@@ -6817,18 +6817,24 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#upModal').classList.contains('hidden')) $('#upModal').classList.add('hidden'); });
   $('#sFill').addEventListener('click', () => {
     const list = [], skipped = [];
-    srows.filter((r) => r.kind === 'd' && (r.d.type === '고정' || r.d.type === '품앗이') && r.d.baseRoute && !/백업|용차/.test(r.d.baseRoute)).forEach((r) => {
+    // 고정·품앗이 기사: 빈칸 → 고정휴무 요일이면 '고정휴무', 아니면 '출근'
+    // 백업 기사(단가코드 백업 또는 기본노선 백업): 고정휴무 요일만 '고정휴무' 로 채우고 나머지 빈칸은 그대로 (어느 캠프를 뛸지 모르므로 '출근' 은 안 적음)
+    srows.filter((r) => r.kind === 'd' && !r.d.ex && !r.staff && r.d.status === '승인' && (r.d.type === '고정' || r.d.type === '품앗이' || r.d.type === '백업' || /백업/.test(r.d.baseRoute || '')) && !/용차/.test(r.d.baseRoute || '')).forEach((r) => {
+      const backup = r.d.type === '백업' || /백업/.test(r.d.baseRoute || '') || !r.d.baseRoute;
+      if (!backup && !r.d.baseRoute) return;
       const off = r.d.fixedOff ? parseOffDays(r.d.fixedOff) : [];
       if (off === null) { skipped.push(r.d.name); return; }
+      if (backup && !off.length) return;
       SD.dates.forEach((dt) => {
         if (dt < SD.today || sget(r.row, dt)) return;
         const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
-        list.push({ row: r.row, date: dt, value: off.includes(dow) ? '고정휴무' : '출근' });
+        if (off.includes(dow)) list.push({ row: r.row, date: dt, value: '고정휴무' });
+        else if (!backup) list.push({ row: r.row, date: dt, value: '출근' });
       });
     });
     if (!list.length) return toast('채울 빈칸이 없습니다.' + (skipped.length ? ' (고정휴무일을 요일로 적지 않은 기사: ' + skipped.join(', ') + ')' : ''));
     const nOff = list.filter((x) => x.value === '고정휴무').length;
-    if (!confirm('오늘 이후 빈칸 ' + list.length + '개를 채웁니다.\n출근 ' + (list.length - nOff) + '칸 · 고정휴무 ' + nOff + '칸\n(고정·품앗이 기사만, 이미 적힌 칸은 그대로)' +
+    if (!confirm('오늘 이후 빈칸 ' + list.length + '개를 채웁니다.\n출근 ' + (list.length - nOff) + '칸 · 고정휴무 ' + nOff + '칸\n(고정·품앗이 기사는 출근/고정휴무 · 백업 기사는 고정휴무 요일만 · 이미 적힌 칸은 그대로)' +
       (skipped.length ? '\n\n고정휴무일을 "월,화"처럼 요일로 적지 않아 건너뛰는 기사: ' + skipped.join(', ') : '') + '\n\n채울까요? (Ctrl+Z 로 되돌릴 수 있습니다)')) return;
     setCells(list);
   });
