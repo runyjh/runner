@@ -136,7 +136,7 @@ const STL_CFG = [
   ['uncFee', '미계약 라우트 업체 수수료율', '10%', '기사 지급 = 미계약 금액 × (1 − 수수료율), 10원 단위 반올림', '금액 환산 · 기사 지급률'],
   ['etcRate', '기타(프로모션·소급) 기사 지급률', '0%', '', '금액 환산 · 기사 지급률'],
   ['lossRate', '분실파손 기사 부담률', '100%', '', '분실파손'],
-  ['lossVat', '분실파손 부가세 포함 환산 (Y/N)', 'Y', 'Y = 차감금액 × 1.1 을 기사 부담', '분실파손'],
+  ['lossVat', '분실파손 부가세 포함 환산 (Y/N)', 'Y', 'Y = 쿠팡 차감금액(소비자가) × 1.1 을 기사 부담 · 차이는 러너 잉여', '분실파손'],
   ['expense', '필요경비 공제율 (경비율, 공단 기준)', '34.6%', '보수액 = 기준금액 × (1 − 경비율)', '산재 · 고용보험'],
   ['san', '산재보험료율 (전체 요율 · 기사+러너)', '1.76%', '기사 공제 = 보수액 × 요율 × (1 − 러너 부담률) · 10원 미만 버림', '산재 · 고용보험'],
   ['commute', '출퇴근재해 요율 (전체 요율)', '0%', '', '산재 · 고용보험'],
@@ -1322,11 +1322,11 @@ function stlCompute_(month) {
     return (S[gkey] = {
       id: gkey, cid: g.cid, name: o.name || '(명의자 없음) ' + String(g.cid).replace(/@.*$/, ''), owner: o, ownerId: g.ownerId || '', vendor: g.vendor || '',
       type: main.type, mode: main.mode, insEx: main.insEx, fbCutTxt: main.fbCut, workers: {}, ids: {}, qty: 0, base: 0, inc: 0, freshRaw: 0, fresh: 0, fbCut: 0, fbKeep: 0, unc: 0, etc: 0,
-      loss: 0, lossCp: 0, sales: 0, supplyCp: 0, campPay: {}, routes: {}, daily: {}, lossLines: [], yong: [], yongPay: 0, yongCut: 0, yongLines: [],
+      loss: 0, lossCp: 0, lossSup: 0, sales: 0, supplyCp: 0, campPay: {}, routes: {}, daily: {}, lossLines: [], yong: [], yongPay: 0, yongCut: 0, yongLines: [],
       noPriceQty: 0, rows: 0, movedIn: {}, movedOut: {}, cidDays: {}
     });
   };
-  const company = { sales: 0, supplyCp: 0, lossCp: 0, unregSales: 0, vendorCut: 0, progFee: 0, yongGain: 0, promoBase: 0, promoRunner: 0, promoDrv: 0 };
+  const company = { sales: 0, supplyCp: 0, lossCp: 0, lossSup: 0, unregSales: 0, vendorCut: 0, progFee: 0, yongGain: 0, promoBase: 0, promoRunner: 0, promoDrv: 0 };
   const byDateLogin = {}, lastDel = {}, cutIds = {}; // lastDel[로그인] = 이 정산기간 마지막 배송일 · cutIds = 업체차감 줄의 쿠팡ID 칸(영업점 수수료 등, 아이디 아님)
 
   raw.forEach(function (r) {
@@ -1447,14 +1447,14 @@ function stlCompute_(month) {
   // 분실파손
   loss.forEach(function (r) {
     const amt = stlNum_(r.amt);
-    company.lossCp += amt;
+    company.lossCp += amt; company.lossSup += stlLossSup_(amt, cfg);
     const idx = X.by[stlLogin_(r.cid)];
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.loss = (u.loss || 0) + amt; return; }
     const lr = { date: stlYmd_(r.date), cid: r.cid };
     const mv = stlMoveOf_(ctx, idx, stlWorkerOf_(ctx, stlLogin_(r.cid), lr.date), lr, warn);
     const s = sum(mv ? mv.key : idx.mainKey);
     const share = stlR10_(amt * (cfg.lossVat ? 1 + cfg.vat : 1) * cfg.lossRate);
-    s.loss += share; s.lossCp += amt;
+    s.loss += share; s.lossCp += amt; s.lossSup += stlLossSup_(amt, cfg);
     if (mv) stlMoveNote_(s, sum(idx.mainKey), lr, mv.worker, X, D, idx, -share, 0, mv.key);
     s.lossLines.push({ date: stlYmd_(r.date), cid: r.cid, camp: r.camp, type: r.type, detail: r.detail, item: r.item, waybill: r.waybill, amt: share });
   });
@@ -1713,7 +1713,7 @@ function stlCompute_(month) {
       workDays: s.sched.days, workDaysBy: s.sched.byCid, workDaysSrc: s.sched.src, qty: s.qty, sales: s.sales,
       base: s.base, inc: s.inc, fresh: s.fresh, freshRaw: s.freshRaw, fbCutTxt: s.fbCutTxt || '', fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, lossCp: s.lossCp, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
-      profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
+      profit: Math.round(s.supplyCp - s.lossSup - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '', bizName: o.vendor ? '' : o.bizName || '',
       checked: stlYes_(p.checked), payDate: p.date || '', payMemo: p.memo || '',
       advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty,
@@ -1724,7 +1724,7 @@ function stlCompute_(month) {
       row.ceo = true;
       row.ceoView = {};
       ['pay', 'taxDed', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'runnerIns', 'insGain'].forEach(function (k) { row.ceoView[k] = row[k]; row[k] = 0; });
-      row.profit = Math.round(s.supplyCp - s.lossCp);
+      row.profit = Math.round(s.supplyCp - s.lossSup);
     }
     drivers.push(row);
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
@@ -1829,8 +1829,8 @@ function stlCompute_(month) {
     month: month, period: P, today: today, round: rounds.latest, roundFile: rounds.file, roundAt: rounds.at,
     rawRows: raw.length, lossRows: loss.length, drivers: drivers, total: tot,
     company: {
-      sales: company.sales, supplyCp: company.supplyCp, lossCp: company.lossCp, unregSales: company.unregSales, vendorCut: company.vendorCut, progFee: company.progFee, yongGain: company.yongGain,
-      coupangNet: company.supplyCp - company.lossCp - company.vendorCut
+      sales: company.sales, supplyCp: company.supplyCp, lossCp: company.lossCp, lossSup: company.lossSup, unregSales: company.unregSales, vendorCut: company.vendorCut, progFee: company.progFee, yongGain: company.yongGain,
+      coupangNet: company.supplyCp - company.lossSup - company.vendorCut
     },
     dates: stlDates_(month, cfg), warnings: warnings, yong: yongOut, advAuto: advAuto, vendors: X.vendors.list.map(function (v) { return v.name; })
   };
@@ -2194,11 +2194,13 @@ function stlWht_(pay, rate) {
   if (Math.abs(r - 0.033) < 1e-9) { const inc = Math.floor(pay * 0.03 / 10) * 10; return inc + Math.floor(inc * 0.1 / 10) * 10; }
   return Math.floor(pay * r / 10) * 10;
 }
+/** 쿠팡 분실파손 차감금액은 소비자가(부가세 포함) → 공급가 환산 (손익·매출세액·역발행 계산서에 쓰는 값) */
+function stlLossSup_(amt, cfg) { const v = cfg && typeof cfg.vat === 'number' ? cfg.vat : 0.1; return Math.round(stlNum_(amt) / (1 + v)); }
 function stlPnl_(month, sum) {
   const t = (sum && sum.total) || {}, c = (sum && sum.company) || {};
   const o = {
     month: month, closed: !!(sum && sum.closed), hasData: !!(sum && (sum.drivers || []).length),
-    qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 0.1), loss: c.lossCp || 0, progFee: -(c.vendorCut || 0),
+    qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: Math.round((c.supplyCp || 0) * 0.1 - ((c.lossCp || 0) - (c.lossSup || 0))), loss: c.lossCp || 0, lossSup: c.lossSup || 0, progFee: -(c.vendorCut || 0),
     drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0),
     insDrv: (t.san || 0) + (t.goy || 0),
     staff: 0, staffWht: 0, staffNet: 0, staffN: 0, fixed: 0, fixedVat: 0, fixedN: 0, varCost: 0, varVat: 0, varN: 0, byCat: {}
@@ -2289,7 +2291,7 @@ function stlFund_(month) {
   const rows = {};
   stlRead_('stl_fund').forEach(function (r) { if (r.month === month) rows[r.item] = r; });
   const dep = rows['쿠팡 입금'] || {};
-  const depPlan = Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 1.1);
+  const depPlan = Math.round((c.supplyCp || 0) * 1.1 - (c.lossCp || 0)); // 분실파손 차감은 소비자가(부가세 포함)라 부가세 붙인 뒤 뺀다
   const deposit = { plan: depPlan, amt: stlNum_(dep.amt) || 0, done: stlYes_(dep.done), date: dep.date || '', memo: dep.memo || '', due: (sum.dates || {}).coupang || '', bank: source };
   const auto = {
     driver: t.net || 0, vat: Math.max(0, pnl.vatDue), ins: pnl.ins.total, staff: pnl.staff,

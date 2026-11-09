@@ -7624,9 +7624,9 @@
     const k = (lab, v, sub) => '<div class="kpi"><small>' + lab + '</small><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
     $('#stKpi').innerHTML = k('쿠팡 매출 (VAT포함)', wn(c.sales), '공급가 ' + wn(c.supplyCp) + (c.lossCp ? ' · 분실차감 ' + wn(c.lossCp) : '')) +
       k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax)) +
-      (c.lossCp || t.loss ? k('분실파손 (쿠팡 정산서)', wn(c.lossCp), '기사 부담 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossGain ? ' · 부가세분 ' + wn(STX.pnl.lossGain) + ' → 러너 잉여' : STX.pnl && STX.pnl.lossVat === false ? ' · 부가세 환산 안 함' : '')) : '') +
+      (c.lossCp || t.loss ? k('분실파손 (쿠팡 정산서 · 소비자가)', wn(c.lossCp), '공급가 환산 ' + wn(c.lossSup || 0) + ' · 기사 부담 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossGain ? ' · 부가세분 ' + wn(STX.pnl.lossGain) + ' → 러너 잉여' : STX.pnl && STX.pnl.lossVat === false ? ' · 부가세 환산 안 함' : '')) : '') +
       k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 공제금액 ' + wn(t.depDed)) +
-      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0)), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
+      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0)), '쿠팡 공급가 − 분실(공급가 환산 ' + wn(c.lossSup || 0) + ') − 기사 공급가' + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
       (STX.pnl && STX.pnl.ins ? k('러너 잉여 (프백 잉여 + 보험 차액 + 용차·품앗이' + (STX.pnl.lossGain ? ' + 분실 부가세' : '') + ')', wn(STX.pnl.surplus), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + (STX.pnl.lossGain ? ' · 분실 부가세 ' + wn(STX.pnl.lossGain) : '') + ' · 보험 차액 ' + wn(STX.pnl.insGap) + ' · 용차·품앗이 ' + wn(c.yongGain || 0)) +
         k('산재·고용 신고액 (빼둘 돈)', wn(STX.pnl.ins.total), '기사분 ' + wn(STX.pnl.ins.sanD + STX.pnl.ins.goyD) + ' + 러너 ' + Math.round(STX.pnl.ins.runner * 100) + '% ' + wn(STX.pnl.ins.runnerAmt)) : '') +
       (STX.pnl ? '<div class="kpi clk" id="stKpiNet" title="손익·운영비 보기"><small>당기순이익 (공급가 · 세전)</small><b' + (STX.pnl.net < 0 ? ' style="color:var(--danger)"' : '') + '>' + wn(STX.pnl.net) + '</b><em>회사이익 − 러너 보험 ' + wn(STX.pnl.runnerIns) + ' + 보험 차액 ' + wn(STX.pnl.insGap || 0) + ' − 인건비 ' + wn(STX.pnl.staff) + ' − 운영비 ' + wn(STX.pnl.cost) + (STX.pnl.staff || STX.pnl.cost ? '' : ' · 운영비 미입력') + '</em></div>' : '') +
@@ -7820,7 +7820,7 @@
     const today = new Date().toISOString().slice(0, 10);
     const amtIn = (key, v, ph, dis) => '<input class="inp fnum" data-fk="' + key + '" data-ff="amt" inputmode="numeric" value="' + (v === '' || v == null ? '' : wn(v)) + '" placeholder="' + esc(wn(ph)) + '"' + (dis ? ' disabled' : '') + '>';
     const dep = '<div class="fund-dep' + (d.done ? ' ok' : '') + '"><div><b>쿠팡 입금</b> <small>' + esc(mt) + ' 정산 · 입금 예정 ' + esc(mdTxt(d.due)) + ' · 받는 통장 ' + esc(d.bank || '(통장 목록에 \'쿠팡 입금\' 용도 통장 없음)') + '</small>' +
-      '<div class="sub" style="font-size:12px">계산 금액 ' + wn(d.plan) + ' = (쿠팡 공급가 − 분실) × 1.1 · 실제로 들어온 금액이 다르면 넣어 주세요</div></div>' +
+      '<div class="sub" style="font-size:12px">계산 금액 ' + wn(d.plan) + ' = 쿠팡 공급가 × 1.1 − 분실파손(소비자가) · 실제로 들어온 금액이 다르면 넣어 주세요</div></div>' +
       '<div class="fund-ctl">' + amtIn('deposit', d.amt || '', d.plan, d.done) + '<input class="inp" type="date" data-fk="deposit" data-ff="date" value="' + esc(d.date || '') + '"><label class="check"><input type="checkbox" data-fk="deposit" data-ff="done"' + (d.done ? ' checked' : '') + '> 받음</label></div></div>';
     // 기사정산금: 입금확인 진행 (정산서 목록의 입금 체크)
     const dl = ((STX.sum && STX.sum.drivers) || []).filter((v) => v.net), dDone = dl.filter((v) => v.checked);
@@ -7897,7 +7897,7 @@
     const step = (lab, v, sign, cls, note) => '<div class="pnl-step' + (cls ? ' ' + cls : '') + '"><span>' + lab + (note ? '<small>' + note + '</small>' : '') + '</span><b>' + (sign || '') + wn(v) + '</b></div>';
     const c = cur || {};
     const box = '<div class="pnl-box"><h4>' + esc(ymTitle(c.month || STX.month)) + ' 정산 손익 <small>공급가 · 세전' + (c.closed ? ' · 마감' : '') + '</small></h4>' +
-      step('회사이익금', c.profit, '', 'base', '쿠팡 공급가 ' + wn(c.salesSupply) + ' − 분실 ' + wn(c.loss) + ' − 기사 공급가 ' + wn(c.drvSupply) + (c.progFee ? ' − 영업점 수수료 ' + wn(c.progFee) : '') + ' (프백·용차 잉여 포함)') +
+      step('회사이익금', c.profit, '', 'base', '쿠팡 공급가 ' + wn(c.salesSupply) + ' − 분실 ' + wn(c.lossSup != null ? c.lossSup : c.loss) + ' (소비자가 ' + wn(c.loss) + ' ÷ 1.1) − 기사 공급가 ' + wn(c.drvSupply) + (c.progFee ? ' − 영업점 수수료 ' + wn(c.progFee) : '') + ' (프백·용차 잉여 포함)') +
       step('러너 산재·고용 ' + (c.ins ? Math.round(c.ins.runner * 100) + '%' : ''), c.runnerIns, '− ', '', '산재·고용 신고 표의 러너 몫') +
       step('보험 차액 (러너 잉여)', c.insGap || 0, (c.insGap || 0) < 0 ? '' : '+ ', '', '기사 정산서 실제 공제 ' + wn(c.insDrv) + ' − 신고 기준 기사분 ' + wn(c.ins ? c.ins.sanD + c.ins.goyD : 0)) +
       step('직원 인건비', c.staff, '− ', '', c.staffN ? c.staffN + '명 세전 · 원천세 ' + wn(c.staffWht) + ' (다음 달 10일 납부) · 실지급 ' + wn(c.staffNet) : '직원 탭에 입력') +
