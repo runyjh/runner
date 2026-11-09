@@ -449,6 +449,7 @@
   .dsel .dmy small { font-size: 12px; color: var(--sub); font-weight: 700; } .dsel .dmy .none { color: #b0b8c1; } .dsel .dmy b.tag { font-size: 16px; border-radius: 8px; padding: 2px 10px; }
   .dsel .dmy b.tag.k-off { background: #f08c8c; color: #fff; } .dsel .dmy b.tag.k-sick { background: #d4edbc; color: #11734b; } .dsel .dmy b.tag.k-mi { background: #d15555; color: #ffcfc9; } .dsel .dmy b.tag.k-yong { background: #e6cff2; color: #5a3286; } .dsel .dmy b.tag.k-reg { background: #d9f5ef; color: #0b6b57; } .dsel .dmy b.tag.k-work { background: #bfe1f6; color: #0a53a8; }
   .dsel .dsum { margin-top: 6px; font-size: 12.5px; color: var(--sub); } .dsel .dsum b { color: var(--ink); }
+  .dsel .bk { font-size: 12.5px; color: #5a3286; background: #f5eefb; border-radius: 8px; padding: 6px 10px; line-height: 1.5; } .dsel .bk b { margin-right: 6px; } .dsel .pmx { margin-top: 8px; }
   .dsel .dwork { margin-top: 6px; font-size: 12.5px; color: var(--sub); background: #f7f8fa; border-radius: 8px; padding: 5px 9px; } .dsel .dwork b { color: var(--ink); }
   .dsel.pdd .dwork { background: #fff; }
   .dsel .inst { margin-top: 8px; font-size: 13px; color: #8a4b00; background: #fff4d6; border: 1px solid #f5d38a; border-radius: 8px; padding: 6px 10px; line-height: 1.5; } .dsel .inst b { display: block; font-size: 12px; }
@@ -708,7 +709,7 @@
     <div class="hello"><h2><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><span id="homeName">기사님, 안녕하세요</span></h2><p>오늘도 안전 운행하세요.</p></div>
     <div class="ntcard hidden" id="ntCard"></div>
     <div class="menu">
-      <button class="tile" id="mSched" type="button"><i class="ti">📅</i><b>스케줄</b><span>2주·한 달 일정 보기 →</span></button>
+      <button class="tile" id="mSched" type="button"><i class="ti">📅</i><b>스케줄</b><span>한 달 일정 · 내 캠프 →</span></button>
       <button class="tile" id="mSettle" type="button"><i class="ti">💰</i><b>정산서 보기</b><span>월별 정산서·계산서 →</span></button>
       <button class="tile" id="mPm" type="button"><i class="ti">🤝</i><b>품앗이</b><span>일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><i class="ti">👤</i><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
@@ -742,7 +743,7 @@
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
     <div class="topbar"><button class="back" id="scBack" aria-label="뒤로">←</button><h2>내 스케줄</h2>
-      <div class="segm" id="scMode"><button type="button" data-m="month" class="on">한 달</button><button type="button" data-m="2w">2주</button><button type="button" data-m="camp">내 캠프</button></div></div>
+      <div class="segm" id="scMode"><button type="button" data-m="month" class="on">한 달</button><button type="button" data-m="camp">내 캠프</button></div></div>
     <div id="scBody"></div>
     <p class="hint" id="scHint" style="text-align:center;margin:4px 0 24px">이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.</p>
   </section>
@@ -1594,8 +1595,8 @@
   }
   function paintScMode() {
     $$('#scMode button').forEach((b) => b.classList.toggle('on', b.dataset.m === scMode));
-    $('#scHint').textContent = scMode === 'camp' ? '달력의 날짜를 누르면 그날 내 노선과 우리 캠프 기사님들·백업 일정이 아래에 보입니다. 다음 주 이후는 바뀔 수 있습니다.' : scMode === '2w' ? '이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.'
-      : '날짜를 누르면 그날 일정과 우리 캠프 백업이 보입니다. 다음 주 이후는 바뀔 수 있습니다.';
+    $('#scHint').textContent = scMode === 'camp' ? '날짜를 누르면 그날 우리 캠프 기사님들과 백업 일정이 보입니다. 다음 주 이후는 바뀔 수 있습니다.'
+      : '날짜를 누르면 그날 내 노선·출근일·지시사항이 아래에 보입니다. 이번 주는 확정, 다음 주 이후는 바뀔 수 있습니다. 변경 문의는 사무실로.';
   }
   $('#scMode').addEventListener('click', (e) => {
     const b = e.target.closest('[data-m]'); if (!b || b.dataset.m === scMode) return;
@@ -1688,15 +1689,10 @@
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
     const bk = (r.backup || {})[d] || [];
-    // 고른 날 요약: 날짜(PDD 강조) · 캠프 · 내 노선·회전 · 근무/백업 인원 · 지시사항 — 한눈에
-    const mv = me ? me.cells[d] || '' : '', mp = mv ? schParse(mv, me ? me.route : '') : null;
-    const myLine = !me ? '' : !mv ? '<span class="none">아직 정해지지 않음</span>'
-      : mp.routes ? '<b>' + escH((mp.camp || r.camp) + ' 캠프') + '</b> <b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(mv) && !/\d/.test(mv) ? '<small>출근</small>' : '')
-      : '<b class="' + schKind(mv) + ' tag">' + escH(mp.raw) + '</b>';
-    const dsel = dselCard({ d, pdd, today: r.today, holiday: r.holidays[d], est, cell: mv, baseRoute: me ? me.route : '', camp: r.camp, inst: me ? (me.inst || {})[d] || '' : '',
-      sum: escH(r.camp) + ' 캠프 · 기사 ' + r.drivers.length + '명 · 근무 <b>' + work + '</b>명 · 백업 <b>' + bk.length + '</b>명' });
-    $('#scBody').innerHTML = picker + chips + dsel +
-      '<div class="wk"><h3>' + escH(r.camp) + ' 캠프 기사 <small class="fix">' + r.drivers.length + '명</small></h3>' +
+    $('#scBody').innerHTML = picker + chips +
+      '<div class="wk"><h3>' + escH(r.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
+        '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
+        '<p class="hint" style="margin:-2px 0 6px">기사 ' + r.drivers.length + '명 · 근무 ' + work + '명</p>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(r.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>';
@@ -1744,7 +1740,7 @@
       '<div class="dwork">🚚 배송(PDD) <b>' + (+p[1]) + '/' + (+p[2]) + '</b> · 실제 출근(상차) <b>' + prevTxt + ' 밤</b></div>' +
       '<div class="dmy">' + myLine + '</div>' +
       (o.sum ? '<div class="dsum">' + o.sum + '</div>' : '') +
-      (o.inst ? '<div class="inst"><b>📌 지시사항</b>' + escH(o.inst) + '</div>' : '') + '</div>';
+      (o.inst ? '<div class="inst"><b>📌 지시사항</b>' + escH(o.inst) + '</div>' : '') + (o.extra || '') + '</div>';
   }
   function renderMonth(r) {
     scLast = r;
@@ -1770,13 +1766,14 @@
     $('#scBody').innerHTML = rcNote(r) + '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
       '<div class="msum">근무 ' + work + '일 · 휴무 ' + off + '일' + (r.camp ? ' · ' + escH(r.camp) : '') + '</div>' +
       '<div class="mgrid">' + DOWK.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + w + '</div>').join('') + cells.join('') + '</div></div>' +
-      '<div id="scDsel">' + monthDsel(r) + '</div>' +
-      '<div class="wk mdet" id="scDet">' + dayRow(r, scSel) + '</div>';
+      '<div id="scDsel">' + monthDsel(r) + '</div>';
   }
   function monthDsel(r) {
-    const d = scSel, bk = ((r.backup || {})[d] || []).length;
+    const d = scSel, bk = (r.backup || {})[d] || [];
+    const pm = ((r.pumasi || {})[d] || []).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : '') + '</b>' + escH(x.text) + '</button>').join('');
+    const extra = pmDoneRow(r, d) + pm + (r.camp && bk.length ? '<div class="bk" style="margin-top:8px"><b>' + escH(r.camp) + ' 백업</b>' + bk.map(escH).join(', ') + '</div>' : '');
     return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', camp: r.camp || '', inst: (r.inst || {})[d] || '',
-      sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk ? ' · 들어오는 백업 <b>' + bk + '</b>명' : '') : '') });
+      sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk.length ? ' · 들어오는 백업 <b>' + bk.length + '</b>명' : ' · 이 날 들어오는 백업 없음') : ''), extra });
   }
   $('#scBody').addEventListener('change', (e) => {
     if (e.target.id !== 'scCampSel') return;
@@ -1804,7 +1801,6 @@
     if (c && scLast) {
       scSel = c.dataset.d;
       $$('#scBody .mc.sel').forEach((x) => x.classList.remove('sel')); c.classList.add('sel');
-      $('#scDet').innerHTML = dayRow(scLast, scSel);
       const ds = $('#scDsel'); if (ds) ds.innerHTML = monthDsel(scLast);
     }
   });
