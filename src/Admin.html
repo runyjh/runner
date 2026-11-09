@@ -290,6 +290,8 @@
   .t-품앗이 { background: var(--ok-weak); color: var(--ok); }
   .t-외부용차 { background: #f1ecfb; color: #6b46c1; }
   .t-운영자, .t-관리자, .t-대표 { background: #e8edf3; color: #334155; }
+  .lnrt { display: inline-flex; gap: 4px; margin-left: 6px; cursor: pointer; vertical-align: middle; }
+  .lnrt .lnt { font-size: 11px; }
   .t-none { background: var(--gray-weak); color: var(--faint); }
   .tabs.sub2 .tab { padding: 4px 10px; font-size: 13px; }
   .code-row { display: flex; gap: 6px; }
@@ -1030,8 +1032,7 @@
       </div>
       <div class="ng g-ops"><p class="ngt">운영</p>
         <a data-view="route">노선관리</a>
-        <a data-view="perf">노선 수행률</a>
-        <a data-view="sla">SLA 점수</a>
+        <a data-view="perf">수행률 · SLA</a>
         <a data-view="memo">업무스케줄</a>
       </div>
       <div class="ng g-fin"><p class="ngt">정산 · 회계</p>
@@ -1337,17 +1338,10 @@
    </section>
    <section id="view-perf" class="hidden">
     <div class="head">
-      <h2>노선 수행률 <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 '수행률 안내' 파일</small></h2>
+      <h2>노선 수행률 · SLA <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 '수행률 안내' · 월간 SLA 점수 파일</small></h2>
       <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 주간 '수행률 안내' 또는 월간 SLA 점수 엑셀 (파일 종류 자동 인식 · 같은 기간은 덮어씀)">수행률·SLA 업로드</button><input type="file" id="rpFile" accept=".xlsx" class="hidden"></div>
     </div>
     <div class="rp-box" id="perfBox"></div>
-   </section>
-   <section id="view-sla" class="hidden">
-    <div class="head">
-      <h2>SLA 점수 <small class="sub" style="font-size:13px;font-weight:500">쿠팡 월간 Vendor SLA 파일 · 총점 100</small></h2>
-      <div class="tools"><button class="btn ghost" id="slReload">새로고침</button><button class="btn" id="slUpBtn" title="쿠팡 월간 SLA 점수 엑셀 (주간 수행률 파일도 같은 버튼)">수행률·SLA 업로드</button></div>
-    </div>
-    <div class="rp-box" id="slaBox"></div>
    </section>
    <section id="view-settle" class="hidden">
     <div class="head">
@@ -2997,8 +2991,8 @@
     $('#view-bib').classList.toggle('hidden', v !== 'bib');
     $('#view-route').classList.toggle('hidden', v !== 'route');
     $('#view-perf').classList.toggle('hidden', v !== 'perf');
-    $('#view-sla').classList.toggle('hidden', v !== 'sla');
-    if (v === 'perf' || v === 'sla') { RP.tab = v === 'sla' ? 'sla' : 'wk'; rpRender(); loadPerf(); if (v === 'sla') loadSla(); }
+    if (v === 'sla') v = 'perf'; // (예전 메뉴 이름)
+    if (v === 'perf') { rpRender(); loadPerf(); if (RP.tab === 'sla') loadSla(); }
     $('#view-sched').classList.toggle('hidden', v !== 'sched');
     $('#view-pumasi').classList.toggle('hidden', v !== 'pumasi');
     if (v === 'pumasi') loadPumasi();
@@ -4444,16 +4438,34 @@
       '</div>') +
       '<div class="sec"><div class="sec-h"><div class="rtabs">' +
           '<button class="tab' + (rtab === 'routes' ? ' on' : '') + '" data-rtab="routes">노선 <b id="rCount"></b></button>' +
-          (orphan ? '' : '<button class="tab' + (rtab === 'prices' ? ' on' : '') + '" data-rtab="prices">구분별 단가 <b id="pCount"></b></button>') + '</div>' +
+          (orphan ? '' : '<button class="tab' + (rtab === 'prices' ? ' on' : '') + '" data-rtab="prices">구분별 단가 <b id="pCount"></b></button>' +
+            '<button class="tab' + (rtab === 'ln' ? ' on' : '') + '" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 없어진 라우트는 종료 (수행률·SLA 이력이 이어집니다)">변경이력 <b id="lnCount"></b></button>') + '</div>' +
           (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
         '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
         '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
         '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th title="쿠팡 정산서 최근 2개월 · 라우트별 배송건수 ÷ 배송한 날 수">1일 평균물량</th><th title="쿠팡 주간 수행률 최신 등급 (1~2 우수 · 3~4 위탁 조정 대상) · 누르면 이력">수행률</th><th>메모</th><th>수정일시</th></tr></thead>' +
         '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div></div>' +
-        (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div>') +
+        (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div><div id="tabLn"' + (rtab === 'ln' ? '' : ' class="hidden"') + '></div>') +
       '</div>';
     renderFilters(); renderRoutes(); loadThumbs();
-    if (!orphan) renderPrices();
+    if (!orphan) { renderPrices(); renderLnTab(); }
+  }
+  // ── 변경이력 탭 (lnRender 공용 · 고른 캠프 관련 줄만, '전체 캠프' 체크로 모두) ──
+  let lnAll = false;
+  function renderLnTab() {
+    const box = $('#tabLn'); if (!box) return;
+    const c = campById(curCamp), cs = c ? rpCamp(c.name) : '';
+    const cnt = $('#lnCount'); if (cnt) cnt.textContent = LN.loaded ? LN.edges.filter((e) => !cs || e.fromCamp === cs || e.toCamp === cs).length + '건' : '';
+    if (rtab !== 'ln') return;
+    if (!RP.loaded || !SL.loaded) {
+      box.innerHTML = '<div class="sec"><div class="spin"></div></div>';
+      const p = [];
+      if (!RP.loaded) p.push(loadPerf(true)); if (!SL.loaded) p.push(loadSla(true));
+      Promise.all(p).then(() => { if (rtab === 'ln') renderLnTab(); });
+      return;
+    }
+    box.innerHTML = '';
+    lnRender(box, { camp: cs, all: lnAll, routes: routesOf(curCamp) });
   }
 
   function renderFilters() {
@@ -4483,7 +4495,7 @@
     $('#rRows').innerHTML = list.map((r) =>
       '<tr data-rid="' + esc(r.id) + '"' + (r.status === '정지' ? ' class="off"' : '') + '>' +
       '<td class="ck"><input type="checkbox" data-rck="' + esc(r.id) + '"' + (rsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
-      '<td><b class="code">' + esc(r.code) + '</b></td>' + GK.map((k) => '<td class="g">' + esc(r[k]) + '</td>').join('') +
+      '<td><b class="code">' + esc(r.code) + '</b>' + lnRouteTags(r) + '</td>' + GK.map((k) => '<td class="g">' + esc(r[k]) + '</td>').join('') +
       '<td><span class="badge ' + (r.status === '정지' ? 'b-roff' : 'b-ron') + '">' + esc(r.status) + '</span></td>' + volCell(r) + perfCell(r) +
       '<td class="sub memo-cell" title="' + esc(r.memo) + '">' + esc(r.memo) + '</td><td class="sub">' + esc(String(r.updatedAt || '').slice(0, 16)) + '</td></tr>').join('');
     const em = $('#rEmpty');
@@ -4491,6 +4503,14 @@
     em.innerHTML = all.length ? '조건에 맞는 노선이 없습니다.' : '등록된 노선이 없습니다. <b>+ 노선 추가</b>로 노선코드를 입력하세요.';
     $('#rAll').checked = !!list.length && list.every((r) => rsel.has(r.id));
     renderBulk();
+  }
+  /** 노선 표 배지: 이전 코드를 이어 받은 라우트 '← 211A' · 종료 기록된 라우트 '종료 8/25' (누르면 변경이력 탭) */
+  function lnRouteTags(r) {
+    if (!LN.loaded) return '';
+    const camp = campById(r.campId), cs = camp ? rpCamp(camp.name) : ''; if (!cs) return '';
+    const L = GK.slice(1).map((k) => r[k]).filter(Boolean);
+    const out = (L.length ? L.map((x) => [x, r.g1 + x]) : [['', r.code]]).map(([l, c]) => { const k = rpKey(cs, c), t = lnTail(k) + lnEndTag(k); return t ? (l ? '<small class="sub">' + esc(l) + '</small>' : '') + t : ''; }).filter(Boolean);
+    return out.length ? '<span class="lnrt" data-rtab="ln" title="변경이력 탭으로">' + out.join(' ') + '</span>' : '';
   }
   // 1일 평균물량 (쿠팡 정산서 기준, 정산 코드 = 번호+글자 마다)
   let RVOL = null;
@@ -4502,7 +4522,7 @@
     const camp = campById(r.campId), cs = camp ? shortCamp(camp.name).replace(/\s/g, '').toUpperCase() : '';
     const letters = GK.slice(1).map((k) => r[k]).filter(Boolean);
     const codes = letters.length ? letters.map((L) => [L, r.g1 + L]) : [['', r.code]];
-    const parts = codes.map(([L, c]) => { const v = RVOL.vol[cs + '|' + c]; return v ? { L, c, v } : null; }).filter(Boolean);
+    const parts = codes.map(([L, c]) => { const v = (RVOL.vol || {})[cs + '|' + c]; return v ? { L, c, v } : null; }).filter(Boolean);
     if (!parts.length) return '<td class="sub">-</td>';
     const tip = parts.map((p) => p.c + ': ' + p.v.avg + '건 (' + p.v.days + '일 · 합 ' + p.v.qty + '건)').join('\n') + '\n기간: ' + (RVOL.months || []).join(', ') + ' 정산';
     const sum = parts.reduce((a, p) => a + (Number(p.v.avg) || 0), 0);
@@ -4748,7 +4768,7 @@
       RP.rows = r.rows || []; RP.weeks = r.weeks || []; RP.drvOn = !!r.drvOn; RP.memoOn = !!r.memoOn; RP.totalWeeks = r.totalWeeks || 0; RP.loaded = true;
       if (r.lineage) lnSet(r.lineage);
       rpIndex();
-      if ($('#rRows')) renderRoutes();
+      if ($('#rRows')) { renderRoutes(); renderLnTab(); }
       if (rpViewOn()) rpRender();
       return RP;
     }).catch(() => RP).finally(() => { RP.loading = null; });
@@ -4778,14 +4798,12 @@
     return '<td class="rc" data-rpc="' + esc(parts.map((p) => cs + '|' + p.c).join(',')) + '">' + parts.map((p) => (p.L ? '<small>' + esc(p.L) + '</small>' : '') +
       grBadge(p.v.grade, p.c + ' ' + p.v.wk + (p.v.perf != null ? ' ' + p.v.perf + '%' : '') + (p.v.stale ? ' (최신 주차 자료 없음)' : '')) + (p.v.improve ? '<span class="gr-imp">개선 요청</span>' : '')).join(' ') + '</td>';
   }
-  // 수행률·SLA 는 각각 독립 메뉴 (view-perf / view-sla). 같은 그리기 함수를 쓰고, 메뉴에 따라 탭이 다르다
-  const rpViewOn = () => currentView === 'perf' || currentView === 'sla';
-  const rpBox = () => (currentView === 'sla' ? $('#slaBox') : $('#perfBox'));
-  const rpTabs = () => (currentView === 'sla' ? [['sla', 'SLA 점수 (월간)'], ['ln', '라우트 변경이력']] : [['wk', '주간 수행률 (등급)'], ['ln', '라우트 변경이력']]);
+  // 수행률·SLA 는 한 메뉴(view-perf)에 탭 둘. 라우트 변경이력은 노선관리 → 변경이력 탭 (lnRender 공용)
+  const rpViewOn = () => currentView === 'perf';
+  const rpBox = () => $('#perfBox');
+  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)']];
   const rpTabNow = () => { const ts = rpTabs().map((t) => t[0]); if (ts.indexOf(RP.tab) < 0) RP.tab = ts[0]; return RP.tab; };
   $('#rpReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
-  $('#slReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadSla(true).then(() => loadPerf(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
-  $('#slUpBtn').addEventListener('click', () => $('#rpFile').click());
   function rpList() {
     const f = RP.f, q = normCode(f.q);
     return Array.from(RP.map.values()).map((e) => {
@@ -4799,12 +4817,11 @@
   function rpRender() {
     if (!rpViewOn()) return;
     const box = rpBox(), tab = rpTabNow();
-    const other = box.id === 'slaBox' ? $('#perfBox') : $('#slaBox'); if (other.innerHTML) other.innerHTML = ''; // 두 메뉴가 같은 id 를 쓰므로 안 보이는 쪽은 비운다
     const onBtn = (id, on, lab) => '<span class="rp-on">' + lab + ' <b class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-rpset="' + id + '">' + (on ? '끄기' : '켜기') + '</button></span>';
     box.innerHTML = '<div class="sec rp-top"><div class="xp-head"><div class="tabs rp-tabs">' + rpTabs().map((t) => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" data-rptab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
-      '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 기록을 업무스케줄에') : '') + '</span></div></div>';
+      '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 기록을 업무스케줄에') : '') +
+      '<a class="btn sm ghost" href="#" data-view="route" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 종료 — 노선관리에서 관리합니다">라우트 변경이력 → 노선관리</a></span></div></div>';
     if (tab === 'sla') return slaRender(box);
-    if (tab === 'ln') { if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; } if (!SL.loaded) loadSla(); return lnRender(box); }
     if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; }
     const wks = RP.weeks.slice(-8), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw);
     const camps = [...new Set(RP.rows.map((r) => r.camp))].sort(koSort);
@@ -4840,15 +4857,8 @@
   }
   $$('.rp-box').forEach((bx) => bx.addEventListener('input', (e) => { if (e.isComposing) return; if (e.target.id === 'rpQ') { RP.f.q = e.target.value; rpRenderRows(); } if (e.target.id === 'slQ') { SL.f.q = e.target.value; slaRenderRows(); } }));
   $$('.rp-box').forEach((bx) => bx.addEventListener('change', (e) => { const m = { rpCamp: 'camp', rpMode: 'mode' }[e.target.id]; if (m) { RP.f[m] = e.target.value; rpRenderRows(); } const m2 = { slCamp: 'camp', slMode: 'mode' }[e.target.id]; if (m2) { SL.f[m2] = e.target.value; slaRenderRows(); } if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); } if (e.target.id === 'rpEnded') { RP.f.ended = e.target.checked; rpRenderRows(); } if (e.target.id === 'slEnded') { SL.f.ended = e.target.checked; slaRenderRows(); } }));
-  $$('.rp-box').forEach((bx) => bx.addEventListener('click', (e) => {
-    const sb = e.target.closest('[data-rpset]');
-    if (sb) {
-      const k = sb.dataset.rpset, f = k === 'drv' ? { drvOn: !RP.drvOn } : { memoOn: !RP.memoOn };
-      sb.disabled = true;
-      return api('adm_perfSet', f).then((r) => { if (!r.ok) return toast(r.msg); RP.drvOn = !!r.drvOn; RP.memoOn = !!r.memoOn; rpRender(); toast(k === 'drv' ? '기사 앱 표시를 ' + (r.drvOn ? '켰습니다. (기사 앱 마이페이지에 내 라우트 등급이 보입니다)' : '껐습니다.') : '메모 자동을 ' + (r.memoOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { sb.disabled = false; });
-    }
-    if (e.target.id === 'rpUpBtn2' || e.target.id === 'rpUpBtn3') return $('#rpFile').click();
-    const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); return; }
+  /** 라우트 변경이력 패널 클릭 (수행률 화면 · 노선관리 변경이력 탭 공용) */
+  function lnClick(e) {
     if (e.target.id === 'lnSugBtn') {
       e.target.disabled = true;
       return api('adm_lineageSuggest').then((r) => { if (!r.ok) return toast(r.msg); lnSug = (r.suggestions || []).map((x) => Object.assign({ on: x.kind === '개명' || x.kind === '이관' }, x)); lnSugRender(); }).catch(() => {}).finally(() => { e.target.disabled = false; });
@@ -4868,9 +4878,29 @@
     if (del) {
       if (!confirm('이 변경이력 줄을 지울까요? 이어 붙였던 이력이 다시 따로 보입니다.')) return;
       del.disabled = true;
-      return api('adm_lineageDel', del.dataset.lndel).then((r) => { if (!r.ok) return toast(r.msg); lnSet(r.edges || []); RP.loaded = false; SL.loaded = false; return loadPerf(true).then(() => loadSla(true)).then(() => rpRender()); }).catch(() => {});
+      return api('adm_lineageDel', del.dataset.lndel).then((r) => { if (!r.ok) return toast(r.msg); lnSet(r.edges || []); RP.loaded = false; SL.loaded = false; return loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); lnAfter(); }); }).catch(() => {});
     }
+    return false;
+  }
+  $$('.rp-box').forEach((bx) => bx.addEventListener('click', (e) => {
+    const sb = e.target.closest('[data-rpset]');
+    if (sb) {
+      const k = sb.dataset.rpset, f = k === 'drv' ? { drvOn: !RP.drvOn } : { memoOn: !RP.memoOn };
+      sb.disabled = true;
+      return api('adm_perfSet', f).then((r) => { if (!r.ok) return toast(r.msg); RP.drvOn = !!r.drvOn; RP.memoOn = !!r.memoOn; rpRender(); toast(k === 'drv' ? '기사 앱 표시를 ' + (r.drvOn ? '켰습니다. (기사 앱 마이페이지에 내 라우트 등급이 보입니다)' : '껐습니다.') : '메모 자동을 ' + (r.memoOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { sb.disabled = false; });
+    }
+    const go = e.target.closest('a[data-rtab="ln"]'); if (go) { e.preventDefault(); rtab = 'ln'; switchView('route'); if (RT.camps.length) renderCampMain(); return; }
+    if (e.target.id === 'rpUpBtn2' || e.target.id === 'rpUpBtn3') return $('#rpFile').click();
+    const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); return; }
+    lnClick(e);
   }));
+  // 노선관리 변경이력 탭: 같은 핸들러
+  $('#campMain').addEventListener('click', (e) => { if (e.target.closest('#tabLn')) lnClick(e); });
+  $('#campMain').addEventListener('change', (e) => {
+    if (!e.target.closest('#tabLn')) return;
+    if (e.target.id === 'lnAllCk') { lnAll = e.target.checked; renderLnTab(); }
+    if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); }
+  });
   // 라우트 이력 창 (노선 표 · 수행률 패널 공용)
   document.addEventListener('click', (e) => {
     const td = e.target.closest('td.rc[data-rpc]'); if (!td || !RP.loaded) return;
@@ -5018,7 +5048,8 @@
       if (!r.ok) { toast(r.msg); return SL; }
       SL.rows = r.rows || []; SL.periods = r.periods || []; SL.th = r.th || SL.th; SL.campMap = r.campMap || {}; SL.loaded = true;
       if (r.lineage) { lnSet(r.lineage); if (RP.loaded) rpIndex(); }
-      if (rpViewOn() && (RP.tab === 'sla' || RP.tab === 'ln')) rpRender();
+      if (rpViewOn() && RP.tab === 'sla') rpRender();
+      if (currentView === 'route' && $('#tabLn')) renderLnTab();
       return SL;
     }).catch(() => SL).finally(() => { SL.loading = null; });
     return SL.loading;
@@ -5122,24 +5153,29 @@
   }
   // 계보 탭: 저장된 계보 + 노선 이관에서 온 계보 · 자동 제안 확인 · 직접 등록
   let lnSug = null;
-  function lnRender(box) {
-    const camps = [...new Set(RP.rows.map((r) => r.camp).concat(SL.rows.map((r) => r.camp)).filter(Boolean))].sort(koSort);
+  function lnRender(box, o) {
+    o = o || {};
+    const cs = o.camp || '';
+    const camps = [...new Set(RP.rows.map((r) => r.camp).concat(SL.rows.map((r) => r.camp), RT.camps.map((c) => rpCamp(c.name))).filter(Boolean))].sort(koSort);
     const kinds = ['개명', '이관', '분할', '병합', '종료'];
-    const edges = LN.edges.slice().sort((a, b) => koSort(b.date || '', a.date || '') || koSort(a.fromCamp, b.fromCamp) || koSort(a.fromCode, b.fromCode));
-    box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">라우트 변경이력 <small class="sub">코드가 바뀐 라우트를 이어 붙입니다 · 없어진 라우트는 종료</small></h4><span class="grow"></span><button class="btn sm" id="lnSugBtn">자동 제안 확인</button></div>' +
+    const edges = LN.edges.filter((e) => o.all || !cs || e.fromCamp === cs || e.toCamp === cs).slice().sort((a, b) => koSort(b.date || '', a.date || '') || koSort(a.fromCamp, b.fromCamp) || koSort(a.fromCode, b.fromCode));
+    // 이 캠프 노선의 정산코드(숫자+글자) 목록 → 라우트 칸 자동완성
+    const rcodes = [...new Set((o.routes || []).flatMap((r) => { const L = GK.slice(1).map((k) => r[k]).filter(Boolean); return L.length ? L.map((x) => r.g1 + x) : [r.code]; }))].sort(koSort);
+    box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">라우트 변경이력' + (cs ? ' <span style="color:var(--brand)">' + esc(cs) + '</span>' : '') + ' <small class="sub">코드가 바뀐 라우트를 이어 붙입니다 · 없어진 라우트는 종료</small></h4><span class="grow"></span>' +
+      (cs ? '<label class="check" style="align-self:center"><input type="checkbox" id="lnAllCk"' + (o.all ? ' checked' : '') + '> 전체 캠프 보기</label>' : '') + '<button class="btn sm" id="lnSugBtn">자동 제안 확인</button></div>' +
       '<p class="sub" style="margin:6px 0 10px;font-size:12.5px"><b>개명·이관(1:1)</b>은 이전 코드의 주간 등급·SLA 점수를 새 코드 줄에 그대로 이어 붙입니다 (보라 점 = 이전 코드 시절). <b>분할·병합</b>은 숫자를 합치지 않고 이력 창에서 관련 라우트를 나란히 보여 줍니다. 노선 이관(노선관리 → 노선 이관)으로 바꾼 것은 자동으로 들어옵니다. <b>종료</b>는 더 이상 운영하지 않는 라우트(이후 라우트 없음) — 목록에서 숨겨지고 \'종료 포함\'을 켜면 보입니다.</p>' +
       '<div id="lnSugBox"></div>' +
       '<div class="ptools" style="align-items:flex-end;flex-wrap:wrap"><b style="align-self:center">직접 등록</b>' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이전 캠프<input class="inp" id="lnFc" list="lnCamps" placeholder="안양1" style="width:90px"></label>' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이전 라우트<input class="inp" id="lnF" placeholder="605A" style="width:90px"></label><span style="align-self:center">→</span>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이전 캠프<input class="inp" id="lnFc" list="lnCamps" placeholder="안양1" value="' + esc(cs) + '" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이전 라우트<input class="inp" id="lnF" list="lnRoutes" placeholder="605A" style="width:90px"></label><span style="align-self:center">→</span>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이후 캠프<input class="inp" id="lnTc" list="lnCamps" placeholder="(같으면 비움)" style="width:110px"></label>' +
-        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이후 라우트<input class="inp" id="lnT" placeholder="723A (종료면 비움)" style="width:120px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">이후 라우트<input class="inp" id="lnT" list="lnRoutes" placeholder="723A (종료면 비움)" style="width:120px"></label>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">적용일<input class="inp" id="lnD" type="date" style="width:150px"></label>' +
         '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">종류<select class="inp" id="lnK">' + kinds.map((k) => '<option>' + k + '</option>').join('') + '</select></label>' +
-        '<button class="btn sm" id="lnAdd">추가</button><datalist id="lnCamps">' + camps.map((c) => '<option value="' + esc(c) + '">').join('') + '</datalist></div>' +
+        '<button class="btn sm" id="lnAdd">추가</button><datalist id="lnCamps">' + camps.map((c) => '<option value="' + esc(c) + '">').join('') + '</datalist><datalist id="lnRoutes">' + rcodes.map((c) => '<option value="' + esc(c) + '">').join('') + '</datalist></div>' +
       '<div class="table-wrap rt-table ln-table"><table><thead><tr><th>적용일</th><th>종류</th><th>이전</th><th></th><th>이후</th><th>출처·메모</th><th></th></tr></thead><tbody>' +
       (edges.length ? edges.map((e) => '<tr><td>' + esc(e.date || '') + '</td><td>' + esc(e.kind) + '</td><td class="k">' + esc(e.fromCamp + ' ' + e.fromCode) + '</td><td>→</td><td class="k">' + (e.kind === '종료' ? '<span class="sub">(종료)</span>' : esc(e.toCamp + ' ' + e.toCode)) + '</td><td class="sub">' + esc((e.src === 'move' ? '노선 이관 기록' : e.by || '') + (e.memo ? ' · ' + e.memo : '')) + '</td>' +
-        '<td>' + (e.src === 'saved' ? '<button class="btn sm ghost danger-t" data-lndel="' + esc(e.id) + '">지우기</button>' : '') + '</td></tr>').join('') : '<tr><td colspan="7" class="sub" style="text-align:center;padding:16px">등록된 변경이력이 없습니다. [자동 제안 확인]을 눌러 보세요.</td></tr>') +
+        '<td>' + (e.src === 'saved' ? '<button class="btn sm ghost danger-t" data-lndel="' + esc(e.id) + '">지우기</button>' : '') + '</td></tr>').join('') : '<tr><td colspan="7" class="sub" style="text-align:center;padding:16px">' + (cs && !o.all && LN.edges.length ? esc(cs) + ' 캠프 관련 변경이력이 없습니다. (전체 캠프 보기로 다른 캠프 것도 볼 수 있습니다)' : '등록된 변경이력이 없습니다. [자동 제안 확인]을 눌러 보세요.') + '</td></tr>') +
       '</tbody></table></div></div>');
     if (lnSug) lnSugRender();
   }
@@ -5160,7 +5196,21 @@
     toast('변경이력을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + '. 이력을 다시 불러옵니다.');
     lnSug = null;
     await loadPerf(true); await loadSla(true);
-    rpRender();
+    rpRender(); lnAfter();
+  }
+  /** 변경이력이 바뀐 뒤 노선관리 화면 갱신 (변경이력 탭 · 노선 표 배지) */
+  function lnAfter() { if (currentView === 'route' && $('#campMain') && RT.camps.length) { if (rtab === 'ln') renderLnTab(); else { renderRoutes(); const cnt = $('#lnCount'); if (cnt) renderLnTab(); } } }
+  /** 노선을 정지할 때: 변경이력에 '종료'로 기록할지 묻기 (이미 종료된 코드는 건너뜀) */
+  function lnAskEnd(routes) {
+    const todo = [];
+    routes.forEach((r) => {
+      const camp = campById(r.campId), cs = camp ? rpCamp(camp.name) : ''; if (!cs) return;
+      const L = GK.slice(1).map((k) => r[k]).filter(Boolean);
+      (L.length ? L.map((x) => r.g1 + x) : [r.code]).forEach((c) => { if (!LN.ended.has(rpKey(cs, c))) todo.push({ fromCamp: cs, fromCode: c, toCamp: cs, toCode: '', date: ymdLocal(new Date()), kind: '종료', memo: '노선 정지' }); });
+    });
+    if (!todo.length) return;
+    if (!confirm('정지한 노선을 라우트 변경이력에 "종료"로 기록할까요? (적용일 오늘)\n' + todo.map((t) => t.fromCamp + ' ' + t.fromCode).join(', ') + '\n\n종료로 기록하면 수행률·SLA 목록에서 숨겨지고 "종료 포함"을 켜면 보입니다. 잠시 쉬는 노선이면 [취소].')) return;
+    lnSaveRows(todo);
   }
   function slaUpPreview() {
     const U = rpUp; if (!U || U.kind !== 'sla') return;
@@ -5191,7 +5241,7 @@
       $('#rpUpModal').classList.add('hidden'); rpUp = null;
       toast('SLA 점수를 저장했습니다. ' + out.join(' / '));
       await loadSla(true); await loadPerf(true);
-      if (currentView !== 'sla') switchView('sla'); else { RP.tab = 'sla'; rpRender(); }
+      RP.tab = 'sla'; if (currentView !== 'perf') switchView('perf'); else rpRender();
     } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
   }
   function renderBulk() {
@@ -5232,6 +5282,7 @@
       api('adm_routeStatus', [...rsel], st).then((r) => {
         if (!r.ok) return toast(r.msg);
         r.routes.forEach(patchRoute); rsel.clear(); renderRoutes(); toast(r.routes.length + '개 노선을 ' + st + '(으)로 바꿨습니다.');
+        if (st === '정지') lnAskEnd(r.routes);
       }).catch(() => {});
     } else if (act === 'bulk-del') {
       const n = rsel.size;
@@ -5401,6 +5452,7 @@
       $('#routeModal').classList.add('hidden');
       renderCampList(); renderCampMain();
       toast(f.campId ? '"' + campById(f.campId).name + '" 캠프로 옮겼습니다.' : '저장했습니다.');
+      if (f.status === '정지') lnAskEnd([r.route]);
     }).catch(() => {}).finally(() => { b.disabled = false; });
   });
   $('#rmDel').addEventListener('click', () => {
@@ -5716,8 +5768,10 @@
     $$('[data-rtab]', $('#campMain')).forEach((b) => b.classList.toggle('on', b.dataset.rtab === v));
     $('#tabRoutes').classList.toggle('hidden', v !== 'routes');
     $('#tabPrices').classList.toggle('hidden', v !== 'prices');
+    const tl = $('#tabLn'); if (tl) tl.classList.toggle('hidden', v !== 'ln');
     const add = $('[data-ract="route-add"]', $('#campMain')); if (add) add.classList.toggle('hidden', v !== 'routes');
     if (v === 'prices') renderPrices();
+    if (v === 'ln') renderLnTab();
   });
   // 단가 칸 입력
   $('#campMain').addEventListener('input', (e) => {
@@ -9405,7 +9459,6 @@
       ['bib', '', [['#bibNew', '버튼'], ['#coBtn', '버튼']]],
       ['route', '', [['#xpOpen', '버튼'], ['[data-rcopen="move"]', '버튼'], ['#campNew', '버튼']]],
       ['perf', '', [['#rpUpBtn', '버튼']]],
-      ['sla', '', [['#slUpBtn', '버튼']]],
       ['settle', '', [['#stTabs .tab', '탭', { ids: '#stIdTabs .tab', cfg: '#stCfgTabs .tab' }], ['#stUpBtn', '버튼'], ['#stRecalc', '버튼'], ['#stCloseBtn', '버튼']]],
       ['settle', 'pnl', [['#stPnlTabs .tab', '탭']]],
       ['taxinv', '', [['#tiTabs .tab', '탭'], ['#tiFromStl', '버튼'], ['#tiNew', '버튼']]],
