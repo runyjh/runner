@@ -209,15 +209,23 @@ function adm_bankSave(token, p) {
       }
       // 4) 쿠팡 입금 확인 (stl_fund '쿠팡 입금' 줄: 금액·날짜·완료)
       if (opt.deposit) {
+        // 같은 정산월 입금이 나눠 들어오면(1차·2차) 더해서 · 탭은 마지막에 한 번만 씀
+        const dep = {};
         rows.forEach(function (r) {
           if (r.cat !== '쿠팡 입금' || !r.ref) return;
-          const fund = stlRead_('stl_fund');
-          let row = fund.filter(function (x) { return x.month === r.ref && x.item === '쿠팡 입금'; })[0];
-          if (row) { row.amt = stlNum_(r.amt); row.date = r.date; row.done = 'Y'; row.memo = str_(row.memo) || '통장 내역 자동'; }
-          else fund.push({ month: r.ref, item: '쿠팡 입금', bank: str_(r.bankName) || bankName, plan: '', amt: stlNum_(r.amt), done: 'Y', date: r.date, memo: '통장 내역 자동' });
-          stlWriteAll_('stl_fund', fund.map(function (x) { return { month: x.month, item: x.item, bank: x.bank, plan: x.plan, amt: x.amt, done: x.done, date: x.date, memo: x.memo }; }));
+          const d = dep[r.ref] || (dep[r.ref] = { amt: 0, date: '', bank: str_(r.bankName) || bankName });
+          d.amt += stlNum_(r.amt); if (str_(r.date) > d.date) d.date = str_(r.date);
           res.deposit++;
         });
+        if (Object.keys(dep).length) {
+          const fund = stlRead_('stl_fund');
+          Object.keys(dep).forEach(function (m) {
+            const d = dep[m], row = fund.filter(function (x) { return x.month === m && x.item === '쿠팡 입금'; })[0];
+            if (row) { row.amt = d.amt; row.date = d.date; row.done = 'Y'; row.memo = str_(row.memo) || '통장 내역 자동'; }
+            else fund.push({ month: m, item: '쿠팡 입금', bank: d.bank, plan: '', amt: d.amt, done: 'Y', date: d.date, memo: '통장 내역 자동' });
+          });
+          stlWriteAll_('stl_fund', fund.map(function (x) { return { month: x.month, item: x.item, bank: x.bank, plan: x.plan, amt: x.amt, done: x.done, date: x.date, memo: x.memo }; }));
+        }
       }
       // 5) 지출 기록 (중복 방지: 메모에 [통장:키])
       if (opt.expense) {

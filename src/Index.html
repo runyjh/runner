@@ -1163,7 +1163,8 @@
   function swrPrefetch() {
     const tok = store.get(TOKEN); if (!tok) return;
     const all = swrAll(), now = Date.now();
-    [['api_mySchedule', [tok]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]]].forEach((x, i) => {
+    const t1 = new Date(), pddMonth = ymdOf(new Date(t1.getFullYear(), t1.getMonth(), t1.getDate() + 1)).slice(0, 7); // 스케줄 화면이 처음 여는 달 (PDD가 있는 달)과 같은 키로
+    [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]]].forEach((x, i) => {
       const k = swrKey(x[0], x[1]), c = all[k];
       if (c && now - c.t < 600000) return;
       setTimeout(() => { if (store.get(TOKEN) === tok) gsCall(x[0], x[1]).then((r) => { if (r && r.ok) swrSave(k, r); }).catch(() => {}); }, i * 1500);
@@ -1327,7 +1328,7 @@
     if (last) $('#lgId').value = last;
     show('login');
   }
-  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); }
+  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); if (window.scReset) window.scReset(); } // 다음 로그인(공용 폰의 다른 기사)에 고른 캠프가 남지 않게
 
   // ───── 화면 문구 (관리자앱 → 올인원 설정 → 기사앱 에서 바꿈) ─────
   // 키 = "d:화면id:기본 문구". 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. ※ 관리자앱 uiDrvScan 과 같은 규칙
@@ -1649,6 +1650,7 @@
     paintScMode(); loadSched();
   });
   let scCamp = null, scCampDay = '', scCampMonth = '', scSeq = 0, scCampId = ''; // scCampId: 직함자(관리자·운영자·대표)가 고른 캠프 (빈칸 = 내 소속)
+  window.scReset = () => { scCamp = null; scCampDay = ''; scCampMonth = ''; scCampId = ''; CAMP_ROTS = {}; };
   // 달 이동은 앞뒤 12개월까지 (서버와 같은 규칙 · 넘어가면 화면이 멈추지 않게 미리 막음)
   const scMonthShift = (ym, by) => {
     const [y, m] = ym.split('-').map(Number), d = new Date(y, m - 1 + by, 1), t = new Date();

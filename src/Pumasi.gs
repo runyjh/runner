@@ -34,8 +34,13 @@ function appSet_() {
   return m;
 }
 function appSetPut_(key, value, memo) {
-  const row = findRow_(SH.APPSET, 'key', key);
-  if (row) writeFields_(SH.APPSET, row, { value: value }); else appendObj_(SH.APPSET, { key: key, value: value, memo: memo || '' });
+  const lock = scriptLock_(); // 처음 저장 두 번이 겹쳐 같은 키가 두 줄 생기지 않게 (scriptLock_ 은 겹쳐 잡아도 됨)
+  lock.waitLock(20000);
+  try {
+    const row = findRow_(SH.APPSET, 'key', key);
+    if (row) writeFields_(SH.APPSET, row, { value: value }); else appendObj_(SH.APPSET, { key: key, value: value, memo: memo || '' });
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
   cache_().remove('appset');
 }
 /** 품앗이 일감 올리기 켜짐? (관리자 품앗이 관리에서 ON/OFF, 기본 ON) */

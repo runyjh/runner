@@ -91,7 +91,7 @@ function adm_perfSave(token, p) {
         } else add.push(o);
       });
       const toArr = function (o) { const arr = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { if (c[k] !== undefined) arr[c[k]] = safeText_(o[k]); }); return arr; };
-      upd.forEach(function (u) { sh.getRange(u.row, 1, 1, c.__w).setNumberFormat('@').setValues([toArr(u.o)]); });
+      rpfWriteRows_(sh, upd, c.__w, toArr);
       if (add.length) {
         const r0 = sh.getLastRow() + 1;
         if (r0 + add.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(500, add.length));
@@ -177,17 +177,47 @@ function stlPeriodOfToday_() {
   return { from: ymd_(from), to: ymd_(to) };
 }
 /**
+ * 이 기사 한 사람의 스케줄 칸만 읽기 { cells: { 'YYYY-MM-DD': 글자 }, camps } — 관리자용 전체 그리드(schRead_)를 읽지 않음
+ *  (api_mySchedule 와 같은 방식: 행ID 열에서 내 줄만 찾고 그 줄의 날짜 칸만 읽음 · 한 실행 안에서 같은 기간은 한 번만)
+ */
+/** 바뀐 줄 쓰기: 붙어 있는 줄끼리 묶어 한 번에 (예전: 줄마다 2번 호출 → 1,000줄이면 잠금을 쥔 채 100초 넘게) */
+function rpfWriteRows_(sh, upd, w, toArr) {
+  const list = upd.slice().sort(function (a, b) { return a.row - b.row; });
+  for (let i = 0; i < list.length;) {
+    let j = i; while (j + 1 < list.length && list[j + 1].row === list[j].row + 1) j++;
+    sh.getRange(list[i].row, 1, j - i + 1, w).setNumberFormat('@').setValues(list.slice(i, j + 1).map(function (u) { return toArr(u.o); }));
+    i = j + 1;
+  }
+}
+var RPF_MY_ = {};
+function rpfMyCells_(driverId, from, to) {
+  const key = driverId + '|' + from + '|' + to;
+  if (RPF_MY_[key]) return RPF_MY_[key];
+  const out = { cells: {}, camps: master_().camps || [] };
+  RPF_MY_[key] = out;
+  if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
+  const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+  if (last < 2) return out;
+  const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(String(driverId)).matchEntireCell(true).matchCase(true).findNext();
+  if (!cell) return out;
+  const dates = schDateRange_(parseYmd_(from), parseYmd_(to)), cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
+  if (!cols.length) return out;
+  const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+  const vals = sh.getRange(cell.getRow(), c0 + 1, 1, c1 - c0 + 1).getValues()[0];
+  dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
+  return out;
+}
+/**
  * 백업 기사가 이번 정산기간(전월 26일~당월 25일, 오늘까지)에 기사스케줄 칸에 적힌 대로 입차한 라우트 [{ camp, code, days }] (많이 뛴 순)
  *  칸 글자에 캠프 이름이 있으면 그 캠프, 없으면 소속 캠프. 휴무·휴가·병가·미입차·비고 칸은 제외
  */
 function rpfRanRoutes_(driverId, camp, limit) {
   const pd = stlPeriodOfToday_(), today = todayText_(), rec = {};
-  const s = schRead_(parseYmd_(pd.from), parseYmd_(today < pd.to ? today : pd.to));
-  const campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); }), campName = {};
-  (s.camps || []).forEach(function (c) { campName[c.id] = rpfCamp_(c.name); });
+  const s = rpfMyCells_(driverId, pd.from, pd.to); // 기간 전체를 한 번 읽고 아래에서 오늘까지만 (rpfWorkDays_ 와 같은 읽기 재사용)
+  const campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
   const scan = function (cells, defCamp, defRoute) {
     Object.keys(cells || {}).forEach(function (d) {
-      if (d < pd.from || d > pd.to) return;
+      if (d < pd.from || d > pd.to || d > today) return;
       let v = String(cells[d] || '').toUpperCase();
       if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
       if (v === '출근' && defRoute) v = defRoute.toUpperCase(); // 추가 배정 줄의 '출근' = 그 캠프 배정 노선
@@ -196,12 +226,7 @@ function rpfRanRoutes_(driverId, camp, limit) {
       rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++; });
     });
   };
-  scan(s.cells[driverId], camp, '');
-  // 추가 배정 줄(EX기사ID@캠프ID): 다른 캠프 칸에 적힌 것도 입차로 본다
-  try {
-    const me = driverById_(driverId), ex = me ? extraAssignOf_(me) : [];
-    ex.forEach(function (x) { scan(s.cells[schExId_(driverId, x.c)], campName[x.c] || camp, x.r); });
-  } catch (e) { /* 추가 배정 없음 */ }
+  scan(s.cells, camp, ''); // (다른 캠프 추가 배정 줄은 #279 에서 없앰)
   const list = Object.keys(rec).map(function (k) { return rec[k]; }).sort(function (a, b) { return b.days - a.days; });
   return { period: pd, routes: limit ? list.slice(0, limit) : list };
 }
@@ -211,9 +236,9 @@ function rpfRanRoutes_(driverId, camp, limit) {
  */
 function rpfWorkDays_(driverId, camp, baseRoute) {
   const pd = stlPeriodOfToday_(), today = todayText_(), out = { total: 0, done: 0, perRoute: {} };
-  const s = schRead_(parseYmd_(pd.from), parseYmd_(pd.to));
+  const s = rpfMyCells_(driverId, pd.from, pd.to);
   const campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
-  const cells = s.cells[driverId] || {};
+  const cells = s.cells || {};
   Object.keys(cells).forEach(function (d) {
     if (d < pd.from || d > pd.to) return;
     let v = String(cells[d] || '').toUpperCase().trim();
@@ -358,7 +383,7 @@ function adm_slaSave(token, p) {
         } else add.push(o);
       });
       const toArr = function (o) { const arr = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { if (c[k] !== undefined) arr[c[k]] = safeText_(o[k]); }); return arr; };
-      upd.forEach(function (u) { sh.getRange(u.row, 1, 1, c.__w).setNumberFormat('@').setValues([toArr(u.o)]); });
+      rpfWriteRows_(sh, upd, c.__w, toArr);
       if (add.length) {
         const r0 = sh.getLastRow() + 1;
         if (r0 + add.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(500, add.length));
@@ -493,10 +518,12 @@ function adm_lineageSave(token, rows) {
 function adm_lineageDel(token, id) {
   return run_(function () {
     const a = requireAdmin_(token);
-    const row = findRow_(SH.RLIN, 'id', str_(id));
-    if (!row) fail_('계보 줄을 찾을 수 없습니다.');
     const lock = scriptLock_(); lock.waitLock(20000);
-    try { delRows_(sheet_(SH.RLIN), [row]); SpreadsheetApp.flush(); rpfBump_(); } finally { lock.releaseLock(); }
+    try {
+      const row = findRow_(SH.RLIN, 'id', str_(id)); // 잠금 안에서 줄 찾기 (동시에 지울 때 줄이 밀려 다른 줄을 지우지 않게)
+      if (!row) fail_('계보 줄을 찾을 수 없습니다.');
+      delRows_(sheet_(SH.RLIN), [row]); SpreadsheetApp.flush(); rpfBump_();
+    } finally { lock.releaseLock(); }
     logAdmin_(a, '라우트 계보 삭제', str_(id), '');
     return { ok: true, edges: rlnEdges_() };
   });
@@ -662,7 +689,7 @@ function adm_fbSave(token, p) {
         } else add.push(o);
       });
       const toArr = function (o) { const arr = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { if (c[k] !== undefined) arr[c[k]] = safeText_(o[k]); }); return arr; };
-      upd.forEach(function (u) { sh.getRange(u.row, 1, 1, c.__w).setNumberFormat('@').setValues([toArr(u.o)]); });
+      rpfWriteRows_(sh, upd, c.__w, toArr);
       if (add.length) {
         const r0 = sh.getLastRow() + 1;
         if (r0 + add.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(500, add.length));

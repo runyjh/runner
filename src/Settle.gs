@@ -170,7 +170,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261109b';
+const STL_CALC_VER = '20261110a'; // 회사 합계에 러너 몫 프로모션(promoBase·promoRunner) 추가
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed', 'stl_bankrows']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay', 'stl_bankrules'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -1852,6 +1852,7 @@ function stlCompute_(month) {
     rawRows: raw.length, lossRows: loss.length, drivers: drivers, total: tot,
     company: {
       sales: company.sales, supplyCp: company.supplyCp, lossCp: company.lossCp, lossSup: company.lossSup, unregSales: company.unregSales, vendorCut: company.vendorCut, progFee: company.progFee, yongGain: company.yongGain,
+      promoBase: company.promoBase, promoRunner: company.promoRunner, // 러너 몫 프로모션 (기사 줄에 없음 → 회사이익에 따로 더함)
       coupangNet: company.supplyCp - company.lossSup - company.vendorCut
     },
     dates: stlDates_(month, cfg), warnings: warnings, yong: yongOut, advAuto: advAuto, vendors: X.vendors.list.map(function (v) { return v.name; })
@@ -2146,7 +2147,7 @@ function stlClosedLoad_(month) {
   rows.forEach(function (r) {
     const m = /^(.*)##(\d+)$/.exec(str_(r.acct)), base = m ? m[1] : str_(r.acct), n = m ? Number(m[2]) : 0;
     if (!parts[base]) { parts[base] = []; order.push(base); }
-    parts[base][n] = str_(r.data);
+    parts[base][n] = r.data == null ? '' : String(r.data); // str_ 는 앞뒤 공백을 지움 → 나눠 저장한 경계의 공백이 사라지지 않게
   });
   order.forEach(function (acct) {
     try {
@@ -2294,7 +2295,7 @@ function stlPnl_(month, sum) {
   const o = {
     month: month, closed: !!(sum && sum.closed), hasData: !!(sum && (sum.drivers || []).length),
     qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: Math.round((c.supplyCp || 0) * 0.1 - ((c.lossCp || 0) - (c.lossSup || 0))), loss: c.lossCp || 0, lossSup: c.lossSup || 0, progFee: -(c.vendorCut || 0),
-    drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0),
+    drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0) + (c.promoBase || 0) + (c.promoRunner || 0),
     insDrv: (t.san || 0) + (t.goy || 0),
     staff: 0, staffWht: 0, staffNet: 0, staffN: 0, fixed: 0, fixedVat: 0, fixedN: 0, varCost: 0, varVat: 0, varN: 0, byCat: {}
   };
@@ -3633,8 +3634,8 @@ function adm_stlWarnAct(token, month, act, list, opt) {
 
 // ───────────────────────── 기사 앱: 내 정산서 ─────────────────────────
 /** 기사 본인이 명의자인 정산 묶음(메인 아이디키) 목록 */
-function stlMyGroups_(driverId) {
-  const D = stlDrivers_(), X = stlIds_(D);
+function stlMyGroups_(driverId, X) {
+  X = X || stlIds_(stlDrivers_());
   return Object.keys(X.groups).filter(function (k) { return X.groups[k].ownerId === driverId; });
 }
 /** 기사 앱: 볼 수 있는 정산월 목록 (마감한 달, 설정에 따라 계산 중인 달도) */
@@ -3659,17 +3660,17 @@ function api_mySlip(token, month) {
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     const cfg = stlCfg_(), closed = stlClosedInfo_(month);
     if (!closed && !cfg.appOpen) fail_('아직 마감되지 않은 달입니다. 사무실에서 마감하면 볼 수 있습니다.');
-    const r = stlResult_(month, false), groups = stlMyGroups_(u.id);
+    const r = stlResult_(month, false), XD = stlIds_(stlDrivers_()), groups = stlMyGroups_(u.id, XD); // 기사·아이디 표는 한 번만 읽음
     let co = {};
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
     // 내 묶음 키로 찾고, 없으면 내 아이디가 들어 있는 정산서 (기존 정산 이식 달은 정산서 키가 그때 아이디라 다를 수 있음)
-    const X = stlIds_(stlDrivers_()), mine = {}, seen = {};
+    const X = XD, mine = {}, seen = {};
     groups.forEach(function (g) { ((X.groups[g] || {}).cids || []).forEach(function (c) { mine[stlLogin_(c)] = 1; }); });
     const found = groups.map(function (g) { return r.slips[g]; }).filter(Boolean);
     found.forEach(function (sl) { seen[sl.row.id] = 1; });
     Object.keys(r.slips).forEach(function (k) {
       const sl = r.slips[k], row = sl && sl.row;
-      if (!row || seen[row.id] || row.legacyNote) return;
+      if (!row || seen[row.id] || row.legacyNote || row.vendor || !(r.summary && r.summary.legacy)) return; // 기존 정산 이식 달만 (아이디가 다른 사람에게 넘어간 보통 달의 정산서가 보이지 않게)
       if (row.ownerId ? row.ownerId === u.id : (row.cids || []).some(function (c) { return mine[stlLogin_(c)]; })) { found.push(sl); seen[row.id] = 1; } // 명의자가 있으면 명의자만
     });
     const slips = found.filter(function (sl) { return !sl.row.legacyNote; }).map(function (sl) {
@@ -3943,7 +3944,8 @@ function stlLegacyMerge_(month, leg) {
     if (gid) { slip = slips[gid]; row = slip.row; rep.matched++; }
     else {
       gid = ids[0] || ('legacy:' + L.name); rep.added++;
-      const owner = (D.byName[L.name] || [])[0];
+      if (slips[gid] || used[gid]) gid += '#leg' + rep.added; // 이미 다른 줄이 쓰는 키면 겹치지 않게 (덮어쓰거나 두 번 세지 않게)
+      const oid = stlPerson_(D, L.name), owner = oid ? D.byId[oid] : null; // 같은 이름이 둘이면 명의자 없음 (엉뚱한 사람 기사앱에 보이지 않게)
       row = { id: gid, cid: ids[0] || '', name: L.name, ownerId: owner ? owner.id : '', cids: ids.slice(), usedCids: ids.slice(), ids: ids.length, workers: [], qty: 0, sales: 0, bank: '', holder: '', account: '', bizNo: '', bizName: '', movedIn: [], movedOut: [] };
       slip = { row: row, lines: [], ins: {}, routes: [], daily: {}, sched: {}, idUse: {}, loss: [], yong: [], members: ids.slice(), workers: [], movedIn: [], movedOut: [] };
       slips[gid] = slip; sum.drivers.push(row);

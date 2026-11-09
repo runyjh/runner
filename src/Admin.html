@@ -2619,7 +2619,9 @@
     if (!r || u === undefined) return false;
     st.per = st.per || {};
     const us = st.units.filter((x) => unitRe.test(x));
-    const rotOf = (x) => (st.per[x] && st.per[x].length ? st.per[x] : (st.rots || [])).slice();
+    // 이 캠프에서 고를 수 있는 회전 = 화면에 그려진 칸 (D1,D2 만 도는 캠프에 남아 있던 F3 같은 값이 섞여 '전부 끔 → 전체 회전'으로 저장되지 않게)
+    const box = e.target.closest('table, .rotgrid, div'), allow = box ? [...new Set($$('[data-' + p + 'rot]', box).map((x) => x.dataset[p + 'rot']))] : [];
+    const rotOf = (x) => (st.per[x] && st.per[x].length ? st.per[x] : (st.rots || [])).filter((y) => !allow.length || allow.includes(y));
     const on = !!e.target.checked;
     const targets = u === '*' ? us : [u];
     const next = {};
@@ -4444,8 +4446,7 @@
     return api('adm_routeAll').then((r) => {
       if (!r.ok) return toast(r.msg);
       RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images; RT.addresses = r.addresses || []; RT.prices = r.prices || [];
-      if (!RVOL) loadVolumes();
-      if (!RP.loaded) loadPerf();
+      if (currentView === 'route') { if (!RVOL) loadVolumes(); if (!RP.loaded) loadPerf(); } // 대시보드 검색 준비로 부를 때는 노선 목록만 (물량·수행률은 필요할 때 dsNeed 가 따로)
       if (curCamp && curCamp !== ORPHAN && !campById(curCamp)) curCamp = null;
       if (curCamp === ORPHAN && !routesOf(ORPHAN).length) curCamp = null;
       if (!curCamp && RT.camps.length) curCamp = sortedCamps()[0].id;
@@ -4531,6 +4532,7 @@
   }
   // ── 변경이력 탭 (lnRender 공용 · 고른 캠프 관련 줄만, '전체 캠프' 체크로 모두) ──
   let lnAll = false;
+  document.addEventListener('click', (e) => { if (e.target.id === 'lnRetry') renderLnTab(); });
   function renderLnTab() {
     const box = $('#tabLn'); if (!box) return;
     const c = campById(curCamp), cs = c ? rpCamp(c.name) : '';
@@ -4540,7 +4542,9 @@
       box.innerHTML = '<div class="sec"><div class="spin"></div></div>';
       const p = [];
       if (!RP.loaded) p.push(loadPerf(true)); if (!SL.loaded) p.push(loadSla(true));
-      Promise.all(p).then(() => { if (rtab === 'ln') renderLnTab(); });
+      // 불러오기 실패면 다시 부르지 않고 '다시' 버튼 (예전: 실패하면 2~3초마다 끝없이 다시 불렀음)
+      Promise.all(p).then(() => { if (rtab !== 'ln') return; if (RP.loaded && SL.loaded) renderLnTab(); else box.innerHTML = '<div class="sec sub">변경이력을 불러오지 못했습니다. <button type="button" class="btn ghost sm" id="lnRetry">다시</button></div>'; })
+        .catch(() => { if (rtab === 'ln') box.innerHTML = '<div class="sec sub">변경이력을 불러오지 못했습니다. <button type="button" class="btn ghost sm" id="lnRetry">다시</button></div>'; });
       return;
     }
     box.innerHTML = '';
@@ -4935,7 +4939,14 @@
     const em = $('#rpEmpty'); em.classList.toggle('hidden', !!list.length);
     em.textContent = RP.rows.length ? '조건에 맞는 라우트가 없습니다.' : '올린 수행률 자료가 없습니다. [수행률 업로드]로 쿠팡 파일을 올려 주세요.';
   }
-  $$('.rp-box').forEach((bx) => bx.addEventListener('input', (e) => { if (e.isComposing) return; if (e.target.id === 'rpQ') { RP.f.q = e.target.value; rpRenderRows(); } if (e.target.id === 'slQ') { SL.f.q = e.target.value; slaRenderRows(); } if (e.target.id === 'fbQ') { FW.f.q = e.target.value; fbRenderRows(); } }));
+  // 검색칸: 글자마다 표 전체를 다시 그리지 않고 잠깐(120ms) 멈췄을 때 한 번
+  let rpQT = 0;
+  $$('.rp-box').forEach((bx) => bx.addEventListener('input', (e) => {
+    if (e.isComposing) return;
+    const id = e.target.id, v = e.target.value; if (id !== 'rpQ' && id !== 'slQ' && id !== 'fbQ') return;
+    clearTimeout(rpQT);
+    rpQT = setTimeout(() => { if (id === 'rpQ') { RP.f.q = v; rpRenderRows(); } else if (id === 'slQ') { SL.f.q = v; slaRenderRows(); } else { FW.f.q = v; fbRenderRows(); } }, 120);
+  }));
   $$('.rp-box').forEach((bx) => bx.addEventListener('change', (e) => { const m = { rpCamp: 'camp', rpMode: 'mode' }[e.target.id]; if (m) { RP.f[m] = e.target.value; rpRenderRows(); } const m3 = { fbCamp: 'camp', fbMode: 'mode' }[e.target.id]; if (m3) { FW.f[m3] = e.target.value; fbRenderRows(); } const m2 = { slCamp: 'camp', slMode: 'mode' }[e.target.id]; if (m2) { SL.f[m2] = e.target.value; slaRenderRows(); } if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); } if (e.target.id === 'rpEnded') { RP.f.ended = e.target.checked; rpRenderRows(); } if (e.target.id === 'slEnded') { SL.f.ended = e.target.checked; slaRenderRows(); } }));
   /** 라우트 변경이력 패널 클릭 (수행률 화면 · 노선관리 변경이력 탭 공용) */
   function lnClick(e) {
@@ -4958,7 +4969,7 @@
     if (del) {
       if (!confirm('이 변경이력 줄을 지울까요? 이어 붙였던 이력이 다시 따로 보입니다.')) return;
       del.disabled = true;
-      return api('adm_lineageDel', del.dataset.lndel).then((r) => { if (!r.ok) return toast(r.msg); lnSet(r.edges || []); RP.loaded = false; SL.loaded = false; return loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); lnAfter(); }); }).catch(() => {});
+      return api('adm_lineageDel', del.dataset.lndel).then((r) => { if (!r.ok) return toast(r.msg); lnSet(r.edges || []); if (RP.loaded) rpIndex(); rpRender(); lnAfter(); }).catch(() => { del.disabled = false; });
     }
     return false;
   }
@@ -5287,10 +5298,11 @@
   async function lnSaveRows(rows) {
     const r = await api('adm_lineageSave', rows);
     if (!r.ok) return toast(r.msg);
-    lnSet(r.edges || []); RP.loaded = false; SL.loaded = false;
-    toast('변경이력을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + '. 이력을 다시 불러옵니다.');
+    lnSet(r.edges || []);
+    toast('변경이력을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed);
     lnSug = null;
-    await loadPerf(true); await loadSla(true);
+    // 이력 잇기는 화면에서 계산 (rpIndex · slaMap 이 lnHead 로 다시 묶음) → 서버에서 다시 받지 않음 (예전: 수행률·SLA 두 번 더 불러 5~6초)
+    if (RP.loaded) rpIndex();
     rpRender(); lnAfter();
   }
   /** 변경이력이 바뀐 뒤 노선관리 화면 갱신 (변경이력 탭 · 노선 표 배지) */
@@ -7695,7 +7707,7 @@
       k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax) + (t.taxDed ? ' · 계산서 차감 ' + wn(t.taxDed) : ' · 지급 합계 전액으로 발행 (분실·용차는 발행 후 공제)')) +
       (c.lossCp || t.loss ? k('분실파손 (쿠팡 정산서 · 소비자가)', wn(c.lossCp), '공급가 환산 ' + wn(c.lossSup || 0) + ' · 기사 변상 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossVat === false ? ' (부가세 환산 안 함)' : ' (×1.1)') + ' → 기타수익') : '') +
       k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 공제금액 ' + wn(t.depDed)) +
-      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0)), '쿠팡 공급가 − 분실(공급가 환산 ' + wn(c.lossSup || 0) + ') − 기사 공급가' + (t.otherInc ? ' + 기타수익(분실·용차) ' + wn(t.otherInc) : '') + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
+      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0) + (c.promoBase || 0) + (c.promoRunner || 0)), '쿠팡 공급가 − 분실(공급가 환산 ' + wn(c.lossSup || 0) + ') − 기사 공급가' + (t.otherInc ? ' + 기타수익(분실·용차) ' + wn(t.otherInc) : '') + ((c.promoBase || 0) + (c.promoRunner || 0) ? ' + 러너 몫 프로모션 ' + wn((c.promoBase || 0) + (c.promoRunner || 0)) : '') + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
       (STX.pnl && STX.pnl.ins ? k('기타수익 (세무사 전달용 · 부가세 없음)', wn((STX.pnl.otherInc || {}).total || 0), '분실 변상금 ' + wn((STX.pnl.otherInc || {}).loss || 0) + ' · 용차 차액 ' + wn((STX.pnl.otherInc || {}).yong || 0) + ' · 보험 차액 ' + wn(STX.pnl.insGap || 0)) +
         k('지급률 마진 (참고 · 이익에 이미 포함)', wn((STX.pnl.margin || {}).total || 0), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 용차·품앗이 러너 몫 ' + wn(c.yongGain || 0)) +
         k('산재·고용 신고액 (빼둘 돈)', wn(STX.pnl.ins.total), '기사분 ' + wn(STX.pnl.ins.sanD + STX.pnl.ins.goyD) + ' + 러너 ' + Math.round(STX.pnl.ins.runner * 100) + '% ' + wn(STX.pnl.ins.runnerAmt)) : '') +
@@ -7820,7 +7832,7 @@
     $('#stPnl').classList.toggle('hidden', !pane);
     $('#stEditor').classList.toggle('hidden', pane);
     paintHelp(name === 'pnl' ? 'pnlSum' : name);
-    if (name === 'pnl') loadPnl(); else if (name === 'fund') loadFund(); else if (name === 'bal') loadBal(); else if (name === 'tax') loadTaxPlan(); else if (name === 'bank') BK.load(); else loadEditor(name);
+    if (name === 'pnl') loadPnl(); else if (name === 'fund') loadFund(); else if (name === 'bal') loadBal(); else if (name === 'tax') loadTaxPlan(); else if (name === 'bank') BK.load(STX.month); else loadEditor(name);
   }
   // 세금 일정 (부가세 · 원천세 · 산재고용 · 종합소득세)
   function loadTaxPlan() {
@@ -7887,7 +7899,7 @@
     const F = STX.fund; if (!F) return;
     const d = F.deposit, mt = ymTitle(F.month), bal = {};
     (F.banks || []).forEach((b) => { bal[b.name] = b.balance; });
-    const today = new Date().toISOString().slice(0, 10);
+    const today = ymdLocal(new Date());
     const amtIn = (key, v, ph, dis) => '<input class="inp fnum" data-fk="' + key + '" data-ff="amt" inputmode="numeric" value="' + (v === '' || v == null ? '' : wn(v)) + '" placeholder="' + esc(wn(ph)) + '"' + (dis ? ' disabled' : '') + '>';
     const dep = '<div class="fund-dep' + (d.done ? ' ok' : '') + '"><div><b>쿠팡 입금</b> <small>' + esc(mt) + ' 정산 · 입금 예정 ' + esc(mdTxt(d.due)) + ' · 받는 통장 ' + esc(d.bank || '(통장 목록에 \'쿠팡 입금\' 용도 통장 없음)') + '</small>' +
       '<div class="sub" style="font-size:12px">계산 금액 ' + wn(d.plan) + ' = 쿠팡 공급가 × 1.1 − 분실파손(소비자가) · 실제로 들어온 금액이 다르면 넣어 주세요</div></div>' +
@@ -8824,6 +8836,7 @@
     const done = [];
     for (const i of pick) {
       const f = SDR.files[i], st = $('[data-sdrst="' + i + '"]'), say = (t) => { if (st) st.textContent = t; };
+      const okDone = () => { const cb = $('[data-sdr="' + i + '"]'); if (cb) { cb.checked = false; cb.disabled = true; } }; // 끝난 파일은 체크 풀기 (다시 눌러 한 번 더 들어가지 않게)
       try {
         say('읽는 중…');
         const g = await api('adm_stlDriveGet', f.id); if (!g.ok) throw new Error(g.msg);
@@ -8835,9 +8848,9 @@
         say(month + ' ' + round + '차 반영 중…');
         const r = await api('adm_stlImport', { month, round, file: g.name, url: g.url, raw: P.raw, loss: P.loss, legacy: !!ri.legacy });
         if (!r.ok) throw new Error(r.msg);
-        if (r.legacy) { say('✓ ' + month + ' 쿠팡 매출만 반영 (기존 정산 이식 달 · 기사 금액 그대로) · 매출 ' + wn(r.legacy.sales)); done.push(month); continue; }
+        if (r.legacy) { say('✓ ' + month + ' 쿠팡 매출만 반영 (기존 정산 이식 달 · 기사 금액 그대로) · 매출 ' + wn(r.legacy.sales)); done.push(month); okDone(); continue; }
         say('✓ ' + month + ' ' + round + '차 · ' + wn(r.rows) + '줄 · ID ' + r.ids + (r.newIds && r.newIds.length ? ' · 새 아이디 ' + r.newIds.length : ''));
-        done.push(month);
+        done.push(month); okDone();
       } catch (err) { say('✗ ' + (err && err.message || err)); }
     }
     b.disabled = false;
@@ -8852,6 +8865,7 @@
   $('#legCancel').addEventListener('click', () => $('#legModal').classList.add('hidden'));
   $('#legPrev').addEventListener('click', () => {
     const file = $('#legFile').files[0]; if (!file) return toast('이식 자료 파일(.json)을 골라 주세요.');
+    const seq = LEG.seq = (LEG.seq || 0) + 1, pv = $('#legPrev'); pv.disabled = true; // 미리보기를 두 번 눌러도 한 번만 (늦게 끝난 쪽이 덮어쓰지 않게)
     $('#legBody').innerHTML = '<div class="spin"></div> <span class="sub">달마다 계산·비교 중 (1~2분)…</span>'; $('#legGo').disabled = true;
     const draw = () => {
       $('#legBody').innerHTML = '<table class="bk-table" data-tk-off><thead><tr><th><input type="checkbox" id="legAll" checked></th><th>정산월</th><th>상태</th><th class="n">기존 기사</th><th class="n">기존 계산서</th><th class="n">기존 실지급</th><th class="n">올인원 계산 실지급</th><th>짝 · 새 줄 · 0원</th><th>차액 줄</th></tr></thead><tbody>' +
@@ -8861,15 +8875,16 @@
     // 달마다 따로 불러 계산 (한 번에 10달은 서버 시간 제한에 걸릴 수 있음)
     file.text().then(async (txt) => {
       try { LEG.data = JSON.parse(txt); } catch (e) { LEG.data = null; }
-      if (!LEG.data || !LEG.data.months) { $('#legBody').innerHTML = ''; return toast('이식 자료 파일이 아닙니다.'); }
+      if (!LEG.data || !LEG.data.months) { pv.disabled = false; $('#legBody').innerHTML = ''; return toast('이식 자료 파일이 아닙니다.'); }
       LEG.rows = Object.keys(LEG.data.months).sort().map((m) => ({ month: m, wait: true })); draw();
       for (let i = 0; i < LEG.rows.length; i++) {
+        if (seq !== LEG.seq) return;
         try { const x = await api('adm_stlLegacyPreview', legPart(LEG.rows[i].month), [LEG.rows[i].month]); LEG.rows[i] = x.ok && x.months[0] ? x.months[0] : { month: LEG.rows[i].month, err: x.msg || '불러오지 못함', legN: 0 }; }
         catch (e) { LEG.rows[i] = { month: LEG.rows[i].month, err: '불러오지 못함', legN: 0 }; }
         draw();
       }
-      $('#legGo').disabled = false;
-    }).catch(() => { $('#legBody').innerHTML = ''; });
+      pv.disabled = false; $('#legGo').disabled = false;
+    }).catch(() => { pv.disabled = false; $('#legBody').innerHTML = ''; });
   });
   $('#legGo').addEventListener('click', async () => {
     const pick = $$('[data-legm]').filter((x) => x.checked).map((x) => LEG.rows[+x.dataset.legm].month);
@@ -9102,11 +9117,24 @@
     });
     $$('[data-bkf]').forEach((b) => b.addEventListener('click', () => { S.f = b.dataset.bkf; $$('[data-bkf]').forEach((z) => z.classList.toggle('on', z === b)); paintRows(); }));
     $('#bkCancel').addEventListener('click', () => $('#bkModal').classList.add('hidden'));
+    $('#bkSave').addEventListener('click', () => {
+      const r = S.pv; if (!r) return;
+      const none = r.rows.filter((x) => x.status === '미분류').length;
+      if (none && !confirm('미분류 ' + none + '줄이 있습니다. 그대로 저장할까요? (나중에 통장 내역 탭에서 분류를 고칠 수 있습니다)')) return;
+      const b = $('#bkSave'); b.disabled = true; b.textContent = '저장 중…';
+      // 줄마다 통장(bankName)이 이미 들어 있음 (계좌별 은행 선택) → 공통 bankName 은 빈칸
+      api('adm_bankSave', { rows: r.rows, bankName: '', opt: { learn: $('#bkLearn').checked, payCheck: $('#bkPay').checked, deposit: $('#bkDep').checked, expense: $('#bkExp').checked } }).then((x) => {
+        if (!x.ok) return toast(x.msg);
+        toast('저장했습니다. 새로 ' + x.saved + '줄 · 덮어씀 ' + x.replaced + '줄' + (x.rules ? ' · 분류 기억 ' + x.rules : '') + (x.pay ? ' · 기사 입금체크 ' + x.pay : '') + (x.deposit ? ' · 쿠팡 입금 확인 ' + x.deposit : '') + (x.expense ? ' · 지출 기록 ' + x.expense + '줄' : ''));
+        $('#bkModal').classList.add('hidden');
+        S.month = r.months[r.months.length - 1]; load(S.month);
+      }).catch(() => toast('저장하지 못했습니다.')).finally(() => { b.disabled = false; b.textContent = '저장'; });
+    });
     // ── 탭 화면: 저장된 내역 보기·분류 고치기 ──
-    function load() {
+    function load(want) {
       const ps = STX.paneSeq, el = $('#stPnl');
       el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
-      const m = S.month || STX.month;
+      const m = want || S.month || STX.month; // 위 정산월을 바꾸고 통장 탭을 열면 그 달
       api('adm_bankList', m).then((r) => { if (ps !== STX.paneSeq) return; if (!r.ok) { el.innerHTML = ''; return toast(r.msg); } S.month = r.month; S.months = r.months; S.rows = r.rows; S.cats = r.cats; S.sum = r.sum; render(); }).catch(() => {});
     }
     function render() {
@@ -9152,7 +9180,7 @@
     if (!ms.length) return toast('정산 자료가 없습니다.');
     const cur = STX.month, prev = STX.months[STX.months.indexOf(cur) - 1];
     $('#tpMonths').innerHTML = ms.map((m) => '<label><input type="checkbox" data-tpm="' + m + '"' + (m === cur || m === prev ? ' checked' : '') + '> ' + esc(ymTitle(m)) + '</label>').join('');
-    const t = new Date(); $('#tpExtraTo').value = t.toISOString().slice(0, 10); $('#tpExtraOn').checked = false;
+    const t = new Date(); $('#tpExtraTo').value = ymdLocal(t); $('#tpExtraOn').checked = false;
     $('#tpModal').classList.remove('hidden');
   });
   $('#tpCancel').addEventListener('click', () => $('#tpModal').classList.add('hidden'));
@@ -9197,7 +9225,7 @@
     line('회사이익금 (공급가 − 분실 환산 − 기사 공급가 + 기타수익)', (x) => x.profit); line('당기순이익 (세전)', (x) => x.net); line('부가세 납부 예상', (x) => x.vatDue);
     S.push([]); S.push(H(['[일정]'])); S.push(['기사 지급일'].concat(r.summary.map((x) => x.payDate))); S.push(['쿠팡 입금 예정일'].concat(r.summary.map((x) => x.coupangDate))); S.push(['계산서 작성일자'].concat(r.summary.map((x) => x.writeDate)));
     S.push([]); S.push(['사업자', (co.name || '') + (co.ceo ? ' (대표 ' + co.ceo + ')' : ''), '사업자번호', co.bizNo || '', '이메일', co.email || '']);
-    S.push(['만든 날짜', new Date().toISOString().slice(0, 10), '러너 올인원 정산관리 → 세무자료 내보내기']);
+    S.push(['만든 날짜', ymdLocal(new Date()), '러너 올인원 정산관리 → 세무자료 내보내기']);
     sheets.push({ name: '요약', rows: S, widths: [44].concat(r.summary.map(() => 16), [16]) });
     // ② 기사 세금계산서
     const I = [H(['정산월', '기사(명의자)', '정산 아이디', '사업자명', '사업자번호', '공급가액', '세액', '합계 (발행 금액)', '작성일자', '구분', '비고'])];

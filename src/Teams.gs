@@ -41,9 +41,10 @@ function tmHash_(key) {
 /** 수집 키 확인 (틀린 키가 반복되면 15분 막음) */
 function tmAuth_(key) {
   const c = cache_(), bad = Number(c.get('tm:bad') || 0);
-  if (bad >= 30) fail_('수집 키 확인 실패가 반복되어 잠시 막혔습니다. 15분 뒤 다시 시도합니다.');
   const want = str_(PropertiesService.getScriptProperties().getProperty('TEAMS_KEY_HASH'));
-  if (!want || !key || tmHash_(key) !== want) {
+  if (want && key && tmHash_(key) === want) return; // 맞는 키는 막지 않음 (틀린 키를 30번 보내 진짜 수집기를 막지 못하게)
+  if (bad >= 30) fail_('수집 키 확인 실패가 반복되어 잠시 막혔습니다. 15분 뒤 다시 시도합니다.');
+  {
     c.put('tm:bad', String(bad + 1), 900);
     const e = new Error('수집 키가 맞지 않습니다. 관리자 화면 → 대시보드 → 팀즈 소식 → 설정에서 연결 코드를 다시 만들어 넣어 주세요.');
     e.userMsg = e.message; e.code = 'BAD_KEY'; throw e;

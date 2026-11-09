@@ -6288,7 +6288,7 @@ function rcRows_(fresh) {
   rows.forEach(function (o) { o.date = normDate_(o.date) || o.date; });
   return (_rcRows = rows);
 }
-function rcTouch_() { _rcRows = null; try { cache_().remove('rc:due:' + todayText_()); } catch (e) { /* 무시 */ } }
+function rcTouch_() { _rcRows = null; try { cache_().remove('rc:due:' + todayText_()); } catch (e) { /* 무시 */ } try { if (typeof rpfBump_ === 'function') rpfBump_(); } catch (e) { /* 무시 */ } } // 노선 변경·이관 = 라우트 계보 → 기사앱 내 수행률 캐시도 새로
 const rcSort_ = function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0); };
 /** 기사ID → 그 기사의 변경 목록 (적용일 순) */
 function rcByDriver_() {
