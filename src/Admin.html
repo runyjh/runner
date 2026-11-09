@@ -290,18 +290,6 @@
   .t-품앗이 { background: var(--ok-weak); color: var(--ok); }
   .t-외부용차 { background: #f1ecfb; color: #6b46c1; }
   .t-운영자, .t-관리자, .t-대표 { background: #e8edf3; color: #334155; }
-  .pt td.prot { white-space: nowrap; } .pt .protw { display: inline-flex; align-items: center; gap: 6px; } .pt .protw label { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; cursor: pointer; } .pt .protw input { margin: 0; } .pt .protw small { font-size: 11px; } .pt td.prot.dirty { background: #fff8e1; }
-  /* 기사스케줄: 마우스를 올린 줄 · 편집 중인 줄 강조 */
-  .sg tbody tr.drv:hover td.fx, .sg tbody tr.drv.editing td.fx { background: #e8f0fe !important; }
-  .sg tbody tr.drv:hover td.c, .sg tbody tr.drv.editing td.c { box-shadow: inset 0 0 0 1px rgba(47,111,237,.35); }
-  .sg tbody tr.drv.editing td.c { box-shadow: inset 0 0 0 1px rgba(47,111,237,.55); } .sg tbody tr.drv.editing td.c.editcell { box-shadow: inset 0 0 0 2px var(--brand); }
-  .sg tbody tr.drv:hover td.fx.f2 .dname, .sg tbody tr.drv.editing td.fx.f2 .dname { color: var(--brand); }
-  /* 노선 전체 줄 */
-  .sg tr.rtrow td { background: #f6f7fb; border-top: 1px dashed #c9d2e3; font-size: 11.5px; color: #4b5563; } .sg tr.rtrow td.lab { font-weight: 700; color: #64748b; }
-  .sg tr.rtrow .rtall { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 100%; }
-  .sg tr.rtrow td.rtc { text-align: center; cursor: default; } .sg tr.rtrow td.rtc b { color: #b91c1c; font-size: 11px; } .sg tr.rtrow td.rtc.rmis { background: #fdecec; } .sg tr.rtrow td.rtc .ok { color: #16a34a; font-weight: 800; }
-  .sg td.fx.f3 .subid { display: block; font-size: 10.5px; color: var(--sub); line-height: 1.2; margin-top: 1px; }
-  .spk-ids { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; } .spk-ids small { font-size: 11px; color: var(--sub); margin-right: 2px; } .spk-ids .st { height: 26px; padding: 0 8px; font-size: 12px; } .spk-ids .st i { font-style: normal; font-size: 10px; opacity: .7; margin-left: 2px; }
   .lnrt { display: inline-flex; gap: 4px; margin-left: 6px; cursor: pointer; vertical-align: middle; }
   .fbb { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11.5px; font-weight: 800; }
   .fbb.ok { background: #dcfce7; color: #15803d; } .fbb.no { background: #fee2e2; color: #b91c1c; } .fbb.wn { background: #fef3c7; color: #b45309; }
@@ -5915,7 +5903,7 @@
         '<div class="grow"><span id="pMsg"></span><button class="btn sm ghost" id="pReset" disabled>되돌리기</button><button class="btn sm" id="pSave" disabled>단가 저장</button></div>' +
       '</div>' +
       '<div class="table-wrap rt-table pt"><table><thead><tr><th>구분</th>' +
-        PKEYS.map((k) => '<th>' + PLABEL[k] + '</th>').join('') + '<th title="이 글자 노선이 뛰는 회전. 비우면 캠프 기본 회전(캠프 정보 수정). 기사스케줄 미입차 계산·어드민 업로드 회전 열에 쓰임">회전</th>' +
+        PKEYS.map((k) => '<th>' + PLABEL[k] + '</th>').join('') +
         '</tr></thead><tbody id="pRows"></tbody></table>' +
         '<div class="empty hidden" id="pEmpty"></div></div>' +
       '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">숫자(구분1)마다 구분2~5의 글자별로 단가를 따로 정합니다. 예: 110ABCD 는 110의 구분2 A · 구분3 B · 구분4 C · 구분5 D 단가를 씁니다. 110의 A 와 111의 A 는 따로입니다. 칸을 고치고 <b>단가 저장</b>을 누르세요. 한 줄의 단가를 모두 지우고 저장하면 그 줄은 지워집니다.</p>';
@@ -5932,7 +5920,7 @@
       let head = '';
       if (n.num !== lastNum) {
         const cnt = routesOf(curCamp).filter((r) => r.g1 === n.num).length;
-        head = '<tr class="grp"><td class="pg"><b class="code">' + esc(n.num) + '</b><span class="pcnt">노선 ' + cnt + '</span></td><td colspan="' + (PALL.length + 1) + '"></td></tr>';
+        head = '<tr class="grp"><td class="pg"><b class="code">' + esc(n.num) + '</b><span class="pcnt">노선 ' + cnt + '</span></td><td colspan="' + PALL.length + '"></td></tr>';
         lastNum = n.num; lastLv = null;
       }
       const cell = (k) => {
@@ -5942,13 +5930,9 @@
       };
       const lv = n.level !== lastLv ? '<span class="lvb">구분' + n.level + '</span>' : '<span class="lvb" style="visibility:hidden">구분' + n.level + '</span>';
       lastLv = n.level;
-      // 회전: 글자별 D1/D2/F3 체크 (비우면 캠프 기본)
-      const rotCur = String(curVal(n, 'rot') || ''), rotSet = rotCur ? rotCur.split(',') : [], rotDirty = pdirty[n.key] && 'rot' in pdirty[n.key], campDef = String((campById(curCamp) || {}).rot || 'D1,D2,F3');
-      const rotCell = '<td class="prot' + (rotDirty ? ' dirty' : '') + '"><span class="protw" title="' + esc(n.num + n.value + ' 회전 · 비우면 캠프 기본 ' + campDef) + '">' + ['D1', 'D2', 'F3'].map((x) => '<label><input type="checkbox" data-prot="' + x + '"' + (rotSet.includes(x) ? ' checked' : '') + '>' + x + '</label>').join('') +
-        (rotSet.length ? '' : '<small class="sub">기본 ' + esc(campDef) + '</small>') + '</span></td>';
       return head + '<tr data-key="' + esc(n.key) + '" class="lv' + n.level + '"><td class="pg"><span style="padding-left:14px">' + lv + '<b class="code">' + esc(n.value) + '</b>' +
         (n.routes ? '<span class="pcnt">· 노선 ' + n.routes + '</span>' : '<span class="tag" title="이 글자를 쓰는 노선이 없습니다">노선 없음</span>') +
-        '</span></td>' + PALL.map(cell).join('') + rotCell + '</tr>';
+        '</span></td>' + PALL.map(cell).join('') + '</tr>';
     }).join('');
     const em = $('#pEmpty');
     em.classList.toggle('hidden', !!list.length);
@@ -5994,12 +5978,6 @@
   });
   $('#campMain').addEventListener('change', (e) => {
     const t = e.target;
-    if (t.dataset && t.dataset.prot) {
-      const tr = t.closest('tr[data-key]'); if (!tr) return;
-      const set = [...tr.querySelectorAll('input[data-prot]')].filter((x) => x.checked).map((x) => x.dataset.prot);
-      setPDirty(tr.dataset.key, 'rot', ['D1', 'D2', 'F3'].filter((x) => set.includes(x)).join(','));
-      renderPriceRows(); pStatus(); return;
-    }
     if (t.id === 'pfNum') { pf.num = t.value; renderPriceRows(); }
     else if (t.id === 'pfLevel') { pf.level = t.value; renderPriceRows(); }
     else if (t.id === 'pfOnly') { pf.only = t.checked; renderPriceRows(); }
@@ -6028,7 +6006,6 @@
       const n = nodes[key], row = { num: n.num, level: n.level, value: n.value };
       if (n.price) row.seen = n.price.updatedAt;
       PALL.forEach((k) => { row[k] = curVal(n, k); });
-      row.rot = curVal(n, 'rot');
       return row;
     });
     for (const r of rows) {
@@ -6115,10 +6092,8 @@
      * rows: [{ key, camp(짧은 캠프명 예: 강서1, 없으면 ''), name, baseRoute, type, cells: [날짜별 글자] }]
      * camps: { 짧은캠프명: ['D1','D2','F3'] }  (캠프별 기본 회전)
      */
-    function compute(rows, camps, nDays, routeRot, campRoutes) {
-      routeRot = routeRot || {}; campRoutes = campRoutes || {}; // campRoutes: { 짧은캠프명: ['110AB','116C'] } 노선관리 등록 노선 (담당 기사가 없어도 미배정으로 셈)
-      // 회전: 노선(글자)별 회전(노선관리 구분별 단가 '회전')이 있으면 그것, 없으면 캠프 기본
-      const defRotArr = (camp, rt) => (rt && routeRot[camp + '|' + rt]) || (camps[camp] && camps[camp].length ? camps[camp] : ALL_ROTS);
+    function compute(rows, camps, nDays) {
+      const defRotArr = (camp) => (camps[camp] && camps[camp].length ? camps[camp] : ALL_ROTS);
       const campNames = Object.keys(camps).sort((a, b) => b.length - a.length);
       const counts = {};
       rows.forEach((r) => { counts[r.key] = r.cells.filter(isWorkDay).length; });
@@ -6159,8 +6134,7 @@
       const missCells = new Map(); // '행|날짜칸' → ['529A', '529B(F3)'] : 그 기사 기본노선 중 그날 아무도 안 뛰는(미배정) 노선
       for (let d = 0; d < nDays; d++) {
         const baseRouteSet = new Set(), present = new Map(), explicitMi = [];
-        Object.keys(campRoutes).forEach((cp) => (campRoutes[cp] || []).forEach((code) => routeExpand(splitBase(code).routes).forEach((rt) => baseRouteSet.add(cp + '|' + rt))));
-        const addPresent = (camp, routeList, rotArr, key) => routeList.forEach((rt) => (rotArr || defRotArr(camp, rt)).forEach((rot) => { // rotArr = null 이면 노선별 기본 회전
+        const addPresent = (camp, routeList, rotArr, key) => routeList.forEach((rt) => rotArr.forEach((rot) => {
           const k = [camp, rt, rot].join('|');
           if (!present.has(k)) present.set(k, new Set());
           present.get(k).add(key);
@@ -6176,7 +6150,7 @@
           if (!flat || flat.includes('비고')) return;
           if (/미입차/.test(flat)) { explicitMi.push({ baseCamp, defRt: base.routes }); return; }
           let m = flat.match(/^([0-9A-Za-z,]+)\s+업무등록$/);
-          if (m && routeExpand(m[1]).length) { addPresent(baseCamp, routeExpand(m[1]), null, r.key); return; }
+          if (m && routeExpand(m[1]).length) { addPresent(baseCamp, routeExpand(m[1]), defRotArr(baseCamp), r.key); return; }
           if (flat.includes('추가업무등록')) {
             const tokens = flat.replace(/추가업무등록/g, ' ').split(/\s+/).filter(Boolean);
             for (let t = 0; t < tokens.length;) {
@@ -6187,14 +6161,14 @@
               if (!/^\d+[A-Za-z,]+$/.test(rt)) { t++; continue; }
               t++;
               const list = routeExpand(rt);
-              if (list.length) addPresent(baseCamp, list, null, r.key);
+              if (list.length) addPresent(baseCamp, list, defRotArr(baseCamp), r.key);
             }
             return;
           }
           m = flat.match(/^([0-9A-Za-z,]+)\s+([A-Za-z][A-Za-z0-9_]{2,})\s+업무등록$/);
-          if (m && routeExpand(m[1]).length) { addPresent(baseCamp, routeExpand(m[1]), null, r.key); return; }
+          if (m && routeExpand(m[1]).length) { addPresent(baseCamp, routeExpand(m[1]), defRotArr(baseCamp), r.key); return; }
           if (lines.length >= 3 && lines[2].includes('업무등록') && /[A-Za-z][A-Za-z0-9_]{2,}/.test(lines[1]) && routeExpand(lines[0]).length) {
-            addPresent(baseCamp, routeExpand(lines[0]), null, r.key); return;
+            addPresent(baseCamp, routeExpand(lines[0]), defRotArr(baseCamp), r.key); return;
           }
           if (EXCL_WORDS.some((w) => flat.includes(w))) return;
           let cell = flat;
@@ -6217,7 +6191,7 @@
           let routeList = routeExpand(code);
           if (!routeList.length) (cell.match(/\d+[A-Za-z]+/g) || []).forEach((rc) => { routeList = routeList.concat(routeExpand(rc)); });
           let rotArr = normRot(rotation);
-          if (!rotArr.length) rotArr = null; // 회전을 안 적으면 노선별 기본 회전
+          if (!rotArr.length) rotArr = defRotArr(finalCamp);
           const hasKey = KEYWORDS.some((k) => routeList.join(',').includes(k));
           if (routeList.length && (flat.includes('업무') || hasKey || isValidRouteList(routeList.join(',')))) addPresent(finalCamp, routeList, rotArr, r.key);
         });
@@ -6230,20 +6204,20 @@
           if (!byRoute.has(camp + '|' + rt)) byRoute.set(camp + '|' + rt, new Set());
           byRoute.get(camp + '|' + rt).add(rot);
         });
-        byRoute.forEach((rots, k) => { const [camp, rt] = k.split('|'); defRotArr(camp, rt).filter((x) => !rots.has(x)).forEach((x) => addMissing(camp, rt, x)); });
-        explicitMi.forEach(({ baseCamp, defRt }) => routeExpand(defRt).forEach((rt) => defRotArr(baseCamp, rt).forEach((rot) => {
+        byRoute.forEach((rots, k) => { const [camp, rt] = k.split('|'); defRotArr(camp).filter((x) => !rots.has(x)).forEach((x) => addMissing(camp, rt, x)); });
+        explicitMi.forEach(({ baseCamp, defRt }) => routeExpand(defRt).forEach((rt) => defRotArr(baseCamp).forEach((rot) => {
           if (!present.has([baseCamp, rt, rot].join('|'))) addMissing(baseCamp, rt, rot);
         })));
         baseRouteSet.forEach((k) => {
           const [camp, rt] = k.split('|');
-          const covered = defRotArr(camp, rt).some((rot) => present.has([camp, rt, rot].join('|')));
-          if (!covered) defRotArr(camp, rt).forEach((rot) => addMissing(camp, rt, rot));
+          const covered = defRotArr(camp).some((rot) => present.has([camp, rt, rot].join('|')));
+          if (!covered) defRotArr(camp).forEach((rot) => addMissing(camp, rt, rot));
         });
         const grouped = new Map();
         miss.forEach((rots, k) => {
           const [camp, rt] = k.split('|');
           const mr = Array.from(rots).sort();
-          const label = mr.length === defRotArr(camp, rt).length ? '' : '(' + mr.join(',') + ')';
+          const label = mr.length === defRotArr(camp).length ? '' : '(' + mr.join(',') + ')';
           const gk = camp + '|' + label;
           if (!grouped.has(gk)) grouped.set(gk, []);
           grouped.get(gk).push(rt);
@@ -6252,8 +6226,8 @@
         if (miss.size) rows.forEach((r) => {
           if (r.active && !r.active[d]) return;
           const defRt = String(r.baseRoute || '').trim(); if (!defRt || /백업|예비|용차/.test(defRt)) return;
-          const camp = r.camp || '';
-          const list = routeExpand(splitBase(defRt).routes).filter((rt) => miss.has(camp + '|' + rt)).map((rt) => { const rs = Array.from(miss.get(camp + '|' + rt)).sort(); return rt + (rs.length === defRotArr(camp, rt).length ? '' : '(' + rs.join(',') + ')'); });
+          const camp = r.camp || '', full = defRotArr(camp).length;
+          const list = routeExpand(splitBase(defRt).routes).filter((rt) => miss.has(camp + '|' + rt)).map((rt) => { const rs = Array.from(miss.get(camp + '|' + rt)).sort(); return rt + (rs.length === full ? '' : '(' + rs.join(',') + ')'); });
           if (list.length) missCells.set(r.key + '|' + d, list);
         });
         missing.push(Array.from(grouped.keys()).sort().map((gk) => {
@@ -6443,19 +6417,7 @@
       return koSort(ca, cb) || (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) ||
         (Number(a.order) || 9999) - (Number(b.order) || 9999) || koSort(a.name, b.name);
     });
-    const rows0 = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, staff: isStaffRow(d) && !d.ex, camp: isStaffRow(d) && !d.ex ? STAFF_GROUP : (camps[d.campId] ? camps[d.campId].name : '') }));
-    // 캠프마다 기사 줄 다음에 '노선 전체' 줄: 노선관리에 등록된 노선을 모두 보여 주고, 날짜 칸에는 그날 아무도 안 뛰는(미배정) 노선
-    const rows = [];
-    const campsShown = new Set();
-    rows0.forEach((r, i) => {
-      rows.push(r);
-      const next = rows0[i + 1];
-      if (!r.staff && r.d.campId && (!next || next.camp !== r.camp) && !campsShown.has(r.d.campId) && !q) {
-        campsShown.add(r.d.campId);
-        const codes = (SD.routes[r.d.campId] || []).slice().sort(koSort);
-        if (codes.length) rows.push({ kind: 'rt', row: 'RT|' + r.d.campId, key: 'RT|' + r.d.campId, campId: r.d.campId, camp: r.camp, codes });
-      }
-    });
+    const rows = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, staff: isStaffRow(d) && !d.ex, camp: isStaffRow(d) && !d.ex ? STAFF_GROUP : (camps[d.campId] ? camps[d.campId].name : '') }));
     // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트 (배차 확정 때 서버가 적음 · 직접 고쳐도 됨)
     (SD.pmRows || []).filter((pr) => {
       if (q && !qHit([pr.name, pr.loginId].concat(infoOf(pr.driverId || pr.id)))) return false;
@@ -6475,9 +6437,7 @@
       cells: SD.dates.map((dt) => (segIn(d._seg, dt) ? sget(d.id, dt) : '')),
       active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null
     }));
-    const campRoutes = {};
-    SD.camps.forEach((c) => { if ((SD.routes[c.id] || []).length && rows.some((r) => r.camp === shortCamp(c.name))) campRoutes[shortCamp(c.name)] = SD.routes[c.id]; }); // 기사가 있는 캠프의 등록 노선 전부
-    scalc = SchedCalc.compute(rows, campRot, SD.dates.length, SD.routeRot || {}, campRoutes);
+    scalc = SchedCalc.compute(rows, campRot, SD.dates.length);
   }
 
   /** PDD(배송 예정일) = 오늘 기준 내일. 표에서 파란색으로 강조하는 열 */
@@ -6514,15 +6474,6 @@
           '<td class="fx f2 lab">' + esc(r.p.name) + '</td><td class="fx f3">' + esc(r.p.loginId || '') + '</td><td class="fx f4"></td>' +
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex num">' + dates.filter((dt) => sget(r.row, dt)).length + '</td><td class="ex" colspan="4"></td></tr>';
       }
-      if (r.kind === 'rt') {
-        const cs = shortCamp(r.camp);
-        const dayMiss = (ci) => (scalc && scalc.missing[ci] ? scalc.missing[ci] : []).filter((x) => x.split(' ')[0] === cs).map((x) => x.slice(cs.length + 1)).join(',');
-        const comp = (list) => { const n = {}, o = []; list.forEach((c) => { const m = String(c).match(/^(\d+)([A-Za-z]+)$/); if (!m) { o.push(c); n[c] = ''; return; } if (!(m[1] in n)) { n[m[1]] = ''; o.push(m[1]); } n[m[1]] += m[2]; }); return o.map((k) => k + n[k]).join(' '); };
-        return '<tr class="rtrow"><td class="fx f1 lab" title="노선관리에 등록된 이 캠프 노선 전체. 날짜 칸 = 그날 아무도 안 뛰는 노선(미배정)">노선</td>' +
-          '<td class="fx f2 lab">전체 <b>' + r.codes.length + '</b>개</td><td class="fx f3 f34" colspan="2"><span class="rtall" title="' + esc(r.codes.join(', ')) + '">' + esc(comp(r.codes)) + '</span></td>' +
-          dates.map((dt, ci) => { const m = dayMiss(ci); return '<td class="c rtc' + (m ? ' rmis' : '') + (sepCol(ci) ? ' wk2' : '') + (dt === today ? ' today' : '') + '" title="' + esc(m ? '미배정: ' + m : '모든 노선 배정됨') + '">' + (m ? '<b>' + esc(m) + '</b>' : '<span class="ok">✓</span>') + '</td>'; }).join('') +
-          '<td class="ex" colspan="5"></td></tr>';
-      }
       if (r.kind === 'n') {
         return '<tr class="note' + (ri && srows[ri - 1].kind !== 'n' ? ' gtop' : '') + '"><td class="fx f1 lab">비고</td><td class="fx f2 lab" colspan="3"><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td>' +
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="5"></td></tr>';
@@ -6535,7 +6486,7 @@
         '<td class="fx f1">' + (r.staff ? '<span class="sub" title="' + STAFF_GROUP + ' — 고른 캠프 기사들 다음에 이어서 표시">직원</span>' : esc(cs || '-')) + (miN ? '<span class="campwarn" title="이 캠프에 담당 기사가 없는 노선 칸 ' + miN + '개 (아래 미입차 줄)">⚠</span>' : '') + '</td>' +
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (ttl ? '<span class="tbad t-' + esc(ttl) + '" style="width:auto;padding:0 5px">' + esc(ttl) + '</span>' : d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
           (d.ex ? '<span class="exbad" title="추가 배정 줄 (소속: ' + esc(((SD.drivers.find((x) => x.id === d.mainId) || {}).camp) || '-') + ') · 이 캠프 칸은 따로 입력">추가</span>' : '') + rcBadge(r) + '</td>' +
-        '<td class="fx f3">' + esc(d.loginId || '') + ((d.subIds || []).length ? '<small class="subid" title="서브아이디">' + (d.subIds || []).map(esc).join('<br>') + '</small>' : '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
+        '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
         '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + (scalc.counts[r.key || d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
         '<td class="ex">' + esc(d.workPattern || '') + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
@@ -6779,7 +6730,7 @@
   function fillSel(v) {
     const s = selRect(); if (!s) return;
     const list = [];
-    for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) if (!segOff(r, c) && srows[r].kind !== 'rt') list.push({ row: srows[r].row, date: SD.dates[c], value: v });
+    for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) if (!segOff(r, c)) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
     setCells(list);
   }
   // 복사 · 붙여넣기 (엑셀·구글시트와 주고받기)
@@ -6815,7 +6766,7 @@
     if (grid.length === 1 && grid[0].length === 1 && s && (s.r1 !== s.r2 || s.c1 !== s.c2)) return fillSel(grid[0][0]);
     grid.forEach((line, i) => line.forEach((v, j) => {
       const r = s.r1 + i, c = s.c1 + j;
-      if (r < nRows() && c < nCols() && !segOff(r, c) && srows[r].kind !== 'rt') list.push({ row: srows[r].row, date: SD.dates[c], value: v });
+      if (r < nRows() && c < nCols() && !segOff(r, c)) list.push({ row: srows[r].row, date: SD.dates[c], value: v });
     }));
     setCells(list);
     sAnchor = { r: s.r1, c: s.c1 }; sAct = { r: Math.min(nRows() - 1, s.r1 + grid.length - 1), c: Math.min(nCols() - 1, s.c1 + Math.max.apply(null, grid.map((g) => g.length)) - 1) };
@@ -6851,14 +6802,12 @@
   }
   function openEdit(initial) {
     if (!sAct || sEdit) return;
-    if (srows[sAct.r] && srows[sAct.r].kind === 'rt') return toast('노선 전체 줄은 보기 전용입니다.');
     if (segOff(sAct.r, sAct.c)) { const sg = srows[sAct.r].seg; return toast('이 날은 ' + (SD.dates[sAct.c] < sg.from ? '이전' : '새') + ' 캠프 줄에서 입력해 주세요. (노선 변경 예약)'); }
     const r = srows[sAct.r], dt = SD.dates[sAct.c];
     const td = $('#sGrid').querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]'); if (!td) return;
     const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
     const box = document.createElement('div'); box.className = 'sed';
     box.style.left = (rc.left - wc.left + wrap.scrollLeft) + 'px'; box.style.top = (rc.top - wc.top + wrap.scrollTop) + 'px';
-    const trEd = td.closest('tr'); if (trEd) trEd.classList.add('editing'); td.classList.add('editcell'); // 편집 중인 줄·칸 강조
     const isDrv = r.kind === 'd';
     if (isDrv) box.style.width = '330px'; // 기사 칸 편집기는 크기 고정 (칸 너비와 상관없이)
     else box.style.minWidth = Math.max(rc.width, 170) + 'px';
@@ -6884,21 +6833,17 @@
     let pk = null;
     if (pkEl) {
       const myCamp = r.d.campId || '', campOf = (id) => SD.camps.find((c) => c.id === id);
-      // 아이디: 기본은 본인 아이디 · 서브아이디로 뛴 날은 '(서브아이디)' 를 뒤에 붙인다 (업로드 테이블·정산이 알아보는 모양)
-      const idMain = String(r.d.loginId || ''), idSubs = (r.d.subIds || []).filter(Boolean);
-      const v00 = String(ta.value || '').trim(), ms = v00.match(/\(\s*([A-Za-z][A-Za-z0-9_]{2,})\s*\)/);
-      const sub0 = ms && idSubs.some((x) => x.toLowerCase() === ms[1].toLowerCase()) ? idSubs.find((x) => x.toLowerCase() === ms[1].toLowerCase()) : '';
-      const v0 = v00.replace(/\(\s*[A-Za-z][A-Za-z0-9_]{2,}\s*\)/g, '').replace(/\s+/g, ' ').trim(), mc = v0.match(/^([가-힣]+\d)\s+(.+)$/);
+      const v0 = String(ta.value || '').trim(), mc = v0.match(/^([가-힣]+\d)\s+(.+)$/);
       const c0 = mc ? SD.camps.find((c) => shortCamp(c.name).replace(/\s/g, '') === mc[1]) : null;
       const body = c0 ? mc[2] : v0, p0 = /^\d/.test(body) || /^용차/.test(body) ? parseBR(body) : { units: [], special: '', rots: [] };
-      pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: p0.special === '용차' ? '용차' : '', rots: p0.rots, sub: sub0 };
+      pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: p0.special === '용차' ? '용차' : '', rots: p0.rots };
       if (!pk.rots.length) pk.rots = sdCampRots(pk.campId);
       const list = () => (SD.routes[pk.campId] || []).map((c) => ({ code: c, stopped: false }));
       const compose = () => {
         const base = composeUnits(pk.units, pk.special, pk.rots, sdCampRots(pk.campId));
         if (!base || base === '용차') return base;
         const c = campOf(pk.campId);
-        return (pk.campId && pk.campId !== myCamp && c ? shortCamp(c.name).replace(/\s/g, '') + ' ' + base : base) + (pk.sub ? ' (' + pk.sub + ')' : '');
+        return pk.campId && pk.campId !== myCamp && c ? shortCamp(c.name).replace(/\s/g, '') + ' ' + base : base;
       };
       const paintPk = () => {
         const rots = sdCampRots(pk.campId), v = compose();
@@ -6906,13 +6851,11 @@
           .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === pk.campId ? ' selected' : '') + '>' + esc(c.name) + (c.id === myCamp ? ' (소속)' : '') + '</option>').join('') + '</select></div>' +
           unitPickerHtml('pk', pk.campId ? list() : [], pk.units, pk.special, '').replace(/<button[^>]*data-pksp="백업"[^>]*>[^<]*<\/button>/, '') +
           (pk.units.length && !pk.special ? '<div class="radios spk-rot">' + rots.map((x) => '<label><input type="checkbox" data-pkrot="' + x + '"' + (pk.rots.includes(x) ? ' checked' : '') + '> ' + x + '</label>').join('') + '</div>' : '') +
-          (idSubs.length && !pk.special ? '<div class="spk-ids"><small>아이디</small><button type="button" class="st' + (!pk.sub ? ' on' : '') + '" data-pksub="">' + esc(idMain || '본인') + '</button>' + idSubs.map((x) => '<button type="button" class="st' + (pk.sub === x ? ' on' : '') + '" data-pksub="' + esc(x) + '">' + esc(x) + ' <i>서브</i></button>').join('') + '</div>' : '') +
           '<div class="spk-f"><span>입력될 값: <b>' + (v ? esc(v) : '<span style="color:var(--faint)">없음</span>') + '</b></span><button type="button" class="btn sm" data-pkput' + (v ? '' : ' disabled') + '>넣기</button></div>';
       };
       pkEl.addEventListener('mousedown', (e) => { if (!e.target.closest('select')) e.preventDefault(); });
       pkEl.addEventListener('click', (e) => {
         if (e.target.closest('[data-pkput]')) { const v = compose(); if (v) { ta.value = v; commitEdit(); $('#sWrap').focus({ preventScroll: true }); } return; }
-        const sb = e.target.closest('[data-pksub]'); if (sb) { pk.sub = sb.dataset.pksub || ''; ta.value = compose(); grow(); renderSug(); paintPk(); return; }
         if (unitClick(e, 'pk', pk, list())) { ta.value = compose(); grow(); renderSug(); paintPk(); }
       });
       pkEl.addEventListener('change', (e) => {
@@ -6964,7 +6907,6 @@
     if (!sEdit) return;
     const e = sEdit; sEdit = null;
     e.box.remove();
-    $$('#sGrid tr.editing').forEach((x) => x.classList.remove('editing')); $$('#sGrid td.editcell').forEach((x) => x.classList.remove('editcell'));
     setCells([{ row: e.r.row, date: e.dt, value: e.ta.value }]);
     if (e.insTa) saveInst(e.r.row, e.dt, e.insTa.value.trim(), e.ins0);
   }
@@ -6984,7 +6926,7 @@
       SD.issues = (SD.issues || []).filter((x) => x !== cur).concat([r.issue]); done(); toast('지시사항을 저장했습니다.');
     }).catch(() => {});
   }
-  function closeEdit() { if (sEdit) { sEdit.box.remove(); sEdit = null; } $$('#sGrid tr.editing').forEach((x) => x.classList.remove('editing')); $$('#sGrid td.editcell').forEach((x) => x.classList.remove('editcell')); }
+  function closeEdit() { if (sEdit) { sEdit.box.remove(); sEdit = null; } }
 
   // ── 위쪽 도구 ──
   function schedGo(start) {
