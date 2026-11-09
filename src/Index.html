@@ -1575,6 +1575,14 @@
     t.toUpperCase().split(/[,\s/]+/).filter(Boolean).forEach((c) => { const mm = c.match(/^(\d{2,4})([A-Z]+)$/); if (!mm) return; codes.push(c); if (!nums[mm[1]]) { nums[mm[1]] = ''; order.push(mm[1]); } nums[mm[1]] += mm[2]; });
     return { camp, codes, routes: order.map((n) => n + nums[n]).join(' '), rot, raw: String(v || '').replace(/\([^)]*\)/g, '').trim() };
   }
+  /** 칸 글자를 깔끔하게: '강서1 529A,529B (D1,D2,F3)' → '강서1 529AB' · 회전이 기본(D1,D2,F3)이 아니면 '(D1,D2)' 붙임 · 라우트 없으면 원문 */
+  const ROT_FULL = 'D1,D2,F3';
+  function schNice(v, camp, baseRoute) {
+    const pc = schParse(v, baseRoute || '');
+    if (!pc.routes) return pc.raw || String(v || '');
+    const rot = pc.rot.replace(/\s/g, '').toUpperCase();
+    return ((pc.camp || camp) ? (pc.camp || camp) + ' ' : '') + pc.routes + (rot && rot !== ROT_FULL ? ' (' + rot + ')' : '');
+  }
   function schKind(v) {
     const s = String(v || '').trim();
     if (s === '출근') return 'k-work';
@@ -1667,7 +1675,7 @@
       // 칸 글자가 잘리지 않게: 캠프명(다른 캠프일 때만 작은 꼬리표) · 라우트는 529A,529B → 529AB 로 줄임 · 회전(D1,D2)은 아래 요약에만
       const pc = mv ? schParse(mv, me ? me.route : '') : null;
       const chip = !pc ? '' : pc.routes
-        ? '<span class="v ' + schKind(mv) + (pc.routes.length > 5 ? ' long' : '') + '">' + (pc.camp && pc.camp !== r.camp ? '<i class="cp">' + escH(pc.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        ? '<span class="v ' + (schKind(mv) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + (pc.camp && pc.camp !== r.camp ? '<i class="cp">' + escH(pc.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
         : '<span class="v ' + schKind(mv) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const hasInst = (me && (me.inst || {})[dd]) || r.drivers.some((x) => (x.inst || {})[dd]);
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[dd] ? ' sun' : dow === 6 ? ' sat' : '') + (dd === pdd ? ' pdd' : '') + (dd === scCampDay ? ' sel' : '') + '" data-cd="' + dd + '">' +
@@ -1688,7 +1696,7 @@
       const pc = v ? schParse(v, x.route || '') : null, rtTxt = pc && pc.routes ? pc.routes : (x.route ? schParse(x.route, '').routes || x.route : '');
       return '<div class="day cmate' + (x.me ? ' me' : '') + '"><div class="dt">' + (rtTxt ? '<b class="rt">' + escH(rtTxt) + '</b>' : '<b class="rt none">—</b>') +
         '<span class="nm">' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</span>' + (x.type ? '<small>' + escH(x.type) + '</small>' : '') + '</div>' +
-        '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' +
+        '<div class="vc"><div class="val ' + (v ? (schKind(v) || (pc && pc.routes ? 'k-work' : '')) : 'none') + '">' + (v ? escH(schNice(v, r.camp, x.route)) : '미정') + '</div>' +
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
     const bk = (r.backup || {})[d] || [];
@@ -1736,7 +1744,7 @@
     const prev = new Date(+p[0], +p[1] - 1, +p[2] - 1), prevTxt = (prev.getMonth() + 1) + '/' + prev.getDate() + ' (' + DOWK[prev.getDay()] + ')';
     const mp = o.cell ? schParse(o.cell, o.baseRoute || '') : null;
     const myLine = !o.cell ? '<span class="none">아직 정해지지 않음</span>'
-      : mp.routes ? (mp.camp || o.camp ? '<b>' + escH((mp.camp || o.camp) + ' 캠프') + '</b> ' : '') + '<b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(o.cell) && !/\d/.test(o.cell) ? '<small>출근</small>' : '')
+      : mp.routes ? (mp.camp || o.camp ? '<b>' + escH((mp.camp || o.camp) + ' 캠프') + '</b> ' : '') + '<b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot && mp.rot.replace(/\s/g, '').toUpperCase() !== ROT_FULL ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(o.cell) && !/\d/.test(o.cell) ? '<small>출근</small>' : '')
       : '<b class="' + schKind(o.cell) + ' tag">' + escH(mp.raw) + '</b>';
     return '<div class="dsel' + (d === o.pdd ? ' pdd' : '') + '">' +
       '<div class="dd"><b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b>' + (d === o.pdd ? '<em class="pddt">PDD · 내일 배송</em>' : d === o.today ? '<em class="today">오늘</em>' : '') + (o.holiday ? '<em class="hol">' + escH(o.holiday) + '</em>' : '') +
@@ -1760,7 +1768,7 @@
       // 칸에는 내 노선(줄임 표기)만. 지시·품앗이·확정완료는 작은 아이콘, 백업/근무 인원 글자는 없음 (아래 요약·상세에)
       const pc = v ? schParse(v, r.baseRoute || '') : null;
       const chip = !pc ? '' : pc.routes
-        ? '<span class="v ' + schKind(v) + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || r.camp) ? '<i class="cp">' + escH(pc.camp || r.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        ? '<span class="v ' + (schKind(v) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || r.camp) ? '<i class="cp">' + escH(pc.camp || r.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
         : '<span class="v ' + schKind(v) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const icons = ((r.inst || {})[d] ? '<span title="지시사항">📌</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
