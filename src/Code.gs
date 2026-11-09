@@ -155,7 +155,7 @@ const M = {
   author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', cat: '비고 줄'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전해서 자동으로 추가하는 열 (시트별)
-const AUTO_ADD_COLS = { work_memo: ['cat'], camps: ['cpCode'] };
+const AUTO_ADD_COLS = { work_memo: ['cat'], camps: ['cpCode'], route_prices: ['rot'] };
 // 예전 버전이 쓰던 머리글 (지금은 정산 DB 로 옮겨짐). 남아 있어도 '이름 바뀐 머리글'로 보지 않는다
 const LEGACY_HEADS = { drivers: ['정산 대상 기사ID', '기사 일시단가', '기사 일시단가 노선', '기사 일시단가 시작일', '기사 일시단가 종료일'] };
 const M_NOTES = {
@@ -300,7 +300,7 @@ const CAD_MAX = 10;
 const RP = {
   id: '단가ID', campId: '캠프ID', campName: '캠프명', num: '숫자(구분1)', level: '구분', value: '글자',
   p1: '원청단가', p2: '고정단가', p3: '백업단가', p4: '품앗이단가', p5: '외부용차단가',
-  createdAt: '등록일시', updatedAt: '수정일시'
+  rot: '회전', createdAt: '등록일시', updatedAt: '수정일시'
 };
 const RP_PRICE_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5']; // 일시단가는 정산관리(기사 + 기간)로 옮김
 const RP_NOTES = {
@@ -309,6 +309,7 @@ const RP_NOTES = {
   level: '구분2 / 구분3 / 구분4 / 구분5 (2 처럼 숫자만 써도 됨)',
   value: '그 구분 자리의 글자. 예: 110ABCD 의 구분3 은 B',
   p1: '숫자만 (원). 1,200 처럼 써도 됩니다.',
+  rot: '이 글자 노선의 회전. 예: D1,D2 (비우면 캠프 기본 회전). 기사스케줄 미입차 계산·어드민 업로드 회전 열에 사용',
 };
 // ── 품앗이 (기사끼리 용차 일감 주고받기 · Pumasi.gs) ──
 const PST = { OPEN: '모집 중', TALK: '배차 협의중', DONE: '배차 확정', CLOSED: '모집 마감', CANCEL: '취소' };
@@ -4231,6 +4232,7 @@ function priceView_(o) {
     updatedAt: o.updatedAt
   };
   RP_PRICE_KEYS.forEach(function (k) { const m = normMoney_(o[k]); v[k] = m === null ? o[k] : m; });
+  v.rot = normRot_(o.rot).join(',');
   return v;
 }
 
@@ -4255,7 +4257,8 @@ function adm_priceSave(token, campId, rows) {
         if (m === null) fail_(name + ' ' + RP[k] + ': 숫자만 입력해 주세요.');
         x[k] = m;
       });
-      x.empty = RP_PRICE_KEYS.every(function (k) { return !x[k]; });
+      x.rot = r.rot === undefined ? undefined : normRot_(r.rot).join(','); // 글자별 회전 (빈칸 = 캠프 기본)
+      x.empty = RP_PRICE_KEYS.every(function (k) { return !x[k]; }) && !x.rot;
       return x;
     });
     // 2) 저장 (짧게 잠금)
@@ -4284,6 +4287,7 @@ function adm_priceSave(token, campId, rows) {
         if (x.empty) { if (o) { del.push(o._row); changed++; } return; }
         const f = { num: x.num, level: '구분' + x.level, value: x.value };
         RP_PRICE_KEYS.forEach(function (k) { f[k] = x[k]; });
+        if (x.rot !== undefined) f.rot = x.rot;
         if (!o) {
           add.push(Object.assign({ id: newRid_('P'), campId: camp.id, campName: camp.name, createdAt: now, updatedAt: now }, f));
           changed++;
@@ -4297,7 +4301,7 @@ function adm_priceSave(token, campId, rows) {
       del.sort(function (p, q) { return q - p; }).forEach(function (r) { sheet_(SH.PRICES).deleteRow(r); });
       if (changed) {
         logAdmin_(a, '단가 저장', camp.name, clean.slice(0, 20).map(function (x) {
-          return x.name + (x.empty ? ' 삭제' : ' ' + RP_PRICE_KEYS.map(function (k) { return x[k] || '-'; }).join('/'));
+          return x.name + (x.empty ? ' 삭제' : ' ' + RP_PRICE_KEYS.map(function (k) { return x[k] || '-'; }).join('/') + (x.rot ? ' 회전 ' + x.rot : ''));
         }).join(', ') + (clean.length > 20 ? ' 외 ' + (clean.length - 20) + '건' : ''));
       }
       bumpMaster_();
@@ -4683,6 +4687,9 @@ function schRead_(sun, end) {
   const m = master_();
   const routes = {};
   m.routes.forEach(function (r) { if (r.status !== RST.OFF) (routes[r.campId] = routes[r.campId] || []).push(r.code); });
+  // 글자별 회전 (노선관리 구분별 단가 '회전' · 비우면 캠프 기본): { '강서1|529B': ['D1','D2'] }
+  const routeRot = {};
+  (function () { const cn = {}; m.camps.forEach(function (c) { cn[c.id] = String(c.name).replace(/\s*캠프\s*$/, '').replace(/\s+/g, ''); }); (m.prices || []).forEach(function (p) { if (p.rot && cn[p.campId]) routeRot[cn[p.campId] + '|' + p.num + p.value] = p.rot.split(','); }); })();
   // 캠프 이름은 노선관리(camps)에서, 이름·노선은 기사 정보에서 바로 가져온다
   const campName = {};
   m.camps.forEach(function (c) { campName[c.id] = c.name; });
@@ -4738,7 +4745,7 @@ function schRead_(sun, end) {
   return {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
-    routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, rcMoves: rcMoves,
+    routes: routes, routeRot: routeRot, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, rcMoves: rcMoves,
     issues: issues, issueKinds: SCH_ISSUE.KINDS
   };
 }
@@ -5679,7 +5686,10 @@ function schBuildUpload_(data, opt) {
     const r = str_(c.rot || '').split(',').map(function (x) { return x.trim().toUpperCase(); }).filter(function (x) { return ALL.indexOf(x) >= 0; });
     campRot[short(c.name)] = r.length ? r : ALL;
   });
-  const defRotArr = function (camp) { return campRot[camp] || ALL; };
+  const routeRot = data.routeRot || {};
+  // 회전: 노선(글자)별 회전이 있으면 그것, 없으면 캠프 기본
+  const defRotArr = function (camp, rt) { return (rt && routeRot[camp + '|' + rt]) || campRot[camp] || ALL; };
+  const unionRots = function (camp, rl) { const u = {}; rl.forEach(function (rt) { defRotArr(camp, rt).forEach(function (x) { u[x] = 1; }); }); return rotSort(Object.keys(u)); };
   const hasWork = function (s) { return String(s || '').indexOf(SCHED_WORK_WORD) > -1; };
   const hasKeyword = function (s) { return KEYWORDS.some(function (k) { return String(s || '').indexOf(k) > -1; }); };
   const isValidRouteList = function (s) {
@@ -5748,10 +5758,10 @@ function schBuildUpload_(data, opt) {
     // 중복 규칙: 쿠팡은 아이디 한 줄에 회전 하나라 '205C,205D' + '205C (D2,F3)' 처럼 겹쳐 올린다.
     //   회전을 좁게 적은 사람(부분)이 그 회전의 주인 → 전체 회전으로 적힌 사람은 나머지 회전만 맡은 것으로 본다.
     //   중복 = 같은 회전에 부분끼리 2명, 또는 부분 없이 전체끼리 2명
-    const addPresent = function (date, camp, routes, rots, effId, effNm, per) {
-      const full = defRotArr(camp).length;
+    const addPresent = function (date, camp, routes, rots, effId, effNm, per) { // rots = null 이면 노선별 기본 회전
       routes.forEach(function (rt) {
-        const rr = per && per[rt] ? per[rt] : rots, part = rr.length < full;
+        const full = defRotArr(camp, rt).length;
+        const rr = per && per[rt] ? per[rt] : (rots || defRotArr(camp, rt)), part = rr.length < full;
         rr.forEach(function (rot) {
           const k = [date, camp, rt, rot].join('|');
           present[k] = 1;
@@ -5793,14 +5803,13 @@ function schBuildUpload_(data, opt) {
         if (m) {
           const rl = routeExpand(m[1]);
           if (rl.length) {
-            const effId = idFromParen || id, effNm = nm(effId) || nm(id), rots = defRotArr(baseCamp);
-            addPresent(date, baseCamp, rl, rots, effId, effNm); pushEntry(date, baseCamp, effId, effNm, rots, rl, '', 1, true);
+            const effId = idFromParen || id, effNm = nm(effId) || nm(id), rots = unionRots(baseCamp, rl);
+            addPresent(date, baseCamp, rl, null, effId, effNm); pushEntry(date, baseCamp, effId, effNm, rots, rl, '', 1, true);
             return;
           }
         }
         if (flat.indexOf('추가업무등록') >= 0) {
           const tokens = flat.replace(/추가업무등록/g, '').trim().split(/\s+/).filter(Boolean);
-          const rots = defRotArr(baseCamp);
           for (let t = 0; t < tokens.length;) {
             const mi = tokens[t].match(/^([A-Za-z][A-Za-z0-9_]{2,})$/);
             if (!mi) { t++; continue; }
@@ -5812,7 +5821,7 @@ function schBuildUpload_(data, opt) {
             t++;
             const rl = routeExpand(rtTok);
             if (!rl.length) continue;
-            addPresent(date, baseCamp, rl, rots, cid, nm(cid)); pushEntry(date, baseCamp, cid, nm(cid), rots, rl, '', 1, true);
+            addPresent(date, baseCamp, rl, null, cid, nm(cid)); pushEntry(date, baseCamp, cid, nm(cid), unionRots(baseCamp, rl), rl, '', 1, true);
           }
           return;
         }
@@ -5820,8 +5829,7 @@ function schBuildUpload_(data, opt) {
         if (m) {
           const rl = routeExpand(m[1]);
           if (rl.length) {
-            const rots = defRotArr(baseCamp);
-            addPresent(date, baseCamp, rl, rots, m[2], nm(m[2])); pushEntry(date, baseCamp, m[2], nm(m[2]), rots, rl, '', 1, true);
+            addPresent(date, baseCamp, rl, null, m[2], nm(m[2])); pushEntry(date, baseCamp, m[2], nm(m[2]), unionRots(baseCamp, rl), rl, '', 1, true);
             return;
           }
         }
@@ -5830,8 +5838,7 @@ function schBuildUpload_(data, opt) {
           if (mi) {
             const rl = routeExpand(lines[0]);
             if (rl.length) {
-              const rots = defRotArr(baseCamp);
-              addPresent(date, baseCamp, rl, rots, mi[1], nm(mi[1])); pushEntry(date, baseCamp, mi[1], nm(mi[1]), rots, rl, '', 1, true);
+              addPresent(date, baseCamp, rl, null, mi[1], nm(mi[1])); pushEntry(date, baseCamp, mi[1], nm(mi[1]), unionRots(baseCamp, rl), rl, '', 1, true);
               return;
             }
           }
@@ -5864,7 +5871,7 @@ function schBuildUpload_(data, opt) {
         if (!rl.length && fromText.length) fromText.forEach(function (rc) { rl = rl.concat(routeExpand(rc)); });
         const routeHasKey = hasKeyword(rl.join(','));
         let rots = normRot(rotation);
-        if (!rots.length) rots = defRotArr(finalCamp);
+        if (!rots.length) rots = null; // 회전을 안 적으면 노선별 기본 회전
         const include = rl.length && (hasWork(flat) || routeHasKey || isValidRouteList(rl.join(',')));
         let effId = id;
         if (idFromParen) effId = idFromParen;
@@ -5877,9 +5884,9 @@ function schBuildUpload_(data, opt) {
           const effNm = nm(effId) || nm(id);
           addPresent(date, finalCamp, rl, rots, effId, effNm, per);
           // 쿠팡 한 줄 = 회전 하나: 노선별 회전이 다르면 합집합으로 (205C(D1),205D → D1,D2,F3 / 205C,205D)
-          const union = {}; rl.forEach(function (rt) { (per[rt] || rots).forEach(function (x) { union[x] = 1; }); });
+          const union = {}; rl.forEach(function (rt) { (per[rt] || rots || defRotArr(finalCamp, rt)).forEach(function (x) { union[x] = 1; }); });
           const rowRots = rotSort(Object.keys(union));
-          const miss = defRotArr(finalCamp).filter(function (x) { return rowRots.indexOf(x) < 0; });
+          const miss = unionRots(finalCamp, rl).filter(function (x) { return rowRots.indexOf(x) < 0; });
           pushEntry(date, finalCamp, effId, effNm, rowRots, rl, miss.length ? '미입차(' + miss.join(',') + ')' : '', priority, hasWork(flat) || routeHasKey);
         }
       });
@@ -5917,17 +5924,17 @@ function schBuildUpload_(data, opt) {
     });
     Object.keys(byRoute).forEach(function (k) {
       const s = k.split('|');
-      defRotArr(s[1]).filter(function (x) { return !byRoute[k][x]; }).forEach(function (x) { addMissing(s[0], s[1], s[2], x); });
+      defRotArr(s[1], s[2]).filter(function (x) { return !byRoute[k][x]; }).forEach(function (x) { addMissing(s[0], s[1], s[2], x); });
     });
     explicitMi.forEach(function (x) {
       routeExpand(x.defRt).forEach(function (rt) {
-        defRotArr(x.baseCamp).forEach(function (rot) { if (!present[[x.date, x.baseCamp, rt, rot].join('|')]) addMissing(x.date, x.baseCamp, rt, rot); });
+        defRotArr(x.baseCamp, rt).forEach(function (rot) { if (!present[[x.date, x.baseCamp, rt, rot].join('|')]) addMissing(x.date, x.baseCamp, rt, rot); });
       });
     });
     Object.keys(baseRouteSet).forEach(function (k) {
       const s = k.split('|');
-      const covered = defRotArr(s[1]).some(function (rot) { return present[[s[0], s[1], s[2], rot].join('|')]; });
-      if (!covered) defRotArr(s[1]).forEach(function (rot) { addMissing(s[0], s[1], s[2], rot); });
+      const covered = defRotArr(s[1], s[2]).some(function (rot) { return present[[s[0], s[1], s[2], rot].join('|')]; });
+      if (!covered) defRotArr(s[1], s[2]).forEach(function (rot) { addMissing(s[0], s[1], s[2], rot); });
     });
     const byRot = {};
     Object.keys(gm).forEach(function (k) {
