@@ -2896,7 +2896,8 @@
     }).catch(() => {}).finally(() => { paBusy = false; });
   }
   window.pmAlertStart = function () {
-    if (!paTimer) paTimer = setInterval(() => pollAlerts(false), 30000);
+    // 휴대폰 알림(푸시)이 등록된 기기는 새 알림이 오면 바로 깨워 주므로 2분마다, 아니면 1분마다 확인 (예전 30초 → 서버 호출 절반 이하)
+    if (!paTimer) paTimer = setInterval(() => pollAlerts(false), lsGet(PUSH_TOK) ? 120000 : 60000);
     clearShownNotifications();
     pollAlerts(true);
     pushAuto();

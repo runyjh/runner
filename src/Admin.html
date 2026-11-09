@@ -5774,10 +5774,10 @@
     if (imgPending[pk]) return imgPending[pk];
     const fromServer = () => queued(() => api('adm_campImage', im.id, !!full)).then((r) => {
       if (!r.ok) throw new Error(r.msg);
-      if (!full) IDB.set(key, { mime: r.mime, data: r.data, thumb: !!r.thumb, at: Date.now() });
+      IDB.set(full ? key + ':f' : key, { mime: r.mime, data: r.data, thumb: !!r.thumb, at: Date.now() }); // 크게 보기도 보관 (다시 열 때 서버 호출 없음)
       return (imgCache[key] = { src: b64Url(r.data, r.mime), thumb: !!r.thumb });
     });
-    const p = (full ? Promise.resolve(null) : IDB.get(key)).then((c) => (c && c.data && c.mime && Date.now() - (c.at || 0) < IMG_KEEP)
+    const p = IDB.get(full ? key + ':f' : key).then((c) => (c && c.data && c.mime && Date.now() - (c.at || 0) < IMG_KEEP)
       ? (imgCache[key] = { src: b64Url(c.data, c.mime), thumb: !!c.thumb }) : fromServer());
     return (imgPending[pk] = p.finally(() => { delete imgPending[pk]; }));
   }
