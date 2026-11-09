@@ -2137,6 +2137,17 @@ function stlClosedInfo_(month) {
   return r ? { at: r.at, admin: r.admin } : null;
 }
 /** 결과: 마감된 달은 마감 때 저장한 결과, 아니면 계산 (5분 캐시) */
+/** 마감 기록 줄: 칸 하나에 다 안 들어가면(5만 자 제한) acct##1, acct##2 … 로 나눠 저장 */
+function stlSnapRows_(month, res) {
+  const out = [], CH = 45000;
+  const add = function (acct, obj) {
+    const t = JSON.stringify(obj);
+    for (let i = 0, n = 0; i < t.length || n === 0; i += CH, n++) out.push({ month: month, acct: n ? acct + '##' + n : acct, data: t.slice(i, i + CH) });
+  };
+  add('_summary', res.summary);
+  Object.keys(res.slips).forEach(function (id) { add(id, res.slips[id]); });
+  return out;
+}
 function stlResult_(month, fresh) {
   const closed = stlClosedInfo_(month);
   if (closed) {
@@ -2146,10 +2157,17 @@ function stlResult_(month, fresh) {
     const rows = stlReadMonth_('stl_closed', month);
     let summary = null;
     const slips = {};
+    // 긴 결과는 여러 줄로 나눠 저장됨 (acct##1, acct##2 …) → 이어 붙여 읽음
+    const parts = {}, order = [];
     rows.forEach(function (r) {
+      const m = /^(.*)##(\d+)$/.exec(str_(r.acct)), base = m ? m[1] : str_(r.acct), n = m ? Number(m[2]) : 0;
+      if (!parts[base]) { parts[base] = []; order.push(base); }
+      parts[base][n] = str_(r.data);
+    });
+    order.forEach(function (acct) {
       try {
-        const o = JSON.parse(r.data);
-        if (r.acct === '_summary') summary = o; else slips[r.acct] = o;
+        const o = JSON.parse(parts[acct].join(''));
+        if (acct === '_summary') summary = o; else slips[acct] = o;
       } catch (e) { /* 손상된 줄은 건너뜀 */ }
     });
     if (summary) {
@@ -2741,9 +2759,7 @@ function adm_stlClose(token, month, close) {
         if (rows.some(function (r) { return r.month === month; })) fail_('이미 마감된 달입니다.');
         const res = stlCompute_(month);
         res.summary.computedAt = nowText_();
-        const snap = [{ month: month, acct: '_summary', data: JSON.stringify(res.summary) }];
-        Object.keys(res.slips).forEach(function (id) { snap.push({ month: month, acct: id, data: JSON.stringify(res.slips[id]) }); });
-        if (snap.some(function (s) { return s.data.length > 49000; })) fail_('결과가 너무 커서 마감 기록을 저장할 수 없습니다.');
+        const snap = stlSnapRows_(month, res);
         stlReplaceMonth_('stl_closed', month, snap);
         stlWriteAll_('stl_close', others.concat([{ month: month, at: nowText_(), admin: a.name }]));
         stlAdvMark_(month, res.summary.advAuto || [], true);
@@ -3975,9 +3991,7 @@ function adm_stlLegacyClose(token, fileId, month) {
       const rows = stlRead_('stl_close'), others = rows.filter(function (r) { return r.month !== month; });
       const mg = stlLegacyMerge_(month, leg), res = mg.res;
       res.summary.computedAt = nowText_();
-      const snap = [{ month: month, acct: '_summary', data: JSON.stringify(res.summary) }];
-      Object.keys(res.slips).forEach(function (id) { snap.push({ month: month, acct: id, data: JSON.stringify(res.slips[id]) }); });
-      if (snap.some(function (s) { return s.data.length > 49000; })) fail_('결과가 너무 커서 마감 기록을 저장할 수 없습니다.');
+      const snap = stlSnapRows_(month, res);
       stlReplaceMonth_('stl_closed', month, snap);
       stlWriteAll_('stl_close', others.concat([{ month: month, at: nowText_(), admin: a.name + ' (기존 정산 이식)' }]));
       stlLastCloseSet_(month);
