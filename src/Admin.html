@@ -4844,7 +4844,7 @@
     if (tab === 'sla') return slaRender(box);
     if (tab === 'fb') return fbRender(box);
     if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; }
-    const wks = RP.weeks.slice(-8), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw);
+    const wks = RP.weeks.slice(-8).reverse(), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw); // 최신 주차가 앞
     const camps = [...new Set(RP.rows.map((r) => r.camp))].sort(koSort);
     const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
     const cnt = (g) => lrows.filter((r) => r.grade === g).length;
@@ -4864,7 +4864,7 @@
   }
   function rpRenderRows() {
     const tb = $('#rpRows'); if (!tb) return;
-    const wks = RP.weeks.slice(-8), list = rpList();
+    const wks = RP.weeks.slice(-8).reverse(), list = rpList();
     tb.innerHTML = list.map((x) => {
       const l = x.latest;
       const hk = rpKey(x.camp, x.code);
@@ -5093,7 +5093,7 @@
   function slaShow() {
     const ps = SL.periods, lp = ps[ps.length - 1]; if (!lp) return [];
     const w = ps.filter((p) => p.slice(0, 4) === lp.slice(0, 4));
-    return w.length >= 6 ? w : ps.slice(-6);
+    return (w.length >= 6 ? w : ps.slice(-6)).slice().reverse(); // 최신 기간이 앞
   }
   function slaList() {
     const f = SL.f, q = normCode(f.q), ps = SL.periods, lp = ps[ps.length - 1], pp = ps[ps.length - 2], fp = ps[0];
@@ -5130,7 +5130,7 @@
         '<input class="inp" id="slQ" placeholder="캠프·라우트 검색" value="' + esc(SL.f.q) + '" autocomplete="off" style="width:150px">' + '<label class="check" style="align-self:center"><input type="checkbox" id="slEnded"' + (SL.f.ended ? ' checked' : '') + '> 종료 포함</label>' +
         '</div>' +
       '<div class="table-wrap rt-table rp-table sla-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>총점 (최신)</th><th title="미수행률 15 · 반품 미회수 15 · 고객만족 50 · 고객불만 20 (만점 대비 높이)">항목</th><th>고객만족<br><small>/50</small></th><th>고객불만<br><small>/20</small></th><th title="직전 집계기간 대비">전 기간 대비</th><th title="이 라우트의 가장 오래된 기록 대비 (지표개선표)">최초 대비</th>' +
-        show.map((p, i) => '<th title="' + esc(p) + (i === 0 ? ' · 올해 누적 이력 (1월부터)' : '') + '"' + (i === 0 ? ' class="wk2"' : '') + '>~' + slaPd(p) + '</th>').join('') + '</tr></thead><tbody id="slRows"></tbody></table><div class="empty hidden" id="slEmpty"></div></div>' +
+        show.map((p, i) => '<th title="' + esc(p) + (i === 0 ? ' · 최신 기간 (올해 1월부터 누적 이력)' : '') + '"' + (i === 0 ? ' class="wk2"' : '') + '>~' + slaPd(p) + '</th>').join('') + '</tr></thead><tbody id="slRows"></tbody></table><div class="empty hidden" id="slEmpty"></div></div>' +
       '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">총점 100 = 미수행률 15 + 반품 미회수율 15 + 고객만족 50 + 고객불만 20. 색: <span class="sla ok">' + SL.th.good + '↑</span> 우수 · <span class="sla warn">' + SL.th.warn + '~</span> 주의 · <span class="sla bad">' + SL.th.warn + '↓</span> 위험. 쿠팡 집계기간은 누적(예 6/1~9/25)이라 열은 기간 끝 날짜입니다. 라우트를 누르면 주간 등급과 월별 점수를 함께 봅니다.</p></div>');
     slaRenderRows();
   }
