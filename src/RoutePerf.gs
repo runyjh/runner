@@ -170,9 +170,34 @@ function rpfSummary_() {
     badList: bad.slice(0, 8).map(function (o) { return o.camp + ' ' + o.code + ' ' + o.grade + '등급' + (o.perf !== '' ? ' ' + o.perf + '%' : ''); }), uploadedAt: rows[0].uploadedAt };
 }
 
+/** 오늘이 속한 정산기간 (전월 26일 ~ 당월 25일) { from, to, end } */
+function stlPeriodOfToday_() {
+  const t = parseYmd_(todayText_()), y = t.getFullYear(), m = t.getMonth(), d = t.getDate();
+  const from = d <= 25 ? new Date(y, m - 1, 26) : new Date(y, m, 26), to = d <= 25 ? new Date(y, m, 25) : new Date(y, m + 1, 25);
+  return { from: ymd_(from), to: ymd_(to) };
+}
+/**
+ * 백업 기사가 이번 정산기간(전월 26일~당월 25일, 오늘까지)에 기사스케줄 칸에 적힌 대로 입차한 라우트 [{ camp, code, days }] (많이 뛴 순)
+ *  칸 글자에 캠프 이름이 있으면 그 캠프, 없으면 소속 캠프. 휴무·휴가·병가·미입차·비고 칸은 제외
+ */
+function rpfRanRoutes_(driverId, camp, limit) {
+  const pd = stlPeriodOfToday_(), today = todayText_(), rec = {};
+  const s = schRead_(parseYmd_(pd.from), parseYmd_(today < pd.to ? today : pd.to));
+  const cells = s.cells[driverId] || {}, campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
+  Object.keys(cells).forEach(function (d) {
+    if (d < pd.from || d > pd.to) return;
+    const v = String(cells[d] || '').toUpperCase();
+    if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
+    let cp = camp;
+    campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
+    rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++; });
+  });
+  const list = Object.keys(rec).map(function (k) { return rec[k]; }).sort(function (a, b) { return b.days - a.days; });
+  return { period: pd, routes: limit ? list.slice(0, limit) : list };
+}
 /**
  * 기사 앱: 내 라우트 수행률 (관리자가 켜 두었을 때만)
- *  - 고정 기사: 기본노선 라우트(mine) · 백업 기사(기본노선 없음): 최근 4주 기사스케줄에서 실제로 뛴 라우트(recent)
+ *  - 고정 기사: 기본노선 라우트(mine) · 백업 기사(기본노선 없음): 이번 정산기간(전월 26일~당월 25일) 기사스케줄에서 입차한 라우트(recent)
  *  - 그 아래 소속 캠프 전체 라우트의 최신 등급(campAll · 접힌 상태로)
  */
 function api_myPerf(token) {
@@ -196,23 +221,11 @@ function api_myPerf(token) {
     const has = function (r) { return r.weeks.some(function (w) { return w.grade; }); };
     const out = { ok: true, on: true, camp: camp, backup: !base.length, weeks: weeks, routes: [], recent: [], campAll: [] };
     if (camp && base.length) out.routes = base.map(function (c) { return series(camp, c); }).filter(has);
-    // 최근 4주 스케줄에서 뛴 라우트 — 백업 기사(기본노선 없음)만. 고정 기사는 기본노선 기준으로만 본다
+    // 이번 정산기간(전월 26일~당월 25일) 스케줄에서 입차한 라우트 — 백업 기사(기본노선 없음)만. 고정 기사는 기본노선 기준으로만 본다
     if (!base.length) try {
-      const today = parseYmd_(todayText_()), rec = {};
-      const s = schRead_(sundayOf_(addDays_(today, -27)), today);
-      const cells = s.cells[u.id] || {}, campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
-      Object.keys(cells).forEach(function (d) {
-        const v = String(cells[d] || '').toUpperCase();
-        if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
-        let cp = camp;
-        campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
-        rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) {
-          if (!/^\d/.test(code)) return;
-          const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++;
-        });
-      });
-      out.recent = Object.keys(rec).map(function (k) { return rec[k]; }).filter(function (x) { return !(x.camp === camp && base.indexOf(x.code) >= 0); })
-        .sort(function (a, b) { return b.days - a.days; }).slice(0, 8).map(function (x) { const r = series(x.camp, x.code); r.days = x.days; return r; }).filter(has);
+      const ran = rpfRanRoutes_(u.id, camp, 10);
+      out.period = ran.period;
+      out.recent = ran.routes.map(function (x) { const r = series(x.camp, x.code); r.days = x.days; return r; }).filter(has);
     } catch (e) { out.recent = []; }
     if (camp && latest) {
       out.campAll = all.filter(function (r) { return r.camp === camp && r.week === latest; }).sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; })
@@ -669,7 +682,7 @@ function fbSummary_() {
     none: rows.filter(function (o) { return o.f1 === '미해당' && o.f2 === '미해당'; }).length, f1: rows.filter(function (o) { return o.f1 === '해당'; }).length, f2: rows.filter(function (o) { return o.f2 === '해당'; }).length };
 }
 /**
- * 기사 앱: 내 라우트의 가중요인 (관리자가 켜 두었을 때만). 고정 = 기본노선 · 백업 = 최근 4주 뛴 라우트
+ * 기사 앱: 내 라우트의 가중요인 (관리자가 켜 두었을 때만). 고정 = 기본노선 · 백업 = 이번 정산기간(전월 26일~당월 25일) 입차한 라우트
  *  routes: [{ camp, code, cum:{to,f1pct,f1,f2pct,f2}, days:[{date,f1pct,f1,f2pct,f2}](최근 7일), month:{period,f1,f2}, won, est, vol }]
  */
 function api_myFb(token) {
@@ -709,20 +722,8 @@ function api_myFb(token) {
     };
     let codes = [];
     if (camp && base.length) codes = base.map(function (c) { return { camp: camp, code: c }; });
-    else try {
-      const today = parseYmd_(todayText_()), rec = {};
-      const s = schRead_(sundayOf_(addDays_(today, -27)), today);
-      const cells = s.cells[u.id] || {}, campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
-      Object.keys(cells).forEach(function (d) {
-        const v = String(cells[d] || '').toUpperCase();
-        if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
-        let cp = camp;
-        campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
-        rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++; });
-      });
-      codes = Object.keys(rec).map(function (k) { return rec[k]; }).sort(function (a, b) { return b.days - a.days; }).slice(0, 6);
-    } catch (e) { codes = []; }
-    out.routes = codes.map(function (x) { return mk(x.camp, x.code); }).filter(Boolean);
+    else try { const ran = rpfRanRoutes_(u.id, camp, 10); out.period = ran.period; codes = ran.routes; } catch (e) { codes = []; }
+    out.routes = codes.map(function (x) { const r = mk(x.camp, x.code); if (r && x.days) r.ranDays = x.days; return r; }).filter(Boolean);
     out.backup = !base.length;
     try { const j = JSON.stringify(out); if (j.length < 90000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
     return out;
