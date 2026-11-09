@@ -7624,9 +7624,10 @@
     const k = (lab, v, sub) => '<div class="kpi"><small>' + lab + '</small><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
     $('#stKpi').innerHTML = k('쿠팡 매출 (VAT포함)', wn(c.sales), '공급가 ' + wn(c.supplyCp) + (c.lossCp ? ' · 분실차감 ' + wn(c.lossCp) : '')) +
       k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax)) +
+      (c.lossCp || t.loss ? k('분실파손 (쿠팡 정산서)', wn(c.lossCp), '기사 부담 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossGain ? ' · 부가세분 ' + wn(STX.pnl.lossGain) + ' → 러너 잉여' : STX.pnl && STX.pnl.lossVat === false ? ' · 부가세 환산 안 함' : '')) : '') +
       k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 공제금액 ' + wn(t.depDed)) +
       k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0)), '쿠팡 공급가 − 분실 − 기사 공급가' + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
-      (STX.pnl && STX.pnl.ins ? k('러너 잉여 (프백 잉여 + 보험 차액 + 용차·품앗이)', wn(STX.pnl.surplus), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 보험 차액 ' + wn(STX.pnl.insGap) + ' · 용차·품앗이 ' + wn(c.yongGain || 0)) +
+      (STX.pnl && STX.pnl.ins ? k('러너 잉여 (프백 잉여 + 보험 차액 + 용차·품앗이' + (STX.pnl.lossGain ? ' + 분실 부가세' : '') + ')', wn(STX.pnl.surplus), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + (STX.pnl.lossGain ? ' · 분실 부가세 ' + wn(STX.pnl.lossGain) : '') + ' · 보험 차액 ' + wn(STX.pnl.insGap) + ' · 용차·품앗이 ' + wn(c.yongGain || 0)) +
         k('산재·고용 신고액 (빼둘 돈)', wn(STX.pnl.ins.total), '기사분 ' + wn(STX.pnl.ins.sanD + STX.pnl.ins.goyD) + ' + 러너 ' + Math.round(STX.pnl.ins.runner * 100) + '% ' + wn(STX.pnl.ins.runnerAmt)) : '') +
       (STX.pnl ? '<div class="kpi clk" id="stKpiNet" title="손익·운영비 보기"><small>당기순이익 (공급가 · 세전)</small><b' + (STX.pnl.net < 0 ? ' style="color:var(--danger)"' : '') + '>' + wn(STX.pnl.net) + '</b><em>회사이익 − 러너 보험 ' + wn(STX.pnl.runnerIns) + ' + 보험 차액 ' + wn(STX.pnl.insGap || 0) + ' − 인건비 ' + wn(STX.pnl.staff) + ' − 운영비 ' + wn(STX.pnl.cost) + (STX.pnl.staff || STX.pnl.cost ? '' : ' · 운영비 미입력') + '</em></div>' : '') +
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
@@ -7666,16 +7667,16 @@
     const q = $('#stQ').value.trim().toLowerCase();
     const list = s.drivers.filter((d) => !q || d.name.toLowerCase().includes(q) || d.cids.some((x) => x.toLowerCase().includes(q)) || (d.workers || []).some((x) => x.toLowerCase().includes(q)));
     STX.slipIds = list.map((d) => d.id);
-    const H = ['명의자', '정산 아이디 (메인 · 서브)', '근무일', '배송건수', '지급 합계', '분실파손금액', '세금계산서', '공급가', '세액', '산재', '고용', '공제금액', '실입금', '회사이익금', '입금'];
+    const H = ['명의자', '정산 아이디 (메인 · 서브)', '근무일', '배송건수', '지급 합계', '분실파손 (정산서)', '세금계산서', '공급가', '세액', '산재', '고용', '공제금액', '실입금', '회사이익금', '입금'];
     const num = (v, neg) => '<td class="n' + (neg && v < 0 ? ' neg' : '') + '">' + wnz(v) + '</td>';
     const tr = (d) => '<tr class="clk" data-slip="' + esc(d.id) + '"><td><b>' + esc(d.name) + '</b>' + (d.vendor ? ' <span class="vtag">용차업체' + (d.vendorPrice ? ' · 지급 ' + wn(d.vendorPrice) : '') + '</span>' : '') + (d.mode ? ' <small class="sub">' + esc(d.mode) + '</small>' : '') + (d.ceo ? ' <span class="vtag" title="대표: 지급하지 않음 · 매출은 러너 수익 · 명세서는 확인용">대표 · 러너 수익</span>' : '') + (d.noPriceQty ? ' <small style="color:var(--danger)">단가없음 ' + wn(d.noPriceQty) + '</small>' : '') + '</td>' +
       '<td class="sub">' + d.cids.map((x, i) => (i ? '<span style="opacity:.7">' : '<b style="color:var(--ink)">') + esc(x.replace(/@.*/, '')) + (i ? '</span>' : '</b>')).join(', ') +
         (d.workers && d.workers.length ? '<br><small>일한 기사: ' + esc(d.workers.join(', ')) + '</small>' : '') +
         (d.movedIn && d.movedIn.length ? '<br><small style="color:var(--ok)">' + esc(d.movedIn.join(', ')) + '</small>' : '') +
         (d.movedOut && d.movedOut.length ? '<br><small style="color:#b45309">' + esc(d.movedOut.join(', ')) + '</small>' : '') + '</td>' +
-      '<td class="n">' + (d.workDays || '-') + '</td>' + num(d.qty) + num(d.pay) + num(d.taxDed) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
+      '<td class="n">' + (d.workDays || '-') + '</td>' + num(d.qty) + num(d.pay) + num(d.lossCp) + num(d.invoice) + num(d.supply) + num(d.tax) + num(d.san) + num(d.goy) + num(d.depDed) + num(d.net, true) + num(d.profit, true) +
       '<td>' + (d.checked ? '<span style="color:var(--ok);font-weight:700">✓ ' + esc(mdTxt(d.payDate)) + '</span>' : '') + '</td></tr>';
-    const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + '<td></td>' + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';
+    const totRow = '<tr class="tot"><td>합계</td><td></td><td></td>' + num(t.qty) + num(t.pay) + num(t.lossCp) + num(t.invoice) + num(t.supply) + num(t.tax) + num(t.san) + num(t.goy) + num(t.depDed) + num(t.net) + num(t.profit) + '<td></td></tr>';
     $('#stTable').innerHTML = '<thead><tr>' + H.map((h, i) => '<th' + (i > 2 && i < 14 ? ' class="n"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + totRow + list.map(tr).join('') + '</tbody>';
     // 모바일: 카드 (명의자 · 실입금 크게 · 계산서 · 배송 · 공제) — 누르면 정산서
     const card = (d) => '<div class="st-card" data-slip="' + esc(d.id) + '"><div class="ch"><b>' + esc(d.name) + '</b><span class="ids">' + esc(d.cids.map((x) => x.replace(/@.*/, '')).join(' · ')) + '</span></div>' +

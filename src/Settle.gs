@@ -1698,7 +1698,7 @@ function stlCompute_(month) {
     });
   });
   const drivers = [], slips = {};
-  const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, profit: 0, runnerIns: 0, fbCut: 0, fbKeep: 0, insGain: 0, sales: 0 };
+  const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, lossCp: 0, profit: 0, runnerIns: 0, fbCut: 0, fbKeep: 0, insGain: 0, sales: 0 };
   Object.keys(S).forEach(function (id) {
     const s = S[id], f = fin(id, extraAdj[id]);
     const o = s.owner;
@@ -1711,7 +1711,7 @@ function stlCompute_(month) {
       id: id, cid: s.cid, name: s.name, ownerId: s.ownerId, vendor: s.vendor, vendorPrice: s.vendor && X.groups[id].main.vinfo ? X.groups[id].main.vinfo.price : 0, ids: X.groups[id].cids.length, cids: X.groups[id].cids.slice(), usedCids: Object.keys(s.ids), type: s.type || '', mode: s.mode || '',
       workers: workers.filter(function (w) { return !w.owner && !(s.vendor && !w.id); }).map(function (w) { return w.name; }),
       workDays: s.sched.days, workDaysBy: s.sched.byCid, workDaysSrc: s.sched.src, qty: s.qty, sales: s.sales,
-      base: s.base, inc: s.inc, fresh: s.fresh, freshRaw: s.freshRaw, fbCutTxt: s.fbCutTxt || '', fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, yongPay: s.yongPay, yongCut: s.yongCut,
+      base: s.base, inc: s.inc, fresh: s.fresh, freshRaw: s.freshRaw, fbCutTxt: s.fbCutTxt || '', fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, lossCp: s.lossCp, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
       profit: Math.round(s.supplyCp - s.lossCp - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '', bizName: o.vendor ? '' : o.bizName || '',
@@ -1730,7 +1730,7 @@ function stlCompute_(month) {
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
       daily: s.daily, sched: s.sched.cells, idUse: s.idUse || {}, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers,
       movedIn: stlMoveList_(s.movedIn), movedOut: stlMoveList_(s.movedOut) };
-    ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
+    ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'lossCp', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
   });
   drivers.sort(function (a, b) { return b.sales - a.sales || koCmp_(a.name, b.name); });
 
@@ -2212,7 +2212,9 @@ function stlPnl_(month, sum) {
   ins.total = ins.sanD + ins.goyD + ins.runnerAmt;
   ins.gap = o.insDrv - (ins.sanD + ins.goyD); // 기사에게 실제 공제한 보험 − 신고 기준 기사분 → 러너 잉여
   o.ins = ins; o.runnerIns = ins.runnerAmt; o.insGap = ins.gap;
-  o.surplus = (t.fbKeep || 0) + (t.fbCut || 0) + ins.gap + (c.yongGain || 0);
+  // 분실파손: 쿠팡 정산서 차감금액(공급가) vs 기사 부담(설정 '부가세 포함 환산' Y 면 ×1.1) 차이 → 러너 잉여
+  o.lossDrv = t.loss || 0; o.lossVat = !!cfg.lossVat; o.lossGain = cfg.lossVat ? Math.max(0, (t.loss || 0) - (c.lossCp || 0)) : 0;
+  o.surplus = (t.fbKeep || 0) + (t.fbCut || 0) + ins.gap + (c.yongGain || 0) + o.lossGain;
   const cat = function (k, v) { if (v) o.byCat[k || '기타'] = (o.byCat[k || '기타'] || 0) + v; };
   stlRead_('stl_staff').forEach(function (r) {
     const pay = stlR0_(stlNum_(r.pay));
