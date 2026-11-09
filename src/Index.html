@@ -370,7 +370,7 @@
   .sl-ik b em { font-style: normal; font-size: 20px; font-weight: 800; color: var(--brand); } .sl-ik b small { font-weight: 600; color: var(--sub); font-size: 12px; }
   .sl-ik .sl-cp { padding: 3px 8px; min-height: 26px; font-size: 11.5px; } .sl-ik:not(:has(.sl-cp)) b { grid-column: 2 / 4; }
   .sl-ihint { margin-top: 8px; font-size: 12px; color: var(--sub); line-height: 1.5; }
-  .sl-netc { background: var(--brand-weak, #e8f0fe); border: 1px solid #cfe0fb; } .sl-netc .sl-stats2 div { background: #fff; }
+  .sl-netc { background: var(--brand-weak, #e8f0fe); border: 1px solid #cfe0fb; } .sl-netc .sl-stats2 div { background: #fff; } .sl-stats2 span i { font-style: normal; color: var(--brand); font-weight: 700; }
   .sl-netc .sl-netrow { display: flex; justify-content: space-between; align-items: baseline; } .sl-netrow span { font-size: 13px; color: var(--sub); font-weight: 700; } .sl-netrow span small { font-weight: 600; } .sl-netrow b { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--brand); } .sl-netrow b small { font-size: 14px; margin-left: 2px; } .sl-netrow b.neg { color: var(--danger); }
   .sl-hs2 { font-size: 12.5px; color: var(--sub); margin-top: 4px; } .sl-hs2 b { color: var(--ink); }
   .sl-stats2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; } .sl-stats2 div { background: #f7f8fa; border-radius: 10px; padding: 8px 9px; min-width: 0; } .sl-stats2 span { display: block; font-size: 11.5px; color: var(--sub); } .sl-stats2 b { display: block; font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sl-stats2 b.neg { color: var(--danger); }
@@ -2800,11 +2800,11 @@
         kv('사업자번호', escH(co.bizNo || '-'), co.bizNo ? cp(co.bizNo, '사업자번호') : '') +
         (co.email ? kv('이메일', escH(co.email), cp(co.email, '이메일')) : '') +
         kv('작성일자 · 품목', escH(D.writeDate || '-') + ' <small>· 배송(' + escH(r.month) + ') · 청구</small>') +
-      '</div><div class="sl-ihint">공급자 ' + escH(supName) + ' → 러너. 홈택스에서 공급가액·세액을 위 숫자 그대로 입력해 발행해 주세요.</div></div>';
+      '</div><div class="sl-ihint">공급자 ' + escH(supName) + ' → 러너. 홈택스에서 공급가액·세액을 위 숫자 그대로 입력해 발행해 주세요.' + (d.taxDed ? '' : ' 발행 금액은 지급 합계 전액이고, 분실파손·보험·가불 등 공제는 발행 후 실 입금액에서 뺍니다.') + '</div></div>';
     return invCard +
-      '<div class="sl-card sl-netc"><div class="sl-netrow"><span>실 입금액 <small>(지급 − 공제)</small></span><b' + (d.net < 0 ? ' class="neg"' : '') + '>' + slWon(d.net) + '<small>원</small></b></div>' +
+      '<div class="sl-card sl-netc"><div class="sl-netrow"><span>실 입금액 <small>(지급 합계 − 공제)</small></span><b' + (d.net < 0 ? ' class="neg"' : '') + '>' + slWon(d.net) + '<small>원</small></b></div>' +
       '<div class="sl-hs2">' + escH(slMonthTxt(r.month)) + ' ' + slMd(P.from) + '~' + slMd(P.to) + (D.pay ? ' · 지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
-      '<div class="sl-stats2"><div><span>지급 합계</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
+      '<div class="sl-stats2"><div><span>지급 합계' + (d.taxDed ? '' : ' <i>= 계산서</i>') + '</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
       '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
       '<div class="sl-card"><h3>차감 · 공제</h3>' + (deds.length ? deds.map((l) => line(l, '−')).join('') : '<div class="sl-line"><div class="hint">없음</div></div>') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +
       (moved.length ? fold('다른 아이디 사용', moved.length + '건', '<table class="sl-tbl"><thead><tr><th>내용</th><th>기간</th><th class="n">건수</th><th class="n">금액</th></tr></thead><tbody>' +

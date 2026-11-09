@@ -7422,7 +7422,7 @@
     items: [
       ['하는 일', '기사 정산서에 나오는 <b>줄 이름표</b> · <span class="gp">지급</span> = 더 주는 돈 · <span class="gm">차감</span> = 빼는 돈'],
       ['금액 넣는 곳', '계산 방식 <b>직접입력</b> 항목 → [공제·가감]에 그 달 금액 · 매달 같으면 [고정수당 및 공제설정]'],
-      ['계산서', '차감 항목 <b>계산서에서 빼기 Y</b> = 세금계산서 금액에서 빠짐 · <b>N</b> = 입금액에서만 빠짐'],
+      ['계산서', '차감 항목 <b>계산서에서 빼기 Y</b> = 세금계산서 금액에서 빠짐 · <b>N</b> = 입금액에서만 빠짐 (정석: 지급 전액 발행 → 공제) · 분실파손·용차(지출)는 2026-11-09부터 N 기본, 공제액은 기타수익'],
       ['주의', '자동 항목(배송 기본 · 분실파손 · 산재보험 …)의 <b>계산 방식은 바꾸지 마세요</b>']
     ],
     camps: [
@@ -7623,11 +7623,12 @@
     const t = s.total, c = s.company;
     const k = (lab, v, sub) => '<div class="kpi"><small>' + lab + '</small><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
     $('#stKpi').innerHTML = k('쿠팡 매출 (VAT포함)', wn(c.sales), '공급가 ' + wn(c.supplyCp) + (c.lossCp ? ' · 분실차감 ' + wn(c.lossCp) : '')) +
-      k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax)) +
-      (c.lossCp || t.loss ? k('분실파손 (쿠팡 정산서 · 소비자가)', wn(c.lossCp), '공급가 환산 ' + wn(c.lossSup || 0) + ' · 기사 부담 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossGain ? ' · 부가세분 ' + wn(STX.pnl.lossGain) + ' → 러너 잉여' : STX.pnl && STX.pnl.lossVat === false ? ' · 부가세 환산 안 함' : '')) : '') +
+      k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax) + (t.taxDed ? ' · 계산서 차감 ' + wn(t.taxDed) : ' · 지급 합계 전액으로 발행 (분실·용차는 발행 후 공제)')) +
+      (c.lossCp || t.loss ? k('분실파손 (쿠팡 정산서 · 소비자가)', wn(c.lossCp), '공급가 환산 ' + wn(c.lossSup || 0) + ' · 기사 변상 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossVat === false ? ' (부가세 환산 안 함)' : ' (×1.1)') + ' → 기타수익') : '') +
       k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 공제금액 ' + wn(t.depDed)) +
-      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0)), '쿠팡 공급가 − 분실(공급가 환산 ' + wn(c.lossSup || 0) + ') − 기사 공급가' + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
-      (STX.pnl && STX.pnl.ins ? k('러너 잉여 (프백 잉여 + 보험 차액 + 용차·품앗이' + (STX.pnl.lossGain ? ' + 분실 부가세' : '') + ')', wn(STX.pnl.surplus), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + (STX.pnl.lossGain ? ' · 분실 부가세 ' + wn(STX.pnl.lossGain) : '') + ' · 보험 차액 ' + wn(STX.pnl.insGap) + ' · 용차·품앗이 ' + wn(c.yongGain || 0)) +
+      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0)), '쿠팡 공급가 − 분실(공급가 환산 ' + wn(c.lossSup || 0) + ') − 기사 공급가' + (t.otherInc ? ' + 기타수익(분실·용차) ' + wn(t.otherInc) : '') + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
+      (STX.pnl && STX.pnl.ins ? k('기타수익 (세무사 전달용 · 부가세 없음)', wn((STX.pnl.otherInc || {}).total || 0), '분실 변상금 ' + wn((STX.pnl.otherInc || {}).loss || 0) + ' · 용차 차액 ' + wn((STX.pnl.otherInc || {}).yong || 0) + ' · 보험 차액 ' + wn(STX.pnl.insGap || 0)) +
+        k('지급률 마진 (참고 · 이익에 이미 포함)', wn((STX.pnl.margin || {}).total || 0), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 용차·품앗이 러너 몫 ' + wn(c.yongGain || 0)) +
         k('산재·고용 신고액 (빼둘 돈)', wn(STX.pnl.ins.total), '기사분 ' + wn(STX.pnl.ins.sanD + STX.pnl.ins.goyD) + ' + 러너 ' + Math.round(STX.pnl.ins.runner * 100) + '% ' + wn(STX.pnl.ins.runnerAmt)) : '') +
       (STX.pnl ? '<div class="kpi clk" id="stKpiNet" title="손익·운영비 보기"><small>당기순이익 (공급가 · 세전)</small><b' + (STX.pnl.net < 0 ? ' style="color:var(--danger)"' : '') + '>' + wn(STX.pnl.net) + '</b><em>회사이익 − 러너 보험 ' + wn(STX.pnl.runnerIns) + ' + 보험 차액 ' + wn(STX.pnl.insGap || 0) + ' − 인건비 ' + wn(STX.pnl.staff) + ' − 운영비 ' + wn(STX.pnl.cost) + (STX.pnl.staff || STX.pnl.cost ? '' : ' · 운영비 미입력') + '</em></div>' : '') +
       k('배송건수', wn(t.qty) + '건', s.drivers.length + '명 · 원천 ' + wn(s.rawRows) + '줄');
@@ -7897,9 +7898,9 @@
     const step = (lab, v, sign, cls, note) => '<div class="pnl-step' + (cls ? ' ' + cls : '') + '"><span>' + lab + (note ? '<small>' + note + '</small>' : '') + '</span><b>' + (sign || '') + wn(v) + '</b></div>';
     const c = cur || {};
     const box = '<div class="pnl-box"><h4>' + esc(ymTitle(c.month || STX.month)) + ' 정산 손익 <small>공급가 · 세전' + (c.closed ? ' · 마감' : '') + '</small></h4>' +
-      step('회사이익금', c.profit, '', 'base', '쿠팡 공급가 ' + wn(c.salesSupply) + ' − 분실 ' + wn(c.lossSup != null ? c.lossSup : c.loss) + ' (소비자가 ' + wn(c.loss) + ' ÷ 1.1) − 기사 공급가 ' + wn(c.drvSupply) + (c.progFee ? ' − 영업점 수수료 ' + wn(c.progFee) : '') + ' (프백·용차 잉여 포함)') +
+      step('회사이익금', c.profit, '', 'base', '쿠팡 공급가 ' + wn(c.salesSupply) + ' − 분실 ' + wn(c.lossSup != null ? c.lossSup : c.loss) + ' (소비자가 ' + wn(c.loss) + ' ÷ 1.1) − 기사 공급가 ' + wn(c.drvSupply) + (c.otherInc && (c.otherInc.loss || c.otherInc.yong) ? ' + 기타수익(분실 변상금 ' + wn(c.otherInc.loss) + ' · 용차 차액 ' + wn(c.otherInc.yong) + ')' : '') + (c.progFee ? ' − 영업점 수수료 ' + wn(c.progFee) : '') + ' (프백 마진 포함)') +
       step('러너 산재·고용 ' + (c.ins ? Math.round(c.ins.runner * 100) + '%' : ''), c.runnerIns, '− ', '', '산재·고용 신고 표의 러너 몫') +
-      step('보험 차액 (러너 잉여)', c.insGap || 0, (c.insGap || 0) < 0 ? '' : '+ ', '', '기사 정산서 실제 공제 ' + wn(c.insDrv) + ' − 신고 기준 기사분 ' + wn(c.ins ? c.ins.sanD + c.ins.goyD : 0)) +
+      step('보험 차액 (기타수익)', c.insGap || 0, (c.insGap || 0) < 0 ? '' : '+ ', '', '기사 정산서 실제 공제 ' + wn(c.insDrv) + ' − 신고 기준 기사분 ' + wn(c.ins ? c.ins.sanD + c.ins.goyD : 0)) +
       step('직원 인건비', c.staff, '− ', '', c.staffN ? c.staffN + '명 세전 · 원천세 ' + wn(c.staffWht) + ' (다음 달 10일 납부) · 실지급 ' + wn(c.staffNet) : '직원 탭에 입력') +
       step('고정 운영비', c.fixed, '− ', '', c.fixedN ? c.fixedN + '개 항목 (공급가)' : '고정 운영비 탭에 입력') +
       step('지출 기록', c.varCost, '− ', '', c.varN ? c.varN + '건 (공급가)' : '이 달 지출 기록 없음') +
@@ -8388,7 +8389,7 @@
       // 세금계산서 발행 안내 (기사가 이 칸만 보고 바로 발행할 수 있게) + 실 입금액
       // 공급자 이름: 사업자 상호 → 기사 이름 → '기사님' (용차업체는 업체명)
       '<div class="invbox"><div class="ihd">📄 세금계산서 발행 <small>' + esc(d.vendor ? d.name : d.bizName || (d.ownerId && d.name) || '기사님') + ' → ' + esc(co.name || '러너') + '</small></div>' +
-      '<div class="iamt"><span>발행 금액 (합계)</span><b>' + wn(d.invoice) + '원</b></div>' +
+      '<div class="iamt"><span>발행 금액 (합계)' + (d.taxDed ? '' : ' <small>= 지급 합계 전액 · 공제는 발행 후 실 입금에서</small>') + '</span><b>' + wn(d.invoice) + '원</b></div>' +
       '<table class="kv2"><tbody><tr><th>공급가액</th><td class="n">' + wn(d.supply) + '</td><th>세액</th><td class="n">' + wn(d.tax) + '</td></tr>' +
       '<tr><th>공급받는자</th><td colspan="3">' + esc(co.name || '') + (co.ceo ? ' / 대표 ' + esc(co.ceo) : '') + '</td></tr>' +
       '<tr><th>사업자번호</th><td colspan="3">' + esc(co.bizNo || '') + (co.email ? ' / ' + esc(co.email) : '') + '</td></tr>' +

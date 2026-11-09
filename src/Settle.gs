@@ -110,8 +110,8 @@ const STL_ITEM_DEFAULT = [
   ['4', '지급', '기타 (프로모션)', '기타프로모션', '금액 있을 때', '', '프로모션·소급 등'],
   ['5', '지급', '팀장수당', '직접입력', '금액 있을 때', '', ''],
   ['5.5', '지급', '유류비지원', '직접입력', '금액 있을 때', '', ''],
-  ['6', '차감', '분실파손 부담', '분실파손', '항상', 'Y', ''],
-  ['7', '차감', '용차(지출)', '용차지출', '금액 있을 때', 'Y', '용차 단가 − 기사 단가 차액'],
+  ['6', '차감', '분실파손 부담', '분실파손', '항상', 'N', '계산서 발행 후 공제 (정석) · 공제액은 러너 기타수익'],
+  ['7', '차감', '용차(지출)', '용차지출', '금액 있을 때', 'N', '용차 단가 − 기사 단가 차액 · 계산서 발행 후 공제'],
   ['8', '차감', '계산서 차감', '직접입력', '금액 있을 때', 'Y', ''],
   ['8.5', '차감', '매출 분할 이전', '직접입력', '금액 있을 때', 'Y', ''],
   ['9', '차감', '산재보험', '산재보험', '항상', 'N', ''],
@@ -167,7 +167,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261109a';
+const STL_CALC_VER = '20261109b';
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -656,6 +656,7 @@ function stlCfg_() {
   };
 }
 function stlItems_() {
+  stlItemsTaxCutV2_();
   const rows = stlRead_('stl_items').filter(function (o) { return o.name; });
   const defs = STL_ITEM_DEFAULT.map(function (r) { return { order: r[0], side: r[1], name: r[2], method: r[3], show: r[4], taxCut: r[5], desc: r[6] }; });
   // 탭에 줄이 있어도 새로 생긴 자동 계산 항목(예: 프로모션)이 빠져 있으면 기본값을 보탠다 → 명세서에 제자리(순서)로 보임
@@ -672,6 +673,21 @@ function stlItems_() {
   const by = {};
   list.forEach(function (it) { by[it.name] = it; });
   return { list: list, by: by };
+}
+/** 2026-11-09 정석 전환 (한 번만): 분실파손 부담·용차(지출)을 계산서 발행 후 공제로 (시트에 저장된 설정도 N 으로) · 되돌리려면 항목 탭에서 Y */
+function stlItemsTaxCutV2_() {
+  try {
+    const ps = PropertiesService.getScriptProperties();
+    if (ps.getProperty('STL_TAXCUT_V2') === '1') return;
+    const rows = stlRead_('stl_items');
+    let changed = false;
+    rows.forEach(function (o) { if ((o.method === '분실파손' || o.method === '용차지출') && stlYes_(o.taxCut)) { o.taxCut = 'N'; changed = true; } });
+    if (changed && rows.length) {
+      const lock = scriptLock_(); lock.waitLock(30000);
+      try { stlWriteAll_('stl_items', rows.map(function (o) { const x = {}; Object.keys(STL_TABS.stl_items).forEach(function (k) { x[k] = o[k]; }); return x; })); } finally { lock.releaseLock(); }
+    }
+    ps.setProperty('STL_TAXCUT_V2', '1');
+  } catch (e) { /* 다음 호출 때 다시 시도 */ }
 }
 function stlKinds_() {
   const map = {};
@@ -1698,7 +1714,7 @@ function stlCompute_(month) {
     });
   });
   const drivers = [], slips = {};
-  const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, lossCp: 0, profit: 0, runnerIns: 0, fbCut: 0, fbKeep: 0, insGain: 0, sales: 0 };
+  const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, lossCp: 0, lossInc: 0, yongInc: 0, otherInc: 0, profit: 0, runnerIns: 0, fbCut: 0, fbKeep: 0, insGain: 0, sales: 0 };
   Object.keys(S).forEach(function (id) {
     const s = S[id], f = fin(id, extraAdj[id]);
     const o = s.owner;
@@ -1713,7 +1729,8 @@ function stlCompute_(month) {
       workDays: s.sched.days, workDaysBy: s.sched.byCid, workDaysSrc: s.sched.src, qty: s.qty, sales: s.sales,
       base: s.base, inc: s.inc, fresh: s.fresh, freshRaw: s.freshRaw, fbCutTxt: s.fbCutTxt || '', fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, lossCp: s.lossCp, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
-      profit: Math.round(s.supplyCp - s.lossSup - f.supply), runnerIns: f.runnerIns, insGain: f.insGain,
+      lossInc: f.lossInc, yongInc: f.yongInc, otherInc: f.otherInc, // 계산서 발행 후 공제한 분실 변상금·용차 차액 = 러너 기타수익 (부가세 없음)
+      profit: Math.round(s.supplyCp - s.lossSup - f.supply + f.otherInc), runnerIns: f.runnerIns, insGain: f.insGain,
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '', bizName: o.vendor ? '' : o.bizName || '',
       checked: stlYes_(p.checked), payDate: p.date || '', payMemo: p.memo || '',
       advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty,
@@ -1723,14 +1740,14 @@ function stlCompute_(month) {
     if (normTitle_(o.title) === '대표' || s.mode === '원청단가') {
       row.ceo = true;
       row.ceoView = {};
-      ['pay', 'taxDed', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'runnerIns', 'insGain'].forEach(function (k) { row.ceoView[k] = row[k]; row[k] = 0; });
+      ['pay', 'taxDed', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'runnerIns', 'insGain', 'lossInc', 'yongInc', 'otherInc'].forEach(function (k) { row.ceoView[k] = row[k]; row[k] = 0; });
       row.profit = Math.round(s.supplyCp - s.lossSup);
     }
     drivers.push(row);
     slips[id] = { row: row, lines: f.lines, ins: f.ins, routes: Object.keys(s.routes).map(function (k) { return s.routes[k]; }).sort(function (a, b) { return koCmp_(a.camp, b.camp) || koCmp_(a.route, b.route); }),
       daily: s.daily, sched: s.sched.cells, idUse: s.idUse || {}, loss: s.lossLines, yong: s.yongLines, members: X.groups[id].cids.slice(), workers: workers,
       movedIn: stlMoveList_(s.movedIn), movedOut: stlMoveList_(s.movedOut) };
-    ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'lossCp', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
+    ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'lossCp', 'lossInc', 'yongInc', 'otherInc', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales'].forEach(function (k) { tot[k] += row[k] || 0; });
   });
   drivers.sort(function (a, b) { return b.sales - a.sales || koCmp_(a.name, b.name); });
 
@@ -1975,7 +1992,7 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
   const put = function (method, amt) {
     const n = autoName[method];
     if (n) lines[n].amt += amt;
-    else lines['(' + method + ')'] = { name: method, side: /분실|지출/.test(method) ? '차감' : '지급', method: method, taxCut: /분실|지출/.test(method), show: '금액 있을 때', order: 99, amt: amt, memo: [] };
+    else lines['(' + method + ')'] = { name: method, side: /분실|지출/.test(method) ? '차감' : '지급', method: method, taxCut: false, show: '금액 있을 때', order: 99, amt: amt, memo: [] };
   };
   put('배송기본', s.base + s.inc);
   put('프레시백', s.fresh);
@@ -1992,6 +2009,7 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
     if (a.memo) L.memo.push(a.memo);
   });
   let pay = 0, taxDed = 0, depDed = 0, depAdd = 0, insAdjS = 0, insAdjG = 0;
+  let lossInc = 0, yongInc = 0; // 계산서 발행 후 공제 (기타수익)
   Object.keys(lines).forEach(function (k) {
     const L = lines[k];
     if (L.method === '산재보험') { insAdjS += L.amt; return; }
@@ -1999,7 +2017,7 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
     if (L.method === '입금가산') depAdd += L.amt;
     else if (L.side === '지급') pay += L.amt;
     else if (L.taxCut) taxDed += L.amt;
-    else depDed += L.amt;
+    else { depDed += L.amt; if (L.method === '분실파손') lossInc += L.amt; else if (L.method === '용차지출') yongInc += L.amt; }
   });
   const invoice = pay - taxDed;
   const supply = Math.round(invoice / (1 + cfg.vat)), tax = invoice - supply;
@@ -2053,7 +2071,7 @@ function stlFinish_(s, adjs, items, cfg, campIns) {
   const list = Object.keys(lines).map(function (k) { return lines[k]; }).filter(function (L) { return L.show === '항상' || L.amt; })
     .sort(function (a, b) { return a.order - b.order; })
     .map(function (L) { return { name: L.name, side: L.side, method: L.method, taxCut: !!L.taxCut, amt: L.amt, memo: L.memo.join(' · '), unknown: !!L.unknown }; });
-  return { lines: list, pay: pay, taxDed: taxDed, invoice: invoice, supply: supply, tax: tax, san: san, goy: goy, depDed: depDed, depAdd: depAdd, net: net, ins: ins, runnerIns: runnerIns, insGain: insGain };
+  return { lines: list, pay: pay, taxDed: taxDed, invoice: invoice, supply: supply, tax: tax, san: san, goy: goy, depDed: depDed, depAdd: depAdd, net: net, ins: ins, runnerIns: runnerIns, insGain: insGain, lossInc: lossInc, yongInc: yongInc, otherInc: lossInc + yongInc };
 }
 
 const STL_ADV_ITEM = '가불금 상환';
@@ -2214,9 +2232,13 @@ function stlPnl_(month, sum) {
   ins.total = ins.sanD + ins.goyD + ins.runnerAmt;
   ins.gap = o.insDrv - (ins.sanD + ins.goyD); // 기사에게 실제 공제한 보험 − 신고 기준 기사분 → 러너 잉여
   o.ins = ins; o.runnerIns = ins.runnerAmt; o.insGap = ins.gap;
-  // 분실파손: 쿠팡 정산서 차감금액(공급가) vs 기사 부담(설정 '부가세 포함 환산' Y 면 ×1.1) 차이 → 러너 잉여
-  o.lossDrv = t.loss || 0; o.lossVat = !!cfg.lossVat; o.lossGain = cfg.lossVat ? Math.max(0, (t.loss || 0) - (c.lossCp || 0)) : 0;
-  o.surplus = (t.fbKeep || 0) + (t.fbCut || 0) + ins.gap + (c.yongGain || 0) + o.lossGain;
+  // 기타수익 (세무사에게 넘길 기타수입 · 부가세 없음): 계산서 발행 후 기사에게서 공제한 분실 변상금 + 용차 차액 + 보험 차액
+  //  분실·용차는 회사이익금(row.profit)에 이미 더해져 있고, 보험 차액은 당기순이익에서 더한다
+  o.lossDrv = t.loss || 0; o.lossVat = !!cfg.lossVat;
+  o.otherInc = { loss: t.lossInc || 0, yong: t.yongInc || 0, ins: ins.gap, total: (t.lossInc || 0) + (t.yongInc || 0) + ins.gap };
+  // 참고 마진 (이미 매출−매입 안에 들어 있음 · 기타수입 아님): 프백 지급률 밖 + 프백 차감 + 용차 러너 몫
+  o.margin = { fb: (t.fbKeep || 0) + (t.fbCut || 0), yong: c.yongGain || 0, total: (t.fbKeep || 0) + (t.fbCut || 0) + (c.yongGain || 0) };
+  o.lossGain = 0; o.surplus = o.otherInc.total;
   const cat = function (k, v) { if (v) o.byCat[k || '기타'] = (o.byCat[k || '기타'] || 0) + v; };
   stlRead_('stl_staff').forEach(function (r) {
     const pay = stlR0_(stlNum_(r.pay));
