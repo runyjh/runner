@@ -5060,7 +5060,7 @@
   function loadSla(force) {
     if (SL.loading) return SL.loading;
     if (SL.loaded && !force) return Promise.resolve(SL);
-    SL.loading = api('adm_slaList', 18).then((r) => {
+    SL.loading = api('adm_slaList', 24).then((r) => {
       if (!r.ok) { toast(r.msg); return SL; }
       SL.rows = r.rows || []; SL.periods = r.periods || []; SL.th = r.th || SL.th; SL.campMap = r.campMap || {}; SL.loaded = true;
       if (r.lineage) { lnSet(r.lineage); if (RP.loaded) rpIndex(); }
@@ -5074,6 +5074,13 @@
     const m = new Map();
     SL.rows.forEach((r) => { const k0 = rpKey(r.camp, r.code), k = r.code === '영업점' ? k0 : lnHead(k0); r._k = k0; if (!m.has(k)) m.set(k, { camp: lnCampOf(k), code: lnCodeOf(k), by: {} }); const e = m.get(k); if (!e.by[r.period] || k0 === k) e.by[r.period] = r; });
     return m;
+  }
+  /** 표에 보여 줄 기간 열: 최신 기간부터 1년 누적 (최근 12개월 안의 집계기간 · 최소 6개) */
+  function slaShow() {
+    const ps = SL.periods, lp = ps[ps.length - 1]; if (!lp) return [];
+    const cut = ymdLocal(new Date(+lp.slice(0, 4) - 1, +lp.slice(5, 7) - 1, +lp.slice(8, 10)));
+    const w = ps.filter((p) => p > cut);
+    return w.length >= 6 ? w : ps.slice(-6);
   }
   function slaList() {
     const f = SL.f, q = normCode(f.q), ps = SL.periods, lp = ps[ps.length - 1], pp = ps[ps.length - 2], fp = ps[0];
@@ -5092,7 +5099,7 @@
   }
   function slaRender(box) {
     if (!SL.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); loadSla(); return; }
-    const ps = SL.periods, lp = ps[ps.length - 1], pp = ps[ps.length - 2], lrows = SL.rows.filter((r) => r.period === lp), show = ps.slice(-6);
+    const ps = SL.periods, lp = ps[ps.length - 1], pp = ps[ps.length - 2], lrows = SL.rows.filter((r) => r.period === lp), show = slaShow();
     const vendor = lrows.find((r) => r.code === '영업점'), vPrev = pp ? SL.rows.find((r) => r.period === pp && r.code === '영업점') : null;
     const routes = lrows.filter((r) => r.code !== '영업점' && r.total != null);
     const camps = [...new Set(SL.rows.map((r) => r.camp).filter((c) => c))].sort(koSort);
@@ -5110,13 +5117,13 @@
         '<input class="inp" id="slQ" placeholder="캠프·라우트 검색" value="' + esc(SL.f.q) + '" autocomplete="off" style="width:150px">' + '<label class="check" style="align-self:center"><input type="checkbox" id="slEnded"' + (SL.f.ended ? ' checked' : '') + '> 종료 포함</label>' +
         '</div>' +
       '<div class="table-wrap rt-table rp-table sla-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>총점 (최신)</th><th title="미수행률 15 · 반품 미회수 15 · 고객만족 50 · 고객불만 20 (만점 대비 높이)">항목</th><th>고객만족<br><small>/50</small></th><th>고객불만<br><small>/20</small></th><th title="직전 집계기간 대비">전 기간 대비</th><th title="이 라우트의 가장 오래된 기록 대비 (지표개선표)">최초 대비</th>' +
-        show.map((p) => '<th title="' + esc(p) + '">~' + slaPd(p) + '</th>').join('') + '</tr></thead><tbody id="slRows"></tbody></table><div class="empty hidden" id="slEmpty"></div></div>' +
+        show.map((p, i) => '<th title="' + esc(p) + (i === 0 ? ' · 1년 누적 이력 (최근 12개월 집계기간)' : '') + '"' + (i === 0 ? ' class="wk2"' : '') + '>~' + slaPd(p) + '</th>').join('') + '</tr></thead><tbody id="slRows"></tbody></table><div class="empty hidden" id="slEmpty"></div></div>' +
       '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">총점 100 = 미수행률 15 + 반품 미회수율 15 + 고객만족 50 + 고객불만 20. 색: <span class="sla ok">' + SL.th.good + '↑</span> 우수 · <span class="sla warn">' + SL.th.warn + '~</span> 주의 · <span class="sla bad">' + SL.th.warn + '↓</span> 위험. 쿠팡 집계기간은 누적(예 6/1~9/25)이라 열은 기간 끝 날짜입니다. 라우트를 누르면 주간 등급과 월별 점수를 함께 봅니다.</p></div>');
     slaRenderRows();
   }
   function slaRenderRows() {
     const tb = $('#slRows'); if (!tb) return;
-    const show = SL.periods.slice(-6), list = slaList();
+    const show = slaShow(), list = slaList();
     const dcell = (d) => d == null ? '<span class="sub">-</span>' : '<span class="' + (d > 0 ? 'up' : d < 0 ? 'dn' : '') + '">' + (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + Math.abs(d) + '</span>';
     tb.innerHTML = list.map((x) => {
       const l = x.l;
