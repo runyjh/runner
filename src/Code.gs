@@ -79,6 +79,10 @@ const TITLES = ['관리자', '운영자', '대표'];
 const DTYPES_STAFF = TITLES; // (예전 이름)
 /** 러너 내부 인원(관리자·운영자·대표)인지: 직함 칸 (예전에 단가코드에 적은 값도 인정) */
 function isStaff_(o) { return !!o && (TITLES.indexOf(str_(o.title)) >= 0 || TITLES.indexOf(str_(o.driverType)) >= 0); }
+/** 직함 글자 ('관리자'·'운영자'·'대표' · 일반 기사는 ''). 예전에 단가코드에 적은 값도 인정 */
+function titleOf_(o) { if (!o) return ''; const t = normTitle_(o.title); if (t) return t; return TITLES.indexOf(str_(o.driverType)) >= 0 ? str_(o.driverType) : ''; }
+/** 운영자 전용 가짜 캠프(노선 없음)인지 — 기사 앱에는 캠프로 안 보여 준다 */
+function isStaffCamp_(name) { return /^운영자/.test(str_(name).replace(/\s+/g, '')); }
 /** 직함 글자 정리. 모르는 값이면 null */
 function normTitle_(v) {
   const s = str_(v).replace(/\s+/g, '');
@@ -962,7 +966,7 @@ function driverInfo_(id) {
   if (!o) return null;
   const info = {
     name: o.name, loginId: o.loginId.toLowerCase(), status: o.status,
-    pwChangedAt: toMs_(o.pwChangedAt), mustChange: mustChange_(o), campId: o.schCampId, camp: o.schCamp
+    pwChangedAt: toMs_(o.pwChangedAt), mustChange: mustChange_(o), campId: o.schCampId, camp: o.schCamp, title: titleOf_(o)
   };
   cache_().put(key, JSON.stringify(info), 600);
   return info;
@@ -1164,7 +1168,7 @@ function api_login(loginId, password, auto) {
     if (o.status !== ST.ACTIVE) fail_('사용이 중지된 계정입니다. 관리자에게 문의해 주세요.');
 
     const s = createSession_(o.id, auto === true);
-    return { ok: true, token: s.token, expiresAt: s.expiresAt, mustChange: mustChange_(o), user: { name: o.name, loginId: id }, slipClose: stlLastClose_() };
+    return { ok: true, token: s.token, expiresAt: s.expiresAt, mustChange: mustChange_(o), user: { name: o.name, loginId: id, title: titleOf_(o) }, slipClose: stlLastClose_() };
   });
 }
 
@@ -1210,7 +1214,7 @@ function api_checkSession(token) {
     if (!s) return { ok: false, code: 'EXPIRED' };
     const info = driverInfo_(s.d);
     if (!info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED' };
-    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId }, slipClose: stlLastClose_() };
+    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId, title: info.title || '' }, slipClose: stlLastClose_() };
   });
 }
 
@@ -4582,7 +4586,7 @@ function schExParse_(id) {
 /** 기사 → 화면용 요약 (스케줄에 필요한 것만, 개인정보 없음) */
 function schDriver_(o) {
   return {
-    id: o.id, name: o.name, loginId: o.loginId, type: o.driverType, code: o.driverCode, status: o.status,
+    id: o.id, name: o.name, loginId: o.loginId, type: o.driverType, code: o.driverCode, status: o.status, title: titleOf_(o),
     campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute, fixedOff: o.fixedOff, extraOff: o.extraOff,
     workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
     workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o),
@@ -5136,12 +5140,15 @@ function api_mySchedule(token, month) {
  * 기사 앱 '캠프전체': 내 소속 캠프 기사들의 2주 스케줄 + 내 캠프에 들어오는 백업 명단.
  * 기사 순서는 기사스케줄(관리자) 줄 순서. 연락처 등 개인정보는 보내지 않는다.
  */
-function api_campSchedule(token, month) {
+function api_campSchedule(token, month, campId) {
   return run_(function () {
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
     if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    // 직함자(관리자·운영자·대표)는 캠프를 골라 다른 캠프도 볼 수 있다 (보기만). 일반 기사는 소속 캠프만
+    const staff = !!info.title, pickCamp = staff ? str_(campId) : '';
+    if (campId && !staff) fail_('소속 캠프만 볼 수 있습니다.');
     // month = 'yyyy-MM' 이면 그 달 전체, 없으면 2주
     let dates, ym = '';
     const mm = str_(month).match(/^(\d{4})-(\d{2})$/);
@@ -5165,8 +5172,12 @@ function api_campSchedule(token, month) {
     try { rcBy = rcByDriver_(); } catch (e) { rcBy = {}; }
     const today = todayText_(), ref = dates.indexOf(today) >= 0 ? today : (today < dates[0] ? dates[0] : dates[dates.length - 1]);
     const at = function (o, d) { return rcAt_({ campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute }, rcBy[o.id], d, today); };
-    const myCampId = me ? at(me, ref).campId : '';
+    const realCamps = master_().camps.filter(function (c) { return c.id && !isStaffCamp_(c.name); });
+    if (staff) out.camps = realCamps.map(function (c) { return { id: c.id, name: String(c.name).replace(/\s*캠프\s*$/, '').trim() }; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+    const myCampId = pickCamp || (me ? at(me, ref).campId : '');
+    if (staff && !pickCamp && (!myCampId || isStaffCamp_(info.camp))) { out.noCamp = true; out.pick = true; return out; }
     if (!me || !myCampId) { out.noCamp = true; return out; }
+    out.campId = myCampId;
     const camp = master_().camps.filter(function (c) { return c.id === myCampId; })[0];
     out.camp = camp ? String(camp.name).replace(/\s*캠프\s*$/, '').trim() : (me.schCamp || '');
     const inCamp = {};
@@ -5193,7 +5204,7 @@ function api_campSchedule(token, month) {
           x.order = i;
           dates.forEach(function (d) { if (!inCamp[x.id].days[d]) return; const c = h.dates[d]; if (c !== undefined) { const v = str_(block[i][c - c0]); if (v) x.cells[d] = v; } });
         });
-        try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1, { drivers: all, ids: ids, block: block }).list; } catch (e) { out.backup = {}; }
+        try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1, { drivers: all, ids: ids, block: block, campId: myCampId }).list; } catch (e) { out.backup = {}; }
       }
     }
     // 관리자가 기사스케줄 칸에 적은 지시사항 (그 캠프에서 일하는 날만)
@@ -5221,12 +5232,12 @@ function schMyCampBackup_(myId, dates, h, c0, c1, pre) {
   m.camps.forEach(function (c) { campName[c.id] = c.name; });
   const short = function (n) { return str_(n).replace(/\s*캠프\s*$/, '').trim(); };
   // 같은 캠프 기사들은 명단이 똑같다 → 캠프·기간별로 60초 캐시 (기사마다 기사 전체·스케줄 전체를 다시 읽지 않게)
-  const info = driverInfo_(myId), ck = info && info.campId && campName[info.campId] ? 'schbk:' + info.campId + ':' + dates[0] + ':' + dates[dates.length - 1] + ':' + (c1 - c0) : '';
-  if (ck) { const hit = cache_().get(ck); if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 만든다 */ } } }
   pre = pre || {};
+  const info = driverInfo_(myId), useCamp = pre.campId || (info && info.campId) || '';
+  const ck = useCamp && campName[useCamp] ? 'schbk:' + useCamp + ':' + dates[0] + ':' + dates[dates.length - 1] + ':' + (c1 - c0) : '';
+  if (ck) { const hit = cache_().get(ck); if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 만든다 */ } } }
   const drivers = (pre.drivers || readAll_(SH.DRIVERS)).filter(function (o) { return o.id; });
-  const me = drivers.filter(function (o) { return o.id === myId; })[0];
-  const myCamp = me && campName[me.schCampId] ? short(campName[me.schCampId]) : '';
+  const myCamp = campName[useCamp] ? short(campName[useCamp]) : '';
   const res = { camp: myCamp, list: {} };
   if (!myCamp) return res;
   const byId = {};

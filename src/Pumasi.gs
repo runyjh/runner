@@ -520,7 +520,8 @@ function api_myInfo(token) {
     const d = pmData_(), today = todayText_();
     return {
       ok: true, info: {
-        name: o.name, loginId: o.loginId, phone: o.phone, type: o.driverType || '', code: o.driverCode || '', camp: o.schCamp || '', baseRoute: o.baseRoute || '',
+        name: o.name, loginId: o.loginId, phone: o.phone, type: TITLES.indexOf(str_(o.driverType)) >= 0 ? '' : (o.driverType || ''), title: titleOf_(o), code: o.driverCode || '',
+        camp: isStaffCamp_(o.schCamp) ? '' : (o.schCamp || ''), baseRoute: o.baseRoute || '',
         carNo: o.carNo || '', qual: !!o.docQual, bank: o.bankName || ''
       },
       stats: {

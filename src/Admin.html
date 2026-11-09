@@ -1298,6 +1298,7 @@
       <select class="inp" id="sCamp" aria-label="캠프"></select>
       <input class="inp" id="sQ" placeholder="이름·캠프·노선 (여러 개는 콤마)" style="width:200px" title="콤마로 여러 개: 계동희,수원1캠프,백업 · 검색하면 캠프 선택과 상관없이 전체에서 찾습니다">
       <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
+      <label class="check" id="sStaffAllWrap" title="관리자·운영자·대표 줄은 고른 캠프 기사들 다음에 이어서 나옵니다. 캠프를 고르면 그 기간에 그 캠프 노선을 뛴 사람만 — 체크하면 전원"><input type="checkbox" id="sStaffAll"> 관리자·운영자·대표 전원</label>
       <div class="grow">
         <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
         <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
@@ -4386,7 +4387,9 @@
   // 왼쪽 캠프 목록
   function renderCampList() {
     const q = normCode($('#campQ').value);
-    const items = sortedCamps().map((c) => ({ id: c.id, name: c.name, address: c.address, routes: routesOf(c.id), imgs: imagesOf(c.id).length }));
+    // 운영자(관리자·운영자·대표 소속용 가짜 캠프)는 노선이 없으면 목록에서 숨김 (캠프 관리에서는 그대로 다룬다)
+    const items = sortedCamps().filter((c) => !(/^운영자/.test(String(c.name).replace(/\s/g, '')) && !routesOf(c.id).length && curCamp !== c.id))
+      .map((c) => ({ id: c.id, name: c.name, address: c.address, routes: routesOf(c.id), imgs: imagesOf(c.id).length }));
     const orphan = routesOf(ORPHAN);
     if (orphan.length) items.push({ id: ORPHAN, name: '캠프 미지정', address: '시트에서 캠프명을 확인해 주세요', routes: orphan, imgs: 0, orphan: true });
     const shown = items.filter((it) => {
@@ -6006,7 +6009,10 @@
   const SD = { start: '', today: '', dates: [], holidays: {}, camps: [], routes: {}, drivers: [], cells: {}, notes: [] };
   let srows = [], scalc = null, sAct = null, sAnchor = null, sEdit = null, sUndo = [], sBusy = false;
   const sBase = {}, sPending = {};
-  const sf = { camp: '', q: '', all: false };
+  const sf = { camp: '', q: '', all: false, staffAll: false };
+  const TITLE_ORDER = { '대표': 0, '관리자': 1, '운영자': 2 };
+  const isStaffRow = (d) => !!(d.title || TITLES.includes(d.type));
+  const STAFF_GROUP = '관리자·운영자·대표';
   const shortCamp = (n) => String(n || '').replace(/\s*캠프\s*$/, '').trim();
   /** 그 달의 몇 주차인지 (한 주 시작은 항상 일요일 · 1일이 든 주가 1주차 · 업로드 테이블 탭과 같은 셈법) */
   const weekOfMonth = (ds) => {
@@ -6098,7 +6104,7 @@
   }
   function renderSchedCamps() {
     const sel = $('#sCamp'), v = sf.camp;
-    sel.innerHTML = '<option value="">캠프 전체</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
+    sel.innerHTML = '<option value="">캠프 전체</option>' + SD.camps.filter((c) => !/^운영자/.test(String(c.name).replace(/\s/g, ''))).sort((a, b) => koSort(a.name, b.name))
       .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === v ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
   }
   // ── 노선 변경 예약: 보는 기간 안에서 캠프·노선이 바뀌는 기사는 구간마다 줄을 나눠 그 캠프 쪽에 보인다 (정산·칸 저장은 아이디 그대로) ──
@@ -6139,21 +6145,27 @@
     const camps = {};
     SD.camps.forEach((c) => { camps[c.id] = c; });
     const qHit = (vals) => qs.some((t) => vals.some((x) => nfc(String(x || '')).toLowerCase().replace(/\s/g, '').includes(t.replace(/\s/g, ''))));
+    const campShort = !q && sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
+    const ranCamp = (id) => SD.dates.some((dt) => sget(id, dt).replace(/\s/g, '').includes(campShort));
     const list = schSegDrivers().filter((d) => {
       const has = Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k) && segIn(d._seg, k));
       if (d.status !== '승인' && !has && !sf.all) return false;
-      if (!q && sf.camp && d.campId !== sf.camp) return false;
+      // 직함자(관리자·운영자·대표): 캠프 줄에 섞지 않고 맨 뒤에 이어서. 캠프를 고르면 그 기간에 그 캠프를 뛴 사람만 (체크하면 전원)
+      if (isStaffRow(d) && !d.ex) { if (campShort && !sf.staffAll && !ranCamp(d.id)) return false; }
+      else if (!q && sf.camp && d.campId !== sf.camp) return false;
       const cn = camps[d.campId] ? camps[d.campId].name : (d.camp || '');
       if (q && !qHit([d.name, d.loginId, d.code, d.baseRoute, d.type, cn, shortCamp(cn)])) return false;
       return true;
     }).sort((a, b) => {
+      const sa = isStaffRow(a) && !a.ex ? 1 : 0, sb = isStaffRow(b) && !b.ex ? 1 : 0;
+      if (sa !== sb) return sa - sb;
+      if (sa) return (TITLE_ORDER[a.title || a.type] ?? 9) - (TITLE_ORDER[b.title || b.type] ?? 9) || (Number(a.order) || 9999) - (Number(b.order) || 9999) || koSort(a.name, b.name);
       const ca = camps[a.campId] ? camps[a.campId].name : '￿', cb = camps[b.campId] ? camps[b.campId].name : '￿';
       return koSort(ca, cb) || (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) ||
         (Number(a.order) || 9999) - (Number(b.order) || 9999) || koSort(a.name, b.name);
     });
-    const rows = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, camp: camps[d.campId] ? camps[d.campId].name : '' }));
+    const rows = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, staff: isStaffRow(d) && !d.ex, camp: isStaffRow(d) && !d.ex ? STAFF_GROUP : (camps[d.campId] ? camps[d.campId].name : '') }));
     // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트 (배차 확정 때 서버가 적음 · 직접 고쳐도 됨)
-    const campShort = !q && sf.camp && camps[sf.camp] ? shortCamp(camps[sf.camp].name).replace(/\s/g, '') : '';
     (SD.pmRows || []).filter((pr) => {
       if (q && !qHit([pr.name, pr.loginId])) return false;
       if (campShort && !SD.dates.some((dt) => sget(pr.id, dt).replace(/\s/g, '').includes(campShort))) return false;
@@ -6215,10 +6227,11 @@
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp, firstOfCamp = prevCamp !== r.camp;
       prevCamp = r.camp;
-      const cs = shortCamp(r.camp), miN = firstOfCamp && scalc ? scalc.missing.reduce((n, l) => n + l.filter((x) => x.split(' ')[0] === cs).length, 0) : 0;
-      return '<tr class="drv' + (gtop ? ' gtop' : '') + (d.status !== '승인' ? ' dim' : '') + '">' +
-        '<td class="fx f1">' + esc(cs || '-') + (miN ? '<span class="campwarn" title="이 캠프에 담당 기사가 없는 노선 칸 ' + miN + '개 (아래 미입차 줄)">⚠</span>' : '') + '</td>' +
-        '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
+      const cs = r.staff ? '' : shortCamp(r.camp), miN = !r.staff && firstOfCamp && scalc ? scalc.missing.reduce((n, l) => n + l.filter((x) => x.split(' ')[0] === cs).length, 0) : 0;
+      const ttl = r.staff ? (d.title || d.type) : '';
+      return '<tr class="drv' + (gtop ? ' gtop' : '') + (r.staff ? ' staff' : '') + (d.status !== '승인' ? ' dim' : '') + '">' +
+        '<td class="fx f1">' + (r.staff ? '<span class="sub" title="' + STAFF_GROUP + ' — 고른 캠프 기사들 다음에 이어서 표시">직원</span>' : esc(cs || '-')) + (miN ? '<span class="campwarn" title="이 캠프에 담당 기사가 없는 노선 칸 ' + miN + '개 (아래 미입차 줄)">⚠</span>' : '') + '</td>' +
+        '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (ttl ? '<span class="tbad t-' + esc(ttl) + '" style="width:auto;padding:0 5px">' + esc(ttl) + '</span>' : d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
           (d.ex ? '<span class="exbad" title="추가 배정 줄 (소속: ' + esc(((SD.drivers.find((x) => x.id === d.mainId) || {}).camp) || '-') + ') · 이 캠프 칸은 따로 입력">추가</span>' : '') + rcBadge(r) + '</td>' +
         '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4">' + esc(d.baseRoute || '') + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
@@ -6233,7 +6246,7 @@
   /** 배정 안 된 칸: 소속 캠프가 있는 재직 기사(추가 배정 줄·휴직·퇴사일 이후 제외)의 빈 칸 */
   function noAssign(r, dt, v) {
     if (v || r.kind !== 'd') return false;
-    const d = r.d; if (!d || d.ex || !d.campId || d.status !== '승인') return false;
+    const d = r.d; if (!d || d.ex || !d.campId || d.status !== '승인' || r.staff) return false; // 직함자는 빈칸이어도 미배정 아님
     if (d.workStatus === '휴직' || (d.workStatus === '퇴사' && (!d.leaveDate || dt >= d.leaveDate))) return false;
     if (d.leaveDate && dt >= d.leaveDate) return false;
     return true;
@@ -6690,6 +6703,7 @@
   $('#sCamp').addEventListener('change', (e) => { sf.camp = e.target.value; sAct = null; sAnchor = null; renderSched(); });
   onSearch($('#sQ'), () => { sf.q = $('#sQ').value; sAct = null; sAnchor = null; renderSched(); });
   $('#sAll').addEventListener('change', (e) => { sf.all = e.target.checked; renderSched(); });
+  $('#sStaffAll').addEventListener('change', (e) => { sf.staffAll = e.target.checked; renderSched(); });
   $('#sReload').addEventListener('click', () => schedGo(SD.start));
   $('#sNoteAdd').addEventListener('click', () => {
     ask('비고 줄 추가', '날짜별로 메모를 적는 줄을 하나 더 만듭니다. 줄 이름을 입력하세요.', '예: 유정근 비고').then((v) => {

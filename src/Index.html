@@ -389,6 +389,10 @@
   .segm button { border: 0; background: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 14px; color: var(--sub); }
   .segm button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
   .mcal { background: #fff; border-radius: var(--radius); padding: 12px 10px; margin-bottom: 12px; }
+  .cpick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .cpick label { font-size: 13px; color: var(--sub); font-weight: 700; }
+  .cpick select { flex: 1; min-width: 150px; height: 40px; font-size: 15px; font-weight: 700; color: var(--brand); }
+  .cpick small { flex-basis: 100%; font-size: 12px; color: var(--sub); }
   .mnav { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 10px; }
   .mnav b { font-size: 17px; }
   .mnav button { border: 0; background: #f2f4f6; width: 38px; height: 34px; border-radius: 8px; font-size: 15px; }
@@ -1241,8 +1245,10 @@
     Promise.all(ps.map((p) => Promise.resolve(p).catch(() => {}))).then(end);
     setTimeout(end, 15000);
   }
+  /** 호칭: 직함(관리자·운영자·대표)이 있으면 '유정훈 대표님', 없으면 '홍길동 기사님' */
+  const honor = (u) => !u || !u.name ? '기사님' : u.name + ' ' + (u.title ? u.title + '님' : '기사님');
   function goHome(user) {
-    $('#homeName').textContent = (user && user.name ? user.name + ' 기사님' : '기사님') + ', 안녕하세요';
+    $('#homeName').textContent = honor(user) + ', 안녕하세요';
     const saved = viewRestored ? null : ssGet('runner.view');
     viewRestored = true;
     show('home');
@@ -1302,7 +1308,7 @@
         store.set(USER, JSON.stringify(r.user), persist);
         slipPop(r.slipClose);
         if (r.mustChange) openChangePw(true, '');
-        else if (cached && curView !== 'splash' && curView !== 'login') $('#homeName').textContent = (r.user && r.user.name ? r.user.name + ' 기사님' : '기사님') + ', 안녕하세요'; // 이미 홈(또는 새로고침 전 화면)을 보여 주는 중
+        else if (cached && curView !== 'splash' && curView !== 'login') $('#homeName').textContent = honor(r.user) + ', 안녕하세요'; // 이미 홈(또는 새로고침 전 화면)을 보여 주는 중
         else goHome(r.user);
       }
       else if (!r || r.code === 'EXPIRED' || r.code === 'UNKNOWN_FN') { clearSession(); goLogin(); if (cached) toast('다시 로그인해 주세요.'); }
@@ -1541,7 +1547,7 @@
     if (scMode === 'month' && !scMonth) { const t = new Date(); scMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // PDD(내일)가 있는 달
     paintScMode(); loadSched();
   });
-  let scCamp = null, scCampDay = '', scCampMonth = '', scSeq = 0;
+  let scCamp = null, scCampDay = '', scCampMonth = '', scSeq = 0, scCampId = ''; // scCampId: 직함자(관리자·운영자·대표)가 고른 캠프 (빈칸 = 내 소속)
   // 달 이동은 앞뒤 12개월까지 (서버와 같은 규칙 · 넘어가면 화면이 멈추지 않게 미리 막음)
   const scMonthShift = (ym, by) => {
     const [y, m] = ym.split('-').map(Number), d = new Date(y, m - 1 + by, 1), t = new Date();
@@ -1558,7 +1564,7 @@
     $('#scBody').innerHTML = '<div class="card" style="text-align:center;color:var(--sub)">불러오는 중…</div>';
     if (mode === 'camp') {
       if (!scCampMonth) { const t = new Date(); scCampMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // PDD(내일)가 있는 달
-      return api('api_campSchedule', token, scCampMonth).then((r) => {
+      return api('api_campSchedule', token, scCampMonth, scCampId || undefined).then((r) => {
         if (stale()) return;
         if (!r.ok) {
           toast(r.msg || '스케줄을 불러오지 못했습니다.');
@@ -1588,7 +1594,10 @@
   }
   function renderCampSched() {
     const r = scCamp, pdd = pddOf(r.today);
-    if (r.noCamp) { $('#scBody').innerHTML = '<div class="card" style="text-align:center;color:var(--sub)">소속 캠프가 정해지지 않았습니다. 사무실에 문의해 주세요.</div>'; return; }
+    // 직함자: 캠프 선택 (모든 캠프 · 보기만)
+    const picker = r.camps ? '<div class="card cpick"><label for="scCampSel">보는 캠프</label><select id="scCampSel" class="inp">' + (r.pick || !r.campId ? '<option value="">캠프를 골라 주세요</option>' : '') +
+      r.camps.map((c) => '<option value="' + escH(c.id) + '"' + (c.id === (scCampId || r.campId) ? ' selected' : '') + '>' + escH(c.name) + ' 캠프</option>').join('') + '</select><small>관리자·운영자·대표는 모든 캠프 스케줄을 볼 수 있습니다 (수정은 관리자 프로그램에서)</small></div>' : '';
+    if (r.noCamp) { $('#scBody').innerHTML = picker + '<div class="card" style="text-align:center;color:var(--sub)">' + (r.pick ? '위에서 캠프를 골라 주세요.' : '소속 캠프가 정해지지 않았습니다. 사무실에 문의해 주세요.') + '</div>'; return; }
     // 한 달 달력: 날마다 근무 인원 · 백업 인원 · 내 칸
     const [yy, mo] = (r.month || r.dates[0].slice(0, 7)).split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
     const isWork = (v) => v && !/휴무|휴가|병가|퇴사/.test(v);
@@ -1618,7 +1627,7 @@
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
     const bk = (r.backup || {})[d] || [];
-    $('#scBody').innerHTML = chips +
+    $('#scBody').innerHTML = picker + chips +
       '<div class="wk"><h3>' + escH(r.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
         '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
         '<p class="hint" style="margin:-2px 0 6px">기사 ' + r.drivers.length + '명 · 근무 ' + work + '명</p>' +
@@ -1678,6 +1687,10 @@
       '<div class="mgrid">' + DOWK.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + w + '</div>').join('') + cells.join('') + '</div></div>' +
       '<div class="wk mdet" id="scDet">' + dayRow(r, scSel) + '</div>';
   }
+  $('#scBody').addEventListener('change', (e) => {
+    if (e.target.id !== 'scCampSel') return;
+    scCampId = e.target.value; scCampDay = ''; loadSched();
+  });
   $('#scBody').addEventListener('click', (e) => {
     const px = e.target.closest('[data-pm]');
     if (px) return openPmDetail(px.dataset.pm, 'sched');
@@ -2295,8 +2308,8 @@
     api('api_myInfo', token).then((r) => {
       if (!pmOk(r)) { myCardFail(); return; }
       const i = r.info;
-      $('#myCard').innerHTML = '<div class="myhd"><div class="av">' + escH(String(i.name || '?').slice(0, 1)) + '</div><div><b>' + escH(i.name) + ' 기사님</b><small>' +
-        escH([i.type, i.camp].filter(Boolean).join(' · ') || '러너 기사') + '</small></div></div>' +
+      $('#myCard').innerHTML = '<div class="myhd"><div class="av">' + escH(String(i.name || '?').slice(0, 1)) + '</div><div><b>' + escH(honor(i)) + '</b><small>' +
+        escH([i.type, i.camp].filter(Boolean).join(' · ') || (i.title ? '러너 ' + i.title : '러너 기사')) + '</small></div></div>' +
         '<div class="mystat"><div><b>' + r.stats.posted + '</b>올린 품앗이</div><div><b>' + r.stats.helped + '</b>도와준 품앗이</div></div>';
       pmPostOn = r.postOn !== false; pmOfferOn = r.offerOn !== false; paintPostOn();
       const gv = $('#myGive'); if (gv) gv.textContent = [r.stats.giveDays ? r.stats.giveDays + '일' : '', r.stats.offers ? '제안 ' + r.stats.offers : ''].filter(Boolean).join(' · ');
