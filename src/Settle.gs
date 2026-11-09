@@ -3662,7 +3662,17 @@ function api_mySlip(token, month) {
     const r = stlResult_(month, false), groups = stlMyGroups_(u.id);
     let co = {};
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
-    const slips = groups.map(function (g) { return r.slips[g]; }).filter(Boolean).map(function (sl) {
+    // 내 묶음 키로 찾고, 없으면 내 아이디가 들어 있는 정산서 (기존 정산 이식 달은 정산서 키가 그때 아이디라 다를 수 있음)
+    const X = stlIds_(stlDrivers_()), mine = {}, seen = {};
+    groups.forEach(function (g) { ((X.groups[g] || {}).cids || []).forEach(function (c) { mine[stlLogin_(c)] = 1; }); });
+    const found = groups.map(function (g) { return r.slips[g]; }).filter(Boolean);
+    found.forEach(function (sl) { seen[sl.row.id] = 1; });
+    Object.keys(r.slips).forEach(function (k) {
+      const sl = r.slips[k], row = sl && sl.row;
+      if (!row || seen[row.id] || row.legacyNote) return;
+      if (row.ownerId ? row.ownerId === u.id : (row.cids || []).some(function (c) { return mine[stlLogin_(c)]; })) { found.push(sl); seen[row.id] = 1; } // 명의자가 있으면 명의자만
+    });
+    const slips = found.filter(function (sl) { return !sl.row.legacyNote; }).map(function (sl) {
       const d = sl.row.ceo ? Object.assign({}, sl.row, sl.row.ceoView) : sl.row;
       stlLiveBizName_(d);
       return {
