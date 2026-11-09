@@ -1672,11 +1672,13 @@
     // 백업 기사: 날짜마다 '그날 입차 캠프'(내 칸의 캠프) 기준. 소속 캠프면 home
     const home = { camp: r.camp, campId: r.campId, drivers: r.drivers, backup: r.backup || {} };
     const campFor = (dd) => (r.multi && r.multi.byDay[dd] && r.multi.camps[r.multi.byDay[dd]]) || home;
+    // 그날 이 캠프에 실제로 있는 기사: 다른 캠프로 간 소속 기사(away)는 빼고, 손님(guest)은 그날 칸이 있을 때만
+    const onDay = (C, dd) => C.drivers.filter((x) => !(x.away && x.away[dd]) && !(x.guest && !x.me && !x.cells[dd]));
     const cells = [];
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((dd) => {
       const C = campFor(dd);
-      const day = +dd.slice(8), dow = (lead + day - 1) % 7, w = C.drivers.filter((x) => isWork(x.cells[dd])).length, nb = ((C.backup || {})[dd] || []).length, mv = me ? me.cells[dd] || '' : '';
+      const day = +dd.slice(8), dow = (lead + day - 1) % 7, w = onDay(C, dd).filter((x) => isWork(x.cells[dd])).length, nb = ((C.backup || {})[dd] || []).length, mv = me ? me.cells[dd] || '' : '';
       // 칸 글자가 잘리지 않게: 캠프명(다른 캠프일 때만 작은 꼬리표) · 라우트는 529A,529B → 529AB 로 줄임 · 회전(D1,D2)은 아래 요약에만
       const pc = mv ? schParse(mv, me ? me.route : '') : null;
       const chip = !pc ? '' : pc.routes
@@ -1694,14 +1696,14 @@
     const d = scCampDay, p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
     const sunThis = (() => { const t = new Date(+r.today.slice(0, 4), +r.today.slice(5, 7) - 1, +r.today.slice(8, 10)); t.setDate(t.getDate() - t.getDay() + 6); return ymdOf(t); })();
     const est = d > sunThis; // 이번 주(토요일)까지는 확정, 그 뒤는 예상
-    const D = campFor(d), guest = D !== home;
-    const work = D.drivers.filter((x) => { const v = x.cells[d] || ''; return v && !/휴무|휴가|병가|퇴사/.test(v); }).length;
-    const rows = D.drivers.map((x) => {
+    const D = campFor(d), guest = D !== home, list = onDay(D, d);
+    const work = list.filter((x) => { const v = x.cells[d] || ''; return v && !/휴무|휴가|병가|퇴사/.test(v); }).length;
+    const rows = list.map((x) => {
       const v = x.cells[d] || '';
       // 왼쪽: 노선(크게) → 이름 → 단가코드. 노선이 눈에 먼저 들어오게
       const pc = v ? schParse(v, x.route || '') : null, rtTxt = pc && pc.routes ? pc.routes : (x.route ? schParse(x.route, '').routes || x.route : '');
       return '<div class="day cmate' + (x.me ? ' me' : '') + '"><div class="dt">' + (rtTxt ? '<b class="rt">' + escH(rtTxt) + '</b>' : '<b class="rt none">—</b>') +
-        '<span class="nm">' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</span>' + (x.type || x.guest ? '<small>' + escH(x.type || '') + (x.guest ? ' · 소속 ' + escH(x.homeCamp || r.camp) : '') + '</small>' : '') + '</div>' +
+        '<span class="nm">' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</span>' + (x.type || x.guest ? '<small>' + escH(x.type || '') + (x.guest && x.homeCamp ? ' · 소속 ' + escH(x.homeCamp) : '') + '</small>' : '') + '</div>' +
         '<div class="vc"><div class="val ' + (v ? (schKind(v) || (pc && pc.routes ? 'k-work' : '')) : 'none') + '">' + (v ? escH(schNice(v, D.camp, x.route)) : '미정') + '</div>' +
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
@@ -1711,7 +1713,7 @@
       '<div class="wk"><h3>' + escH(D.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (d === pdd ? ' <em class="pddt" style="font-style:normal;font-size:11px;font-weight:800;color:#fff;background:var(--brand);border-radius:6px;padding:2px 7px;vertical-align:middle">PDD</em>' : '') + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
         '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
         (guest ? '<div class="camptag">🚚 이날 입차 캠프 <b>' + escH(D.camp) + '</b> <small>· 소속은 ' + escH(r.camp) + '</small></div>' : '') +
-        '<p class="hint" style="margin:-2px 0 6px">실제 출근일 ' + (prevD.getMonth() + 1) + '/' + prevD.getDate() + ' (' + DOWK[prevD.getDay()] + ') 저녁 입차 · ' + (guest ? escH(D.camp) + ' ' : '') + '기사 ' + D.drivers.length + '명 · 근무 ' + work + '명 · 백업 ' + bk.length + '명</p>' +
+        '<p class="hint" style="margin:-2px 0 6px">실제 출근일 ' + (prevD.getMonth() + 1) + '/' + prevD.getDate() + ' (' + DOWK[prevD.getDay()] + ') 저녁 입차 · ' + (guest ? escH(D.camp) + ' ' : '') + '기사 ' + list.length + '명 · 근무 ' + work + '명 · 백업 ' + bk.length + '명</p>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(D.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>';

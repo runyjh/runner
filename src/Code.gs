@@ -5226,26 +5226,47 @@ function api_campSchedule(token, month, campId) {
     }
     let issues = [];
     try { issues = schIssues_(dates[0], dates[dates.length - 1]); } catch (e) { issues = []; }
-    /** 한 캠프의 기사 목록(날짜별 칸·지시) + 백업 명단. guest = 소속이 아닌 나(백업)를 목록에 끼워 넣기 */
-    const buildCamp = function (cid, guest) {
+    // 캠프 짧은 이름 → ID (칸 글자 '강서1 527B' 에서 캠프 찾기 · 긴 이름부터)
+    const shortOf = {}; realCamps.forEach(function (c) { shortOf[String(c.name).replace(/\s*캠프\s*$/, '').replace(/\s+/g, '')] = c.id; });
+    const shorts = Object.keys(shortOf).sort(function (a, b) { return b.length - a.length; });
+    const campInCell = function (v) { const t = str_(v).replace(/\s+/g, ''); if (!t || /휴무|휴가|병가|미입차/.test(t)) return ''; for (var i = 0; i < shorts.length; i++) if (t.indexOf(shorts[i]) >= 0) return shortOf[shorts[i]]; return ''; };
+    const rowOf = {}; ids.forEach(function (id, i) { if (rowOf[id] === undefined) rowOf[id] = i; });
+    const cellAt = function (id, d) { const i = rowOf[id], c = h ? h.dates[d] : undefined; return i === undefined || c === undefined ? '' : str_(block[i][c - c0]); };
+    /**
+     * 한 캠프의 기사 목록(날짜별 칸·지시) + 백업 명단.
+     *  - 소속 기사라도 그날 칸에 다른 캠프가 적혀 있으면 away[d] = 그 캠프 (앱에서 그날 목록에서 뺌)
+     *  - 다른 캠프 소속이라도 그날 칸에 이 캠프가 적혀 있으면 guest 로 그날만 들어온다 (백업이 입차하는 캠프에 보이게)
+     */
+    const buildCamp = function (cid, forceMe) {
       const inCamp = {};
       all.forEach(function (o) {
         if (o.status !== ST.ACTIVE) return;
         const days = {};
         let any = false, route = '';
         dates.forEach(function (d) { const v = rcBy[o.id] ? at(o, d) : { campId: o.schCampId, baseRoute: o.baseRoute }; if (v.campId === cid) { days[d] = 1; any = true; if (!route || d === ref) route = v.baseRoute; } });
-        if (any) inCamp[o.id] = { days: days, route: route };
+        if (any) { inCamp[o.id] = { days: days, route: route }; return; }
+        if (!hasSheet) return;
+        // 손님: 그달 칸에 이 캠프 이름이 적힌 날만
+        const gd = {}; let g = false;
+        dates.forEach(function (d) { if (campInCell(cellAt(o.id, d)) === cid) { gd[d] = 1; g = true; } });
+        if (g) inCamp[o.id] = { days: gd, route: o.baseRoute || '', guest: true, home: campNameOf(o.schCampId) || str_(o.schCamp).replace(/\s*캠프\s*$/, '') };
       });
-      if (guest && !inCamp[me.id]) { const all1 = {}; dates.forEach(function (d) { all1[d] = 1; }); inCamp[me.id] = { days: all1, route: me.baseRoute || '', guest: true }; }
+      if (forceMe && !inCamp[me.id]) { const all1 = {}; dates.forEach(function (d) { all1[d] = 1; }); inCamp[me.id] = { days: all1, route: me.baseRoute || '', guest: true, home: out.camp }; }
       const byId = {};
-      all.filter(function (o) { return inCamp[o.id]; }).forEach(function (o) { byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].guest ? out.camp : '', cells: {}, order: 1e9 }; });
+      all.filter(function (o) { return inCamp[o.id]; }).forEach(function (o) { byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].home || '', cells: {}, away: {}, order: 1e9 }; });
       let backup = {};
       if (hasSheet) {
         ids.forEach(function (id, i) {
           const x = byId[id];
           if (!x || x.order < 1e9) return;
           x.order = i;
-          dates.forEach(function (d) { if (!inCamp[x.id].days[d]) return; const c = h.dates[d]; if (c !== undefined) { const v = str_(block[i][c - c0]); if (v) x.cells[d] = v; } });
+          dates.forEach(function (d) {
+            if (!inCamp[x.id].days[d]) return;
+            const c = h.dates[d]; if (c === undefined) return;
+            const v = str_(block[i][c - c0]); if (!v) return;
+            x.cells[d] = v;
+            const oc = campInCell(v); if (oc && oc !== cid) x.away[d] = campNameOf(oc); // 소속 기사가 그날 다른 캠프로
+          });
         });
         try { backup = schMyCampBackup_(me.id, dates, h, c0, c1, { drivers: all, ids: ids.map(function (x) { return [x]; }), block: block, campId: cid }).list; } catch (e) { backup = {}; }
       }
@@ -5257,15 +5278,8 @@ function api_campSchedule(token, month, campId) {
     out.drivers = home.drivers; out.backup = home.backup;
     // 백업 기사(기본노선 없음 · 직함자 캠프 선택 아님): 내 칸에 적힌 캠프가 소속과 다른 날은 그 캠프의 기사·백업을 같이 내려준다 → 앱에서 날짜마다 '그날 입차 캠프' 기준으로 보여 줌
     if (!pickCamp && hasSheet && !rpfBaseCodes_(me.baseRoute || '').length) {
-      const shortOf = {}; realCamps.forEach(function (c) { shortOf[String(c.name).replace(/\s*캠프\s*$/, '').replace(/\s+/g, '')] = c.id; });
-      const shorts = Object.keys(shortOf).sort(function (a, b) { return b.length - a.length; });
-      const myRow = ids.indexOf(String(me.id));
       const byDay = {}, need = {};
-      if (myRow >= 0) dates.forEach(function (d) {
-        const c = h.dates[d]; if (c === undefined) return;
-        const v = str_(block[myRow][c - c0]).replace(/\s+/g, ''); if (!v || /휴무|휴가|병가|미입차/.test(v)) return;
-        for (var i = 0; i < shorts.length; i++) { if (v.indexOf(shorts[i]) >= 0) { const cid = shortOf[shorts[i]]; if (cid !== myCampId) { byDay[d] = cid; need[cid] = 1; } break; } }
-      });
+      dates.forEach(function (d) { const cid = campInCell(cellAt(String(me.id), d)); if (cid && cid !== myCampId) { byDay[d] = cid; need[cid] = 1; } });
       if (Object.keys(need).length) {
         const camps = {};
         Object.keys(need).forEach(function (cid) { camps[cid] = buildCamp(cid, true); });
