@@ -362,14 +362,16 @@
   .sl-line b { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .sl-line.tot { border-top: 2px solid var(--ink); font-weight: 800; font-size: 15.5px; }
   .sl-line .neg { color: var(--danger); }
-  .sl-invh { background: linear-gradient(160deg, #1b64da, #2f7cf6); color: #fff; padding: 16px 18px; }
-  .sl-invh .sl-hm { align-items: center; } .sl-invh .sl-hm b { font-size: 15px; } .sl-invh .sl-dd { white-space: nowrap; flex: none; } .sl-invh .sl-dd { background: #fff; color: var(--brand); } .sl-invh .sl-dd.hot { color: var(--danger); }
-  .sl-invh .sl-hn { font-size: 36px; } .sl-invh .sl-hs b { font-weight: 800; }
-  .sl-inv2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; } .sl-inv2 div { background: rgba(255,255,255,.14); border-radius: 10px; padding: 8px 9px; min-width: 0; display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 6px; }
-  .sl-inv2 span { grid-column: 1 / -1; font-size: 11.5px; opacity: .85; } .sl-inv2 b { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; } .sl-inv2 .sl-cp { border: 0; padding: 3px 8px; min-height: 26px; font-size: 11.5px; }
-  .sl-meta { margin-top: 10px; background: rgba(255,255,255,.14); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; line-height: 1.8; } .sl-meta b { font-weight: 800; } .sl-meta .sl-cp { margin-left: 6px; border: 0; padding: 2px 7px; min-height: 22px; font-size: 11px; } .sl-meta .sl-due { color: #ffe9a8; }
-  .sl-steps { margin-top: 10px; font-size: 12.5px; line-height: 1.6; opacity: .95; } .sl-steps b { font-weight: 800; }
-  .sl-netc .sl-netrow { display: flex; justify-content: space-between; align-items: baseline; } .sl-netrow span { font-size: 13px; color: var(--sub); font-weight: 700; } .sl-netrow span small { font-weight: 600; } .sl-netrow b { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; } .sl-netrow b small { font-size: 14px; margin-left: 2px; } .sl-netrow b.neg { color: var(--danger); }
+  .sl-invc { padding: 14px 16px; }
+  .sl-invc .sl-hm { align-items: center; margin-bottom: 8px; } .sl-invc .sl-hm b { font-size: 15px; } .sl-invc .sl-dd { white-space: nowrap; flex: none; }
+  .sl-ikv { display: flex; flex-direction: column; }
+  .sl-ik { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+  .sl-ik:first-child { border-top: 0; } .sl-ik span { color: var(--sub); } .sl-ik b { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; word-break: break-all; }
+  .sl-ik b em { font-style: normal; font-size: 20px; font-weight: 800; color: var(--brand); } .sl-ik b small { font-weight: 600; color: var(--sub); font-size: 12px; }
+  .sl-ik .sl-cp { padding: 3px 8px; min-height: 26px; font-size: 11.5px; } .sl-ik:not(:has(.sl-cp)) b { grid-column: 2 / 4; }
+  .sl-ihint { margin-top: 8px; font-size: 12px; color: var(--sub); line-height: 1.5; }
+  .sl-netc { background: var(--brand-weak, #e8f0fe); border: 1px solid #cfe0fb; } .sl-netc .sl-stats2 div { background: #fff; }
+  .sl-netc .sl-netrow { display: flex; justify-content: space-between; align-items: baseline; } .sl-netrow span { font-size: 13px; color: var(--sub); font-weight: 700; } .sl-netrow span small { font-weight: 600; } .sl-netrow b { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--brand); } .sl-netrow b small { font-size: 14px; margin-left: 2px; } .sl-netrow b.neg { color: var(--danger); }
   .sl-hs2 { font-size: 12.5px; color: var(--sub); margin-top: 4px; } .sl-hs2 b { color: var(--ink); }
   .sl-stats2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; } .sl-stats2 div { background: #f7f8fa; border-radius: 10px; padding: 8px 9px; min-width: 0; } .sl-stats2 span { display: block; font-size: 11.5px; color: var(--sub); } .sl-stats2 b { display: block; font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sl-stats2 b.neg { color: var(--danger); }
   .sl-inv { border: 2px solid var(--brand); background: #f3f7ff; }
@@ -2479,18 +2481,18 @@
       const estSum = routes.reduce((a, x) => a + (x.est || 0), 0), estMaxSum = routes.reduce((a, x) => a + (x.estMax || 0), 0);
       const rows = routes.map((x) => {
         const c = x.cum, tip = [];
-        if (!yes(c.f1) && c.f1pct != null) tip.push('연계건: 수행률을 ' + S.th1 + '%까지 올리면 +' + vat(S.won1) + '원/건' + (x.vol ? ' → 이달 약 ' + won0(S.won1 * x.vol.qty * 1.1) + '원' : '') + ' (지금 ' + c.f1pct + '%)');
+        if (!yes(c.f1) && c.f1pct != null) tip.push('연계건: 프레시백 회수율을 ' + S.th1 + '%까지 올리면 +' + vat(S.won1) + '원/건' + (x.vol ? ' → 이달 약 ' + won0(S.won1 * x.vol.qty * 1.1) + '원' : '') + ' (지금 ' + c.f1pct + '% · ' + Math.round((S.th1 - c.f1pct) * 10) / 10 + '%p 부족)');
         if (!yes(c.f2) && c.f2pct != null) tip.push('단독건: 프레시백 회수율을 ' + S.th2 + '%까지 올리면 +' + vat(S.won2) + '원/건' + (x.vol ? ' → 이달 약 ' + won0(S.won2 * x.vol.qty * 1.1) + '원' : '') + ' (지금 ' + c.f2pct + '% · ' + Math.round((S.th2 - c.f2pct) * 10) / 10 + '%p 부족)');
         const dots = (k) => x.days.length ? '<div class="fdots">' + x.days.map((d) => '<i class="' + (yes(d[k]) ? 'y' : d[k] === '미해당' ? 'n' : '') + '" title="' + md(d.date) + '"></i>').join('') + '<small>최근 ' + x.days.length + '일</small></div>' : '';
-        return '<div class="mpr fbr"><div class="fbhd"><b class="code">' + escH((x.camp ? x.camp + ' ' : '') + x.code) + (x.ranDays ? '<small style="display:block;font-size:11px;color:var(--sub);font-weight:600">이번 정산기간 ' + x.ranDays + '일 입차</small>' : '') + '</b><span class="fbest">' + (x.won ? '예상 +' + vat(x.won) + '원/건' : '예상 0원') + (x.est != null ? '<small>이달 약 ' + won0(x.est * 1.1) + '원' + (x.vol ? ' <i>(전월 ' + won0(x.vol.qty) + '건 기준)</i>' : '') + '</small>' : '') + '</span></div>' +
-          '<div class="fgrid"><div>연계건 ' + S.th1 + '% — 수행률 (+' + vat(S.won1) + '원)<b>' + (c.f1pct != null ? c.f1pct + '% ' : '') + bd(c.f1) + '</b>' + bar(c.f1pct, S.th1, yes(c.f1)) + dots('f1') + '</div>' +
+        return '<div class="mpr fbr"><div class="fbhd"><b class="code">' + escH((x.camp ? x.camp + ' ' : '') + x.code) + (x.ranDays ? '<small style="display:block;font-size:11px;color:var(--sub);font-weight:600">이번 정산기간 ' + x.ranDays + '일 입차</small>' : '') + '</b><span class="fbest">' + (x.won ? '예상 +' + vat(x.won) + '원/건' : '예상 0원') + (x.est != null ? '<small>이달 약 ' + won0(x.est * 1.1) + '원' + (x.vol ? ' <i>(하루 ' + won0(x.vol.avg) + '건 × 출근 ' + x.vol.days + '일 = ' + won0(x.vol.qty) + '건)</i>' : '') + '</small>' : (x.vol === null && r.workDays && !r.workDays.total ? '<small>스케줄에 출근일이 없어 예상 금액을 못 냈어요</small>' : '')) + '</span></div>' +
+          '<div class="fgrid"><div>연계건 ' + S.th1 + '% — 프레시백 회수 (+' + vat(S.won1) + '원)<b>' + (c.f1pct != null ? c.f1pct + '% ' : '') + bd(c.f1) + '</b>' + bar(c.f1pct, S.th1, yes(c.f1)) + dots('f1') + '</div>' +
           '<div>단독건 ' + S.th2 + '% — 프레시백 회수 (+' + vat(S.won2) + '원)<b>' + (c.f2pct != null ? c.f2pct + '% ' : '') + bd(c.f2) + '</b>' + bar(c.f2pct, S.th2, yes(c.f2)) + dots('f2') + '</div></div>' +
           (tip.length ? '<div class="ftip">' + tip.map(escH).join('<br>') + '</div>' : '') +
           (x.month ? '<div class="sub" style="margin-top:6px">전월(' + (+x.month.period.slice(5, 7)) + '월 정산) 확정: 연계건 ' + escH(x.month.f1) + ' · 단독건 ' + escH(x.month.f2) + ' → ' + (x.month.won ? '+' + vat(x.month.won) + '원/건' : '0원') + '</div>' : '') + '</div>';
       }).join('');
       box.innerHTML = '<h4>🧺 프레시백 가중요인 <small class="sub" style="font-weight:500">' + (+lp.slice(5, 7)) + '월 정산 · ' + md(to) + ' 기준' + (left ? ' · 25일까지 ' + left + '일' : '') + '</small></h4>' +
-        '<p class="sub" style="margin:0 0 6px"><b>연계건 ' + S.th1 + '%</b>: 이달(전월 26일~25일) 누적 수행률이 ' + S.th1 + '% 이상이면 건당 +' + vat(S.won1) + '원 · <b>단독건 ' + S.th2 + '%</b>: 프레시백 회수율이 ' + S.th2 + '% 이상이면 +' + vat(S.won2) + '원이 이달 전체 배송건에 붙습니다. 예상 금액은 전월 정산서 배송수량 기준 (부가세 포함 · 쿠팡 정산 확정 후 정산서에서 확인).' + (r.backup ? ' 백업 기사는 이번 정산기간(' + (r.period ? md(r.period.from) + '~' + md(r.period.to) : '전월 26일~25일') + ')에 스케줄에 적힌 대로 입차한 라우트를 보여 드립니다.' : '') + '</p>' + rows +
-        (estSum ? '<div class="fsum"><span>이달 예상 가중요인 추가금 <small style="display:inline;flex-basis:auto">(전월 수량 기준)</small></span><b>약 ' + won0(Math.round(estSum * 1.1 / 1000) * 1000) + '원</b>' + (estMaxSum > estSum ? '<small>모두 해당이면 약 ' + won0(Math.round(estMaxSum * 1.1 / 1000) * 1000) + '원</small>' : '') + '</div>' : '');
+        '<p class="sub" style="margin:0 0 6px"><b>연계건 ' + S.th1 + '%</b>: 이달(전월 26일~25일) 누적 연계건 프레시백 회수율이 ' + S.th1 + '% 이상이면 건당 +' + vat(S.won1) + '원 · <b>단독건 ' + S.th2 + '%</b>: 단독건 프레시백 회수율이 ' + S.th2 + '% 이상이면 +' + vat(S.won2) + '원이 이달 전체 배송건에 붙습니다. 예상 금액 = 단가 × 하루 평균 수량(최근 정산서) × 이번 정산기간 스케줄 출근일' + (r.workDays && r.workDays.total ? ' (출근 ' + r.workDays.total + '일' + (r.workDays.done < r.workDays.total ? ' · 오늘까지 ' + r.workDays.done + '일' : '') + ')' : '') + ' · 부가세 포함 · 쿠팡 정산 확정 후 정산서에서 확인.' + (r.backup ? ' 백업 기사는 이번 정산기간(' + (r.period ? md(r.period.from) + '~' + md(r.period.to) : '전월 26일~25일') + ')에 스케줄에 적힌 대로 입차한 라우트를 보여 드립니다.' : '') + '</p>' + rows +
+        (estSum ? '<div class="fsum"><span>이달 예상 가중요인 추가금 <small style="display:inline;flex-basis:auto">(출근 ' + (r.workDays ? r.workDays.total : 0) + '일 기준)</small></span><b>약 ' + won0(Math.round(estSum * 1.1 / 1000) * 1000) + '원</b>' + (estMaxSum > estSum ? '<small>모두 해당이면 약 ' + won0(Math.round(estMaxSum * 1.1 / 1000) * 1000) + '원</small>' : '') + '</div>' : '');
       myStat('fb', true);
     }).catch(() => { myStat('fb', false); });
   }
@@ -2509,7 +2511,7 @@
         const l = rt.weeks[rt.weeks.length - 1] || {};
         return '<div class="mpr"><b class="code">' + escH(rt.code) + (sub ? '<small>' + escH(sub) + '</small>' : '') + '</b><div class="wks">' + rt.weeks.slice().reverse().map((w) => '<span>' + gr(w.grade) + escH(String(w.wk || '').replace('WK', 'W')) + '</span>').join('') + '</div>' +
           '<div class="now"><b>' + gr(l.grade) + ' ' + (l.perf != null ? l.perf + '%' : '') + '</b>' + (l.improve ? '<span class="imp">개선 요청</span>' : (l.grade >= 3 ? '95% 미만' : l.grade ? '우수' : '')) + '</div></div>' +
-          '<div class="grnote">' + (l.improve ? '개선 요청 — 기한 안에 95% 이상으로 올려 주세요. ' : '') + '1~2등급 우수(95% 초과) · 3~4등급은 위탁 조정 대상(95% 미만). 안전 운전과 함께 꾸준한 완료 부탁드립니다.</div>' +
+          '<div class="grnote">' + (l.improve ? '개선 요청 — 기한 안에 95% 이상으로 올려 주세요. ' : '') + '1~2등급 우수(95% 초과) · 3~4등급은 위탁 조정 대상(95% 미만). 안전 운전과 함께 95% 이상 유지 부탁드립니다.</div>' +
           slaBlock(rt.sla);
       };
       // SLA (수행률과 구분해서 따로): 최신 총점·고객만족 + 올해 1월부터 월별 누적 칩 + 총점 설명
@@ -2787,16 +2789,21 @@
     // 맨 위: 세금계산서 발행 카드 (기사가 직접 발행하므로 금액이 가장 먼저 보이게) → 실 입금액 → 지급·공제
     const supName = d.bizName || (d.name && !/^\(명의자 없음\)/.test(d.name) ? d.name : '') || '기사님';
     const hot = dd === '기한 지남' || dd === '오늘까지' || /^D-[1-3]$/.test(dd);
-    const invCard = '<div class="sl-card sl-invh"><div class="sl-hm"><b>📄 세금계산서, 이 금액으로 발행</b>' + (dd ? '<span class="sl-dd' + (hot ? ' hot' : '') + '">' + dd + '</span>' : '') + '</div>' +
-      '<div class="sl-hl">발행 금액 (합계 · 부가세 포함) · ' + escH(slMonthTxt(r.month)) + ' ' + slMd(P.from) + '~' + slMd(P.to) + '</div><div class="sl-hn">' + slWon(d.invoice) + '<small>원</small></div>' +
-      '<div class="sl-hs">공급자 <b>' + escH(supName) + '</b> → 공급받는자 <b>' + escH(co.name || '러너') + (co.ceo ? ' (대표 ' + escH(co.ceo) + ')' : '') + '</b></div>' +
-      '<div class="sl-inv2"><div><span>공급가액</span><b>' + slWon(d.supply) + '</b>' + cp(d.supply, '공급가액') + '</div><div><span>세액 (10%)</span><b>' + slWon(d.tax) + '</b>' + cp(d.tax, '세액') + '</div></div>' +
-      '<div class="sl-meta">공급받는자 사업자번호 <b>' + escH(co.bizNo || '-') + '</b>' + (co.bizNo ? cp(co.bizNo, '사업자번호') : '') + '<br>작성일자 <b>' + escH(D.writeDate || '-') + '</b> · 품목 <b>배송(' + escH(r.month) + ')</b> · 구분 <b>청구</b>' +
-        (co.email ? '<br>이메일 <b>' + escH(co.email) + '</b>' + cp(co.email, '이메일') : '') + (D.invoice ? '<br>발행기한 <b class="sl-due">' + escH(D.invoice) + ' 까지</b>' : '') + '</div>' +
-      '<div class="sl-steps">① 홈택스 → 전자세금계산서 발급 ② 공급받는자 사업자번호 입력 ③ <b>공급가액·세액을 위 숫자 그대로</b> ④ 작성일자 ' + escH(String(D.writeDate || '').slice(5)) + ' · 청구 ⑤ 발급</div></div>';
+    // 맨 위: 세금계산서 정보만 깔끔하게 (기사가 홈택스에 그대로 옮겨 적는 숫자 · 복사 버튼) → 실 입금액 카드 (과하지 않게 강조) → 지급·공제
+    const kv = (k, v, extra) => '<div class="sl-ik"><span>' + k + '</span><b>' + v + '</b>' + (extra || '') + '</div>';
+    const invCard = '<div class="sl-card sl-invc"><div class="sl-hm"><b>세금계산서 발행 정보</b>' + (dd ? '<span class="sl-dd' + (hot ? ' hot' : '') + '">' + (D.invoice ? escH(String(D.invoice).slice(5).replace('-', '/')) + '까지 · ' : '') + dd + '</span>' : '') + '</div>' +
+      '<div class="sl-ikv">' +
+        kv('발행 금액 (부가세 포함)', '<em>' + slWon(d.invoice) + '</em>원', cp(d.invoice, '발행 금액')) +
+        kv('공급가액', slWon(d.supply) + '원', cp(d.supply, '공급가액')) +
+        kv('세액 (10%)', slWon(d.tax) + '원', cp(d.tax, '세액')) +
+        kv('공급받는자', escH(co.name || '러너') + (co.ceo ? ' <small>(대표 ' + escH(co.ceo) + ')</small>' : '')) +
+        kv('사업자번호', escH(co.bizNo || '-'), co.bizNo ? cp(co.bizNo, '사업자번호') : '') +
+        (co.email ? kv('이메일', escH(co.email), cp(co.email, '이메일')) : '') +
+        kv('작성일자 · 품목', escH(D.writeDate || '-') + ' <small>· 배송(' + escH(r.month) + ') · 청구</small>') +
+      '</div><div class="sl-ihint">공급자 ' + escH(supName) + ' → 러너. 홈택스에서 공급가액·세액을 위 숫자 그대로 입력해 발행해 주세요.</div></div>';
     return invCard +
       '<div class="sl-card sl-netc"><div class="sl-netrow"><span>실 입금액 <small>(지급 − 공제)</small></span><b' + (d.net < 0 ? ' class="neg"' : '') + '>' + slWon(d.net) + '<small>원</small></b></div>' +
-      '<div class="sl-hs2">' + (D.pay ? '지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
+      '<div class="sl-hs2">' + escH(slMonthTxt(r.month)) + ' ' + slMd(P.from) + '~' + slMd(P.to) + (D.pay ? ' · 지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
       '<div class="sl-stats2"><div><span>지급 합계</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
       '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
       '<div class="sl-card"><h3>차감 · 공제</h3>' + (deds.length ? deds.map((l) => line(l, '−')).join('') : '<div class="sl-line"><div class="hint">없음</div></div>') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +

@@ -206,6 +206,28 @@ function rpfRanRoutes_(driverId, camp, limit) {
   return { period: pd, routes: limit ? list.slice(0, limit) : list };
 }
 /**
+ * 이번 정산기간(전월 26일~당월 25일) 기사스케줄에서 이 기사의 출근일 수 (오늘 이후 미리 적어 둔 칸도 포함 · 휴무·휴가·병가·미입차·비고·빈칸 제외)
+ *  { total, done(오늘까지), perRoute: { '캠프|코드': 일수 } }  — 가중요인 예상 금액 = 단가 × 하루 평균 수량 × 출근일
+ */
+function rpfWorkDays_(driverId, camp, baseRoute) {
+  const pd = stlPeriodOfToday_(), today = todayText_(), out = { total: 0, done: 0, perRoute: {} };
+  const s = schRead_(parseYmd_(pd.from), parseYmd_(pd.to));
+  const campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
+  const cells = s.cells[driverId] || {};
+  Object.keys(cells).forEach(function (d) {
+    if (d < pd.from || d > pd.to) return;
+    let v = String(cells[d] || '').toUpperCase().trim();
+    if (!v || /휴무|휴가|병가|미입차|비고|퇴사/.test(v)) return;
+    out.total++; if (d <= today) out.done++;
+    if (v === '출근' && baseRoute) v = String(baseRoute).toUpperCase();
+    let cp = camp;
+    campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
+    rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; out.perRoute[k] = (out.perRoute[k] || 0) + 1; });
+  });
+  out.period = pd;
+  return out;
+}
+/**
  * 기사 앱: 내 라우트 수행률 (관리자가 켜 두었을 때만)
  *  - 고정 기사: 기본노선 라우트(mine) · 백업 기사(기본노선 없음): 이번 정산기간(전월 26일~당월 25일) 기사스케줄에서 입차한 라우트(recent)
  *  - 그 아래 소속 캠프 전체 라우트의 최신 등급(campAll · 접힌 상태로)
@@ -729,16 +751,20 @@ function api_myFb(token) {
       const c = lp ? pick(cum.filter(function (r) { return r.period === lp; }), keys) : null;
       if (!c) return null;
       const won = (c.f1 === '해당' ? set.won1 : 0) + (c.f2 === '해당' ? set.won2 : 0);
-      // 예상 금액 = 단가 × 전월(가장 최근 쿠팡 정산서 달) 이 라우트 배송수량
-      const v = vol[cp + '|' + code], lm = volMonths[volMonths.length - 1] || '', prevQty = v && v.m && lm ? Number(v.m[lm]) || 0 : 0;
-      const est = prevQty ? Math.round(won * prevQty) : null, estMax = prevQty ? Math.round((set.won1 + set.won2) * prevQty) : null;
+      // 예상 금액 = 단가 × 하루 평균 수량(최근 정산서 2달 · 이 라우트) × 이번 정산기간 출근일(스케줄에 적힌 날 · 고정 기사는 전체 출근일, 백업은 이 라우트에 적힌 날)
+      const v = vol[cp + '|' + code], avg = v ? Number(v.avg) || 0 : 0;
+      const days = base.length ? wd.total : (wd.perRoute[cp + '|' + code] || 0);
+      const qty = avg && days ? avg * days : 0;
+      const est = qty ? Math.round(won * qty) : null, estMax = qty ? Math.round((set.won1 + set.won2) * qty) : null;
       const mp = mps.filter(function (p) { return p < lp; }).pop() || '';
       const m = mp ? pick(months.filter(function (r) { return r.period === mp; }), keys) : null;
       return { camp: cp, code: code, period: lp, cum: { to: c.to, from: c.from, f1pct: c.f1pct, f1: c.f1, f2pct: c.f2pct, f2: c.f2 },
         days: dayList.map(function (d) { const r = pick(all.filter(function (x) { return x.kind === FBK.DAY && x.date === d; }), keys); return { date: d, f1: r ? r.f1 : '', f2: r ? r.f2 : '', f1pct: r ? r.f1pct : null, f2pct: r ? r.f2pct : null }; }),
         month: m ? { period: mp, f1: m.f1, f2: m.f2, won: (m.f1 === '해당' ? set.won1 : 0) + (m.f2 === '해당' ? set.won2 : 0) } : null,
-        won: won, est: est, estMax: estMax, vol: prevQty ? { qty: prevQty, month: lm } : null };
+        won: won, est: est, estMax: estMax, vol: qty ? { qty: Math.round(qty), avg: avg, days: days, done: base.length ? wd.done : Math.min(days, wd.done) } : null };
     };
+    let wd = { total: 0, done: 0, perRoute: {} };
+    try { wd = rpfWorkDays_(u.id, camp, o.baseRoute || ''); out.workDays = { total: wd.total, done: wd.done, period: wd.period }; } catch (e) { /* 스케줄 없음 */ }
     let codes = [];
     if (camp && base.length) codes = base.map(function (c) { return { camp: camp, code: c }; });
     else try { const ran = rpfRanRoutes_(u.id, camp, 10); out.period = ran.period; codes = ran.routes; } catch (e) { codes = []; }
