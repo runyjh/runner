@@ -651,6 +651,13 @@
   .radios { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; min-height: 40px; }
   .radios label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
   .radios label.dirty { color: var(--warn); font-weight: 700; }
+  .rotgrid { display: grid; grid-template-columns: max-content repeat(3, max-content); gap: 4px 14px; align-items: center; margin-top: 4px; font-size: 13px; }
+  .rotgrid .rrow { display: contents; }
+  .rotgrid .rrow b { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  .rotgrid .rrow.all b { font-family: inherit; color: var(--sub); font-weight: 700; }
+  .rotgrid .rrow.all { font-weight: 700; }
+  .rotgrid label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+  .rotgrid input.mixed { opacity: .45; }
   .kv { display: grid; grid-template-columns: 118px 1fr; gap: 4px 10px; font-size: 13px; }
   .kv span:nth-child(odd) { color: var(--sub); }
   .kv .miss { color: var(--danger); }
@@ -896,10 +903,6 @@
   .sg tr.calc.du td.cc { color: #b45309; background: #fffaf0; }
   .sg tr.calc.bk td.cc { color: var(--ink); background: #f8fbff; }
   .exbad { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700; color: #7c3aed; background: #f3e8ff; border-radius: 4px; padding: 0 4px; vertical-align: middle; }
-  .xas { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
-  .xas .xone { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: #fafbfc; }
-  .xas .xone .rchips { display: none; } /* 추가 배정은 라우트만 (백업·용차 없음) */
-  .xas .xhd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-weight: 700; font-size: 13px; }
   .sed { position: absolute; z-index: 30; background: #fff; border: 2px solid var(--brand); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
   .sed textarea { display: block; width: 100%; border: 0; outline: none; resize: none; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 8px; min-height: 30px; }
   /* 추천 목록: 흰 바탕 둥근 버튼 (배정 캠프·라우트 버튼과 같은 모양) · 왼쪽 점 색 = 칸 색 */
@@ -2494,10 +2497,19 @@
   /** '404D,405AB (D1,D2)' → { special, units: ['404D','405A','405B'], rots: ['D1','D2'] } */
   function parseBR(s) {
     s = String(s || '').trim();
-    if (/^(백업|예비)/.test(s)) return { special: '백업', units: [], rots: [] };
-    if (/^용차/.test(s)) return { special: '용차', units: [], rots: [] };
+    if (/^(백업|예비)/.test(s)) return { special: '백업', units: [], rots: [], per: {} };
+    if (/^용차/.test(s)) return { special: '용차', units: [], rots: [], per: {} };
+    const ROTS = ['D1', 'D2', 'F3'], normRot = (x) => String(x || '').split(/[\s,]+/).map((y) => y.toUpperCase()).filter((y) => ROTS.includes(y));
+    // '408A(D1,D2),408B' 처럼 노선 바로 뒤 괄호 = 그 노선(글자)만의 회전
+    const per = {};
+    s = s.replace(/(\d+[A-Za-z]+)\(([^)]*)\)/g, (m0, rt, ro) => {
+      const rr = normRot(ro); if (!rr.length) return m0;
+      const mm = rt.toUpperCase().match(/^(\d+)([A-Z]+)$/);
+      if (mm) mm[2].split('').forEach((ch) => { per[mm[1] + ch] = rr; });
+      return rt;
+    });
     const m = s.match(/\(([^)]*)\)/);
-    const rots = m ? m[1].split(/[\s,]+/).map((x) => x.toUpperCase()).filter((x) => ['D1', 'D2', 'F3'].includes(x)) : [];
+    const rots = m ? normRot(m[1]) : [];
     const units = [];
     let lastNum = '';
     s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean).forEach((t) => {
@@ -2506,18 +2518,63 @@
       else if (aa && lastNum) aa[1].split('').forEach((ch) => units.push(lastNum + ch));
       else units.push(t); // 나눌 수 없는 코드는 통째로
     });
-    return { special: '', units: [...new Set(units)], rots };
+    return { special: '', units: [...new Set(units)], rots, per };
   }
-  /** 고른 단위 → 저장 글자 */
-  function composeUnits(units, special, rots, allRots) {
+  /** 고른 단위 → 저장 글자. per = { '408A': ['D1','D2'] } 글자별 회전 (없으면 rots 공통)
+   *  모두 같은 회전이면 '408AB (D1,D2)', 글자마다 다르면 '408A(D1,D2),408B' (전체 회전인 글자는 괄호 없음) */
+  function composeUnits(units, special, rots, allRots, per) {
     if (special) return special;
     if (!units.length) return '';
+    per = per || {};
+    const rotOf = (u) => allRots.filter((r) => (per[u] && per[u].length ? per[u] : rots).includes(r));
+    const key = (u) => { const r = rotOf(u); return r.length ? r.join(',') : allRots.join(','); };
+    const keys = [...new Set(units.map(key))];
     const byNum = new Map(), whole = [];
-    units.forEach((u) => { const m = u.match(unitRe); if (m) { if (!byNum.has(m[1])) byNum.set(m[1], new Set()); byNum.get(m[1]).add(m[2]); } else whole.push(u); });
-    const parts = [...byNum.keys()].sort((a, b) => Number(a) - Number(b) || koSort(a, b)).map((n) => n + [...byNum.get(n)].sort().join('')).concat(whole.sort(koSort));
-    const use = allRots.filter((r) => rots.includes(r));
-    return parts.join(',') + (use.length && use.length < allRots.length ? ' (' + use.join(',') + ')' : '');
+    units.forEach((u) => { const m = u.match(unitRe); if (m) { const k = m[1] + '|' + key(u); if (!byNum.has(k)) byNum.set(k, { n: m[1], k: key(u), ch: new Set() }); byNum.get(k).ch.add(m[2]); } else whole.push(u); });
+    const first = (g) => [...g.ch].sort()[0] || '';
+    const groups = [...byNum.values()].sort((a, b) => Number(a.n) - Number(b.n) || koSort(a.n, b.n) || koSort(first(a), first(b)));
+    if (keys.length <= 1) { // 공통 회전 (옛 형식 그대로)
+      const parts = groups.map((g) => g.n + [...g.ch].sort().join('')).concat(whole.sort(koSort));
+      const use = keys.length ? keys[0].split(',') : allRots;
+      return parts.join(',') + (use.length && use.length < allRots.length ? ' (' + use.join(',') + ')' : '');
+    }
+    const parts = groups.map((g) => g.n + [...g.ch].sort().join('') + (g.k !== allRots.join(',') ? '(' + g.k + ')' : '')).concat(whole.sort(koSort));
+    return parts.join(',');
   }
+  /** 회전 고르기 표 (공용): 글자(408A…)마다 D1·D2·F3 체크 + 맨 위 '전체' 줄. p = data 속성 앞글자, st = { units, rots, per } */
+  function rotGridHtml(p, st, allRots) {
+    const us = st.units.filter((u) => unitRe.test(u));
+    if (!us.length || st.special) return '';
+    const per = st.per || {};
+    const rotOf = (u) => (per[u] && per[u].length ? per[u] : st.rots);
+    const allSame = us.every((u) => rotOf(u).join(',') === rotOf(us[0]).join(','));
+    const row = (u, lab) => '<div class="rrow' + (u === '*' ? ' all' : '') + '"><b>' + esc(lab) + '</b>' +
+      allRots.map((r) => { const on = u === '*' ? us.every((x) => rotOf(x).includes(r)) : rotOf(u).includes(r); return '<label><input type="checkbox" data-' + p + 'rot="' + r + '" data-' + p + 'ru="' + esc(u) + '"' + (on ? ' checked' : '') + (u === '*' && !allSame && !on && us.some((x) => rotOf(x).includes(r)) ? ' class="mixed"' : '') + '> ' + r + '</label>'; }).join('') + '</div>';
+    return '<div class="rotgrid">' + row('*', '전체' + (allSame ? '' : ' (글자마다 다름)')) + us.slice().sort((a, b) => koSort(a, b)).map((u) => row(u, u)).join('') + '</div>';
+  }
+  /** 회전 체크 바뀜 (공용). 바꿨으면 true. '전체' 줄은 모든 글자에 더하거나 빼기 · 모두 같아지면 글자별 설정은 지움 */
+  function rotChange(e, p, st) {
+    const r = e.target.dataset && e.target.dataset[p + 'rot'], u = e.target.dataset && e.target.dataset[p + 'ru'];
+    if (!r || u === undefined) return false;
+    st.per = st.per || {};
+    const us = st.units.filter((x) => unitRe.test(x));
+    const rotOf = (x) => (st.per[x] && st.per[x].length ? st.per[x] : (st.rots || [])).slice();
+    const on = !!e.target.checked;
+    const targets = u === '*' ? us : [u];
+    const next = {};
+    for (const x of targets) {
+      const cur = rotOf(x), nx = on ? [...new Set(cur.concat([r]))] : cur.filter((y) => y !== r);
+      if (!nx.length) { toast('회전은 하나 이상 골라야 합니다.'); return true; }
+      next[x] = nx;
+    }
+    Object.keys(next).forEach((x) => { st.per[x] = next[x]; });
+    // 모두 같으면 공통 회전으로
+    const keys = [...new Set(us.map((x) => rotOf(x).join(',')))];
+    if (keys.length === 1) { st.rots = keys[0].split(','); st.per = {}; }
+    return true;
+  }
+  /** 고르기에서 빠진 글자의 회전 설정 지움 */
+  function rotPrune(st) { if (st.per) Object.keys(st.per).forEach((u) => { if (!st.units.includes(u)) delete st.per[u]; }); }
   /** 캠프의 노선관리 라우트 → 숫자별 글자 목록. list = [{code, stopped}] */
   function unitGroups(list) {
     const groups = new Map(), whole = new Map();
@@ -2570,19 +2627,14 @@
 
   const campRots = (id) => { const c = CR && CR.camps.find((x) => x.id === id); return String((c && c.rot) || 'D1,D2,F3').split(',').filter(Boolean); };
   const campList = (id) => (CR ? CR.routes.filter((r) => r.campId === id).map((r) => ({ code: r.code, stopped: r.status === '정지' })) : []);
-  function composeBR() { return aSel ? composeUnits(aSel.units, aSel.special, aSel.rots, campRots(aSel.campId)) : ''; }
+  function composeBR() { return aSel ? composeUnits(aSel.units, aSel.special, aSel.rots, campRots(aSel.campId), aSel.per) : ''; }
   function assignSec() {
     return '<div class="sec" id="aSec"><h4>배정 캠프 · 라우트</h4><div id="aBody"><div class="spin" style="width:20px;height:20px"></div></div>' +
-      '<input type="hidden" data-k="schCampId" id="aCampVal"><input type="hidden" data-k="baseRoute" id="aRouteVal"><input type="hidden" data-k="extraAssign" id="xVal"></div>';
+      '<input type="hidden" data-k="schCampId" id="aCampVal"><input type="hidden" data-k="baseRoute" id="aRouteVal"></div>';
   }
-  // 추가 배정: 소속 캠프 말고 다른 캠프 라우트도 맡을 때 (기사스케줄에 그 캠프 줄이 하나 더 생김)
-  let xSel = [];
   function initAssign(d) {
     const p = parseBR(d.baseRoute);
-    aSel = { campId: d.schCampId || '', units: p.units, special: p.special, rots: p.rots, q: '' };
-    let xa = []; try { xa = JSON.parse(d.extraAssign || '[]') || []; } catch (e) { xa = []; }
-    xSel = xa.map((x) => ({ campId: x.c, units: parseBR(x.r).units, rots: parseBR(x.r).rots }));
-    $('#xVal').value = d.extraAssign || '';
+    aSel = { campId: d.schCampId || '', units: p.units, special: p.special, rots: p.rots, per: p.per || {}, q: '' };
     $('#aCampVal').value = d.schCampId || ''; $('#aRouteVal').value = d.baseRoute || '';
     loadCR(true).then(() => { if ($('#aBody')) { if (!aSel.rots.length) aSel.rots = campRots(aSel.campId); paintAssign(); } }).catch(() => {});
   }
@@ -2599,66 +2651,23 @@
         (list.length > 24 ? '<input class="inp" id="aQ" placeholder="숫자 검색 (예: 110)" value="' + esc(aSel.q) + '" style="height:34px;margin-bottom:6px">' : '') +
         '<div id="aChips">' + unitPickerHtml('a', aSel.campId ? list : [], aSel.units, aSel.special, aSel.q) +
         (aSel.campId && !list.length ? '<span class="sub" style="font-size:13px;padding:6px 0;display:block">이 캠프에 등록된 라우트가 없습니다. 노선관리에서 추가해 주세요.</span>' : '') + '</div></div>' +
-      (aSel.campId && !aSel.special && aSel.units.length ? '<div class="field" style="margin:0"><span class="lb">회전 (일부만 맡을 때만 해제)</span><div class="radios">' +
-        rots.map((r) => '<label><input type="checkbox" data-rot="' + r + '"' + (aSel.rots.includes(r) ? ' checked' : '') + '> ' + r + '</label>').join('') + '</div></div>' : '') +
-      '<div class="brprev">저장될 기본노선: <b>' + (esc(composeBR()) || '<span style="color:var(--faint)">없음</span>') + '</b></div>' +
-      '<div class="xas">' + xSel.map((x, i) => {
-        const used = new Set([aSel.campId].concat(xSel.filter((_, j) => j !== i).map((y) => y.campId)));
-        const xr = x.campId && x.units.length ? composeUnits(x.units, '', x.rots && x.rots.length ? x.rots : campRots(x.campId), campRots(x.campId)) : '';
-        return '<div class="xone"><div class="xhd"><span>추가 배정 ' + (i + 1) + '</span><span style="display:flex;gap:6px"><button type="button" class="btn sm ghost" data-xmain="' + i + '" title="이 캠프·라우트를 기본노선으로 (지금 기본노선은 추가 배정으로 바뀜)">★ 기본노선으로</button><button type="button" class="btn sm ghost danger-t" data-xdel="' + i + '">빼기</button></span></div>' +
-          '<select class="inp" data-xcamp="' + i + '" style="margin-bottom:8px"><option value="">(캠프 고르기)</option>' +
-          camps.filter((c) => c.id === x.campId || !used.has(c.id)).map((c) => '<option value="' + esc(c.id) + '"' + (c.id === x.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>' +
-          (x.campId ? '<div class="xchips" data-xi="' + i + '">' + unitPickerHtml('x' + i, campList(x.campId), x.units, '', '') + '</div>' : '') +
-          '<div class="brprev" style="margin-top:6px">' + (xr ? '추가: <b>' + esc(shortCamp((camps.find((c) => c.id === x.campId) || {}).name || '')) + ' ' + esc(xr) + '</b>' : '<span style="color:var(--faint)">캠프와 라우트를 고르면 저장됩니다</span>') + '</div></div>';
-      }).join('') +
-      '<button type="button" class="btn sm ghost" id="xAdd"' + (!aSel.campId ? ' disabled title="소속 캠프를 먼저 고르세요"' : '') + '>+ 다른 캠프 라우트 추가 배정</button>' +
-      '<div class="sub" style="font-size:12px;margin-top:6px">추가 배정한 캠프는 기사스케줄에 이 기사 줄이 하나 더 생기고(보라색 \'추가\' 표시), 칸은 따로 입력합니다. <b>★ 기본노선으로</b>를 누르면 그 캠프·라우트가 기본노선이 되고 지금 기본은 추가 배정으로 바뀝니다 (저장하면 오늘부터 칸도 서로 바뀜). 기사 앱 내 스케줄에는 \'강서1 527B\'처럼 함께 보입니다.</div></div>';
+      (aSel.campId && !aSel.special && aSel.units.length ? '<div class="field" style="margin:0"><span class="lb">회전 — 글자(A·B·C·D)마다 D1·D2·F3 를 고를 수 있어요 (일부만 맡을 때만 해제)</span>' + rotGridHtml('a', aSel, rots) + '</div>' : '') +
+      '<div class="brprev">저장될 기본노선: <b>' + (esc(composeBR()) || '<span style="color:var(--faint)">없음</span>') + '</b></div>';
     if (aSel.q && $('#aQ')) { const i = $('#aQ'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
   }
   function syncAssign() {
     const cv = $('#aCampVal'), rv = $('#aRouteVal');
+    rotPrune(aSel);
     if (cv.value !== aSel.campId) { cv.value = aSel.campId; cv.dispatchEvent(new Event('input', { bubbles: true })); }
     const br = composeBR();
     if (rv.value !== br) { rv.value = br; rv.dispatchEvent(new Event('input', { bubbles: true })); }
     paintAssign();
   }
   $('#dBody').addEventListener('change', (e) => {
-    if (e.target.id === 'aCamp') { aSel.campId = e.target.value; aSel.units = []; aSel.rots = campRots(aSel.campId); aSel.q = ''; syncAssign(); }
-    else if (e.target.dataset && e.target.dataset.xcamp !== undefined) { const x = xSel[+e.target.dataset.xcamp]; if (x) { x.campId = e.target.value; x.units = []; x.rots = []; syncX(); } }
-    else if (e.target.dataset && e.target.dataset.rot) {
-      const r = e.target.dataset.rot;
-      aSel.rots = e.target.checked ? aSel.rots.concat([r]) : aSel.rots.filter((x) => x !== r);
-      if (!aSel.rots.length) { aSel.rots = [r]; toast('회전은 하나 이상 골라야 합니다.'); }
-      syncAssign();
-    }
+    if (e.target.id === 'aCamp') { aSel.campId = e.target.value; aSel.units = []; aSel.rots = campRots(aSel.campId); aSel.per = {}; aSel.q = ''; syncAssign(); }
+    else if (aSel && rotChange(e, 'a', aSel)) syncAssign();
   });
   $('#dBody').addEventListener('click', (e) => { if (aSel && e.target.closest('#aChips') && unitClick(e, 'a', aSel, campList(aSel.campId))) syncAssign(); });
-  function syncX() {
-    const arr = xSel.filter((x) => x.campId && x.units.length).map((x) => ({ c: x.campId, r: composeUnits(x.units, '', x.rots && x.rots.length ? x.rots : campRots(x.campId), campRots(x.campId)) }));
-    const v = arr.length ? JSON.stringify(arr) : '', el = $('#xVal');
-    let same = false; try { same = JSON.stringify(JSON.parse(el.value || '[]')) === JSON.stringify(arr); } catch (e) { same = false; }
-    if (el && !same && el.value !== v) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
-    paintAssign();
-  }
-  $('#dBody').addEventListener('click', (e) => {
-    if (!aSel) return;
-    if (e.target.id === 'xAdd') { xSel.push({ campId: '', units: [], rots: [] }); return paintAssign(); }
-    const del = e.target.closest('[data-xdel]'); if (del) { xSel.splice(+del.dataset.xdel, 1); return syncX(); }
-    // ★ 기본노선으로: 이 추가 배정과 지금 기본(소속 캠프·기본노선)을 맞바꿈 → 저장하면 오늘부터 기사스케줄 칸도 줄끼리 바뀜
-    const mk = e.target.closest('[data-xmain]');
-    if (mk) {
-      const i = +mk.dataset.xmain, x = xSel[i];
-      if (!x || !x.campId || !x.units.length) return toast('이 추가 배정의 캠프와 라우트를 먼저 고르세요.');
-      const old = { campId: aSel.campId, units: aSel.units.slice(), rots: aSel.special ? [] : aSel.rots.slice() };
-      aSel.campId = x.campId; aSel.units = x.units.slice(); aSel.special = ''; aSel.q = '';
-      aSel.rots = x.rots && x.rots.length ? x.rots.slice() : campRots(x.campId);
-      if (old.campId && old.units.length) xSel[i] = old; else xSel.splice(i, 1);
-      syncAssign(); syncX();
-      toast('기본노선을 바꿨습니다. 저장하면 오늘부터 기사스케줄 칸도 서로 바뀝니다.');
-    }
-    const box = e.target.closest('.xchips[data-xi]');
-    if (box) { const i = +box.dataset.xi, x = xSel[i]; if (x && unitClick(e, 'x' + i, x, campList(x.campId))) syncX(); }
-  });
   $('#dBody').addEventListener('input', (e) => { if (e.target.id === 'aQ') { aSel.q = e.target.value; paintAssign(); } });
 
   /** 근무상태 (재직·휴직·퇴사 + 퇴사일) — 앱 사용(상태)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐 */
@@ -6835,12 +6844,12 @@
       const myCamp = r.d.campId || '', campOf = (id) => SD.camps.find((c) => c.id === id);
       const v0 = String(ta.value || '').trim(), mc = v0.match(/^([가-힣]+\d)\s+(.+)$/);
       const c0 = mc ? SD.camps.find((c) => shortCamp(c.name).replace(/\s/g, '') === mc[1]) : null;
-      const body = c0 ? mc[2] : v0, p0 = /^\d/.test(body) || /^용차/.test(body) ? parseBR(body) : { units: [], special: '', rots: [] };
-      pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: p0.special === '용차' ? '용차' : '', rots: p0.rots };
+      const body = c0 ? mc[2] : v0, p0 = /^\d/.test(body) || /^용차/.test(body) ? parseBR(body) : { units: [], special: '', rots: [], per: {} };
+      pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: p0.special === '용차' ? '용차' : '', rots: p0.rots, per: p0.per || {} };
       if (!pk.rots.length) pk.rots = sdCampRots(pk.campId);
       const list = () => (SD.routes[pk.campId] || []).map((c) => ({ code: c, stopped: false }));
       const compose = () => {
-        const base = composeUnits(pk.units, pk.special, pk.rots, sdCampRots(pk.campId));
+        rotPrune(pk); const base = composeUnits(pk.units, pk.special, pk.rots, sdCampRots(pk.campId), pk.per);
         if (!base || base === '용차') return base;
         const c = campOf(pk.campId);
         return pk.campId && pk.campId !== myCamp && c ? shortCamp(c.name).replace(/\s/g, '') + ' ' + base : base;
@@ -6850,7 +6859,7 @@
         pkEl.innerHTML = '<div class="spk-h"><select class="inp" data-pkcamp>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
           .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === pk.campId ? ' selected' : '') + '>' + esc(c.name) + (c.id === myCamp ? ' (소속)' : '') + '</option>').join('') + '</select></div>' +
           unitPickerHtml('pk', pk.campId ? list() : [], pk.units, pk.special, '').replace(/<button[^>]*data-pksp="백업"[^>]*>[^<]*<\/button>/, '') +
-          (pk.units.length && !pk.special ? '<div class="radios spk-rot">' + rots.map((x) => '<label><input type="checkbox" data-pkrot="' + x + '"' + (pk.rots.includes(x) ? ' checked' : '') + '> ' + x + '</label>').join('') + '</div>' : '') +
+          (pk.units.length && !pk.special ? '<div class="spk-rot">' + rotGridHtml('pk', pk, rots) + '</div>' : '') +
           '<div class="spk-f"><span>입력될 값: <b>' + (v ? esc(v) : '<span style="color:var(--faint)">없음</span>') + '</b></span><button type="button" class="btn sm" data-pkput' + (v ? '' : ' disabled') + '>넣기</button></div>';
       };
       pkEl.addEventListener('mousedown', (e) => { if (!e.target.closest('select')) e.preventDefault(); });
@@ -6859,12 +6868,8 @@
         if (unitClick(e, 'pk', pk, list())) { ta.value = compose(); grow(); renderSug(); paintPk(); }
       });
       pkEl.addEventListener('change', (e) => {
-        if (e.target.dataset.pkcamp !== undefined) { pk.campId = e.target.value; pk.units = []; pk.special = ''; pk.rots = sdCampRots(pk.campId); }
-        else if (e.target.dataset.pkrot) {
-          const x = e.target.dataset.pkrot;
-          pk.rots = e.target.checked ? pk.rots.concat([x]) : pk.rots.filter((y) => y !== x);
-          if (!pk.rots.length) { pk.rots = [x]; toast('회전은 하나 이상 골라야 합니다.'); }
-        } else return;
+        if (e.target.dataset.pkcamp !== undefined) { pk.campId = e.target.value; pk.units = []; pk.special = ''; pk.rots = sdCampRots(pk.campId); pk.per = {}; }
+        else if (!rotChange(e, 'pk', pk)) return;
         ta.value = compose(); grow(); renderSug(); paintPk(); ta.focus();
       });
       sEdit.paintPk = () => paintPk();
@@ -7096,7 +7101,7 @@
     $('#sdCamp').innerHTML = '<option value="">(소속 캠프 없음)</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name))
       .map((c) => '<option value="' + esc(c.id) + '"' + (c.id === d.campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
     const pb = parseBR(d.baseRoute);
-    sdSel = { units: pb.units, special: pb.special, rots: pb.rots.length ? pb.rots : sdCampRots(d.campId) };
+    sdSel = { units: pb.units, special: pb.special, rots: pb.rots.length ? pb.rots : sdCampRots(d.campId), per: pb.per || {} };
     paintSdRoutes();
     $('#sdOff').value = d.fixedOff || ''; $('#sdExtra').value = d.extraOff || '';
     $('#sdPat').value = d.workPattern || ''; $('#sdMemo').value = d.memo || ''; $('#sdOrder').value = d.order || '';
@@ -7119,27 +7124,24 @@
   });
   $('#sdOff').addEventListener('input', paintOffBtns);
   // 라우트 고르기 (노선관리 데이터)
-  let sdSel = { units: [], special: '', rots: [] };
+  let sdSel = { units: [], special: '', rots: [], per: {} };
   const sdCampRots = (id) => { const c = SD.camps.find((x) => x.id === id); return String((c && c.rot) || 'D1,D2,F3').split(',').filter(Boolean); };
   const sdList = () => (SD.routes[$('#sdCamp').value] || []).map((c) => ({ code: c, stopped: false }));
-  function sdCompose() { return composeUnits(sdSel.units, sdSel.special, sdSel.rots, sdCampRots($('#sdCamp').value)); }
+  function sdCompose() { rotPrune(sdSel); return composeUnits(sdSel.units, sdSel.special, sdSel.rots, sdCampRots($('#sdCamp').value), sdSel.per); }
   function paintSdRoutes() {
     const campId = $('#sdCamp').value, list = sdList();
     $('#sdChips').innerHTML = unitPickerHtml('sd', campId ? list : [], sdSel.units, sdSel.special, '') +
       (!campId ? '<span class="sub" style="font-size:13px;padding:6px 0;display:block">캠프를 먼저 고르세요.</span>'
         : !list.length ? '<span class="sub" style="font-size:13px;padding:6px 0;display:block">이 캠프에 등록된 라우트가 없습니다. 노선관리에서 추가해 주세요.</span>' : '');
     const rots = sdCampRots(campId);
-    $('#sdRots').innerHTML = campId && !sdSel.special && sdSel.units.length ? '<span class="lb" style="margin:0 6px 0 0">회전</span>' +
-      rots.map((r) => '<label><input type="checkbox" data-sdrot="' + r + '"' + (sdSel.rots.includes(r) ? ' checked' : '') + '> ' + r + '</label>').join('') : '';
+    $('#sdRots').innerHTML = campId && !sdSel.special && sdSel.units.length ? '<span class="lb" style="margin:0 6px 0 0">회전</span>' + rotGridHtml('sd', sdSel, rots) : '';
     const br = sdCompose();
     $('#sdRoute').value = br;
     $('#sdBr').innerHTML = br ? esc(br) : '<span style="color:var(--faint)">없음</span>';
   }
   $('#sdChips').addEventListener('click', (e) => { if (unitClick(e, 'sd', sdSel, sdList())) paintSdRoutes(); });
   $('#sdRots').addEventListener('change', (e) => {
-    const r = e.target.dataset && e.target.dataset.sdrot; if (!r) return;
-    sdSel.rots = e.target.checked ? sdSel.rots.concat([r]) : sdSel.rots.filter((x) => x !== r);
-    if (!sdSel.rots.length) { sdSel.rots = [r]; toast('회전은 하나 이상 골라야 합니다.'); }
+    if (!rotChange(e, 'sd', sdSel)) return;
     paintSdRoutes();
   });
   $('#sdCamp').addEventListener('change', () => { sdSel = { units: [], special: sdSel.special, rots: sdCampRots($('#sdCamp').value) }; paintSdRoutes(); });

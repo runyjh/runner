@@ -1578,25 +1578,41 @@
   // ───── 내 스케줄 (이번 주 확정 + 다음 주 예상) ─────
   const DOWK = ['일', '월', '화', '수', '목', '금', '토'];
   const escH = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  /** 스케줄 칸 글자 풀기: '강서1 529A,529B (D1,D2,F3)' → { camp:'강서1', codes:['529A','529B'], routes:'529AB', rot:'D1,D2,F3', raw } · '출근' 은 기본노선(baseRoute)으로 */
+  /** 스케줄 칸 글자 풀기: '강서1 529A,529B (D1,D2,F3)' → { camp:'강서1', codes:['529A','529B'], routes:'529AB', rot:'D1,D2,F3', per:{}, raw } · '출근' 은 기본노선(baseRoute)으로
+   *  '408A(D1,D2),408B' 처럼 노선 바로 뒤 괄호 = 그 글자만의 회전 → per['408A']='D1,D2', routes '408A(D1,D2) 408B' */
+  const ROT_FULL = 'D1,D2,F3';
   function schParse(v, baseRoute) {
-    let t = String(v || '').trim();
-    const rot = (t.match(/\(([^)]*)\)/) || [])[1] || '';
+    const per = {};
+    const pull = (x) => String(x || '').replace(/(\d+[A-Za-z]+)\(([^)]*)\)/g, (m0, rt, ro) => {
+      const r = ro.replace(/\s/g, '').toUpperCase(); const mm = rt.toUpperCase().match(/^(\d+)([A-Z]+)$/);
+      if (r && mm) mm[2].split('').forEach((ch) => { per[mm[1] + ch] = r; });
+      return rt;
+    });
+    let t = pull(String(v || '').trim());
+    const rot = ((t.match(/\(([^)]*)\)/) || [])[1] || '').replace(/\s/g, '').toUpperCase();
     t = t.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
     let camp = '';
     const m = t.match(/^([가-힣]+\d*)\s+(?=\d)/); if (m) { camp = m[1]; t = t.slice(m[0].length).trim(); }
-    if (/^출근$/.test(t) && baseRoute) t = String(baseRoute).replace(/\([^)]*\)/g, '').trim();
-    const codes = [], nums = {}, order = [];
-    t.toUpperCase().split(/[,\s/]+/).filter(Boolean).forEach((c) => { const mm = c.match(/^(\d{2,4})([A-Z]+)$/); if (!mm) return; codes.push(c); if (!nums[mm[1]]) { nums[mm[1]] = ''; order.push(mm[1]); } nums[mm[1]] += mm[2]; });
-    return { camp, codes, routes: order.map((n) => n + nums[n]).join(' '), rot, raw: String(v || '').replace(/\([^)]*\)/g, '').trim() };
+    if (/^출근$/.test(t) && baseRoute) t = pull(String(baseRoute)).replace(/\([^)]*\)/g, '').trim();
+    const codes = [], groups = {}, order = [];
+    t.toUpperCase().split(/[,\s/]+/).filter(Boolean).forEach((c) => {
+      const mm = c.match(/^(\d{2,4})([A-Z]+)$/); if (!mm) return;
+      mm[2].split('').forEach((ch) => {
+        const u = mm[1] + ch; codes.push(u);
+        const rr = per[u] || rot, k = mm[1] + '|' + rr; if (!groups[k]) { groups[k] = { n: mm[1], r: rr, ch: '' }; order.push(k); }
+        groups[k].ch += ch;
+      });
+    });
+    const mixed = Object.keys(per).length > 0;
+    const routes = order.map((k) => { const g = groups[k]; return g.n + g.ch + (mixed && g.r && g.r !== ROT_FULL ? '(' + g.r + ')' : ''); }).join(' ');
+    return { camp, codes, routes, rot, per, mixed, raw: String(v || '').replace(/\([^)]*\)/g, '').trim() };
   }
-  /** 칸 글자를 깔끔하게: '강서1 529A,529B (D1,D2,F3)' → '강서1 529AB' · 회전이 기본(D1,D2,F3)이 아니면 '(D1,D2)' 붙임 · 라우트 없으면 원문 */
-  const ROT_FULL = 'D1,D2,F3';
+  /** 칸 글자를 깔끔하게: '강서1 529A,529B (D1,D2,F3)' → '강서1 529AB' · 회전이 기본(D1,D2,F3)이 아니면 '(D1,D2)' 붙임 · 글자별 회전이면 '408A(D1,D2) 408B' · 라우트 없으면 원문 */
   function schNice(v, camp, baseRoute) {
     const pc = schParse(v, baseRoute || '');
     if (!pc.routes) return pc.raw || String(v || '');
-    const rot = pc.rot.replace(/\s/g, '').toUpperCase();
-    return ((pc.camp || camp) ? (pc.camp || camp) + ' ' : '') + pc.routes + (rot && rot !== ROT_FULL ? ' (' + rot + ')' : '');
+    const rot = pc.rot;
+    return ((pc.camp || camp) ? (pc.camp || camp) + ' ' : '') + pc.routes + (!pc.mixed && rot && rot !== ROT_FULL ? ' (' + rot + ')' : '');
   }
   function schKind(v) {
     const s = String(v || '').trim();

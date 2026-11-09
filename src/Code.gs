@@ -4524,10 +4524,8 @@ function schSyncCopies_(sh, h, drivers, fixedRows) {
 // ───── 추가 배정: 소속 캠프 말고 다른 캠프의 라우트도 맡는 기사 ─────
 // drivers '추가 배정' 칸 = JSON [{ c: 캠프ID, r: 라우트 }]. 기사스케줄에는 그 캠프 줄이 하나 더 생긴다 (행ID = EX기사ID@캠프ID)
 const SCH_EX_PREFIX = 'EX';
-function extraAssignOf_(o) {
-  try { const a = JSON.parse(str_(o && o.extraAssign) || '[]'); return Array.isArray(a) ? a.filter(function (x) { return x && x.c; }).map(function (x) { return { c: String(x.c), r: String(x.r || '') }; }) : []; }
-  catch (e) { return []; }
-}
+// #279 추가 배정 기능 삭제: 칸에 값이 남아 있어도 읽지 않는다 (기사스케줄 EX 줄 · 내 스케줄 합치기 · 수행률 EX 모두 없어짐). 다른 캠프 입차는 칸에 '강서1 527B' 처럼 적는다.
+function extraAssignOf_(o) { return []; }
 function extraAssignNorm_(v, mainCampId) {
   let a = v;
   if (typeof a === 'string') { try { a = JSON.parse(a || '[]'); } catch (e) { fail_('추가 배정 값을 알아볼 수 없습니다.'); } }
