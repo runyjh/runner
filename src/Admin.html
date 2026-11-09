@@ -291,6 +291,12 @@
   .t-외부용차 { background: #f1ecfb; color: #6b46c1; }
   .t-운영자, .t-관리자, .t-대표 { background: #e8edf3; color: #334155; }
   .lnrt { display: inline-flex; gap: 4px; margin-left: 6px; cursor: pointer; vertical-align: middle; }
+  .fbb { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11.5px; font-weight: 800; }
+  .fbb.ok { background: #dcfce7; color: #15803d; } .fbb.no { background: #fee2e2; color: #b91c1c; } .fbb.wn { background: #fef3c7; color: #b45309; }
+  .fb-table .pct { font-weight: 800; } .fbgap { color: #b45309; font-size: 11px; }
+  .fb-table td.fbd div { line-height: 12px; white-space: nowrap; } .fb-table td.fbd i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 2px; background: #d1d5db; }
+  .fb-table td.fbd i.y { background: #16a34a; } .fb-table td.fbd i.n { background: #dc2626; }
+  .fb-table .plus { color: var(--brand); } .fb-table tr.edge td { background: #fffbeb; } .rp-sum span.hi b { color: var(--brand); } .rp-sum span small.sub { display: block; font-size: 11px; font-weight: 500; }
   .lnrt .lnt { font-size: 11px; }
   .t-none { background: var(--gray-weak); color: var(--faint); }
   .tabs.sub2 .tab { padding: 4px 10px; font-size: 13px; }
@@ -4801,7 +4807,7 @@
   // 수행률·SLA 는 한 메뉴(view-perf)에 탭 둘. 라우트 변경이력은 노선관리 → 변경이력 탭 (lnRender 공용)
   const rpViewOn = () => currentView === 'perf';
   const rpBox = () => $('#perfBox');
-  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)']];
+  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)'], ['fb', '프레시백 가중요인']];
   const rpTabNow = () => { const ts = rpTabs().map((t) => t[0]); if (ts.indexOf(RP.tab) < 0) RP.tab = ts[0]; return RP.tab; };
   $('#rpReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
   function rpList() {
@@ -4822,6 +4828,7 @@
       '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 기록을 업무스케줄에') : '') +
       '<a class="btn sm ghost" href="#" data-view="route" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 종료 — 노선관리에서 관리합니다">라우트 변경이력 → 노선관리</a></span></div></div>';
     if (tab === 'sla') return slaRender(box);
+    if (tab === 'fb') return fbRender(box);
     if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; }
     const wks = RP.weeks.slice(-8), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw);
     const camps = [...new Set(RP.rows.map((r) => r.camp))].sort(koSort);
@@ -4855,8 +4862,8 @@
     const em = $('#rpEmpty'); em.classList.toggle('hidden', !!list.length);
     em.textContent = RP.rows.length ? '조건에 맞는 라우트가 없습니다.' : '올린 수행률 자료가 없습니다. [수행률 업로드]로 쿠팡 파일을 올려 주세요.';
   }
-  $$('.rp-box').forEach((bx) => bx.addEventListener('input', (e) => { if (e.isComposing) return; if (e.target.id === 'rpQ') { RP.f.q = e.target.value; rpRenderRows(); } if (e.target.id === 'slQ') { SL.f.q = e.target.value; slaRenderRows(); } }));
-  $$('.rp-box').forEach((bx) => bx.addEventListener('change', (e) => { const m = { rpCamp: 'camp', rpMode: 'mode' }[e.target.id]; if (m) { RP.f[m] = e.target.value; rpRenderRows(); } const m2 = { slCamp: 'camp', slMode: 'mode' }[e.target.id]; if (m2) { SL.f[m2] = e.target.value; slaRenderRows(); } if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); } if (e.target.id === 'rpEnded') { RP.f.ended = e.target.checked; rpRenderRows(); } if (e.target.id === 'slEnded') { SL.f.ended = e.target.checked; slaRenderRows(); } }));
+  $$('.rp-box').forEach((bx) => bx.addEventListener('input', (e) => { if (e.isComposing) return; if (e.target.id === 'rpQ') { RP.f.q = e.target.value; rpRenderRows(); } if (e.target.id === 'slQ') { SL.f.q = e.target.value; slaRenderRows(); } if (e.target.id === 'fbQ') { FW.f.q = e.target.value; fbRenderRows(); } }));
+  $$('.rp-box').forEach((bx) => bx.addEventListener('change', (e) => { const m = { rpCamp: 'camp', rpMode: 'mode' }[e.target.id]; if (m) { RP.f[m] = e.target.value; rpRenderRows(); } const m3 = { fbCamp: 'camp', fbMode: 'mode' }[e.target.id]; if (m3) { FW.f[m3] = e.target.value; fbRenderRows(); } const m2 = { slCamp: 'camp', slMode: 'mode' }[e.target.id]; if (m2) { SL.f[m2] = e.target.value; slaRenderRows(); } if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); } if (e.target.id === 'rpEnded') { RP.f.ended = e.target.checked; rpRenderRows(); } if (e.target.id === 'slEnded') { SL.f.ended = e.target.checked; slaRenderRows(); } }));
   /** 라우트 변경이력 패널 클릭 (수행률 화면 · 노선관리 변경이력 탭 공용) */
   function lnClick(e) {
     if (e.target.id === 'lnSugBtn') {
@@ -4892,6 +4899,7 @@
     const go = e.target.closest('a[data-rtab="ln"]'); if (go) { e.preventDefault(); rtab = 'ln'; switchView('route'); if (RT.camps.length) renderCampMain(); return; }
     if (e.target.id === 'rpUpBtn2' || e.target.id === 'rpUpBtn3') return $('#rpFile').click();
     const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); return; }
+    if (fbClick(e)) return;
     lnClick(e);
   }));
   // 노선관리 변경이력 탭: 같은 핸들러
@@ -4982,8 +4990,15 @@
     try {
       const sheets = await readXlsx(await f.arrayBuffer());
       const isSla = sheets.some((sh) => sh.rows.some((r) => r && r.some((v) => /data\s*end\s*date/i.test(String(v == null ? '' : v)))));
-      $('#rpUpKind').classList.toggle('hidden', isSla);
-      if (isSla) {
+      const isFb = !isSla && sheets.some((sh) => sh.rows.slice(0, 8).some((r) => r && r.some((v) => /가중요인/.test(String(v == null ? '' : v)))));
+      $('#rpUpKind').classList.toggle('hidden', isSla || isFb);
+      if (isFb) {
+        const blocks = parseFbSheet(sheets);
+        if (!blocks.length) throw new Error('가중요인 파일에서 표(Wave · Camp · Route · 가중요인1 · 가중요인2)를 찾지 못했습니다.');
+        rpUp = { file: f.name, kind: 'fb', blocks };
+        if (!FW.loaded) await loadFb();
+        fbUpPreview();
+      } else if (isSla) {
         const blocks = parseSlaSheet(sheets);
         if (!blocks.length) throw new Error('SLA 파일에서 점수 표(Category · Camp · Route · Total Score)를 찾지 못했습니다.');
         rpUp = { file: f.name, kind: 'sla', blocks };
@@ -5000,7 +5015,7 @@
   });
   const rpPctTxt = (v) => { if (v === '' || v == null) return '-'; const s = String(v).trim(); if (/%$/.test(s)) return s; const n = Number(s); return isNaN(n) ? s : Math.round((n <= 1.5 ? n * 100 : n) * 10) / 10 + '%'; };
   function rpUpPreview() {
-    const U = rpUp; if (!U || U.kind === 'sla') return;
+    const U = rpUp; if (!U || U.kind === 'sla' || U.kind === 'fb') return;
     const P = U.P, wk = +$('#rpUpWk').value || P.wk, year = +$('#rpUpYear').value || P.year;
     const shift = wk - P.wk; // 주차를 손으로 고치면 과거 주차도 같이 밀린다
     const lrows = P.rows.filter((r) => r.wk === P.wk), g = (n) => lrows.filter((r) => String(r.grade).replace(/\D/g, '') === String(n)).length;
@@ -5020,6 +5035,7 @@
   $('#rpUpOk').addEventListener('click', () => {
     const U = rpUp; if (!U) return;
     if (U.kind === 'sla') return slaUpSave();
+    if (U.kind === 'fb') return fbUpSave();
     const wk = +$('#rpUpWk').value, year = +$('#rpUpYear').value;
     if (!(wk >= 1 && wk <= 53)) return toast('주차(1~53)를 확인해 주세요.');
     if (!(year >= 2020 && year <= 2100)) return toast('연도를 확인해 주세요.');
@@ -5243,6 +5259,176 @@
       await loadSla(true); await loadPerf(true);
       RP.tab = 'sla'; if (currentView !== 'perf') switchView('perf'); else rpRender();
     } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
+  }
+  // ───── 프레시백 가중요인 (쿠팡 Weekly·월간 '가중요인 해당여부' 파일 · route_fb) ─────
+  const FW = { cum: [], day: [], month: [], periods: [], days: [], set: { th1: 95, th2: 75, won1: 14, won2: 9, drvOn: true }, vol: {}, volMonths: [], loaded: false, loading: null, f: { camp: '', mode: '', q: '' } };
+  const fbWonV = (w) => Math.round(w * 1.1); // 공급가 → 부가세 포함 (기사가 실제 받는 금액 표기)
+  const fbYes = (v) => String(v || '').replace(/\s/g, '') === '해당';
+  const fbBadge = (v) => v === '해당' ? '<span class="fbb ok">해당</span>' : v === '미해당' ? '<span class="fbb no">미해당</span>' : '<span class="sub">-</span>';
+  const fbPeriodOf = (d) => { if (!d) return ''; const [y, m, dd] = String(d).split('-').map(Number); const e = dd <= 25 ? new Date(y, m - 1, 25) : new Date(y, m, 25); return ymdLocal(e); };
+  const fbPdLabel = (p) => p ? (() => { const [y, m] = p.split('-').map(Number); const f = new Date(y, m - 2, 26); return Number(String(f.getMonth() + 1)) + '/26~' + m + '/25 (' + m + '월 정산)'; })() : '';
+  function loadFb(force) {
+    if (FW.loading) return FW.loading;
+    if (FW.loaded && !force) return Promise.resolve(FW);
+    FW.loading = api('adm_fbList').then((r) => {
+      if (!r.ok) { toast(r.msg); return FW; }
+      FW.cum = r.cum || []; FW.day = r.day || []; FW.month = r.month || []; FW.periods = r.periods || []; FW.days = r.days || []; FW.set = r.set || FW.set; FW.vol = r.vol || {}; FW.volMonths = r.volMonths || []; FW.loaded = true;
+      if (r.lineage && !LN.loaded) lnSet(r.lineage);
+      if (rpViewOn() && RP.tab === 'fb') rpRender();
+      return FW;
+    }).catch(() => FW).finally(() => { FW.loading = null; });
+    return FW.loading;
+  }
+  /** 쿠팡 가중요인 시트 → blocks [{ kind:'누적'|'일별'|'월간', from, to, date, title, rows:[{wave,camp,code,f1pct,f1,f2pct,f2}] }] */
+  function parseFbSheet(sheets) {
+    const txt = (v) => (v == null ? '' : String(v)).trim();
+    const dt = (s) => { const m = String(s).match(/(20\d{2})\s*[.\-\/]\s*(\d{1,2})\s*[.\-\/]\s*(\d{1,2})/); return m ? m[1] + '-' + String(+m[2]).padStart(2, '0') + '-' + String(+m[3]).padStart(2, '0') : ''; };
+    const out = [];
+    for (const sh of sheets) {
+      const hi = sh.rows.findIndex((r) => r && r.some((v) => /^wave$/i.test(txt(v))) && r.some((v) => /^route$/i.test(txt(v))) && r.some((v) => /가중요인\s*1/.test(txt(v).replace(/\n/g, ''))));
+      if (hi < 0) continue;
+      const head = sh.rows[hi];
+      // 제목 줄: 머리글 위쪽에서 'Title' 또는 날짜가 든 칸
+      const titleRows = sh.rows.slice(Math.max(0, hi - 4), hi);
+      head.forEach((v, c) => {
+        if (!/^wave$/i.test(txt(v))) return;
+        const camp = c + 1, route = c + 2;
+        const pct1 = /%/.test(txt(head[c + 3]).replace(/\n/g, ''));
+        const ci = pct1 ? { f1pct: c + 3, f1: c + 4, f2pct: c + 5, f2: c + 6 } : { f1: c + 3, f2: c + 4 };
+        // 이 블록의 제목: 같은 열 묶음(c-2 ~ c+6) 안에서 날짜가 든 글자
+        let title = '';
+        titleRows.forEach((r) => { for (let j = Math.max(0, c - 2); j <= c + 6; j++) { const t = txt((r || [])[j]); if (/20\d{2}\s*[.\-\/]\s*\d{1,2}/.test(t) && /가중요인|해당/.test(t)) title = t; } });
+        if (!title) titleRows.forEach((r) => { for (let j = Math.max(0, c - 2); j <= c + 6; j++) { const t = txt((r || [])[j]); if (/20\d{2}\s*[.\-\/]\s*\d{1,2}/.test(t)) title = title || t; } });
+        if (!title) return;
+        const dates = title.match(/20\d{2}\s*[.\-\/]\s*\d{1,2}\s*[.\-\/]\s*\d{1,2}/g) || [];
+        const month = /월간/.test(title), range = dates.length >= 2;
+        const kind = month ? '월간' : range ? '누적' : '일별';
+        const b = { kind, title, from: range ? dt(dates[0]) : '', to: range ? dt(dates[1]) : dt(dates[0]), date: kind === '일별' ? dt(dates[0]) : '', rows: [] };
+        for (let r = hi + 1; r < sh.rows.length; r++) {
+          const row = sh.rows[r] || []; const cp = txt(row[camp]), code = txt(row[route]);
+          if (!cp || !code || !/\d/.test(code)) continue;
+          b.rows.push({ wave: txt(row[c]), camp: cp, code, f1pct: ci.f1pct !== undefined ? txt(row[ci.f1pct]) : '', f1: txt(row[ci.f1]), f2pct: ci.f2pct !== undefined ? txt(row[ci.f2pct]) : '', f2: txt(row[ci.f2]) });
+        }
+        if (b.rows.length) out.push(b);
+      });
+      if (out.length) break;
+    }
+    return out;
+  }
+  function fbUpPreview() {
+    const U = rpUp; if (!U || U.kind !== 'fb') return;
+    const S = FW.set;
+    $('#rpUpInfo').innerHTML = '<b>' + esc(U.file) + '</b><br>쿠팡 프레시백 가중요인 파일 · 블록 ' + U.blocks.length + '개: ' + U.blocks.map((b) => esc(b.kind + ' ' + (b.kind === '일별' ? slaPd(b.date) : slaPd(b.from) + '~' + slaPd(b.to)))).join(', ') +
+      '<br>정산기간: <b>' + esc(fbPdLabel(fbPeriodOf(U.blocks[0].kind === '일별' ? U.blocks[0].date : U.blocks[0].to))) + '</b> · 누적은 기준일이 더 최신인 것만 덮어쓰고, 일별은 날짜마다, 월간은 확정값으로 저장됩니다.';
+    const main = U.blocks.find((b) => b.kind === '월간') || U.blocks.find((b) => b.kind === '누적') || U.blocks[0];
+    const both = main.rows.filter((r) => fbYes(r.f1) && fbYes(r.f2)), none = main.rows.filter((r) => !fbYes(r.f1) && !fbYes(r.f2)), one = main.rows.filter((r) => fbYes(r.f1) !== fbYes(r.f2));
+    const pct = (v) => { const n = Number(String(v).replace(/[^\d.\-]/g, '')); return isNaN(n) ? null : n; };
+    const edge = main.rows.filter((r) => { const a = pct(r.f1pct), b2 = pct(r.f2pct); return (a != null && Math.abs(a - S.th1) <= 5) || (b2 != null && Math.abs(b2 - S.th2) <= 5); });
+    $('#rpUpDetail').innerHTML = '<div style="margin-top:8px"><b>' + esc(main.kind + ' ' + (main.kind === '일별' ? slaPd(main.date) : slaPd(main.from) + '~' + slaPd(main.to))) + '</b> · 라우트 ' + main.rows.length + '개' +
+      '<div class="rp-sum" style="margin-top:6px"><span>둘 다 해당 (+' + fbWonV(S.won1 + S.won2) + '원)<b>' + both.length + '</b></span><span>하나만 해당<b>' + one.length + '</b></span><span class="' + (none.length ? 'bad' : '') + '">둘 다 미해당 (0원)<b>' + none.length + '</b></span><span>경계 (±5%p)<b>' + edge.length + '</b></span></div>' +
+      (none.length ? '<div><b>둘 다 미해당:</b> ' + none.map((r) => esc(r.camp + ' ' + r.code) + (r.f1pct ? ' <small>' + esc(r.f1pct) + ' / ' + esc(r.f2pct) + '</small>' : '')).join(', ') + '</div>' : '') +
+      (one.length ? '<div style="margin-top:4px"><b>하나만 미해당:</b> ' + one.map((r) => esc(r.camp + ' ' + r.code) + ' <small>' + (fbYes(r.f1) ? '회수 ' + esc(r.f2pct || '미해당') : '수행률 ' + esc(r.f1pct || '미해당')) + '</small>').join(', ') + '</div>' : '') + '</div>' +
+      (RP.memoOn ? '<div style="margin-top:6px" class="sub">저장하면 업무스케줄에 "' + (main.kind === '월간' ? Number(fbPeriodOf(main.to).slice(5, 7)) + '월 가중요인 확정 업로드' : '가중요인 업로드 (' + slaPd(main.to) + ' 기준)') + '" 한 줄이 적힙니다.</div>' : '');
+  }
+  async function fbUpSave() {
+    const U = rpUp; if (!U || U.kind !== 'fb') return;
+    const b = $('#rpUpOk'); b.disabled = true; b.textContent = '저장 중…';
+    try {
+      const r = await api('adm_fbSave', { file: U.file, blocks: U.blocks.map((x) => ({ kind: x.kind, from: x.from, to: x.to, date: x.date, rows: x.rows })) });
+      if (!r.ok) { toast(r.msg); return; }
+      $('#rpUpModal').classList.add('hidden'); rpUp = null;
+      toast('가중요인을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged + (r.skippedOld ? ' · 더 최신 자료가 있어 건너뜀 ' + r.skippedOld : '') + (r.memo ? ' · 업무스케줄에 메모' : ''));
+      await loadFb(true);
+      RP.tab = 'fb'; if (currentView !== 'perf') switchView('perf'); else rpRender();
+    } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
+  }
+  /** 라우트 한 줄 계산: 최신 누적 + 일별 점 + 전월 확정 + 예상 금액 */
+  function fbRow(camp, code, lp) {
+    const keys = [rpKey(camp, code)].concat(lnPrevOf(lnHead(rpKey(camp, code))));
+    const pick = (rows) => rows.find((r) => keys.includes(rpKey(r.camp, r.code))) || null;
+    const c = pick(FW.cum.filter((r) => r.period === lp)); if (!c) return null;
+    const S = FW.set, won = (fbYes(c.f1) ? S.won1 : 0) + (fbYes(c.f2) ? S.won2 : 0);
+    const v = FW.vol[camp + '|' + code], pmd = v && FW.volMonths.length ? Math.round(v.days / FW.volMonths.length) : 0;
+    const est = v ? won * v.avg * pmd : null, estMax = v ? (S.won1 + S.won2) * v.avg * pmd : null;
+    const mp = FW.month.map((r) => r.period).filter((p) => p < lp).sort().pop() || '';
+    const m = mp ? pick(FW.month.filter((r) => r.period === mp)) : null;
+    const days = FW.days.filter((d) => fbPeriodOf(d) === lp).slice(-7).map((d) => { const r = pick(FW.day.filter((x) => x.date === d)); return { date: d, f1: r ? r.f1 : '', f2: r ? r.f2 : '', f2pct: r ? r.f2pct : null, f1pct: r ? r.f1pct : null }; });
+    const gap1 = c.f1pct != null ? Math.round((c.f1pct - S.th1) * 10) / 10 : null, gap2 = c.f2pct != null ? Math.round((c.f2pct - S.th2) * 10) / 10 : null;
+    const near = (g) => g != null && ((g < 0 && g >= -5) || (g >= 0 && g < 3)); // 경계: 기준 아래 5%p 이내 또는 위 3%p 미만
+    return { camp, code, c, won, est, estMax, v, pmd, m, mp, days, gap1, gap2, near, edge: near(gap1) || near(gap2), none: !fbYes(c.f1) && !fbYes(c.f2) };
+  }
+  function fbList() {
+    const lp = FW.periods.filter((p) => FW.cum.some((r) => r.period === p)).pop(); if (!lp) return [];
+    const q = normCode(FW.f.q), f = FW.f;
+    const seen = new Set();
+    return FW.cum.filter((r) => r.period === lp).map((r) => { const h = lnHead(rpKey(r.camp, r.code)); if (seen.has(h)) return null; seen.add(h); return fbRow(lnCampOf(h), lnCodeOf(h), lp); }).filter(Boolean)
+      .filter((x) => (!f.camp || x.camp === f.camp) && (!q || (x.camp + x.code).toUpperCase().includes(q)) &&
+        (!f.mode || (f.mode === 'edge' && x.edge) || (f.mode === 'none' && x.none) || (f.mode === 'one' && fbYes(x.c.f1) !== fbYes(x.c.f2)) || (f.mode === 'chg' && x.m && x.m.f1 + x.m.f2 !== x.c.f1 + x.c.f2)))
+      .sort((a, b) => koSort(a.camp, b.camp) || koSort(a.code, b.code));
+  }
+  function fbRender(box) {
+    if (!FW.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); loadFb(); return; }
+    const S = FW.set, lp = FW.periods.filter((p) => FW.cum.some((r) => r.period === p)).pop() || '';
+    const lrows = lp ? FW.cum.filter((r) => r.period === lp) : [], to = lrows.length ? lrows[0].to : '';
+    const camps = [...new Set(FW.cum.map((r) => r.camp).filter(Boolean))].sort(koSort);
+    const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
+    const listAll = (() => { const f0 = Object.assign({}, FW.f); FW.f = { camp: '', mode: '', q: '' }; const l = fbList(); FW.f = f0; return l; })();
+    const both = listAll.filter((x) => fbYes(x.c.f1) && fbYes(x.c.f2)).length, none = listAll.filter((x) => x.none).length, estSum = listAll.reduce((a, x) => a + (x.est || 0), 0), estMaxSum = listAll.reduce((a, x) => a + (x.estMax || 0), 0);
+    const mp = FW.month.map((r) => r.period).sort().pop() || '', mRows = mp ? FW.month.filter((r) => r.period === mp) : [];
+    const mWon = mRows.reduce((a, r) => { const v = FW.vol[r.camp + '|' + r.code], pmd = v && FW.volMonths.length ? Math.round(v.days / FW.volMonths.length) : 0; return a + ((fbYes(r.f1) ? S.won1 : 0) + (fbYes(r.f2) ? S.won2 : 0)) * (v ? v.avg * pmd : 0); }, 0);
+    const daysLeft = (() => { if (!lp || !to) return ''; const a = new Date(lp), b = new Date(to); return Math.max(0, Math.round((a - b) / 864e5)); })();
+    const today = ymdLocal(new Date()), closed = lp && lp < today;
+    box.insertAdjacentHTML('beforeend', '<div class="sec">' +
+      (lp ? '<div class="xp-head"><h4 style="margin:0">' + esc(fbPdLabel(lp)) + ' <span class="fbb ' + (closed ? 'ok' : 'wn') + '">' + (closed ? '기간 종료' : '진행 중') + '</span></h4><span class="xp-sum">기준일 ' + esc(slaPd(to)) + (daysLeft !== '' && !closed ? ' · 25일까지 ' + daysLeft + '일 남음' : '') + ' · 업로드 ' + esc(String(lrows[0].uploadedAt || '').slice(0, 16)) + '</span></div>' +
+        '<div class="rp-sum"><span>라우트<b>' + listAll.length + '</b></span><span>요인1 해당 (수행률 ' + S.th1 + '%↑)<b>' + listAll.filter((x) => fbYes(x.c.f1)).length + '</b></span><span>요인2 해당 (프레시백 ' + S.th2 + '%↑)<b>' + listAll.filter((x) => fbYes(x.c.f2)).length + '</b></span>' +
+        '<span class="hi">둘 다 해당 (+' + fbWonV(S.won1 + S.won2) + '원/건)<b>' + both + '</b></span><span class="' + (none ? 'bad' : '') + '">둘 다 미해당 (0원)<b>' + none + '</b></span>' +
+        (estSum ? '<span class="hi">이달 예상 추가금 (공급가)<b>약 ' + wn(Math.round(estSum / 1000) * 1000) + '원</b><small class="sub">모두 해당이면 ' + wn(Math.round(estMaxSum / 1000) * 1000) + '원</small></span>' : '') +
+        (mp ? '<span>전월 확정 (' + Number(mp.slice(5, 7)) + '월)<b>둘 다 ' + mRows.filter((r) => fbYes(r.f1) && fbYes(r.f2)).length + ' · 0원 ' + mRows.filter((r) => !fbYes(r.f1) && !fbYes(r.f2)).length + '</b>' + (mWon ? '<small class="sub">약 ' + wn(Math.round(mWon / 1000) * 1000) + '원 (물량 기준 추정)</small>' : '') + '</span>' : '') + '</div>'
+        : '<div class="empty">아직 올린 가중요인 자료가 없습니다. [수행률·SLA 업로드]에 쿠팡 메일의 Weekly 가중요인 파일(xlsx)을 올려 주세요. (파일 종류는 자동 인식)</div>') +
+      '<div class="ptools">' +
+        '<select class="inp" id="fbCamp" aria-label="캠프">' + opt('', '캠프 전체', FW.f.camp) + camps.map((c) => opt(c, c, FW.f.camp)).join('') + '</select>' +
+        '<select class="inp" id="fbMode" aria-label="보기">' + opt('', '전체', FW.f.mode) + opt('edge', '경계 (기준 ±5%p)', FW.f.mode) + opt('one', '하나만 미해당', FW.f.mode) + opt('none', '둘 다 미해당', FW.f.mode) + opt('chg', '전월과 달라진 라우트', FW.f.mode) + '</select>' +
+        '<input class="inp" id="fbQ" placeholder="캠프·라우트 검색" value="' + esc(FW.f.q) + '" autocomplete="off" style="width:150px">' +
+        '<span class="grow"></span><span class="rp-on">기사 앱에 가중요인 카드 <b class="' + (S.drvOn ? 'on' : 'off') + '">' + (S.drvOn ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-fbset="drvOn">' + (S.drvOn ? '끄기' : '켜기') + '</button></span>' +
+        '<button class="btn sm ghost" id="fbSetBtn">기준·단가 설정</button></div>' +
+      '<div id="fbSetBox" class="hidden" style="background:#f7f9ff;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인1 기준 (수행률 %)<input class="inp" id="fbTh1" value="' + S.th1 + '" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인2 기준 (프레시백 회수율 %)<input class="inp" id="fbTh2" value="' + S.th2 + '" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인1 단가 (공급가 원/건)<input class="inp" id="fbWon1" value="' + S.won1 + '" style="width:90px"></label>' +
+        '<label class="lb" style="display:flex;flex-direction:column;gap:2px;font-size:11px">요인2 단가 (공급가 원/건)<input class="inp" id="fbWon2" value="' + S.won2 + '" style="width:90px"></label>' +
+        '<button class="btn sm" id="fbSetSave">저장</button><small class="sub" style="flex-basis:100%">공급가 기준(쿠팡 정산서와 같음). 부가세 포함 실지급은 ×1.1 → 요인1 ' + fbWonV(S.won1) + '원 · 요인2 ' + fbWonV(S.won2) + '원 · 둘 다 ' + fbWonV(S.won1 + S.won2) + '원. 기준 %는 쿠팡 파일의 해당/미해당에서 역산한 값(95 / 75)입니다.</small></div>' +
+      '<div class="table-wrap rt-table rp-table fb-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>요인1 수행률 (누적)</th><th>요인2 프레시백 (누적)</th><th title="최근 7일 일별 해당 여부 (위 요인1 · 아래 요인2)">최근 7일</th><th>예상 단가</th><th title="예상 단가 × 1일 평균물량 × 한 달 배송일 (쿠팡 정산서 최근 2개월 기준)">이달 예상 (공급가)</th><th>전월 확정</th></tr></thead><tbody id="fbRows"></tbody></table><div class="empty hidden" id="fbEmpty"></div></div>' +
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">쿠팡이 메일로 보내는 <b>Weekly 가중요인 해당여부</b>(정산기간 누적 + 일별)와 <b>월간 Freshbag 해당여부</b>(확정) 파일을 올리면 쌓입니다. 요인1 = 누적 수행률 ' + S.th1 + '% 이상 → 공급가 ' + S.won1 + '원/건(실지급 ' + fbWonV(S.won1) + '원), 요인2 = 누적 프레시백 회수율 ' + S.th2 + '% 이상 → ' + S.won2 + '원/건(' + fbWonV(S.won2) + '원). 정산기간(전월 26일~당월 25일) 누적으로 정해지고 이달 전체 배송건에 붙습니다. 노란 줄 = 경계(±5%p) · 빨간 줄 = 둘 다 미해당.</p></div>');
+    fbRenderRows();
+  }
+  function fbRenderRows() {
+    const tb = $('#fbRows'); if (!tb) return;
+    const S = FW.set, list = fbList();
+    const pcell = (pct, yes, th, gap) => pct == null && !yes ? '<span class="sub">-</span>' : '<b class="pct">' + (pct == null ? '' : pct + '%') + '</b> ' + fbBadge(yes) + (gap != null && gap < 0 ? ' <small class="fbgap">' + th + '%까지 ' + Math.abs(gap) + '%p</small>' : gap != null && gap < 3 ? ' <small class="fbgap">경계 +' + gap + '%p</small>' : '');
+    const dots = (days, k) => days.map((d) => '<i class="' + (d[k] === '해당' ? 'y' : d[k] === '미해당' ? 'n' : '') + '" title="' + esc(slaPd(d.date) + ' ' + (d[k] || '-') + (d[k + 'pct'] != null ? ' ' + d[k + 'pct'] + '%' : '')) + '"></i>').join('');
+    tb.innerHTML = list.map((x) => {
+      const hk = rpKey(x.camp, x.code);
+      return '<tr class="' + (x.none ? 'bad' : x.edge ? 'edge' : '') + '"><td>' + esc(x.camp) + '</td><td class="rc" data-rpc="' + esc(hk) + '"><b class="code">' + esc(x.code) + '</b>' + lnTail(hk) + '</td>' +
+        '<td>' + pcell(x.c.f1pct, x.c.f1, S.th1, x.gap1) + '</td><td>' + pcell(x.c.f2pct, x.c.f2, S.th2, x.gap2) + '</td>' +
+        '<td class="fbd"><div>' + dots(x.days, 'f1') + '</div><div>' + dots(x.days, 'f2') + '</div></td>' +
+        '<td class="num"><b class="' + (x.won ? 'plus' : 'sub') + '">' + (x.won ? '+' + x.won + '원' : '0원') + '</b><small class="sub"> (' + fbWonV(x.won) + ')</small></td>' +
+        '<td class="num">' + (x.est == null ? '<span class="sub" title="정산서에 이 라우트 배송 기록이 없어 물량을 모릅니다">-</span>' : '<b>' + (x.won ? '약 ' + wn(Math.round(x.est / 1000) * 1000) : '0') + '</b>' + (x.won < S.won1 + S.won2 && x.estMax ? '<small class="sub"> (모두 해당 시 ' + wn(Math.round(x.estMax / 1000) * 1000) + ')</small>' : '') + (x.v ? '<small class="sub" title="1일 평균 ' + x.v.avg + '건 × ' + x.pmd + '일"> ' + x.v.avg + '건×' + x.pmd + '일</small>' : '')) + '</td>' +
+        '<td>' + (x.m ? '<span class="fbb ' + ((fbYes(x.m.f1) && fbYes(x.m.f2)) ? 'ok' : (fbYes(x.m.f1) || fbYes(x.m.f2)) ? 'wn' : 'no') + '" title="' + esc(Number(x.mp.slice(5, 7)) + '월 정산 · 요인1 ' + x.m.f1 + ' · 요인2 ' + x.m.f2) + '">' + ((fbYes(x.m.f1) ? S.won1 : 0) + (fbYes(x.m.f2) ? S.won2 : 0)) + '원</span>' : '<span class="sub">-</span>') + '</td></tr>';
+    }).join('');
+    const em = $('#fbEmpty'); em.classList.toggle('hidden', !!list.length);
+    em.textContent = FW.cum.length ? '조건에 맞는 라우트가 없습니다.' : '올린 가중요인 자료가 없습니다.';
+  }
+  function fbClick(e) {
+    const sb = e.target.closest('[data-fbset]');
+    if (sb) { sb.disabled = true; api('adm_fbSet', { drvOn: !FW.set.drvOn }).then((r) => { if (!r.ok) return toast(r.msg); FW.set = r.set; rpRender(); toast('기사 앱 가중요인 카드를 ' + (r.set.drvOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { sb.disabled = false; }); return true; }
+    if (e.target.id === 'fbSetBtn') { $('#fbSetBox').classList.toggle('hidden'); return true; }
+    if (e.target.id === 'fbSetSave') {
+      const f = { th1: $('#fbTh1').value, th2: $('#fbTh2').value, won1: $('#fbWon1').value, won2: $('#fbWon2').value };
+      e.target.disabled = true;
+      api('adm_fbSet', f).then((r) => { if (!r.ok) return toast(r.msg); FW.set = r.set; rpRender(); toast('가중요인 기준·단가를 저장했습니다.'); }).catch(() => {}).finally(() => { e.target.disabled = false; });
+      return true;
+    }
+    return false;
   }
   function renderBulk() {
     const have = new Set(RT.routes.map((r) => r.id));

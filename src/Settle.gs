@@ -3562,6 +3562,12 @@ function api_mySlip(token, month) {
 function adm_routeVolumes(token) {
   return run_(function () {
     requireAdmin_(token);
+    return routeVolumes_();
+  });
+}
+/** (내부) 라우트별 1일 평균 물량 — 관리자 노선관리 · 기사 앱 가중요인 예상 공용 */
+function routeVolumes_() {
+  {
     if (!props_().STL_DB_ID) return { ok: true, months: [], vol: {} };
     const key = 'stl:vol:' + stlVer_();
     const hit = stlCacheGet_(key);
@@ -3586,7 +3592,7 @@ function adm_routeVolumes(token) {
     const out = { ok: true, months: months, vol: vol };
     stlCachePut_(key, out, 1800);
     return out;
-  });
+  }
 }
 
 

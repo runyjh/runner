@@ -539,3 +539,191 @@ function adm_lineageSuggest(token) {
     return { ok: true, suggestions: left };
   });
 }
+
+// ───────────────────────── 프레시백 가중요인 (쿠팡 Weekly·월간 '가중요인 해당여부' 파일 · route_fb) ─────────────────────────
+// 가중요인1 = 누적 수행률(배송완료율) 95% 이상 → 공급가 14원/건 (부가세 포함 15원) · 가중요인2 = 누적 프레시백 회수율 75% 이상 → 공급가 9원/건 (10원)
+// 둘 다 해당 = 23원(25원). 정산기간(전월 26일~당월 25일) 누적으로 정해지며 월간 파일이 확정값. 기준·단가는 설정(app_settings fbTh1/fbTh2/fbWon1/fbWon2)에서 바꿀 수 있다.
+const FBK = { CUM: '누적', DAY: '일별', MONTH: '월간' };
+function fbSettings_() {
+  const a = appSet_();
+  const n = function (k, d) { const v = Number(a[k]); return isNaN(v) || a[k] === '' || a[k] == null ? d : v; };
+  return { th1: n('fbTh1', 95), th2: n('fbTh2', 75), won1: n('fbWon1', 14), won2: n('fbWon2', 9), drvOn: !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(a.fbDrvOn)) };
+}
+/** 날짜 → 그 날짜가 속한 정산기간의 끝(25일). 11/03 → 2026-11-25 · 10/25 → 2026-10-25 · 10/26 → 2026-11-25 */
+function fbPeriodOf_(d) {
+  const t = parseYmd_(d); if (!t) return '';
+  const y = t.getFullYear(), m = t.getMonth(), day = t.getDate();
+  const end = day <= 25 ? new Date(y, m, 25) : new Date(y, m + 1, 25);
+  return ymd_(end);
+}
+function fbAll_() { let rows = []; try { rows = readAll_(SH.RFB).filter(function (o) { return o.key && o.code; }); } catch (e) { rows = []; } return rows; }
+function fbYes_(v) { const s = str_(v).replace(/\s/g, ''); return s === '해당' || /^(y|yes|o|true)$/i.test(s) ? '해당' : s === '미해당' || /^(n|no|x|false)$/i.test(s) ? '미해당' : ''; }
+function fbView_(o) {
+  return { key: o.key, period: o.period, kind: o.kind, from: o.from, to: o.to, date: o.date, camp: o.camp, code: o.code,
+    f1pct: o.f1pct === '' ? null : Number(o.f1pct), f1: o.f1, f2pct: o.f2pct === '' ? null : Number(o.f2pct), f2: o.f2, uploadedAt: o.uploadedAt };
+}
+/**
+ * 관리자: 가중요인 파일 저장. p = { file, blocks: [{ kind: '누적'|'일별'|'월간', from, to, date, rows: [{ wave, camp, code, f1pct, f1, f2pct, f2 }] }] }
+ *  누적: 정산기간마다 한 벌(기준일이 더 최신인 것만 덮어씀) · 일별: 날짜마다 · 월간: 정산기간마다 (확정)
+ */
+function adm_fbSave(token, p) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    p = p || {};
+    const blocks = Array.isArray(p.blocks) ? p.blocks : [];
+    if (!blocks.length) fail_('저장할 블록이 없습니다.');
+    const file = str_(p.file).slice(0, 120), now = nowText_();
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    try {
+      const sh = sheet_(SH.RFB), c = cols_(SH.RFB, true);
+      const cur = fbAll_(), byKey = {};
+      cur.forEach(function (o) { byKey[o.key] = o; });
+      const list = [];
+      let cumTo = '', monthPeriod = '', skippedOld = 0;
+      blocks.forEach(function (b) {
+        const kind = b.kind === FBK.DAY ? FBK.DAY : b.kind === FBK.MONTH ? FBK.MONTH : FBK.CUM;
+        const from = normDate_(b.from), to = normDate_(b.to), date = normDate_(b.date);
+        const ref = kind === FBK.DAY ? date : to;
+        if (!ref) return;
+        const period = fbPeriodOf_(ref);
+        if (kind === FBK.CUM) cumTo = cumTo < to ? to : cumTo;
+        if (kind === FBK.MONTH) monthPeriod = period;
+        (b.rows || []).forEach(function (r) {
+          const camp = rpfCamp_(r.camp), code = rpfCode_(r.code || r.route); if (!camp || !code) return;
+          const key = kind === FBK.DAY ? FBK.DAY + '|' + date + '|' + camp + '|' + code : period + '|' + kind + '|' + camp + '|' + code;
+          list.push({ key: key, period: period, kind: kind, from: from || '', to: kind === FBK.DAY ? date : to, date: kind === FBK.DAY ? date : '', wave: str_(r.wave).slice(0, 10), camp: camp, code: code,
+            f1pct: rpfPct_(r.f1pct), f1: fbYes_(r.f1), f2pct: rpfPct_(r.f2pct), f2: fbYes_(r.f2), file: file, uploadedAt: now, by: a.name });
+        });
+      });
+      if (!list.length) fail_('저장할 줄이 없습니다. (캠프·라우트가 비어 있음)');
+      const seen = {}, upd = [], add = []; let unchanged = 0;
+      list.forEach(function (o) {
+        if (seen[o.key]) return; seen[o.key] = 1;
+        const old = byKey[o.key];
+        if (old) {
+          if (o.kind === FBK.CUM && str_(old.to) > o.to) { skippedOld++; return; } // 더 최신 기준일이 이미 있으면 옛 파일은 건너뜀
+          if (['f1pct', 'f1', 'f2pct', 'f2', 'to', 'from'].every(function (k) { return str_(old[k]) === String(o[k]); })) { unchanged++; return; }
+          upd.push({ row: old._row, o: o });
+        } else add.push(o);
+      });
+      const toArr = function (o) { const arr = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { if (c[k] !== undefined) arr[c[k]] = safeText_(o[k]); }); return arr; };
+      upd.forEach(function (u) { sh.getRange(u.row, 1, 1, c.__w).setNumberFormat('@').setValues([toArr(u.o)]); });
+      if (add.length) {
+        const r0 = sh.getLastRow() + 1;
+        if (r0 + add.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(500, add.length));
+        sh.getRange(r0, 1, add.length, c.__w).setNumberFormat('@').setValues(add.map(toArr));
+      }
+      SpreadsheetApp.flush();
+      rpfBump_();
+      let memo = null;
+      if (perfMemoOn_()) {
+        const main = list.filter(function (o) { return o.kind === (monthPeriod ? FBK.MONTH : FBK.CUM); });
+        const none = main.filter(function (o) { return o.f1 === '미해당' && o.f2 === '미해당'; }).length, one = main.filter(function (o) { return (o.f1 === '미해당') !== (o.f2 === '미해당'); }).length;
+        const title = monthPeriod ? Number(monthPeriod.slice(5, 7)) + '월 가중요인 확정 업로드' : '가중요인 업로드 (' + Number(cumTo.slice(5, 7)) + '/' + Number(cumTo.slice(8, 10)) + ' 기준)';
+        memo = uploadMemo_(a, title, [none ? '둘 다 미해당 ' + none : '', one ? '하나 미해당 ' + one : ''].filter(Boolean).join(' · '), !!none);
+      }
+      logAdmin_(a, '가중요인 업로드', monthPeriod ? '월간 ~' + monthPeriod : '누적 ~' + cumTo, '새로 ' + add.length + ' · 바뀜 ' + upd.length + ' · 같음 ' + unchanged + (skippedOld ? ' · 옛 기준일 건너뜀 ' + skippedOld : '') + (file ? ' · ' + file : ''));
+      return { ok: true, added: add.length, changed: upd.length, unchanged: unchanged, skippedOld: skippedOld, memo: memo };
+    } finally { lock.releaseLock(); }
+  });
+}
+/** 관리자: 가중요인 전체 — 누적(기간별 최신) · 최근 21일 일별 · 월간 확정 · 설정 · 라우트 물량 */
+function adm_fbList(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const ck = cache_(), key = 'fb:l:' + rpfVer_(), hit = ck.get(key);
+    if (hit) { try { const o = JSON.parse(hit); o.set = fbSettings_(); return o; } catch (e) { /* 다시 */ } }
+    const all = fbAll_().map(fbView_);
+    const days = Object.keys(all.filter(function (o) { return o.kind === FBK.DAY; }).reduce(function (m, o) { m[o.date] = 1; return m; }, {})).sort().slice(-21);
+    const dset = {}; days.forEach(function (d) { dset[d] = 1; });
+    const periods = Object.keys(all.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort();
+    let vol = null; try { vol = routeVolumes_(); } catch (e) { vol = null; }
+    const out = { ok: true, periods: periods, days: days, cum: all.filter(function (o) { return o.kind === FBK.CUM; }), day: all.filter(function (o) { return o.kind === FBK.DAY && dset[o.date]; }),
+      month: all.filter(function (o) { return o.kind === FBK.MONTH; }), set: fbSettings_(), vol: vol && vol.vol ? vol.vol : {}, volMonths: vol ? vol.months : [], lineage: rlnEdges_() };
+    try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
+    return out;
+  });
+}
+/** 관리자: 가중요인 설정 (기준 % · 공급가 단가 · 기사 앱 표시) */
+function adm_fbSet(token, f) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    f = f || {};
+    const num = function (k, label, lo, hi) { if (f[k] === undefined) return; const v = Number(f[k]); if (isNaN(v) || v < lo || v > hi) fail_(label + ' 값을 확인해 주세요. (' + lo + '~' + hi + ')'); appSetPut_('fb' + k.charAt(0).toUpperCase() + k.slice(1), String(v), '프레시백 가중요인 ' + label); logAdmin_(a, '가중요인 설정', label, String(v)); };
+    num('th1', '요인1 기준 % (수행률)', 50, 120); num('th2', '요인2 기준 % (프레시백 회수율)', 10, 120);
+    num('won1', '요인1 단가 (공급가, 원/건)', 0, 1000); num('won2', '요인2 단가 (공급가, 원/건)', 0, 1000);
+    if (f.drvOn !== undefined) { appSetPut_('fbDrvOn', f.drvOn ? 'ON' : 'OFF', '기사 앱에 프레시백 가중요인 카드 (ON/OFF)'); logAdmin_(a, '가중요인 설정', '기사 앱 표시', f.drvOn ? 'ON' : 'OFF'); }
+    rpfBump_();
+    return { ok: true, set: fbSettings_() };
+  });
+}
+/** 대시보드용 요약 (최신 누적 기간) */
+function fbSummary_() {
+  const all = fbAll_();
+  const cum = all.filter(function (o) { return o.kind === FBK.CUM; });
+  if (!cum.length) return null;
+  const periods = Object.keys(cum.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort(), lp = periods[periods.length - 1];
+  const rows = cum.filter(function (o) { return o.period === lp; });
+  return { period: lp, to: rows[0].to, routes: rows.length, both: rows.filter(function (o) { return o.f1 === '해당' && o.f2 === '해당'; }).length,
+    none: rows.filter(function (o) { return o.f1 === '미해당' && o.f2 === '미해당'; }).length, f1: rows.filter(function (o) { return o.f1 === '해당'; }).length, f2: rows.filter(function (o) { return o.f2 === '해당'; }).length };
+}
+/**
+ * 기사 앱: 내 라우트의 가중요인 (관리자가 켜 두었을 때만). 고정 = 기본노선 · 백업 = 최근 4주 뛴 라우트
+ *  routes: [{ camp, code, cum:{to,f1pct,f1,f2pct,f2}, days:[{date,f1pct,f1,f2pct,f2}](최근 7일), month:{period,f1,f2}, won, est, vol }]
+ */
+function api_myFb(token) {
+  return run_(function () {
+    const u = pmUser_(token);
+    const set = fbSettings_();
+    if (!set.drvOn) return { ok: true, on: false, routes: [] };
+    const ck = cache_(), key = 'myfb:' + u.id + ':' + rpfVer_(), hit = ck.get(key);
+    if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 */ } }
+    const o = driverById_(u.id) || {};
+    const camp = rpfCamp_(o.schCamp || ''), base = rpfBaseCodes_(o.baseRoute || '');
+    const all = fbAll_().map(fbView_);
+    const out = { ok: true, on: true, set: { th1: set.th1, th2: set.th2, won1: set.won1, won2: set.won2 }, routes: [] };
+    if (!all.length) return out;
+    const cum = all.filter(function (r) { return r.kind === FBK.CUM; }), periods = Object.keys(cum.reduce(function (m, r) { m[r.period] = 1; return m; }, {})).sort();
+    const lp = periods[periods.length - 1] || '';
+    const months = all.filter(function (r) { return r.kind === FBK.MONTH; }), mps = Object.keys(months.reduce(function (m, r) { m[r.period] = 1; return m; }, {})).sort();
+    const dayList = Object.keys(all.filter(function (r) { return r.kind === FBK.DAY && (!lp || r.period === lp); }).reduce(function (m, r) { m[r.date] = 1; return m; }, {})).sort().slice(-7);
+    let vol = {}, volMonths = []; try { const v = routeVolumes_(); vol = v.vol || {}; volMonths = v.months || []; } catch (e) { vol = {}; }
+    const edges = rlnEdges_();
+    const keysOf = function (cp, code) { return [cp + '|' + code].concat(rlnChain_(edges, cp, code).map(function (x) { return x.camp + '|' + x.code; })); };
+    const pick = function (rows, keys) { return rows.filter(function (r) { return keys.indexOf(r.camp + '|' + r.code) >= 0; })[0] || null; };
+    const mk = function (cp, code) {
+      const keys = keysOf(cp, code);
+      const c = lp ? pick(cum.filter(function (r) { return r.period === lp; }), keys) : null;
+      if (!c) return null;
+      const won = (c.f1 === '해당' ? set.won1 : 0) + (c.f2 === '해당' ? set.won2 : 0);
+      const v = vol[cp + '|' + code], perMonthDays = v && volMonths.length ? Math.round(v.days / volMonths.length) : 0;
+      const est = v ? Math.round(won * v.avg * perMonthDays) : null, estMax = v ? Math.round((set.won1 + set.won2) * v.avg * perMonthDays) : null;
+      const mp = mps.filter(function (p) { return p < lp; }).pop() || '';
+      const m = mp ? pick(months.filter(function (r) { return r.period === mp; }), keys) : null;
+      return { camp: cp, code: code, period: lp, cum: { to: c.to, from: c.from, f1pct: c.f1pct, f1: c.f1, f2pct: c.f2pct, f2: c.f2 },
+        days: dayList.map(function (d) { const r = pick(all.filter(function (x) { return x.kind === FBK.DAY && x.date === d; }), keys); return { date: d, f1: r ? r.f1 : '', f2: r ? r.f2 : '', f1pct: r ? r.f1pct : null, f2pct: r ? r.f2pct : null }; }),
+        month: m ? { period: mp, f1: m.f1, f2: m.f2, won: (m.f1 === '해당' ? set.won1 : 0) + (m.f2 === '해당' ? set.won2 : 0) } : null,
+        won: won, est: est, estMax: estMax, vol: v ? { avg: v.avg, days: perMonthDays } : null };
+    };
+    let codes = [];
+    if (camp && base.length) codes = base.map(function (c) { return { camp: camp, code: c }; });
+    else try {
+      const today = parseYmd_(todayText_()), rec = {};
+      const s = schRead_(sundayOf_(addDays_(today, -27)), today);
+      const cells = s.cells[u.id] || {}, campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
+      Object.keys(cells).forEach(function (d) {
+        const v = String(cells[d] || '').toUpperCase();
+        if (!v || /휴무|휴가|병가|미입차|비고/.test(v)) return;
+        let cp = camp;
+        campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
+        rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; rec[k] = rec[k] || { camp: cp, code: code, days: 0 }; rec[k].days++; });
+      });
+      codes = Object.keys(rec).map(function (k) { return rec[k]; }).sort(function (a, b) { return b.days - a.days; }).slice(0, 6);
+    } catch (e) { codes = []; }
+    out.routes = codes.map(function (x) { return mk(x.camp, x.code); }).filter(Boolean);
+    out.backup = !base.length;
+    try { const j = JSON.stringify(out); if (j.length < 90000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
+    return out;
+  });
+}
