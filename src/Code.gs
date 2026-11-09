@@ -5210,45 +5210,68 @@ function api_campSchedule(token, month, campId) {
     if (staff && !pickCamp && (!myCampId || isStaffCamp_(info.camp))) { out.noCamp = true; out.pick = true; return out; }
     if (!me || !myCampId) { out.noCamp = true; return out; }
     out.campId = myCampId;
-    const camp = master_().camps.filter(function (c) { return c.id === myCampId; })[0];
-    out.camp = camp ? String(camp.name).replace(/\s*캠프\s*$/, '').trim() : (me.schCamp || '');
-    const inCamp = {};
-    all.forEach(function (o) {
-      if (o.status !== ST.ACTIVE) return;
-      const days = {};
-      let any = false, route = '';
-      dates.forEach(function (d) { const v = rcBy[o.id] ? at(o, d) : { campId: o.schCampId, baseRoute: o.baseRoute }; if (v.campId === myCampId) { days[d] = 1; any = true; if (!route || d === ref) route = v.baseRoute; } });
-      if (any) inCamp[o.id] = { days: days, route: route };
-    });
-    const mates = all.filter(function (o) { return inCamp[o.id]; });
-    const byId = {};
-    mates.forEach(function (o) { byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', me: o.id === me.id, cells: {}, order: 1e9 }; });
+    const campNameOf = function (cid) { const c = master_().camps.filter(function (x) { return x.id === cid; })[0]; return c ? String(c.name).replace(/\s*캠프\s*$/, '').trim() : ''; };
+    out.camp = campNameOf(myCampId) || (me.schCamp || '');
+    // 스케줄 시트는 한 번만 읽는다 (캠프가 여러 개여도)
+    let h = null, sh = null, ids = [], block = [], c0 = 0, c1 = 0, hasSheet = false;
     if (props_().SCH_DB_ID && schSS_().getSheetByName(SCH.SHEET)) {
-      const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
-      const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
+      h = schHeader_(); sh = schSheet_();
+      const last = sh.getLastRow(), cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
       if (last >= 2 && cols.length) {
-        const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
-        const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues();
-        const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
-        ids.forEach(function (r, i) {
-          const x = byId[str_(r[0])];
+        c0 = Math.min.apply(null, cols); c1 = Math.max.apply(null, cols);
+        ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); });
+        block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+        hasSheet = true;
+      }
+    }
+    let issues = [];
+    try { issues = schIssues_(dates[0], dates[dates.length - 1]); } catch (e) { issues = []; }
+    /** 한 캠프의 기사 목록(날짜별 칸·지시) + 백업 명단. guest = 소속이 아닌 나(백업)를 목록에 끼워 넣기 */
+    const buildCamp = function (cid, guest) {
+      const inCamp = {};
+      all.forEach(function (o) {
+        if (o.status !== ST.ACTIVE) return;
+        const days = {};
+        let any = false, route = '';
+        dates.forEach(function (d) { const v = rcBy[o.id] ? at(o, d) : { campId: o.schCampId, baseRoute: o.baseRoute }; if (v.campId === cid) { days[d] = 1; any = true; if (!route || d === ref) route = v.baseRoute; } });
+        if (any) inCamp[o.id] = { days: days, route: route };
+      });
+      if (guest && !inCamp[me.id]) { const all1 = {}; dates.forEach(function (d) { all1[d] = 1; }); inCamp[me.id] = { days: all1, route: me.baseRoute || '', guest: true }; }
+      const byId = {};
+      all.filter(function (o) { return inCamp[o.id]; }).forEach(function (o) { byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].guest ? out.camp : '', cells: {}, order: 1e9 }; });
+      let backup = {};
+      if (hasSheet) {
+        ids.forEach(function (id, i) {
+          const x = byId[id];
           if (!x || x.order < 1e9) return;
           x.order = i;
           dates.forEach(function (d) { if (!inCamp[x.id].days[d]) return; const c = h.dates[d]; if (c !== undefined) { const v = str_(block[i][c - c0]); if (v) x.cells[d] = v; } });
         });
-        try { out.backup = schMyCampBackup_(me.id, dates, h, c0, c1, { drivers: all, ids: ids, block: block, campId: myCampId }).list; } catch (e) { out.backup = {}; }
+        try { backup = schMyCampBackup_(me.id, dates, h, c0, c1, { drivers: all, ids: ids.map(function (x) { return [x]; }), block: block, campId: cid }).list; } catch (e) { backup = {}; }
+      }
+      issues.forEach(function (x) { const m = byId[x.driverId]; if (x.kind === '지시' && x.reason && m && inCamp[m.id].days[x.date]) (m.inst = m.inst || {})[x.date] = x.reason; });
+      const drivers = Object.keys(byId).map(function (k) { return byId[k]; }).sort(function (a, b) { return a.order - b.order || a.name.localeCompare(b.name, 'ko'); }).map(function (x) { delete x.order; return x; });
+      return { camp: campNameOf(cid), campId: cid, drivers: drivers, backup: backup };
+    };
+    const home = buildCamp(myCampId, false);
+    out.drivers = home.drivers; out.backup = home.backup;
+    // 백업 기사(기본노선 없음 · 직함자 캠프 선택 아님): 내 칸에 적힌 캠프가 소속과 다른 날은 그 캠프의 기사·백업을 같이 내려준다 → 앱에서 날짜마다 '그날 입차 캠프' 기준으로 보여 줌
+    if (!pickCamp && hasSheet && !rpfBaseCodes_(me.baseRoute || '').length) {
+      const shortOf = {}; realCamps.forEach(function (c) { shortOf[String(c.name).replace(/\s*캠프\s*$/, '').replace(/\s+/g, '')] = c.id; });
+      const shorts = Object.keys(shortOf).sort(function (a, b) { return b.length - a.length; });
+      const myRow = ids.indexOf(String(me.id));
+      const byDay = {}, need = {};
+      if (myRow >= 0) dates.forEach(function (d) {
+        const c = h.dates[d]; if (c === undefined) return;
+        const v = str_(block[myRow][c - c0]).replace(/\s+/g, ''); if (!v || /휴무|휴가|병가|미입차/.test(v)) return;
+        for (var i = 0; i < shorts.length; i++) { if (v.indexOf(shorts[i]) >= 0) { const cid = shortOf[shorts[i]]; if (cid !== myCampId) { byDay[d] = cid; need[cid] = 1; } break; } }
+      });
+      if (Object.keys(need).length) {
+        const camps = {};
+        Object.keys(need).forEach(function (cid) { camps[cid] = buildCamp(cid, true); });
+        out.multi = { byDay: byDay, camps: camps };
       }
     }
-    // 관리자가 기사스케줄 칸에 적은 지시사항 (그 캠프에서 일하는 날만)
-    try {
-      schIssues_(dates[0], dates[dates.length - 1]).forEach(function (x) {
-        const m = byId[x.driverId];
-        if (x.kind === '지시' && x.reason && m && inCamp[m.id].days[x.date]) (m.inst = m.inst || {})[x.date] = x.reason;
-      });
-    } catch (e) { /* 지시사항 없이 */ }
-    out.drivers = Object.keys(byId).map(function (k) { return byId[k]; })
-      .sort(function (a, b) { return a.order - b.order || a.name.localeCompare(b.name, 'ko'); })
-      .map(function (x) { delete x.order; return x; });
     return out;
   });
 }

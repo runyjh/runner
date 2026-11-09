@@ -453,6 +453,7 @@
   .dsel .dwork { margin-top: 6px; font-size: 12.5px; color: var(--sub); background: #f7f8fa; border-radius: 8px; padding: 5px 9px; } .dsel .dwork b { color: var(--ink); }
   .dsel.pdd .dwork { background: #fff; }
   .dsel .inst { margin-top: 8px; font-size: 13px; color: #8a4b00; background: #fff4d6; border: 1px solid #f5d38a; border-radius: 8px; padding: 6px 10px; line-height: 1.5; } .dsel .inst b { display: block; font-size: 12px; }
+  .camptag { display: inline-flex; align-items: center; gap: 6px; background: #fff4d6; color: #8a4b00; border: 1px solid #f5d38a; border-radius: 8px; padding: 5px 9px; font-size: 12.5px; font-weight: 700; margin: 4px 0 8px; } .camptag small { font-weight: 600; color: #a16207; }
   .cmate .dt b.rt { display: block; font-size: 19px; line-height: 1.1; color: var(--ink); font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2px; } .cmate .dt b.rt.none { color: #b0b8c1; }
   .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--brand); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
@@ -1668,14 +1669,18 @@
     const [yy, mo] = (r.month || r.dates[0].slice(0, 7)).split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
     const isWork = (v) => v && !/휴무|휴가|병가|퇴사/.test(v);
     const me = r.drivers.find((x) => x.me);
+    // 백업 기사: 날짜마다 '그날 입차 캠프'(내 칸의 캠프) 기준. 소속 캠프면 home
+    const home = { camp: r.camp, campId: r.campId, drivers: r.drivers, backup: r.backup || {} };
+    const campFor = (dd) => (r.multi && r.multi.byDay[dd] && r.multi.camps[r.multi.byDay[dd]]) || home;
     const cells = [];
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((dd) => {
-      const day = +dd.slice(8), dow = (lead + day - 1) % 7, w = r.drivers.filter((x) => isWork(x.cells[dd])).length, nb = ((r.backup || {})[dd] || []).length, mv = me ? me.cells[dd] || '' : '';
+      const C = campFor(dd);
+      const day = +dd.slice(8), dow = (lead + day - 1) % 7, w = C.drivers.filter((x) => isWork(x.cells[dd])).length, nb = ((C.backup || {})[dd] || []).length, mv = me ? me.cells[dd] || '' : '';
       // 칸 글자가 잘리지 않게: 캠프명(다른 캠프일 때만 작은 꼬리표) · 라우트는 529A,529B → 529AB 로 줄임 · 회전(D1,D2)은 아래 요약에만
       const pc = mv ? schParse(mv, me ? me.route : '') : null;
       const chip = !pc ? '' : pc.routes
-        ? '<span class="v ' + (schKind(mv) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + (pc.camp && pc.camp !== r.camp ? '<i class="cp">' + escH(pc.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        ? '<span class="v ' + (schKind(mv) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || C.camp) && (r.multi || (pc.camp && pc.camp !== r.camp)) ? '<i class="cp">' + escH(pc.camp || C.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
         : '<span class="v ' + schKind(mv) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const hasInst = (me && (me.inst || {})[dd]) || r.drivers.some((x) => (x.inst || {})[dd]);
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[dd] ? ' sun' : dow === 6 ? ' sat' : '') + (dd === pdd ? ' pdd' : '') + (dd === scCampDay ? ' sel' : '') + '" data-cd="' + dd + '">' +
@@ -1683,30 +1688,32 @@
         chip +
         ((w || nb) ? '<span class="cwk">' + (w ? '<span>근무 ' + w + '</span>' : '') + (nb ? '<b class="bkdot">백업 ' + nb + '</b>' : '') + '</span>' : '') + '</button>');
     });
-    const chips = '<div class="mcal"><div class="mnav"><button type="button" data-cmv="-1" aria-label="이전 달">◀</button><b>' + yy + '년 ' + mo + '월 · ' + escH(r.camp) + '</b><button type="button" data-cmv="1" aria-label="다음 달">▶</button></div>' +
-      '<div class="msum">기사 ' + r.drivers.length + '명 · 칸: 내 스케줄 / 근무 인원 / 백업 인원</div>' +
+    const chips = '<div class="mcal"><div class="mnav"><button type="button" data-cmv="-1" aria-label="이전 달">◀</button><b>' + yy + '년 ' + mo + '월 · ' + escH(r.camp) + (r.multi ? ' <small style="font-size:12px;color:var(--sub);font-weight:600">(소속)</small>' : '') + '</b><button type="button" data-cmv="1" aria-label="다음 달">▶</button></div>' +
+      '<div class="msum">' + (r.multi ? '백업 기사: 칸의 캠프 = <b style="color:var(--brand)">그날 입차 캠프</b> · 근무/백업 인원도 그 캠프 기준' : '기사 ' + r.drivers.length + '명 · 칸: 내 스케줄 / 근무 인원 / 백업 인원') + '</div>' +
       '<div class="mgrid">' + DOWK.map((wd, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + wd + '</div>').join('') + cells.join('') + '</div></div>';
     const d = scCampDay, p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
     const sunThis = (() => { const t = new Date(+r.today.slice(0, 4), +r.today.slice(5, 7) - 1, +r.today.slice(8, 10)); t.setDate(t.getDate() - t.getDay() + 6); return ymdOf(t); })();
     const est = d > sunThis; // 이번 주(토요일)까지는 확정, 그 뒤는 예상
-    const work = r.drivers.filter((x) => { const v = x.cells[d] || ''; return v && !/휴무|휴가|병가|퇴사/.test(v); }).length;
-    const rows = r.drivers.map((x) => {
+    const D = campFor(d), guest = D !== home;
+    const work = D.drivers.filter((x) => { const v = x.cells[d] || ''; return v && !/휴무|휴가|병가|퇴사/.test(v); }).length;
+    const rows = D.drivers.map((x) => {
       const v = x.cells[d] || '';
       // 왼쪽: 노선(크게) → 이름 → 단가코드. 노선이 눈에 먼저 들어오게
       const pc = v ? schParse(v, x.route || '') : null, rtTxt = pc && pc.routes ? pc.routes : (x.route ? schParse(x.route, '').routes || x.route : '');
       return '<div class="day cmate' + (x.me ? ' me' : '') + '"><div class="dt">' + (rtTxt ? '<b class="rt">' + escH(rtTxt) + '</b>' : '<b class="rt none">—</b>') +
-        '<span class="nm">' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</span>' + (x.type ? '<small>' + escH(x.type) + '</small>' : '') + '</div>' +
-        '<div class="vc"><div class="val ' + (v ? (schKind(v) || (pc && pc.routes ? 'k-work' : '')) : 'none') + '">' + (v ? escH(schNice(v, r.camp, x.route)) : '미정') + '</div>' +
+        '<span class="nm">' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</span>' + (x.type || x.guest ? '<small>' + escH(x.type || '') + (x.guest ? ' · 소속 ' + escH(x.homeCamp || r.camp) : '') + '</small>' : '') + '</div>' +
+        '<div class="vc"><div class="val ' + (v ? (schKind(v) || (pc && pc.routes ? 'k-work' : '')) : 'none') + '">' + (v ? escH(schNice(v, D.camp, x.route)) : '미정') + '</div>' +
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
-    const bk = (r.backup || {})[d] || [];
+    const bk = (D.backup || {})[d] || [];
     const prevD = new Date(+p[0], +p[1] - 1, +p[2] - 1);
     $('#scBody').innerHTML = picker + chips +
-      '<div class="wk"><h3>' + escH(r.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (d === pdd ? ' <em class="pddt" style="font-style:normal;font-size:11px;font-weight:800;color:#fff;background:var(--brand);border-radius:6px;padding:2px 7px;vertical-align:middle">PDD</em>' : '') + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
+      '<div class="wk"><h3>' + escH(D.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (d === pdd ? ' <em class="pddt" style="font-style:normal;font-size:11px;font-weight:800;color:#fff;background:var(--brand);border-radius:6px;padding:2px 7px;vertical-align:middle">PDD</em>' : '') + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
         '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
-        '<p class="hint" style="margin:-2px 0 6px">실제 출근일 ' + (prevD.getMonth() + 1) + '/' + prevD.getDate() + ' (' + DOWK[prevD.getDay()] + ') 저녁 입차 · 기사 ' + r.drivers.length + '명 · 근무 ' + work + '명 · 백업 ' + bk.length + '명</p>' +
+        (guest ? '<div class="camptag">🚚 이날 입차 캠프 <b>' + escH(D.camp) + '</b> <small>· 소속은 ' + escH(r.camp) + '</small></div>' : '') +
+        '<p class="hint" style="margin:-2px 0 6px">실제 출근일 ' + (prevD.getMonth() + 1) + '/' + prevD.getDate() + ' (' + DOWK[prevD.getDay()] + ') 저녁 입차 · ' + (guest ? escH(D.camp) + ' ' : '') + '기사 ' + D.drivers.length + '명 · 근무 ' + work + '명 · 백업 ' + bk.length + '명</p>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
-      '<div class="wk"><h3>' + escH(r.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
+      '<div class="wk"><h3>' + escH(D.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>';
   }
   /** 하루 상세 줄 (2주 보기와 같은 모양) */
