@@ -162,6 +162,10 @@
   .day .bk { font-size: 12.5px; color: #5a3286; background: #f5eefb; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; }
   .day .bk b { font-weight: 700; margin-right: 4px; }
   .day .bk.none { color: #b0b8c1; background: transparent; padding: 0 2px; }
+  .day .bk.stf { color: #334155; background: #eef2f7; margin-bottom: 4px; }
+  .day .bk.stf i { font-style: normal; font-weight: 700; color: var(--brand); }
+  .day .bk.stf i.none { color: #b0b8c1; font-weight: 500; }
+  .day .bk.stf i.k-off, .day .bk.stf i.k-sick { color: #b45309; }
   .day .inst { font-size: 13px; color: #8a4b00; background: #fff4d6; border: 1px solid #f5d38a; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; white-space: pre-wrap; }
   .day .inst b { display: block; font-size: 12px; font-weight: 800; margin-bottom: 1px; }
   .mc .instdot { position: absolute; top: 2px; right: 3px; font-size: 10px; line-height: 1; }
@@ -1641,7 +1645,9 @@
     const sub = d === pdd ? '<small class="pdd">PDD</small>' : d === r.today ? '<small>오늘</small>' : r.holidays[d] ? '<small>' + escH(r.holidays[d]) + '</small>' : '';
     const peak = +p[2] <= 7 ? '<small class="peak">🔥 피크데이</small>' : '';
     const l = (r.backup || {})[d] || [];
-    const bk = !r.camp ? '' : l.length ? '<div class="bk"><b>' + escH(r.camp) + ' 백업</b>' + l.map(escH).join(', ') + '</div>' : '<div class="bk none">' + escH(r.camp) + ' 백업 없음</div>';
+    const st = ((r.staff || {})[d] || []);
+    const stRow = st.length ? '<div class="bk stf"><b>직원</b>' + st.map((x) => escH(x.name) + ' ' + escH(x.title) + ' · <i class="' + (x.v ? schKind(x.v) : 'none') + '">' + escH(x.v || '미정') + '</i>').join('<br>') + '</div>' : '';
+    const bk = stRow + (!r.camp ? '' : l.length ? '<div class="bk"><b>' + escH(r.camp) + ' 백업</b>' + l.map(escH).join(', ') + '</div>' : '<div class="bk none">' + escH(r.camp) + ' 백업 없음</div>');
     const pm = ((r.pumasi || {})[d] || []).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : '') + '</b>' + escH(x.text) + '</button>').join('');
     return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
       '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +

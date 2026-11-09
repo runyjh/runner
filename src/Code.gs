@@ -5122,11 +5122,16 @@ function api_mySchedule(token, month) {
         });
       }
     } catch (e) { console.error('추가 배정 줄 읽기 실패: ' + (e && e.message)); }
-    // 내 캠프에 들어오는 백업 (기사스케줄 '백업 명단' 과 같은 규칙)
-    try {
-      const bk = schMyCampBackup_(s.d, dates, h, c0, c1);
-      out.camp = bk.camp; out.backup = bk.list;
-    } catch (e) { out.backup = {}; }
+    // 내 캠프에 들어오는 백업 (기사스케줄 '백업 명단' 과 같은 규칙) · 직함자(소속 = 운영자 가짜 캠프)는 백업 줄 대신 다른 직원 스케줄
+    if (info.title && isStaffCamp_(info.camp)) {
+      out.camp = ''; out.backup = {};
+      try { out.staff = schStaffOf_(String(s.d), dates, h, c0, c1); } catch (e) { out.staff = {}; }
+    } else {
+      try {
+        const bk = schMyCampBackup_(s.d, dates, h, c0, c1);
+        out.camp = bk.camp; out.backup = bk.list;
+      } catch (e) { out.backup = {}; }
+    }
     // 내가 올린 품앗이가 배차 확정되고, 그날 내 스케줄 칸의 캠프·라우트와 같으면 '배차확정 완료' 표시
     try { out.pmDone = pmDoneOf_(String(s.d), out.cells, info.camp || out.camp || ''); } catch (e) { out.pmDone = {}; }
     // 관리자가 기사스케줄 칸에 적은 지시사항 (스케줄 이슈 '지시')
@@ -5134,6 +5139,26 @@ function api_mySchedule(token, month) {
     try { schIssues_(dates[0], dates[dates.length - 1]).forEach(function (x) { if (x.kind === '지시' && x.driverId === String(s.d) && x.reason) out.inst[x.date] = x.reason; }); } catch (e) { out.inst = {}; }
     return fsW(out);
   });
+}
+
+/** 기사 앱(직함자용): 나 말고 다른 관리자·운영자·대표의 날짜별 칸 { 'yyyy-MM-dd': [{ name, title, v }] } (칸이 비면 '미정') */
+function schStaffOf_(myId, dates, h, c0, c1) {
+  const out = {};
+  const others = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.id !== myId && o.status === ST.ACTIVE && titleOf_(o) && str_(o.workStatus) !== '퇴사'; });
+  if (!others.length) return out;
+  const order = { '대표': 0, '관리자': 1, '운영자': 2 };
+  others.sort(function (a, b) { return (order[titleOf_(a)] || 9) - (order[titleOf_(b)] || 9) || String(a.name).localeCompare(String(b.name), 'ko'); });
+  const sh = schSheet_(), last = sh.getLastRow();
+  const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
+  others.forEach(function (o) {
+    const i = ids.indexOf(String(o.id));
+    const vals = i >= 0 ? sh.getRange(i + 2, c0 + 1, 1, c1 - c0 + 1).getValues()[0] : null;
+    dates.forEach(function (d) {
+      const c = h.dates[d], v = vals && c !== undefined ? str_(vals[c - c0]) : '';
+      (out[d] = out[d] || []).push({ name: o.name, title: titleOf_(o), v: v });
+    });
+  });
+  return out;
 }
 
 /**
