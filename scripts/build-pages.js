@@ -38,6 +38,24 @@ function copyDir(from, to) {
 }
 copyDir(path.join(ROOT, 'site'), OUT);
 
+// 통장 내역 올리기(PDF 읽기)용 pdf.js — 관리자 화면 CSP 가 외부 스크립트를 막으므로 같은 곳(lib/)에 둔다. npm 레지스트리에서 받아 build/ 두 파일만 복사
+(function bundlePdfJs() {
+  const { execSync } = require('child_process');
+  const os = require('os');
+  const ver = '3.11.174', lib = path.join(OUT, 'lib');
+  fs.mkdirSync(lib, { recursive: true });
+  try {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pdfjs-'));
+    execSync('npm pack pdfjs-dist@' + ver + ' --silent', { cwd: tmp, stdio: 'pipe' });
+    const tgz = fs.readdirSync(tmp).find((f) => /\.tgz$/.test(f));
+    execSync('tar -xzf ' + JSON.stringify(tgz) + ' package/build/pdf.min.js package/build/pdf.worker.min.js', { cwd: tmp, stdio: 'pipe' });
+    ['pdf.min.js', 'pdf.worker.min.js'].forEach((f) => fs.copyFileSync(path.join(tmp, 'package', 'build', f), path.join(lib, f)));
+    console.log('OK   _site/lib/pdf.min.js · pdf.worker.min.js (pdfjs-dist ' + ver + ')');
+  } catch (e) {
+    console.log('::warning::pdf.js 를 받지 못했습니다 (' + String(e && e.message || e).slice(0, 120) + ') — 통장 내역 PDF 올리기는 cdnjs 로 대신 시도합니다');
+  }
+})();
+
 const ver = (process.env.GITHUB_SHA || String(Date.now())).slice(0, 7);
 const common = [
   '<script>window.RUNNER_CONFIG = ' + JSON.stringify({ api: api, ver: ver }) + ';</script>',
@@ -76,10 +94,10 @@ const pages = [
       SW.replace("register(\'sw.js\')", "register(\'../sw.js\')"),
       // 관리자 화면 보안 정책: 서버(구글 웹앱)와 Firestore 읽기 사본(파이어베이스 runner-push) 외의 곳으로는 연결할 수 없고, 다른 곳의 스크립트도 실행되지 않는다
       '<meta http-equiv="Content-Security-Policy" content="' + [
-        "default-src 'self'", "script-src 'self' 'unsafe-inline' https://www.gstatic.com/firebasejs/10.12.2/", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "default-src 'self'", "script-src 'self' 'unsafe-inline' https://www.gstatic.com/firebasejs/10.12.2/ https://cdnjs.cloudflare.com/ajax/libs/pdf.js/", "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
         "font-src 'self' https://cdn.jsdelivr.net data:", "img-src 'self' data: blob:", "manifest-src 'self'",
         "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
-        "frame-src 'self' blob: data: https://runner-push.firebaseapp.com", "worker-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"
+        "frame-src 'self' blob: data: https://runner-push.firebaseapp.com", "worker-src 'self' blob: https://cdnjs.cloudflare.com/ajax/libs/pdf.js/", "object-src 'none'", "base-uri 'self'", "form-action 'self'"
       ].join('; ') + '">'
     ])
   }

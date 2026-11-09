@@ -8785,10 +8785,18 @@
     const num = (v) => { const t = String(v == null ? '' : v).replace(/[,\s원₩]/g, ''); return t && t !== '-' ? Number(t) || 0 : 0; };
     /** pdf.js 를 필요할 때만 불러온다 */
     let pdfLib = null;
+    // 깃허브 페이지에는 같은 곳(../lib/)에 묶어 둔 pdf.js 를 먼저, 없으면 cdnjs
+    const PDF_SRC = [['../lib/pdf.min.js', '../lib/pdf.worker.min.js'], ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js']];
     function loadPdfJs() {
       if (pdfLib) return Promise.resolve(pdfLib);
-      if (window.pdfjsLib) { pdfLib = window.pdfjsLib; pdfLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; return Promise.resolve(pdfLib); }
-      return new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; sc.onload = () => { pdfLib = window.pdfjsLib; pdfLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(pdfLib); }; sc.onerror = () => no(new Error('PDF 읽기 도구를 불러오지 못했습니다 (인터넷 연결 확인)')); document.head.appendChild(sc); });
+      const tryAt = (i) => new Promise((ok, no) => {
+        if (i >= PDF_SRC.length) return no(new Error('PDF 읽기 도구를 불러오지 못했습니다. 관리자앱을 새로고침(Ctrl+Shift+R)한 뒤 다시 시도해 주세요.'));
+        const sc = document.createElement('script'); sc.src = PDF_SRC[i][0];
+        sc.onload = () => { if (!window.pdfjsLib) return tryAt(i + 1).then(ok, no); pdfLib = window.pdfjsLib; pdfLib.GlobalWorkerOptions.workerSrc = PDF_SRC[i][1]; ok(pdfLib); };
+        sc.onerror = () => { sc.remove(); tryAt(i + 1).then(ok, no); };
+        document.head.appendChild(sc);
+      });
+      return tryAt(0);
     }
     /** PDF → 줄 글자 배열 (같은 y 의 글자를 x 순서로 이어 붙임) */
     async function pdfLines(buf) {
