@@ -8710,12 +8710,12 @@
     vendor: ['업체명'], waybill: ['운송장번호', '운송장'], item: ['상품명(상세)', '상품명'] };
   const ST_LOSS_KEYS = ['date', 'camp', 'cid', 'type', 'detail', 'cnt', 'amt', 'vendor', 'waybill', 'item'];
   const hk = (v) => String(v == null ? '' : v).replace(/\s+/g, '').toLowerCase();
-  function mapHeader(row, MAP) {
+  function mapHeader(row, MAP, loose) {
     const h = row.map(hk), out = {};
     Object.keys(MAP).forEach((k) => { for (const cand of MAP[k]) { const i = h.indexOf(hk(cand)); if (i >= 0 && !Object.values(out).includes(i)) { out[k] = i; break; } } });
     // 예전 쿠팡 양식: '배송건수(파슬)' · '반품(운송장)' 처럼 괄호 설명이 붙은 머리글 → 괄호 빼고 한 번 더
     const np = (x) => x.replace(/\([^)]*\)/g, ''), h2 = h.map(np);
-    Object.keys(MAP).forEach((k) => { if (out[k] != null) return; for (const cand of MAP[k]) { const i = h2.indexOf(np(hk(cand))); if (i >= 0 && h2[i] && !Object.values(out).includes(i)) { out[k] = i; break; } } });
+    if (loose) Object.keys(MAP).forEach((k) => { if (out[k] != null) return; for (const cand of MAP[k]) { const i = h2.indexOf(np(hk(cand))); if (i >= 0 && h2[i] && !Object.values(out).includes(i)) { out[k] = i; break; } } });
     return out;
   }
   const xlDate = (v) => {
@@ -8726,10 +8726,13 @@
   };
   function findTable(sheets, MAP, need, names) {
     const order = sheets.slice().sort((a, b) => (names.some((n) => hk(n) === hk(b.name)) ? 1 : 0) - (names.some((n) => hk(n) === hk(a.name)) ? 1 : 0));
-    for (const sh of order) {
-      for (let r = 0; r < Math.min(20, sh.rows.length); r++) {
-        const m = mapHeader(sh.rows[r] || [], MAP);
-        if (need.every((k) => m[k] != null)) return { sheet: sh.name, head: r, map: m, rows: sh.rows.slice(r + 1) };
+    // 먼저 머리글이 정확히 맞는 시트, 없으면 괄호 설명을 뺀 머리글로 (예전 양식)
+    for (const loose of [false, true]) {
+      for (const sh of order) {
+        for (let r = 0; r < Math.min(20, sh.rows.length); r++) {
+          const m = mapHeader(sh.rows[r] || [], MAP, loose);
+          if (need.every((k) => m[k] != null)) return { sheet: sh.name, head: r, map: m, rows: sh.rows.slice(r + 1) };
+        }
       }
     }
     return null;

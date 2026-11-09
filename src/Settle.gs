@@ -2196,7 +2196,7 @@ function stlLegacySales_(month) {
     if (slips[row.id]) slips[row.id].row = row;
   });
   ['sales', 'lossCp', 'profit', 'qty'].forEach(function (k) { sum.total[k] = sum.drivers.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0); });
-  ['period', 'round', 'roundFile', 'roundAt', 'rawRows', 'lossRows'].forEach(function (k) { if (res.summary[k] !== undefined) sum[k] = res.summary[k]; });
+  ['period', 'round', 'roundFile', 'roundAt', 'rawRows', 'lossRows', 'company'].forEach(function (k) { if (res.summary[k] !== undefined) sum[k] = res.summary[k]; }); // company = 쿠팡 매출·공급가·분실(쿠팡) 회사 합계 (화면 '쿠팡 매출'·'회사이익' 칸)
   sum.legacy = Object.assign({}, sum.legacy || {}, { salesAt: nowText_(), salesExtra: extra });
   delete sum.closed;
   stlReplaceMonth_('stl_closed', month, stlSnapRows_(month, { summary: sum, slips: slips }));
