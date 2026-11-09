@@ -6158,8 +6158,11 @@
       else if (!q && sf.camp && d.campId !== sf.camp) return false;
       const cn = camps[d.campId] ? camps[d.campId].name : (d.camp || '');
       if (q && !qHit([d.name, d.loginId, d.code, d.baseRoute, d.type, d.title, cn, shortCamp(cn)].concat(d.subIds || [], infoOf(d.id)))) return false;
+      d._campHit = q && cn ? qHit([cn, shortCamp(cn)]) : false; // 검색어 중 캠프 이름으로 맞은 줄 → 맨 위에 캠프째로
       return true;
     }).sort((a, b) => {
+      // 콤마 검색에서 캠프 이름으로 찾은 줄(캠프 전체)이 무조건 맨 위, 그 다음 이름·코드 등으로 찾은 기사, 직함자는 맨 뒤
+      if (!!a._campHit !== !!b._campHit) return a._campHit ? -1 : 1;
       const sa = isStaffRow(a) && !a.ex ? 1 : 0, sb = isStaffRow(b) && !b.ex ? 1 : 0;
       if (sa !== sb) return sa - sb;
       if (sa) return (TITLE_ORDER[a.title || a.type] ?? 9) - (TITLE_ORDER[b.title || b.type] ?? 9) || (Number(a.order) || 9999) - (Number(b.order) || 9999) || koSort(a.name, b.name);
