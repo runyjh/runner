@@ -316,6 +316,7 @@
   .mp-grid span { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: #f7f8fa; font-size: 13px; }
   .mp-grid span small { margin-left: auto; color: var(--sub); font-size: 11px; } .mp-grid span.bad { background: #fff6e8; } .mp-grid span.imp { background: #fdecec; }
   .mp-grid em { font-style: normal; font-weight: 800; } .mp-grid em.ok { color: #12a150; } .mp-grid em.warn { color: #d97706; } .mp-grid em.bad { color: #c62828; }
+  .grnote { font-size: 11.5px; color: var(--sub); padding: 0 0 8px; margin-top: -4px; line-height: 1.45; }
   .slah { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 0 0 8px; margin-top: -4px; }
   .slah small { font-size: 10.5px; color: var(--sub); margin-right: 2px; } .slah span { display: inline-flex; flex-direction: column; align-items: center; min-width: 30px; padding: 2px 4px; border-radius: 6px; background: #f3f4f6; font-size: 11px; font-weight: 800; line-height: 1.15; }
   .slah span em { font-style: normal; font-size: 9.5px; font-weight: 600; color: var(--sub); } .slah span.ok { color: #12a150; } .slah span.warn { color: #d97706; } .slah span.bad { color: #c62828; }
@@ -2473,15 +2474,16 @@
       const th = (r.sla && r.sla.th) || { good: 95, warn: 90 }, slaCls = (t) => t >= th.good ? 'ok' : t >= th.warn ? 'warn' : 'bad';
       const row = (rt, sub) => {
         const l = rt.weeks[rt.weeks.length - 1] || {};
-        return '<div class="mpr"><b class="code">' + escH(rt.code) + (sub ? '<small>' + escH(sub) + '</small>' : '') + '</b><div class="wks">' + rt.weeks.map((w) => '<span>' + gr(w.grade) + escH(String(w.wk || '').replace('WK', 'W')) + '</span>').join('') + '</div>' +
+        return '<div class="mpr"><b class="code">' + escH(rt.code) + (sub ? '<small>' + escH(sub) + '</small>' : '') + '</b><div class="wks">' + rt.weeks.slice().reverse().map((w) => '<span>' + gr(w.grade) + escH(String(w.wk || '').replace('WK', 'W')) + '</span>').join('') + '</div>' +
           '<div class="now"><b>' + gr(l.grade) + ' ' + (l.perf != null ? l.perf + '%' : '') + '</b>' + (l.improve ? '<span class="imp">개선 요청</span>' : (l.grade >= 3 ? '95% 미만' : l.grade ? '우수' : '')) +
-          (rt.sla && rt.sla.total != null ? '<span class="slat ' + slaCls(rt.sla.total) + '">SLA ' + rt.sla.total + '점' + (rt.sla.cs != null ? ' · 고객만족 ' + rt.sla.cs : '') + '</span>' : '') + '</div></div>' + slaHist(rt.sla);
+          (rt.sla && rt.sla.total != null ? '<span class="slat ' + slaCls(rt.sla.total) + '">SLA ' + rt.sla.total + '점' + (rt.sla.cs != null ? ' · 고객만족 ' + rt.sla.cs : '') + '</span>' : '') + '</div></div>' + slaHist(rt.sla) +
+          '<div class="grnote">' + (l.improve ? '개선 요청 — 기한 안에 95% 이상으로 올려 주세요. ' : '') + '1~2등급 우수(95% 초과) · 3~4등급은 위탁 조정 대상(95% 미만). 안전 운전과 함께 꾸준한 완료 부탁드립니다.</div>';
       };
       // SLA 1년 누적 흐름: 최근 12개월 집계기간의 총점을 월별 칩으로 (점수 없는 달은 비움)
       const slaHist = (sl) => {
         const h = sl && sl.hist ? sl.hist.filter((x) => x.total != null) : [];
         if (h.length < 2) return '';
-        return '<div class="slah"><small>SLA 1년 누적</small>' + h.map((x) => '<span class="' + slaCls(x.total) + '"><em>' + (+x.period.slice(5, 7)) + '월</em>' + x.total + '</span>').join('') + '</div>';
+        return '<div class="slah"><small>SLA 올해 누적</small>' + h.map((x) => '<span class="' + slaCls(x.total) + '"><em>' + (+x.period.slice(5, 7)) + '월</em>' + x.total + '</span>').join('') + '</div>';
       };
       const openAll = !routes.length && !recent.length;
       box.innerHTML = '<h4>📈 내 라우트 수행률 <small class="sub">' + escH(last ? last.wk + (last.from ? ' (' + md(last.from) + '~' + md(last.to) + ')' : '') : '') + ' · 쿠팡 주간 안내 기준</small></h4>' +
@@ -2490,9 +2492,7 @@
         (!routes.length && !recent.length && r.backup ? '<div class="sub" style="margin:4px 0 6px">이번 정산기간 스케줄에 라우트가 적힌 날이 없어 캠프 전체 등급만 보여 드립니다.</div>' : '') +
         (campAll.length ? '<details class="mp-all"' + (openAll ? ' open' : '') + '><summary>' + escH(r.camp || '내 캠프') + ' 캠프 전체 라우트 ' + campAll.length + '개 · 3~4등급 ' + campAll.filter((x) => x.grade >= 3).length + '개</summary><div class="mp-grid">' +
           campAll.map((x) => '<span class="' + (x.improve ? 'imp' : x.grade >= 3 ? 'bad' : '') + '">' + gr(x.grade) + ' <b>' + escH(x.code) + '</b><small>' + (x.perf != null ? x.perf + '%' : '-') + (x.improve ? ' · 개선 요청' : '') + (x.sla && x.sla.total != null ? ' · SLA <em class="' + slaCls(x.sla.total) + '">' + x.sla.total + '</em>' : '') + '</small></span>').join('') + '</div></details>' : '') +
-        (r.sla && r.sla.vendor != null ? '<div class="sub" style="margin-top:6px">월간 SLA (' + escH((r.sla.from ? md(r.sla.from) + '~' : '') + md(r.sla.period)) + ' 누적) · 러너 영업점 총점 <b>' + r.sla.vendor + '점</b> / 100 — 총점은 미수행 15 · 반품 15 · 고객만족 50 · 고객불만 20</div>' +
-          slaHist({ hist: r.sla.vendorHist }).replace('SLA 1년 누적', '영업점 SLA 1년 누적') : '') +
-        '<div class="sub" style="margin-top:6px">1~2등급 우수(95% 초과) · 3~4등급은 위탁 조정 대상(95% 미만)입니다. 안전 운전과 함께 꾸준한 완료 부탁드립니다.</div>';
+        (r.sla ? '<div class="sub" style="margin-top:6px">SLA 총점 100 = 미수행 15 · 반품 15 · 고객만족 50 · 고객불만 20 (올해 1월부터 누적)</div>' : '');
       myStat('perf', true);
     }).catch(() => {});
   }

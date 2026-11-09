@@ -246,9 +246,8 @@ function api_myPerf(token) {
       const sla = slaAll_(), ps = Object.keys(sla.reduce(function (m, o) { m[o.period] = 1; return m; }, {})).sort(), lp = ps[ps.length - 1];
       if (lp) {
         const lrows = sla.filter(function (o) { return o.period === lp; }), th = slaThresholds_();
-        // 1년 누적 이력: 최신 기간부터 12개월 안의 집계기간들 (기사 앱에 월별 점수 흐름)
-        const lpD = parseYmd_(lp), cut = ymd_(new Date(lpD.getFullYear() - 1, lpD.getMonth(), lpD.getDate()));
-        const ps12 = ps.filter(function (p) { return p > cut; });
+        // 올해 누적 이력: 최신 기간이 속한 해의 1월부터 (기사 앱에 월별 점수 흐름)
+        const ps12 = ps.filter(function (p) { return p.slice(0, 4) === lp.slice(0, 4); });
         const of = function (cp, code) {
           const keys = [cp + '|' + code].concat(rlnChain_(edges, cp, code).map(function (x) { return x.camp + '|' + x.code; }));
           const r = lrows.filter(function (o) { return keys.indexOf(o.camp + '|' + o.code) >= 0; })[0];
