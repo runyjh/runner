@@ -6167,7 +6167,7 @@
         rows.forEach((r) => {
           if (r.active && !r.active[d]) return; // 노선 변경 예약: 이 줄은 그날 다른 캠프·노선
           const baseCamp = r.camp || '';
-          const defRt = String(r.baseRoute || '').trim();
+          const defRt = String((r.baseAt && r.baseAt[d]) || r.baseRoute || '').trim(); // 같은 캠프에서 노선이 바뀐 기사: 그날의 기본노선
           const base = splitBase(defRt);
           if (defRt && !/백업|예비|용차/.test(defRt)) routeExpand(base.routes).forEach((rt) => baseRouteSet.add(baseCamp + '|' + rt));
           const lines = String(r.cells[d] || '').replace(/<br\s*\/?>/gi, '\n').split(/\r?\n|\r/).map((v) => v.trim()).filter(Boolean);
@@ -6252,7 +6252,7 @@
         // 미배정 노선을 기본노선으로 가진 기사 칸에 표시 (병가·휴무·빈 칸이든 상관없이)
         if (miss.size) rows.forEach((r) => {
           if (r.active && !r.active[d]) return;
-          const defRt = String(r.baseRoute || '').trim(); if (!defRt || /백업|예비|용차/.test(defRt)) return;
+          const defRt = String((r.baseAt && r.baseAt[d]) || r.baseRoute || '').trim(); if (!defRt || /백업|예비|용차/.test(defRt)) return;
           const camp = r.camp || '', full = defRotArr(camp).length;
           const list = routeExpand(splitBase(defRt).routes).filter((rt) => miss.has(camp + '|' + rt)).map((rt) => { const rs = Array.from(miss.get(camp + '|' + rt)).sort(); return rt + (rs.length === full ? '' : '(' + rs.join(',') + ')'); });
           if (list.length) missCells.set(r.key + '|' + d, list);
@@ -6390,18 +6390,30 @@
     const out = [];
     SD.drivers.forEach((d) => {
       if (!d.segs || !d.segs.length) { out.push(Object.assign({}, d, { _key: d.id, _seg: null })); return; }
-      const whole = d.segs.length === 1;
-      d.segs.forEach((sg, i) => out.push(Object.assign({}, d, { campId: sg.campId, camp: sg.camp, baseRoute: sg.baseRoute, _key: i ? d.id + '~' + i : d.id, _seg: whole ? null : sg, _segs: d.segs, _si: i })));
+      // 같은 캠프 안에서 노선·회전만 바뀐 구간은 줄을 나누지 않는다 (캠프가 바뀔 때만 줄이 나뉨) · 날짜별 기본노선은 _baseAt 으로
+      const groups = [];
+      d.segs.forEach((sg, i) => { const g = groups[groups.length - 1]; if (g && g.campId === sg.campId) { g.to = sg.to; g.last = i; g.segs.push(sg); } else groups.push({ campId: sg.campId, camp: sg.camp, from: sg.from, to: sg.to, first: i, last: i, segs: [sg] }); });
+      const whole = groups.length === 1;
+      groups.forEach((g, gi) => {
+        const lastSeg = g.segs[g.segs.length - 1], baseAt = {};
+        if (g.segs.length > 1) g.segs.forEach((sg) => SD.dates.forEach((dt) => { if (dt >= sg.from && dt <= sg.to) baseAt[dt] = sg.baseRoute; }));
+        out.push(Object.assign({}, d, { campId: g.campId, camp: g.camp, baseRoute: lastSeg.baseRoute, _key: gi ? d.id + '~' + gi : d.id, _seg: whole ? null : { from: g.from, to: g.to }, _segs: d.segs, _si0: g.first, _si: g.last, _grp: g.segs, _baseAt: g.segs.length > 1 ? baseAt : null }));
+      });
     });
     return out;
   }
   function rcBadge(r) {
     const d = r.d, out = [];
+    const multi = d._grp && d._grp.length > 1; // 같은 캠프 안에서 노선·회전만 바뀜
+    if (multi) {
+      const lastSeg = d._grp[d._grp.length - 1], prevSeg = d._grp[d._grp.length - 2];
+      out.push('<small class="rcb new" title="' + esc(mdOf(lastSeg.from) + '부터 ' + (lastSeg.baseRoute || '') + ' (이전 ' + (prevSeg.baseRoute || '') + ')') + '">' + mdOf(lastSeg.from) + '~ 노선</small>');
+    }
     if (r.seg && d._segs) {
-      const prev = d._segs[d._si - 1], next = d._segs[d._si + 1];
+      const prev = d._segs[(d._si0 !== undefined ? d._si0 : d._si) - 1], next = d._segs[d._si + 1];
       if (next) out.push('<small class="rcb" title="' + esc(mdOf(next.from) + '부터 ' + (next.camp || '') + ' ' + (next.baseRoute || '')) + '">~' + mdOf(r.seg.to) + '</small>');
       if (prev) out.push('<small class="rcb new" title="' + esc(mdOf(r.seg.from) + '부터 (이전 ' + (prev.camp || '') + ' ' + (prev.baseRoute || '') + ')') + '">' + mdOf(r.seg.from) + '~</small>');
-    } else (d.changes || []).filter((c) => c.status === '예약').forEach((c) => {
+    } else if (!multi) (d.changes || []).filter((c) => c.status === '예약').forEach((c) => {
       out.push('<small class="rcb" title="' + esc(mdOf(c.date) + '부터 ' + c.toCamp + ' ' + c.toRoute + ' (노선 변경 예약)') + '">' + mdOf(c.date) + '~ ' + esc(shortCamp(c.toCamp) + ' ' + c.toRoute) + '</small>');
     });
     return out.join('');
@@ -6460,7 +6472,7 @@
     const campById = {};
     SD.camps.forEach((c) => { campById[c.id] = c; });
     const rows = schSegDrivers().filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
-      key: d._key, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type,
+      key: d._key, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type, baseAt: d._baseAt ? SD.dates.map((dt) => d._baseAt[dt] || d.baseRoute) : null,
       cells: SD.dates.map((dt) => (segIn(d._seg, dt) ? sget(d.id, dt) : '')),
       active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null
     }));
