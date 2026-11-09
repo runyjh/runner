@@ -8824,11 +8824,12 @@
         const P = parseCoupang(await readXlsx(b64ToBuf(g.b64)));
         const month = P.month || f.month; if (!month) throw new Error('정산월을 알 수 없습니다');
         const ri = await api('adm_stlRoundInfo', month); if (!ri.ok) throw new Error(ri.msg);
-        if (ri.closed) { say('⏭ ' + month + ' 마감됨 — 건너뜀'); continue; }
+        if (ri.closed && !ri.legacy) { say('⏭ ' + month + ' 마감됨 — 건너뜀'); continue; }
         const round = Math.min(9, (ri.latest || 0) + 1);
         say(month + ' ' + round + '차 반영 중…');
-        const r = await api('adm_stlImport', { month, round, file: g.name, url: g.url, raw: P.raw, loss: P.loss });
+        const r = await api('adm_stlImport', { month, round, file: g.name, url: g.url, raw: P.raw, loss: P.loss, legacy: !!ri.legacy });
         if (!r.ok) throw new Error(r.msg);
+        if (r.legacy) { say('✓ ' + month + ' 쿠팡 매출만 반영 (기존 정산 이식 달 · 기사 금액 그대로) · 매출 ' + wn(r.legacy.sales)); done.push(month); continue; }
         say('✓ ' + month + ' ' + round + '차 · ' + wn(r.rows) + '줄 · ID ' + r.ids + (r.newIds && r.newIds.length ? ' · 새 아이디 ' + r.newIds.length : ''));
         done.push(month);
       } catch (err) { say('✗ ' + (err && err.message || err)); }

@@ -2136,6 +2136,71 @@ function stlClosedInfo_(month) {
   const r = stlRead_('stl_close').filter(function (x) { return x.month === month; })[0];
   return r ? { at: r.at, admin: r.admin } : null;
 }
+/** 마감 기록 읽기 (나눠 저장된 줄 이어 붙임) → { summary, slips } */
+function stlClosedLoad_(month) {
+  const rows = stlReadMonth_('stl_closed', month);
+  let summary = null;
+  const slips = {};
+  // 긴 결과는 여러 줄로 나눠 저장됨 (acct##1, acct##2 …) → 이어 붙여 읽음
+  const parts = {}, order = [];
+  rows.forEach(function (r) {
+    const m = /^(.*)##(\d+)$/.exec(str_(r.acct)), base = m ? m[1] : str_(r.acct), n = m ? Number(m[2]) : 0;
+    if (!parts[base]) { parts[base] = []; order.push(base); }
+    parts[base][n] = str_(r.data);
+  });
+  order.forEach(function (acct) {
+    try {
+      const o = JSON.parse(parts[acct].join(''));
+      if (acct === '_summary') summary = o; else slips[acct] = o;
+    } catch (e) { /* 손상된 줄은 건너뜀 */ }
+  });
+  return { summary: summary, slips: slips };
+}
+/** 기존 정산 이식으로 마감한 달인지 */
+function stlLegacyClosed_(month) {
+  const c = stlClosedInfo_(month);
+  return !!(c && /기존 정산 이식/.test(str_(c.admin)));
+}
+/**
+ * 기존 정산 이식으로 마감한 달에 쿠팡 정산서를 넣은 뒤: 기사 금액(기존 그대로)은 두고 쿠팡 매출·분실(쿠팡)·회사이익만 채운다.
+ * 짝: 마감 기록의 줄 id / 쿠팡 아이디 ↔ 올인원 계산 묶음. 마감 기록에 없는 묶음은 0원 줄로 매출만 더함.
+ */
+function stlLegacySales_(month) {
+  const snap = stlClosedLoad_(month), sum = snap.summary, slips = snap.slips;
+  if (!sum) fail_(month + ' 마감 기록을 읽을 수 없습니다.');
+  const res = stlCompute_(month), byId = {}, byCid = {}, used = {};
+  res.summary.drivers.forEach(function (c) { byId[c.id] = c; (c.cids || []).concat(c.usedCids || []).forEach(function (x) { byCid[stlLogin_(x)] = c; }); });
+  const pick = function (row) {
+    let c = byId[row.id] && !used[byId[row.id].id] ? byId[row.id] : null;
+    if (!c) (row.cids || []).concat(row.usedCids || [], [row.cid, row.id]).some(function (x) { const y = byCid[stlLogin_(x)]; if (y && !used[y.id]) { c = y; return true; } return false; });
+    return c;
+  };
+  sum.drivers.forEach(function (row) {
+    const c = pick(row);
+    row.sales = c ? c.sales || 0 : 0; row.lossCp = c ? c.lossCp || 0 : 0;
+    if (c) used[c.id] = 1;
+  });
+  let extra = 0;
+  res.summary.drivers.forEach(function (c) {
+    if (used[c.id] || !(c.sales || c.lossCp)) return;
+    const row = { id: c.id, cid: c.cid, name: c.name, ownerId: c.ownerId || '', vendor: c.vendor || '', cids: c.cids || [], usedCids: c.usedCids || [], ids: c.ids || 0, workers: c.workers || [], qty: c.qty || 0, sales: c.sales || 0, lossCp: c.lossCp || 0, legacyNote: '기존 정산서 없음 (쿠팡 매출만)' };
+    ['pay', 'taxDed', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'lossInc', 'yongInc', 'otherInc', 'runnerIns', 'insGain', 'fbCut', 'fbKeep'].forEach(function (k) { row[k] = 0; });
+    if (slips[row.id]) row.id = row.id + '#cp';
+    sum.drivers.push(row); extra++;
+    slips[row.id] = { row: row, lines: [{ name: '(기존 정산서 없음 · 쿠팡 매출만)', side: '지급', method: '직접입력', taxCut: false, amt: 0, memo: '', unknown: false }], ins: {}, routes: [], daily: {}, sched: {}, idUse: {}, loss: [], yong: [], members: row.cids.slice(), workers: [], movedIn: [], movedOut: [] };
+  });
+  sum.drivers.forEach(function (row) {
+    row.profit = Math.round(Math.round((row.sales || 0) / 1.1) - (row.lossCp ? Math.round(row.lossCp / 1.1) : 0) - (row.supply || 0) + (row.otherInc || 0));
+    if (slips[row.id]) slips[row.id].row = row;
+  });
+  ['sales', 'lossCp', 'profit', 'qty'].forEach(function (k) { sum.total[k] = sum.drivers.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0); });
+  ['period', 'round', 'roundFile', 'roundAt', 'rawRows', 'lossRows'].forEach(function (k) { if (res.summary[k] !== undefined) sum[k] = res.summary[k]; });
+  sum.legacy = Object.assign({}, sum.legacy || {}, { salesAt: nowText_(), salesExtra: extra });
+  delete sum.closed;
+  stlReplaceMonth_('stl_closed', month, stlSnapRows_(month, { summary: sum, slips: slips }));
+  stlBump_();
+  return { sales: sum.total.sales, profit: sum.total.profit, extra: extra };
+}
 /** 결과: 마감된 달은 마감 때 저장한 결과, 아니면 계산 (5분 캐시) */
 /** 마감 기록 줄: 칸 하나에 다 안 들어가면(5만 자 제한) acct##1, acct##2 … 로 나눠 저장 */
 function stlSnapRows_(month, res) {
@@ -2154,22 +2219,7 @@ function stlResult_(month, fresh) {
     const key = 'stl:cl:' + month + ':' + stlVer_();
     let hit = stlCacheGet_(key);
     if (hit) return hit;
-    const rows = stlReadMonth_('stl_closed', month);
-    let summary = null;
-    const slips = {};
-    // 긴 결과는 여러 줄로 나눠 저장됨 (acct##1, acct##2 …) → 이어 붙여 읽음
-    const parts = {}, order = [];
-    rows.forEach(function (r) {
-      const m = /^(.*)##(\d+)$/.exec(str_(r.acct)), base = m ? m[1] : str_(r.acct), n = m ? Number(m[2]) : 0;
-      if (!parts[base]) { parts[base] = []; order.push(base); }
-      parts[base][n] = str_(r.data);
-    });
-    order.forEach(function (acct) {
-      try {
-        const o = JSON.parse(parts[acct].join(''));
-        if (acct === '_summary') summary = o; else slips[acct] = o;
-      } catch (e) { /* 손상된 줄은 건너뜀 */ }
-    });
+    const snap = stlClosedLoad_(month), summary = snap.summary, slips = snap.slips;
     if (summary) {
       summary.closed = closed;
       hit = { summary: summary, slips: slips };
@@ -2684,7 +2734,8 @@ function adm_stlImport(token, p) {
     const lock = scriptLock_();
     lock.waitLock(30000);
     try {
-      stlAssertOpen_(month);
+      const legacyM = !!p.legacy && stlLegacyClosed_(month); // 기존 정산 이식으로 마감한 달: 쿠팡 매출만 채움
+      if (!legacyM) stlAssertOpen_(month);
       const idAmt = function (rs, ls) {
         const m = {};
         rs.forEach(function (o) { m[o.cid] = (m[o.cid] || 0) + stlNum_(o.total) + stlNum_(o.fresh); });
@@ -2717,8 +2768,10 @@ function adm_stlImport(token, p) {
       const changed = hist.filter(function (h) { return h.diff; }).length;
       const totalAmt = Object.keys(after).reduce(function (s, k) { return s + after[k]; }, 0);
       logAdmin_(a, '쿠팡 정산서 반영', month + ' ' + round + '차', rawObjs.length + '줄 · 분실 ' + lossObjs.length + '줄 · 변동 ID ' + changed);
-      try { uploadMemo_(a, Number(month.slice(5, 7)) + '월 정산서 업로드', round > 1 ? round + '차' : '', false); } catch (e) { /* 메모 실패는 무시 */ }
-      return { ok: true, month: month, round: round, rows: rawObjs.length, loss: lossObjs.length, ids: Object.keys(after).length, changed: changed, total: Math.round(totalAmt), newIds: addIds.map(function (x) { return x.cid + (x.owner ? ' → ' + x.owner : ' (명의자 없음)'); }) };
+      let legSales = null;
+      if (legacyM) legSales = stlLegacySales_(month);
+      else try { uploadMemo_(a, Number(month.slice(5, 7)) + '월 정산서 업로드', round > 1 ? round + '차' : '', false); } catch (e) { /* 메모 실패는 무시 */ }
+      return { ok: true, legacy: legSales, month: month, round: round, rows: rawObjs.length, loss: lossObjs.length, ids: Object.keys(after).length, changed: changed, total: Math.round(totalAmt), newIds: addIds.map(function (x) { return x.cid + (x.owner ? ' → ' + x.owner : ' (명의자 없음)'); }) };
     } finally {
       lock.releaseLock();
     }
@@ -3297,7 +3350,8 @@ function adm_stlRoundInfo(token, month) {
     requireAdmin_(token);
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     const r = stlRounds_(month);
-    return { ok: true, month: month, latest: r.latest, closed: !!stlClosedInfo_(month), period: stlPeriod_(month) };
+    const ci = stlClosedInfo_(month);
+    return { ok: true, month: month, latest: r.latest, closed: !!ci, legacy: stlLegacyClosed_(month), period: stlPeriod_(month) };
   });
 }
 
