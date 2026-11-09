@@ -8785,6 +8785,7 @@
     const num = (v) => { const t = String(v == null ? '' : v).replace(/[,\s원₩]/g, ''); return t && t !== '-' ? Number(t) || 0 : 0; };
     /** pdf.js 를 필요할 때만 불러온다 */
     let pdfLib = null;
+    const pdfDbg = { pages: 0, lines: [] }; // 못 읽었을 때 어떤 글자가 나왔는지 (콘솔 · 안내문)
     // 깃허브 페이지에는 같은 곳(../lib/)에 묶어 둔 pdf.js 를 먼저, 없으면 cdnjs
     const PDF_SRC = [['../lib/pdf.min.js', '../lib/pdf.worker.min.js'], ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js']];
     function loadPdfJs() {
@@ -8805,11 +8806,19 @@
       const lines = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p), tc = await page.getTextContent();
-        const byY = new Map();
-        tc.items.forEach((it) => { if (!it.str || !it.str.trim()) return; const y = Math.round(it.transform[5] / 3); if (!byY.has(y)) byY.set(y, []); byY.get(y).push({ x: it.transform[4], s: it.str }); });
-        [...byY.keys()].sort((a, b) => b - a).forEach((y) => lines.push(byY.get(y).sort((a, b) => a.x - b.x).map((x) => x.s).join(' ').replace(/\s+/g, ' ').trim()));
+        // 글자 조각을 y(위→아래)로 늘어놓고, 바로 앞 조각과 y 차이가 작으면 같은 줄 (반올림 경계에서 줄이 갈라지지 않게)
+        const items = tc.items.filter((it) => it.str && it.str.trim()).map((it) => ({ x: it.transform[4], y: it.transform[5], h: Math.abs(it.transform[3]) || Math.abs(it.height) || 8, s: it.str }));
+        items.sort((a, b) => b.y - a.y || a.x - b.x);
+        let cur = null;
+        items.forEach((it) => {
+          if (!cur || Math.abs(cur.y - it.y) > Math.max(2.5, Math.min(cur.h, it.h) * 0.6)) { cur = { y: it.y, h: it.h, arr: [] }; lines.push(cur); }
+          cur.arr.push(it);
+        });
+        pdfDbg.pages = p;
       }
-      return lines;
+      const out = lines.map((l) => l.arr.sort((a, b) => a.x - b.x).map((x) => x.s).join(' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+      pdfDbg.lines = out.slice(0, 40);
+      return out;
     }
     /** 글자 줄 → 거래 줄 (카카오뱅크 거래내역서 · 우리은행 거래실적증명서) */
     function parseLines(lines) {
@@ -8844,6 +8853,23 @@
         }
         if (l && !isHead(l) && !/^\d{4}[.\-/]\d{2}/.test(l)) seq.push({ text: l });
       });
+      // 줄이 이상하게 나뉘어 하나도 못 읽었으면: 글자 전체를 한 줄로 붙여 날짜 패턴 단위로 자른다
+      if (!seq.some((x) => x.row)) {
+        const flat = lines.join(' ').replace(/\s+/g, ' ');
+        const re = /(\d{4})[.\-/](\d{2})[.\-/](\d{2}) ?(\d{2}:\d{2}:\d{2})? (입금|출금) (-?[\d,]+) ([\d,]+) (.*?)(?= \d{4}[.\-/]\d{2}[.\-/]\d{2} ?\d{2}:|$| Page )/g;
+        let m;
+        while ((m = re.exec(flat))) {
+          let memo = m[8].trim(), kind = '';
+          const parts = memo.split(/\s+/); if (parts.length > 1 && KIND_RX.test(parts[parts.length - 1])) { kind = parts.pop(); memo = parts.join(' '); }
+          seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: m[5], amt: Math.abs(num(m[6])), bal: num(m[7]), memo, kind } });
+        }
+        if (seq.some((x) => x.row) && !bank) bank = '카카오뱅크';
+        if (!seq.some((x) => x.row)) {
+          const re2 = /(\d{4})[.\-/](\d{2})[.\-/](\d{2}) ?(\d{2}:\d{2}:\d{2})? (\S+) (.*?) ([\d,]+|-) ([\d,]+|-) ([\d,]{5,})(?= |$)/g;
+          while ((m = re2.exec(flat))) { const out = num(m[7]), inn = num(m[8]); if (!out && !inn) continue; seq.push({ row: { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] || '', io: inn ? '입금' : '출금', amt: inn || out, bal: num(m[9]), memo: m[6].trim(), kind: m[5] } }); }
+          if (seq.some((x) => x.row) && !bank) bank = '우리은행';
+        }
+      }
       for (let i = 0; i < seq.length; i++) {
         const it = seq[i]; if (!it.row) continue;
         if (!it.row.memo) {
@@ -8899,7 +8925,11 @@
         let P;
         if (/\.pdf$/i.test(f.name) || (u8[0] === 0x25 && u8[1] === 0x50)) P = parseLines(await pdfLines(buf));
         else P = parseSheets(/\.csv$/i.test(f.name) ? readCsv(buf) : await readXlsx(buf));
-        if (!P.rows.length) throw new Error('거래 줄을 찾지 못했습니다. 카카오뱅크 거래내역서(PDF/엑셀) · 우리은행 거래실적증명서(PDF/엑셀)인지 확인해 주세요.');
+        if (!P.rows.length) {
+          try { console.log('[통장 내역] 읽은 글자 줄', pdfDbg); } catch (e2) { /* 무시 */ }
+          const peek = (pdfDbg.lines || []).filter((l) => /\d{4}/.test(l)).slice(0, 2).map((l) => l.slice(0, 70)).join(' | ');
+          throw new Error('거래 줄을 찾지 못했습니다. 카카오뱅크 거래내역서(PDF/엑셀) · 우리은행 거래실적증명서(PDF/엑셀)인지 확인해 주세요.' + (peek ? ' (읽은 글자: ' + peek + ')' : ''));
+        }
         const r = await api('adm_bankPreview', { bank: P.bank, acct: P.acct, rows: P.rows, file: f.name });
         if (!r.ok) return toast(r.msg);
         S.pv = r; S.pv.file = f.name; S.pv.bank = P.bank; S.f = 'all';
