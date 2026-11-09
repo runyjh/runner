@@ -2168,6 +2168,8 @@ function stlLegacyClosed_(month) {
 function stlLegacySales_(month) {
   const snap = stlClosedLoad_(month), sum = snap.summary, slips = snap.slips;
   if (!sum) fail_(month + ' 마감 기록을 읽을 수 없습니다.');
+  // 전에 쿠팡 매출만 더했던 줄은 지우고 다시 (쿠팡 정산서를 다시 넣을 때)
+  sum.drivers = sum.drivers.filter(function (r) { if (/쿠팡 매출만/.test(str_(r.legacyNote))) { delete slips[r.id]; return false; } return true; });
   const res = stlCompute_(month), byId = {}, byCid = {}, used = {};
   res.summary.drivers.forEach(function (c) { byId[c.id] = c; (c.cids || []).concat(c.usedCids || []).forEach(function (x) { byCid[stlLogin_(x)] = c; }); });
   const pick = function (row) {
