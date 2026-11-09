@@ -1581,7 +1581,9 @@
   /** 스케줄 칸 글자 풀기: '강서1 529A,529B (D1,D2,F3)' → { camp:'강서1', codes:['529A','529B'], routes:'529AB', rot:'D1,D2,F3', per:{}, raw } · '출근' 은 기본노선(baseRoute)으로
    *  '408A(D1,D2),408B' 처럼 노선 바로 뒤 괄호 = 그 글자만의 회전 → per['408A']='D1,D2', routes '408A(D1,D2) 408B' */
   const ROT_FULL = 'D1,D2,F3';
-  function schParse(v, baseRoute) {
+  let CAMP_ROTS = {}; // 기본 회전이 D1,D2,F3 가 아닌 캠프 { '시흥2': 'D1,D2' } (서버 api_mySchedule·api_campSchedule)
+  const fullRot = (camp) => CAMP_ROTS[String(camp || '').replace(/\s+/g, '')] || ROT_FULL;
+  function schParse(v, baseRoute, homeCamp) {
     const per = {};
     const pull = (x) => String(x || '').replace(/(\d+[A-Za-z]+)\(([^)]*)\)/g, (m0, rt, ro) => {
       const r = ro.replace(/\s/g, '').toUpperCase(); const mm = rt.toUpperCase().match(/^(\d+)([A-Z]+)$/);
@@ -1603,16 +1605,16 @@
         groups[k].ch += ch;
       });
     });
-    const mixed = Object.keys(per).length > 0;
-    const routes = order.map((k) => { const g = groups[k]; return g.n + g.ch + (mixed && g.r && g.r !== ROT_FULL ? '(' + g.r + ')' : ''); }).join(' ');
-    return { camp, codes, routes, rot, per, mixed, raw: String(v || '').replace(/\([^)]*\)/g, '').trim() };
+    const mixed = Object.keys(per).length > 0, full = fullRot(camp || homeCamp);
+    const routes = order.map((k) => { const g = groups[k]; return g.n + g.ch + (mixed && g.r && g.r !== full ? '(' + g.r + ')' : ''); }).join(' ');
+    return { camp, codes, routes, rot, per, mixed, full, raw: String(v || '').replace(/\([^)]*\)/g, '').trim() };
   }
   /** 칸 글자를 깔끔하게: '강서1 529A,529B (D1,D2,F3)' → '강서1 529AB' · 회전이 기본(D1,D2,F3)이 아니면 '(D1,D2)' 붙임 · 글자별 회전이면 '408A(D1,D2) 408B' · 라우트 없으면 원문 */
   function schNice(v, camp, baseRoute) {
-    const pc = schParse(v, baseRoute || '');
+    const pc = schParse(v, baseRoute || '', camp);
     if (!pc.routes) return pc.raw || String(v || '');
     const rot = pc.rot;
-    return ((pc.camp || camp) ? (pc.camp || camp) + ' ' : '') + pc.routes + (!pc.mixed && rot && rot !== ROT_FULL ? ' (' + rot + ')' : '');
+    return ((pc.camp || camp) ? (pc.camp || camp) + ' ' : '') + pc.routes + (!pc.mixed && rot && rot !== pc.full ? ' (' + rot + ')' : '');
   }
   function schKind(v) {
     const s = String(v || '').trim();
@@ -1669,6 +1671,7 @@
           else $('#scBody').innerHTML = scFailBox(r.msg);
           return;
         }
+        if (r.campRots) CAMP_ROTS = r.campRots;
         scCamp = r; if (!scCampDay || !r.dates.includes(scCampDay)) scCampDay = r.dates.includes(pddOf(r.today)) ? pddOf(r.today) : r.dates[0];
         renderCampSched();
       }).catch(() => { if (stale()) return; $('#scBody').innerHTML = scFailBox('인터넷 연결을 확인해 주세요.'); netErr(); });
@@ -1676,6 +1679,7 @@
     const args = mode === 'month' ? [token, scMonth] : [token];
     api('api_mySchedule', ...args).then((r) => {
       if (stale()) return;
+      if (r && r.campRots) CAMP_ROTS = r.campRots;
       if (!r.ok) {
         toast(r.msg || '스케줄을 불러오지 못했습니다.');
         if (r.code === 'EXPIRED') { clearSession(); goLogin(); }
@@ -1783,7 +1787,7 @@
     const prev = new Date(+p[0], +p[1] - 1, +p[2] - 1), prevTxt = (prev.getMonth() + 1) + '/' + prev.getDate() + ' (' + DOWK[prev.getDay()] + ')';
     const mp = o.cell ? schParse(o.cell, o.baseRoute || '') : null;
     const myLine = !o.cell ? '<span class="none">아직 정해지지 않음</span>'
-      : mp.routes ? (mp.camp || o.camp ? '<b>' + escH((mp.camp || o.camp) + ' 캠프') + '</b> ' : '') + '<b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot && mp.rot.replace(/\s/g, '').toUpperCase() !== ROT_FULL ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(o.cell) && !/\d/.test(o.cell) ? '<small>출근</small>' : '')
+      : mp.routes ? (mp.camp || o.camp ? '<b>' + escH((mp.camp || o.camp) + ' 캠프') + '</b> ' : '') + '<b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot && !mp.mixed && mp.rot.replace(/\s/g, '').toUpperCase() !== fullRot(mp.camp || o.camp) ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(o.cell) && !/\d/.test(o.cell) ? '<small>출근</small>' : '')
       : '<b class="' + schKind(o.cell) + ' tag">' + escH(mp.raw) + '</b>';
     return '<div class="dsel' + (d === o.pdd ? ' pdd' : '') + '">' +
       '<div class="dd"><b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b>' + (d === o.pdd ? '<em class="pddt">PDD · 내일 배송</em>' : d === o.today ? '<em class="today">오늘</em>' : '') + (o.holiday ? '<em class="hol">' + escH(o.holiday) + '</em>' : '') +

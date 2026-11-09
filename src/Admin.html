@@ -651,6 +651,7 @@
   .radios { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; min-height: 40px; }
   .radios label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
   .radios label.dirty { color: var(--warn); font-weight: 700; }
+  .rotb { display: inline-block; margin-left: 6px; vertical-align: middle; font-size: 11px; font-weight: 800; color: #9a3412; background: #ffedd5; border-radius: 6px; padding: 1px 6px; }
   .rotgrid { display: grid; grid-template-columns: max-content repeat(3, max-content); gap: 4px 14px; align-items: center; margin-top: 4px; font-size: 13px; }
   .rotgrid .rrow { display: contents; }
   .rotgrid .rrow b { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
@@ -1661,6 +1662,7 @@
     <div class="field"><span class="lb">상차지 주소 (캠프 주소와 다른 곳일 때. 여러 개 가능)</span><div id="cmAddrs"></div>
       <button type="button" class="btn sm ghost" id="cmAddrAdd">+ 상차지 주소 추가</button></div>
     <div class="field"><label class="lb" for="cmMemo">메모 (선택)</label><textarea class="inp" id="cmMemo" placeholder="출입 방법, 주차, 연락처 등"></textarea></div>
+    <div class="field"><span class="lb">기본 회전 (이 캠프에서 운영하는 회전 · 2회전 캠프면 F3 해제)</span><div class="radios" id="cmRot"><label><input type="checkbox" data-cmrot="D1" checked> D1</label><label><input type="checkbox" data-cmrot="D2" checked> D2</label><label><input type="checkbox" data-cmrot="F3" checked> F3</label></div></div>
     <div class="field"><label class="lb" for="cmCode">쿠팡 캠프코드 (SLA 파일의 Camp 열 · 예: AYG_1)</label><input class="inp" id="cmCode" maxlength="12" autocomplete="off" placeholder="비우면 캠프명으로 자동 추정"></div>
     <div class="m-actions"><button type="button" class="btn ghost" id="cmCancel">닫기</button><button class="btn" id="cmSave">저장</button></div>
   </form>
@@ -4394,11 +4396,13 @@
   $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk() || !xpLeaveOk()) return; pdirty = {}; adirty = {}; RVOL = null; RP.loaded = false; loadRoutes().then(() => { if (xpOn) xpRender(); toast('새로 불러왔습니다.'); }); });
 
   // 왼쪽 캠프 목록
+  /** 기본 회전이 D1·D2·F3 전부가 아니면 배지 ('2회전 D1·D2') */
+  const rotBadge = (c) => { const r = String((c && c.rot) || 'D1,D2,F3').split(',').filter(Boolean); return r.length && r.join(',') !== 'D1,D2,F3' ? '<span class="rotb" title="이 캠프 기본 회전 — 미배정 계산·쿠팡 업로드에 사용">' + r.length + '회전 ' + esc(r.join('·')) + '</span>' : ''; };
   function renderCampList() {
     const q = normCode($('#campQ').value);
     // 운영자(관리자·운영자·대표 소속용 가짜 캠프)는 노선이 없으면 목록에서 숨김 (캠프 관리에서는 그대로 다룬다)
     const items = sortedCamps().filter((c) => !(/^운영자/.test(String(c.name).replace(/\s/g, '')) && !routesOf(c.id).length && curCamp !== c.id))
-      .map((c) => ({ id: c.id, name: c.name, address: c.address, routes: routesOf(c.id), imgs: imagesOf(c.id).length }));
+      .map((c) => ({ id: c.id, name: c.name, rot: c.rot, address: c.address, routes: routesOf(c.id), imgs: imagesOf(c.id).length }));
     const orphan = routesOf(ORPHAN);
     if (orphan.length) items.push({ id: ORPHAN, name: '캠프 미지정', address: '시트에서 캠프명을 확인해 주세요', routes: orphan, imgs: 0, orphan: true });
     const shown = items.filter((it) => {
@@ -4408,7 +4412,7 @@
     });
     $('#campList').innerHTML = shown.length ? shown.map((it) =>
       '<button class="camp-item' + (it.id === curCamp ? ' on' : '') + (it.orphan ? ' orphan' : '') + '" data-camp="' + esc(it.id) + '">' +
-      '<b>' + esc(it.name) + '</b><small>노선 ' + it.routes.length + (it.orphan ? '' : ' · 이미지 ' + it.imgs) +
+      '<b>' + esc(it.name) + (it.orphan ? '' : rotBadge(it)) + '</b><small>노선 ' + it.routes.length + (it.orphan ? '' : ' · 이미지 ' + it.imgs) +
       (q && it.hit ? ' · <em>노선 ' + it.hit + '개 일치</em>' : '') + '</small>' +
       (it.address ? '<span>' + esc(it.address) + '</span>' : '') + '</button>').join('')
       : '<div class="empty" style="padding:24px 8px">' + (RT.camps.length ? '검색 결과가 없습니다.' : '등록된 캠프가 없습니다.<br><b>+ 캠프 추가</b>로 시작하세요.') + '</div>';
@@ -4437,11 +4441,12 @@
     const imgs = orphan ? [] : imagesOf(curCamp);
     m.innerHTML =
       '<div class="sec">' +
-        '<div class="ch-top"><h3>' + esc(c.name) + '</h3>' +
+        '<div class="ch-top"><h3>' + esc(c.name) + (orphan ? '' : rotBadge(c)) + '</h3>' +
           (orphan ? '' : '<button class="btn sm ghost" data-ract="camp-edit">캠프 정보 수정</button><button class="btn sm ghost danger-t" data-ract="camp-del">캠프 삭제</button>') + '</div>' +
         (orphan ? '<p style="margin:0;color:var(--sub);font-size:13px">시트(routes 탭)에서 캠프명이 비었거나, camps 탭에 없는 캠프명을 쓴 노선입니다. 노선을 눌러 캠프를 지정해 주세요.</p>'
           : '<div class="kv2"><span>캠프 주소</span><span>' + (c.address ? esc(c.address) + mapLink(c.address) : '<em>없음</em>') + '</span>' +
             addrsOf(c.id).map((a) => '<span>' + esc(a.label) + '</span><span>' + esc(a.address) + mapLink(a.address) + '</span>').join('') +
+            '<span>기본 회전</span><span>' + esc(String(c.rot || 'D1,D2,F3').split(',').join(' · ')) + '</span>' +
             '<span>메모</span><span class="pre">' + (c.memo ? esc(c.memo) : '<em>없음</em>') + '</span></div>') +
       '</div>' +
       (orphan ? '' :
@@ -5507,6 +5512,8 @@
     cmEdit = c || null;
     $('#cmTitle').textContent = c ? '캠프 정보 수정' : '캠프 추가';
     $('#cmName').value = c ? c.name : ''; $('#cmAddr').value = c ? c.address : ''; $('#cmMemo').value = c ? c.memo : ''; $('#cmCode').value = c ? (c.cpCode || '') : '';
+    const crs = String((c && c.rot) || 'D1,D2,F3').split(',');
+    $$('[data-cmrot]', $('#cmRot')).forEach((x) => { x.checked = crs.includes(x.dataset.cmrot); });
     $('#cmAddrs').innerHTML = '';
     (c ? addrsOf(c.id) : []).forEach((a) => addAddrRow(a.label, a.address));
     $('#campModal').classList.remove('hidden'); $('#cmName').focus();
@@ -5532,6 +5539,8 @@
       addresses: $$('.addr-row', $('#cmAddrs')).map((d) => ({ label: d.querySelector('[data-al]').value.trim(), address: d.querySelector('[data-aa]').value.trim() }))
         .filter((x) => x.address) };
     if (!f.name) { $('#cmName').focus(); return toast('캠프명을 입력해 주세요.'); }
+    f.rot = $$('[data-cmrot]', $('#cmRot')).filter((x) => x.checked).map((x) => x.dataset.cmrot).join(',');
+    if (!f.rot) return toast('기본 회전을 하나 이상 골라 주세요.');
     if (cmEdit) { f.id = cmEdit.id; f.seen = cmEdit.updatedAt; }
     const b = $('#cmSave'); b.disabled = true;
     api('adm_campSave', f).then((r) => {

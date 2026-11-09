@@ -3537,6 +3537,17 @@ function campView_(o) {
   return { id: o.id, name: o.name, address: o.address, memo: o.memo, rot: normRot_(o.rot).join(',') || ROTS.join(','), cpCode: str_(o.cpCode).toUpperCase(), createdAt: o.createdAt, updatedAt: o.updatedAt };
 }
 /** 회전 글자 정리: 'd1, d2 f3' → ['D1','D2','F3'] (모르는 값은 버림) */
+/** 기본 회전이 D1,D2,F3 가 아닌 캠프만 { 짧은캠프명: 'D1,D2' } (기사앱 칸 표시용 — 그 캠프 기본과 같으면 회전 글자 생략) */
+function campRotMap_() {
+  const out = {};
+  try {
+    master_().camps.forEach(function (c) {
+      const r = normRot_(c.rot).join(',');
+      if (r && r !== ROTS.join(',')) out[str_(c.name).replace(/\s*캠프\s*$/, '').replace(/\s+/g, '')] = r;
+    });
+  } catch (e) { /* 표시용이라 실패해도 무시 */ }
+  return out;
+}
 function normRot_(v) {
   const out = [];
   str_(v).toUpperCase().split(/[\s,\/]+/).forEach(function (x) { if (ROTS.indexOf(x) >= 0 && out.indexOf(x) < 0) out.push(x); });
@@ -5082,7 +5093,8 @@ function api_mySchedule(token, month) {
     }
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
-    try { const me0 = driverById_(String(s.d)); out.baseRoute = me0 ? str_(me0.baseRoute) : ''; } catch (e) { out.baseRoute = ''; } // '출근' 칸을 기본노선 코드로 보여 주기 위해
+    try { const me0 = driverById_(String(s.d)); out.baseRoute = me0 ? str_(me0.baseRoute) : ''; } catch (e) { out.baseRoute = ''; }
+    out.campRots = campRotMap_(); // '출근' 칸을 기본노선 코드로 보여 주기 위해
     // 노선 변경 예약 안내: '11/11부터 군포1캠프 212AB'
     try {
       rcApplyDue_();
@@ -5192,7 +5204,7 @@ function api_campSchedule(token, month, campId) {
       const sun = sundayOf_(new Date());
       dates = schDateRange_(sun, addDays_(sun, SCH_DAYS - 1));
     }
-    const out = { ok: true, today: todayText_(), month: ym, dates: dates, holidays: {}, camp: '', drivers: [], backup: {} };
+    const out = { ok: true, today: todayText_(), month: ym, dates: dates, holidays: {}, camp: '', drivers: [], backup: {} , campRots: campRotMap_() };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
     try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); }
     const all = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
