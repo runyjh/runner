@@ -6413,6 +6413,35 @@ function adm_rcSave(token, f) {
     } finally { lock.releaseLock(); }
   });
 }
+/**
+ * 관리자: 이미 바뀐 캠프·노선의 '적용일'을 앞당기거나 늦추기 (늦게 입력했을 때 · 지난 날짜로 정정)
+ *  f = { driverId, date } → 그 기사의 가장 최근 '적용' 변경의 날짜를 date 로. 기사 정보(지금 캠프·노선)는 그대로
+ *  date 는 오늘 이전·당일, 그 앞 변경의 날짜보다 뒤여야 한다. 스케줄은 그날부터 새 캠프 줄에 보인다 (정산은 아이디 기준이라 그대로)
+ */
+function adm_rcSetDate(token, f) {
+  return run_(function () {
+    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
+    f = f || {};
+    const date = normDate_(f.date), today = todayText_();
+    if (!date) fail_('날짜를 확인해 주세요.');
+    if (date > today) fail_('앞으로의 날짜는 예약으로 넣어 주세요.');
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      rcTouch_();
+      const list = (rcByDriver_()[str_(f.driverId)] || []).filter(function (c) { return c.status === RCS.DONE; });
+      const c = list[list.length - 1];
+      if (!c) fail_('이 기사는 바뀐 캠프·노선 기록이 없습니다. 캠프·노선을 고르고 날짜를 넣어 주세요.');
+      const prev = list[list.length - 2];
+      if (prev && date <= prev.date) fail_('그 앞 변경(' + prev.date + ' ' + (prev.toCamp || '') + ' ' + (prev.toRoute || '') + ')보다 뒤 날짜여야 합니다.');
+      const old = c.date;
+      writeFields_(SH.RCHG, c._row, { date: date, memo: (c.memo ? c.memo + ' / ' : '') + '적용일 ' + old + ' → ' + date + ' 정정' });
+      rcTouch_();
+      logAdmin_(a, '노선 변경 적용일 정정', c.name + ' (' + c.driverId + ')', old + ' → ' + date + ' · ' + (c.fromCamp || '') + ' ' + (c.fromRoute || '') + ' → ' + (c.toCamp || '') + ' ' + (c.toRoute || ''));
+      return { ok: true, change: rcView_(Object.assign({}, c, { date: date }), rcCampNames_()), old: old };
+    } finally { lock.releaseLock(); }
+  });
+}
 /** 관리자: 예약 취소 (적용 전만). 노선 이관이면 같이 만든 기사 예약도 취소 */
 function adm_rcCancel(token, id) {
   return run_(function () {

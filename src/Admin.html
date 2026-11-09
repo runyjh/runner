@@ -1721,7 +1721,7 @@
       <div class="field full"><label class="lb" for="sdCamp">소속 캠프 (노선관리)</label><select class="inp" id="sdCamp"></select></div>
       <div class="field full"><span class="lb">라우트 (노선관리) — 여러 개 고를 수 있습니다</span><div class="rchips" id="sdChips"></div>
         <div class="radios" id="sdRots"></div><div class="brprev">저장될 기본노선: <b id="sdBr"></b></div><input type="hidden" id="sdRoute"></div>
-      <div class="field full"><label class="lb" for="sdWhen">캠프·라우트 변경 적용일 (비우면 지금 바로 · 날짜를 넣으면 그날부터 바뀌도록 예약)</label>
+      <div class="field full"><label class="lb" for="sdWhen">캠프·라우트 변경 적용일 (비우면 오늘부터 · 앞 날짜 = 그날부터 바뀌도록 예약 · 지난 날짜 = 그날부터 바뀐 것으로 정정)</label>
         <input class="inp" type="date" id="sdWhen" style="max-width:200px"><div class="sub" id="sdRcInfo" style="font-size:12px;margin-top:4px"></div></div>
       <div class="field full"><span class="lb">고정휴무일</span><div class="offbtns" id="sdOffBtns">
         <button type="button" data-off="0">일</button><button type="button" data-off="1">월</button><button type="button" data-off="2">화</button><button type="button" data-off="3">수</button><button type="button" data-off="4">목</button><button type="button" data-off="5">금</button><button type="button" data-off="6">토</button></div>
@@ -6821,7 +6821,7 @@
     $('#sdOff').value = d.fixedOff || ''; $('#sdExtra').value = d.extraOff || '';
     $('#sdPat').value = d.workPattern || ''; $('#sdMemo').value = d.memo || ''; $('#sdOrder').value = d.order || '';
     paintOffBtns();
-    $('#sdWhen').value = ''; $('#sdWhen').min = SD.today || '';
+    $('#sdWhen').value = ''; $('#sdWhen').removeAttribute('min');
     const pend = (d.changes || []).filter((c) => c.status === '예약');
     $('#sdRcInfo').innerHTML = pend.length ? '예약됨: ' + pend.map((c) => '<b>' + mdOf(c.date) + '부터 ' + esc(c.toCamp + ' ' + c.toRoute) + '</b>').join(', ') + ' · <a href="#" data-rcopen="list">예약 보기·취소</a>' : '';
     $('#sdModal').classList.remove('hidden');
@@ -6877,14 +6877,21 @@
     Object.keys(f).forEach((k) => { if (f[k] === was[k]) delete f[k]; });
     // 적용일을 넣고 캠프·노선을 바꿨으면: 그날부터 바뀌도록 예약 (지금 기사 정보는 그대로 · 적용일에 자동 변경)
     const when = $('#sdWhen').value, today = SD.today || '';
-    let rc = null;
-    if (when && when > today && ('schCampId' in f || 'baseRoute' in f)) {
+    let rc = null, redate = null;
+    const chg = 'schCampId' in f || 'baseRoute' in f;
+    if (when && when !== today && chg) {
+      // 앞 날짜 = 예약 · 지난 날짜 = 그날부터 바뀐 것으로 (지금 바로 바꾸고 이력은 그 날짜로)
+      if (when < today && !confirm(mdOf(when) + '부터 ' + ($('#sdCamp').selectedOptions[0] || {}).textContent + ' ' + $('#sdRoute').value.trim() + ' 로 바뀐 것으로 고칩니다.\n\n· 기사 정보는 지금 바로 바뀝니다\n· 기사스케줄은 ' + mdOf(when) + '부터 새 캠프 줄에 보입니다 (이미 적힌 칸은 그대로)\n· 정산은 아이디 기준이라 영향 없습니다\n\n진행할까요?')) return;
       rc = { driverId: d.id, date: when, toCampId: $('#sdCamp').value, toRoute: $('#sdRoute').value.trim() };
       delete f.schCampId; delete f.baseRoute;
+    } else if (when && when < today && !chg) {
+      // 캠프·노선은 이미 바뀌어 있고 적용일만 지난 날짜로 정정
+      if (!confirm('가장 최근에 바뀐 캠프·노선(지금 ' + (d.camp || '') + ' ' + (d.baseRoute || '') + ')의 적용일을 ' + mdOf(when) + '(으)로 고칩니다.\n기사스케줄은 그날부터 지금 캠프 줄에 보입니다. 진행할까요?')) return;
+      redate = { driverId: d.id, date: when };
     }
-    if (!Object.keys(f).length && !rc) return $('#sdModal').classList.add('hidden');
+    if (!Object.keys(f).length && !rc && !redate) return $('#sdModal').classList.add('hidden');
     const b = $('#sdSave'); b.disabled = true;
-    const step1 = rc ? api('adm_rcSave', rc) : Promise.resolve(null);
+    const step1 = rc ? api('adm_rcSave', rc) : redate ? api('adm_rcSetDate', redate) : Promise.resolve(null);
     step1.then((rr) => {
       if (rr && !rr.ok) { toast(rr.msg); return; }
       return (Object.keys(f).length ? api('adm_updateDriver', d.id, f, null) : Promise.resolve({ ok: true })).then((r) => {
@@ -6892,7 +6899,8 @@
         return fetchSched(SD.start).then((w) => {
           if (w.ok) { SD.drivers = w.drivers; }
           $('#sdModal').classList.add('hidden'); renderSched();
-          if (rr) rcShowInfo(d.name + ' · ' + mdOf(rr.change.date) + '부터 ' + rr.change.toCamp + ' ' + rr.change.toRoute + (rr.dup ? ' (이미 있던 예약)' : ' 예약했습니다'), rr.warnings);
+          if (rr && redate) toast(d.name + ' · 적용일을 ' + mdOf(rr.old) + ' → ' + mdOf(rr.change.date) + '(으)로 고쳤습니다.');
+          else if (rr) rcShowInfo(d.name + ' · ' + mdOf(rr.change.date) + '부터 ' + rr.change.toCamp + ' ' + rr.change.toRoute + (rr.dup ? ' (이미 있던 예약)' : rr.change.date < today ? ' (지난 날짜로 정정 · 바로 적용)' : ' 예약했습니다'), rr.warnings);
           else toast(d.name + ' 기사님 스케줄 설정을 저장했습니다.');
         });
       });
