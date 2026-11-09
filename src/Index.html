@@ -449,6 +449,8 @@
   .dsel .dmy small { font-size: 12px; color: var(--sub); font-weight: 700; } .dsel .dmy .none { color: #b0b8c1; } .dsel .dmy b.tag { font-size: 16px; border-radius: 8px; padding: 2px 10px; }
   .dsel .dmy b.tag.k-off { background: #f08c8c; color: #fff; } .dsel .dmy b.tag.k-sick { background: #d4edbc; color: #11734b; } .dsel .dmy b.tag.k-mi { background: #d15555; color: #ffcfc9; } .dsel .dmy b.tag.k-yong { background: #e6cff2; color: #5a3286; } .dsel .dmy b.tag.k-reg { background: #d9f5ef; color: #0b6b57; } .dsel .dmy b.tag.k-work { background: #bfe1f6; color: #0a53a8; }
   .dsel .dsum { margin-top: 6px; font-size: 12.5px; color: var(--sub); } .dsel .dsum b { color: var(--ink); }
+  .dsel .dwork { margin-top: 6px; font-size: 12.5px; color: var(--sub); background: #f7f8fa; border-radius: 8px; padding: 5px 9px; } .dsel .dwork b { color: var(--ink); }
+  .dsel.pdd .dwork { background: #fff; }
   .dsel .inst { margin-top: 8px; font-size: 13px; color: #8a4b00; background: #fff4d6; border: 1px solid #f5d38a; border-radius: 8px; padding: 6px 10px; line-height: 1.5; } .dsel .inst b { display: block; font-size: 12px; }
   .cmate .dt b { display: block; font-size: 15px; } .cmate .dt small.rt { color: var(--brand); font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
@@ -740,7 +742,7 @@
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
     <div class="topbar"><button class="back" id="scBack" aria-label="뒤로">←</button><h2>내 스케줄</h2>
-      <div class="segm" id="scMode"><button type="button" data-m="camp">내 캠프</button><button type="button" data-m="2w" class="on">2주</button><button type="button" data-m="month">한 달</button></div></div>
+      <div class="segm" id="scMode"><button type="button" data-m="month" class="on">한 달</button><button type="button" data-m="2w">2주</button><button type="button" data-m="camp">내 캠프</button></div></div>
     <div id="scBody"></div>
     <p class="hint" id="scHint" style="text-align:center;margin:4px 0 24px">이번 주는 확정, 다음 주는 바뀔 수 있습니다. 변경 문의는 사무실로 연락해 주세요.</p>
   </section>
@@ -1581,11 +1583,12 @@
     if (/업무등록/.test(s)) return 'k-reg';
     return '';
   }
-  let scMode = '2w', scMonth = '', scSel = '';
+  let scMode = 'month', scMonth = '', scSel = '';
   const ymdOf = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const pddOf = (today) => { const p = String(today || '').split('-'); return p.length === 3 ? ymdOf(new Date(+p[0], +p[1] - 1, +p[2] + 1)) : ''; };
   function openSched() {
-    scMode = '2w'; paintScMode();
+    scMode = 'month'; if (!scMonth) { const t = new Date(); scMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // 처음은 한 달 (PDD가 있는 달)
+    paintScMode();
     show('sched');
     loadSched();
   }
@@ -1690,12 +1693,8 @@
     const myLine = !me ? '' : !mv ? '<span class="none">아직 정해지지 않음</span>'
       : mp.routes ? '<b>' + escH((mp.camp || r.camp) + ' 캠프') + '</b> <b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(mv) && !/\d/.test(mv) ? '<small>출근</small>' : '')
       : '<b class="' + schKind(mv) + ' tag">' + escH(mp.raw) + '</b>';
-    const dsel = '<div class="dsel' + (d === pdd ? ' pdd' : '') + (est ? ' est' : '') + '">' +
-      '<div class="dd"><b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b>' + (d === pdd ? '<em class="pddt">PDD · 내일 배송</em>' : d === r.today ? '<em class="today">오늘</em>' : '') + (r.holidays[d] ? '<em class="hol">' + escH(r.holidays[d]) + '</em>' : '') +
-        '<span class="st ' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</span></div>' +
-      (me ? '<div class="dmy">' + myLine + '</div>' : '') +
-      '<div class="dsum">' + escH(r.camp) + ' 캠프 · 기사 ' + r.drivers.length + '명 · 근무 <b>' + work + '</b>명 · 백업 <b>' + bk.length + '</b>명</div>' +
-      (me && (me.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(me.inst[d]) + '</div>' : '') + '</div>';
+    const dsel = dselCard({ d, pdd, today: r.today, holiday: r.holidays[d], est, cell: mv, baseRoute: me ? me.route : '', camp: r.camp, inst: me ? (me.inst || {})[d] || '' : '',
+      sum: escH(r.camp) + ' 캠프 · 기사 ' + r.drivers.length + '명 · 근무 <b>' + work + '</b>명 · 백업 <b>' + bk.length + '</b>명' });
     $('#scBody').innerHTML = picker + chips + dsel +
       '<div class="wk"><h3>' + escH(r.camp) + ' 캠프 기사 <small class="fix">' + r.drivers.length + '명</small></h3>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
@@ -1731,6 +1730,22 @@
     return list.map((c) => '<div class="card" style="border-left:4px solid var(--brand);padding:12px 14px;margin-bottom:10px;font-size:14px;line-height:1.5">🚚 <b>' + md(c.date) + '부터 ' + escH(c.camp + ' ' + c.route) + '</b>' +
       (c.done ? '로 바뀌었습니다.' : '로 바뀝니다.') + (c.fromCamp || c.fromRoute ? '<div style="color:var(--sub);font-size:13px">이전: ' + escH((c.fromCamp || '') + ' ' + (c.fromRoute || '')) + '</div>' : '') + '</div>').join('');
   }
+  /** 고른 날 요약 카드 (한 달 · 내 캠프 공용): 날짜 + PDD/출근일 안내 · 내 노선 크게 · 인원 · 지시사항 */
+  function dselCard(o) {
+    const d = o.d, p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+    const prev = new Date(+p[0], +p[1] - 1, +p[2] - 1), prevTxt = (prev.getMonth() + 1) + '/' + prev.getDate() + ' (' + DOWK[prev.getDay()] + ')';
+    const mp = o.cell ? schParse(o.cell, o.baseRoute || '') : null;
+    const myLine = !o.cell ? '<span class="none">아직 정해지지 않음</span>'
+      : mp.routes ? (mp.camp || o.camp ? '<b>' + escH((mp.camp || o.camp) + ' 캠프') + '</b> ' : '') + '<b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(o.cell) && !/\d/.test(o.cell) ? '<small>출근</small>' : '')
+      : '<b class="' + schKind(o.cell) + ' tag">' + escH(mp.raw) + '</b>';
+    return '<div class="dsel' + (d === o.pdd ? ' pdd' : '') + '">' +
+      '<div class="dd"><b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b>' + (d === o.pdd ? '<em class="pddt">PDD · 내일 배송</em>' : d === o.today ? '<em class="today">오늘</em>' : '') + (o.holiday ? '<em class="hol">' + escH(o.holiday) + '</em>' : '') +
+        (o.est != null ? '<span class="st ' + (o.est ? 'est' : 'fix') + '">' + (o.est ? '예상 · 변동 있음' : '확정') + '</span>' : '') + '</div>' +
+      '<div class="dwork">🚚 배송(PDD) <b>' + (+p[1]) + '/' + (+p[2]) + '</b> · 실제 출근(상차) <b>' + prevTxt + ' 밤</b></div>' +
+      '<div class="dmy">' + myLine + '</div>' +
+      (o.sum ? '<div class="dsum">' + o.sum + '</div>' : '') +
+      (o.inst ? '<div class="inst"><b>📌 지시사항</b>' + escH(o.inst) + '</div>' : '') + '</div>';
+  }
   function renderMonth(r) {
     scLast = r;
     const pdd = pddOf(r.today), [y, m] = r.month.split('-').map(Number);
@@ -1741,20 +1756,27 @@
     const cells = [];
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((d) => {
-      const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', nb = ((r.backup || {})[d] || []).length, np = ((r.pumasi || {})[d] || []);
+      const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', np = ((r.pumasi || {})[d] || []);
+      // 칸에는 내 노선(줄임 표기)만. 지시·품앗이·확정완료는 작은 아이콘, 백업/근무 인원 글자는 없음 (아래 요약·상세에)
+      const pc = v ? schParse(v, '') : null;
+      const chip = !pc ? '' : pc.routes
+        ? '<span class="v ' + schKind(v) + (pc.routes.length > 5 ? ' long' : '') + '">' + (pc.camp && pc.camp !== r.camp ? '<i class="cp">' + escH(pc.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        : '<span class="v ' + schKind(v) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
+      const icons = ((r.inst || {})[d] ? '<span title="지시사항">📌</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
-        '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + '</span>' +
-        (d === pdd ? '<em class="pddt">PDD</em>' : '') +
-        (v ? '<span class="v ' + schKind(v) + '">' + escH(v) + '</span>' : '') +
-        ((r.inst || {})[d] ? '<span class="minst" title="지시사항">📌 ' + escH(r.inst[d]) + '</span>' : '') +
-        (((r.pmDone || {})[d] || []).length ? '<span class="pmok">✅ 확정완료</span>' : '') +
-        (np.length ? '<span class="pmdot">🤝 ' + escH(np.some((x) => x.role === '수행') ? '수행' : np[0].role) + '</span>' : '') +
-        (nb ? '<span class="bkdot">백업 ' + nb + '</span>' : '') + '</button>');
+        '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
+        (d === pdd ? '<em class="pddt">PDD</em>' : '') + chip + '</button>');
     });
     $('#scBody').innerHTML = rcNote(r) + '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
       '<div class="msum">근무 ' + work + '일 · 휴무 ' + off + '일' + (r.camp ? ' · ' + escH(r.camp) : '') + '</div>' +
       '<div class="mgrid">' + DOWK.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + w + '</div>').join('') + cells.join('') + '</div></div>' +
+      '<div id="scDsel">' + monthDsel(r) + '</div>' +
       '<div class="wk mdet" id="scDet">' + dayRow(r, scSel) + '</div>';
+  }
+  function monthDsel(r) {
+    const d = scSel, bk = ((r.backup || {})[d] || []).length;
+    return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', camp: r.camp || '', inst: (r.inst || {})[d] || '',
+      sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk ? ' · 들어오는 백업 <b>' + bk + '</b>명' : '') : '') });
   }
   $('#scBody').addEventListener('change', (e) => {
     if (e.target.id !== 'scCampSel') return;
@@ -1783,6 +1805,7 @@
       scSel = c.dataset.d;
       $$('#scBody .mc.sel').forEach((x) => x.classList.remove('sel')); c.classList.add('sel');
       $('#scDet').innerHTML = dayRow(scLast, scSel);
+      const ds = $('#scDsel'); if (ds) ds.innerHTML = monthDsel(scLast);
     }
   });
   // ───── 앱 설치 (깃허브 페이지에서 열렸을 때만) ─────
