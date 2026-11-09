@@ -453,8 +453,8 @@
   .dsel .dwork { margin-top: 6px; font-size: 12.5px; color: var(--sub); background: #f7f8fa; border-radius: 8px; padding: 5px 9px; } .dsel .dwork b { color: var(--ink); }
   .dsel.pdd .dwork { background: #fff; }
   .dsel .inst { margin-top: 8px; font-size: 13px; color: #8a4b00; background: #fff4d6; border: 1px solid #f5d38a; border-radius: 8px; padding: 6px 10px; line-height: 1.5; } .dsel .inst b { display: block; font-size: 12px; }
-  .cmate .dt b.rt { display: block; font-size: 19px; line-height: 1.1; color: var(--brand); font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2px; } .cmate .dt b.rt.none { color: #b0b8c1; }
-  .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
+  .cmate .dt b.rt { display: block; font-size: 19px; line-height: 1.1; color: var(--ink); font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2px; } .cmate .dt b.rt.none { color: #b0b8c1; }
+  .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--brand); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .cbk { font-size: 14px; line-height: 1.7; color: #5a3286; }
   .cbk div { background: #f5eefb; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-weight: 600; }
@@ -1692,11 +1692,11 @@
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
     const bk = (r.backup || {})[d] || [];
-    const mv = me ? me.cells[d] || '' : '';
-    const dsel = dselCard({ d, pdd, today: r.today, holiday: r.holidays[d], est, cell: mv, baseRoute: me ? me.route : '', camp: r.camp, inst: me ? (me.inst || {})[d] || '' : '',
-      sum: escH(r.camp) + ' 캠프 · 기사 ' + r.drivers.length + '명 · 근무 <b>' + work + '</b>명 · 백업 <b>' + bk.length + '</b>명' });
-    $('#scBody').innerHTML = picker + chips + dsel +
-      '<div class="wk"><h3>' + escH(r.camp) + ' 캠프 기사 <small class="fix">' + r.drivers.length + '명</small></h3>' +
+    const prevD = new Date(+p[0], +p[1] - 1, +p[2] - 1);
+    $('#scBody').innerHTML = picker + chips +
+      '<div class="wk"><h3>' + escH(r.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (d === pdd ? ' <em class="pddt" style="font-style:normal;font-size:11px;font-weight:800;color:#fff;background:var(--brand);border-radius:6px;padding:2px 7px;vertical-align:middle">PDD</em>' : '') + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
+        '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
+        '<p class="hint" style="margin:-2px 0 6px">실제 출근일 ' + (prevD.getMonth() + 1) + '/' + prevD.getDate() + ' (' + DOWK[prevD.getDay()] + ') 저녁 입차 · 기사 ' + r.drivers.length + '명 · 근무 ' + work + '명 · 백업 ' + bk.length + '명</p>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(r.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>';
