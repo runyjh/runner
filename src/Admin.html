@@ -1361,6 +1361,7 @@
         <select class="inp" id="stMonth" aria-label="정산월" style="width:auto"></select>
         <button class="btn ghost sm" id="stNext" aria-label="다음 달">▶</button>
         <button class="btn ghost" id="stRecalc" title="시트에서 직접 고친 내용까지 다시 계산">다시 계산</button>
+        <button class="btn ghost" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기</button>
         <button class="btn ghost" id="stCloseBtn">마감</button>
         <button class="btn" id="stUpBtn">쿠팡 정산서 올리기</button>
         <input type="file" id="stFile" accept=".xlsx,.csv" class="hidden">
@@ -1653,6 +1654,17 @@
   </form>
 </div>
 
+<!-- ───────────── 정산관리: 세무자료 내보내기 ───────────── -->
+<div class="modal hidden" id="tpModal">
+  <div class="m-box" style="width:min(560px,100%)">
+    <h3>세무자료 내보내기</h3>
+    <p class="sub" style="margin:0 0 10px;font-size:13px">세무소(기장)에 보낼 자료를 엑셀 한 파일로 만듭니다. 시트: 요약 · 기사 세금계산서 · 기사 지급 명세(계좌 대조) · 급여 · 고용산재 · 운영비지출 · 쿠팡 입금 · 가불 대장 · 분실파손 · 쿠팡 정산서 원본 링크 · 사업자번호 미입력.</p>
+    <div class="field"><span class="lb">정산월 (여러 개 선택)</span><div class="radios" id="tpMonths"></div></div>
+    <div class="field"><label class="check"><input type="checkbox" id="tpExtraOn"> 마지막 정산월 다음 달의 지출 기록도 <input class="inp" type="date" id="tpExtraTo" style="width:150px;height:32px;margin:0 4px"> 까지 포함 (예: 11월 1~7일)</label></div>
+    <p class="sub" style="font-size:12.5px;margin:0 0 6px">같이 보낼 외부 자료: 사업용계좌 거래내역 엑셀(은행) · 종이 매입 세금계산서 스캔 · 쿠팡 정산서 원본(링크 시트 참고) · 사업용 카드가 홈택스 미등록이면 카드 이용내역.</p>
+    <div class="m-actions"><button type="button" class="btn ghost" id="tpCancel">닫기</button><button type="button" class="btn" id="tpGo">엑셀 만들기</button></div>
+  </div>
+</div>
 <!-- ───────────── 노선관리: 캠프 추가·수정 ───────────── -->
 <div class="modal hidden" id="campModal">
   <form class="m-box" id="campForm" novalidate style="width:min(520px,100%)">
@@ -6069,6 +6081,7 @@
     if (vis('#imgAddModal')) closeIa();
     else if (vis('#routeModal')) $('#routeModal').classList.add('hidden');
     else if (vis('#campModal')) $('#campModal').classList.add('hidden');
+    else if (vis('#tpModal')) $('#tpModal').classList.add('hidden');
   });
 
   // ───── 스케줄 계산 (운영시트 스크립트의 규칙을 그대로 옮김) ─────
@@ -7728,7 +7741,7 @@
     const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!on);
     $('#stTitle').textContent = na ? na.textContent.trim() : on ? '러너 손익·통장' : '정산관리';
     $('#stTabs').classList.toggle('hidden', on);
-    ['#stRecalc', '#stCloseBtn', '#stUpBtn'].forEach((id) => $(id).classList.toggle('hidden', on));
+    ['#stRecalc', '#stCloseBtn', '#stUpBtn', '#stTaxPack'].forEach((id) => $(id).classList.toggle('hidden', on));
     $('#stPnlTabs').classList.toggle('hidden', !on);
   }
   /** 사이드바: 정산관리 / 러너 손익·통장 중 지금 보는 쪽 표시 */
@@ -8731,6 +8744,118 @@
   $('#stPrev').addEventListener('click', () => stStep(-1));
   $('#stNext').addEventListener('click', () => stStep(1));
   $('#stRecalc').addEventListener('click', () => { if (stLeaveOk()) loadSettle(STX.month, true); });
+  // ───── 세무자료 내보내기 ─────
+  $('#stTaxPack').addEventListener('click', () => {
+    const ms = (STX.months || []).slice().reverse();
+    if (!ms.length) return toast('정산 자료가 없습니다.');
+    const cur = STX.month, prev = STX.months[STX.months.indexOf(cur) - 1];
+    $('#tpMonths').innerHTML = ms.map((m) => '<label><input type="checkbox" data-tpm="' + m + '"' + (m === cur || m === prev ? ' checked' : '') + '> ' + esc(ymTitle(m)) + '</label>').join('');
+    const t = new Date(); $('#tpExtraTo').value = t.toISOString().slice(0, 10); $('#tpExtraOn').checked = false;
+    $('#tpModal').classList.remove('hidden');
+  });
+  $('#tpCancel').addEventListener('click', () => $('#tpModal').classList.add('hidden'));
+  $('#tpGo').addEventListener('click', () => {
+    const months = $$('[data-tpm]', $('#tpMonths')).filter((x) => x.checked).map((x) => x.dataset.tpm).sort();
+    if (!months.length) return toast('정산월을 하나 이상 골라 주세요.');
+    const extra = $('#tpExtraOn').checked ? $('#tpExtraTo').value : '';
+    const b = $('#tpGo'); b.disabled = true; b.textContent = '만드는 중…';
+    api('adm_stlTaxPack', months, extra).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      const blob = ZIPW.xlsx(tpSheets(r));
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = '러너_세무자료_' + months[0].replace('-', '') + (months.length > 1 ? '~' + months[months.length - 1].replace('-', '') : '') + (extra ? '_지출' + extra.replace(/-/g, '').slice(4) : '') + '.xlsx';
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      $('#tpModal').classList.add('hidden');
+      toast('세무자료 엑셀을 내려받았습니다. 기사 ' + r.invoices.length + '줄 · 지출 ' + r.costs.length + '줄' + (r.noBiz.length ? ' · 사업자번호 미입력 ' + r.noBiz.length + '줄 (마지막 시트)' : ''));
+    }).catch(() => toast('만들지 못했습니다.')).finally(() => { b.disabled = false; b.textContent = '엑셀 만들기'; });
+  });
+  /** 서버 자료 → 시트 배열 (ZIPW.xlsx 용). 머리글 행은 .h = true */
+  function tpSheets(r) {
+    const H = (arr) => { arr.h = true; return arr; };
+    const n = (v) => (v == null || v === '' ? '' : Number(v) || 0);
+    const mt = (m) => ymTitle(m).replace(' ', '');
+    const co = r.company || {};
+    const sheets = [];
+    // ① 요약
+    const S = [H(['구분'].concat(r.summary.map((x) => mt(x.month) + (x.closed ? ' (마감)' : ' (가계산)')), r.summary.length > 1 ? ['합계'] : []))];
+    const tot = (f) => r.summary.reduce((a, x) => a + (Number(f(x)) || 0), 0);
+    const line = (lab, f, noSum) => S.push([lab].concat(r.summary.map((x) => n(f(x))), r.summary.length > 1 ? [noSum ? '' : tot(f)] : []));
+    S.push(['※ 기사 세금계산서는 지급 합계 전액으로 발행 · 분실파손 변상금·용차 차액·산재고용·가불은 발행 후 실 입금에서 공제 · 공제한 분실 변상금·용차 차액·보험 차액은 러너 기타수입(부가세 없음)']);
+    S.push([]);
+    S.push(H(['[매출 — 쿠팡]']));
+    line('배송 건수', (x) => x.qty); line('쿠팡 매출 (부가세 포함)', (x) => x.sales); line('쿠팡 공급가', (x) => x.supplyCp); line('매출세액 (분실 부가세분 차감)', (x) => x.salesVat);
+    line('분실파손 차감 (소비자가)', (x) => x.lossCp); line('분실파손 공급가 환산 (÷1.1)', (x) => x.lossSup); line('영업점 수수료 (프로그램 사용료)', (x) => x.progFee);
+    S.push([]); S.push(H(['[매입 — 기사 세금계산서]']));
+    line('기사 수 (계산서)', (x) => x.drvN, true); line('계산서 합계 (부가세 포함)', (x) => x.drvInvoice); line('공급가액', (x) => x.drvSupply); line('매입세액', (x) => x.drvVat); line('기사 실 입금 합계', (x) => x.drvNet);
+    S.push([]); S.push(H(['[기타수익 — 기타수입으로 신고 · 부가세 없음]']));
+    line('분실 변상금 (기사 공제)', (x) => (x.otherInc || {}).loss); line('용차 차액 (기사 공제)', (x) => (x.otherInc || {}).yong); line('보험 차액 (기사 공제 − 신고 기사분)', (x) => (x.otherInc || {}).ins); line('기타수익 합계', (x) => (x.otherInc || {}).total);
+    S.push([]); S.push(H(['[경비]']));
+    line('러너 산재·고용 부담분', (x) => x.runnerIns); line('직원 급여 (세전)', (x) => x.staff); line('└ 원천세 (3.3%)', (x) => x.staffWht); line('고정 운영비 (공급가)', (x) => x.fixed); line('└ 부가세', (x) => x.fixedVat); line('지출 기록 (공급가)', (x) => x.varCost); line('└ 부가세', (x) => x.varVat);
+    S.push([]); S.push(H(['[손익]']));
+    line('회사이익금 (공급가 − 분실 환산 − 기사 공급가 + 기타수익)', (x) => x.profit); line('당기순이익 (세전)', (x) => x.net); line('부가세 납부 예상', (x) => x.vatDue);
+    S.push([]); S.push(H(['[일정]'])); S.push(['기사 지급일'].concat(r.summary.map((x) => x.payDate))); S.push(['쿠팡 입금 예정일'].concat(r.summary.map((x) => x.coupangDate))); S.push(['계산서 작성일자'].concat(r.summary.map((x) => x.writeDate)));
+    S.push([]); S.push(['사업자', (co.name || '') + (co.ceo ? ' (대표 ' + co.ceo + ')' : ''), '사업자번호', co.bizNo || '', '이메일', co.email || '']);
+    S.push(['만든 날짜', new Date().toISOString().slice(0, 10), '러너 올인원 정산관리 → 세무자료 내보내기']);
+    sheets.push({ name: '요약', rows: S, widths: [44].concat(r.summary.map(() => 16), [16]) });
+    // ② 기사 세금계산서
+    const I = [H(['정산월', '기사(명의자)', '정산 아이디', '사업자명', '사업자번호', '공급가액', '세액', '합계 (발행 금액)', '작성일자', '구분', '비고'])];
+    r.invoices.forEach((x) => I.push([mt(x.month), x.name, x.cids, x.bizName, x.bizNo, n(x.supply), n(x.tax), n(x.invoice), x.writeDate, x.vendor ? '용차업체' : '기사 발행', x.bizNo ? '' : '사업자번호 없음 — 계산서 불가']));
+    I.push(H(['합계', '', '', '', '', r.invoices.reduce((a, x) => a + n(x.supply), 0), r.invoices.reduce((a, x) => a + n(x.tax), 0), r.invoices.reduce((a, x) => a + n(x.invoice), 0)]));
+    sheets.push({ name: '기사 세금계산서', rows: I, widths: [12, 14, 22, 16, 14, 14, 12, 16, 12, 10, 26] });
+    // ③ 기사 지급 명세 (계좌 대조)
+    const dn = r.dedNames || [];
+    const P = [H(['정산월', '기사(명의자)', '정산 아이디', '근무일', '배송건수', '지급 합계 (= 계산서)'].concat(dn.map((d) => '공제: ' + d), ['공제 합계', '실 입금액', '지급 예정일', '입금일', '입금 확인', '은행', '예금주', '계좌번호']))];
+    r.pays.forEach((x) => P.push([mt(x.month), x.name, x.cids, n(x.workDays), n(x.qty), n(x.pay)].concat(dn.map((d) => n(x.ded[d])), [n(x.dedSum), n(x.net), x.planDate, x.payDate, x.checked ? '✓' : '', x.bank, x.holder, x.account])));
+    P.push(H(['합계', '', '', '', r.pays.reduce((a, x) => a + n(x.qty), 0), r.pays.reduce((a, x) => a + n(x.pay), 0)].concat(dn.map((d) => r.pays.reduce((a, x) => a + n(x.ded[d]), 0)), [r.pays.reduce((a, x) => a + n(x.dedSum), 0), r.pays.reduce((a, x) => a + n(x.net), 0)])));
+    P.push([]); P.push(['※ 실 입금액이 사업용계좌 출금액. 9월 정산은 10월 지급일에, 10월 정산은 11월 지급일에 출금됩니다 (지급 예정일 열). 분할 이체·수수료로 금액이 다를 수 있습니다.']);
+    sheets.push({ name: '기사 지급 명세', rows: P, widths: [12, 14, 22, 8, 10, 16].concat(dn.map(() => 13), [13, 15, 12, 12, 8, 10, 10, 20]) });
+    // ④ 급여
+    const W = [H(['정산월', '직원', '세전 급여', '원천세율', '원천세 (소득세+지방소득세)', '실지급', '지급일', '은행', '메모'])];
+    r.staff.forEach((x) => W.push([mt(x.month), x.name, n(x.pay), x.rate, n(x.wht), n(x.net), x.day, x.bank, x.memo]));
+    W.push(H(['합계', '', r.staff.reduce((a, x) => a + n(x.pay), 0), '', r.staff.reduce((a, x) => a + n(x.wht), 0), r.staff.reduce((a, x) => a + n(x.net), 0)]));
+    if (!r.staff.length) W.push(['직원 탭에 급여가 입력되어 있지 않습니다.']);
+    W.push([]); W.push(['※ 3.3% 사업소득 원천징수 — 홈택스 원천세 신고(다음 달 10일)·지급명세서와 대조']);
+    sheets.push({ name: '급여', rows: W, widths: [12, 12, 14, 10, 22, 14, 10, 10, 24] });
+    // ⑤ 고용산재
+    const N = [H(['정산월', '기사(명의자)', '정산 아이디', '보험 기준 공급가', '보수월액 (경비율 적용)', '산재 (기사분)', '고용 (기사분)', '러너 부담분', '합계 (공단 신고액)', '비고'])];
+    r.ins.forEach((x) => N.push([mt(x.month), x.name, x.cids, n(x.base), n(x.bosu), n(x.san), n(x.goy), n(x.runner), n(x.total), x.excluded ? '제외' : '']));
+    N.push(H(['합계', '', '', r.ins.reduce((a, x) => a + n(x.base), 0), r.ins.reduce((a, x) => a + n(x.bosu), 0), r.ins.reduce((a, x) => a + n(x.san), 0), r.ins.reduce((a, x) => a + n(x.goy), 0), r.ins.reduce((a, x) => a + n(x.runner), 0), r.ins.reduce((a, x) => a + n(x.total), 0)]));
+    N.push([]); N.push(['※ 기사분은 기사 정산서에서 공제(예수금) · 러너 부담분은 경비 · 합계가 근로복지공단 납부액과 대조 대상']);
+    sheets.push({ name: '고용산재', rows: N, widths: [12, 14, 22, 16, 18, 13, 13, 13, 16, 8] });
+    // ⑥ 운영비·지출
+    const C = [H(['귀속월', '날짜', '구분', '분류', '내용', '거래처', '금액 (지출액)', '공급가', '부가세', '증빙', '통장', '손익 반영', '메모'])];
+    r.costs.sort((a, b) => (a.month + a.date).localeCompare(b.month + b.date)).forEach((x) => C.push([mt(x.month), x.date, x.kind, x.cat, x.name, x.vendor, n(x.amt), n(x.supply), n(x.vat), x.proof, x.bank, x.pnl ? '○' : '제외', x.memo]));
+    C.push(H(['합계', '', '', '', '', '', r.costs.reduce((a, x) => a + n(x.amt), 0), r.costs.reduce((a, x) => a + n(x.supply), 0), r.costs.reduce((a, x) => a + n(x.vat), 0)]));
+    C.push([]); C.push(['※ 증빙이 세금계산서·카드·현금영수증이면 ÷1.1 로 공급가·부가세(매입세액) 구분 · "세금·보험 납부"는 손익 제외 · 종이 세금계산서는 실물 스캔 첨부']);
+    sheets.push({ name: '운영비지출', rows: C, widths: [12, 12, 14, 12, 24, 14, 14, 13, 11, 12, 12, 9, 20] });
+    // ⑦ 쿠팡 입금
+    const D = [H(['정산월', '계산 금액 (공급가×1.1 − 분실)', '실제 입금액', '입금 예정일', '입금일', '확인', '받는 통장'])];
+    r.deposits.forEach((x) => D.push([mt(x.month), n(x.plan), n(x.amt), x.due, x.date, x.done ? '✓' : '', x.bank]));
+    sheets.push({ name: '쿠팡 입금', rows: D, widths: [12, 26, 16, 12, 12, 6, 14] });
+    // ⑧ 가불
+    const A = [H(['기사(명의자)', '정산 아이디', '지급일', '가불금', '상계 예정일', '상환금', '잔액', '메모'])];
+    r.advances.forEach((x) => A.push([x.name, x.acct, x.date, n(x.amt), x.due, n(x.paid), n(x.left), x.memo]));
+    A.push(H(['합계', '', '', r.advances.reduce((a, x) => a + n(x.amt), 0), '', r.advances.reduce((a, x) => a + n(x.paid), 0), r.advances.reduce((a, x) => a + n(x.left), 0)]));
+    A.push([]); A.push(['※ 가불은 대여금 → 경비·수입 아님. 상환금은 기사 정산서 "가불금 상환"으로 공제']);
+    sheets.push({ name: '가불 대장', rows: A, widths: [14, 20, 12, 12, 12, 12, 12, 24] });
+    // ⑨ 분실파손
+    const L = [H(['정산월', '기사(명의자)', '날짜', '운송장번호', '상품', '구분', '쿠팡 차감 (소비자가)', '기사 변상 (×1.1)', '러너 기타수익 (차이)'])];
+    r.losses.forEach((x) => L.push([mt(x.month), x.name, x.date, x.waybill, x.item, x.type, n(x.cp), n(x.share), n(x.share) - n(x.cp)]));
+    L.push(H(['합계', '', '', '', '', '', r.losses.reduce((a, x) => a + n(x.cp), 0), r.losses.reduce((a, x) => a + n(x.share), 0), r.losses.reduce((a, x) => a + n(x.share) - n(x.cp), 0)]));
+    sheets.push({ name: '분실파손', rows: L, widths: [12, 14, 10, 18, 40, 8, 18, 16, 18] });
+    // ⑩ 쿠팡 정산서 원본
+    const F = [H(['정산월', '차수', '파일명', '링크 (드라이브)', '올린 시각'])];
+    r.files.forEach((x) => F.push([mt(x.month), x.round, x.file, x.url, x.at]));
+    if (!r.files.length) F.push(['저장된 원본 파일이 없습니다.']);
+    sheets.push({ name: '쿠팡 정산서 원본', rows: F, widths: [12, 6, 40, 60, 18] });
+    // ⑪ 사업자번호 미입력
+    if (r.noBiz.length) {
+      const B = [H(['정산월', '기사(명의자)', '계산서 금액', '처리 필요'])];
+      r.noBiz.forEach((x) => B.push([mt(x.month), x.name, n(x.invoice), '사업자 등록 또는 3.3% 사업소득 원천징수 — 세무사와 확인']));
+      sheets.push({ name: '사업자번호 미입력', rows: B, widths: [12, 14, 14, 50] });
+    }
+    return sheets;
+  }
   $('#stCloseBtn').addEventListener('click', () => {
     const s = STX.sum; if (!s) { loadSettle(STX.month); return toast('정산을 다시 불러왔습니다. 한 번 더 눌러 주세요.'); }
     if (!stLeaveOk()) return; // 공제·가불 등 표에 저장 안 한 줄이 있으면 먼저 묻는다 (마감하면 표를 다시 불러와 지워짐)
@@ -8975,24 +9100,30 @@
     const xe = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
     const colName = (i) => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
     /** rows = [[값…]…] (행 번호 그대로) → .xlsx Blob. 숫자는 숫자 칸, 나머지는 글자 칸 */
+    /** 시트 하나(rows, sheetName) 또는 여러 장([{ name, rows, widths }]) → .xlsx Blob. 행에 .h = true 면 굵게(머리글) */
     function xlsx(rows, sheetName) {
+      const sheets = Array.isArray(rows) && rows.length && rows[0] && !Array.isArray(rows[0]) && rows[0].rows ? rows : [{ name: sheetName || 'Sheet1', rows: rows }];
       const enc = new TextEncoder();
       const serial = (d) => Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000);
-      const body = rows.map((r, ri) => r ? '<row r="' + (ri + 1) + '">' + r.map((v, ci) => {
-        if (v === '' || v == null) return '';
-        const ref = colName(ci) + (ri + 1);
-        if (v instanceof Date) return '<c r="' + ref + '" s="1"><v>' + serial(v) + '</v></c>'; // 날짜 칸 (yyyy-mm-dd)
-        return typeof v === 'number' ? '<c r="' + ref + '"><v>' + v + '</v></c>' : '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xe(v) + '</t></is></c>';
-      }).join('') + '</row>' : '').join('');
+      const sheetXml = (sh) => {
+        const body = (sh.rows || []).map((r, ri) => r ? '<row r="' + (ri + 1) + '">' + r.map((v, ci) => {
+          if (v === '' || v == null) return '';
+          const ref = colName(ci) + (ri + 1), st = r.h ? ' s="2"' : '';
+          if (v instanceof Date) return '<c r="' + ref + '" s="1"><v>' + serial(v) + '</v></c>'; // 날짜 칸 (yyyy-mm-dd)
+          return typeof v === 'number' ? '<c r="' + ref + '"' + (r.h ? st : ' s="3"') + '><v>' + v + '</v></c>' : '<c r="' + ref + '"' + st + ' t="inlineStr"><is><t xml:space="preserve">' + xe(v) + '</t></is></c>';
+        }).join('') + '</row>' : '').join('');
+        const cols = sh.widths && sh.widths.length ? '<cols>' + sh.widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join('') + '</cols>' : '';
+        return '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + cols + '<sheetData>' + body + '</sheetData></worksheet>';
+      };
+      const safeName = (n, i) => xe(String(n || 'Sheet' + (i + 1)).replace(/[\\/?*\[\]:]/g, ' ').slice(0, 31));
       const f = (name, x) => ({ name, data: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + x) });
       return zip([
-        f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
+        f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheets.map((_, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('') + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
         f('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
-        f('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + xe(sheetName || 'Sheet1') + '" sheetId="1" r:id="rId1"/></sheets></workbook>'),
-        f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
-        f('xl/styles.xml', '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'),
-        f('xl/worksheets/sheet1.xml', '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + body + '</sheetData></worksheet>')
-      ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        f('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + sheets.map((sh, i) => '<sheet name="' + safeName(sh.name, i) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>'),
+        f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheets.map((_, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('') + '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
+        f('xl/styles.xml', '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF3F8"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'),
+      ].concat(sheets.map((sh, i) => f('xl/worksheets/sheet' + (i + 1) + '.xml', sheetXml(sh)))), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }
     return { zip, xlsx };
   })();

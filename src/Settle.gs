@@ -1472,7 +1472,7 @@ function stlCompute_(month) {
     const share = stlR10_(amt * (cfg.lossVat ? 1 + cfg.vat : 1) * cfg.lossRate);
     s.loss += share; s.lossCp += amt; s.lossSup += stlLossSup_(amt, cfg);
     if (mv) stlMoveNote_(s, sum(idx.mainKey), lr, mv.worker, X, D, idx, -share, 0, mv.key);
-    s.lossLines.push({ date: stlYmd_(r.date), cid: r.cid, camp: r.camp, type: r.type, detail: r.detail, item: r.item, waybill: r.waybill, amt: share });
+    s.lossLines.push({ date: stlYmd_(r.date), cid: r.cid, camp: r.camp, type: r.type, detail: r.detail, item: r.item, waybill: r.waybill, amt: share, cp: amt });
   });
 
   // 용차
@@ -3723,5 +3723,65 @@ function adm_stlExpenseAdd(token, rows) {
       logAdmin_(a, '지출 기록 일괄 추가', '', add.length + '줄 추가 · ' + skipped.length + '줄 건너뜀');
       return { ok: true, added: add.length, skipped: skipped };
     } finally { lock.releaseLock(); }
+  });
+}
+
+// ───────────────────────── 세무자료 내보내기 (#290) ─────────────────────────
+/**
+ * 세무소(기장) 전달용 자료 한 묶음. months = ['2026-09','2026-10'] · extraTo = '2026-11-07' (그 날까지의 지출 기록만 추가)
+ *  시트: 요약 · 기사 세금계산서 · 기사 지급 명세 · 급여 · 고용산재 · 운영비지출 · 쿠팡 입금 · 가불 · 분실파손 · 쿠팡 정산서 원본 링크
+ *  클라이언트(Admin.html)가 엑셀로 만든다. 계좌번호는 기사 지급 명세 대조용으로 넣는다 (세무소 전달 자료).
+ */
+function adm_stlTaxPack(token, months, extraTo) {
+  return run_(function () {
+    requireAdmin_(token);
+    months = (Array.isArray(months) ? months : [months]).filter(stlMonthOk_).sort();
+    if (!months.length) fail_('정산월을 골라 주세요.');
+    let co0 = {}; try { co0 = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
+    const cfg = stlCfg_(), co = { name: co0.branchName || '', ceo: co0.branchCeo || '', bizNo: co0.branchBizNo || '', addr: co0.branchAddr || '', email: cfg.email || '' }, items = stlItems_().list;
+    const dedNames = items.filter(function (i) { return i.side === '차감'; }).map(function (i) { return i.name; });
+    const out = { ok: true, months: months, extraTo: extraTo || '', company: co, dedNames: dedNames, summary: [], invoices: [], pays: [], staff: [], ins: [], costs: [], deposits: [], advances: [], losses: [], files: [], noBiz: [] };
+    months.forEach(function (m) {
+      const res = stlResult_(m, false), sum = res.summary, t = sum.total || {}, c = sum.company || {};
+      const pnl = stlPnl_(m, sum), fund = stlFund_(m), rd = stlRounds_(m), dates = sum.dates || {};
+      out.summary.push({
+        month: m, closed: !!sum.closed, qty: t.qty || 0, sales: c.sales || 0, supplyCp: c.supplyCp || 0, salesVat: pnl.salesVat, lossCp: c.lossCp || 0, lossSup: c.lossSup || 0, progFee: c.vendorCut || 0,
+        drvInvoice: t.invoice || 0, drvSupply: t.supply || 0, drvVat: t.tax || 0, drvNet: t.net || 0, drvN: (sum.drivers || []).length,
+        otherInc: pnl.otherInc, margin: pnl.margin, profit: pnl.profit, runnerIns: pnl.runnerIns, insGap: pnl.insGap, staff: pnl.staff, staffWht: pnl.staffWht, fixed: pnl.fixed, fixedVat: pnl.fixedVat, varCost: pnl.varCost, varVat: pnl.varVat, net: pnl.net, vatDue: pnl.vatDue,
+        insTotal: pnl.ins ? pnl.ins.total : 0, insDrv: pnl.ins ? pnl.ins.sanD + pnl.ins.goyD : 0, insRunner: pnl.ins ? pnl.ins.runnerAmt : 0,
+        payDate: dates.pay || '', coupangDate: dates.coupang || '', invoiceDue: dates.invoice || '', writeDate: dates.write || ''
+      });
+      (sum.drivers || []).forEach(function (d) {
+        const slip = res.slips[d.id] || {}, lines = slip.lines || [], ins = slip.ins || {};
+        const ded = {};
+        lines.forEach(function (L) { if (L.side === '차감' && L.amt) ded[L.name] = (ded[L.name] || 0) + L.amt; });
+        const base = { month: m, name: d.name, id: d.id, cids: (d.cids || []).map(function (x) { return String(x).replace(/@.*/, ''); }).join(', '), vendor: !!d.vendor, ceo: !!d.ceo, bizNo: d.bizNo || '', bizName: d.bizName || '' };
+        if (!d.ceo) {
+          out.invoices.push(Object.assign({}, base, { invoice: d.invoice, supply: d.supply, tax: d.tax, writeDate: dates.write || '' }));
+          out.pays.push(Object.assign({}, base, { qty: d.qty, workDays: d.workDays, pay: d.pay + (d.depAdd || 0), ded: ded, dedSum: (d.san || 0) + (d.goy || 0) + (d.depDed || 0) + (d.taxDed || 0), net: d.net, bank: d.bank, holder: d.holder, account: d.account, payDate: d.payDate || '', checked: !!d.checked, planDate: dates.pay || '' }));
+          out.ins.push(Object.assign({}, base, { base: ins.base || 0, bosu: ins.bosu || 0, san: d.san || 0, goy: d.goy || 0, runner: d.runnerIns || 0, total: (d.san || 0) + (d.goy || 0) + (d.runnerIns || 0), excluded: !!ins.excluded }));
+          if (!d.bizNo && !d.vendor) out.noBiz.push({ month: m, name: d.name, invoice: d.invoice });
+        }
+        (slip.loss || []).forEach(function (x) { out.losses.push({ month: m, name: d.name, date: x.date || '', waybill: x.waybill || '', item: x.item || x.detail || '', type: x.type || '', cp: stlNum_(x.cp) || 0, share: stlNum_(x.amt) || 0 }); });
+      });
+      out.deposits.push({ month: m, plan: fund.deposit.plan, amt: fund.deposit.amt, done: fund.deposit.done, date: fund.deposit.date, due: fund.deposit.due, bank: fund.deposit.bank });
+      // 고정 운영비 (그 달 유효) · 지출 기록 (귀속월)
+      stlRead_('stl_cost').forEach(function (r) { if (!stlNum_(r.amt) || !stlActiveIn_(r, m)) return; const x = stlSplitVat_(r.amt, r.proof); out.costs.push({ month: m, date: r.day ? m + '-' + ('0' + String(r.day).replace(/\D/g, '').slice(-2)).slice(-2) : '', kind: '고정 운영비', cat: r.cat || '', name: r.name || '', vendor: '', amt: stlNum_(r.amt), supply: x.supply, vat: x.vat, proof: r.proof || '', bank: r.bank || '', pnl: true, memo: r.memo || '' }); });
+      stlRead_('stl_expense').forEach(function (r) { if (r.month !== m || !stlNum_(r.amt)) return; const x = stlSplitVat_(r.amt, r.proof), noPnl = STL_NOPNL_CATS.indexOf(r.cat) >= 0; out.costs.push({ month: m, date: r.date || '', kind: noPnl ? '세금·보험 납부' : '지출 기록', cat: r.cat || '', name: r.name || '', vendor: r.vendor || '', amt: stlNum_(r.amt), supply: noPnl ? stlNum_(r.amt) : x.supply, vat: noPnl ? 0 : x.vat, proof: r.proof || '', bank: r.bank || '', pnl: !noPnl, memo: r.memo || '' }); });
+      // 직원 급여 (그 달 유효)
+      stlRead_('stl_staff').forEach(function (r) { const pay = stlR0_(stlNum_(r.pay)); if (!r.name || !pay || !stlActiveIn_(r, m)) return; const w = stlWht_(pay, r.taxRate); out.staff.push({ month: m, name: r.name, pay: pay, rate: str_(r.taxRate) || '3.3%', wht: w, net: pay - w, day: r.day || '', bank: r.bank || '', memo: r.memo || '' }); });
+      // 쿠팡 정산서 원본
+      stlRead_('stl_rounds').filter(function (r) { return r.month === m && r.file; }).forEach(function (r) { const k = m + '|' + r.round + '|' + r.file; if (!out.files.some(function (f) { return f.k === k; })) out.files.push({ k: k, month: m, round: stlNum_(r.round), file: r.file, url: r.url || '', at: r.at || '' }); });
+    });
+    // 추가 기간 지출 (예: 11월 1~7일) — 귀속월과 상관없이 날짜로
+    if (extraTo && /^\d{4}-\d{2}-\d{2}$/.test(extraTo)) {
+      const from = stlAddMonth_(months[months.length - 1], 1) + '-01';
+      stlRead_('stl_expense').forEach(function (r) { const d = stlYmd_(r.date); if (!d || d < from || d > extraTo || !stlNum_(r.amt)) return; const x = stlSplitVat_(r.amt, r.proof), noPnl = STL_NOPNL_CATS.indexOf(r.cat) >= 0; out.costs.push({ month: r.month || from.slice(0, 7), date: d, kind: noPnl ? '세금·보험 납부' : '지출 기록 (추가 기간)', cat: r.cat || '', name: r.name || '', vendor: r.vendor || '', amt: stlNum_(r.amt), supply: noPnl ? stlNum_(r.amt) : x.supply, vat: noPnl ? 0 : x.vat, proof: r.proof || '', bank: r.bank || '', pnl: !noPnl, memo: r.memo || '' }); });
+      out.extraFrom = from;
+    }
+    // 가불 대장 (전체 · 지급일 순)
+    stlRead_('stl_advance').forEach(function (a) { if (!stlNum_(a.amt)) return; out.advances.push({ name: a.name || '', acct: a.acct || '', date: stlYmd_(a.date) || '', amt: stlNum_(a.amt), due: stlYmd_(a.due) || '', paid: stlNum_(a.paid) || 0, left: Math.max(0, stlNum_(a.amt) - stlNum_(a.paid)), memo: a.memo || '' }); });
+    out.advances.sort(function (a, b) { return koCmp_(a.date, b.date); });
+    return out;
   });
 }
