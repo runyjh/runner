@@ -1681,14 +1681,6 @@
     <div class="m-actions"><button type="button" class="btn ghost" id="bkCancel">닫기</button><button type="button" class="btn" id="bkSave">저장</button></div>
   </div>
 </div>
-<div class="modal hidden" id="bkPasteModal">
-  <div class="m-box" style="width:min(720px,100%)">
-    <h3>통장 내역 글자 붙여넣기</h3>
-    <p class="sub" style="font-size:13px;margin:0 0 8px">은행 PDF 를 열고 <b>Ctrl+A(전체 선택) → Ctrl+C(복사)</b> 한 뒤 아래 칸에 <b>Ctrl+V</b>. <b>여러 통장 PDF 를 이어서 붙여 넣어도</b> 계좌번호 줄을 보고 통장별로 나눕니다. 은행 앱·인터넷뱅킹 거래내역 글자를 그대로 붙여도 됩니다.</p>
-    <textarea class="inp" id="bkText" style="width:100%;height:260px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px" placeholder="2026.10.24 05:36:00 입금 731 17,427 입출금통장이자 예금이자&#10;2026.10.20 10:47:53 출금 -100,000,000 16,696 기사정산금이체 일반이체"></textarea>
-    <div class="m-actions"><button type="button" class="btn ghost" id="bkPasteCancel">닫기</button><button type="button" class="btn" id="bkPasteGo">읽기</button></div>
-  </div>
-</div>
 <!-- ───────────── 정산관리: 세무자료 내보내기 ───────────── -->
 <div class="modal hidden" id="tpModal">
   <div class="m-box" style="width:min(560px,100%)">
@@ -6117,7 +6109,6 @@
     else if (vis('#routeModal')) $('#routeModal').classList.add('hidden');
     else if (vis('#campModal')) $('#campModal').classList.add('hidden');
     else if (vis('#tpModal')) $('#tpModal').classList.add('hidden');
-    else if (vis('#bkPasteModal')) $('#bkPasteModal').classList.add('hidden');
     else if (vis('#bkModal')) $('#bkModal').classList.add('hidden');
   });
 
@@ -8894,14 +8885,20 @@
     }
     /** 엑셀·CSV → 거래 줄 (머리글 이름으로 열 찾기) */
     function parseSheets(sheets) {
+      // 시트마다 통장 하나 (은행 엑셀을 시트별로 붙여 넣은 파일도 됨). 계좌번호는 ****-**-***6179 처럼 가려져 있어도 보이는 숫자로 구분
+      const all = [];
       let acct = '', bank = '';
       for (const sh of sheets) {
         const R = sh.rows;
+        let sAcct = '', sBank = '';
         for (let i = 0; i < Math.min(R.length, 15); i++) {
-          const txt = (R[i] || []).map((v) => String(v == null ? '' : v)).join(' ');
-          const m = txt.match(/계좌번호\s*:?\s*([\d-]{8,})/); if (m && !acct) acct = m[1];
-          if (/카카오/.test(txt)) bank = bank || '카카오뱅크'; if (/우리은행|우리SUPER/.test(txt)) bank = bank || '우리은행';
+          const cells = (R[i] || []).map((v) => String(v == null ? '' : v));
+          const txt = cells.join(' ');
+          const j = cells.findIndex((v) => /계좌번호/.test(v));
+          if (j >= 0 && !sAcct) { const cand = (cells[j].replace(/계좌번호\s*:?/, '') + ' ' + (cells[j + 1] || '')).trim(); const m = cand.match(/[\d*-]{6,}/); if (m) sAcct = m[0]; }
+          if (/카카오/.test(txt)) sBank = sBank || '카카오뱅크'; if (/우리은행|우리SUPER|계좌거래내역 조회/.test(txt)) sBank = sBank || '우리은행';
         }
+        if (!acct) acct = sAcct; if (!bank) bank = sBank;
         let hi = -1, map = null;
         for (let i = 0; i < Math.min(R.length, 30); i++) {
           const h = (R[i] || []).map((v) => String(v == null ? '' : v).replace(/\s/g, ''));
@@ -8917,12 +8914,19 @@
         for (let i = hi + 1; i < R.length; i++) {
           const r = R[i] || []; const d = xlDate(r[map.date]); if (!/^\d{4}-\d{2}-\d{2}/.test(d)) continue;
           const ds = String(r[map.date] || ''), tm = (ds.match(/(\d{2}:\d{2}(?::\d{2})?)/) || [])[1] || '';
-          let io = map.io >= 0 ? String(r[map.io] || '') : '', amt = 0;
+          let io = map.io >= 0 ? String(r[map.io] || '') : '', amt = 0, kind = map.kind >= 0 ? String(r[map.kind] || '').trim() : '';
+          if (io && !/입금|출금/.test(io)) { if (!kind) kind = io.trim(); io = ''; } // '거래구분' 열이 구분 자리에 잡힌 경우(우리은행)
           if (map.inn >= 0 || map.out >= 0) { const a = map.inn >= 0 ? num(r[map.inn]) : 0, b = map.out >= 0 ? num(r[map.out]) : 0; if (!a && !b) continue; io = a ? '입금' : '출금'; amt = a || b; }
           else { amt = num(r[map.amt]); if (!amt) continue; if (!/입금|출금/.test(io)) io = amt > 0 ? '입금' : '출금'; amt = Math.abs(amt); }
-          rows.push({ date: d.slice(0, 10), time: tm, io: /입금/.test(io) ? '입금' : '출금', amt, bal: map.bal >= 0 ? num(r[map.bal]) : 0, memo: map.memo >= 0 ? String(r[map.memo] || '').trim() : '', kind: map.kind >= 0 ? String(r[map.kind] || '').trim() : '' });
+          rows.push({ date: d.slice(0, 10), time: tm, io: /입금/.test(io) ? '입금' : '출금', amt, bal: map.bal >= 0 ? num(r[map.bal]) : 0, memo: map.memo >= 0 ? String(r[map.memo] || '').trim() : '', kind, acct: sAcct || acct, bank: sBank || bank || sh.name });
         }
-        if (rows.length) return { bank: bank || sh.name, acct, rows };
+        rows.forEach((x) => all.push(x));
+      }
+      if (all.length) {
+        // 같은 거래가 두 시트에 있으면 한 번만 (같은 통장을 두 번 붙여 넣은 경우)
+        const seen = new Set();
+        const rows = all.filter((x) => { const k = [x.acct, x.date, x.time, x.io, x.amt, x.memo.slice(0, 20)].join('|'); if (seen.has(k)) return false; seen.add(k); return true; });
+        return { bank, acct, rows, dup: all.length - rows.length };
       }
       // 표 머리글이 없으면(글자를 엑셀에 그대로 붙여 넣은 경우) 줄 글자로 읽는다
       const lines = []; sheets.forEach((sh) => sh.rows.forEach((r) => { const t = (r || []).map((v) => v == null ? '' : typeof v === 'number' ? String(v) : String(v)).join(' ').replace(/\s+/g, ' ').trim(); if (t) lines.push(t); }));
@@ -8942,7 +8946,7 @@
         if (!P.rows.length) {
           try { console.log('[통장 내역] 읽은 글자 줄', pdfDbg); } catch (e2) { /* 무시 */ }
           const peek = (pdfDbg.lines || []).filter((l) => /\d{4}/.test(l)).slice(0, 2).map((l) => l.slice(0, 70)).join(' | ');
-          throw new Error('거래 줄을 찾지 못했습니다. ' + (peek ? '(읽은 글자: ' + peek + ') ' : 'PDF 글자를 꺼내지 못하는 파일입니다. ') + 'PDF 를 열어 Ctrl+A → Ctrl+C 한 뒤 [글자 붙여넣기]로 넣어 주세요.');
+          throw new Error('거래 줄을 찾지 못했습니다. ' + (peek ? '(읽은 글자: ' + peek + ') ' : 'PDF 글자를 꺼내지 못하는 파일입니다. ') + '은행 엑셀(암호 해제) 또는 은행 엑셀 내용을 붙여 넣은 엑셀 파일로 올려 주세요.');
         }
         const r = await api('adm_bankPreview', { bank: P.bank, acct: P.acct, rows: P.rows, file: f.name });
         if (!r.ok) return toast(r.msg);
@@ -8985,30 +8989,6 @@
     });
     $$('[data-bkf]').forEach((b) => b.addEventListener('click', () => { S.f = b.dataset.bkf; $$('[data-bkf]').forEach((z) => z.classList.toggle('on', z === b)); paintRows(); }));
     $('#bkCancel').addEventListener('click', () => $('#bkModal').classList.add('hidden'));
-    $('#bkPasteCancel').addEventListener('click', () => $('#bkPasteModal').classList.add('hidden'));
-    $('#bkPasteGo').addEventListener('click', async () => {
-      const txt = $('#bkText').value; if (!txt.trim()) return toast('붙여넣은 글자가 없습니다.');
-      try {
-        const P = parseLines(txt.split(/\r?\n/).map((l) => l.replace(/\t/g, ' ').trim()).filter(Boolean));
-        if (!P.rows.length) throw new Error('거래 줄을 찾지 못했습니다. PDF 를 열어 Ctrl+A → Ctrl+C 로 전체 글자를 복사해 붙여 주세요.');
-        const r = await api('adm_bankPreview', { bank: P.bank, acct: P.acct, rows: P.rows, file: '붙여넣기' });
-        if (!r.ok) return toast(r.msg);
-        $('#bkPasteModal').classList.add('hidden');
-        S.pv = r; S.pv.file = '붙여넣기'; S.pv.bank = P.bank; S.f = 'all'; openPreview();
-      } catch (err) { toast(err && err.message || '읽지 못했습니다.'); }
-    });
-    $('#bkSave').addEventListener('click', () => {
-      const r = S.pv; if (!r) return;
-      const none = r.rows.filter((x) => x.status === '미분류').length;
-      if (none && !confirm('미분류 ' + none + '줄이 있습니다. 그대로 저장할까요? (나중에 통장 내역 탭에서 분류를 고칠 수 있습니다)')) return;
-      const b = $('#bkSave'); b.disabled = true; b.textContent = '저장 중…';
-      api('adm_bankSave', { rows: r.rows, bankName: '', opt: { learn: $('#bkLearn').checked, payCheck: $('#bkPay').checked, deposit: $('#bkDep').checked, expense: $('#bkExp').checked } }).then((x) => {
-        if (!x.ok) return toast(x.msg);
-        toast('저장했습니다. 새로 ' + x.saved + '줄 · 덮어씀 ' + x.replaced + '줄' + (x.rules ? ' · 분류 기억 ' + x.rules : '') + (x.pay ? ' · 기사 입금체크 ' + x.pay : '') + (x.deposit ? ' · 쿠팡 입금 확인 ' + x.deposit : '') + (x.expense ? ' · 지출 기록 ' + x.expense + '줄' : ''));
-        $('#bkModal').classList.add('hidden');
-        S.month = r.months[r.months.length - 1]; load();
-      }).catch(() => toast('저장하지 못했습니다.')).finally(() => { b.disabled = false; b.textContent = '저장'; });
-    });
     // ── 탭 화면: 저장된 내역 보기·분류 고치기 ──
     function load() {
       const ps = STX.paneSeq, el = $('#stPnl');
@@ -9021,8 +9001,7 @@
       const by = {}; S.rows.forEach((x) => { by[x.bankName || x.bank || '통장'] = (by[x.bankName || x.bank || '통장'] || 0) + 1; });
       el.innerHTML = '<div class="bk-head"><select class="inp" id="bkMonth" style="width:auto;height:34px">' + months.map((m) => '<option value="' + m + '"' + (m === S.month ? ' selected' : '') + '>' + esc(ymTitle(m)) + (S.months.includes(m) ? '' : ' (없음)') + '</option>').join('') + '</select>' +
           '<button class="btn" id="bkUp">통장 내역 올리기 (PDF·엑셀)</button><input type="file" id="bkFile" accept=".pdf,.xlsx,.csv" class="hidden">' +
-          '<button class="btn ghost" id="bkPaste">글자 붙여넣기</button>' +
-          '<span class="sub">카카오뱅크 거래내역서 · 우리은행 거래실적증명서. <b>PDF 가 안 읽히면 [글자 붙여넣기]</b>(PDF 열고 Ctrl+A → Ctrl+C). 비밀번호 걸린 엑셀은 암호를 풀어 저장한 뒤 올려 주세요. 계좌번호는 끝 4자리만 저장합니다.</span></div>' +
+          '<span class="sub">카카오뱅크 거래내역서 · 우리은행 거래실적증명서. 여러 통장을 <b>엑셀 한 파일에 시트별로 붙여 넣어</b> 한 번에 올려도 됩니다 (계좌번호 줄로 통장 구분). 비밀번호 걸린 엑셀은 암호를 풀어 저장한 뒤 올려 주세요. 계좌번호는 끝 4자리만 저장합니다.</span></div>' +
         '<div class="bk-sum">' + (S.sum || []).sort((a, b) => b.n - a.n).map((x) => '<span>' + esc(x.cat) + ' <b>' + x.n + '</b> <small>' + (x.in ? '+' + wn(x.in) : '') + (x.out ? ' −' + wn(x.out) : '') + '</small></span>').join('') + (Object.keys(by).length ? '<span style="background:none">' + Object.keys(by).map((k) => esc(k) + ' ' + by[k] + '줄').join(' · ') + '</span>' : '') + '</div>' +
         (S.rows.length ? '<div class="bk-wrap"><table class="bk-table" data-tk-off><thead><tr><th>통장</th><th>날짜</th><th>입/출</th><th class="n">금액</th><th>거래내용</th><th>거래구분</th><th>분류</th><th>연결 · 이름</th><th>메모</th><th></th></tr></thead><tbody id="bkListRows">' +
           S.rows.map((x, i) => '<tr class="' + (x.status === '미분류' ? 'bk-none' : '') + '" data-bkli="' + i + '"><td>' + esc(x.bankName || x.bank || '') + '</td><td>' + esc(x.date) + '</td><td class="' + (x.io === '입금' ? 'in' : 'out') + '">' + esc(x.io) + '</td><td class="n">' + wn(x.amt) + '</td><td class="bkm" title="' + esc(x.memo) + '">' + esc(x.memo) + '</td><td><small>' + esc(x.kind) + '</small></td>' +
@@ -9033,7 +9012,6 @@
       $('#bkMonth').addEventListener('change', (e) => { S.month = e.target.value; load(); });
       $('#bkUp').addEventListener('click', () => $('#bkFile').click());
       $('#bkFile').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) onFile(f); });
-      $('#bkPaste').addEventListener('click', () => { $('#bkText').value = ''; $('#bkPasteModal').classList.remove('hidden'); setTimeout(() => $('#bkText').focus(), 50); });
       const lr = $('#bkListRows');
       if (lr) {
         lr.addEventListener('change', (e) => {

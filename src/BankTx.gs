@@ -19,6 +19,8 @@ const BK_EXPENSE_CAT = {
 function bkNorm_(s) { return str_(s).replace(/\s+/g, '').replace(/\d+/g, '#').toLowerCase(); }
 function bkKey_(r) { return [r.acct4, r.date, r.time, r.io, r.amt, str_(r.memo).slice(0, 20)].join('|'); }
 function bkMonth_(date) { return str_(date).slice(0, 7); }
+/** 계좌 구분 글자: 끝이 숫자면 끝 4자리('****-**-***6179' → 6179), 끝이 가려져 있으면('1002-59*-******') 앞 숫자 4자리 */
+function bkAcct4_(v) { const s = str_(v); const m = s.match(/(\d{4})\s*$/); if (m) return m[1]; const d = s.replace(/\D/g, ''); return d.slice(0, 4); }
 /** 패턴 규칙: 거래내용(숫자는 #) 완전 일치 → 분류 */
 function bkRules_() {
   const out = {};
@@ -103,7 +105,7 @@ function bkContext_(rows) {
   const D = stlDrivers_(), names = {};
   D.all.forEach(function (o) { if (o.name) (names[o.name] = names[o.name] || []).push(o.id); });
   const staff = {}; stlRead_('stl_staff').forEach(function (r) { if (r.name) staff[r.name] = r; });
-  const banks = {}; stlBanks_().forEach(function (b) { const a4 = str_(b.account).replace(/\D/g, '').slice(-4); if (a4) banks[a4] = b; });
+  const banks = {}; stlBanks_().forEach(function (b) { const d = str_(b.account).replace(/\D/g, ''); if (d.length >= 4) { banks[d.slice(0, 4)] = banks[d.slice(0, 4)] || b; banks[d.slice(-4)] = b; } });
   let owner = ''; try { owner = str_(companyInfo_().branchCeo); } catch (e) { /* 없음 */ }
   const dates = rows.map(function (r) { return str_(r.date); }).filter(Boolean).sort();
   const nets = {}, deposits = {};
@@ -127,7 +129,7 @@ function adm_bankPreview(token, p) {
   return run_(function () {
     requireAdmin_(token);
     const rows = (p && Array.isArray(p.rows) ? p.rows : []).map(function (r) {
-      return { bank: str_(r.bank || p.bank), acct4: str_(r.acct || p.acct).replace(/\D/g, '').slice(-4), date: stlYmd_(r.date), time: str_(r.time), io: r.io === '입금' || stlNum_(r.amt) > 0 && r.io !== '출금' ? '입금' : '출금', amt: Math.abs(stlNum_(r.amt)), bal: stlNum_(r.bal), memo: str_(r.memo).slice(0, 60), kind: str_(r.kind).slice(0, 20) };
+      return { bank: str_(r.bank || p.bank), acct4: bkAcct4_(r.acct || p.acct), date: stlYmd_(r.date), time: str_(r.time), io: r.io === '입금' || stlNum_(r.amt) > 0 && r.io !== '출금' ? '입금' : '출금', amt: Math.abs(stlNum_(r.amt)), bal: stlNum_(r.bal), memo: str_(r.memo).slice(0, 60), kind: str_(r.kind).slice(0, 20) };
     }).filter(function (r) { return r.date && r.amt; });
     if (!rows.length) fail_('읽은 거래 줄이 없습니다.');
     const ctx = bkContext_(rows);
