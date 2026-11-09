@@ -8364,7 +8364,7 @@
     const isOurs = (y) => !!y.whoId && String(y.whoId).indexOf('v:') !== 0;
     const ykind = (y) => (d.vendor ? '용차업체' : isOurs(y) ? '품앗이' : '외부용차');
     const yong = (s.yong || []).map((y) => '<tr><td>' + mdTxt(y.date) + '</td><td>' + ykind(y) + ' · ' + esc(y.camp || '') + ' ' + esc(y.route || '그날 전체') + ' · ' + wn(y.qty) + '건' + (y.whoId === d.id ? ' (수행 · 추가지급)' : ' (차액 부담' + (y.who && !y.whoStaff ? ' · 수행 ' + esc(String(y.who).replace(/\s*\(.*\)$/, '')) : '') + ')') + (y.memo ? '<div class="smemo">' + esc(y.memo) + '</div>' : '') + '</td><td class="n">' + (y.whoId === d.id ? wn(y.extra) : y.cut < 0 ? '+' + wn(-y.cut) : '−' + wn(y.cut)) + '</td></tr>').join('');
-    const loss = (s.loss || []).map((x) => '<tr><td>' + mdTxt(x.date) + '</td><td>' + esc(x.item || x.detail || x.type || '분실') + (x.waybill ? '<div class="smemo">' + esc(x.waybill) + '</div>' : '') + '</td><td class="n">−' + wn(x.amt) + '</td></tr>').join('');
+    const loss = (s.loss || []).map((x) => '<tr><td>' + mdTxt(x.date) + '</td><td>' + esc(x.item || x.detail || x.type || '분실') + (x.waybill ? '<div class="smemo">운송장 ' + esc(x.waybill) + '</div>' : '') + '</td><td class="n">−' + wn(x.amt) + '</td></tr>').join('');
     const yongAllOurs = (s.yong || []).filter((y) => y.whoId !== d.id).every(isOurs);
     const yk = new Set((s.yong || []).map((y) => (y.whoId === d.id || isOurs(y) ? '품앗이' : '외부용차')));
     const yongHead = yk.size === 1 ? [...yk][0] + ' 내역' : '품앗이 · 외부용차 내역';
