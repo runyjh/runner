@@ -6091,10 +6091,17 @@
       return !['휴무', '용차', '병가', '퇴사', '미입차', '업무'].some((w) => s.includes(w));
     }
     /** 기본노선 '530AB (F3)' → { routes: '530AB', rot: 'F3' } */
+    /** '205C(D1),205D' 처럼 노선 바로 뒤 괄호 = 그 노선만의 회전 → per['205C']=['D1'], 글자에서는 뺌 */
+    function pullRouteRots(s, per) {
+      return String(s || '').replace(/(\d+[A-Za-z]+)\(([^)]*)\)/g, (m0, rt, ro) => {
+        const rr = normRot(ro); if (!rr.length) return m0;
+        routeExpand(rt).forEach((x) => { per[x] = rr; }); return rt;
+      });
+    }
     function splitBase(defRt) {
-      const s = String(defRt || '').trim();
+      const per = {}, s = pullRouteRots(String(defRt || '').trim(), per);
       const m = s.match(/\(([^)]*)\)/);
-      return { routes: s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '' };
+      return { routes: s.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*]/g, '').trim(), rot: m ? m[1].replace(/\s+/g, '') : '', per };
     }
 
     /**
@@ -6143,7 +6150,7 @@
       const missCells = new Map(); // '행|날짜칸' → ['529A', '529B(F3)'] : 그 기사 기본노선 중 그날 아무도 안 뛰는(미배정) 노선
       for (let d = 0; d < nDays; d++) {
         const baseRouteSet = new Set(), present = new Map(), explicitMi = [];
-        const addPresent = (camp, routeList, rotArr, key) => routeList.forEach((rt) => rotArr.forEach((rot) => {
+        const addPresent = (camp, routeList, rotArr, key, per) => routeList.forEach((rt) => ((per && per[rt] && per[rt].length) ? per[rt] : rotArr).forEach((rot) => {
           const k = [camp, rt, rot].join('|');
           if (!present.has(k)) present.set(k, new Set());
           present.get(k).add(key);
@@ -6186,13 +6193,15 @@
           const finalCamp = dynCamp || baseCamp;
           if (dynCamp) cell = cell.slice(mDyn[0].length).trim();
           cell = cell.replace(/\(\s*([A-Za-z][A-Za-z0-9_]{2,})\s*\)/g, '').replace(/\[[^\]]*]/g, '').trim();
+          let per = {};
+          cell = pullRouteRots(cell, per);
           let rotation = '';
           const mR = cell.match(/\(\s*([^)]+?)\s*\)/);
           if (mR) { rotation = mR[1].replace(/\s+/g, ''); cell = cell.replace(/\([^)]*\)/g, '').trim(); }
           cell = cell.replace(/업무등록/g, '').trim();
           let code;
           if (cell === '출근' || (/업무등록/.test(flat) && !/\d+[A-Za-z]+/.test(flat))) {
-            code = base.routes;
+            code = base.routes; per = base.per;
             if (!rotation && base.rot) rotation = base.rot;
           } else code = cell;
           const parts = String(code).split(/\s+/);
@@ -6202,7 +6211,7 @@
           let rotArr = normRot(rotation);
           if (!rotArr.length) rotArr = defRotArr(finalCamp);
           const hasKey = KEYWORDS.some((k) => routeList.join(',').includes(k));
-          if (routeList.length && (flat.includes('업무') || hasKey || isValidRouteList(routeList.join(',')))) addPresent(finalCamp, routeList, rotArr, r.key);
+          if (routeList.length && (flat.includes('업무') || hasKey || isValidRouteList(routeList.join(',')))) addPresent(finalCamp, routeList, rotArr, r.key, per);
         });
         // 미입차 모으기
         const miss = new Map();
