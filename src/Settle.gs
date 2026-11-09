@@ -1716,6 +1716,8 @@ function stlCompute_(month) {
       delete dd[d].rt;
     });
   });
+  // 스케줄 계산 뒤에 생긴 묶음 (목표 매출·매출 분할 대상으로 처음 잡힌 달 등) — 출근일 정보 채움
+  Object.keys(S).forEach(function (id) { if (!S[id].sched) S[id].sched = X.groups[id] ? stlGroupSched_(ctx, X.groups[id], sched, P, S[id].cidDays || {}) : { days: 0, byCid: [], src: '', cells: {} }; });
   const drivers = [], slips = {};
   const tot = { qty: 0, pay: 0, invoice: 0, supply: 0, tax: 0, san: 0, goy: 0, depDed: 0, depAdd: 0, net: 0, loss: 0, lossCp: 0, lossInc: 0, yongInc: 0, otherInc: 0, profit: 0, runnerIns: 0, fbCut: 0, fbKeep: 0, insGain: 0, sales: 0 };
   Object.keys(S).forEach(function (id) {
