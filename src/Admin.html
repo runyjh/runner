@@ -1654,7 +1654,7 @@
     <div class="slegend">
       <span class="k-work">출근</span><span class="k-off">휴무</span><span class="k-sick">병가</span><span class="k-mi">미입차</span><span class="k-yong">용차</span>
       <span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other">다른 캠프</span><span style="box-shadow:inset 0 0 0 2px #8b5cf6">중복</span><span style="box-shadow:inset 0 0 0 2px #12a150">품앗이</span><span>⚠ 미배정 노선</span><span><b style="color:#f59e0b">⚠</b> 배정 안 된 칸</span><span><b style="color:#e5484d">⚠</b> 내 노선 미배정</span>
-      <em style="font-style:normal">· 칸을 누르고 입력 (Enter 저장, Alt+Enter 줄바꿈) · 드래그로 여러 칸 선택 · Ctrl+C / Ctrl+V 로 엑셀·구글시트와 복사 · Delete 지우기 · Ctrl+Z 되돌리기 · 고치면 자동 저장</em>
+      <em style="font-style:normal">· 칸을 누르고 입력 (Enter 저장, Alt+Enter 줄바꿈) · 드래그로 여러 칸 선택 · Ctrl+C / Ctrl+V 로 엑셀·구글시트와 복사 · Delete 지우기 · Ctrl+Z 되돌리기 · 마우스 오른쪽 = 이슈 창 · 고치면 자동 저장</em>
     </div>
    </section>
 
@@ -4559,16 +4559,16 @@
     }
     $('#isMCell').innerHTML = (old ? '<span class="w">' + esc(isMd0(IS.ruleFrom)) + ' 이전 날짜는 기사스케줄 칸을 바꾸지 않습니다 (기록만).</span><br>' : '') +
       (put && !old ? '기사스케줄 ' + esc(span) + ' 칸 → <b>' + esc(put) + '</b> 로 바뀝니다 (지우면 원래 값으로 돌아감)' : ISM.res === '물량조율' ? '뺀 회전을 고르면 기사스케줄 칸에 뛴 회전만 남깁니다.' : '') +
-      subLine + ($('#isMCellNow').textContent ? '<br>' + esc($('#isMCellNow').textContent) : '');
+      subLine + ($('#isMCellNow') && $('#isMCellNow').textContent ? '<br>' + esc($('#isMCellNow').textContent) : '');
   }
-  function isOpen(x) {
+  function isOpen(x, preset) {
     IS.cur = x || null; IS.cellNow = '';
     const done = () => {
       $('#isMTitle').textContent = x ? (isUnsetOf(x) ? '사유 입력' : '이슈 수정') : '이슈 등록';
       $('#isMDrv').innerHTML = '<option value="">기사 선택</option>' + IS.drivers.map((d) => '<option value="' + esc(d.id) + '">' + esc(d.name) + (d.camp ? ' · ' + esc(shortCampSafe(d.camp)) : '') + '</option>').join('') +
         (x && !IS.drivers.some((d) => d.id === x.driverId) ? '<option value="' + esc(x.driverId) + '">' + esc(x.name) + '</option>' : '');
-      $('#isMDrv').value = x ? x.driverId : (IS.drv || '');
-      $('#isMDate').value = x ? x.date : isYmd(new Date());
+      $('#isMDrv').value = x ? x.driverId : (preset && preset.driverId) || IS.drv || '';
+      $('#isMDate').value = x ? x.date : (preset && preset.date) || isYmd(new Date());
       $('#isMEnd').value = x ? (x.end || x.date) : $('#isMDate').value;
       ISM.res = x ? (x.result || (x.kind === '노쇼' ? '노쇼' : x.mi ? '미입차' : x.kind === '물량조율' ? '물량조율' : '')) : '';
       ISM.cut = []; ISM.cutU = [];
@@ -8437,6 +8437,18 @@
     e.preventDefault();
   });
   $('#sWrap').addEventListener('dblclick', (e) => { const td = e.target.closest('td.c'); if (td) openEdit(); });
+  // 마우스 오른쪽: 그 기사·날짜 이슈 창 (이슈가 있으면 수정, 없으면 새 이슈)
+  $('#sWrap').addEventListener('contextmenu', (e) => {
+    const td = e.target.closest('#sGrid td.c[data-c]'); if (!td) return;
+    const r = srows[+td.dataset.r], dt = SD.dates[+td.dataset.c];
+    if (!r || r.kind !== 'd' || !dt) return;
+    e.preventDefault();
+    if (sEdit) commitEdit();
+    const did = String(r.row).split('~')[0];
+    const cur = issOf(did, dt)[0];
+    try { const t = $('#cellTip'); if (t) t.style.display = 'none'; } catch (er) { /* 무시 */ }
+    isOpen(cur ? Object.assign({ camp: r.d.camp || '' }, cur) : null, cur ? null : { driverId: did, date: dt });
+  });
   $('#sWrap').addEventListener('click', (e) => {
     const nb = e.target.closest('[data-note]'); if (nb) return noteMenu(nb.dataset.note);
     const db = e.target.closest('[data-drv]'); if (db) return openSchDriver(db.dataset.drv);
