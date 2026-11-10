@@ -7992,8 +7992,8 @@
       '<div class="noprint"><button type="button" class="btn ghost sm" id="rpPrint">인쇄 · PDF 저장</button> <button type="button" class="btn ghost sm" id="rpXlsx">엑셀</button></div></div>' + t1 + '<div class="rp-grid2">' + t2 + t3 + '</div>' + t4 + '</div>';
     $('#rpPrint').addEventListener('click', () => { document.body.classList.add('print-report'); window.print(); setTimeout(() => document.body.classList.remove('print-report'), 500); });
     $('#rpXlsx').addEventListener('click', () => {
-      const s1 = [['월', '마감', '쿠팡 매출(공급가)', '쿠팡 매출(VAT포함)', '기사 매입(공급가)', '기사 계산서', '기사 실입금', '회사이익', '기타수익', '러너 산재고용', '인건비', '운영비', '당기순이익', '이익률', '배송건수', '기사 수']].concat(has.map((x) => [x.month, x.closed ? 'Y' : '', x.salesSupply, x.sales, x.drvSupply, x.drvInvoice, x.drvNet, x.profit, x.otherInc, x.runnerIns, x.staff, x.cost, x.net, Math.round((x.rate || 0) * 10000) / 100, x.qty, x.drivers]));
-      const s2 = [['캠프', '배송건수', '매출(VAT포함)', '기사 지급', '회사 몫', '비율']].concat(C.map((c) => [c.camp, c.qty, c.sales, c.pay, c.margin, Math.round(c.rate * 10000) / 100]));
+      const s1 = [['월', '마감', '쿠팡 매출(공급가)', '쿠팡 매출(VAT포함)', '기사 매입(공급가)', '기사 계산서', '기사 실입금', '회사이익', '기타수익', '러너 산재고용', '인건비', '운영비', '당기순이익', '이익률', '배송건수', '기사 수']].concat(has.map((x) => [x.month, x.closed ? 'Y' : '', x.salesSupply, x.sales, x.drvSupply, x.drvInvoice, x.drvNet, x.profit, x.otherInc, x.runnerIns, x.staff, x.cost, x.net, { v: x.rate || 0, pct: true }, x.qty, x.drivers]));
+      const s2 = [['캠프', '배송건수', '매출(VAT포함)', '기사 지급', '회사 몫', '비율']].concat(C.map((c) => [c.camp, c.qty, c.sales, c.pay, c.margin, { v: c.rate, pct: true }]));
       const s3 = [['순위', '기사', '매출(VAT포함)', '기사 지급', '회사이익', '근무일수', '배송건수']].concat(T.map((d, i) => [i + 1, d.name, d.sales, d.pay, d.profit, d.workDays, d.qty]));
       const s4 = [['날짜', '배송건수', '매출(VAT포함)']].concat(Dy.map((d) => [d.date, d.qty, d.sales]));
       const blob = ZIPW.xlsx([{ name: '월별 추이', rows: s1, widths: [10, 6, 16, 16, 16, 14, 14, 14, 12, 12, 12, 12, 14, 8, 10, 8] }, { name: '캠프별', rows: s2, widths: [12, 10, 14, 14, 14, 8] }, { name: '기사 TOP10', rows: s3, widths: [6, 12, 14, 14, 12, 8, 10] }, { name: '일별', rows: s4, widths: [12, 10, 14] }]);
@@ -9477,7 +9477,7 @@
   });
   /** 서버 자료 → 시트 배열 (ZIPW.xlsx 용). 머리글 행은 .h = true */
   function tpSheets(r) {
-    const H = (arr) => { arr.h = true; return arr; };
+    const H = (arr) => { arr.h = true; return arr; }, T = (arr) => { arr.t = true; return arr; }, SEC = (arr) => { arr.s = true; return arr; };
     const n = (v) => (v == null || v === '' ? '' : Number(v) || 0);
     const mt = (m) => ymTitle(m).replace(' ', '');
     const co = r.company || {};
@@ -9488,50 +9488,50 @@
     const line = (lab, f, noSum) => S.push([lab].concat(r.summary.map((x) => n(f(x))), r.summary.length > 1 ? [noSum ? '' : tot(f)] : []));
     S.push(['※ 기사 세금계산서는 지급 합계 전액으로 발행 · 분실파손 변상금·용차 차액·산재고용·가불은 발행 후 실 입금에서 공제 · 공제한 분실 변상금·용차 차액·보험 차액은 러너 기타수입(부가세 없음)']);
     S.push([]);
-    S.push(H(['[매출 — 쿠팡]']));
+    S.push(SEC(['[매출 — 쿠팡]']));
     line('배송 건수', (x) => x.qty); line('쿠팡 매출 (부가세 포함)', (x) => x.sales); line('쿠팡 공급가', (x) => x.supplyCp); line('매출세액 (분실 부가세분 차감)', (x) => x.salesVat);
     line('분실파손 차감 (소비자가)', (x) => x.lossCp); line('분실파손 공급가 환산 (÷1.1)', (x) => x.lossSup); line('영업점 수수료 (프로그램 사용료)', (x) => x.progFee);
-    S.push([]); S.push(H(['[매입 — 기사 세금계산서]']));
+    S.push([]); S.push(SEC(['[매입 — 기사 세금계산서]']));
     line('기사 수 (계산서)', (x) => x.drvN, true); line('계산서 합계 (부가세 포함)', (x) => x.drvInvoice); line('공급가액', (x) => x.drvSupply); line('매입세액', (x) => x.drvVat); line('기사 실 입금 합계', (x) => x.drvNet);
-    S.push([]); S.push(H(['[기타수익 — 기타수입으로 신고 · 부가세 없음]']));
+    S.push([]); S.push(SEC(['[기타수익 — 기타수입으로 신고 · 부가세 없음]']));
     line('분실 변상금 (기사 공제)', (x) => (x.otherInc || {}).loss); line('용차 차액 (기사 공제)', (x) => (x.otherInc || {}).yong); line('보험 차액 (기사 공제 − 신고 기사분)', (x) => (x.otherInc || {}).ins); line('기타수익 합계', (x) => (x.otherInc || {}).total);
-    S.push([]); S.push(H(['[경비]']));
+    S.push([]); S.push(SEC(['[경비]']));
     line('러너 산재·고용 부담분', (x) => x.runnerIns); line('직원 급여 (세전)', (x) => x.staff); line('└ 원천세 (3.3%)', (x) => x.staffWht); line('고정 운영비 (공급가)', (x) => x.fixed); line('└ 부가세', (x) => x.fixedVat); line('지출 기록 (공급가)', (x) => x.varCost); line('└ 부가세', (x) => x.varVat);
-    S.push([]); S.push(H(['[손익]']));
+    S.push([]); S.push(SEC(['[손익]']));
     line('회사이익금 (공급가 − 분실 환산 − 기사 공급가 + 기타수익)', (x) => x.profit); line('당기순이익 (세전)', (x) => x.net); line('부가세 납부 예상', (x) => x.vatDue);
-    S.push([]); S.push(H(['[일정]'])); S.push(['기사 지급일'].concat(r.summary.map((x) => x.payDate))); S.push(['쿠팡 입금 예정일'].concat(r.summary.map((x) => x.coupangDate))); S.push(['계산서 작성일자'].concat(r.summary.map((x) => x.writeDate)));
+    S.push([]); S.push(SEC(['[일정]'])); S.push(['기사 지급일'].concat(r.summary.map((x) => x.payDate))); S.push(['쿠팡 입금 예정일'].concat(r.summary.map((x) => x.coupangDate))); S.push(['계산서 작성일자'].concat(r.summary.map((x) => x.writeDate)));
     S.push([]); S.push(['사업자', (co.name || '') + (co.ceo ? ' (대표 ' + co.ceo + ')' : ''), '사업자번호', co.bizNo || '', '이메일', co.email || '']);
     S.push(['만든 날짜', ymdLocal(new Date()), '러너 올인원 정산관리 → 세무자료 내보내기']);
     sheets.push({ name: '요약', rows: S, widths: [44].concat(r.summary.map(() => 16), [16]) });
     // ② 기사 세금계산서
     const I = [H(['정산월', '기사(명의자)', '정산 아이디', '사업자명', '사업자번호', '공급가액', '세액', '합계 (발행 금액)', '작성일자', '구분', '비고'])];
     r.invoices.forEach((x) => I.push([mt(x.month), x.name, x.cids, x.bizName, x.bizNo, n(x.supply), n(x.tax), n(x.invoice), x.writeDate, x.vendor ? '용차업체' : '기사 발행', x.bizNo ? '' : '사업자번호 없음 — 계산서 불가']));
-    I.push(H(['합계', '', '', '', '', r.invoices.reduce((a, x) => a + n(x.supply), 0), r.invoices.reduce((a, x) => a + n(x.tax), 0), r.invoices.reduce((a, x) => a + n(x.invoice), 0)]));
+    I.push(T(['합계', '', '', '', '', r.invoices.reduce((a, x) => a + n(x.supply), 0), r.invoices.reduce((a, x) => a + n(x.tax), 0), r.invoices.reduce((a, x) => a + n(x.invoice), 0)]));
     sheets.push({ name: '기사 세금계산서', rows: I, widths: [12, 14, 22, 16, 14, 14, 12, 16, 12, 10, 26] });
     // ③ 기사 지급 명세 (계좌 대조)
     const dn = r.dedNames || [];
     const P = [H(['정산월', '기사(명의자)', '정산 아이디', '근무일', '배송건수', '지급 합계 (= 계산서)'].concat(dn.map((d) => '공제: ' + d), ['공제 합계', '실 입금액', '지급 예정일', '입금일', '입금 확인', '은행', '예금주', '계좌번호']))];
     r.pays.forEach((x) => P.push([mt(x.month), x.name, x.cids, n(x.workDays), n(x.qty), n(x.pay)].concat(dn.map((d) => n(x.ded[d])), [n(x.dedSum), n(x.net), x.planDate, x.payDate, x.checked ? '✓' : '', x.bank, x.holder, x.account])));
-    P.push(H(['합계', '', '', '', r.pays.reduce((a, x) => a + n(x.qty), 0), r.pays.reduce((a, x) => a + n(x.pay), 0)].concat(dn.map((d) => r.pays.reduce((a, x) => a + n(x.ded[d]), 0)), [r.pays.reduce((a, x) => a + n(x.dedSum), 0), r.pays.reduce((a, x) => a + n(x.net), 0)])));
+    P.push(T(['합계', '', '', '', r.pays.reduce((a, x) => a + n(x.qty), 0), r.pays.reduce((a, x) => a + n(x.pay), 0)].concat(dn.map((d) => r.pays.reduce((a, x) => a + n(x.ded[d]), 0)), [r.pays.reduce((a, x) => a + n(x.dedSum), 0), r.pays.reduce((a, x) => a + n(x.net), 0)])));
     P.push([]); P.push(['※ 실 입금액이 사업용계좌 출금액. 9월 정산은 10월 지급일에, 10월 정산은 11월 지급일에 출금됩니다 (지급 예정일 열). 분할 이체·수수료로 금액이 다를 수 있습니다.']);
     sheets.push({ name: '기사 지급 명세', rows: P, widths: [12, 14, 22, 8, 10, 16].concat(dn.map(() => 13), [13, 15, 12, 12, 8, 10, 10, 20]) });
     // ④ 급여
     const W = [H(['정산월', '직원', '세전 급여', '원천세율', '원천세 (소득세+지방소득세)', '실지급', '지급일', '은행', '메모'])];
     r.staff.forEach((x) => W.push([mt(x.month), x.name, n(x.pay), x.rate, n(x.wht), n(x.net), x.day, x.bank, x.memo]));
-    W.push(H(['합계', '', r.staff.reduce((a, x) => a + n(x.pay), 0), '', r.staff.reduce((a, x) => a + n(x.wht), 0), r.staff.reduce((a, x) => a + n(x.net), 0)]));
+    W.push(T(['합계', '', r.staff.reduce((a, x) => a + n(x.pay), 0), '', r.staff.reduce((a, x) => a + n(x.wht), 0), r.staff.reduce((a, x) => a + n(x.net), 0)]));
     if (!r.staff.length) W.push(['직원 탭에 급여가 입력되어 있지 않습니다.']);
     W.push([]); W.push(['※ 3.3% 사업소득 원천징수 — 홈택스 원천세 신고(다음 달 10일)·지급명세서와 대조']);
     sheets.push({ name: '급여', rows: W, widths: [12, 12, 14, 10, 22, 14, 10, 10, 24] });
     // ⑤ 고용산재
     const N = [H(['정산월', '기사(명의자)', '정산 아이디', '보험 기준 공급가', '보수월액 (경비율 적용)', '산재 (기사분)', '고용 (기사분)', '러너 부담분', '합계 (공단 신고액)', '비고'])];
     r.ins.forEach((x) => N.push([mt(x.month), x.name, x.cids, n(x.base), n(x.bosu), n(x.san), n(x.goy), n(x.runner), n(x.total), x.excluded ? '제외' : '']));
-    N.push(H(['합계', '', '', r.ins.reduce((a, x) => a + n(x.base), 0), r.ins.reduce((a, x) => a + n(x.bosu), 0), r.ins.reduce((a, x) => a + n(x.san), 0), r.ins.reduce((a, x) => a + n(x.goy), 0), r.ins.reduce((a, x) => a + n(x.runner), 0), r.ins.reduce((a, x) => a + n(x.total), 0)]));
+    N.push(T(['합계', '', '', r.ins.reduce((a, x) => a + n(x.base), 0), r.ins.reduce((a, x) => a + n(x.bosu), 0), r.ins.reduce((a, x) => a + n(x.san), 0), r.ins.reduce((a, x) => a + n(x.goy), 0), r.ins.reduce((a, x) => a + n(x.runner), 0), r.ins.reduce((a, x) => a + n(x.total), 0)]));
     N.push([]); N.push(['※ 기사분은 기사 정산서에서 공제(예수금) · 러너 부담분은 경비 · 합계가 근로복지공단 납부액과 대조 대상']);
     sheets.push({ name: '고용산재', rows: N, widths: [12, 14, 22, 16, 18, 13, 13, 13, 16, 8] });
     // ⑥ 운영비·지출
     const C = [H(['귀속월', '날짜', '구분', '분류', '내용', '거래처', '금액 (지출액)', '공급가', '부가세', '증빙', '통장', '손익 반영', '메모'])];
     r.costs.sort((a, b) => (a.month + a.date).localeCompare(b.month + b.date)).forEach((x) => C.push([mt(x.month), x.date, x.kind, x.cat, x.name, x.vendor, n(x.amt), n(x.supply), n(x.vat), x.proof, x.bank, x.pnl ? '○' : '제외', x.memo]));
-    C.push(H(['합계', '', '', '', '', '', r.costs.reduce((a, x) => a + n(x.amt), 0), r.costs.reduce((a, x) => a + n(x.supply), 0), r.costs.reduce((a, x) => a + n(x.vat), 0)]));
+    C.push(T(['합계', '', '', '', '', '', r.costs.reduce((a, x) => a + n(x.amt), 0), r.costs.reduce((a, x) => a + n(x.supply), 0), r.costs.reduce((a, x) => a + n(x.vat), 0)]));
     C.push([]); C.push(['※ 증빙이 세금계산서·카드·현금영수증이면 ÷1.1 로 공급가·부가세(매입세액) 구분 · "세금·보험 납부"는 손익 제외 · 종이 세금계산서는 실물 스캔 첨부']);
     sheets.push({ name: '운영비지출', rows: C, widths: [12, 12, 14, 12, 24, 14, 14, 13, 11, 12, 12, 9, 20] });
     // ⑦ 쿠팡 입금
@@ -9541,13 +9541,13 @@
     // ⑧ 가불
     const A = [H(['기사(명의자)', '정산 아이디', '지급일', '가불금', '상계 예정일', '상환금', '잔액', '메모'])];
     r.advances.forEach((x) => A.push([x.name, x.acct, x.date, n(x.amt), x.due, n(x.paid), n(x.left), x.memo]));
-    A.push(H(['합계', '', '', r.advances.reduce((a, x) => a + n(x.amt), 0), '', r.advances.reduce((a, x) => a + n(x.paid), 0), r.advances.reduce((a, x) => a + n(x.left), 0)]));
+    A.push(T(['합계', '', '', r.advances.reduce((a, x) => a + n(x.amt), 0), '', r.advances.reduce((a, x) => a + n(x.paid), 0), r.advances.reduce((a, x) => a + n(x.left), 0)]));
     A.push([]); A.push(['※ 가불은 대여금 → 경비·수입 아님. 상환금은 기사 정산서 "가불금 상환"으로 공제']);
     sheets.push({ name: '가불 대장', rows: A, widths: [14, 20, 12, 12, 12, 12, 12, 24] });
     // ⑨ 분실파손
     const L = [H(['정산월', '기사(명의자)', '날짜', '운송장번호', '상품', '구분', '쿠팡 차감 (소비자가)', '기사 변상 (×1.1)', '러너 기타수익 (차이)'])];
     r.losses.forEach((x) => L.push([mt(x.month), x.name, x.date, x.waybill, x.item, x.type, n(x.cp), n(x.share), n(x.share) - n(x.cp)]));
-    L.push(H(['합계', '', '', '', '', '', r.losses.reduce((a, x) => a + n(x.cp), 0), r.losses.reduce((a, x) => a + n(x.share), 0), r.losses.reduce((a, x) => a + n(x.share) - n(x.cp), 0)]));
+    L.push(T(['합계', '', '', '', '', '', r.losses.reduce((a, x) => a + n(x.cp), 0), r.losses.reduce((a, x) => a + n(x.share), 0), r.losses.reduce((a, x) => a + n(x.share) - n(x.cp), 0)]));
     sheets.push({ name: '분실파손', rows: L, widths: [12, 14, 10, 18, 40, 8, 18, 16, 18] });
     // ⑩ 쿠팡 정산서 원본
     const F = [H(['정산월', '차수', '파일명', '링크 (드라이브)', '올린 시각'])];
@@ -9558,7 +9558,7 @@
     if (r.bankRows && r.bankRows.length) {
       const T = [H(['통장', '계좌 끝4', '날짜', '시각', '입/출', '입금', '출금', '잔액', '거래내용', '거래구분', '분류', '연결 · 이름', '메모'])];
       r.bankRows.sort((a, b) => (a.bank + a.date + a.time).localeCompare(b.bank + b.date + b.time)).forEach((x) => T.push([x.bank, x.acct4 ? '···' + x.acct4 : '', x.date, x.time, x.io, x.io === '입금' ? n(x.amt) : '', x.io === '출금' ? n(x.amt) : '', n(x.bal), x.memo, x.kind, x.cat, x.refName, x.note]));
-      T.push(H(['합계', '', '', '', '', r.bankRows.reduce((a, x) => a + (x.io === '입금' ? n(x.amt) : 0), 0), r.bankRows.reduce((a, x) => a + (x.io === '출금' ? n(x.amt) : 0), 0)]));
+      T.push(T(['합계', '', '', '', '', r.bankRows.reduce((a, x) => a + (x.io === '입금' ? n(x.amt) : 0), 0), r.bankRows.reduce((a, x) => a + (x.io === '출금' ? n(x.amt) : 0), 0)]));
       T.push([]); T.push(['※ 올인원 [통장 내역 올리기]에서 분류한 결과 · 내부 이체 = 러너 통장끼리 옮긴 돈 · 사업 무관 = 개인 지출']);
       sheets.push({ name: '통장 내역', rows: T, widths: [14, 9, 11, 9, 6, 14, 14, 14, 30, 12, 14, 18, 16] });
     }
@@ -9815,28 +9815,81 @@
     const colName = (i) => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
     /** rows = [[값…]…] (행 번호 그대로) → .xlsx Blob. 숫자는 숫자 칸, 나머지는 글자 칸 */
     /** 시트 하나(rows, sheetName) 또는 여러 장([{ name, rows, widths }]) → .xlsx Blob. 행에 .h = true 면 굵게(머리글) */
+    /**
+     * 엑셀 만들기. sheets = [{ name, rows, widths, filter }] 또는 rows(2차원 배열) + sheetName.
+     *  줄 표시: r.h 머리글(진한 파랑 바탕·흰 글씨·가운데) · r.t 합계(굵게·회색 바탕·위 굵은 선) · r.s 구역 제목(파란 굵은 글씨) · r.n 설명(회색 작은 글씨)
+     *  표시 없으면 첫 줄 = 머리글, 첫 칸이 '합계'인 줄 = 합계, '※'로 시작하는 줄 = 설명. 칸 값: 숫자(천 단위 콤마·음수 빨강) · Date(yyyy-mm-dd) · { v, pct: true }(0.0%) · 글자
+     *  머리글 줄 고정 · 표 시트는 자동 필터 · 가로 인쇄(한 쪽 너비 맞춤)
+     */
     function xlsx(rows, sheetName) {
       const sheets = Array.isArray(rows) && rows.length && rows[0] && !Array.isArray(rows[0]) && rows[0].rows ? rows : [{ name: sheetName || 'Sheet1', rows: rows }];
       const enc = new TextEncoder();
       const serial = (d) => Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000);
+      // 스타일 번호 (styles.xml cellXfs 순서): 0 기본 · 1 날짜 · 2 머리글 · 3 숫자 · 4 글자 · 5 합계 글자 · 6 합계 숫자 · 7 구역 제목 · 8 설명 · 9 퍼센트 · 10 합계 퍼센트 · 11 글자(가운데)
+      const kindOf = (r, ri, sh) => {
+        if (r.h) return 'h'; if (r.t) return 't'; if (r.s) return 's'; if (r.n) return 'n';
+        const f = r[0];
+        if (ri === 0 && !sh._tagged) return 'h';
+        if (typeof f === 'string') { if (/^합계/.test(f) && !sh._tagged) return 't'; if (/^※|^만든 날짜/.test(f)) return 'n'; if (/^\[.*\]$/.test(f)) return 's'; }
+        return 'd';
+      };
       const sheetXml = (sh) => {
-        const body = (sh.rows || []).map((r, ri) => r ? '<row r="' + (ri + 1) + '">' + r.map((v, ci) => {
-          if (v === '' || v == null) return '';
-          const ref = colName(ci) + (ri + 1), st = r.h ? ' s="2"' : '';
-          if (v instanceof Date) return '<c r="' + ref + '" s="1"><v>' + serial(v) + '</v></c>'; // 날짜 칸 (yyyy-mm-dd)
-          return typeof v === 'number' ? '<c r="' + ref + '"' + (r.h ? st : ' s="3"') + '><v>' + v + '</v></c>' : '<c r="' + ref + '"' + st + ' t="inlineStr"><is><t xml:space="preserve">' + xe(v) + '</t></is></c>';
-        }).join('') + '</row>' : '').join('');
-        const cols = sh.widths && sh.widths.length ? '<cols>' + sh.widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join('') + '</cols>' : '';
-        return '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + cols + '<sheetData>' + body + '</sheetData></worksheet>';
+        const R = sh.rows || [];
+        sh._tagged = R.some((r) => r && (r.h || r.t || r.s || r.n));
+        let maxC = 0, lastData = 0, headerAt = -1, hasSection = false;
+        const body = R.map((r, ri) => {
+          if (!r) return '';
+          const k = kindOf(r, ri, sh); if (k === 'h' && headerAt < 0) headerAt = ri; if (k === 's') hasSection = true; if (k === 'd' || k === 'h' || k === 't') lastData = ri;
+          maxC = Math.max(maxC, r.length);
+          const cells = r.map((v, ci) => {
+            if (v === '' || v == null) return k === 'h' || k === 'd' || k === 't' ? '<c r="' + colName(ci) + (ri + 1) + '" s="' + (k === 'h' ? 2 : k === 't' ? 5 : 4) + '"/>' : ''; // 빈 칸도 테두리
+            const ref = colName(ci) + (ri + 1);
+            if (v instanceof Date) return '<c r="' + ref + '" s="1"><v>' + serial(v) + '</v></c>';
+            if (typeof v === 'object' && v.pct != null) return '<c r="' + ref + '" s="' + (k === 't' ? 10 : 9) + '"><v>' + (Number(v.v) || 0) + '</v></c>';
+            if (typeof v === 'number') return '<c r="' + ref + '" s="' + (k === 'h' ? 2 : k === 't' ? 6 : k === 'n' ? 8 : k === 's' ? 7 : 3) + '"><v>' + v + '</v></c>';
+            const st = k === 'h' ? 2 : k === 't' ? 5 : k === 's' ? 7 : k === 'n' ? 8 : (/^[✓○×-]$/.test(String(v)) ? 11 : 4);
+            return '<c r="' + ref + '" s="' + st + '" t="inlineStr"><is><t xml:space="preserve">' + xe(String(v)) + '</t></is></c>';
+          }).join('');
+          const ht = k === 'h' ? ' ht="24" customHeight="1"' : k === 's' ? ' ht="20" customHeight="1"' : '';
+          return '<row r="' + (ri + 1) + '"' + ht + '>' + cells + '</row>';
+        }).join('');
+        const cols = sh.widths && sh.widths.length ? '<cols>' + sh.widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join('') + '</cols>' : (maxC ? '<cols><col min="1" max="' + maxC + '" width="14" customWidth="1"/></cols>' : '');
+        const freeze = headerAt === 0 ? '<sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' : '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>';
+        const filter = sh.filter !== false && headerAt === 0 && !hasSection && lastData > 0 && maxC > 1 ? '<autoFilter ref="A1:' + colName(maxC - 1) + (lastData + 1) + '"/>' : '';
+        return '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' + freeze + '<sheetFormatPr defaultRowHeight="18" customHeight="1"/>' + cols + '<sheetData>' + body + '</sheetData>' + filter +
+          '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><headerFooter><oddHeader>&amp;L&amp;"맑은 고딕,굵게"&amp;10' + xe(String(sh.name || '')) + '&amp;R&amp;8러너 올인원</oddHeader><oddFooter>&amp;C&amp;8&amp;P / &amp;N</oddFooter></headerFooter></worksheet>';
       };
       const safeName = (n, i) => xe(String(n || 'Sheet' + (i + 1)).replace(/[\\/?*\[\]:]/g, ' ').slice(0, 31));
       const f = (name, x) => ({ name, data: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + x) });
+      const FONT = '<name val="맑은 고딕"/><family val="2"/>';
+      const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+        '<numFmts count="3"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/><numFmt numFmtId="165" formatCode="#,##0;[Red]\\-#,##0"/><numFmt numFmtId="166" formatCode="0.0%;[Red]\\-0.0%"/></numFmts>' +
+        '<fonts count="5"><font><sz val="10"/>' + FONT + '</font><font><b/><sz val="10"/>' + FONT + '</font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/>' + FONT + '</font><font><b/><sz val="11"/><color rgb="FF1F4E79"/>' + FONT + '</font><font><i/><sz val="9"/><color rgb="FF808080"/>' + FONT + '</font></fonts>' +
+        '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF305496"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+        '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+        '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>' +
+        '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="medium"><color rgb="FF305496"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>' +
+        '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+        '<cellXfs count="12">' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' + // 0 기본
+        '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>' + // 1 날짜
+        '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' + // 2 머리글
+        '<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment vertical="center"/></xf>' + // 3 숫자
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment vertical="center"/></xf>' + // 4 글자
+        '<xf numFmtId="0" fontId="1" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>' + // 5 합계 글자
+        '<xf numFmtId="165" fontId="1" fillId="3" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>' + // 6 합계 숫자
+        '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment vertical="center"/></xf>' + // 7 구역 제목
+        '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment vertical="center"/></xf>' + // 8 설명
+        '<xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment vertical="center"/></xf>' + // 9 퍼센트
+        '<xf numFmtId="166" fontId="1" fillId="3" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>' + // 10 합계 퍼센트
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' + // 11 가운데 글자
+        '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
       return zip([
         f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheets.map((_, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('') + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
         f('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
         f('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + sheets.map((sh, i) => '<sheet name="' + safeName(sh.name, i) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>'),
         f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheets.map((_, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('') + '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
-        f('xl/styles.xml', '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF3F8"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'),
+        f('xl/styles.xml', styles)
       ].concat(sheets.map((sh, i) => f('xl/worksheets/sheet' + (i + 1) + '.xml', sheetXml(sh)))), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }
     return { zip, xlsx };
