@@ -7966,7 +7966,7 @@
     if (noBiz) chk.push(['warn', '사업자번호 없음', noBiz + '명 (계산서 대상)']);
     if (adv.length) chk.push(['info', '가불 잔액', adv.length + '명 · ' + n(adv.reduce((a, d) => a + d.advLeft, 0))]);
     if (zero.length) chk.push(['info', '정산서 없는 아이디 (0원)', zero.map((d) => esc(d.name)).join(', ')]);
-    warns.slice(0, 8).forEach((w) => chk.push(['warn', '확인 필요', esc(typeof w === 'string' ? w : w.msg || w.text || JSON.stringify(w))]));
+    warns.slice(0, 8).forEach((w) => { if (typeof w === 'string') return chk.push(['warn', '확인 필요', esc(w)]); const items = (w.items || []).slice(0, 4).map(esc).join(' · '); chk.push([w.level === 'info' ? 'info' : 'warn', esc(String(w.label || '확인 필요').replace(/\s*\(.*$/, '')), (w.count ? w.count + '건' : '') + (items ? ' — ' + items + ((w.items || []).length > 4 ? ' 외' : '') : '')]); });
     const head = '<div class="rp-head noprint-keep"><div><h3>' + esc(ymTitle(S.month)) + ' 정산 최종 리포트</h3><div class="sub">정산기간 ' + esc(S.period.from) + ' ~ ' + esc(S.period.to) +
       ' · ' + (closed ? '<b class="rp-closed">마감</b> ' + esc(closed.at || '') + (closed.admin ? ' · ' + esc(closed.admin) : '') : '<b class="rp-open">열림 (마감 전)</b>') + (legacy ? ' · ' + legacy : '') +
       (S.round ? ' · 쿠팡 정산서 ' + S.round + '차' + (S.roundAt ? ' (' + esc(String(S.roundAt).slice(0, 10)) + ')' : '') : ' · 쿠팡 정산서 없음') + ' · 만든 시각 ' + esc(ymdLocal(new Date()) + ' ' + String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')) + '</div></div>' +
