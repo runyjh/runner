@@ -995,6 +995,9 @@
   .sg td.c.pend { font-style: italic; }
   .sg td.ex { color: var(--sub); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
   .sg td.num { text-align: center; font-weight: 700; color: var(--ink); }
+  .sg tr.unas td { background: #fff5f5; } .sg tr.unas td.fx { color: #8b95a1; } .sg tr.unas td.f4 { color: var(--ink); font-weight: 700; }
+  .sg tr.unas .unlab { color: #e03131; font-weight: 800; font-size: 12px; }
+  .sg tr.unas td.uc { background: repeating-linear-gradient(45deg, #fff5f5, #fff5f5 5px, #ffe3e3 5px, #ffe3e3 7px); }
   .sg tr.note td.lab, .sg tr.calc td.lab { color: var(--sub); font-weight: 700; background: #f7f8fa; }
   /* 품앗이 줄(대신 뛰는 기사 · 배차 확정 때 자동) · 품앗이 표시 칸: 준 기사 = 품▶ 받은 기사, 받은 기사 = 품◀ 준 기사 */
   .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
@@ -6900,7 +6903,7 @@
       '<th rowspan="2" class="ex">출근일수</th><th rowspan="2" class="ex">고정휴무</th><th rowspan="2" class="ex">추가휴무</th><th rowspan="2" class="ex">근무형태</th><th rowspan="2" class="ex">메모</th></tr>' +
       '<tr class="h2">' + dates.map(hcell).join('') + '</tr></thead>';
     let prevCamp = null;
-    const body = srows.map((r, ri) => {
+    const parts = srows.map((r, ri) => {
       if (r.kind === 'p') {
         const first = !ri || srows[ri - 1].kind !== 'p';
         return '<tr class="pmr' + (first ? ' gtop' : '') + '"><td class="fx f1 lab" title="품앗이 배차 확정 때 자동으로 적힙니다. 직접 고쳐도 됩니다.">품앗이</td>' +
@@ -6923,11 +6926,53 @@
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
         '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + (scalc.counts[r.key || d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
         '<td class="ex">' + esc(d.workPattern || '') + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
-    }).join('');
+    });
+    // 노선관리 노선인데 기본노선으로 맡은 기사가 없는 노선: 그 캠프 기사 줄 바로 아래 '담당 없음' 줄 (보기 전용 · 칸 선택·입력 대상 아님)
+    const UN = unassignedRoutes(), unDone = {}, campOf = {};
+    SD.camps.forEach((c) => { campOf[c.id] = c; });
+    const qs0 = nfc(sf.q || '').toLowerCase().split(/[,，、]/).map((x) => x.trim().replace(/\s/g, '')).filter(Boolean);
+    const unShow = (cid, code) => (qs0.length ? qs0.some((t) => (shortCamp(campOf[cid].name) + ' ' + campOf[cid].name + ' ' + code).toLowerCase().replace(/\s/g, '').includes(t) || ('담당없음').includes(t)) : (!sf.camp || sf.camp === cid));
+    const unRows = (cid) => {
+      if (!cid || unDone[cid] || !UN[cid] || !campOf[cid]) return '';
+      unDone[cid] = 1;
+      return UN[cid].filter((code) => unShow(cid, code)).map((code) => '<tr class="unas"><td class="fx f1">' + esc(shortCamp(campOf[cid].name)) + '</td><td class="fx f2"><span class="unlab" title="노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f3"></td><td class="fx f4">' + esc(code) + '</td>' +
+        dates.map((dt, ci) => '<td class="uc' + (sepCol(ci) ? ' wk2' : '') + '"></td>').join('') + '<td class="ex" colspan="5"></td></tr>').join('');
+    };
+    const restUn = () => SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => unRows(c.id)).join('');
+    let body = '', lastCamp = null, flushed = false;
+    parts.forEach((h, ri) => {
+      const r = srows[ri];
+      if (r.kind === 'd' && !r.staff) { if (lastCamp && r.d.campId !== lastCamp) body += unRows(lastCamp); lastCamp = r.d.campId; }
+      else if (!flushed) { body += unRows(lastCamp) + restUn(); flushed = true; }
+      body += h;
+    });
+    if (!flushed) body += unRows(lastCamp) + restUn();
     $('#sWrap').innerHTML = '<table class="sg' + (sMode === 'month' ? ' month' : '') + '" id="sGrid">' + head + '<tbody>' + body + '</tbody><tbody id="sCalc"></tbody></table>' +
       (srows.length ? '' : '<div class="empty">표시할 기사가 없습니다. 기사 정보관리에서 기사를 승인하거나, 캠프 필터를 바꿔 보세요.</div>');
     renderCalc(); paintSel();
     $('#sCount').textContent = new Set(srows.filter((r) => r.kind === 'd' && !r.d.ex).map((r) => r.row)).size + '명' + (srows.some((r) => r.kind === 'd' && r.d.ex) ? ' (+추가 배정 ' + srows.filter((r) => r.kind === 'd' && r.d.ex).length + '줄)' : '');
+  }
+  /** 캠프별 '담당 없는' 노선: 노선관리 노선(사용 중) 중 재직 기사의 기본노선(날짜별 구간·추가 배정 포함)에 없는 글자 → 번호별로 묶음 (예: 110CD) */
+  function unassignedRoutes() {
+    const tdy = ymdLocal(new Date()), cov = {};
+    const add = (cid, base) => { if (!cid) return; SchedCalc.routeExpand(String(base || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, '')).forEach((x) => (cov[cid] = cov[cid] || new Set()).add(String(x).toUpperCase())); };
+    SD.drivers.forEach((d) => {
+      if (d.status !== '승인' || (d.workStatus === '퇴사' && (!d.leaveDate || d.leaveDate <= tdy))) return;
+      add(d.campId, d.baseRoute);
+      (d.segs || []).forEach((sg) => add(sg.campId, sg.baseRoute));
+    });
+    const out = {};
+    SD.camps.forEach((c) => {
+      const g = {};
+      (SD.routes[c.id] || []).forEach((code) => SchedCalc.routeExpand(String(code).replace(/\s+/g, '')).forEach((x) => {
+        x = String(x).toUpperCase(); const m = /^(\d+)([A-Z])$/.exec(x);
+        if (!m || (cov[c.id] && cov[c.id].has(x))) return;
+        (g[m[1]] = g[m[1]] || new Set()).add(m[2]);
+      }));
+      const list = Object.keys(g).sort((a, b) => koSort(a, b)).map((n) => n + Array.from(g[n]).sort().join(''));
+      if (list.length) out[c.id] = list;
+    });
+    return out;
   }
   /** 배정 안 된 칸: 소속 캠프가 있는 재직 기사(추가 배정 줄·휴직·퇴사일 이후 제외)의 빈 칸 */
   function noAssign(r, dt, v) {
