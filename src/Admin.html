@@ -1340,6 +1340,7 @@
       <div class="tools">
         <select class="inp" id="evMonth" title="정산월"></select>
         <input class="inp search" id="evQ" placeholder="기사·사업자번호·상호 검색" style="width:200px">
+        <button class="btn" id="stHtBtn" title="홈택스 → 전자세금계산서 → 매입 목록조회 엑셀을 올리면 이 정산월의 기사별 계산서 금액을 대조해 발행 완료로 체크">홈택스 대조</button><input type="file" id="stHtFile" accept=".xls,.xlsx,.csv" class="hidden">
         <button class="btn ghost" id="evReload">새로고침</button>
       </div>
     </div>
@@ -1397,7 +1398,6 @@
         <input class="inp" type="month" id="tiMonth" title="정산월" style="width:auto">
         <button class="btn" id="tiFromStl" title="이 정산월의 세금계산서 발행 금액으로, 기사 정보에서 '역발행 기사'로 지정한 기사만 1장씩 만듭니다">정산서에서 만들기</button>
         <button class="btn ghost" id="tiNew">+ 직접 작성</button>
-        <button class="btn ghost" id="stHtBtn" title="홈택스 → 전자세금계산서 → 매입 목록조회 엑셀을 올리면 위 정산월의 기사별 계산서 금액을 대조해 발행 완료 표시">홈택스 대조</button><input type="file" id="stHtFile" accept=".xls,.xlsx,.csv" class="hidden">
         <button class="btn ghost" id="tiReload">새로고침</button>
       </div>
     </div>
@@ -2026,9 +2026,9 @@
 <div class="modal hidden" id="htModal">
   <div class="m-box" style="width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column">
     <h3 id="htTitle">홈택스 계산서 대조</h3>
-    <p class="sub" style="font-size:12.5px;margin:0 0 8px">홈택스 → 조회/발급 → 전자세금계산서 <b>매입 목록조회</b>(공급받는자 러너)에서 내려받은 엑셀(.xls)로 기사별 계산서 금액을 맞춰 봅니다. [저장]하면 정산관리 4단계 기사별 정산서 표에 <b>✓ 발행 · 금액다름 · 미발행</b>이 표시되고, 다시 올리면 덮어씁니다.</p>
+    <p class="sub" style="font-size:12.5px;margin:0 0 8px">홈택스 → 조회/발급 → 전자세금계산서 <b>매입 목록조회</b>(공급받는자 러너)에서 내려받은 엑셀(.xls)로 기사별 계산서 금액을 맞춰 봅니다. [저장]하면 금액이 맞은 기사는 이 화면에서 <b>발행 완료</b>(작성일자 · 승인번호)로 체크되고, 금액이 다른 기사는 메모에 차이가 남습니다. 정산관리 기사별 정산서 표에도 <b>✓ 발행 · 금액다름 · 미발행</b>이 표시되고, 다시 올리면 덮어씁니다.</p>
     <div id="htBody" style="flex:1;overflow:auto"></div>
-    <div class="m-actions"><button type="button" class="btn ghost" id="htClose">닫기</button><span class="grow"></span><button type="button" class="btn" id="htSave">저장 · 발행 완료 표시</button></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="htClose">닫기</button><span class="grow"></span><button type="button" class="btn" id="htSave">저장 · 발행 완료 체크</button></div>
   </div>
 </div>
 <div class="modal hidden" id="lcModal">
@@ -10716,7 +10716,7 @@
     try { rows = await htParse(f); } catch (err) { return toast(err.message || '엑셀을 읽지 못했습니다.'); }
     if (!rows.length) return toast('계산서 줄을 찾지 못했습니다. 홈택스 → 전자세금계산서 → 매입 목록조회에서 내려받은 엑셀인지 확인해 주세요.');
     HT.rows = rows;
-    const m = $('#tiMonth').value; if (!m) return toast('위에서 정산월을 골라 주세요.');
+    const m = EV.month || $('#evMonth').value; if (!m) return toast('위에서 정산월을 골라 주세요.');
     HT.month = m;
     const r = await api('adm_stlTaxCheck', m, rows, true);
     if (!r.ok) return toast(r.msg);
@@ -10744,7 +10744,7 @@
     const r = await api('adm_stlTaxCheck', HT.month, HT.rows, false).finally(() => { $('#htSave').disabled = false; });
     if (!r.ok) return toast(r.msg);
     toast('계산서 발행 상태를 저장했습니다 — 기사별 표의 "계산서 발행" 칸에 표시됩니다.');
-    htRender(r, true); if (STX.month === HT.month) STX.sum = null;
+    htRender(r, true); if (STX.month === HT.month) STX.sum = null; if (EV.month === HT.month) loadEinv(HT.month);
   });
   $('#htClose').addEventListener('click', () => $('#htModal').classList.add('hidden'));
   // ── 기존 정산서 vs 올인원 계산 비교 (기존 정산 이식으로 마감한 달)

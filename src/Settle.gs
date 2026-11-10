@@ -3108,6 +3108,19 @@ function adm_stlTaxCheck(token, month, rows, dry) {
         stlTouch_(['stl_pay']); stlBump_();
         logAdmin_(a, '홈택스 계산서 대조', month, out.filter(function (x) { return /완료/.test(x.status); }).length + '/' + out.length + ' 완료 · 홈택스 ' + rows.length + '줄');
       } finally { lock.releaseLock(); }
+      // 전자세금계산서 발행 메뉴(inv_checks)에도: 금액이 맞은 기사 → 발행 완료 · 작성일자 · 승인번호 / 금액 다름 → 메모 (미발행은 손대지 않음 · 손으로 체크한 것 유지)
+      try {
+        const chk = {}; readAll_(SH.INVCHK).forEach(function (c) { if (c.month === month && c.acct) chk[c.acct] = c; });
+        const byId = {}; (r.summary.drivers || []).forEach(function (d) { byId[d.id] = d; });
+        const list = out.filter(function (x) { return x.status !== '미발행'; }).map(function (x) {
+          const c = chk[x.id] || {}, ok = /^완료/.test(x.status), d = byId[x.id] || {};
+          return { acct: x.id, driverId: d.ownerId || '', name: x.name, total: x.invoice, done: ok || docYn_(c.done), date: ok ? x.date : (c.date || ''), approvalNo: ok ? x.no.split(' / ')[0] : (c.approvalNo || ''),
+            memo: ok ? (x.status === '완료(1원차)' ? '홈택스 대조 · 1원차' : '홈택스 대조') : '홈택스 ' + won_(x.hometax) + '원 (차이 ' + (x.diff > 0 ? '+' : '') + won_(x.diff) + ')' };
+        });
+        if (list.length) docUpsert_(SH.INVCHK, month, list, a, function (x) {
+          return { driverId: str_(x.driverId), name: str_(x.name), total: String(Math.round(stlNum_(x.total) || 0)), done: x.done ? 'Y' : '', date: x.done ? (stlYmd_(x.date) || todayText_()) : '', approvalNo: str_(x.approvalNo).slice(0, 40), memo: str_(x.memo).slice(0, 200) };
+        });
+      } catch (e) { console.error('홈택스 대조 → 발행 체크 저장 실패: ' + (e && e.message)); }
     }
     const cnt = function (re) { return out.filter(function (x) { return re.test(x.status); }).length; };
     return { ok: true, month: month, rows: out.sort(function (p, q) { return (p.status === '완료') - (q.status === '완료') || Math.abs(q.diff) - Math.abs(p.diff); }), unmatched: unmatched,
