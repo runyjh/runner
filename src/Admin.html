@@ -809,6 +809,10 @@
   .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
   .img-tile { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 0; overflow: hidden; text-align: left; display: flex; flex-direction: column; }
   .img-tile:hover { border-color: #b8c2cc; }
+  .img-tile { position: relative; } .img-grid.selmode .img-tile { cursor: pointer; } .img-tile.sel { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); }
+  .img-tile .img-ck { position: absolute; top: 6px; left: 6px; z-index: 2; width: 22px; height: 22px; border-radius: 6px; background: rgba(255,255,255,.95); border: 2px solid #b8c2cc; display: flex; align-items: center; justify-content: center; font-style: normal; font-weight: 800; font-size: 13px; color: #fff; }
+  .img-tile.sel .img-ck { background: var(--brand); border-color: var(--brand); }
+  .img-bulk { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; }
   .img-tile .ph { aspect-ratio: 4 / 3; background: var(--gray-weak); display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 12px; }
   .img-tile .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .img-tile .ph i { font-style: normal; }
@@ -5675,7 +5679,7 @@
     const b = e.target.closest('[data-camp]'); if (!b) return;
     const id = b.dataset.camp, q = normCode($('#campQ').value);
     if (id !== curCamp && !pricesLeaveOk()) return;
-    if (id !== curCamp) { curCamp = id; resetFilters(); rsel.clear(); pdirty = {}; }
+    if (id !== curCamp) { curCamp = id; resetFilters(); rsel.clear(); pdirty = {}; RT.imgSel = null; }
     if (q && !normCode((campById(id) || {}).name).includes(q) && routesOf(id).some((r) => r.code.includes(q))) rtf.q = q;
     renderCampList(); renderCampMain();
     if (window.innerWidth <= 900) $('#campMain').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -5714,9 +5718,10 @@
         (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div><div id="tabLn"' + (rtab === 'ln' ? '' : ' class="hidden"') + '></div>') +
       '</div>' +
       (orphan ? '' :
-      '<div class="sec"><div class="sec-h"><h4>참고 이미지<small>' + imgs.length + '장</small></h4><button class="btn sm" data-ract="img-add">+ 이미지 추가</button></div>' +
-        (imgs.length ? '<div class="img-grid">' + imgs.map((im) =>
-          '<button class="img-tile" data-img="' + esc(im.id) + '"><div class="ph" data-ph="' + esc(im.id) + '"><div class="spin" style="width:20px;height:20px"></div></div>' +
+      '<div class="sec"><div class="sec-h"><h4>참고 이ミ지<small>' + imgs.length + '장</small></h4><span style="display:flex;gap:6px">' + (imgs.length ? '<button class="btn sm ghost" data-ract="img-sel">' + (RT.imgSel ? '선택 끝내기' : '여러 장 선택') + '</button>' : '') + '<button class="btn sm" data-ract="img-add">+ 이미지 추가</button></span></div>' +
+        (RT.imgSel ? '<div class="rbulk img-bulk" id="imgBulk"><b>' + RT.imgSel.size + '장 선택</b><button type="button" class="btn sm ghost" data-ract="img-selall">' + (RT.imgSel.size === imgs.length ? '모두 풀기' : '모두 선택') + '</button><button type="button" class="btn sm ghost danger-t" data-ract="img-seldel"' + (RT.imgSel.size ? '' : ' disabled') + '>선택한 ' + RT.imgSel.size + '장 삭제</button><span class="sub" style="font-size:12px">이미지를 누르면 선택 · 해제 (Ctrl+클릭으로도 시작)</span></div>' : '') +
+        (imgs.length ? '<div class="img-grid' + (RT.imgSel ? ' selmode' : '') + '">' + imgs.map((im) =>
+          '<button class="img-tile' + (RT.imgSel && RT.imgSel.has(im.id) ? ' sel' : '') + '" data-img="' + esc(im.id) + '">' + (RT.imgSel ? '<i class="img-ck">' + (RT.imgSel.has(im.id) ? '✓' : '') + '</i>' : '') + '<div class="ph" data-ph="' + esc(im.id) + '"><div class="spin" style="width:20px;height:20px"></div></div>' +
           '<span>' + (im.desc ? esc(im.desc) : '<em>설명 없음</em>') + '</span></button>').join('') + '</div>'
           : '<div class="no-memo">참고 이미지가 없습니다. 출입구, 주차 위치, 상차 위치 사진 등을 올려 두세요.</div>') +
       '<div class="db-note" style="margin-top:6px">참고 이미지와 설명은 기사 앱 → 내 스케줄 → 내 캠프 → 노선 정보에도 보입니다. 기사님도 지울 수 있습니다 (아래 기사가 지운 이미지에서 되살리기).</div>' +
@@ -6790,7 +6795,11 @@
   $('#campMain').addEventListener('click', (e) => {
     if (e.target.closest('td.ck, th.ck')) return; // 체크박스 칸은 선택만
     const tile = e.target.closest('[data-img]');
-    if (tile) return openViewer(tile.dataset.img);
+    if (tile) {
+      if (!RT.imgSel && (e.ctrlKey || e.metaKey)) RT.imgSel = new Set();
+      if (RT.imgSel) { const id = tile.dataset.img; RT.imgSel.has(id) ? RT.imgSel.delete(id) : RT.imgSel.add(id); return renderCampMain(); }
+      return openViewer(tile.dataset.img);
+    }
     const tr = e.target.closest('tr[data-rid]');
     if (tr) return openRouteEdit(tr.dataset.rid);
     const b = e.target.closest('[data-ract]'); if (!b) return;
@@ -6798,6 +6807,22 @@
     if (act === 'camp-edit') openCampModal(c);
     else if (act === 'camp-del') deleteCamp(c);
     else if (act === 'img-add') { iaFiles = []; $('#imgFile').click(); }
+    else if (act === 'img-sel') { RT.imgSel = RT.imgSel ? null : new Set(); renderCampMain(); }
+    else if (act === 'img-selall') { const ids = RT.images.filter((i) => i.campId === curCamp && !i.delAt).map((i) => i.id); RT.imgSel = RT.imgSel && RT.imgSel.size === ids.length ? new Set() : new Set(ids); renderCampMain(); }
+    else if (act === 'img-seldel') {
+      const ids = Array.from(RT.imgSel || []); if (!ids.length) return;
+      if (!confirm('선택한 이미지 ' + ids.length + '장을 삭제할까요? (드라이브 파일은 휴지통으로 옮겨집니다)')) return;
+      b.disabled = true; b.textContent = '삭제 중… 0/' + ids.length;
+      (async () => {
+        let ok = 0, fail = 0;
+        for (const id of ids) {
+          try { const r = await api('adm_campImageDelete', id); if (r && r.ok) { ok++; RT.images = RT.images.filter((x) => x.id !== id); } else fail++; } catch (err) { fail++; }
+          b.textContent = '삭제 중… ' + (ok + fail) + '/' + ids.length;
+        }
+        RT.imgSel = null; renderCampList(); renderCampMain();
+        toast(ok + '장 삭제했습니다.' + (fail ? ' (' + fail + '장 실패)' : ''));
+      })();
+    }
     else if (act === 'route-add') openRouteAdd();
     else if (act === 'rf-reset') { resetFilters(); renderFilters(); renderRoutes(); }
     else if (act === 'bulk-clear') { rsel.clear(); renderRoutes(); }
