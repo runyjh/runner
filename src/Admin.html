@@ -974,7 +974,14 @@
   .dname { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; max-width: 70px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
   .dname:hover { color: var(--brand); text-decoration: underline; }
   .tbad { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 3px; margin-left: 3px; vertical-align: middle; }
-  .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; cursor: cell; user-select: none; text-align: center; font-weight: 600; white-space: pre; line-height: 1.25; }
+  .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; cursor: cell; user-select: none; text-align: center; vertical-align: middle; font-weight: 600; white-space: normal; word-break: keep-all; overflow-wrap: break-word; line-height: 1.25; }
+  /* 칸 글자: 잘리지 않게 칸 안에서 줄바꿈 (최대 3줄 · 넘으면 마우스를 올리면 전체) · 가운데 정렬 */
+  .sg td.c .cv { display: inline-block; max-width: 100%; max-height: 3.9em; overflow: hidden; vertical-align: middle; }
+  .sg td.c .ct { display: inline-block; font-size: 10px; font-weight: 700; line-height: 1.35; border-radius: 3px; padding: 0 3px; margin-left: 2px; background: rgba(0,0,0,.07); color: inherit; vertical-align: 1px; white-space: normal; }
+  .sg td.c .ct.chg { background: #0a53a8; color: #fff; }
+  .sg td.c .cid-l { display: block; margin-top: 1px; }
+  .sg td.c .cid { display: inline-block; font-size: 10px; font-weight: 700; line-height: 1.4; border-radius: 3px; padding: 0 4px; margin: 0 1px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .sg td.c .cid.ok { background: #0F6E56; color: #fff; } .sg td.c .cid.etc { background: #e4e4e1; color: #444441; }
   .sg td.wk2, .sg th.wk2 { border-left: 2px solid #c9d1da; }
   .sg td.today { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.04); }
   /* PDD 열: 머리글부터 맨 아래까지 좌우 파란 테두리 (칸의 테두리·그림자 표시와 겹치지 않게 바탕 그림으로 그림) */
@@ -1026,13 +1033,16 @@
   .nlab { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--sub); cursor: pointer; }
   .nlab:hover { color: var(--brand); text-decoration: underline; }
   .sg tr.note td.c { font-weight: 500; text-align: left; background: #fffdf5; color: var(--ink); } /* 비고 줄은 글에 휴무·휴가가 들어가도 검정 글씨 */
-  .sg tr.calc td.cc { white-space: nowrap; vertical-align: top; padding: 4px 6px; font-size: 11px; line-height: 1.45; width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; }
+  .sg tr.calc td.cc { white-space: normal; word-break: keep-all; overflow-wrap: break-word; text-align: center; vertical-align: middle; padding: 4px 6px; font-size: 11px; line-height: 1.45; width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; }
   .sg tr.calc.mi td.cc { color: #e00; font-weight: 700; background: #fff6f6; }
   .sg tr.calc.du td.cc { color: #b45309; background: #fffaf0; }
   .sg tr.calc.bk td.cc { color: var(--ink); background: #f8fbff; }
   .exbad { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700; color: #7c3aed; background: #f3e8ff; border-radius: 4px; padding: 0 4px; vertical-align: middle; }
   .sed { position: absolute; z-index: 30; background: #fff; border: 2px solid var(--brand); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
-  .sed textarea { display: block; width: 100%; border: 0; outline: none; resize: none; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 8px; min-height: 30px; }
+  .sed textarea { display: block; width: 100%; border: 0; outline: none; resize: none; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 8px; min-height: 30px; text-align: center; }
+  /* 편집창 안 표시는 모두 가운데 정렬 (칸 표시와 같게) */
+  .sed .sug { justify-content: center; } .sed .sug button { text-align: center; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+  .sed .sinst label, .sed .sinst textarea, .sed .shint { text-align: center; }
   /* 추천 목록: 흰 바탕 둥근 버튼 (배정 캠프·라우트 버튼과 같은 모양) · 왼쪽 점 색 = 칸 색 */
   .sed .sug { max-height: 260px; overflow: auto; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: #fff; }
   .sed .sug:empty { display: none; }
@@ -7439,6 +7449,54 @@
     return 'k-route';
   }
 
+  // ── 칸 글자 화면 표시 (시트 글자는 그대로 · 화면에서만 핵심만 크게) ──
+  //  · 같은 번호 노선 묶기: 529A,529B → 529AB / 404D,405A,405B → 404D,405AB
+  //  · (D1,D2) 같은 괄호 → 작은 회색 표 · [B01] 번호표는 숨김 · '캠프로 변경 / 노선 변경' → 진한 파란 '변경' 표
+  //  · (아이디) → 둘째 줄 표: 그 기사 서브아이디로 등록됨 = 초록, 그 밖 = 회색 · '업무등록' 글자는 칸 색(초록)으로 대신
+  function groupRoutes(t) {
+    return String(t || '').replace(/\b\d{3}[A-Z]+(?:,\s*\d{3}[A-Z]+)+\b/g, (m) => {
+      const out = [];
+      m.split(',').map((x) => x.trim()).forEach((x) => {
+        const mm = x.match(/^(\d{3})([A-Z]+)$/), last = out[out.length - 1];
+        if (mm && last && last.n === mm[1]) { mm[2].split('').forEach((ch) => { if (!last.ch.includes(ch)) last.ch += ch; }); }
+        else out.push(mm ? { n: mm[1], ch: mm[2] } : { n: x, ch: '' });
+      });
+      return out.map((o) => o.n + o.ch).join(',');
+    });
+  }
+  function cellSubsOf(row) {
+    const d = SD.drivers.find((x) => x.id === String(row || '').split('~')[0]) || {};
+    const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null;
+    return (d.subIds || []).concat((main && main.subIds) || []).map((x) => String(x).toLowerCase());
+  }
+  function cellLineHtml(line, subs) {
+    const tags = [], ids = [];
+    const put = (html) => '\u0001' + (tags.push(html) - 1) + '\u0002';
+    let t = String(line || '');
+    t = t.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, (m0, id) => { if (/^[DF]\d$/i.test(id)) return m0; ids.push(id); return ' '; });
+    let chg = false;
+    t = t.replace(/캠프로\s*변경(됨)?|노선도?\s*변경(됨)?|라우트\s*변경(됨)?|캠프\s*변경(됨)?/g, () => { chg = true; return ' '; });
+    t = t.replace(/(추가)?업무등록/g, (m0) => (m0 === '업무등록' ? ' ' : m0));
+    t = t.replace(/\s*\[\s*[A-Z]?\d+\s*\]/g, '');
+    t = groupRoutes(t.toUpperCase() === t ? t : t.replace(/\b\d{3}[a-z]+\b/g, (x) => x.toUpperCase()));
+    t = t.replace(/\[([^\]]+)\]/g, (m0, x) => put('<span class="ct">' + esc(x.trim()) + '</span>'));
+    t = t.replace(/\(([^()]*)\)/g, (m0, x) => { x = x.trim(); return x ? put('<span class="ct">' + esc(x.replace(/\s*,\s*/g, '·')) + '</span>') : ''; });
+    t = t.replace(/\s+/g, ' ').trim().replace(/\s+(?=\u0001)/g, '');
+    if (!t && chg) t = '노선변경';
+    else if (!t && ids.length) t = '업무등록';
+    let h = esc(t).replace(/,/g, ',<wbr>').replace(/\u0001(\d+)\u0002/g, (m0, i) => tags[+i]);
+    if (chg && t !== '노선변경') h += '<span class="ct chg">변경</span>';
+    if (ids.length) h += '<span class="cid-l">' + ids.map((id) => '<span class="cid ' + (subs.includes(id.toLowerCase()) ? 'ok' : 'etc') + '">' + esc(id) + '</span>').join('') + '</span>';
+    return h;
+  }
+  function cellHtml(v, row) {
+    const s = String(v || '').trim();
+    if (!s) return '';
+    const subs = cellSubsOf(row);
+    return '<span class="cv">' + s.split(/\r?\n/).map((ln) => cellLineHtml(ln, subs)).join('<br>') + '</span>';
+  }
+  const cellTipRaw = (v) => (v && (v.length > 10 || /[(\[\n]/.test(v)) ? v : '');
+
   // 보기: 2주(일요일부터 14일, 확정/예상) 또는 한 달(달력 1일~말일 / 정산 전월 26일~당월 25일)
   let sMode = '2w', sBasis = 'cal', sMonth = '';
   try { sMode = localStorage.getItem('runner.sch.mode') === 'month' ? 'month' : '2w'; sBasis = localStorage.getItem('runner.sch.basis') === 'settle' ? 'settle' : 'cal'; } catch (e) {}
@@ -7731,8 +7789,8 @@
     const nov = noAssign(r, dt, v);
     const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
     if (mis) cls.push('mis'); else if (nov) cls.push('nov');
-    const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="품' + esc(pm) + '"' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + '</td>';
+    const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="품' + esc(pm) + '"' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + cellHtml(v, r.row) + '</td>';
   }
   /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
   function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || ''; }
@@ -7813,9 +7871,18 @@
     const pdd = pddDate();
     const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f1 lab">' + lab + '</td><td class="fx f2 lab" colspan="3">' + sub + '</td>' +
       vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + (dates[i] === pdd ? ' today' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="5"></td></tr>';
-    let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l) => l.filter((x) => campOk(x.split(' ')[0])).map(esc).join('<br>')));
-    html += line('du', '중복', '같은 노선·회전 2명 이상', scalc.dups.map((l) => l.filter((x) => campOk(x.camp)).map((x) => esc(x.camp + ' ' + x.route + '(' + x.rot + ') ' +
-      x.keys.map((k) => (SD.drivers.find((d) => d.id === String(k).split('~')[0]) || {}).name || k).join('·'))).join('<br>')));
+    let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l) => l.filter((x) => campOk(x.split(' ')[0])).map((x) => esc(groupRoutes(x)).replace(/,/g, ',<wbr>')).join('<br>')));
+    // 중복: 같은 캠프·회전·사람이면 노선을 묶어 한 줄로 (529A(D1) 홍·황 + 529B(D1) 홍·황 → 529AB(D1) 홍·황)
+    const nameOf = (k) => (SD.drivers.find((d) => d.id === String(k).split('~')[0]) || {}).name || k;
+    html += line('du', '중복', '같은 노선·회전 2명 이상', scalc.dups.map((l) => {
+      const grp = new Map();
+      l.filter((x) => campOk(x.camp)).forEach((x) => {
+        const who = x.keys.map(nameOf).join('·'), gk = x.camp + '|' + x.rot + '|' + who;
+        if (!grp.has(gk)) grp.set(gk, { camp: x.camp, rot: x.rot, who, rts: [] });
+        grp.get(gk).rts.push(x.route);
+      });
+      return [...grp.values()].map((g) => esc(g.camp + ' ' + groupRoutes(g.rts.sort().join(',')) + '(' + g.rot + ') ' + g.who).replace(/,/g, ',<wbr>')).join('<br>');
+    }));
     SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).forEach((c) => {
       const s = shortCamp(c.name);
       if (!campOk(s) || !scalc.roster[s]) return;
@@ -7839,8 +7906,8 @@
       const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', mis ? 'mis' : nov ? 'nov' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
-      if (td.textContent !== v) td.textContent = v;
-      const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
+      if (td.__v !== v || td.__vr !== r.row) { td.innerHTML = cellHtml(v, r.row); td.__v = v; td.__vr = r.row; }
+      const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
       if (tip) td.title = tip; else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
@@ -8063,6 +8130,18 @@
       (isDrv ? '<div class="sinst"><label>📌 지시사항 <small>기사스케줄 칸에 표시 (마우스를 올리면 보임)</small></label><textarea class="instta" rows="2" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량"></textarea></div>' : '') +
       '<div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
     wrap.appendChild(box);
+    // 편집창이 표 테두리(스크롤 영역) 밖으로 나가 잘리지 않게: 오른쪽·아래 끝 칸이면 왼쪽·위로 당겨 열고, 표가 낮으면 표 높이를 잠시 늘림
+    const baseL = rc.left - wc.left + wrap.scrollLeft, baseT = rc.top - wc.top + wrap.scrollTop;
+    const fit = () => {
+      if (!box.isConnected) return;
+      const bw = box.offsetWidth, bh = box.offsetHeight;
+      if (wrap.clientHeight < bh + 12) wrap.style.minHeight = (bh + 14) + 'px';
+      const maxL = wrap.scrollLeft + wrap.clientWidth - bw - 6, maxT = wrap.scrollTop + wrap.clientHeight - bh - 6;
+      box.style.left = Math.max(wrap.scrollLeft + 6, Math.min(baseL, maxL)) + 'px';
+      box.style.top = Math.max(wrap.scrollTop + 6, Math.min(baseT, maxT)) + 'px';
+    };
+    try { new ResizeObserver(fit).observe(box); } catch (e) {}
+    requestAnimationFrame(fit);
     const ta = box.querySelector('textarea');
     ta.value = initial != null ? initial : sget(r.row, dt);
     sEdit = { box, ta, r, dt, idx: -1 };
@@ -8170,7 +8249,7 @@
       SD.issues = (SD.issues || []).filter((x) => x !== cur).concat([r.issue]); done(); toast('지시사항을 저장했습니다.');
     }).catch(() => {});
   }
-  function closeEdit() { if (sEdit) { sEdit.box.remove(); sEdit = null; } }
+  function closeEdit() { if (sEdit) { sEdit.box.remove(); sEdit = null; const w = $('#sWrap'); if (w) w.style.minHeight = ''; } }
 
   // ── 위쪽 도구 ──
   function schedGo(start) {
