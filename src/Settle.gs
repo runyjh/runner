@@ -2567,6 +2567,24 @@ function stlBankMoves_() {
     Object.keys(byDate).forEach(function (k) { add(k, drvBank, -byDate[k].amt, Number(m.slice(5)) + '월 기사 정산금 입금 ' + byDate[k].n + '명', '기사 지급', m); });
     Object.keys(byDateE).forEach(function (k) { add(k, src, -byDateE[k].amt, Number(m.slice(5)) + '월 운영자 선지급 (15일) ' + byDateE[k].n + '명', '기사 지급', m); });
   });
+  // 고정 운영비: 결제일마다 결제 통장에서 빠짐 (오늘까지 · 은행 내역을 올리기 전에도 '예정'으로 잔액에 반영) · 결제 통장이 비어 있으면 안 셈
+  const today = ymd_(new Date()), tm = today.slice(0, 7);
+  const dayOf = function (m, day) { const last = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0).getDate(); return m + '-' + String(Math.min(last, Math.max(1, day))).padStart(2, '0'); };
+  stlRead_('stl_cost').forEach(function (r) {
+    const amt = stlNum_(r.amt), bank = str_(r.bank); if (!amt || !bank || !byName[bank]) return;
+    const day = stlNum_(r.day) || 1, b = byName[bank];
+    let m = str_(r.from).slice(0, 7); const om = str_(b.openDate).slice(0, 7); if (!m || (om && om > m)) m = om || tm;
+    for (let n = 0; n < 60 && m <= tm; n++, m = stlAddMonth_(m, 1)) {
+      if (!stlActiveIn_(r, m)) continue;
+      const d = dayOf(m, day); if (d > today) break;
+      add(d, bank, -amt, '고정비 · ' + str_(r.name) + (r.cat ? ' (' + r.cat + ')' : ''), '고정비', m);
+    }
+  });
+  // 지출 기록: 통장을 적은 줄은 그 날 그 통장에서 빠짐 (세금·산재 납부 분류는 세금 일정에서 따로 잡으므로 제외)
+  stlRead_('stl_expense').forEach(function (r) {
+    const amt = stlNum_(r.amt), bank = str_(r.bank); if (!amt || !bank || STL_NOPNL_CATS.indexOf(str_(r.cat)) >= 0) return;
+    add(r.date, bank, -amt, '지출 · ' + str_(r.name) + (r.vendor ? ' · ' + r.vendor : ''), '지출', r.month);
+  });
   moves.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   const bal = {};
   banks.forEach(function (b) { bal[b.name] = { name: b.name, role: b.role, bankName: b.bankName, account: b.account, opening: stlNum_(b.opening), openDate: b.openDate || '', balance: stlNum_(b.opening), inSum: 0, outSum: 0 }; });
