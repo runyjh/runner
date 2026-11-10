@@ -1013,6 +1013,16 @@
   .sg td.c.duphl { box-shadow: inset 0 0 0 3px #6d28d9, inset 0 0 0 9999px rgba(109,40,217,.28); }
   .sg tr.calc.mi td.cc:not(:empty)::before { content: '⚠ '; color: #e5484d; font-weight: 800; } /* 미배정(미입차) 노선 칸 */
   .sg td.fx.f1 .campwarn { color: #e5484d; font-weight: 800; margin-left: 3px; cursor: help; }
+  /* 칸 정보 창 (공용) */
+  #cellTip { position: fixed; z-index: 62; display: none; background: #fff; border: 1px solid #d5dbe3; border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 14px 16px; font-size: 13.5px; line-height: 1.6; color: #333d4b; min-width: 270px; max-width: 380px; pointer-events: none; }
+  #cellTip .cc-h { display: flex; align-items: baseline; gap: 8px; } #cellTip .cc-h b { font-size: 15.5px; color: var(--ink); } #cellTip .cc-h span { color: var(--sub); font-size: 13px; }
+  #cellTip .cc-v { margin-top: 6px; font-size: 15px; font-weight: 700; color: var(--ink); white-space: pre-wrap; word-break: break-all; background: #f6f8fb; border-radius: 8px; padding: 6px 10px; }
+  #cellTip .cc-sec { border-top: 1px solid #eef1f4; margin-top: 10px; padding-top: 9px; }
+  #cellTip .cc-t { font-weight: 800; color: var(--ink); margin-bottom: 4px; } #cellTip .cc-b { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; } #cellTip .cc-b .ikc { font-size: 12.5px; }
+  #cellTip .cc-k { color: var(--sub); } #cellTip .cc-k b { color: var(--ink); }
+  #cellTip .cc-warn { color: #c2410c; font-weight: 700; }
+  #cellTip .cc-pm .pt-h { font-weight: 800; color: #0b6b3a; font-size: 14px; } #cellTip .cc-pm .pt-j { border-top: 1px dashed #e5e8eb; margin-top: 6px; padding-top: 6px; } #cellTip .cc-pm .pt-n { color: #5c6bd6; font-size: 12.5px; }
+  #cellTip .cc-dup .dtip-h { font-weight: 800; color: #b45309; margin-bottom: 4px; } #cellTip .cc-dup .dtip-r { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; } #cellTip .cc-dup .dtip-r em { margin-left: auto; font-style: normal; color: var(--sub); } #cellTip .cc-dup .dtip-f { color: var(--sub); font-size: 12px; }
   #pmTip { position: fixed; z-index: 61; display: none; background: #fff; border: 1px solid #8fd3ad; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.15); padding: 8px 10px; font-size: 12px; min-width: 190px; max-width: 320px; pointer-events: none; }
   #pmTip .pt-h { font-weight: 800; color: #0b6b3a; font-size: 13px; } #pmTip .pt-j { border-top: 1px solid #f2f4f6; margin-top: 5px; padding-top: 5px; line-height: 1.6; color: #333d4b; }
   #pmTip .pt-j b { color: var(--ink); } #pmTip .pt-n { color: #5c6bd6; font-size: 11.5px; }
@@ -1151,7 +1161,7 @@
   .is-chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .is-chips button { border: 1px solid var(--line); border-radius: 999px; background: #fff; padding: 6px 13px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink); }
   .is-chips button.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand); }
-  .is-prev { background: #f6f8fb; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: var(--sub); line-height: 1.6; margin-top: 4px; }
+  .is-prev { background: #f6f8fb; border-radius: 10px; padding: 12px 14px; font-size: 14px; color: var(--sub); line-height: 1.6; margin-top: 4px; }
   .is-prev b { color: var(--ink); } .is-prev .w { color: #c2410c; font-weight: 700; }
   .ikc.r-미입차 { background: #e5484d; color: #fff; } .ikc.r-노쇼 { background: #2b2f36; color: #fff; } .ikc.r-물량조율 { background: #fff4d6; color: #8a5a00; } .ikc.r-병가 { background: #d4edbc; color: #11734b; }
   .ikc.k-차량사고 { background: #fde8e8; color: #c81e1e; } .ikc.k-차량고장 { background: #eef2ff; color: #4338ca; } .ikc.k-경조사 { background: #f3e8ff; color: #6d28d9; } .ikc.k-개인사정 { background: #eef6ff; color: #1d4ed8; }
@@ -8163,7 +8173,7 @@
     const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
     if (mis) cls.push('mis'); else if (nov) cls.push('nov');
     const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="품' + esc(pm) + '"' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + cellHtml(v, r.row) + '</td>';
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="품' + esc(pm) + '"' : '') + '>' + cellHtml(v, r.row) + '</td>';
   }
   /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
   function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || ''; }
@@ -8198,12 +8208,7 @@
         ((scalc.dupInfo && scalc.dupInfo.get((r.key || r.row) + '|' + ci)) || []).forEach((x) => x.keys.forEach((k) => { if (k !== (r.key || r.row)) keys.add(k); }));
         srows.forEach((x, i) => { if (keys.has(x.key || x.row)) { const c = $('#sGrid td.c[data-r="' + i + '"][data-c="' + ci + '"]'); if (c) c.classList.add('duphl'); } });
       }
-      if (!tip) { tip = document.createElement('div'); tip.id = 'dupTip'; document.body.appendChild(tip); }
-      tip.innerHTML = html; tip.style.display = 'block';
-      const rc = td.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
-      // 같은 날짜 열의 상대 칸을 가리지 않게 칸 오른쪽(모자라면 왼쪽)에 띄움
-      tip.style.left = (rc.right + 10 + w < innerWidth ? rc.right + 10 : Math.max(8, rc.left - w - 10)) + 'px';
-      tip.style.top = Math.max(8, Math.min(rc.top - 4, innerHeight - h - 8)) + 'px';
+      // 내용 창은 공용 칸 정보 창(#cellTip)이 함께 보여 줌
     });
     document.addEventListener('scroll', hide, true);
   })();
@@ -8217,22 +8222,56 @@
       (t.kind === '야간' ? '<div class="pt-n">🌙 ' + esc(prev(t.date)) + ' 밤 입차 → ' + esc(md(t.date).split(' ')[0]) + ' 아침 7시 끝</div>' : '') +
       '<div>' + esc([t.camp, t.route].filter(Boolean).join(' ') || t.area || '') + '</div><div><b>' + esc(t.from) + '</b> ▶ <b>' + esc(t.to) + '</b></div></div>').join('');
   }
+  // ── 칸 정보 창 (공용 · 큼직하게): 칸 글자 전체 · 이슈 · 지시 · 품앗이 일감 · 중복 · 미배정을 한 창에 ──
+  function cellCardHtml(r, ci) {
+    const dt = SD.dates[ci]; if (!r || !dt) return '';
+    const v = sget(r.row, dt);
+    const DW = '일월화수목금토', md = (d) => { const x = new Date(d + 'T00:00:00'); return (x.getMonth() + 1) + '/' + x.getDate() + ' (' + DW[x.getDay()] + ')'; };
+    const md0 = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8));
+    const secs = [];
+    const iss = r.kind === 'd' ? issOf(r.row, dt) : [];
+    iss.forEach((x) => {
+      const badges = (x.result ? '<span class="ikc r-' + esc(x.result) + '">' + esc(x.result) + '</span>' : '') + (x.cut ? '<span class="ikc">' + esc(x.cut) + ' 뺌</span>' : '') +
+        (x.kind ? '<span class="ikc k-' + esc(String(x.kind).replace(/\s/g, '')) + '">' + esc(x.kind) + '</span>' : '');
+      secs.push('<div class="cc-sec"><div class="cc-t">🚩 이슈' + (x.end && x.end !== x.date ? ' · ' + esc(md0(x.date) + ' ~ ' + md0(x.end)) + ' (' + (x.miDays || '') + '일)' : '') + '</div><div class="cc-b">' + badges + '</div>' +
+        (x.reason ? '<div>' + esc(x.reason) + '</div>' : '') +
+        (x.sub ? '<div class="cc-k">대체 <b>' + esc(x.sub + (x.subWho ? ' ' + x.subWho : '')) + '</b></div>' : '') +
+        (x.action ? '<div class="cc-k">조치 ' + esc(x.action) + '</div>' : '') + '</div>');
+    });
+    const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
+    if (ins) secs.push('<div class="cc-sec"><div class="cc-t">📌 지시사항</div><div>' + esc(ins.reason) + '</div></div>');
+    const pl = pmTipList(r, dt);
+    if (pl.length) secs.push('<div class="cc-sec cc-pm">' + pmTipHtml(pl) + '</div>');
+    else { const pm = r.kind === 'd' ? pmMark(r.row, dt) : ''; if (pm) secs.push('<div class="cc-sec"><div class="cc-t">🤝 품앗이</div><div>' + esc(pm) + '</div></div>'); }
+    const dup = scalc ? dupTipHtml(r.key || r.row, ci) : '';
+    if (dup) secs.push('<div class="cc-sec cc-dup">' + dup + '</div>');
+    const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
+    if (mis) secs.push('<div class="cc-sec cc-warn">⚠ 미배정 노선 <b>' + esc(mis.join(', ')) + '</b> — 그날 아무도 안 뜀</div>');
+    else if (noAssign(r, dt, v)) secs.push('<div class="cc-sec cc-warn">⚠ 배정 안 됨 — 출근·휴무 등을 입력해 주세요</div>');
+    const longV = !!cellTipRaw(v);
+    if (!secs.length && !longV) return '';
+    const who = r.kind === 'd' ? r.d.name : r.kind === 'p' ? r.p.name + ' · 품앗이 줄' : r.note ? r.note.label : '';
+    return '<div class="cc-h"><b>' + esc(who) + '</b><span>' + esc(md(dt)) + '</span></div>' + (v ? '<div class="cc-v">' + esc(v) + '</div>' : '') + secs.join('');
+  }
   (function () {
-    let tip = null;
-    const hide = () => { if (tip) tip.style.display = 'none'; };
+    let tip = null, curTd = null;
+    const hide = () => { if (tip) tip.style.display = 'none'; curTd = null; };
     document.addEventListener('mouseover', (e) => {
       const td = e.target.closest && e.target.closest('#sGrid td.c[data-c]');
-      if (!td || td.classList.contains('dup')) return hide(); // 중복 칸은 중복 창이 먼저
-      const r = srows[+td.dataset.r], dt = r && SD.dates[+td.dataset.c];
-      const list = r && dt ? pmTipList(r, dt) : [];
-      if (!list.length) return hide();
-      if (!tip) { tip = document.createElement('div'); tip.id = 'pmTip'; document.body.appendChild(tip); }
-      tip.innerHTML = pmTipHtml(list); tip.style.display = 'block';
+      if (!td) return hide();
+      if (td === curTd && tip && tip.style.display === 'block') return;
+      const r = srows[+td.dataset.r];
+      const html = r ? cellCardHtml(r, +td.dataset.c) : '';
+      if (!html) return hide();
+      if (!tip) { tip = document.createElement('div'); tip.id = 'cellTip'; document.body.appendChild(tip); }
+      curTd = td; tip.innerHTML = html; tip.style.display = 'block';
       const rc = td.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
-      tip.style.left = (rc.right + 10 + w < innerWidth ? rc.right + 10 : Math.max(8, rc.left - w - 10)) + 'px';
-      tip.style.top = Math.max(8, Math.min(rc.top - 4, innerHeight - h - 8)) + 'px';
+      // 같은 날짜 열을 가리지 않게 칸 오른쪽(모자라면 왼쪽)에 띄움
+      tip.style.left = (rc.right + 12 + w < innerWidth ? rc.right + 12 : Math.max(8, rc.left - w - 12)) + 'px';
+      tip.style.top = Math.max(8, Math.min(rc.top - 6, innerHeight - h - 8)) + 'px';
     });
     document.addEventListener('scroll', hide, true);
+    document.addEventListener('keydown', hide);
   })();
   /** 칸의 지시사항 (스케줄 이슈 중 구분 '지시') */
   /** 이슈 관리의 이슈 (지시 제외) */
@@ -8283,7 +8322,7 @@
       const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
       if (td.__v !== v || td.__vr !== r.row) { td.innerHTML = cellHtml(v, r.row); td.__v = v; td.__vr = r.row; }
       const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
-      if (tip) td.title = tip; else td.removeAttribute('title');
+      td.removeAttribute('title'); void tip;
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
     $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });
