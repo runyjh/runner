@@ -2362,11 +2362,19 @@ function stlSnapRows_(month, res) {
  * 이식할 때 그날 노선 글자가 빠져 정산서 일자별 표의 '노선 · 스케줄' 칸이 비어 있었다 → 쿠팡 정산서 원본으로 다시 계산한 노선 글자만 채워 넣는다.
  * 금액·건수·줄은 건드리지 않는다. 저장 뒤 다시 읽어 정산서 수·실지급 합계가 그대로인지 확인하고, 다르면 원래 줄로 되돌린다. 반환 = 채운 날 수 (-1 = 대상 아님)
  */
+function stlRouteFixTodo_(month) { return (',' + str_(props_().STL_ROUTE_FIX) + ',').indexOf(',' + month + ',') < 0; }
+function stlRouteFixDone_(month) {
+  try {
+    const sp = PropertiesService.getScriptProperties(), cur = str_(sp.getProperty('STL_ROUTE_FIX'));
+    if ((',' + cur + ',').indexOf(',' + month + ',') < 0) sp.setProperty('STL_ROUTE_FIX', cur ? cur + ',' + month : month);
+    _props = null;
+  } catch (e) { /* 다음에 다시 */ }
+}
 function stlLegacyRouteFix_(month) {
   const snap = stlClosedLoad_(month), sum = snap.summary, slips = snap.slips;
   if (!sum || !sum.legacy || sum.legacy.routeFix) return -1;
   const lock = scriptLock_();
-  if (!lock.tryLock(3000)) return -1;
+  if (!lock.tryLock(3000)) return -2; // 다른 저장 중 → 다음에
   try {
     const oldRows = stlReadMonth_('stl_closed', month).map(function (r) { return { month: r.month, acct: r.acct, data: r.data }; });
     const res = stlCompute_(month), byCid = {};
@@ -2405,18 +2413,21 @@ function stlLegacyRouteFixAll_() {
   const t0 = Date.now();
   stlRead_('stl_close').forEach(function (r) {
     if (Date.now() - t0 > 180000 || !stlMonthOk_(r.month) || !/기존 정산 이식/.test(str_(r.admin))) return;
-    try { stlLegacyRouteFix_(r.month); } catch (e) { errLog_('서버 오류', 'stlLegacyRouteFix_', r.month + ' ' + String(e && e.message || e)); }
+    if (!stlRouteFixTodo_(r.month)) return;
+    try { if (stlLegacyRouteFix_(r.month) !== -2) stlRouteFixDone_(r.month); } catch (e) { errLog_('서버 오류', 'stlLegacyRouteFix_', r.month + ' ' + String(e && e.message || e)); }
   });
 }
 function stlResult_(month, fresh) {
   const closed = stlClosedInfo_(month);
   if (closed) {
-
-    const key = 'stl:cl:' + month + ':' + stlVer_();
+    // 관리자가 열었을 때 그 달의 '그날 노선'이 아직 비어 있으면 그 자리에서 한 번 채운다 (기사 앱에서는 기다리게 하지 않음 · 새벽 작업이 나머지를 채움)
+    //  ※ 캐시보다 먼저 본다 — 기사 앱이 캐시를 계속 데워 두면 관리자 쪽에서 영영 실행되지 않기 때문. 끝난 달은 스크립트 속성에 적어 두고 다시 보지 않는다
+    if (/^adm_/.test(_curFn) && /기존 정산 이식/.test(str_(closed.admin)) && stlRouteFixTodo_(month)) {
+      try { if (stlLegacyRouteFix_(month) !== -2) stlRouteFixDone_(month); } catch (e) { errLog_('서버 오류', 'stlLegacyRouteFix_', month + ' ' + String(e && e.message || e)); }
+    }
+    const key = 'stl:cl:' + month + ':' + stlVer_(); // (위에서 채웠으면 버전이 올라가 새 키)
     let hit = stlCacheGet_(key);
     if (hit) return hit;
-    // 관리자가 열었을 때 그 달의 '그날 노선'이 아직 비어 있으면 그 자리에서 한 번 채운다 (기사 앱에서는 기다리게 하지 않음 · 새벽 작업이 나머지를 채움)
-    if (/^adm_/.test(_curFn) && /기존 정산 이식/.test(str_(closed.admin))) { try { stlLegacyRouteFix_(month); } catch (e) { errLog_('서버 오류', 'stlLegacyRouteFix_', month + ' ' + String(e && e.message || e)); } }
     const snap = stlClosedLoad_(month), summary = snap.summary, slips = snap.slips;
     if (summary) {
       summary.closed = closed;
