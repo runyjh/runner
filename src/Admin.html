@@ -8976,8 +8976,10 @@
     if (!job.campId) return toast('캠프를 골라 주세요.');
     try { localStorage.setItem('runner.pmcKind', kind); } catch (e) {}
     const b = $('#pmcGo'); b.disabled = true;
-    api('adm_pmCreate', job).then((r) => {
+    const send = (j) => api('adm_pmCreate', j).then((r) => (r && !r.ok && r.code === 'LOW' ? (confirm(r.msg + '\n\n그래도 이 단가로 등록할까요?') ? send(Object.assign({}, j, { okLow: true })) : null) : r));
+    send(job).then((r) => {
       b.disabled = false;
+      if (r === null) return;
       if (!r.ok) return toast(r.msg);
       $('#pmcModal').classList.add('hidden');
       toast(PMC.mode === 'confirm' ? '등록하고 배차 확정했습니다.' : PMC.mode === 'offer' ? '등록하고 제안을 보냈습니다.' : '등록했습니다. 기사님들이 지원할 수 있습니다.');

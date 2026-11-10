@@ -2554,7 +2554,10 @@
     const need = [['date', '배차일자'], ['time', '입차시간'], ['campId', '센터'], ['area', '배송지'], ['qty', '평균 물량'], ['price', '건당 단가']].find((x) => !job[x[0]]);
     if (need) return toast(need[1] + '을(를) 입력해 주세요.');
     const btn = $('#pfBtn'); btn.disabled = true; loading(true, pmAttach ? '사진 올리는 중…' : '저장하는 중…');
-    api('api_pmSave', pmTok(), job).then((r) => {
+    // 단가가 평소 단가보다 낮으면 서버가 먼저 물어본다 → 확인하면 그대로 다시 보냄
+    const send = (j) => api('api_pmSave', pmTok(), j).then((r) => (r && !r.ok && r.code === 'LOW' ? (confirm(r.msg + '\n\n그래도 이 단가로 올릴까요?') ? send(Object.assign({}, j, { okLow: true })) : null) : r));
+    send(job).then((r) => {
+      if (r === null) return;
       if (!pmOk(r)) return;
       toast(pmEditId ? '저장했습니다.' : r.offered ? r.offered + ' 기사님에게 제안했습니다. 수락하면 알림이 옵니다.' : '일감을 올렸습니다. 지원이 오면 품앗이 관리에서 확인하세요.');
       pmOffer = null;

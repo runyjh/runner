@@ -174,7 +174,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261110b'; // 쿠팡 분실 차감 = 공급가에서 그대로 (계산서 방식) · 매출세액 끝자리 버림
+const STL_CALC_VER = '20261111a'; // 쿠팡 분실 차감 = 공급가에서 그대로 (계산서 방식) · 매출세액 끝자리 버림
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed', 'stl_bankrows']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay', 'stl_bankrules'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -1144,16 +1144,23 @@ function stlVendorForRoute_(VR, date, camp, route) {
   }
   return null;
 }
-/** 모르는 아이디 → 그 노선을 맡은 업체 아이디로 X 에 끼워 넣는다 (정산 계산 안에서만 · 기록은 warn.autoVendor) */
+/**
+ * 모르는 아이디의 '이 줄'이 용차업체 맡은 노선이면 그 업체 정산으로 (정산 계산 안에서만 · 기록은 warn.autoVendor).
+ * 맡은 노선·기간에 해당하는 줄만 묶는다: X.by 에 등록하지 않으므로 같은 아이디의 다른 노선 줄은 그대로 '등록 안 된 아이디' (줄 순서와 무관).
+ * 그 아이디가 이 달에 묶인 업체는 X.autoV[로그인] 에 적어 둔다 (분실파손 줄을 같은 업체로 보낼 때 씀).
+ */
 function stlAutoVendorIdx_(X, VR, r, warn) {
   const v = stlVendorForRoute_(VR, r.date, r.camp, r.route);
   if (!v) return null;
   const login = stlLogin_(r.cid);
+  X.autoV = X.autoV || {};
+  const mine = X.autoV[login] || (X.autoV[login] = {});
+  if (mine[v.key]) return mine[v.key];
   if (!X.groups[v.key]) {
     const vi = X.vendors.by[v.key] || { name: v.name, price: 0, ins: true };
     X.groups[v.key] = { key: v.key, cids: [], main: { key: v.key, cid: v.name, role: '메인', ownerId: '', ownerName: v.name, type: '외부용차', mode: '', insEx: !vi.ins, fbCut: '', stopped: false, vendor: v.name, vinfo: vi }, cid: v.name, ownerId: '', vendor: v.name };
   }
-  const idx = X.by[login] = { key: login, cid: r.cid, role: '메인', ownerId: '', ownerName: v.name, type: '외부용차', mode: '', insEx: false, fbCut: '', stopped: false, vendor: v.name, mainKey: v.key, auto: true };
+  const idx = mine[v.key] = { key: login, cid: r.cid, role: '메인', ownerId: '', ownerName: v.name, type: '외부용차', mode: '', insEx: false, fbCut: '', stopped: false, vendor: v.name, mainKey: v.key, auto: true };
   if (X.groups[v.key].cids.indexOf(r.cid) < 0) X.groups[v.key].cids.push(r.cid);
   const a = warn.autoVendor[v.name] || (warn.autoVendor[v.name] = {});
   a[r.cid] = (a[r.cid] || '') || (stlShort_(r.camp) + ' ' + normCode_(r.route));
@@ -1571,7 +1578,9 @@ function stlCompute_(month, opts) {
   loss.forEach(function (r) {
     const amt = stlNum_(r.amt);
     company.lossCp += amt; company.lossSup += stlLossSup_(amt, cfg);
-    const idx = X.by[stlLogin_(r.cid)];
+    // 맡은 노선으로 자동 묶인 아이디의 분실파손: 이 달에 묶인 업체가 하나뿐이면 그 업체로 (둘 이상이면 판단하지 않고 미등록으로 남김)
+    const lAuto = X.autoV && X.autoV[stlLogin_(r.cid)], lKeys = lAuto ? Object.keys(lAuto) : [];
+    const idx = X.by[stlLogin_(r.cid)] || (lKeys.length === 1 ? lAuto[lKeys[0]] : null);
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.loss = (u.loss || 0) + amt; return; }
     const lr = { date: stlYmd_(r.date), cid: r.cid };
     const mv = stlMoveOf_(ctx, idx, stlWorkerOf_(ctx, stlLogin_(r.cid), lr.date), lr, warn);
@@ -1586,7 +1595,7 @@ function stlCompute_(month, opts) {
   const yongMan = stlRead_('stl_yongcha').filter(function (y) { return y.date && stlMonthOfDate_(y.date) === month; });
   // 품앗이 자동: 배차 확정된 품앗이 일감 → 쿠팡 정산서에 실제 수행이 잡힌 것만 품앗이 줄로 (직접 적은 줄이 있으면 그 줄이 우선)
   const yong = yongMan.concat(stlPmAuto_(month, D, X, yongMan));
-  const yongOut = [], yongNoP = [], yongNoP5 = [], pmNoPerf = [], pmApplied = [];
+  const yongOut = [], yongNoP = [], yongNoP5 = [], pmNoPerf = [], pmApplied = [], pmNoPrice = [], pmLow = [];
   yong.forEach(function (y) {
     const date = stlYmd_(y.date), routes = stlYongRoutes_(y.route);
     const route = routes.length === 1 ? routes[0] : '';                 // 라우트 하나
@@ -1612,6 +1621,10 @@ function stlCompute_(month, opts) {
     }
     if (y._auto && !(wg && found && autoQty)) { // 실제 수행 기록이 없으면 정산하지 않음 (쿠팡 정산서가 그 날짜까지 들어온 뒤에만 경고)
       if (date <= rawMax) pmNoPerf.push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + y._from + ' → ' + y.who + ' · ' + y._camp + ' ' + routeLabel + (wg ? '' : ' (받은 기사 정산 아이디 없음)'));
+      return;
+    }
+    if (y._auto && hits.some(function (x) { return !(x.unit > 0); })) { // 수행자의 그 노선 단가가 비어 있음 → 자동 반영하지 않음 (전액이 맡긴 기사에게 청구되는 것을 막음)
+      pmNoPrice.push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + y._from + ' → ' + y.who + ' · ' + (camp || y._camp) + ' ' + routeLabel + ' (노선관리 단가를 넣으면 다음 계산부터 반영)');
       return;
     }
     const qty = stlNum_(y.qty) || autoQty;
@@ -1659,6 +1672,11 @@ function stlCompute_(month, opts) {
     //    차액부담 기사에게는 단가 칸(비우면 품앗이단가/외부용차단가)으로 청구 → 러너 몫 = 청구 금액 − 수행자 지급
     //    예: 외부용차단가 1,350 · 히어로 지급 1,320 → 러너 30원 / 단가 칸 1,400 → 러너 80원
     //  - 수행자 지급 (품앗이는 기본): 단가/금액만큼 수행자에게 지급 (원래 단가와의 차이 = 추가지급)
+    // 품앗이 자동: 일감 단가가 수행자 평소 단가보다 낮으면 평소 단가로만 지급 (추가지급·맡긴 기사 공제 0 · 경고)
+    if (y._auto && existing > 0 && payAmt < existing) {
+      pmLow.push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + y._from + ' → ' + y.who + ' · ' + (camp || y._camp) + ' ' + routeLabel + ' · 일감 ' + won_(qty ? Math.round(payAmt / qty) : 0) + '원 < 평소 ' + won_(qty ? Math.round(existing / qty) : 0) + '원');
+      payAmt = existing;
+    }
     const gainMode = str_(y.gain);
     const toRunner = isVendor ? gainMode !== '수행자 지급' : gainMode === '러너 몫';
     const charge = payAmt;                                    // 차액부담 계산에 쓰는 금액 (단가 칸 / 기본값)
@@ -1885,6 +1903,8 @@ function stlCompute_(month, opts) {
   const W = function (key, label, list, level, acts, links) { const n = key === 'manual' ? 1000 : 50; if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, n), level: level || 'warn', acts: acts ? acts.slice(0, n) : null, links: links ? links.slice(0, n) : null }); };
   const lnk = function (d) { return d.vendor ? { t: 'vendor' } : d.ownerId ? { t: 'drv', id: d.ownerId } : { t: 'slip', id: d.id }; };
   W('pmNoPerf', '품앗이 배차 확정인데 쿠팡 정산서에 수행 기록 없음 (정산 안 함 · 실제로 뛰었으면 캠프·노선·배송 아이디를 확인하거나 품앗이 · 용차에 직접 적어 주세요)', pmNoPerf, 'warn');
+  W('pmNoPrice', '품앗이 자동 반영 보류 — 수행자의 그 노선 단가가 비어 있음 (노선관리에 단가를 넣으면 반영 · 급하면 품앗이 · 용차에 직접 적어 주세요)', pmNoPrice, 'warn');
+  W('pmLow', '품앗이 일감 단가가 수행자 평소 단가보다 낮음 → 평소 단가로만 지급 (추가지급·공제 0)', pmLow, 'warn');
   W('pmAuto', '품앗이 자동 반영 (배차 확정 + 실제 수행 · 일감 단가 · 비우면 노선관리 품앗이단가 · 맡긴 쪽이 러너·직원이면 러너 부담)', pmApplied, 'info');
   W('yongNoP', '품앗이 단가 없음 (노선관리 품앗이단가가 비어 있어 원래 단가로만 지급 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP, 'warn');
   W('yongNoP5', '외부용차단가 없음 (용차업체·외부 수행 노선의 노선관리 외부용차단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP5, 'warn');
@@ -1895,7 +1915,7 @@ function stlCompute_(month, opts) {
     Object.keys(warn.unreg).map(function (k) { return { cids: [warn.unreg[k].cid] }; }));
   const avL = [];
   Object.keys(warn.autoVendor).forEach(function (vn) { Object.keys(warn.autoVendor[vn]).forEach(function (c) { avL.push(vn + ' ← ' + cidNm(c) + ' · ' + warn.autoVendor[vn][c]); }); });
-  W('autoVendor', '맡은 노선으로 용차업체에 자동 묶은 쿠팡 ID (용차업체 목록의 맡은 노선·기간 기준 · 계속 쓰는 아이디면 업체 쿠팡 아이디 칸에 적어 두세요)', avL, 'info', null, avL.map(function () { return { t: 'vendor' }; }));
+  W('autoVendor', '맡은 노선으로 용차업체에 자동 묶은 쿠팡 ID (맡은 노선·기간에 해당하는 줄만 · 같은 아이디의 다른 노선 줄은 「등록 안 된 아이디」에 남음 · 계속 쓰는 아이디면 업체 쿠팡 아이디 칸에 적어 두세요)', avL, 'info', null, avL.map(function () { return { t: 'vendor' }; }));
   const noOwn = drivers.filter(function (d) { return !d.ownerId && !d.vendor; });
   W('noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정 · 용차업체 아이디면 [용차업체로 지정])', noOwn.map(function (d) { return d.cids.map(cidNm).join(', ') + ' · ' + won_(d.sales) + '원'; }), 'bad',
     noOwn.map(function (d) { return { cids: d.cids.slice() }; }));

@@ -294,6 +294,8 @@ function api_pmSave(token, job) {
     if (!job.id && job.offerToId && !pmOfferOn_()) fail_('지금은 사무실에서 품앗이 일감 제안을 잠시 막아 두었습니다. 사무실에 문의해 주세요.');
     f.desc = t(job.desc, 3000, '상세 설명');
     f.secret = t(job.secret, 1500, '비공개 정보');
+    // 단가가 평소 단가보다 낮으면 먼저 확인받는다 (okLow 로 다시 보내면 그대로 등록)
+    if (!job.okLow) { const low = pmLowPriceNote_(f.campId, f.route, f.price); if (low) return { ok: false, code: 'LOW', msg: low }; }
     // 첨부 (이미지 1장) — 잠금 밖에서 올린다
     let attachUrl = null;
     if (job.attach && job.attach.data) {
@@ -1148,6 +1150,27 @@ function pmSchApply_(ops) {
     console.error('기사스케줄 품앗이 반영 실패: ' + (e && e.message));
   }
 }
+/**
+ * 일감 단가가 그 노선의 평소 단가(고정·백업단가 중 높은 쪽)보다 낮으면 안내 글, 아니면 ''.
+ * 정산은 낮은 단가를 평소 단가로 올려 지급하므로(추가지급·공제 0) 등록할 때 미리 알린다. 단가를 못 찾으면 묻지 않는다.
+ */
+function pmLowPriceNote_(campId, route, price) {
+  try {
+    const pr = Number(String(price == null ? '' : price).replace(/[^\d.]/g, ''));
+    if (!(pr > 0) || !campId || !route) return '';
+    const units = issExpand_(normCode_(route));
+    if (!units.length) return '';
+    const num = function (v) { return Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')) || 0; };
+    let hi = 0;
+    master_().prices.forEach(function (p) {
+      if (p.campId !== campId) return;
+      units.forEach(function (u) { const m = u.match(/^(\d+)([A-Z])$/); if (m && String(p.num) === m[1] && String(p.value) === m[2]) hi = Math.max(hi, num(p.p2), num(p.p3)); });
+    });
+    if (!hi || pr >= hi) return '';
+    const w = function (n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+    return '건당 단가 ' + w(pr) + '원이 이 노선 평소 단가(' + w(hi) + '원)보다 낮습니다.\n정산에서는 평소 단가로만 지급됩니다 (추가지급·맡긴 기사 공제 0원).';
+  } catch (e) { return ''; }
+}
 /** 배차 확정 품앗이가 적힌 품앗이 줄 칸 (잠금): { 'PM기사ID': { 날짜: [{ id, text, from, to }] } } */
 function pmSchLocks_(dates) {
   const set = {}, out = {};
@@ -1248,6 +1271,7 @@ function adm_pmCreate(token, job) {
     f.desc = t(job.desc, 3000, '상세 설명');
     f.secret = t(job.secret, 1500, '비공개 정보');
     f.byOffice = a.name + ' · ' + nowText_().slice(0, 16);
+    if (!job.okLow) { const low = pmLowPriceNote_(f.campId, f.route, f.price); if (low) return { ok: false, code: 'LOW', msg: low }; }
     let tgt = null;
     if (mode !== 'open') {
       tgt = driverById_(str_(job.toId));
