@@ -7596,6 +7596,43 @@
       upRosterInfo(); toast('쿠팡 등록 목록을 저장했습니다 (' + r.roster.length + '줄).');
     } catch (err) { toast('엑셀을 읽지 못했습니다: ' + (err && err.message || err)); }
   });
+  /**
+   * 쿠팡 어드민 양식과 '파일 구조'까지 똑같은 .xlsx (쿠팡 다운로드 파일을 그대로 따라 함).
+   * 쿠팡 업로드는 글자를 공유 문자열표(sharedStrings, t="s")로만 읽고 칸 종류(t)가 없으면 빈칸으로 본다 →
+   * 모든 글자 칸 t="s" · 날짜 칸 t="n" + 서식 yyyy/MM/dd · 빈 값도 "" 문자열 · 시트 이름 Sheet0 · dimension 표시.
+   */
+  function cpXlsx(rows) {
+    const enc = new TextEncoder(), xe = (v) => String(v).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    const col = (i) => String.fromCharCode(65 + i);
+    const sst = [], sIdx = new Map(), si = (v) => { v = String(v == null ? '' : v); if (!sIdx.has(v)) { sIdx.set(v, sst.length); sst.push(v); } return sIdx.get(v); };
+    let refs = 0;
+    const serial = (d) => Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000);
+    const W = 10, body = rows.map((r, ri) => '<row r="' + (ri + 1) + '">' + Array.from({ length: W }, (_, ci) => {
+      const v = r[ci], ref = col(ci) + (ri + 1);
+      if (v instanceof Date) return '<c r="' + ref + '" t="n" s="2"><v>' + serial(v) + '.0</v></c>';
+      refs++;
+      return '<c r="' + ref + '" t="s"' + (ri === 0 ? ' s="1"' : '') + '><v>' + si(v) + '</v></c>';
+    }).join('') + '</row>').join('');
+    const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const f = (name, x) => ({ name, data: enc.encode(X + x) });
+    const sheet = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:J' + rows.length + '"/><sheetViews><sheetView workbookViewId="0" tabSelected="true"/></sheetViews><sheetFormatPr defaultRowHeight="15.0"/>' +
+      '<cols>' + [11, 12, 12, 8, 8, 9, 14, 8, 10, 20].map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="true"/>').join('') + '</cols><sheetData>' + body + '</sheetData><pageMargins bottom="0.75" footer="0.3" header="0.3" left="0.7" right="0.7" top="0.75"/></worksheet>';
+    const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy/MM/dd"/></numFmts>' +
+      '<fonts count="1"><font><sz val="11.0"/><color indexed="8"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>' +
+      '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="darkGray"/></fill><fill><patternFill patternType="solid"><fgColor indexed="22"/></patternFill></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="true"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="true"/></cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    return ZIPW.zip([
+      f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default ContentType="application/vnd.openxmlformats-package.relationships+xml" Extension="rels"/><Default ContentType="application/xml" Extension="xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml" PartName="/xl/sharedStrings.xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml" PartName="/xl/styles.xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" PartName="/xl/workbook.xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml" PartName="/xl/worksheets/sheet1.xml"/></Types>'),
+      f('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="xl/workbook.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"/></Relationships>'),
+      f('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="false"/><bookViews><workbookView activeTab="0"/></bookViews><sheets><sheet name="Sheet0" r:id="rId3" sheetId="1"/></sheets></workbook>'),
+      f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="sharedStrings.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings"/><Relationship Id="rId2" Target="styles.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"/><Relationship Id="rId3" Target="worksheets/sheet1.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"/></Relationships>'),
+      f('xl/sharedStrings.xml', '<sst count="' + refs + '" uniqueCount="' + sst.length + '" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + sst.map((v) => '<si><t>' + xe(v) + '</t></si>').join('') + '</sst>'),
+      f('xl/styles.xml', styles),
+      f('xl/worksheets/sheet1.xml', sheet)
+    ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }
   /** 고른 주차 → 쿠팡 양식 줄. 등록 목록(아이디 × 캠프)마다 매일 1줄: 일하면 출근(회전·라우트), 아니면 휴무 */
   function upCoupang(tab) {
     const w = upWk(tab);
@@ -7645,7 +7682,7 @@
       if (!confirm('쿠팡 등록 목록에 없는 아이디 × 캠프가 ' + lines.length + '건 있습니다. 쿠팡에서 거절될 수 있습니다:\n\n' + lines.slice(0, 15).join('\n') + (lines.length > 15 ? '\n… 외 ' + (lines.length - 15) + '건' : '') +
         '\n\n쿠팡에 먼저 등록하거나 스케줄을 고치세요. 그래도 이 줄들을 넣어 받을까요?')) return;
     }
-    const blob = ZIPW.xlsx([{ name: 'Sheet0', rows: c.rows, widths: [12, 14, 14, 10, 9, 10, 16, 9, 12, 26], filter: false, dateFmt: 'slash' }]);
+    const blob = cpXlsx(c.rows);
     const md = (d) => d.slice(5).replace('-', '');
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '쿠팡_기사스케줄_업로드_' + md(c.dates[0]) + '-' + md(c.dates[c.dates.length - 1]) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     const nW = c.rows.filter((r) => r[7] === '출근').length;
