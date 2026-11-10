@@ -1060,6 +1060,10 @@
   .is-mionly, .is-mi { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .is-mi input, .is-mionly input { width: 16px; height: 16px; accent-color: #e5484d; }
   .is-codes { flex-wrap: wrap; }
+  .is-midays { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13.5px; font-weight: 700; }
+  .is-midays input { width: 76px; height: 34px; text-align: right; }
+  .is-tb input.midays { width: 54px; height: 26px; padding: 0 6px; text-align: right; font-size: 12.5px; vertical-align: middle; }
+  .is-tb .mirange { font-size: 11.5px; color: #c81e1e; font-weight: 700; margin-top: 3px; }
   #isQuick button { white-space: nowrap; padding: 0 10px; }
   .is-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   .is-sum .isd { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 8px 12px; min-width: 150px; cursor: pointer; text-align: left; font: inherit; }
@@ -1402,7 +1406,7 @@
         <button class="btn" id="isAdd">+ 이슈 등록</button>
       </div>
     </div>
-    <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사별 이슈를 <b>이슈 항목 코드</b>로 기록하고, 그 이슈 때문에 <b>미입차</b>했는지 체크합니다. 표의 미입차 칸을 누르면 바로 바뀝니다. 기사스케줄에서는 이슈가 있는 칸 왼쪽 위에 빨간 표시가 붙습니다. 데이터는 스케줄 DB 의 <b>issues</b> 탭.</p>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사별 이슈를 <b>이슈 항목 코드</b>로 기록하고, 그 이슈 때문에 <b>미입차</b>했는지, <b>며칠</b> 미입차했는지 적습니다. 표에서 미입차 버튼과 일수를 바로 고칠 수 있습니다. 기사스케줄에서는 이슈가 있는 칸 왼쪽 위에 빨간 표시가 붙습니다. 데이터는 스케줄 DB 의 <b>issues</b> 탭.</p>
     <div class="tabs" id="isCodes"></div>
     <div class="is-sum" id="isSum"></div>
     <div class="table-wrap">
@@ -1778,7 +1782,8 @@
       <div class="field"><label class="lb" for="isMDate">날짜</label><input class="inp" type="date" id="isMDate"></div>
     </div>
     <div class="field"><span class="lb">이슈 항목 코드</span><div class="seg is-codes" id="isMKind"></div></div>
-    <div class="field"><label class="is-mi"><input type="checkbox" id="isMMi"> <b>미입차</b> <span class="sub">이 이슈 때문에 그날 입차하지 못함</span></label>
+    <div class="field"><label class="is-mi"><input type="checkbox" id="isMMi"> <b>미입차</b> <span class="sub">이 이슈 때문에 입차하지 못함</span></label>
+      <div class="is-midays hidden" id="isMDaysW"><label for="isMDays">미입차 일수</label> <input class="inp" type="number" min="1" max="365" id="isMDays" value="1"> 일 <span class="sub" id="isMRange"></span></div>
       <div class="db-note" id="isMCell" style="margin-top:6px"></div></div>
     <div class="field"><label class="lb" for="isMReason">사유</label><textarea class="inp" id="isMReason" style="height:64px" maxlength="200" placeholder="예: 허리 부상으로 병원 진료"></textarea></div>
     <div class="field"><label class="lb" for="isMAction">조치</label><textarea class="inp" id="isMAction" style="height:52px" maxlength="200" placeholder="예: 백업 기사 투입 · 품앗이 요청"></textarea></div>
@@ -3740,26 +3745,28 @@
     const tabs = ['전체'].concat(IS.codes, extra);
     $('#isCodes').innerHTML = tabs.map((k) => {
       const n = k === '전체' ? base.length : base.filter((x) => x.kind === k).length;
-      const m = (k === '전체' ? base : base.filter((x) => x.kind === k)).filter((x) => x.mi).length;
-      return '<button class="tab' + (IS.code === k ? ' on' : '') + '" data-ik="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b>' + (m ? ' <span class="ikc mi" title="미입차">' + m + '</span>' : '') + '</button>';
+      const m = (k === '전체' ? base : base.filter((x) => x.kind === k)).filter((x) => x.mi).reduce((a, x) => a + (x.miDays || 1), 0);
+      return '<button class="tab' + (IS.code === k ? ' on' : '') + '" data-ik="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b>' + (m ? ' <span class="ikc mi" title="미입차 일수">' + m + '일</span>' : '') + '</button>';
     }).join('');
     // 기사별 요약 (기사 필터는 빼고 계산 · 누르면 그 기사만)
     const drvBase = IS.list.filter((x) => (IS.code === '전체' || x.kind === IS.code) && (!$('#isMiOnly').checked || x.mi));
     const by = new Map();
-    drvBase.forEach((x) => { const g = by.get(x.driverId) || { id: x.driverId, name: x.name, camp: x.camp, n: 0, mi: 0, k: {} }; g.n++; if (x.mi) g.mi++; g.k[x.kind] = (g.k[x.kind] || 0) + 1; by.set(x.driverId, g); });
+    drvBase.forEach((x) => { const g = by.get(x.driverId) || { id: x.driverId, name: x.name, camp: x.camp, n: 0, mi: 0, k: {} }; g.n++; if (x.mi) g.mi += (x.miDays || 1); g.k[x.kind] = (g.k[x.kind] || 0) + 1; by.set(x.driverId, g); });
     const sums = Array.from(by.values()).sort((a, b) => b.n - a.n || b.mi - a.mi || String(a.name).localeCompare(String(b.name), 'ko'));
-    $('#isSum').innerHTML = sums.map((g) => '<button type="button" class="isd' + (IS.drv === g.id ? ' on' : '') + '" data-idrv="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><small>' + esc(g.camp ? shortCampSafe(g.camp) : '') + ' · ' + g.n + '건' + (g.mi ? ' · 미입차 ' + g.mi : '') + '</small><div class="k">' +
+    $('#isSum').innerHTML = sums.map((g) => '<button type="button" class="isd' + (IS.drv === g.id ? ' on' : '') + '" data-idrv="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><small>' + esc(g.camp ? shortCampSafe(g.camp) : '') + ' · ' + g.n + '건' + (g.mi ? ' · 미입차 ' + g.mi + '일' : '') + '</small><div class="k">' +
       Object.keys(g.k).sort((a, b) => g.k[b] - g.k[a]).map((k) => '<span class="ikc k-' + esc(k) + '">' + esc(k) + ' ' + g.k[k] + '</span>').join('') + '</div></button>').join('') +
       (IS.drv ? '<button type="button" class="btn sm ghost" data-idrv="" style="align-self:center">기사 선택 풀기</button>' : '');
     const list = isFiltered(false);
-    const miN = list.filter((x) => x.mi).length;
-    $('#isCount').textContent = list.length + '건' + (miN ? ' · 미입차 ' + miN : '');
+    const miN = list.filter((x) => x.mi).reduce((a, x) => a + (x.miDays || 1), 0);
+    $('#isCount').textContent = list.length + '건' + (miN ? ' · 미입차 ' + miN + '일' : '');
     $('#isRows').innerHTML = list.map((x) => '<tr data-iid="' + esc(x.id) + '"' + (x.mi ? ' class="mi"' : '') + '>' +
       '<td style="white-space:nowrap">' + esc(isMd(x.date)) + '</td>' +
       '<td style="white-space:nowrap"><b>' + esc(x.name) + '</b></td>' +
       '<td class="cl">' + esc(x.camp ? shortCampSafe(x.camp) : '') + '</td>' +
       '<td>' + isKc(x.kind) + '</td>' +
-      '<td><button type="button" class="mick' + (x.mi ? ' on' : '') + '" data-mi="' + esc(x.id) + '" title="눌러서 미입차 체크/해제">' + (x.mi ? '미입차' : '입차') + '</button></td>' +
+      '<td style="white-space:nowrap"><button type="button" class="mick' + (x.mi ? ' on' : '') + '" data-mi="' + esc(x.id) + '" title="눌러서 미입차 체크/해제">' + (x.mi ? '미입차' : '입차') + '</button>' +
+        (x.mi ? ' <input class="inp midays" type="number" min="1" max="365" value="' + (x.miDays || 1) + '" data-midays="' + esc(x.id) + '" title="미입차 일수 (이슈 날짜부터)"> 일' +
+          (x.miDays > 1 ? '<div class="mirange">' + esc(isMd(x.date).replace(/ \(.\)$/, '') + ' ~ ' + isMd(x.end).replace(/ \(.\)$/, '')) + '</div>' : '') : '') + '</td>' +
       '<td class="cl' + (isCellWarn(x) ? ' warn' : '') + '"' + (isCellWarn(x) ? ' title="미입차로 체크했지만 기사스케줄 칸은 출근으로 되어 있습니다"' : '') + '>' + (isCellWarn(x) ? '⚠ ' : '') + esc(x.cell || '—') + '</td>' +
       '<td class="rs">' + esc(x.reason) + '</td><td class="rs">' + esc(x.action) + '</td>' +
       '<td class="cl" title="' + esc(x.at) + '">' + esc(x.by) + '</td>' +
@@ -3777,14 +3784,26 @@
   $('#isQ').addEventListener('compositionend', renderIssue);
   $('#isMiOnly').addEventListener('change', renderIssue);
   $('#isReload').addEventListener('click', loadIssue);
+  // 표에서 미입차 일수 바로 고치기
+  $('#isRows').addEventListener('change', (e) => {
+    const inp = e.target.closest('[data-midays]'); if (!inp) return;
+    const x = IS.list.find((i) => i.id === inp.dataset.midays); if (!x) return;
+    const n = Math.max(1, Math.min(365, parseInt(inp.value, 10) || 1)), old = x.miDays;
+    if (n === old) { inp.value = n; return; }
+    x.miDays = n;
+    api('adm_schIssueSave', { id: x.id, date: x.date, driverId: x.driverId, kind: x.kind, reason: x.reason, action: x.action, mi: true, miDays: n }).then((r) => {
+      if (!r.ok) { x.miDays = old; renderIssue(); return toast(r.msg); }
+      Object.assign(x, { miDays: r.issue.miDays, end: r.issue.end }); renderIssue(); isSyncSched(r.issue); toast(x.name + ' 미입차 ' + n + '일로 고쳤습니다.');
+    }).catch(() => { x.miDays = old; renderIssue(); });
+  });
   $('#isRows').addEventListener('click', (e) => {
     const m = e.target.closest('[data-mi]');
     if (m) {
       const x = IS.list.find((i) => i.id === m.dataset.mi); if (!x) return;
       const want = !x.mi; x.mi = want; renderIssue();
-      api('adm_schIssueSave', { id: x.id, date: x.date, driverId: x.driverId, kind: x.kind, reason: x.reason, action: x.action, mi: want }).then((r) => {
+      api('adm_schIssueSave', { id: x.id, date: x.date, driverId: x.driverId, kind: x.kind, reason: x.reason, action: x.action, mi: want, miDays: x.miDays || 1 }).then((r) => {
         if (!r.ok) { x.mi = !want; renderIssue(); return toast(r.msg); }
-        isSyncSched(r.issue); toast(x.name + ' ' + isMd(x.date) + (want ? ' 미입차로 체크했습니다.' : ' 미입차 체크를 풀었습니다.'));
+        Object.assign(x, { miDays: r.issue.miDays, end: r.issue.end }); renderIssue(); isSyncSched(r.issue); toast(x.name + ' ' + isMd(x.date) + (want ? ' 미입차로 체크했습니다.' : ' 미입차 체크를 풀었습니다.'));
       }).catch(() => { x.mi = !want; renderIssue(); });
       return;
     }
@@ -3812,6 +3831,7 @@
       $('#isMKind').innerHTML = isKindsFor(k0).map((k) => '<button type="button" data-k="' + esc(k) + '">' + esc(k) + '</button>').join('');
       isPaintKind(k0);
       $('#isMMi').checked = x ? !!x.mi : false;
+      $('#isMDays').value = x && x.miDays ? x.miDays : 1; isPaintDays();
       $('#isMReason').value = x ? x.reason : ''; $('#isMAction').value = x ? x.action : '';
       $('#isMDel').classList.toggle('hidden', !x);
       $('#isMCell').textContent = '';
@@ -3832,17 +3852,27 @@
       if (seq !== IS.cellSeq) return;
       const c = (r && r.cell) || '';
       $('#isMCell').textContent = '그날 기사스케줄: ' + (c || '(빈 칸)') + (/미입차/.test(c) ? ' → 미입차로 체크했습니다' : '');
-      if (/미입차/.test(c) && !IS.miTouched) $('#isMMi').checked = true;
+      if (/미입차/.test(c) && !IS.miTouched) { $('#isMMi').checked = true; isPaintDays(); }
     }).catch(() => { if (seq === IS.cellSeq) $('#isMCell').textContent = ''; });
   }
   $('#isAdd').addEventListener('click', () => isOpen(null));
   $('#isMDrv').addEventListener('change', isLoadCell);
-  $('#isMDate').addEventListener('change', isLoadCell);
-  $('#isMMi').addEventListener('change', () => { IS.miTouched = true; });
+  $('#isMDate').addEventListener('change', () => { isLoadCell(); isPaintDays(); });
+  $('#isMMi').addEventListener('change', () => { IS.miTouched = true; isPaintDays(); });
+  /** 미입차면 일수 칸을 보이고, 날짜 ~ 끝나는 날을 같이 보여 준다 */
+  function isPaintDays() {
+    const on = $('#isMMi').checked;
+    $('#isMDaysW').classList.toggle('hidden', !on);
+    const dt = $('#isMDate').value, n = Math.max(1, Math.min(365, parseInt($('#isMDays').value, 10) || 1));
+    if (!on || !dt) { $('#isMRange').textContent = ''; return; }
+    const d = new Date(dt + 'T00:00:00'); d.setDate(d.getDate() + n - 1);
+    $('#isMRange').textContent = n > 1 ? isMd(dt) + ' ~ ' + isMd(isYmd(d)) : isMd(dt) + ' 하루';
+  }
+  $('#isMDays').addEventListener('input', isPaintDays);
   $('#isMKind').addEventListener('click', (e) => {
     const b = e.target.closest('[data-k]'); if (!b) return;
     isPaintKind(b.dataset.k);
-    if (!IS.miTouched && IS.miDef[b.dataset.k] !== undefined) $('#isMMi').checked = !!IS.miDef[b.dataset.k] || /미입차/.test($('#isMCell').textContent);
+    if (!IS.miTouched && IS.miDef[b.dataset.k] !== undefined) { $('#isMMi').checked = !!IS.miDef[b.dataset.k] || /미입차/.test($('#isMCell').textContent); isPaintDays(); }
   });
   const isClose = () => $('#isModal').classList.add('hidden');
   $('#isMCancel').addEventListener('click', isClose);
@@ -3850,7 +3880,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#isModal').classList.contains('hidden')) isClose(); });
   $('#isMGo').addEventListener('click', () => {
     const on = $('#isMKind button.on');
-    const o = { id: IS.cur ? IS.cur.id : '', driverId: $('#isMDrv').value, date: $('#isMDate').value, kind: on ? on.dataset.k : '', mi: $('#isMMi').checked,
+    const o = { id: IS.cur ? IS.cur.id : '', driverId: $('#isMDrv').value, date: $('#isMDate').value, kind: on ? on.dataset.k : '', mi: $('#isMMi').checked, miDays: Math.max(1, Math.min(365, parseInt($('#isMDays').value, 10) || 1)),
       reason: $('#isMReason').value.trim(), action: $('#isMAction').value.trim() };
     if (!o.driverId) return toast('기사를 고르세요.');
     if (!o.date) return toast('날짜를 고르세요.');
@@ -7324,8 +7354,8 @@
   })();
   /** 칸의 지시사항 (스케줄 이슈 중 구분 '지시') */
   /** 이슈 관리의 이슈 (지시 제외) */
-  function issOf(row, dt) { return (SD.issues || []).filter((x) => x.driverId === row && x.date === dt && x.kind !== '지시'); }
-  function issTip(list) { return list.map((x) => '🚩 ' + x.kind + (x.mi ? ' · 미입차' : '') + (x.reason ? ' · ' + x.reason : '')).join('\n'); }
+  function issOf(row, dt) { return (SD.issues || []).filter((x) => x.driverId === row && x.kind !== '지시' && x.date <= dt && dt <= (x.end || x.date)); }
+  function issTip(list) { return list.map((x) => '🚩 ' + x.kind + (x.mi ? ' · 미입차' + (x.miDays > 1 ? ' ' + x.miDays + '일 (' + Number(x.date.slice(5, 7)) + '/' + Number(x.date.slice(8)) + '~' + Number(x.end.slice(5, 7)) + '/' + Number(x.end.slice(8)) + ')' : '') : '') + (x.reason ? ' · ' + x.reason : '')).join('\n'); }
   function instOf(row, dt) { return (SD.issues || []).find((x) => x.driverId === row && x.date === dt && x.kind === '지시') || null; }
   function renderCalc() {
     const dates = SD.dates, campOk = (short) => !sf.camp || shortCamp((SD.camps.find((c) => c.id === sf.camp) || {}).name) === short;

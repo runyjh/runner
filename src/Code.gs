@@ -5553,7 +5553,7 @@ function adm_cpRosterSave(token, p) {
 
 // ───────────────────────── 스케줄 이슈 (칸별 사유: 부상·병가·차량 등) ─────────────────────────
 // 스케줄 DB 파일의 'issues' 탭. 시트에서 직접 고쳐도 된다 (이슈ID 는 비워 두면 다음에 자동으로 채워짐).
-const SCH_ISSUE = { SHEET: 'issues', HEAD: ['이슈ID', '날짜', '기사ID', '이름', '구분', '사유', '조치', '작성자', '작성일시', '미입차'],
+const SCH_ISSUE = { SHEET: 'issues', HEAD: ['이슈ID', '날짜', '기사ID', '이름', '구분', '사유', '조치', '작성자', '작성일시', '미입차', '미입차일수'],
   // 이슈 관리의 이슈 항목 코드 (+ 지시 = 칸 편집기의 '지시사항', 기사스케줄 칸에 표시). 예전 구분(병가·차량 등)도 그대로 읽어 보여 준다
   CODES: ['질병', '부상', '사고', '고장', '물량조율', '노쇼'],
   KINDS: ['질병', '부상', '사고', '고장', '물량조율', '노쇼', '지시'],
@@ -5585,7 +5585,8 @@ function schIssueSheet_() {
     return sh;
   } finally { lock.releaseLock(); }
 }
-/** 이슈 전체 (from·to 가 있으면 그 기간) */
+function schAddDays_(ymd, n) { const d = parseYmd_(ymd); if (!d) return ymd; d.setDate(d.getDate() + n); return ymd_(d); }
+/** 이슈 전체 (from·to 가 있으면 그 기간 · 미입차 기간이 걸치는 것 포함) */
 function schIssues_(from, to) {
   const sh = schSS_().getSheetByName(SCH_ISSUE.SHEET); // 아직 없으면 (처음 기록할 때 만든다)
   if (!sh) return [];
@@ -5596,7 +5597,12 @@ function schIssues_(from, to) {
   const g = function (r, h) { const v = ix[h] >= 0 ? r[ix[h]] : ''; return v instanceof Date ? ymd_(v) : str_(v); };
   return vals.slice(1).map(function (r, i) {
     return { row: i + 2, id: g(r, '이슈ID'), date: g(r, '날짜'), driverId: g(r, '기사ID'), name: g(r, '이름'), kind: g(r, '구분'), reason: g(r, '사유'), action: g(r, '조치'), by: g(r, '작성자'), at: g(r, '작성일시'), mi: /^(Y|O|TRUE|1|미입차)$/i.test(g(r, '미입차')) };
-  }).filter(function (x) { return x.date && (x.driverId || x.name) && (!from || x.date >= from) && (!to || x.date <= to); });
+  }).map(function (x) {
+    // 미입차 일수: 이슈 날짜부터 며칠 (적지 않았으면 1일)
+    x.miDays = x.mi ? Math.max(1, Math.min(365, parseInt(str_(vals[x.row - 1][ix['미입차일수']] === undefined ? '' : vals[x.row - 1][ix['미입차일수']]), 10) || 1)) : 0;
+    x.end = x.date && x.mi && x.miDays > 1 ? schAddDays_(x.date, x.miDays - 1) : x.date;
+    return x;
+  }).filter(function (x) { return x.date && (x.driverId || x.name) && (!from || x.end >= from) && (!to || x.date <= to); });
 }
 /** 이슈 저장. o = { id(있으면 고침), date, driverId, kind, reason, action, mi(미입차 여부 · 없으면 예전 값 유지) } */
 function adm_schIssueSave(token, o) {
@@ -5618,10 +5624,11 @@ function adm_schIssueSave(token, o) {
       const hit = o.id ? list.filter(function (x) { return x.id === str_(o.id); })[0] : null;
       if (o.id && !hit) fail_('이미 지워진 이슈입니다. 새로고침해 주세요.');
       const mi = o.mi === undefined || o.mi === null ? !!(hit && hit.mi) : !!o.mi;
+      const miDays = !mi ? 0 : Math.max(1, Math.min(365, parseInt(o.miDays, 10) || (hit && hit.miDays) || 1));
       const vals = {
         '이슈ID': hit ? hit.id : 'I' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10),
         '날짜': date, '기사ID': drv.id, '이름': drv.name, '구분': kind, '사유': reason, '조치': action,
-        '작성자': hit ? hit.by : a.name, '작성일시': hit ? hit.at : nowText_(), '미입차': mi ? 'Y' : ''
+        '작성자': hit ? hit.by : a.name, '작성일시': hit ? hit.at : nowText_(), '미입차': mi ? 'Y' : '', '미입차일수': mi ? String(miDays) : ''
       };
       // 머리글 순서대로 (사람이 탭의 열 순서를 바꿨어도 맞는 칸에)
       const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(str_);
@@ -5632,8 +5639,8 @@ function adm_schIssueSave(token, o) {
         row.forEach(function (v, i) { if (v === null) row[i] = cur[i]; });
       } else row.forEach(function (v, i) { if (v === null) row[i] = ''; });
       sh.getRange(at, 1, 1, row.length).setNumberFormat('@').setValues([row]);
-      logAdmin_(a, hit ? '스케줄 이슈 수정' : '스케줄 이슈 기록', drv.name + ' ' + date, kind + ' · ' + reason + (mi ? ' · 미입차' : ''));
-      return { ok: true, issue: { id: vals['이슈ID'], date: date, driverId: drv.id, name: drv.name, kind: kind, reason: reason, action: action, by: vals['작성자'], at: vals['작성일시'], mi: mi } };
+      logAdmin_(a, hit ? '스케줄 이슈 수정' : '스케줄 이슈 기록', drv.name + ' ' + date, kind + ' · ' + reason + (mi ? ' · 미입차 ' + miDays + '일' : ''));
+      return { ok: true, issue: { id: vals['이슈ID'], date: date, driverId: drv.id, name: drv.name, kind: kind, reason: reason, action: action, by: vals['작성자'], at: vals['작성일시'], mi: mi, miDays: miDays, end: mi && miDays > 1 ? schAddDays_(date, miDays - 1) : date } };
     } finally { lock.releaseLock(); }
   });
 }
