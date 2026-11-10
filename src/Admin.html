@@ -8115,6 +8115,7 @@
     // 줄 구성이 바뀌어도(정지·대기 보기, 캠프·검색, 이슈 저장 뒤 다시 그리기) 선택 칸이 다른 기사 줄로 옮겨 가지 않게: 줄 ID로 다시 찾고, 없으면 선택을 푼다
     const keyOf = (p) => (p && srows[p.r] ? srows[p.r].key || srows[p.r].row : null), actId = keyOf(sAct), ancId = keyOf(sAnchor);
     srows = buildRows(); recalc();
+    UNC = null; const UNM = unMissCount(); // 담당 없음 노선의 미입차 칸 수 (캠프 ⚠ 에 더함)
     const reIx = (p, id) => { if (!p) return null; const r = id == null ? -1 : srows.findIndex((x) => (x.key || x.row) === id); return r >= 0 && p.c < SD.dates.length ? { r, c: p.c } : null; };
     sAct = reIx(sAct, actId); sAnchor = sAct ? reIx(sAnchor, ancId) : null;
     const today = pddDate(), dates = SD.dates;
@@ -8145,7 +8146,7 @@
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp, firstOfCamp = prevCamp !== r.camp;
       prevCamp = r.camp;
-      const cs = r.staff ? '' : shortCamp(r.camp), miN = !r.staff && firstOfCamp && scalc ? scalc.missing.reduce((n, l, i) => n + (SD.dates[i] < pddDate() ? 0 : l.filter((x) => x.split(' ')[0] === cs).length), 0) : 0; // 지난 날(PDD 이전) 미입차는 세지 않음 — 앞으로 챙길 것만 경고
+      const cs = r.staff ? '' : shortCamp(r.camp), miN = !r.staff && firstOfCamp && scalc ? scalc.missing.reduce((n, l, i) => n + (SD.dates[i] < pddDate() ? 0 : l.filter((x) => x.split(' ')[0] === cs).length), 0) + (UNM[d.campId] || 0) : 0; // 지난 날(PDD 이전) 미입차는 세지 않음 — 앞으로 챙길 것만 경고
       const ttl = r.staff ? (d.title || d.type) : '';
       return '<tr class="drv' + (gtop ? ' gtop' : '') + (r.staff ? ' staff' : '') + (d.status !== '승인' ? ' dim' : '') + '">' +
         '<td class="fx f1">' + (r.staff ? '<span class="sub" title="' + STAFF_GROUP + ' — 고른 캠프 기사들 다음에 이어서 표시">직원</span>' : esc(cs || '-')) + (miN ? '<span class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + miN + '개 · 맨 아래 「미입차 노선 (자동)」 줄에서 날짜·노선 확인 (이 기사 줄의 문제가 아니라 캠프 전체 표시)">⚠' + miN + '</span>' : '') + '</td>' +
@@ -8221,7 +8222,28 @@
     return d ? { d, pm: false } : null;
   }
   /** { need: ['919C|D1',…], who: [{ key, name, units: ['919C|D1',…], id }], miss: [...] } */
+  //  한 번 그리는 동안(표 전체 · 칸 수정 뒤 새로 그림) 같은 노선·날짜는 한 번만 계산한다 → 담당 없음 줄 · 아래 미입차 줄 · 캠프 ⚠ 가 나눠 씀
+  let UNC = null;
   function unCover(cid, code, dt) {
+    if (!UNC) UNC = new Map();
+    const mk = cid + '|' + code + '|' + dt, hit = UNC.get(mk);
+    if (hit) return hit;
+    const out = unCover0(cid, code, dt);
+    UNC.set(mk, out);
+    return out;
+  }
+  /** 그날 담당 없음 노선에서 아무도 안 뛰는 물량 (용차업체가 맡은 노선은 제외) → { 캠프ID: 칸 수 } · PDD 이후만 */
+  function unMissCount() {
+    const UN = unassignedRoutes(), out = {}, pdd = pddDate();
+    Object.keys(UN).forEach((cid) => UN[cid].forEach((code) => SD.dates.forEach((dt) => {
+      if (dt < pdd) return;
+      const c = unCover(cid, code, dt); if (!c.miss.length) return;
+      if (unVendor(c.camp, Array.from(new Set(c.miss.map((x) => x.split('|')[0]))), dt)) return;
+      out[cid] = (out[cid] || 0) + 1;
+    })));
+    return out;
+  }
+  function unCover0(cid, code, dt) {
     const rots = unRotsOf(cid), camp = shortCamp((SD.camps.find((c) => c.id === cid) || {}).name || '');
     const need = [];
     SchedCalc.routeExpand(code).forEach((u) => rots.forEach((r) => need.push(u + '|' + r)));
@@ -8360,7 +8382,7 @@
   /** 배차 확정 품앗이가 적힌 품앗이 줄 칸 (잠금) → [{ id, text, from, to }] · 없으면 null */
   function pmLockOf(row, dt) { const l = ((SD.pmLocks || {})[row] || {})[dt]; return l && l.length ? l : null; }
   /** 잠긴 칸에 넣으려는 값이 확정 글자를 그대로 두는지 */
-  function pmLockKeeps(row, dt, v) { const l = pmLockOf(row, dt); if (!l) return true; const lines = String(v || '').split('\n').map((x) => x.trim()); return l.every((o) => lines.includes(o.text)); }
+  function pmLockKeeps(row, dt, v) { const l = pmLockOf(row, dt); if (!l) return true; const lines = String(v || '').split('\n').map((x) => x.trim()); return l.every((o) => lines.some((x) => x.indexOf(o.text) === 0)); }
   const PM_LOCK_MSG = '배차 확정된 품앗이 칸입니다. 취소·변경은 품앗이에서 해 주세요. (칸 우클릭 → 품앗이 상세)';
   // 중복 칸(주황 테두리)에 마우스를 올리면 어디와 겹치는지 작은 창으로 보여 줌
   function dupTipHtml(row, ci) {
@@ -8504,6 +8526,7 @@
     $('#sCalc').innerHTML = html;
   }
   function refreshAfterChange(changedRows) {
+    UNC = null;
     recalc();
     const tb = $('#sGrid'); if (!tb) return;
     const pdd = pddDate();
@@ -8530,6 +8553,7 @@
 
   // ── 값 바꾸기 · 자동 저장 ──
   function setCells(list, opts) {
+    UNC = null;
     const undo = [];
     let lockHit = 0;
     list.forEach((x) => {
@@ -8982,6 +9006,7 @@
       if (r === null) return;
       if (!r.ok) return toast(r.msg);
       $('#pmcModal').classList.add('hidden');
+      if (r.dup) toast('방금 등록된 같은 일감이 있어 새로 만들지 않았습니다.'); else
       toast(PMC.mode === 'confirm' ? '등록하고 배차 확정했습니다.' : PMC.mode === 'offer' ? '등록하고 제안을 보냈습니다.' : '등록했습니다. 기사님들이 지원할 수 있습니다.');
       schedGo(SD.start);
     }).catch(() => { b.disabled = false; });

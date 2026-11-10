@@ -1285,6 +1285,12 @@ function adm_pmCreate(token, job) {
       if (tgt && readAll_(SH.PJOB).some(function (x) { return x.acceptedId === tgt.id && x.status === PST.DONE && x.date === f.date; }))
         fail_(tgt.name + ' 기사님은 ' + f.date + ' 에 이미 확정된 품앗이가 있습니다.');
       const now = nowText_();
+      // 같은 일감을 2분 안에 또 보냄(화면이 끊겨 다시 누름) → 새로 만들지 않고 먼저 만든 것을 돌려준다
+      const twin = readAll_(SH.PJOB).filter(function (x) {
+        return str_(x.posterId) === str_(poster.id) && x.poster === poster.name && x.date === f.date && x.campId === f.campId && str_(x.route) === str_(f.route) && x.kind === f.kind &&
+          (x.status === PST.OPEN || x.status === PST.TALK || x.status === PST.DONE) && Math.abs(toMs_(now) - toMs_(x.createdAt)) < 120000;
+      })[0];
+      if (twin) return { ok: true, id: twin.id, mode: mode, dup: true };
       id = uniqId_('J');
       if (mode === 'offer') { f.offerToId = tgt.id; f.offerTo = tgt.name; }
       const row = Object.assign({ id: id, status: PST.OPEN, posterId: poster.id, poster: poster.name, attach: '', createdAt: now, updatedAt: now }, f);
@@ -1381,11 +1387,12 @@ function adm_pmDelete(token, ids) {
       const jobs = readAll_(SH.PJOB).filter(function (j) { return want[j.id]; });
       const apps = readAll_(SH.PAPP).filter(function (x) { return want[x.jobId]; });
       jobs.forEach(function (j) {
+        // 확정된 일감은 지난 날짜라도 기사스케줄 품앗이 칸(과 정산 아이디 사용 기록)을 같이 지운다 → 글자만 남지 않게
+        if (j.status === PST.DONE && j.acceptedId) pmSchOp_(out, 'clear', j.acceptedId, j);
         const live = (j.status === PST.OPEN || j.status === PST.TALK || j.status === PST.DONE) && !pmPast_(j, today);
         if (!live) return;
         apps.forEach(function (x) { if (x.jobId === j.id && pmActiveApp_(x)) out.push(pmA_(x.driverId, x.name, j, 'canceled')); });
         out.push(pmA_(j.posterId, j.poster, j, 'admin', 'cancel'));
-        if (j.status === PST.DONE && j.acceptedId) pmSchOp_(out, 'clear', j.acceptedId, j);
       });
       delRows_(sheet_(SH.PAPP), apps.map(function (x) { return x._row; }));
       delRows_(sheet_(SH.PJOB), jobs.map(function (j) { return j._row; }));

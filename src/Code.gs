@@ -4844,7 +4844,7 @@ function schRead_(sun, end) {
       Object.keys(pmLocks[id]).forEach(function (dt) {
         pmLocks[id][dt].forEach(function (L) {
           const cur = str_((cells[id] || {})[dt]);
-          if (cur.split(/\r?\n/).map(function (x) { return x.trim(); }).indexOf(L.text) >= 0) return;
+          if (cur.split(/\r?\n/).some(function (x) { return x.trim().indexOf(L.text) === 0; })) return; // 확정 글자로 시작하는 줄이 있으면 그대로 둠 (예: 뒤에 회전을 덧붙인 '시흥2 708C (D1)')
           fix.push({ op: 'set', driverId: id.slice(SCH_PM_PREFIX.length), date: dt, value: L.text });
           (cells[id] = cells[id] || {})[dt] = cur ? cur + '\n' + L.text : L.text;
         });
@@ -4888,7 +4888,7 @@ function adm_schSave(token, changes) {
           const l = x.row.indexOf(SCH_PM_PREFIX) === 0 ? (L[x.row] || {})[x.date] : null;
           if (!l) return true;
           const lines = String(x.value == null ? '' : x.value).split(/\r?\n/).map(function (v) { return v.trim(); });
-          if (l.every(function (o) { return lines.indexOf(o.text) >= 0; })) return true;
+          if (l.every(function (o) { return lines.some(function (v) { return v.indexOf(o.text) === 0; }); })) return true;
           pmLocked.push({ row: x.row, date: x.date, current: l.map(function (o) { return o.text; }).join('\n') });
           return false;
         });
@@ -4939,7 +4939,7 @@ function adm_schSave(token, changes) {
         changes = changes.filter(function (x) { return !/^NOTE\d+$/.test(x.row); });
         if (!changes.length) {
           if (noteRes.saved) logAdmin_(a, '기사스케줄 비고 수정', noteRes.saved + '칸', '업무스케줄에 저장');
-          return Object.assign({ ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts }, rcExtra);
+          return Object.assign({ ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts, pmLocked: pmLocked }, rcExtra);
         }
       }
       // 행 찾기 (없는 기사는 새 줄)
@@ -4975,7 +4975,7 @@ function adm_schSave(token, changes) {
       // 지금 값 읽어서 충돌 확인 (바뀌는 칸을 감싸는 범위를 한 번에)
       const ok = changes.filter(function (x) { return rowOf[x.row]; });
       const conflicts = [];
-      if (!ok.length) return Object.assign({ ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts }, rcExtra);
+      if (!ok.length) return Object.assign({ ok: true, saved: noteRes.saved, conflicts: noteRes.conflicts, pmLocked: pmLocked }, rcExtra);
       const r0 = Math.min.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
       const r1 = Math.max.apply(null, ok.map(function (x) { return rowOf[x.row]; }));
       const cs = ok.map(function (x) { return h.dates[x.date] + 1; });
@@ -6102,7 +6102,7 @@ function schBuildUpload_(data, opt) {
   const res = { bizNo: opt.bizNo, wave: opt.wave, target: opt.target, dates: data.dates, weeks: weeks.map(function () { return []; }), keys: weeks.map(function () { return []; }), missing: [], dups: [], over7: [], badId: [] };
 
   weeks.forEach(function (dates, widx) {
-    const baseRouteSet = {}, baseOwner = {}, vendorOwner = {}, entries = [], present = {}, dupe = {}, explicitMi = [];
+    const baseRouteSet = {}, baseOwner = {}, vendorOwner = {}, vacant = {}, entries = [], present = {}, dupe = {}, explicitMi = [];
     // 중복 규칙: 쿠팡은 아이디 한 줄에 회전 하나라 '205C,205D' + '205C (D2,F3)' 처럼 겹쳐 올린다.
     //   회전을 좁게 적은 사람(부분)이 그 회전의 주인 → 전체 회전으로 적힌 사람은 나머지 회전만 맡은 것으로 본다.
     //   중복 = 같은 회전에 부분끼리 2명, 또는 부분 없이 전체끼리 2명
@@ -6269,7 +6269,7 @@ function schBuildUpload_(data, opt) {
     // 미입차 사유: 그 노선 주인(기본노선 기사)에게 그날 이슈가 있으면 비고에
     const whyOf = function (k) {
       const dt = k.split('|')[0];
-      return (vendorOwner[k] || []).map(function (n) { return '용차업체 ' + n; }).concat((baseOwner[k] || []).map(function (id) { return issueBy[dt + '|' + id] || (leftInfo[id] && dt >= leftInfo[id].from ? leftInfo[id].name + ' 퇴사' : ''); })).filter(Boolean);
+      return (vendorOwner[k] || []).map(function (n) { return '용차업체 ' + n; }).concat(vacant[k] ? ['담당 없음'] : []).concat((baseOwner[k] || []).map(function (id) { return issueBy[dt + '|' + id] || (leftInfo[id] && dt >= leftInfo[id].from ? leftInfo[id].name + ' 퇴사' : ''); })).filter(Boolean);
     };
     const byRoute = {};
     Object.keys(present).forEach(function (p) {
@@ -6293,6 +6293,23 @@ function schBuildUpload_(data, opt) {
         v.units.forEach(function (rt) { const bk = [date, camp, rt].join('|'); baseRouteSet[bk] = 1; const a = vendorOwner[bk] || (vendorOwner[bk] = []); if (a.indexOf(v.name) < 0) a.push(v.name); });
       });
     });
+    // 담당 없음 노선 (노선관리에 사용 중인데 그날 기본노선 주인도, 용차업체도 없음): 아무도 안 뛰면 미입차로 · 비고 '담당 없음'
+    //  (화면 아래 '미입차 노선' 줄과 같게 · 이관 예약으로 그날부터 다른 캠프로 옮겨 가는 노선은 뺀다 — 적용일에 자동 정지됨)
+    const movedOut = function (cid, rt, date) { return (data.rcMoves || []).some(function (m) { return m.fromCampId === cid && m.date <= date && String(rt).indexOf(String(m.fromRoute)) === 0; }); };
+    Object.keys(data.routes || {}).forEach(function (cid) {
+      const camp = campById[cid];
+      if (!camp || !campReal[camp]) return;
+      (data.routes[cid] || []).forEach(function (code) {
+        routeExpand(code).forEach(function (rt) {
+          dates.forEach(function (date) {
+            if (date < opt.target) return;
+            const bk = [date, camp, rt].join('|');
+            if (baseRouteSet[bk] || movedOut(cid, rt, date)) return;
+            baseRouteSet[bk] = 1; vacant[bk] = 1;
+          });
+        });
+      });
+    });
     Object.keys(baseRouteSet).forEach(function (k) {
       const s = k.split('|');
       const covered = defRotArr(s[1]).some(function (rot) { return present[[s[0], s[1], s[2], rot].join('|')]; });
@@ -6301,7 +6318,7 @@ function schBuildUpload_(data, opt) {
     const byRot = {};
     Object.keys(gm).forEach(function (k) {
       const s = k.split('|'), rotText = Object.keys(gm[k]).sort().join(',');
-      const g = [s[0], s[1], rotText, (vendorOwner[k] || []).join(',')].join('|'); // 용차업체 노선은 따로 한 줄 (사유가 섞이지 않게)
+      const g = [s[0], s[1], rotText, (vendorOwner[k] || []).join(','), vacant[k] ? 'V' : ''].join('|'); // 용차업체·담당 없음 노선은 따로 한 줄 (사유가 섞이지 않게)
       const x = byRot[g] = byRot[g] || { date: s[0], camp: s[1], rotText: rotText, routes: [], why: [] };
       x.routes.push(s[2]);
       whyOf(k).forEach(function (w) { if (x.why.indexOf(w) < 0) x.why.push(w); });

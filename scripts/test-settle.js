@@ -119,6 +119,23 @@ scenario('등록 안내', null, function (r) {
   eq('단가를 모르는 노선은 묻지 않음', vm.runInContext("pmLowPriceNote_('C1','999A','500')", r.ctx), '');
 });
 
+// 7) 쿠팡 업로드 표: 담당 없음 노선 · 용차업체 맡은 노선은 아무도 안 뛰면 미입차 줄로 (사유 따로) · 이관 예약으로 떠나는 노선은 제외
+scenario('업로드 표', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var dates = ['2026-11-15','2026-11-16','2026-11-17','2026-11-18','2026-11-19','2026-11-20','2026-11-21'];
+    var data = { dates: dates, camps: [{ id: 'c1', name: '인천7캠프', rot: 'D1,D2' }, { id: 'c2', name: '안양1캠프', rot: 'D1,D2' }], routes: { c1: ['919CD', '901A', '902A'], c2: ['110AB'] },
+      drivers: [{ id: 'd1', name: '김', loginId: 'kim1', campId: 'c1', status: '승인', baseRoute: '901A' }],
+      cells: { d1: { '2026-11-15': '출근', '2026-11-16': '인천7 919CD' } }, issues: [],
+      rcMoves: [{ fromCampId: 'c2', fromRoute: '110', date: '2026-11-11' }],
+      vendorRoutes: [{ name: '히어로', camp: '인천7', code: '919CD', units: ['919C', '919D'], from: '2026-11-01', to: '' }] };
+    return schBuildUpload_(data, { bizNo: 'x', wave: 'W', target: '2026-11-15', maxDays: 6 }).missing.map(function (x) { return [x[0], x[2], x[7], x[8]].join(' | '); });
+  })()`, r.ctx);
+  const day = function (d) { return out.filter(function (x) { return x.indexOf(d) === 0; }).sort(); };
+  eq('11/15: 담당 없음 902A 와 용차업체 919CD 가 따로, 출근한 901A 는 없음', day('2026-11-15'), ['2026-11-15 | 인천7 | 902A | 사유: 담당 없음', '2026-11-15 | 인천7 | 919C,919D | 사유: 용차업체 히어로']);
+  eq('11/16: 우리 기사가 919CD 를 뛰면 용차업체 줄 없음 · 기본노선 901A 는 미입차', day('2026-11-16'), ['2026-11-16 | 인천7 | 901A | ', '2026-11-16 | 인천7 | 902A | 사유: 담당 없음']);
+  eq('이관 예약으로 떠난 안양1 110 은 올리지 않음', out.filter(function (x) { return /안양1/.test(x); }).length, 0);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n정산 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   정산 시험 ' + count + '개');
