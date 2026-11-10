@@ -8144,10 +8144,10 @@
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp, firstOfCamp = prevCamp !== r.camp;
       prevCamp = r.camp;
-      const cs = r.staff ? '' : shortCamp(r.camp), miN = !r.staff && firstOfCamp && scalc ? scalc.missing.reduce((n, l) => n + l.filter((x) => x.split(' ')[0] === cs).length, 0) : 0;
+      const cs = r.staff ? '' : shortCamp(r.camp), miN = !r.staff && firstOfCamp && scalc ? scalc.missing.reduce((n, l, i) => n + (SD.dates[i] < pddDate() ? 0 : l.filter((x) => x.split(' ')[0] === cs).length), 0) : 0; // 지난 날(PDD 이전) 미입차는 세지 않음 — 앞으로 챙길 것만 경고
       const ttl = r.staff ? (d.title || d.type) : '';
       return '<tr class="drv' + (gtop ? ' gtop' : '') + (r.staff ? ' staff' : '') + (d.status !== '승인' ? ' dim' : '') + '">' +
-        '<td class="fx f1">' + (r.staff ? '<span class="sub" title="' + STAFF_GROUP + ' — 고른 캠프 기사들 다음에 이어서 표시">직원</span>' : esc(cs || '-')) + (miN ? '<span class="campwarn" title="이 캠프에 담당 기사가 없는 노선 칸 ' + miN + '개 (아래 미입차 줄)">⚠</span>' : '') + '</td>' +
+        '<td class="fx f1">' + (r.staff ? '<span class="sub" title="' + STAFF_GROUP + ' — 고른 캠프 기사들 다음에 이어서 표시">직원</span>' : esc(cs || '-')) + (miN ? '<span class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + miN + '개 · 맨 아래 「미입차 노선 (자동)」 줄에서 날짜·노선 확인 (이 기사 줄의 문제가 아니라 캠프 전체 표시)">⚠' + miN + '</span>' : '') + '</td>' +
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정">' + esc(d.name) + '</button>' + (ttl ? '<span class="tbad t-' + esc(ttl) + '" style="width:auto;padding:0 5px">' + esc(ttl) + '</span>' : d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
           (d.ex ? '<span class="exbad" title="추가 배정 줄 (소속: ' + esc(((SD.drivers.find((x) => x.id === d.mainId) || {}).camp) || '-') + ') · 이 캠프 칸은 따로 입력">추가</span>' : '') + rcBadge(r) + '</td>' +
         '<td class="fx f3">' + esc(d.loginId || '') + '</td><td class="fx f4" title="' + esc(d.baseRoute || '') + '">' + baseRouteHtml(r) + '</td>' +
