@@ -1931,7 +1931,7 @@
       <div class="is-qty"><label for="isMQty">뺀 수량 (선택)</label><input class="inp" id="isMQty" placeholder="예: 80개" maxlength="20"></div></div>
     <div class="field"><span class="lb" id="isMReasonLb">3. 사유 — 왜 그랬나</span><div class="is-chips" id="isMKind"></div>
       <textarea class="inp" id="isMReason" style="height:54px;margin-top:8px" maxlength="200" placeholder="상세 사유 (예: 몸살 호소, 허리 통증으로 병원)"></textarea></div>
-    <div class="field"><span class="lb">4. 대체 — 뺀 물량은 누가</span><div class="is-chips" id="isMSub"></div>
+    <div class="field"><span class="lb">4. 대체 — 뺀 물량은 누가 <span class="sub">(업체백업 = 우리 백업 기사 투입 · 품앗이 = 우리 기사끼리 일 주고받기)</span></span><div class="is-chips" id="isMSub"></div>
       <select class="inp hidden" id="isMSubWho" style="margin-top:8px"></select></div>
     <div class="field"><label class="lb" for="isMAction">조치 · 메모</label><textarea class="inp" id="isMAction" style="height:44px" maxlength="200" placeholder="예: 기사에게 주의 · 캠프에 연락함"></textarea></div>
     <div class="is-prev" id="isMCell"></div>
@@ -4252,7 +4252,7 @@
 
   // ───── 이슈 관리: 결과(미입차·노쇼·물량조율) + 사유 · 기사스케줄 칸과 자동 연동 (스케줄 DB issues 탭) ─────
   const IS = { list: [], codes: ['질병', '부상', '사고', '고장', '물량조율', '노쇼'], miDef: {}, drivers: [], camps: [], code: '전체', drv: '', seq: 0, cur: null, cellSeq: 0,
-    results: ['미입차', '노쇼', '물량조율'], reasons: ['차량고장', '차량사고', '질병', '부상', '경조사', '개인사정', '기타'], subs: ['쿠친', '품앗이', '외부용차', '캠프 반납', '없음'], unset: '사유 미정', ruleFrom: '2026-11-01', today: '' };
+    results: ['미입차', '노쇼', '물량조율'], reasons: ['차량고장', '차량사고', '질병', '부상', '경조사', '개인사정', '기타'], subs: ['쿠친', '업체백업', '품앗이', '외부용차', '캠프 반납', '없음'], unset: '사유 미정', ruleFrom: '2026-11-01', today: '' };
   const isYmd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const isMd = (s) => s ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8)) + ' (' + '일월화수목금토'[new Date(s + 'T00:00:00').getDay()] + ')' : '';
   const isMd0 = (s) => s ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8)) : '';
@@ -4260,6 +4260,8 @@
   const isRc = (r) => r ? '<span class="ikc r-' + esc(r) + '">' + esc(r) + '</span>' : '<span class="ikc">기록만</span>';
   const isDays = (a, b) => { const out = []; let d = new Date(a + 'T00:00:00'); const e = new Date((b || a) + 'T00:00:00'); while (d <= e && out.length < 400) { out.push(isYmd(d)); d.setDate(d.getDate() + 1); } return out; };
   const isUnsetOf = (x) => x.kind === IS.unset;
+  /** 우리 인원이 대신 뛴 대체 (업체백업 = 우리 백업 기사 투입 · 품앗이 = 우리 기사끼리 일 주고받기) → 수행률에서 수행으로 봄 */
+  const IS_OURS = (s) => s === '업체백업' || s === '품앗이';
   /** 결과 탭 이름: 결과가 없는 예전 기록은 '예전 기록' */
   const isTabOf = (x) => x.result || '예전 기록';
   /** 위험 점수: 노쇼 5 · 미입차 1일당 1 · 물량조율 0.5 + 사유(차량사고 4 · 부상 3 · 질병·차량고장 2 · 그 밖 1 · 사유 미정 0) · 예전 기록은 예전 방식 */
@@ -4388,7 +4390,7 @@
           if (ro.length) Object.keys(r.u).forEach((rt) => { n += r.u[rt].filter((q) => ro.includes(q)).length; });
           else { const cu = isUnits(x.cut, r.rots) || {}; Object.keys(cu).forEach((rt) => { if (r.u[rt]) n += r.u[rt].filter((q) => cu[rt].includes(q)).length; }); }
         } else n = Object.keys(r.u).reduce((a, rt) => a + r.u[rt].length, 0);
-        if (x.sub === '품앗이') r.pm += n; else r.lost += n;
+        if (IS_OURS(x.sub)) r.pm += n; else r.lost += n;
         const rk = x.kind || x.result; r.rs[rk] = (r.rs[rk] || 0) + 1;
       });
     });
@@ -4396,8 +4398,8 @@
     const pct = (p, l) => p ? Math.round((p - l) / p * 1000) / 10 : 100;
     const bad = rows.filter((r) => r.lost || r.pm).sort((a, b) => pct(a.plan, a.lost) - pct(b.plan, b.lost));
     $('#isPerf').innerHTML = '<div class="pf"><div class="pf-h"><b>노선 수행률</b><span class="big">' + pct(tot.plan, tot.lost) + '%</span>' +
-      '<small>' + isMd0(from) + ' ~ ' + isMd0(to) + ' · 고정 노선 ' + rows.length + '개 · 계획 ' + tot.plan.toLocaleString() + '회전 · 뺀 ' + tot.lost + '회전' + (tot.pm ? ' · 품앗이 대체 ' + tot.pm + '회전(수행으로 봄)' : '') + '</small></div>' +
-      (bad.length ? '<table><thead><tr><th class="l">캠프</th><th class="l">노선</th><th class="l">기사</th><th>계획</th><th>뺀 회전</th><th>품앗이 대체</th><th class="l">수행률</th><th class="l">사유</th></tr></thead><tbody>' +
+      '<small>' + isMd0(from) + ' ~ ' + isMd0(to) + ' · 고정 노선 ' + rows.length + '개 · 계획 ' + tot.plan.toLocaleString() + '회전 · 뺀 ' + tot.lost + '회전' + (tot.pm ? ' · 우리 인원 대체(업체백업·품앗이) ' + tot.pm + '회전(수행으로 봄)' : '') + '</small></div>' +
+      (bad.length ? '<table><thead><tr><th class="l">캠프</th><th class="l">노선</th><th class="l">기사</th><th>계획</th><th>뺀 회전</th><th>우리 인원 대체</th><th class="l">수행률</th><th class="l">사유</th></tr></thead><tbody>' +
         bad.map((r) => { const p = pct(r.plan, r.lost); return '<tr class="' + (p < 95 ? 'bad' : '') + '"><td class="l">' + esc(shortCampSafe(r.d.camp)) + '</td><td class="l"><b>' + esc(r.d.baseRoute) + '</b></td><td class="l">' + esc(r.d.name) + '</td><td>' + r.plan + '</td><td>' + (r.lost || '—') + '</td><td>' + (r.pm || '—') + '</td>' +
           '<td class="l"><span class="bar"><em style="width:' + p + '%"></em></span><b>' + p + '%</b></td><td class="l">' + Object.keys(r.rs).map((k) => isKc(k) + (r.rs[k] > 1 ? '<span class="sub"> ' + r.rs[k] + '일</span>' : '')).join(' ') + '</td></tr>'; }).join('') + '</tbody></table>'
         : '<div class="sub" style="padding:10px 14px">이 기간에 뺀 회전이 없습니다.</div>') + '</div>';
@@ -4442,8 +4444,8 @@
     const reasons = IS.reasons.concat(ISM.kind && !IS.reasons.includes(ISM.kind) ? [ISM.kind] : []);
     $('#isMKind').innerHTML = reasons.map((k) => '<button type="button" data-k="' + esc(k) + '" class="' + (ISM.kind === k ? 'on' : '') + '">' + esc(k) + '</button>').join('');
     $('#isMReasonLb').textContent = '3. 사유 — 왜 그랬나' + (ISM.res === '노쇼' ? ' (노쇼는 선택)' : '');
-    $('#isMSub').innerHTML = IS.subs.map((k) => '<button type="button" data-sub="' + esc(k) + '" class="' + (ISM.sub === k ? 'on' : '') + '">' + esc(k === '품앗이' ? '품앗이 (우리 인원)' : k) + '</button>').join('');
-    $('#isMSubWho').classList.toggle('hidden', ISM.sub !== '품앗이');
+    $('#isMSub').innerHTML = IS.subs.map((k) => '<button type="button" data-sub="' + esc(k) + '" class="' + (ISM.sub === k ? 'on' : '') + '">' + esc(k === '품앗이' ? '품앗이 (우리 인원)' : k === '업체백업' ? '업체백업 (우리 백업 기사)' : k) + '</button>').join('');
+    $('#isMSubWho').classList.toggle('hidden', !IS_OURS(ISM.sub));
     $('#isMBase').textContent = d ? '기본노선: ' + (d.baseRoute || '없음') + (d.camp ? ' · ' + shortCampSafe(d.camp) : '') : '';
     const a = $('#isMDate').value, b = $('#isMEnd').value || a;
     $('#isMRange').textContent = a && b >= a ? '(' + isDays(a, b).length + '일)' : '';
@@ -4536,7 +4538,7 @@
   $('#isMGo').addEventListener('click', () => {
     const o = { id: IS.cur ? IS.cur.id : '', driverId: $('#isMDrv').value, date: $('#isMDate').value, end: $('#isMEnd').value || $('#isMDate').value,
       result: ISM.res, cut: ISM.res === '물량조율' ? (ISM.cutText || IS_ROTS.filter((r) => ISM.cut.includes(r)).join(',')) : '', kind: ISM.kind || (ISM.res === '노쇼' ? '노쇼' : ''), reason: $('#isMReason').value.trim(),
-      sub: ISM.sub, subWho: ISM.sub === '품앗이' ? $('#isMSubWho').value : '', qty: ISM.res === '물량조율' ? $('#isMQty').value.trim() : '', action: $('#isMAction').value.trim() };
+      sub: ISM.sub, subWho: IS_OURS(ISM.sub) ? $('#isMSubWho').value : '', qty: ISM.res === '물량조율' ? $('#isMQty').value.trim() : '', action: $('#isMAction').value.trim() };
     if (!o.driverId) return toast('기사를 고르세요.');
     if (!o.date) return toast('시작일을 고르세요.');
     if (o.end < o.date) return toast('종료일이 시작일보다 빠릅니다.');
@@ -4589,8 +4591,8 @@
   function iqPaint() {
     $('#iqKind').innerHTML = IS.reasons.map((k) => '<button type="button" data-k="' + esc(k) + '" class="' + (IQ.kind === k ? 'on' : '') + '">' + esc(k) + '</button>').join('');
     $('#iqSub2').innerHTML = IS.subs.map((k) => '<button type="button" data-sub="' + esc(k) + '" class="' + (IQ.sub === k ? 'on' : '') + '">' + esc(k) + '</button>').join('');
-    $('#iqSubWho').classList.toggle('hidden', IQ.sub !== '품앗이');
-    if (IQ.sub === '품앗이' && !$('#iqSubWho').options.length) $('#iqSubWho').innerHTML = '<option value="">대신 뛴 우리 기사 (선택)</option>' + IS.drivers.filter((d) => !IQ.cur || d.id !== IQ.cur.driverId).map((d) => '<option>' + esc(d.name) + '</option>').join('');
+    $('#iqSubWho').classList.toggle('hidden', !IS_OURS(IQ.sub));
+    if (IS_OURS(IQ.sub) && !$('#iqSubWho').options.length) $('#iqSubWho').innerHTML = '<option value="">대신 뛴 우리 기사 (선택)</option>' + IS.drivers.filter((d) => !IQ.cur || d.id !== IQ.cur.driverId).map((d) => '<option>' + esc(d.name) + '</option>').join('');
   }
   $('#iqKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; IQ.kind = b.dataset.k; iqPaint(); });
   $('#iqSub2').addEventListener('click', (e) => { const b = e.target.closest('[data-sub]'); if (!b) return; IQ.sub = IQ.sub === b.dataset.sub ? '' : b.dataset.sub; $('#iqSubWho').innerHTML = ''; iqPaint(); });
@@ -4599,7 +4601,7 @@
     const x = IQ.cur; if (!x) return;
     if (!IQ.kind) return toast('사유를 고르세요.');
     const b = $('#iqGo'); b.disabled = true;
-    isSave({ id: x.id, driverId: x.driverId, date: x.date, end: x.end || x.date, result: x.result, cut: x.cut, kind: IQ.kind, reason: $('#iqReason').value.trim(), sub: IQ.sub, subWho: IQ.sub === '품앗이' ? $('#iqSubWho').value : '', qty: x.qty || '', action: x.action || '' }, true)
+    isSave({ id: x.id, driverId: x.driverId, date: x.date, end: x.end || x.date, result: x.result, cut: x.cut, kind: IQ.kind, reason: $('#iqReason').value.trim(), sub: IQ.sub, subWho: IS_OURS(IQ.sub) ? $('#iqSubWho').value : '', qty: x.qty || '', action: x.action || '' }, true)
       .then((r) => { if (r) { toast(x.name + ' 이슈 사유를 저장했습니다.'); iqNext(); } }).catch(() => {}).finally(() => { b.disabled = false; });
   });
   function paDefaultRange() {
