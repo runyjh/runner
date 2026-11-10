@@ -56,7 +56,7 @@ const STL_TABS = {
   stl_camps: { kind: '구분', camp: '캠프명', name: '기사', acct: '정산 아이디', basis: '보험 기준', expense: '경비공제율', san: '산재율', goy: '고용율', runner: '러너 부담률', sanOn: '산재 ON/OFF', goyOn: '고용 ON/OFF', memo: '메모' },
   stl_kinds: { raw: '쿠팡 구분 값', std: '표준 분류' },
   stl_config: { label: '항목', value: '값', desc: '설명' },
-  stl_pay: { month: '정산월', acct: '정산 아이디', name: '명의자', checked: '입금체크', date: '입금일', memo: '메모' },
+  stl_pay: { month: '정산월', acct: '정산 아이디', name: '명의자', checked: '입금체크', date: '입금일', memo: '메모', inv: '계산서 발행', invAmt: '홈택스 합계', invDate: '작성일자', invNo: '승인번호' },
   stl_close: { month: '정산월', at: '마감일시', admin: '관리자' },
   // 정산서 탭 확인 필요에서 [확인함]으로 그 달만 숨긴 항목
   stl_ack: { month: '정산월', kind: '구분', key: '대상', memo: '내용', at: '처리일시', admin: '관리자' },
@@ -1750,7 +1750,7 @@ function stlCompute_(month, opts) {
       lossInc: f.lossInc, yongInc: f.yongInc, otherInc: f.otherInc, // 계산서 발행 후 공제한 분실 변상금·용차 차액 = 러너 기타수익 (부가세 없음)
       profit: Math.round(s.supplyCp - s.lossSup - f.supply + f.otherInc), runnerIns: f.runnerIns, insGain: f.insGain, supplyCp: s.supplyCp, // 회사이익 = 쿠팡 공급가 − 분실(공급가에서 그대로) − 기사 공급가 + 기타수익
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '', bizName: o.vendor ? '' : o.bizName || '',
-      checked: stlYes_(p.checked), payDate: p.date || '', payMemo: p.memo || '',
+      checked: stlYes_(p.checked), payDate: p.date || '', payMemo: p.memo || '', inv: str_(p.inv), invAmt: stlNum_(p.invAmt), invDate: p.invDate || '', invNo: p.invNo || '',
       advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty,
       movedIn: Object.keys(s.movedIn).map(function (k) { return s.movedIn[k].label; }), movedOut: Object.keys(s.movedOut).map(function (k) { return s.movedOut[k].label; })
     };
@@ -2257,7 +2257,7 @@ function stlResult_(month, fresh) {
 function stlPayOverlay_(res, month) {
   const pay = {};
   stlRead_('stl_pay').forEach(function (p) { if (p.month === month) pay[stlLogin_(p.acct)] = p; });
-  res.summary.drivers.forEach(function (d) { const p = pay[d.id] || {}; d.checked = stlYes_(p.checked); d.payDate = p.date || ''; d.payMemo = p.memo || ''; });
+  res.summary.drivers.forEach(function (d) { const p = pay[d.id] || {}; d.checked = stlYes_(p.checked); d.payDate = p.date || ''; d.payMemo = p.memo || ''; d.inv = str_(p.inv); d.invAmt = stlNum_(p.invAmt); d.invDate = p.invDate || ''; d.invNo = p.invNo || ''; });
   return res;
 }
 function stlAssertOpen_(month) {
@@ -3051,6 +3051,67 @@ function adm_stlPaySet(token, month, list) {
   });
 }
 /** 입금목록 (계좌번호 전체 표시 — 관리자 기록에 남음) */
+/**
+ * 홈택스 '매입 전자세금계산서 목록' 엑셀로 기사 계산서 발행 대조 · rows = [{ bizNo, co, ceo, date, approval, total, supply, tax }]
+ *  짝: ① 공급자 사업자번호 = 명의자(또는 용차업체) 사업자번호 ② 없으면 대표자명·상호 = 명의자 이름 ③ 같은 사람 여러 장이면 합계
+ *  판정: 합계 = 정산서 세금계산서 → '완료' · ±1원 → '완료(1원차)' · 다르면 '금액다름' · 홈택스에 없음 → '미발행' (계산서 0원은 '해당없음')
+ *  결과는 stl_pay 의 inv/invAmt/invDate/invNo 에 저장 (다시 올리면 덮어씀)
+ */
+function adm_stlTaxCheck(token, month, rows, dry) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length || rows.length > 3000) fail_('홈택스 엑셀에서 계산서 줄을 찾지 못했습니다.');
+    const r = stlResult_(month, false), D = stlDrivers_(), V = stlVendors_();
+    const norm = function (v) { return str_(v).replace(/[^0-9]/g, ''); };
+    const nm = function (v) { return str_(v).replace(/\s*\(.*\)\s*$/, '').replace(/\s+/g, ''); };
+    const byBiz = {}, byName = {};
+    const targets = (r.summary.drivers || []).filter(function (d) { return d.invoice; }).map(function (d) {
+      const vv = d.vendor ? V.by[stlVendorKey_(d.vendor)] : null, o = vv ? null : (D.byId[d.ownerId] || {});
+      const biz = norm(vv ? vv.bizNo : (o.bizNo || d.bizNo));
+      const t = { id: d.id, name: d.name, invoice: d.invoice, biz: biz, names: [nm(d.name), nm(vv ? vv.name : o.name), nm(vv ? vv.ceo : o.bizCeo), nm(o.bizName)].filter(Boolean), hits: [] };
+      if (biz) (byBiz[biz] = byBiz[biz] || []).push(t);
+      t.names.forEach(function (n) { (byName[n] = byName[n] || []).push(t); });
+      return t;
+    });
+    const used = [], unmatched = [];
+    rows.forEach(function (x) {
+      const biz = norm(x.bizNo), tot = stlNum_(x.total);
+      let c = biz && byBiz[biz] ? byBiz[biz] : [];
+      if (!c.length) { const n1 = nm(x.ceo), n2 = nm(x.co); c = (byName[n1] || []).concat(byName[n2] || []).filter(function (t, i, arr) { return arr.indexOf(t) === i; }); }
+      if (c.length > 1) { const exact = c.filter(function (t) { return Math.abs(t.invoice - tot) <= 1; }); if (exact.length) c = exact; }
+      if (!c.length) { unmatched.push({ bizNo: x.bizNo, co: x.co, ceo: x.ceo, date: x.date, total: tot }); return; }
+      c[0].hits.push({ total: tot, date: str_(x.date), no: str_(x.approval) });
+    });
+    const out = [];
+    targets.forEach(function (t) {
+      const sum = t.hits.reduce(function (s0, h) { return s0 + h.total; }, 0), diff = sum - t.invoice;
+      const st = !t.hits.length ? '미발행' : Math.abs(diff) === 0 ? '완료' : Math.abs(diff) <= 1 ? '완료(1원차)' : '금액다름';
+      out.push({ id: t.id, name: t.name, invoice: t.invoice, hometax: sum, diff: diff, n: t.hits.length, status: st, date: t.hits.map(function (h) { return h.date; }).sort().slice(-1)[0] || '', no: t.hits.map(function (h) { return h.no; }).join(' / '), biz: t.biz });
+    });
+    if (!dry) {
+      const lock = scriptLock_(); lock.waitLock(20000);
+      try {
+        stlFreshIn_('stl_pay');
+        const pays = stlRead_('stl_pay'), by = {};
+        pays.forEach(function (p) { if (p.month === month) by[stlLogin_(p.acct)] = p; });
+        const add = [];
+        out.forEach(function (x) {
+          const cur = by[x.id], o = cur ? Object.assign({}, cur) : { month: month, acct: x.id, name: x.name };
+          o.inv = x.status; o.invAmt = x.hometax ? String(x.hometax) : ''; o.invDate = x.date; o.invNo = x.no;
+          if (cur) stlSetRow_('stl_pay', cur._row, { inv: o.inv, invAmt: o.invAmt, invDate: o.invDate, invNo: o.invNo }); else add.push(o);
+        });
+        if (add.length) stlAppend_('stl_pay', add);
+        stlTouch_(['stl_pay']); stlBump_();
+        logAdmin_(a, '홈택스 계산서 대조', month, out.filter(function (x) { return /완료/.test(x.status); }).length + '/' + out.length + ' 완료 · 홈택스 ' + rows.length + '줄');
+      } finally { lock.releaseLock(); }
+    }
+    const cnt = function (re) { return out.filter(function (x) { return re.test(x.status); }).length; };
+    return { ok: true, month: month, rows: out.sort(function (p, q) { return (p.status === '완료') - (q.status === '완료') || Math.abs(q.diff) - Math.abs(p.diff); }), unmatched: unmatched,
+      n: { total: out.length, done: cnt(/^완료$/), round: cnt(/1원차/), diff: cnt(/금액다름/), none: cnt(/미발행/), hometax: rows.length, hometaxSum: rows.reduce(function (s0, x) { return s0 + stlNum_(x.total); }, 0) } };
+  });
+}
 function adm_stlPayList(token, month) {
   return run_(function () {
     const a = requireAdmin_(token);
@@ -3062,7 +3123,7 @@ function adm_stlPayList(token, month) {
       const o = vv ? { bankName: vv.bank, accountHolder: vv.holder || vv.name, bizNo: vv.bizNo, bizName: vv.name } : (D.byId[d.ownerId] || {});
       let acc = '';
       try { acc = vv ? (vv.account ? fmtAccount_(vv.account, vv.bank) : '') : o.accountEnc ? fmtAccount_(decrypt_(o.accountEnc), o.bankName) : ''; } catch (e) { acc = ''; }
-      return { id: d.id, cid: d.cid, cids: d.cids, workers: d.workers, name: d.name, early: !!early[d.id], bank: o.bankName || '', account: acc, holder: o.accountHolder || d.name, pay: d.invoice + d.depAdd, ded: d.san + d.goy + d.depDed, net: d.net, checked: d.checked, payDate: d.payDate, memo: d.payMemo, supply: d.supply, tax: d.tax, bizNo: o.bizNo || '', bizName: o.bizName || '' };
+      return { id: d.id, cid: d.cid, cids: d.cids, workers: d.workers, name: d.name, early: !!early[d.id], inv: d.inv || '', invAmt: d.invAmt || 0, bank: o.bankName || '', account: acc, holder: o.accountHolder || d.name, pay: d.invoice + d.depAdd, ded: d.san + d.goy + d.depDed, net: d.net, checked: d.checked, payDate: d.payDate, memo: d.payMemo, supply: d.supply, tax: d.tax, bizNo: o.bizNo || '', bizName: o.bizName || '' };
     });
     logAdmin_(a, '입금목록 조회 (계좌번호 표시)', month, list.length + '명');
     return { ok: true, month: month, list: list, dates: r.summary.dates };
