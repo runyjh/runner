@@ -1570,6 +1570,7 @@
         <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
         <button class="btn ghost" id="sFill" title="오늘 이후 빈칸: 고정·품앗이 기사는 출근/고정휴무, 백업 기사는 고정휴무 요일만">빈칸 자동 채우기</button>
         <button class="btn ghost" id="sReload">새로고침</button>
+        <button class="btn ghost" id="sLegacy" type="button" title="기존 운영시트 스케줄 이식 파일(JSON)을 올려 기사스케줄 칸·비고·이슈를 한 번에 넣습니다">⬆ 기존 스케줄 이식</button><input type="file" id="sLegacyFile" accept=".json" class="hidden">
         <button class="btn ghost danger-t" type="button" data-reset="sched">데이터 초기화</button>
       </div>
     </div>
@@ -3791,6 +3792,31 @@
   const paKind = { '주간': '주간 ☀️', '야간': '야간 🌙', '일택': '일택 📦' };
   const paBadge = (st) => '<span class="badge p-' + esc(String(st).replace(/\s/g, '')) + '">' + esc(st) + '</span>';
   const paDay = (d) => { const p = String(d || '').split('-'); if (p.length !== 3) return esc(d || ''); return +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
+  // ───── 기존 운영시트 스케줄 이식 (SchLegacy.gs) ─────
+  $('#sLegacy').addEventListener('click', () => $('#sLegacyFile').click());
+  $('#sLegacyFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (err) { return toast('파일을 읽지 못했습니다: ' + (err.message || err)); }
+    toast('파일을 확인하는 중…');
+    const r = await api('adm_schLegacyImport', data, false).catch(() => null);
+    if (!r) return;
+    if (!r.ok) return toast(r.msg);
+    const p = r.preview;
+    const msg = '기존 스케줄 이식 (' + p.from + ' ~ ' + p.to + ')\n\n' +
+      '· 지금 기사스케줄 칸 ' + p.wipe.toLocaleString() + '칸을 모두 지웁니다 (품앗이 줄은 남김)\n' +
+      '· 기존 스케줄 ' + p.rows + '명 · ' + p.cells.toLocaleString() + '칸을 넣습니다' + (p.newRows.length ? '\n· 새로 만드는 기사 줄 ' + p.newRows.length + '명: ' + p.newRows.join(', ') : '') + '\n' +
+      '· 비고 → 업무스케줄 메모 ' + p.memos + '개 추가 (이미 있는 글은 건너뜀)\n' +
+      '· 이슈 관리에 ' + p.issues + '건 추가' + (p.oldIssues ? ' (예전 이식분 ' + p.oldIssues + '건은 지우고 다시)' : '') + '\n\n' +
+      '되돌리려면 구글 시트의 버전 기록을 써야 합니다. 진행할까요?';
+    if (!confirm(msg)) return;
+    const b = $('#sLegacy'); b.disabled = true; b.textContent = '이식 중…';
+    api('adm_schLegacyImport', data, true).then((x) => {
+      if (!x.ok) return toast(x.msg);
+      toast('이식했습니다: ' + x.put.toLocaleString() + '칸 · 이슈 ' + x.preview.issues + '건');
+      loadSched(SD.start);
+    }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '⬆ 기존 스케줄 이식'; });
+  });
   // ───── 계산서/산재 관리: 전자세금계산서 발행 체크 · 산재/고용 신고 상황 (DocCheck.gs) ─────
   const dWon = (v) => (Number(v) || 0).toLocaleString('ko-KR');
   const dMon = (m) => m ? m.slice(0, 4) + '년 ' + Number(m.slice(5, 7)) + '월' : '';
