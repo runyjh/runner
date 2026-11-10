@@ -3995,6 +3995,29 @@ function adm_stlDrvCond(token, month) {
     return { ok: true, month: month, rows: out, n: { fb: out.filter(function (r) { return r.fb; }).length, regular: out.filter(function (r) { return r.regular.length; }).length, ins: out.filter(function (r) { return r.ins; }).length, tmp: out.filter(function (r) { return r.tmp.length; }).length, leave: out.filter(function (r) { return r.leave; }).length, target: out.filter(function (r) { return r.target || r.split.length; }).length } };
   });
 }
+/** 3단계 조정 카드: 이 달 품앗이·용차 · 공제·가감 · 가불금 · 일시단가 · 아이디 사용 기록 건수와 요약 2줄 */
+function adm_stlAdjSummary(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const P = stlPeriod_(month), cfg = stlCfg_();
+    const nm = function (v) { return str_(v).replace(/\s*\(.*\)\s*$/, ''); };
+    const md = function (d) { const y = stlYmd_(d); return y ? y.slice(5).replace('-', '/') : ''; };
+    const inP = function (from, to) { const f = stlYmd_(from) || '', t = stlYmd_(to) || ''; return (!f || f <= P.to) && (!t || t >= P.from); };
+    const take = function (arr, f) { return { n: arr.length, lines: arr.slice(0, 2).map(f), more: Math.max(0, arr.length - 2) }; };
+    const yong = stlRead_('stl_yongcha').filter(function (r) { return stlMonthOfDate_(r.date) === month; });
+    const adj = stlRead_('stl_adjust').filter(function (r) { return r.month === month && stlNum_(r.amt); });
+    const adv = stlRead_('stl_advance').filter(function (r) { return stlNum_(r.amt) - stlNum_(r.paid) > 0; });
+    const tmp = stlRead_('stl_tmp').filter(function (r) { return stlNum_(r.price) && inP(r.from, r.to); });
+    const use = stlRead_('stl_usage').filter(function (r) { return r.cid && inP(r.from, r.to); });
+    return { ok: true, month: month,
+      yongcha: take(yong, function (r) { return md(r.date) + ' ' + nm(r.who) + (r.route ? ' (' + r.route + ')' : '') + (r.payer ? ' ← ' + nm(r.payer) : ''); }),
+      adjust: take(adj, function (r) { return nm(r.name) + ' ' + str_(r.item) + ' ' + (stlNum_(r.amt) > 0 ? '+' : '') + won_(stlNum_(r.amt)); }),
+      advance: take(adv, function (r) { const left = stlNum_(r.amt) - stlNum_(r.paid); return nm(r.name) + ' 잔여 ' + won_(left) + (r.due && stlAdvMonth_(r.due, cfg) === month ? ' · 이 달 상환' : r.due ? ' · ' + stlYmd_(r.due).slice(0, 7) + ' 상환' : ''); }),
+      tmp: take(tmp, function (r) { return nm(r.name) + ' ' + won_(stlNum_(r.price)) + '원' + (r.from || r.to ? ' (' + md(r.from) + '~' + md(r.to) + ')' : '') + (r.routes ? ' ' + r.routes : ''); }),
+      usage: take(use, function (r) { return r.cid + ' → ' + nm(r.name) + (r.from || r.to ? ' (' + md(r.from) + '~' + md(r.to) + ')' : ''); }) };
+  });
+}
 function adm_stlFbView(token, month) {
   return run_(function () {
     const a = requireAdmin_(token);
