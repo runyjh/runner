@@ -1432,6 +1432,7 @@
         <button class="btn ghost" id="stCloseBtn">마감</button>
         <button class="btn ghost" id="stDrvBtn" title="드라이브 폴더의 쿠팡 정산서 엑셀을 여러 달 한 번에">드라이브에서 가져오기</button>
         <button class="btn ghost" id="stLegBtn" title="기존 급여정산서 결과를 그대로 옮겨 마감 (1~10월 이식)">기존 정산 이식</button>
+        <button class="btn ghost hidden" id="stLegCmp" title="기존 정산서(마감 기록)와 올인원이 지금 설정·쿠팡 정산서로 다시 계산한 결과를 기사별로 비교 — 마감은 그대로">올인원 계산과 비교</button>
         <button class="btn" id="stUpBtn">쿠팡 정산서 올리기</button>
         <input type="file" id="stFile" accept=".xlsx,.csv" class="hidden">
       </div>
@@ -1760,6 +1761,14 @@
     <div class="m-actions"><button type="button" class="btn ghost" id="legCancel">닫기</button><button type="button" class="btn" id="legGo" disabled>체크한 달 이식·마감</button></div>
   </div>
 </div>
+<div class="modal hidden" id="lcModal">
+  <div class="m-box" style="width:min(1200px,100%);max-height:92vh;display:flex;flex-direction:column">
+    <h3 id="lcTitle">기존 정산서 vs 올인원 계산</h3>
+    <p class="sub" style="font-size:12.5px;margin:0 0 8px">왼쪽 = 마감된 <b>기존 정산서</b> 금액 · 오른쪽 = 올인원이 <b>지금 설정과 쿠팡 정산서로 다시 계산</b>한 금액 · 차액 = 올인원 − 기존. 마감은 바뀌지 않습니다.</p>
+    <div id="lcBody" style="flex:1;overflow:auto"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="lcXlsx">⬇ 엑셀</button><span class="grow"></span><button type="button" class="btn" id="lcClose">닫기</button></div>
+  </div>
+</div>
 <!-- ───────────── 정산관리: 세무자료 내보내기 ───────────── -->
 <div class="modal hidden" id="tpModal">
   <div class="m-box" style="width:min(560px,100%)">
@@ -2050,7 +2059,7 @@
     if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     // 오래 걸리는 작업(이관·정산서 올리기·초기화·마감·사본 다시 만들기)은 60초에 끊지 않는다 — 끊으면 서버는 계속 도는데 화면은 "다시 시도"라 해서 두 번 처리될 수 있음
-    const LONG_MS = { adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
+    const LONG_MS = { adm_stlLegacyCompare: 300000, adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
     const timer = setTimeout(() => { if (ctl) ctl.abort(); }, LONG_MS[fn] || 60000);
     return fetch(RUNNER_API, {
       method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',
@@ -7936,6 +7945,7 @@
       (s.closed ? '<span class="closed">마감 ' + esc(String(s.closed.at).slice(0, 16)) + ' · ' + esc(s.closed.admin) + '</span>' : '<span>계산 ' + esc(String(s.computedAt || '').slice(11, 16)) + '</span>');
     $('#stCloseBtn').textContent = s.closed ? '마감 해제' : '이 달 마감';
     $('#stCloseBtn').classList.toggle('danger-t', !!s.closed);
+    $('#stLegCmp').classList.toggle('hidden', !(s.closed && /기존 정산 이식/.test(String(s.closed.admin || ''))));
   }
   // ── 정산관리 표 정렬 (정산서 목록 · 입금확인 · 명의자 사업자 정보): 제목을 누르면 오름차순 → 내림차순 → 원래 순서 ──
   //  합계 줄(tr.tot)은 맨 위에 고정. 숫자·금액·날짜는 숫자로, 글자는 가나다순. 빈 칸·'-' 는 맨 아래
@@ -8210,7 +8220,7 @@
     const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!on);
     $('#stTitle').textContent = na ? na.textContent.trim() : on ? '러너 손익·통장' : '정산관리';
     $('#stTabs').classList.toggle('hidden', on);
-    ['#stRecalc', '#stCloseBtn', '#stUpBtn', '#stTaxPack', '#stDrvBtn', '#stLegBtn'].forEach((id) => $(id).classList.toggle('hidden', on));
+    ['#stRecalc', '#stCloseBtn', '#stUpBtn', '#stTaxPack', '#stDrvBtn', '#stLegBtn'].forEach((id) => $(id).classList.toggle('hidden', on)); if (on) $('#stLegCmp').classList.add('hidden'); else paintStInfo();
     $('#stPnlTabs').classList.toggle('hidden', !on);
   }
   /** 사이드바: 정산관리 / 러너 손익·통장 중 지금 보는 쪽 표시 */
@@ -9301,6 +9311,46 @@
   // ── 기존 정산 이식 (#300) ──
   const LEG = { rows: [] };
   $('#stLegBtn').addEventListener('click', () => $('#legModal').classList.remove('hidden'));
+  // ── 기존 정산서 vs 올인원 계산 비교 (기존 정산 이식으로 마감한 달)
+  const LC = {};
+  $('#stLegCmp').addEventListener('click', async () => {
+    $('#lcModal').classList.remove('hidden'); $('#lcTitle').textContent = ymTitle(STX.month) + ' 기존 정산서 vs 올인원 계산';
+    $('#lcBody').innerHTML = '<div style="padding:30px"><div class="spin"></div><div class="sub" style="margin-top:8px">올인원 방식으로 다시 계산하는 중… (30초~1분)</div></div>';
+    const r = await api('adm_stlLegacyCompare', STX.month);
+    if (!r.ok) { $('#lcBody').innerHTML = '<div class="sub">' + esc(r.msg || '비교하지 못했습니다.') + '</div>'; return; }
+    LC.r = r; renderLegCmp(r);
+  });
+  $('#lcClose').addEventListener('click', () => $('#lcModal').classList.add('hidden'));
+  function renderLegCmp(r) {
+    const d = (v) => v ? '<span style="color:' + (v > 0 ? 'var(--brand)' : 'var(--danger)') + '">' + (v > 0 ? '+' : '') + wn(v) + '</span>' : '<span class="sub">0</span>';
+    const cols = [['qty', '배송건수'], ['pay', '지급 합계'], ['invoice', '세금계산서'], ['san', '산재'], ['goy', '고용'], ['depDed', '공제'], ['net', '실입금']];
+    const diffN = r.rows.filter((x) => x.matched && (x.diff.net || x.diff.invoice)).length, miss = r.rows.filter((x) => !x.matched && !x.onlyNew).length, onlyNew = r.rows.filter((x) => x.onlyNew).length;
+    const top = '<div class="kpis" style="margin-bottom:10px">' +
+      '<div class="kpi"><small>기사 짝</small><b>' + r.n.matched + ' / ' + r.n.legacy + '명</b><em>같음 ' + r.n.same + ' · 차액 있음 ' + diffN + (miss ? ' · 올인원에 없음 ' + miss : '') + (onlyNew ? ' · 기존에 없음 ' + onlyNew : '') + '</em></div>' +
+      '<div class="kpi"><small>세금계산서 합계</small><b>' + wn(r.total.allin.invoice) + '</b><em>기존 ' + wn(r.total.legacy.invoice) + ' · 차액 ' + d(r.total.diff.invoice) + '</em></div>' +
+      '<div class="kpi"><small>실입금 합계</small><b>' + wn(r.total.allin.net) + '</b><em>기존 ' + wn(r.total.legacy.net) + ' · 차액 ' + d(r.total.diff.net) + '</em></div>' +
+      '<div class="kpi"><small>러너 이익금 (공급가)</small><b>' + wn(r.profit.allin) + '</b><em>기존 ' + wn(r.profit.legacy) + ' · 차액 ' + d(r.profit.allin - r.profit.legacy) + '</em></div>' +
+      '<div class="kpi"><small>쿠팡 매출 (같은 정산서)</small><b>' + wn(r.company.allin.invTotal || r.company.legacy.invTotal) + '</b><em>총합계 ' + wn(r.company.allin.supplyCp) + ' · 분실 ' + wn(r.company.allin.lossCp) + '</em></div></div>';
+    const th = '<tr><th rowspan="2">기사</th><th rowspan="2">아이디</th>' + cols.map((c) => '<th colspan="3" style="text-align:center">' + c[1] + '</th>').join('') + '</tr><tr>' + cols.map(() => '<th class="n">기존</th><th class="n">올인원</th><th class="n">차액</th>').join('') + '</tr>';
+    const tr = (x) => '<tr' + (x.matched && !x.diff.net && !x.diff.invoice ? ' class="sub"' : '') + '><td><b>' + esc(x.name) + '</b>' + (x.onlyNew ? ' <small class="sub">(기존 없음)</small>' : !x.matched ? ' <small style="color:var(--danger)">(올인원 없음)</small>' : '') + '</td><td class="sub">' + esc(x.cid || x.newId || '') + '</td>' +
+      cols.map((c) => '<td class="n">' + wn(x.legacy[c[0]]) + '</td><td class="n">' + wn(x.allin[c[0]]) + '</td><td class="n">' + d(x.diff[c[0]]) + '</td>').join('') + '</tr>';
+    const tot = '<tr class="tot"><td><b>합계</b></td><td></td>' + cols.map((c) => '<td class="n"><b>' + wn(r.total.legacy[c[0]]) + '</b></td><td class="n"><b>' + wn(r.total.allin[c[0]]) + '</b></td><td class="n">' + d(r.total.diff[c[0]]) + '</td>').join('') + '</tr>';
+    $('#lcBody').innerHTML = top + '<div class="table-wrap"><table class="sttbl"><thead>' + th + '</thead><tbody>' + tot + r.rows.map(tr).join('') + '</tbody></table></div>' +
+      '<p class="sub" style="font-size:12px;margin:8px 0 0">차액이 나는 흔한 이유: 지급률·보험 설정 차이, 기존 정산서의 수기 조정(기타 지급·공제), 아이디 사용 기록(서브 인원) 차이, 분실 변상 계산 방식(×1.1 여부), 프로모션·추가 인센티브 배분.</p>';
+  }
+  $('#lcXlsx').addEventListener('click', () => {
+    const r = LC.r; if (!r) return;
+    const H = (a) => { a.h = true; return a; }, T = (a) => { a.t = true; return a; };
+    const cols = [['qty', '배송건수'], ['pay', '지급 합계'], ['invoice', '세금계산서'], ['supply', '공급가'], ['tax', '세액'], ['san', '산재'], ['goy', '고용'], ['depDed', '공제'], ['depAdd', '입금 가산'], ['net', '실입금'], ['loss', '분실 변상'], ['workDays', '근무일']];
+    const rows = [H(['기사', '아이디', '짝'].concat(...cols.map((c) => [c[1] + ' (기존)', c[1] + ' (올인원)', c[1] + ' 차액'])))];
+    rows.push(T(['합계', '', ''].concat(...cols.map((c) => [r.total.legacy[c[0]], r.total.allin[c[0]], r.total.diff[c[0]]]))));
+    r.rows.forEach((x) => rows.push([x.name, x.cid || x.newId || '', x.onlyNew ? '기존 없음' : x.matched ? '' : '올인원 없음'].concat(...cols.map((c) => [x.legacy[c[0]], x.allin[c[0]], x.diff[c[0]]]))));
+    const sum = [H(['항목', '기존 정산서', '올인원 계산', '차액 (올인원 − 기존)'])];
+    sum.push(['기사 수', r.n.legacy, r.n.allin, r.n.allin - r.n.legacy]); sum.push(['세금계산서 합계', r.total.legacy.invoice, r.total.allin.invoice, r.total.diff.invoice]); sum.push(['실입금 합계', r.total.legacy.net, r.total.allin.net, r.total.diff.net]);
+    sum.push(['러너 이익금 (공급가)', r.profit.legacy, r.profit.allin, r.profit.allin - r.profit.legacy]); sum.push(['쿠팡 정산서 총합계', r.company.legacy.supplyCp, r.company.allin.supplyCp, r.company.allin.supplyCp - r.company.legacy.supplyCp]);
+    const blob = ZIPW.xlsx([{ name: '요약', rows: sum, widths: [22, 16, 16, 18] }, { name: '기사별', rows: rows, widths: [12, 18, 10].concat(cols.map(() => 12).flatMap((w) => [w, w, w])) }]);
+    TAXDOC.download(blob, '정산비교_기존vs올인원_' + r.month + '.xlsx');
+  });
   // 이식 자료(JSON)는 화면에서 읽고, 서버에는 그 달 몫만 보낸다
   const legPart = (m) => ({ months: { [m]: LEG.data.months[m] } });
   $('#legCancel').addEventListener('click', () => $('#legModal').classList.add('hidden'));

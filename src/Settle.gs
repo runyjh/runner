@@ -4167,6 +4167,41 @@ function adm_stlLegacyPreview(token, fileId, months) {
   });
 }
 /** 실행: 달마다 (마감돼 있으면 풀고) 기존 결과로 덮어써서 마감 */
+/** 기존 정산 이식으로 마감한 달: 기존 정산서(마감 기록) vs 올인원 계산(지금 설정·쿠팡 정산서로 다시 계산) 기사별 차액 — 마감은 건드리지 않음 */
+function adm_stlLegacyCompare(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    if (!stlLegacyClosed_(month)) fail_('기존 정산 이식으로 마감한 달만 비교할 수 있습니다.');
+    const old = stlClosedLoad_(month), legacy = (old.summary && old.summary.drivers) || [];
+    const res = stlCompute_(month), fresh = res.summary.drivers || [];
+    const F = ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'workDays'];
+    const byId = {}, byCid = {}, byName = {};
+    fresh.forEach(function (d) {
+      byId[d.id] = d; (byName[d.name] = byName[d.name] || []).push(d);
+      (d.cids || []).concat(d.usedCids || [], [d.cid, d.id]).forEach(function (c) { if (c) byCid[stlLogin_(c)] = d; });
+    });
+    const used = {}, rows = [];
+    const pick = function (d) { const o = {}; F.forEach(function (k) { o[k] = Number(d && d[k]) || 0; }); return o; };
+    legacy.forEach(function (L) {
+      let d = byId[L.id] && !used[L.id] ? byId[L.id] : null;
+      if (!d) (L.cids || []).concat(L.usedCids || [], [L.cid]).some(function (c) { const x = c && byCid[stlLogin_(c)]; if (x && !used[x.id]) { d = x; return true; } return false; });
+      if (!d) (byName[L.name] || []).some(function (x) { if (!used[x.id]) { d = x; return true; } return false; });
+      if (d) used[d.id] = 1;
+      const a = pick(L), b = pick(d), diff = {};
+      F.forEach(function (k) { diff[k] = b[k] - a[k]; });
+      rows.push({ name: L.name, id: L.id, cid: L.cid || (L.cids || [])[0] || '', newId: d ? d.id : '', matched: !!d, legacy: a, allin: b, diff: diff });
+    });
+    fresh.forEach(function (d) { if (used[d.id] || !(d.invoice || d.net || d.qty)) return; const b = pick(d), a = pick(null), diff = {}; F.forEach(function (k) { diff[k] = b[k]; }); rows.push({ name: d.name, id: '', cid: d.cid || '', newId: d.id, matched: false, onlyNew: true, legacy: a, allin: b, diff: diff }); });
+    rows.sort(function (x, y) { return Math.abs(y.diff.net) - Math.abs(x.diff.net); });
+    const tot = { legacy: pick(null), allin: pick(null), diff: pick(null) };
+    rows.forEach(function (r) { F.forEach(function (k) { tot.legacy[k] += r.legacy[k]; tot.allin[k] += r.allin[k]; tot.diff[k] += r.diff[k]; }); });
+    const oc = (old.summary && old.summary.company) || {}, nc = res.summary.company || {};
+    return { ok: true, month: month, fields: F, rows: rows, total: tot, n: { legacy: legacy.length, allin: fresh.filter(function (d) { return d.invoice || d.net || d.qty; }).length, matched: rows.filter(function (r) { return r.matched; }).length, same: rows.filter(function (r) { return r.matched && !r.diff.net && !r.diff.invoice; }).length },
+      company: { legacy: { supplyCp: oc.supplyCp || 0, lossCp: oc.lossCp || 0, invTotal: oc.invTotal || 0 }, allin: { supplyCp: nc.supplyCp || 0, lossCp: nc.lossCp || 0, invTotal: nc.invTotal || 0 } },
+      profit: { legacy: Number(old.summary && old.summary.total && old.summary.total.profit) || 0, allin: Number(res.summary.total && res.summary.total.profit) || 0 } };
+  });
+}
 function adm_stlLegacyClose(token, fileId, month) {
   return run_(function () {
     const a = requireAdmin_(token);
