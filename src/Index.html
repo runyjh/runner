@@ -1396,7 +1396,7 @@
     if (last) $('#lgId').value = last;
     show('login');
   }
-  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); if (window.scReset) window.scReset(); } // 다음 로그인(공용 폰의 다른 기사)에 고른 캠프가 남지 않게
+  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); if (window.scReset) window.scReset(); try { SLC.tok = ''; SLC.months = null; SLC.slips = {}; } catch (e) { /* 아직 선언 전 */ } } // 다음 로그인(공용 폰의 다른 기사)에 고른 캠프가 남지 않게
 
   // ───── 화면 문구 (관리자앱 → 올인원 설정 → 기사앱 에서 바꿈) ─────
   // 키 = "d:화면id:기본 문구". 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. ※ 관리자앱 uiDrvScan 과 같은 규칙
@@ -2872,12 +2872,41 @@
   const slWon = (v) => (Math.round(Number(v) || 0)).toLocaleString('ko-KR');
   const slMonthTxt = (m) => { const p = String(m || '').split('-'); return p.length === 2 ? p[0] + '년 ' + (+p[1]) + '월 정산' : m; };
   const slMd = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? (+p[1]) + '/' + (+p[2]) : (d || ''); };
+  // 정산서 보관 (이 화면이 열려 있는 동안 메모리에만 · 계좌·금액이 있어 기기에는 저장하지 않음 · 로그아웃·새로고침하면 사라짐)
+  //  다시 열면 보관본을 바로 보여 주고 뒤에서 새로 받아 달라졌을 때만 다시 그린다
+  const SLC = { tok: '', months: null, slips: {}, seq: 0 };
+  function slcFor(token) { if (SLC.tok !== token) { SLC.tok = token; SLC.months = null; SLC.slips = {}; } return SLC; }
+  function slMonthsPaint(months, cur) {
+    $('#slMonth').disabled = false;
+    $('#slMonth').innerHTML = months.map((m) => '<option value="' + escH(m.month) + '">' + escH(slMonthTxt(m.month)) + (m.closed ? '' : ' (확정 전)') + '</option>').join('');
+    if (cur && months.some((m) => m.month === cur)) $('#slMonth').value = cur;
+  }
+  function slipPaint(r) {
+    slTax = r.taxInv || [];
+    $('#slBody').innerHTML = (r.closed ? '' : '<div class="sl-warn">⚠️ 아직 마감 전이라 금액이 바뀔 수 있습니다. 세금계산서는 마감 후 금액으로 발행해 주세요.</div>') + taxCards(slTax) + r.slips.map((sl) => slipCard(r, sl)).join('');
+  }
+  function slipKeep(token, r) { if (!r || !r.month) return ''; const j = JSON.stringify(r, (k, v) => (k === '_ms' || k === '_st' ? undefined : v)); slcFor(token).slips[r.month] = { r: r, j: j }; return j; }
   function openSettle() {
     show('settle');
     const token = pmTok(); if (!token) return;
-    $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
-    api('api_mySettle', token).then((r) => {
-      if (!pmOk(r, '정산서를 불러오지 못했습니다.')) { $('#slBody').innerHTML = ''; return; }
+    const C = slcFor(token), seq = ++SLC.seq;
+    const m0 = C.months && C.months.length ? C.months[0].month : '', had = !!(m0 && C.slips[m0]);
+    if (had) { slMonthsPaint(C.months, m0); slipPaint(C.slips[m0].r); } // 보관본 먼저
+    else $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
+    api('api_mySettle', token, true).then((r) => {
+      if (seq !== SLC.seq) return; // 그 사이 다른 달을 골랐거나 다시 열었음
+      if (!pmOk(r, '정산서를 불러오지 못했습니다.')) { if (!had) $('#slBody').innerHTML = ''; return; }
+      if (r.months.length && (r.first || r.firstErr)) {
+        C.months = r.months;
+        const sel = $('#slMonth').value, first = r.months[0].month;
+        if (!had || sel === first || !sel) {
+          slMonthsPaint(r.months, first);
+          if (r.first) { const old = C.slips[first] && C.slips[first].j; if (slipKeep(token, r.first) !== old || !had) slipPaint(r.first); }
+          else { delete C.slips[first]; toast(r.firstErr); $('#slBody').innerHTML = ''; }
+        } else slMonthsPaint(r.months, sel);
+        return;
+      }
+      C.months = r.months;
       if (!r.months.length) {
         $('#slMonth').innerHTML = ''; $('#slMonth').disabled = true;
         $('#slBody').innerHTML = '<div class="pmempty">' + (r.noId ? '기사님 이름으로 된 정산 아이디가 없습니다.<br>사무실에 문의해 주세요.' : '아직 볼 수 있는 정산서가 없습니다.<br>사무실에서 정산을 마감하면 여기에 나옵니다.') + '</div>';
@@ -2886,16 +2915,18 @@
       $('#slMonth').disabled = false;
       $('#slMonth').innerHTML = r.months.map((m) => '<option value="' + escH(m.month) + '">' + escH(slMonthTxt(m.month)) + (m.closed ? '' : ' (확정 전)') + '</option>').join('');
       loadSlip(r.months[0].month);
-    }).catch(() => { $('#slBody').innerHTML = ''; netErr(); });
+    }).catch(() => { if (seq !== SLC.seq) return; if (!had) $('#slBody').innerHTML = ''; netErr(); });
   }
   function loadSlip(month) {
     const token = pmTok(); if (!token) return;
-    $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
+    const C = slcFor(token), seq = ++SLC.seq, had = C.slips[month];
+    if (had) slipPaint(had.r); // 보관본 먼저
+    else $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     api('api_mySlip', token, month).then((r) => {
-      if (!pmOk(r, '정산서를 불러오지 못했습니다.')) { $('#slBody').innerHTML = ''; return; }
-      slTax = r.taxInv || [];
-      $('#slBody').innerHTML = (r.closed ? '' : '<div class="sl-warn">⚠️ 아직 마감 전이라 금액이 바뀔 수 있습니다. 세금계산서는 마감 후 금액으로 발행해 주세요.</div>') + taxCards(slTax) + r.slips.map((sl) => slipCard(r, sl)).join('');
-    }).catch(() => { $('#slBody').innerHTML = ''; netErr(); });
+      if (seq !== SLC.seq) return;
+      if (!pmOk(r, '정산서를 불러오지 못했습니다.')) { if (!had) $('#slBody').innerHTML = ''; return; }
+      if (slipKeep(token, r) !== (had && had.j) || !had) slipPaint(r);
+    }).catch(() => { if (seq !== SLC.seq) return; if (!had) $('#slBody').innerHTML = ''; netErr(); });
   }
   // ───── 세금계산서 그림 (별지 제11호 서식 모양) — 관리자·기사 앱 공용 ─────
   // t = { date:'2026-10-31', book1, book2, serial, sup:{no,name,ceo,addr,type,item}, buy:{…}, items:[{md:'10-31',name,spec,qty,price,supply,tax,note}], supply, tax, total, cash, check, bill, credit, kind:'영수'|'청구', note }

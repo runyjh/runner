@@ -4054,20 +4054,30 @@ function adm_stlAppRangeSet(token, range) {
     return { ok: true, range: range, months: stlAppMonths_(stlCfg_()).map(function (x) { return x.month; }) };
   });
 }
-function api_mySettle(token) {
+function api_mySettle(token, withFirst) {
   return run_(function () {
-    const u = pmUser_(token);
+    stg_();
+    const u = pmUser_(token); stg_('auth');
     if (!props_().STL_DB_ID) return { ok: true, months: [] };
-    stlLoad_(STL_SMALL);
-    const cfg = stlCfg_(), groups = stlMyGroups_(u.id);
+    stlLoad_(STL_SMALL); stg_('load');
+    const cfg = stlCfg_(), groups = stlMyGroups_(u.id); stg_('groups');
     if (!groups.length) return { ok: true, months: [], noId: true };
-    return { ok: true, months: stlAppMonths_(cfg) };
+    const months = stlAppMonths_(cfg), out = { ok: true, months: months };
+    // 첫 달 정산서를 같이 보낸다 (달 목록 → 정산서 두 번 오가던 것을 한 번으로). 못 만들면 사유만 실어 보내고 화면이 그대로 안내
+    if (withFirst && months.length) {
+      try { out.first = mySlip_(u, months[0].month); }
+      catch (e) { if (e && e.userMsg) out.firstErr = e.userMsg; else throw e; }
+      stg_('slip');
+    }
+    return out;
   });
 }
 /** 기사 앱: 그 달 내 정산서 (명의자인 묶음 모두). 러너 내부 숫자(회사이익·러너 부담 등)는 빼고 보낸다 */
 function api_mySlip(token, month) {
-  return run_(function () {
-    const u = pmUser_(token);
+  return run_(function () { stg_(); const u = pmUser_(token); stg_('auth'); const r = mySlip_(u, month); stg_('slip'); return r; });
+}
+function mySlip_(u, month) {
+  {
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     const cfg = stlCfg_(), closed = stlClosedInfo_(month);
     if (!closed && !cfg.appOpen) fail_('아직 마감되지 않은 달입니다. 사무실에서 마감하면 볼 수 있습니다.');
@@ -4105,7 +4115,7 @@ function api_mySlip(token, month) {
       ok: true, month: month, closed: !!closed, period: r.summary.period, dates: r.summary.dates, slips: slips, taxInv: taxInv,
       company: { name: co.branchName || '', ceo: co.branchCeo || '', bizNo: co.branchBizNo || '', email: cfg.email }
     };
-  });
+  }
 }
 
 // ───────────────────────── 노선관리: 라우트별 1일 평균 물량 (쿠팡 정산서 기준) ─────────────────────────

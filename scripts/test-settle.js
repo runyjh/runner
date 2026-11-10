@@ -264,6 +264,22 @@ ops('자체 검사 (품앗이·이슈 ↔ 칸 · 정산 계산)', function (run)
   eq('정산 계산이 오류를 내면 잡음', run("var keep = stlCompute_; stlCompute_ = function (m) { if (m === '2026-11') throw new Error('boom'); return keep(m); }; var r = dataCheckLive_(__drv, '2026-11-18'); stlCompute_ = keep; return r.map(function (x) { return x.k + ':' + x.list.join(';'); });"), ['stlRun:2026-11 계산 오류: boom']);
 });
 
+// 13) 기사앱 정산서: 달 목록과 첫 달 정산서를 한 번에 — 따로 받은 것과 내용이 같아야 한다
+scenario('기사앱 정산서 한 번에', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    pmUser_ = function () { return { id: 'd1', name: '이현모' }; };
+    var p0 = props_; props_ = function () { var o = p0(); o.STL_DB_ID = 'x'; return o; };
+    companyInfo_ = function () { return {}; }; tiForDriver_ = function () { return []; };
+    stlAppMonths_ = function () { return [{ month: '2026-11', closed: false }]; }; var c0 = stlCfg_; stlCfg_ = function () { var c = c0(); c.appOpen = true; return c; };
+    var a = api_mySettle('t', true), b = a.months && a.months.length ? api_mySlip('t', a.months[0].month) : null, old = api_mySettle('t');
+    var strip = function (o) { return JSON.stringify(o, function (k, v) { return k === '_ms' || k === '_st' ? undefined : v; }); };
+    return { ok: a.ok, months: (a.months || []).length, err: a.firstErr || a.msg || '', same: !!a.first && !!b && strip(a.first) === strip(b), slips: a.first ? a.first.slips.length : 0, oldHasFirst: 'first' in old, st: Object.keys(a._st || {}).join(',') };
+  })()`, r.ctx);
+  eq('달 목록 + 첫 달 정산서가 같이 오고, 따로 받은 것과 같음', [out.ok, out.months > 0, out.err, out.same, out.slips > 0], [true, true, '', true, true]);
+  eq('예전 화면(인자 없이 부름)에는 달 목록만', out.oldHasFirst, false);
+  eq('단계별 시간이 같이 옴', out.st, 'auth,load,groups,slip');
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
