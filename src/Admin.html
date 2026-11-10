@@ -641,6 +641,9 @@
   .m-view iframe { width: 100%; height: 100%; border: 0; background: #fff; }
   .up-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .up-info { color: var(--sub); font-size: 13px; margin-right: auto; }
+  /* 주차 탭: 한 줄을 다 쓰고, 창이 좁아지면 글씨를 줄여 칸을 넘지 않게 (upTabsFit) */
+  #upTabs { display: flex; flex: 1 1 100%; min-width: 0; }
+  #upTabs button { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 .9em; font-size: 14px; }
   .up-wrap { flex: 1; overflow: auto; background: #fff; }
   table.up { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; min-width: 100%; }
   table.up th { position: sticky; top: 0; background: #f1f3f4; z-index: 1; font-weight: 700; text-align: left; }
@@ -7544,7 +7547,8 @@
     const md = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
     const t = (upRes.weeks || []).slice(0, 4).map((rows, i) => { const ds = upRes.dates.slice(i * 7, i * 7 + 7).filter((d) => d >= upRes.target); return ['w' + (i + 1), (ds[0] ? weekOfMonth(ds[0]) : i + 1) + '주차 (' + md(ds[0] || upRes.dates[i * 7]) + '~' + md(upRes.dates[Math.min(upRes.dates.length - 1, i * 7 + 6)]) + ') 출근', '건']; })
       .concat([['mi', '미입차', '건'], ['dup', '중복', '건']]);
-    $('#upTabs').innerHTML = t.map(([k, l, u]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
+    $('#upTabs').innerHTML = t.map(([k, l, u]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '" title="' + esc(l + ' ' + upRows(k).length + u) + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
+    upTabsFit();
   }
   function upRender() {
     const rows = upRows(upTab), keyOf = (w, i) => upRes.keys[w][i];
@@ -7684,6 +7688,15 @@
   $('#sUpload').addEventListener('click', upMake);
   $('#upRegen').addEventListener('click', upMake);
   $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
+  /** 탭 글씨 크기 맞추기: 14px 에서 시작해 탭들이 한 줄 너비를 넘으면 0.5px씩 줄임 (최소 9px) */
+  function upTabsFit() {
+    const bar = $('#upTabs'), bs = $$('#upTabs button'); if (!bar || !bs.length || !bar.clientWidth) return;
+    let fs = 14;
+    const over = () => bar.scrollWidth > bar.clientWidth || bs.some((b) => b.scrollWidth > b.clientWidth);
+    bs.forEach((b) => { b.style.fontSize = fs + 'px'; });
+    while (fs > 9 && over()) { fs -= 0.5; bs.forEach((b) => { b.style.fontSize = fs + 'px'; }); }
+  }
+  if (window.ResizeObserver) new ResizeObserver(() => upTabsFit()).observe($('#upTabs')); else window.addEventListener('resize', upTabsFit);
   $('#upTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-up]'); if (!b) return; upTab = b.dataset.up; upTabsRender(); upRender(); });
   $('#upCopy').addEventListener('click', () => {
     const rows = upRows(upTab);
