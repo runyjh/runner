@@ -2151,7 +2151,7 @@
       <div class="field"><label class="lb" for="sdExtra">추가휴무</label><input class="inp" id="sdExtra" placeholder="예: 월,수요일 / 조정 백업에 맞춰서"></div>
       <div class="field"><label class="lb" for="sdPat">근무형태</label><input class="inp" id="sdPat" list="sdPats" placeholder="예: 5일, 격주"><datalist id="sdPats"><option value="5일"><option value="5.5일"><option value="6일"><option value="격주"><option value="5일 및 격주가능"><option value="3일"></datalist></div>
       <div class="field full"><label class="lb" for="sdMemo">스케줄 메모 (서브 아이디, 요청사항 등)</label><textarea class="inp" id="sdMemo" style="height:60px"></textarea></div>
-      <div class="field"><label class="lb" for="sdOrder">표 순서 (같은 캠프 안, 작은 숫자가 위)</label><input class="inp" id="sdOrder" inputmode="numeric"></div>
+      <input type="hidden" id="sdOrder"><!-- 표 순서: 화면에서 뺌 (있던 값은 저장 때 그대로 유지) -->
     </div>
     <div class="m-actions"><button type="button" class="btn ghost" id="sdOpen" style="margin-right:auto">기사 정보 열기</button><button type="button" class="btn ghost" id="sdCancel">닫기</button><button class="btn" id="sdSave">저장</button></div>
   </form>
