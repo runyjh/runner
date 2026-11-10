@@ -59,6 +59,62 @@ function errLog_(kind, fn, msg, x) {
     sh.appendRow(a); // 동시에 여러 실행이 적어도 줄이 겹치지 않는다
   } catch (e) { try { console.error('오류 기록 실패: ' + (e && e.message)); } catch (x2) { /* 무시 */ } }
 }
+/**
+ * 실제 자료 자체 검사 (읽기만 · 아무것도 고치지 않음). 범위: 7일 전 ~ 14일 뒤 (올인원 규칙 시작일 이후).
+ *  ⑥ 배차 확정 품앗이가 기사스케줄 품앗이 줄 칸에 없음   ⑦ 연동 이슈가 있는 날인데 칸이 그 이슈와 다름   ⑧ 이번 달·지난달 정산 계산이 오류 없이 끝나고 금액에 숫자가 아닌 값이 없는지
+ */
+function dataCheckLive_(drivers, today) {
+  const out = [], day = function (d) { return d.slice(5).replace('-', '/'); };
+  const from0 = schAddDays_(today, -7), from = from0 < ISS.RULE_FROM ? ISS.RULE_FROM : from0, to = schAddDays_(today, 14);
+  if (props_().SCH_DB_ID && from <= to) {
+    const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+    const dates = issDates_(from, to).filter(function (d) { return h.dates[d] !== undefined; });
+    if (dates.length && last >= 2) {
+      const cs = dates.map(function (d) { return h.dates[d]; }), c0 = Math.min.apply(null, cs), c1 = Math.max.apply(null, cs);
+      const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues(), block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+      const cells = {};
+      ids.forEach(function (r, i) { const id = str_(r[0]); if (!id || cells[id]) return; const row = cells[id] = {}; dates.forEach(function (d) { row[d] = str_(block[i][h.dates[d] - c0]).replace(/\r\n?/g, '\n'); }); });
+      // ⑥ 확정 품앗이 ↔ 칸
+      const a6 = [], L = pmSchLocks_(dates);
+      Object.keys(L).forEach(function (rid) { Object.keys(L[rid]).forEach(function (d) {
+        const lines = String((cells[rid] || {})[d] || '').split('\n').map(function (v) { return v.trim(); });
+        L[rid][d].forEach(function (o) { if (!lines.some(function (v) { return v.indexOf(o.text) === 0; })) a6.push(day(d) + ' ' + o.to + ' · ' + o.text); });
+      }); });
+      if (a6.length) out.push({ k: 'pmCell', label: '확정 품앗이가 기사스케줄 품앗이 줄에 없음', list: a6, hint: '기사스케줄에서 그 주를 한 번 열면 자동으로 다시 채워집니다. 계속 남으면 알려 주세요.' });
+      // ⑦ 이슈 ↔ 칸 (칸 → 이슈 연동과 같은 기준: 칸이 이슈가 넣는 글자이거나, 칸 글자가 같은 결과로 읽히면 맞는 것)
+      const byId = {}; drivers.forEach(function (o) { byId[o.id] = o; });
+      const ctxOf = issCtxMaker_(), a7 = [];
+      schIssues_(from, to).forEach(function (x) {
+        const o = byId[x.driverId];
+        if (!o || x.link === 'N' || !x.result || x.kind === '지시') return;
+        issDates_(x.date < from ? from : x.date, (x.end || x.date) > to ? to : (x.end || x.date)).forEach(function (d) {
+          if (!cells[o.id] || cells[o.id][d] === undefined) return;
+          const cell = cells[o.id][d], ctx = ctxOf(o, d);
+          const expect = issCellFor_(x, (x.orig || {}).hasOwnProperty(d) ? x.orig[d] : '', ctx);
+          if (expect === null || expect === cell) return;
+          const cls = issClassify_(cell, ctx.base, ctx.rots, ctx.camp);
+          if (cls && cls.result === x.result && (cls.result !== '물량조율' || cls.cut === x.cut)) return;
+          a7.push(day(d) + ' ' + o.name + ' · 이슈 ' + x.result + (x.cut ? ' ' + x.cut : '') + ' ↔ 칸 ' + (cell || '(빈칸)'));
+        });
+      });
+      if (a7.length) out.push({ k: 'issCell', label: '이슈와 기사스케줄 칸이 다름', list: a7, hint: '이슈 관리와 기사스케줄 중 맞는 쪽을 기준으로 다른 쪽을 고쳐 주세요.' });
+    }
+  }
+  // ⑧ 정산 계산 (이번 달 · 지난달)
+  if (typeof stlCompute_ === 'function') {
+    const a8 = [], lastM = Utilities.formatDate(new Date(parseYmd_(today.slice(0, 8) + '01').getTime() - 864e5), CFG.TZ, 'yyyy-MM');
+    [today.slice(0, 7), lastM].forEach(function (m) {
+      try {
+        const s = stlCompute_(m).summary, bad = [];
+        (s.drivers || []).forEach(function (d) { ['net', 'invoice', 'pay', 'supply'].forEach(function (k) { if (d[k] !== undefined && d[k] !== null && d[k] !== '' && !isFinite(Number(d[k]))) bad.push(d.name + ' ' + k); }); });
+        Object.keys(s.total || {}).forEach(function (k) { if (typeof s.total[k] === 'number' && !isFinite(s.total[k])) bad.push('합계 ' + k); });
+        if (bad.length) a8.push(m + ' 금액이 숫자가 아님: ' + bad.slice(0, 8).join(', '));
+      } catch (e) { a8.push(m + ' 계산 오류: ' + String(e && e.message || e).slice(0, 160)); }
+    });
+    if (a8.length) out.push({ k: 'stlRun', label: '정산 계산이 정상으로 끝나지 않음', list: a8, hint: '프로그램 쪽 문제입니다. 개발 쪽에 알려 주세요.' });
+  }
+  return out;
+}
 /** 화면이 보낸 오류 목록 [{ k: 종류, v: 화면, f: 함수, m: 내용, u: 업데이트 }] (한 번에 10건까지) */
 function errRows_(errs, app, who) {
   if (!Array.isArray(errs)) return;
@@ -135,6 +191,9 @@ function dataCheck_() {
     readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y) { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
     add('err', '어제부터 기록된 오류', Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).map(function (k) { return k + ' ' + cnt[k] + '건'; }), '자세한 내용은 error_log 탭에 있습니다.');
   } catch (e) { /* 탭 없음 */ }
+  // ⑥⑦⑧ 실제 자료로 하는 자체 검사 (운영 자료를 읽기만 함): 확정 품앗이 ↔ 칸 · 이슈 ↔ 칸 · 정산 계산이 끝까지 도는지
+  try { dataCheckLive_(drivers, today).forEach(function (x) { add(x.k, x.label, x.list, x.hint); }); }
+  catch (e) { add('live', '자체 검사를 끝내지 못함', [String(e && e.message || e).slice(0, 200)], '프로그램 쪽 문제입니다. 개발 쪽에 알려 주세요.'); }
   const res = { at: nowText_(), items: items };
   appSetPut_('dataCheck', JSON.stringify(res), '매일 새벽 자료 점검 결과 (자동 · 지워도 다음 날 다시 만들어짐)');
   return res;

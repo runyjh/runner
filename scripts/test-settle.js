@@ -254,6 +254,16 @@ ops('품앗이 확정·취소', function (run) {
   eq('다시 확정 뒤 일감 취소: 칸·기록 지움', run("pmDecide_('d1', 'J3', 'A2', 'accept'); var mid = [__cell('PMd3', '2026-11-20'), __usage.length]; pmClose_('d1', 'J3', 'cancel'); return [mid, __M.jobs[2].status, __cell('PMd3', '2026-11-20'), __usage.length, __apps[1].status];"), [['군포1 212CD', 1], '취소', '', 0, '미선정']);
 });
 
+// 12) 실제 자료 자체 검사: 확정 품앗이 ↔ 칸 · 이슈 ↔ 칸 · 정산 계산
+ops('자체 검사 (품앗이·이슈 ↔ 칸 · 정산 계산)', function (run) {
+  run("todayText_ = function () { return '2026-11-18'; }; __drv = __M.main.drivers.filter(function (o) { return o.id; });");
+  eq('맞는 상태에서는 아무것도 없음', run("pmDecide_('d1', 'J3', 'A1', 'accept'); __save([{ row: 'd1', date: '2026-11-17', value: '미입차', old: '' }]); return dataCheckLive_(__drv, '2026-11-18').map(function (x) { return x.k; });"), []);
+  eq('품앗이 줄 칸이 지워지면 잡음', run("__grid.forEach(function (r) { if (r[0] === 'PMd2') r[__h.dates['2026-11-20']] = ''; }); var r = dataCheckLive_(__drv, '2026-11-18'); return r.map(function (x) { return x.k + ':' + x.list.join(';'); });"), ['pmCell:11/20 강준길 · 군포1 212CD']);
+  eq('이슈가 있는 날 칸이 출근이면 잡음 · 같은 결과로 읽히는 글자는 맞는 것', run("__grid.forEach(function (r) { if (r[0] === 'PMd2') r[__h.dates['2026-11-20']] = '군포1 212CD'; if (r[0] === 'd1') r[__h.dates['2026-11-17']] = '출근'; }); var a = dataCheckLive_(__drv, '2026-11-18').map(function (x) { return x.k + ':' + x.list.join(';'); }); __grid.forEach(function (r) { if (r[0] === 'd1') r[__h.dates['2026-11-17']] = '미입차 (차량고장)'; }); return [a, dataCheckLive_(__drv, '2026-11-18').length];"),
+    [['issCell:11/17 이현모 · 이슈 미입차 ↔ 칸 출근'], 0]);
+  eq('정산 계산이 오류를 내면 잡음', run("var keep = stlCompute_; stlCompute_ = function (m) { if (m === '2026-11') throw new Error('boom'); return keep(m); }; var r = dataCheckLive_(__drv, '2026-11-18'); stlCompute_ = keep; return r.map(function (x) { return x.k + ':' + x.list.join(';'); });"), ['stlRun:2026-11 계산 오류: boom']);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
