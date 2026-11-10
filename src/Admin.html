@@ -898,6 +898,14 @@
   .sg .f4 { left: 250px; width: 84px; min-width: 84px; max-width: 84px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; box-shadow: 1px 0 0 var(--line); }
   .sg tr.gtop td { border-top: 2px solid #c9d1da; }
   .sg tr.dim td { opacity: .55; }
+  /* 마우스를 올린 칸의 줄: 위·아래 파란 선 + 옅은 파란 덮개 (칸 색·선택·중복 표시는 그대로) · 앞 고정 칸 파란 바탕 · 이름 왼쪽 파란 막대 · 그 날짜 머리글도 강조 */
+  #sGrid > tbody:not(#sCalc) > tr:hover > td:not(.rcoff) { background-image: linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da), linear-gradient(rgba(27,100,218,.09), rgba(27,100,218,.09)) !important; background-size: 100% 2px, 100% 2px, 100% 100% !important; background-position: top, bottom, 0 0 !important; background-repeat: no-repeat !important; }
+  #sGrid > tbody:not(#sCalc) > tr:hover > td.fx { background-color: #dce9ff !important; color: var(--ink); }
+  #sGrid > tbody:not(#sCalc) > tr:hover > td.fx.f1 { box-shadow: inset 4px 0 0 #1b64da; }
+  #sGrid > tbody:not(#sCalc) > tr:hover .dname { color: var(--brand); }
+  #sGrid > tbody:not(#sCalc) > tr.dim:hover td { opacity: .85; }
+  #sGrid > tbody:not(#sCalc) > tr > td.c:not(.rcoff):hover { outline: 2px solid #1b64da; outline-offset: -2px; }
+  .sg thead th.dc.hov { background: #1b64da !important; } .sg thead th.dc.hov b, .sg thead th.dc.hov small, .sg thead th.dc.hov b::after { color: #fff !important; }
   .dname { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; max-width: 70px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
   .dname:hover { color: var(--brand); text-decoration: underline; }
   .tbad { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 3px; margin-left: 3px; vertical-align: middle; }
@@ -6942,6 +6950,11 @@
     if (extend) { if (!sAnchor) sAnchor = Object.assign({}, sAct); } else sAnchor = null;
     sAct = n; paintSel();
   }
+  // 마우스를 올린 칸의 날짜 머리글 강조 (줄 강조는 CSS :hover)
+  let sHovC = -1;
+  const sHovSet = (ci) => { if (ci === sHovC && (ci < 0 || $('#sGrid thead th.dc.hov'))) return; sHovC = ci; $$('#sGrid thead th.dc.hov').forEach((th) => th.classList.remove('hov')); if (ci >= 0) { const th = $('#sGrid thead th.dc[data-col="' + ci + '"]'); if (th) th.classList.add('hov'); } };
+  $('#sWrap').addEventListener('mouseover', (e) => { const td = e.target.closest('td.c[data-c]'); sHovSet(td && td.closest('#sGrid > tbody:not(#sCalc)') ? +td.dataset.c : -1); });
+  $('#sWrap').addEventListener('mouseleave', () => sHovSet(-1));
   $('#sWrap').addEventListener('mousedown', (e) => {
     const td = e.target.closest('td.c');
     if (!td || e.button !== 0) return;
