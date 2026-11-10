@@ -1314,7 +1314,8 @@ function stlSchedule_(from, to) {
  * 한 달 정산 계산 → { summary, slips }.
  * 기사 한 명(정산 대상) = 그 기사 + '정산 대상 기사ID'로 묶인 서브 ID 들.
  */
-function stlCompute_(month) {
+function stlCompute_(month, opts) {
+  opts = opts || {};
   const P = stlPeriod_(month);
   stlLoad_(STL_SMALL);
   const cfg = stlCfg_();
@@ -1457,7 +1458,7 @@ function stlCompute_(month) {
   Object.keys(S).forEach(function (id) {
     const s = S[id], t = str_(id in fbMap ? fbMap[id] : s.fbCutTxt);
     s.fbCutTxt = t;
-    if (!t || !s.fresh) return;
+    if (!t || !s.fresh || opts.noFbCut) return; // noFbCut: 프백 차감 없이 (비교용)
     const n = stlNum_(t);
     const cut = /%$/.test(t.replace(/\s/g, '')) || (n > 0 && n < 1) ? stlR100_(s.fresh * stlRate_(t, 0)) : Math.round(n);
     s.fbCut = Math.max(0, Math.min(cut, s.fresh)); s.fresh -= s.fbCut;
@@ -4168,14 +4169,14 @@ function adm_stlLegacyPreview(token, fileId, months) {
 }
 /** 실행: 달마다 (마감돼 있으면 풀고) 기존 결과로 덮어써서 마감 */
 /** 기존 정산 이식으로 마감한 달: 기존 정산서(마감 기록) vs 올인원 계산(지금 설정·쿠팡 정산서로 다시 계산) 기사별 차액 — 마감은 건드리지 않음 */
-function adm_stlLegacyCompare(token, month) {
+function adm_stlLegacyCompare(token, month, opts) {
   return run_(function () {
-    requireAdmin_(token);
+    requireAdmin_(token); opts = opts || {};
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     if (!stlLegacyClosed_(month)) fail_('기존 정산 이식으로 마감한 달만 비교할 수 있습니다.');
     const old = stlClosedLoad_(month), legacy = (old.summary && old.summary.drivers) || [];
-    const res = stlCompute_(month), fresh = res.summary.drivers || [];
-    const F = ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'workDays'];
+    const res = stlCompute_(month, { noFbCut: !!opts.noFbCut }), fresh = res.summary.drivers || [];
+    const F = ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'workDays', 'fresh', 'fbCut'];
     const byId = {}, byCid = {}, byName = {};
     fresh.forEach(function (d) {
       byId[d.id] = d; (byName[d.name] = byName[d.name] || []).push(d);
@@ -4189,6 +4190,8 @@ function adm_stlLegacyCompare(token, month) {
       if (!d) (byName[L.name] || []).some(function (x) { if (!used[x.id]) { d = x; return true; } return false; });
       if (d) used[d.id] = 1;
       const a = pick(L), b = pick(d), diff = {};
+      // 기존 정산서의 프레시백 지급은 명세 줄(method 프레시백)에서 (이식 때 row.fresh 는 올인원 계산값이 남아 있음)
+      const sl = old.slips[L.id]; if (sl && sl.lines) { a.fresh = sl.lines.filter(function (l) { return l.method === '프레시백' && l.side === '지급'; }).reduce(function (x, l) { return x + (Number(l.amt) || 0); }, 0); a.fbCut = 0; }
       F.forEach(function (k) { diff[k] = b[k] - a[k]; });
       rows.push({ name: L.name, id: L.id, cid: L.cid || (L.cids || [])[0] || '', newId: d ? d.id : '', matched: !!d, legacy: a, allin: b, diff: diff });
     });
@@ -4197,7 +4200,7 @@ function adm_stlLegacyCompare(token, month) {
     const tot = { legacy: pick(null), allin: pick(null), diff: pick(null) };
     rows.forEach(function (r) { F.forEach(function (k) { tot.legacy[k] += r.legacy[k]; tot.allin[k] += r.allin[k]; tot.diff[k] += r.diff[k]; }); });
     const oc = (old.summary && old.summary.company) || {}, nc = res.summary.company || {};
-    return { ok: true, month: month, fields: F, rows: rows, total: tot, n: { legacy: legacy.length, allin: fresh.filter(function (d) { return d.invoice || d.net || d.qty; }).length, matched: rows.filter(function (r) { return r.matched; }).length, same: rows.filter(function (r) { return r.matched && !r.diff.net && !r.diff.invoice; }).length },
+    return { ok: true, month: month, noFbCut: !!opts.noFbCut, fields: F, rows: rows, total: tot, n: { legacy: legacy.length, allin: fresh.filter(function (d) { return d.invoice || d.net || d.qty; }).length, matched: rows.filter(function (r) { return r.matched; }).length, same: rows.filter(function (r) { return r.matched && !r.diff.net && !r.diff.invoice; }).length },
       company: { legacy: { supplyCp: oc.supplyCp || 0, lossCp: oc.lossCp || 0, invTotal: oc.invTotal || 0 }, allin: { supplyCp: nc.supplyCp || 0, lossCp: nc.lossCp || 0, invTotal: nc.invTotal || 0 } },
       profit: { legacy: Number(old.summary && old.summary.total && old.summary.total.profit) || 0, allin: Number(res.summary.total && res.summary.total.profit) || 0 } };
   });
