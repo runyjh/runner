@@ -154,9 +154,9 @@ const STL_CFG = [
   ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일', '지급일 · 입금일 · 세금계산서'],
   ['leaveAmt', '퇴사 보류금 기본 금액', '100000', '', '퇴사 보류금'],
   ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임', '기사 앱'],
-  ['appFrom', '기사 앱 정산서 공개 시작 월 (YYYY-MM · 비우면 전체)', '', '이 달부터 기사 앱에 보임. 예) 2026-11 → 1~10월(기존 정산 이식분)은 기사 앱에 안 보임', '기사 앱'],
-  ['appHide', '기사 앱에서 숨길 정산월 (YYYY-MM, 쉼표로 여러 개)', '', '예) 2026-04, 2026-05 → 그 달만 기사 앱에서 숨김 (관리자 화면은 그대로)', '기사 앱']
+  ['appRange', '기사 앱 정산서 표시 범위 (전부 / 최근 3개월 / 정산 당월만 / 전부 숨김)', '전부', '세부정산 설정 위의 단추로 고릅니다', '기사 앱']
 ];
+const STL_APP_RANGES = ['전부', '최근 3개월', '정산 당월만', '전부 숨김'];
 
 const STL_DRIVER_EDIT = ['stlMode', 'insEx']; // 명의자 사업자 정보 표에서 고칠 수 있는 칸 (사업자 정보는 읽기만 · 기사 정보관리 DB 값)
 const STL_DRIVER_FIELDS = ['stlMode', 'insEx', 'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem']; // 기사(사람) 정보: 명의자의 세금계산서용
@@ -648,6 +648,12 @@ function stlCfg_() {
     try { stlAppend_('stl_config', missing.map(function (d) { return { label: d[1], value: d[2], desc: d[3] }; })); } finally { lock.releaseLock(); }
     missing.forEach(function (d) { map[d[1]] = d[2]; });
   }
+  const gone = rows.filter(function (r) { return /^기사 앱 정산서 공개 시작 월|^기사 앱에서 숨길 정산월/.test(str_(r.label)); });
+  if (gone.length) { // 잠깐 있었던 설정 두 줄 정리 (표시 범위 단추로 바뀜)
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try { stlWriteAll_('stl_config', rows.filter(function (r) { return gone.indexOf(r) < 0; }).map(function (r) { return { label: r.label, value: r.value, desc: r.desc }; })); } finally { lock.releaseLock(); }
+  }
   const g = {};
   STL_CFG.forEach(function (d) { g[d[0]] = map[d[1]] !== undefined ? map[d[1]] : d[2]; });
   const rate = function (k) { return stlRate_(g[k], stlRate_(STL_CFG.filter(function (d) { return d[0] === k; })[0][2], 0)); };
@@ -658,7 +664,7 @@ function stlCfg_() {
     runner: rate('runner'), insBasis: str_(g.insBasis) === '부가세포함' ? '부가세포함' : '공급가',
     payDay: stlNum_(g.payDay) || 20, cpDay: stlNum_(g.cpDay) || 15, payShift: stlYes_(g.payShift), invDay: stlNum_(g.invDay) || 10,
     leaveAmt: stlNum_(g.leaveAmt) || 100000, email: str_(g.email), appOpen: /계산|모두|전부|y/i.test(str_(g.appShow)),
-    appFrom: (str_(g.appFrom).match(/\d{4}-\d{2}/) || [''])[0], appHide: (str_(g.appHide).match(/\d{4}-\d{2}/g) || [])
+    appRange: STL_APP_RANGES.indexOf(str_(g.appRange)) >= 0 ? str_(g.appRange) : '전부'
   };
 }
 function stlItems_() {
@@ -3719,11 +3725,33 @@ function stlMyGroups_(driverId, X) {
   return Object.keys(X.groups).filter(function (k) { return X.groups[k].ownerId === driverId; });
 }
 /** 기사 앱: 볼 수 있는 정산월 목록 (마감한 달, 설정에 따라 계산 중인 달도) */
-/** 기사 앱 공개 월 설정(공개 시작 월 · 숨길 달)에 맞는 달인지 */
-function stlAppMonthOk_(cfg, month) {
-  if (cfg.appFrom && month < cfg.appFrom) return false;
-  if ((cfg.appHide || []).indexOf(month) >= 0) return false;
-  return true;
+/** 기사 앱에 보여 줄 정산월 목록 (마감된 달 또는 '계산 중인 달도' 설정 → 표시 범위 적용) · 최신 달이 앞 */
+function stlAppMonths_(cfg) {
+  const closed = {};
+  stlRead_('stl_close').forEach(function (x) { if (stlMonthOk_(x.month)) closed[x.month] = 1; });
+  let list = stlMonths_().withData.filter(function (m) { return closed[m] || cfg.appOpen; }).sort().reverse();
+  if (cfg.appRange === '전부 숨김') list = [];
+  else if (cfg.appRange === '정산 당월만') list = list.slice(0, 1);
+  else if (cfg.appRange === '최근 3개월') list = list.slice(0, 3);
+  return list.map(function (m) { return { month: m, closed: !!closed[m] }; });
+}
+/** 세부정산 설정 위의 단추: 기사 앱 정산서 표시 범위 */
+function adm_stlAppRangeSet(token, range) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (STL_APP_RANGES.indexOf(range) < 0) fail_('표시 범위를 확인해 주세요.');
+    const label = STL_CFG.filter(function (d) { return d[0] === 'appRange'; })[0][1];
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      stlCfg_();
+      const rows = stlRead_('stl_config'), r = rows.filter(function (x) { return x.label === label; })[0];
+      if (r) stlSetRow_('stl_config', r._row, { value: range }); else stlAppend_('stl_config', [{ label: label, value: range, desc: '' }]);
+      stlBump_();
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '기사 앱 정산서 표시 범위', range, '');
+    return { ok: true, range: range, months: stlAppMonths_(stlCfg_()).map(function (x) { return x.month; }) };
+  });
 }
 function api_mySettle(token) {
   return run_(function () {
@@ -3732,11 +3760,7 @@ function api_mySettle(token) {
     stlLoad_(STL_SMALL);
     const cfg = stlCfg_(), groups = stlMyGroups_(u.id);
     if (!groups.length) return { ok: true, months: [], noId: true };
-    const closed = {};
-    stlRead_('stl_close').forEach(function (x) { if (stlMonthOk_(x.month)) closed[x.month] = 1; });
-    const months = stlMonths_().withData.filter(function (m) { return (closed[m] || cfg.appOpen) && stlAppMonthOk_(cfg, m); }).sort().reverse()
-      .map(function (m) { return { month: m, closed: !!closed[m] }; });
-    return { ok: true, months: months };
+    return { ok: true, months: stlAppMonths_(cfg) };
   });
 }
 /** 기사 앱: 그 달 내 정산서 (명의자인 묶음 모두). 러너 내부 숫자(회사이익·러너 부담 등)는 빼고 보낸다 */
@@ -3746,7 +3770,7 @@ function api_mySlip(token, month) {
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     const cfg = stlCfg_(), closed = stlClosedInfo_(month);
     if (!closed && !cfg.appOpen) fail_('아직 마감되지 않은 달입니다. 사무실에서 마감하면 볼 수 있습니다.');
-    if (!stlAppMonthOk_(cfg, month)) fail_('이 달 정산서는 기사 앱에서 보여 주지 않습니다.');
+    if (!stlAppMonths_(cfg).some(function (x) { return x.month === month; })) fail_('이 달 정산서는 기사 앱에서 보여 주지 않습니다.');
     const r = stlResult_(month, false), XD = stlIds_(stlDrivers_()), groups = stlMyGroups_(u.id, XD); // 기사·아이디 표는 한 번만 읽음
     let co = {};
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }

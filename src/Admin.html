@@ -545,6 +545,7 @@
     .slip { overflow: visible; padding: 0; }
     .noprint { display: none !important; }
   }
+  .inssum.apprange { flex-wrap: wrap; gap: 6px 16px; align-items: center; } .inssum.apprange .check { margin: 0; font-weight: 500; }
   /* 최종 리포트 */
   .rp-wrap { background: #fff; border-radius: 12px; padding: 18px 20px; max-width: 1400px; }
   .rp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
@@ -8455,6 +8456,17 @@
   const pnlRate = (v) => { const t = String(v || '').replace(/\s/g, ''); if (!t) return 0.033; const n = Number(t.replace(/%$/, '')); if (!isFinite(n)) return 0.033; return /%$/.test(t) ? n / 100 : n > 1 ? n / 100 : n; };
   const pnlWht = (pay, rate) => { const r = pnlRate(rate); if (Math.abs(r - 0.033) < 1e-9) { const inc = Math.floor(pay * 0.03 / 10) * 10; return inc + Math.floor(inc * 0.1 / 10) * 10; } return Math.floor(pay * r / 10) * 10; };
   const pnlActive = (r, m) => (!r.from || String(r.from).slice(0, 7) <= m) && (!r.to || String(r.to).slice(0, 7) >= m);
+  $('#stEditor').addEventListener('change', (e) => {
+    const r = e.target.closest('input[name="appRange"]'); if (!r) return;
+    const v = r.value, msg = $('#appRangeMsg'); if (msg) msg.textContent = '저장 중…';
+    $$('input[name="appRange"]').forEach((x) => { x.disabled = true; });
+    api('adm_stlAppRangeSet', v).then((x) => {
+      if (!x.ok) return toast(x.msg);
+      const row = (STX.edRows || []).find((q) => /^기사 앱 정산서 표시 범위/.test(String(q.label || ''))); if (row) row.value = v;
+      if (STX.table && STX.table.rows) { const q = STX.table.rows.find((q) => /^기사 앱 정산서 표시 범위/.test(String(q.label || ''))); if (q) q.value = v; }
+      if (msg) msg.textContent = '저장했습니다 · 기사 앱에 보이는 달: ' + (x.months.length ? x.months.map((m) => ymTitle(m).replace(/^\d+년\s*/, '')).join(', ') : '없음') + ' (기사 앱은 완전히 닫았다 다시 열어야 반영)';
+    }).catch(() => { if (msg) msg.textContent = '저장하지 못했습니다.'; }).finally(() => { $$('input[name="appRange"]').forEach((x) => { x.disabled = false; }); });
+  });
   function renderEditor() {
     const T = STX.table, rows = STX.edRows, ro = T.closed;
     const dl = '<datalist id="stAcctDL">' + (T.accts || []).map((o) => '<option value="' + esc(o.label) + '">' + (o.stopped ? '정지' : '') + '</option>').join('') + '</datalist>' +
@@ -8577,6 +8589,12 @@
         '<span class="' + (d > 0 ? 'pos' : d < 0 ? 'neg' : '') + '">차액 <em>' + (d > 0 ? '+' : '') + wn(d) + '원</em> ' + (d > 0 ? '러너 몫' : d < 0 ? '러너 부담' : '') + '</span>') + '</div>';
     }
     const addBtn = T.fixed ? '' : T.name === 'camps' ? '<button class="btn ghost sm ed-add" id="edAdd" data-kind="캠프">+ 캠프 추가</button><button class="btn ghost sm ed-add" data-kind="기사">+ 기사 추가</button>' : '<button class="btn ghost sm ed-add" id="edAdd">+ 줄 추가</button>';
+    // 세부정산 설정 맨 위: 기사 앱 정산서 표시 범위 (단추로 고르면 바로 저장)
+    if (T.name === 'config') {
+      const cur = (rows.find((r) => /^기사 앱 정산서 표시 범위/.test(String(r.label || ''))) || {}).value || '전부';
+      const opts = [['전부', '마감된 달 전부'], ['최근 3개월', '최근 3개월만'], ['정산 당월만', '정산 당월(가장 최근 1개월)만'], ['전부 숨김', '전부 숨김 (기사 앱에 정산서 메뉴만, 목록 없음)']];
+      advSum = '<div class="inssum apprange"><b>📱 기사 앱 정산서 표시</b>' + opts.map((o) => '<label class="check"><input type="radio" name="appRange" value="' + o[0] + '"' + (o[0] === cur ? ' checked' : '') + '> ' + o[1] + '</label>').join('') + '<span class="sub" id="appRangeMsg"></span></div>';
+    }
     $('#stEditor').innerHTML = dl + advSum + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : addBtn +
       '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button>') +
       '<input class="inp edq" id="edQ" type="search" placeholder="검색 (이름·아이디 등)" value="' + esc(STX.edQ || '') + '"><span class="sub" id="edCnt">' + scope + rows.length + '줄 · 정산 DB "stl_' + esc(T.name) + '" 탭에서도 직접 고칠 수 있습니다</span></div>' +
