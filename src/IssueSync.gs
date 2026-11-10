@@ -2,7 +2,7 @@
  * 이슈 관리 ↔ 기사스케줄 자동 연동 (2026-11-01 부터 · 올인원 규칙)
  *
  * 이슈 = 결과 + 사유
- *  - 결과: 미입차(노선 물량 전부 뺌) · 노쇼(연락 없이 미입차) · 물량조율(일부 회전만 뺌)
+ *  - 결과: 미입차(노선 물량 전부 뺌) · 노쇼(연락 없이 미입차) · 병가(아파서 쉼 · 물량 전부 뺌) · 물량조율(일부 회전만 뺌)
  *  - 뺀 회전: 물량조율일 때 'F3' / 'D2,F3' (회전) 또는 '529B' / '529B (F3)' (노선 단위)
  *  - 사유: 차량고장 · 차량사고 · 질병 · 부상 · 경조사 · 개인사정 · 기타 (스케줄 칸에서 자동으로 만든 이슈는 '사유 미정')
  *  - 대체: 쿠친 · 업체백업(우리 백업 기사가 회사 일로 투입) · 품앗이(우리 인원끼리 일 주고받기) · 외부용차 · 캠프 반납 · 없음 (업체백업·품앗이는 대신 뛴 기사도 기록)
@@ -15,7 +15,7 @@
  */
 const ISS = {
   RULE_FROM: '2026-11-01',
-  RESULTS: ['미입차', '노쇼', '물량조율'],
+  RESULTS: ['미입차', '노쇼', '병가', '물량조율'],
   REASONS: ['차량고장', '차량사고', '질병', '부상', '경조사', '개인사정', '기타'],
   SUBS: ['쿠친', '업체백업', '품앗이', '외부용차', '캠프 반납', '없음'],
   UNSET: '사유 미정',
@@ -92,9 +92,10 @@ function issClassify_(value, base, defRots, ownCamp) {
   if (!v) return null;
   if (/노쇼/.test(v)) return { result: '노쇼', cut: '' };
   if (/미입차/.test(v)) return { result: '미입차', cut: '' };
+  if (/^병가/.test(v)) return { result: '병가', cut: '' };
   const b = str_(base);
   if (!b || /백업|예비|용차/.test(b)) return null;
-  if (/휴무|휴가|병가|퇴사|출근|용차|변경/.test(v)) return null;
+  if (/휴무|휴가|퇴사|출근|용차|변경/.test(v)) return null;
   const bu = issUnits_(b, defRots), cu = issUnits_(v, defRots);
   if (!bu || !cu) return null;
   if (cu.camp && cu.camp !== ownCamp) return null; // 다른 캠프 일
@@ -132,6 +133,7 @@ function issApplyCut_(src, base, defRots, cut) {
 function issCellFor_(iss, orig, ctx) {
   if (iss.result === '미입차') return '미입차';
   if (iss.result === '노쇼') return '노쇼';
+  if (iss.result === '병가') return '병가';
   if (iss.result === '물량조율' && iss.cut) { const v = issApplyCut_(orig, ctx.base, ctx.rots, iss.cut); return v === null ? null : v; }
   return null; // 칸을 바꾸지 않음
 }
@@ -176,42 +178,107 @@ function issWriteCells_(a, driverId, map) {
   if (out.length) { logSchChange_(a, out, out.length); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } }
   return out;
 }
+/** 대신 뛴 우리 기사(업체백업·품앗이) */
+function issOurs_(sub) { return sub === '업체백업' || sub === '품앗이'; }
+function issSubDrv_(x) {
+  if (!x || !issOurs_(x.sub) || !str_(x.subWho)) return null;
+  const want = str_(x.subWho);
+  const all = readAll_(SH.DRIVERS).filter(function (o) { return o.id && (o.id === want || o.name === want); });
+  return all.filter(function (o) { return o.status === ST.ACTIVE; })[0] || all[0] || null;
+}
+/** 대신 뛴 기사 칸에 넣는 글자 = 원래 기사가 못 뛴 물량 (다른 캠프면 캠프 이름을 앞에) */
+function issSubCell_(iss, mctx, sctx) {
+  const bu = issUnits_(mctx.base, mctx.rots);
+  if (!bu) return null;
+  let units = bu.units;
+  if (iss.result === '물량조율') {
+    units = {};
+    const c = str_(iss.cut), ro = /\d{3}/.test(c) ? [] : normRot_(c);
+    if (ro.length) Object.keys(bu.units).forEach(function (rt) { const k = bu.units[rt].filter(function (r) { return ro.indexOf(r) >= 0; }); if (k.length) units[rt] = k; });
+    else {
+      const cu = issUnits_(c, mctx.rots); if (!cu) return null;
+      Object.keys(cu.units).forEach(function (rt) { if (bu.units[rt]) { const k = bu.units[rt].filter(function (r) { return cu.units[rt].indexOf(r) >= 0; }); if (k.length) units[rt] = k; } });
+    }
+  }
+  return issCompose_(units, mctx.rots, sctx.camp !== mctx.camp ? mctx.camp : '') || null;
+}
 /**
  * 이슈를 칸에 반영 (저장·수정·삭제 공통 · 잠금 안에서)
  * prev: 고치기 전 이슈(없으면 새 이슈) · next: 고친 뒤 이슈(없으면 삭제)
- * dry: 덮어쓸 특별한 칸만 돌려 줌 · 반환 { cells: [바뀐 칸], orig: 다음 '원래 칸', conflicts }
+ * 1) 그 기사 칸: 미입차 / 노쇼 / 병가 / 뛴 회전만 남긴 노선 (11/1 이후)
+ * 2) 대신 뛴 우리 기사(업체백업·품앗이) 칸: PDD(내일)부터 그 노선 (오늘까지는 실제 기록이라 건드리지 않음)
+ * 원래 값은 '원래 칸'에 { 날짜: 값, '@sub': { id, cells: { 날짜: 값 } } } 로 보관 → 지우거나 바꾸면 (칸이 그대로일 때) 되돌림
+ * dry: 덮어쓸 특별한 칸만 돌려 줌 · subOnly: 대신 뛴 기사 칸만 맞춤 (칸에서 이슈를 고쳤을 때)
  */
-function issSyncCells_(a, drv, prev, next, dry) {
+function issSyncCells_(a, drv, prev, next, dry, subOnly) {
   const ctxOf = issCtxMaker_();
   const live = function (x) { return x && x.link !== 'N' && x.result && ISS.RESULTS.indexOf(x.result) >= 0; };
   const span = function (x) { return live(x) ? issDates_(x.date, x.end || x.date).filter(function (d) { return d >= ISS.RULE_FROM; }) : []; };
   const pd = span(prev), nd = span(next);
+  const orig = JSON.parse(JSON.stringify((prev && prev.orig) || {}));
+  const conflicts = [];
+  let cells = [];
+  // 1) 그 기사 칸
   const all = pd.concat(nd.filter(function (d) { return pd.indexOf(d) < 0; }));
-  const orig = Object.assign({}, (prev && prev.orig) || {});
-  if (!all.length) return { cells: [], orig: next ? orig : {}, conflicts: [] };
-  const cur = schCellsOf_(drv.id, all);
-  const want = {}, conflicts = [];
-  all.forEach(function (d) {
-    const ctx = ctxOf(drv, d), now = cur[d] || '';
-    const had = pd.indexOf(d) >= 0, has = nd.indexOf(d) >= 0;
-    const o0 = had && orig.hasOwnProperty(d) ? orig[d] : now; // 이슈가 넣기 전 값
-    const putPrev = had ? issCellFor_(prev, o0, ctx) : null;
-    const mine = had && putPrev !== null && now === putPrev; // 칸이 아직 이 이슈가 넣은 값
-    if (has) {
-      const base0 = had ? (mine ? o0 : now) : now;
-      const v = issCellFor_(next, base0, ctx);
-      if (v === null) { if (had && mine) want[d] = o0; delete orig[d]; return; }
-      if (now === v) { if (!orig.hasOwnProperty(d)) orig[d] = base0; return; }
-      // 특별한 값(다른 캠프 일·휴무·다른 노선 등)을 덮어쓰면 확인
-      if (!(had && mine) && now && now !== '출근' && now !== ctx.base && !/^(미입차|노쇼)$/.test(now) && issClassify_(now, ctx.base, ctx.rots, ctx.camp) === null) conflicts.push({ date: d, current: now, next: v });
-      orig[d] = base0; want[d] = v;
-    } else if (had) {
-      if (mine) want[d] = o0;
-      delete orig[d];
+  if (all.length && !subOnly) {
+    const cur = schCellsOf_(drv.id, all);
+    const want = {};
+    all.forEach(function (d) {
+      const ctx = ctxOf(drv, d), now = cur[d] || '';
+      const had = pd.indexOf(d) >= 0, has = nd.indexOf(d) >= 0;
+      const o0 = had && orig.hasOwnProperty(d) ? orig[d] : now; // 이슈가 넣기 전 값
+      const putPrev = had ? issCellFor_(prev, o0, ctx) : null;
+      const mine = had && putPrev !== null && now === putPrev; // 칸이 아직 이 이슈가 넣은 값
+      if (has) {
+        const base0 = had ? (mine ? o0 : now) : now;
+        const v = issCellFor_(next, base0, ctx);
+        if (v === null) { if (had && mine) want[d] = o0; delete orig[d]; return; }
+        if (now === v) { if (!orig.hasOwnProperty(d)) orig[d] = base0; return; }
+        // 특별한 값(다른 캠프 일·휴무·다른 노선 등)을 덮어쓰면 확인
+        if (!(had && mine) && now && now !== '출근' && now !== ctx.base && !/^(미입차|노쇼|병가)$/.test(now) && issClassify_(now, ctx.base, ctx.rots, ctx.camp) === null) conflicts.push({ name: drv.name, date: d, current: now, next: v });
+        orig[d] = base0; want[d] = v;
+      } else if (had) {
+        if (mine) want[d] = o0;
+        delete orig[d];
+      }
+    });
+    if (!dry) cells = cells.concat(issWriteCells_(a, drv.id, want));
+  }
+  // 2) 대신 뛴 우리 기사 칸 (PDD = 내일부터)
+  const pdd = schAddDays_(todayText_(), 1);
+  const ps = orig['@sub'] || null, sPrev = ps && ps.id ? (readAll_(SH.DRIVERS).filter(function (o) { return o.id === ps.id; })[0] || null) : null;
+  const sNext = live(next) ? issSubDrv_(next) : null;
+  const so = Object.assign({}, (ps && ps.cells) || {});
+  const ssPrev = sPrev ? pd.filter(function (d) { return d >= pdd; }) : [], ssNext = sNext && sNext.id !== drv.id ? nd.filter(function (d) { return d >= pdd; }) : [];
+  const want = {}; // { 기사ID: { 날짜: 값 } }
+  const put = function (id, d, v) { (want[id] = want[id] || {})[d] = v; };
+  const sameSub = sPrev && sNext && sPrev.id === sNext.id;
+  const sAll = ssPrev.concat(ssNext.filter(function (d) { return ssPrev.indexOf(d) < 0; }));
+  const curP = sPrev && ssPrev.length ? schCellsOf_(sPrev.id, ssPrev) : {};
+  const curN = sNext && ssNext.length ? (sameSub ? Object.assign({}, curP, schCellsOf_(sNext.id, ssNext.filter(function (d) { return !curP.hasOwnProperty(d); }))) : schCellsOf_(sNext.id, ssNext)) : {};
+  const nso = {};
+  sAll.forEach(function (d) {
+    const mctx = ctxOf(drv, d);
+    let mineP = false;
+    if (sPrev && ssPrev.indexOf(d) >= 0) {
+      const now = curP[d] || '', vp = issSubCell_(prev, mctx, ctxOf(sPrev, d));
+      mineP = vp !== null && now === vp;
+      const stay = sameSub && ssNext.indexOf(d) >= 0;
+      if (!stay && mineP && so.hasOwnProperty(d)) put(sPrev.id, d, so[d]);
+    }
+    if (sNext && ssNext.indexOf(d) >= 0) {
+      const now = curN[d] || '', v = issSubCell_(next, mctx, ctxOf(sNext, d));
+      if (v === null) return;
+      const base0 = sameSub && mineP && so.hasOwnProperty(d) ? so[d] : now;
+      nso[d] = base0;
+      if (now === v) return;
+      if (!(sameSub && mineP) && now && !/^(휴무|고정휴무|추가휴무|출근|백업)$/.test(now)) conflicts.push({ name: sNext.name, date: d, current: now, next: v });
+      put(sNext.id, d, v);
     }
   });
+  if (sNext && Object.keys(nso).length) orig['@sub'] = { id: sNext.id, name: sNext.name, cells: nso }; else delete orig['@sub'];
   if (dry) return { cells: [], orig: orig, conflicts: conflicts };
-  const cells = issWriteCells_(a, drv.id, want);
+  Object.keys(want).forEach(function (id) { cells = cells.concat(issWriteCells_(a, id, want[id])); });
   return { cells: cells, orig: orig, conflicts: conflicts };
 }
 
@@ -240,17 +307,24 @@ function issFromCells_(a, saved) {
       const expect = issCellFor_(hit, (hit.orig || {}).hasOwnProperty(ch.date) ? hit.orig[ch.date] : ch.old, ctx);
       if (expect !== null && expect === ch.value) return; // 그대로
       if (cls && cls.result === hit.result && (cls.result !== '물량조율' || cls.cut === hit.cut)) return;
-      // 그날을 이슈에서 뺀다 (하루짜리면 이슈 삭제, 처음·끝이면 줄이고, 가운데면 둘로 나눔)
+      // 그날을 이슈에서 뺀다 (하루짜리면 이슈 삭제, 처음·끝이면 줄이고, 가운데면 둘로 나눔) · 대신 뛴 기사 칸도 같이 맞춤
+      const before = JSON.parse(JSON.stringify(hit));
+      const subFix = function (p0, n0) { const r = issSyncCells_(a, o, p0, n0, false, true); out.cells = (out.cells || []).concat(r.cells); return r.orig['@sub']; };
       const s = hit.date, e = hit.end || hit.date;
-      if (s === e) { sh.deleteRow(hit.row); out.removed.push(hit.id); issues = schIssues_(); }
+      if (s === e) { subFix(before, null); sh.deleteRow(hit.row); out.removed.push(hit.id); issues = schIssues_(); }
       else if (ch.date === s || ch.date === e) {
         if (ch.date === s) hit.date = schAddDays_(s, 1); else hit.end = schAddDays_(e, -1);
-        delete (hit.orig || {})[ch.date]; save(hit); out.changed.push(hit);
+        delete (hit.orig || {})[ch.date];
+        const sub = subFix(before, hit); if (sub) hit.orig['@sub'] = sub; else delete hit.orig['@sub'];
+        save(hit); out.changed.push(hit);
       } else {
         const tail = Object.assign({}, hit, { id: issNewId_(), row: 0, date: schAddDays_(ch.date, 1), end: e, orig: {} });
-        Object.keys(hit.orig || {}).forEach(function (d) { if (d > ch.date) { tail.orig[d] = hit.orig[d]; delete hit.orig[d]; } });
+        Object.keys(hit.orig || {}).forEach(function (d) { if (d > ch.date && d !== '@sub') { tail.orig[d] = hit.orig[d]; delete hit.orig[d]; } });
         delete (hit.orig || {})[ch.date];
-        hit.end = schAddDays_(ch.date, -1); save(hit); out.changed.push(hit);
+        hit.end = schAddDays_(ch.date, -1);
+        const sub = subFix(before, hit); if (sub) hit.orig['@sub'] = sub; else delete hit.orig['@sub'];
+        save(hit); out.changed.push(hit);
+        const sub2 = subFix(null, tail); if (sub2) tail.orig['@sub'] = sub2;
         save(tail); out.created.push(tail);
       }
       issues = schIssues_();
@@ -262,7 +336,9 @@ function issFromCells_(a, saved) {
     const prevDay = schAddDays_(ch.date, -1);
     const near = issues.filter(function (x) { return x.driverId === o.id && x.link !== 'N' && x.result === cls.result && (cls.result !== '물량조율' || x.cut === cls.cut) && (x.end || x.date) === prevDay; })[0];
     if (near) {
+      const before = JSON.parse(JSON.stringify(near));
       near.end = ch.date; near.orig = near.orig || {}; near.orig[ch.date] = ch.old;
+      if (issOurs_(near.sub)) { const r = issSyncCells_(a, o, before, near, false, true); out.cells = (out.cells || []).concat(r.cells); if (r.orig['@sub']) near.orig['@sub'] = r.orig['@sub']; }
       save(near); out.changed.push(near);
     } else {
       const x = { id: issNewId_(), row: 0, date: ch.date, end: ch.date, driverId: o.id, name: o.name, kind: ISS.UNSET, reason: '', action: '', by: a.name + ' (스케줄 칸)', at: nowText_(),
@@ -312,7 +388,7 @@ function issNewId_() { return 'I' + Utilities.formatDate(new Date(), CFG.TZ, 'yy
 /** 이슈 한 줄 쓰기 (x.row 가 있으면 그 줄, 없으면 맨 아래 · 잠금 안에서) */
 function issWriteRow_(sh, x) {
   const days = issDates_(x.date, x.end || x.date).length || 1;
-  const mi = x.result === '미입차' || x.result === '노쇼' || (!x.result && x.mi);
+  const mi = x.result === '미입차' || x.result === '노쇼' || x.result === '병가' || (!x.result && x.mi);
   const vals = {
     '이슈ID': x.id, '날짜': x.date, '기사ID': x.driverId, '이름': x.name, '구분': x.kind, '사유': x.reason, '조치': x.action,
     '작성자': x.by, '작성일시': x.at, '미입차': mi ? 'Y' : '', '미입차일수': mi ? String(days) : '',
@@ -333,7 +409,8 @@ function issWriteRow_(sh, x) {
 function issView_(x) {
   const o = Object.assign({}, x);
   delete o.row; delete o.orig;
-  o.mi = o.result === '미입차' || o.result === '노쇼' || (!o.result && !!x.mi);
+  o.mi = o.result === '미입차' || o.result === '노쇼' || o.result === '병가' || (!o.result && !!x.mi);
+  o.subCells = x.orig && x.orig['@sub'] ? Object.keys(x.orig['@sub'].cells || {}).length : 0;
   o.miDays = o.mi ? issDates_(o.date, o.end || o.date).length : 0;
   return o;
 }

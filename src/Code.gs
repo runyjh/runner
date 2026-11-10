@@ -4961,7 +4961,7 @@ function adm_schSave(token, changes) {
       if (savedList.length) {
         try {
           const r = issFromCells_(a, savedList);
-          if (r.created.length || r.changed.length || r.removed.length) issueSync = { created: r.created.map(issView_), changed: r.changed.map(issView_), removed: r.removed };
+          if (r.created.length || r.changed.length || r.removed.length) issueSync = { created: r.created.map(issView_), changed: r.changed.map(issView_), removed: r.removed, cells: r.cells || [] };
         } catch (e) { issueSync = { error: String(e && e.message || e) }; }
       }
       return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts), issueSync: issueSync }, rcExtra);
@@ -5619,7 +5619,7 @@ function schIssues_(from, to) {
     x.miDays = x.mi ? Math.max(1, Math.min(365, parseInt(str_(vals[x.row - 1][ix['미입차일수']] === undefined ? '' : vals[x.row - 1][ix['미입차일수']]), 10) || 1)) : 0;
     x.end = x.endDate && x.endDate >= x.date ? x.endDate : x.date && x.mi && x.miDays > 1 ? schAddDays_(x.date, x.miDays - 1) : x.date;
     delete x.endDate;
-    if (x.result) { x.mi = x.result === '미입차' || x.result === '노쇼'; x.miDays = x.mi ? issDates_(x.date, x.end).length : 0; }
+    if (x.result) { x.mi = x.result === '미입차' || x.result === '노쇼' || x.result === '병가'; x.miDays = x.mi ? issDates_(x.date, x.end).length : 0; }
     return x;
   }).filter(function (x) { return x.date && (x.driverId || x.name) && (!from || x.end >= from) && (!to || x.date <= to); });
 }

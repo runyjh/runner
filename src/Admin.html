@@ -1135,11 +1135,12 @@
   .is-tb .mick.on { background: #e5484d; border-color: #e5484d; color: #fff; }
   .is-tb tr.mi td:first-child { box-shadow: inset 3px 0 0 #e5484d; }
   /* 이슈 개편: 결과 + 사유 */
-  .is-res { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .is-res { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  @media (max-width: 560px) { .is-res { grid-template-columns: repeat(2, 1fr); } }
   .is-res button { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 9px 6px; cursor: pointer; text-align: center; font: inherit; color: var(--sub); }
   .is-res button b { display: block; font-size: 14.5px; color: var(--ink); } .is-res button small { font-size: 11.5px; }
   .is-res button.on { border: 2px solid var(--brand); background: var(--brand-weak); padding: 8px 5px; } .is-res button.on b { color: var(--brand); }
-  .is-res button[data-res="미입차"].on, .is-res button[data-res="노쇼"].on { border-color: #e5484d; background: #fff1f1; } .is-res button[data-res="미입차"].on b, .is-res button[data-res="노쇼"].on b { color: #c81e1e; }
+  .is-res button[data-res="미입차"].on, .is-res button[data-res="노쇼"].on, .is-res button[data-res="병가"].on { border-color: #e5484d; background: #fff1f1; } .is-res button[data-res="미입차"].on b, .is-res button[data-res="노쇼"].on b { color: #c81e1e; }
   .is-rot { display: flex; gap: 8px; flex-wrap: wrap; }
   .is-rot button { min-width: 74px; height: 38px; border-radius: 9px; border: 1px solid #b7e0c6; background: #e9f7ef; color: #0b6b3a; font: inherit; font-weight: 800; cursor: pointer; }
   .is-rot button.cut { border: 2px solid #e5484d; background: #fff1f1; color: #c81e1e; }
@@ -1149,7 +1150,7 @@
   .is-chips button.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand); }
   .is-prev { background: #f6f8fb; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: var(--sub); line-height: 1.6; margin-top: 4px; }
   .is-prev b { color: var(--ink); } .is-prev .w { color: #c2410c; font-weight: 700; }
-  .ikc.r-미입차 { background: #e5484d; color: #fff; } .ikc.r-노쇼 { background: #2b2f36; color: #fff; } .ikc.r-물량조율 { background: #fff4d6; color: #8a5a00; }
+  .ikc.r-미입차 { background: #e5484d; color: #fff; } .ikc.r-노쇼 { background: #2b2f36; color: #fff; } .ikc.r-물량조율 { background: #fff4d6; color: #8a5a00; } .ikc.r-병가 { background: #d4edbc; color: #11734b; }
   .ikc.k-차량사고 { background: #fde8e8; color: #c81e1e; } .ikc.k-차량고장 { background: #eef2ff; color: #4338ca; } .ikc.k-경조사 { background: #f3e8ff; color: #6d28d9; } .ikc.k-개인사정 { background: #eef6ff; color: #1d4ed8; }
   .ikc.k-사유미정 { background: #fff; color: #c2410c; border: 1px dashed #f59e0b; }
   .is-tb tr.unset td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
@@ -1549,7 +1550,7 @@
         <button class="btn" id="isAdd">+ 이슈 등록</button>
       </div>
     </div>
-    <p class="sub" style="margin:-4px 0 12px;font-size:13px">이슈 = <b>결과</b>(미입차 · 노쇼 · 물량조율) + <b>사유</b>(차량고장 · 차량사고 · 질병 · 부상 · 경조사 · 개인사정 · 기타). 11/1 이후 이슈는 <b>기사스케줄 칸과 자동 연동</b>됩니다 — 이슈를 저장하면 칸이 바뀌고, 칸에 미입차·노쇼·줄인 회전을 적으면 '사유 미정' 이슈가 생깁니다. 데이터는 스케줄 DB 의 <b>issues</b> 탭.</p>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">이슈 = <b>결과</b>(미입차 · 노쇼 · 병가 · 물량조율) + <b>사유</b>(차량고장 · 차량사고 · 질병 · 부상 · 경조사 · 개인사정 · 기타). 11/1 이후 이슈는 <b>기사스케줄 칸과 자동 연동</b>됩니다 — 이슈를 저장하면 칸이 바뀌고, 칸에 미입차·노쇼·병가·줄인 회전을 적으면 '사유 미정' 이슈가 생깁니다. 대체를 <b>업체백업·품앗이 + 대신 뛴 기사</b>로 고르면 그 기사 칸도 PDD(내일)부터 자동 배정됩니다. 데이터는 스케줄 DB 의 <b>issues</b> 탭.</p>
     <div class="tabs" id="isCodes"></div>
     <div class="is-perf" id="isPerf"></div>
     <div class="is-sum" id="isSum"></div>
@@ -1930,6 +1931,7 @@
     <div class="field"><span class="lb">1. 결과 — 노선에 무슨 일이 있었나</span><div class="is-res" id="isMRes">
       <button type="button" data-res="미입차"><b>미입차</b><small>노선 물량 전부 뺌</small></button>
       <button type="button" data-res="노쇼"><b>노쇼</b><small>연락 없이 미입차</small></button>
+      <button type="button" data-res="병가"><b>병가</b><small>아파서 쉼 · 전부 뺌</small></button>
       <button type="button" data-res="물량조율"><b>물량조율</b><small>일부 회전만 뺌</small></button></div></div>
     <div class="field hidden" id="isMCutW"><span class="lb">2. 뺀 회전</span><div class="is-rot" id="isMCut"></div>
       <div class="is-qty"><label for="isMQty">뺀 수량 (선택)</label><input class="inp" id="isMQty" placeholder="예: 80개" maxlength="20"></div></div>
@@ -4256,7 +4258,7 @@
 
   // ───── 이슈 관리: 결과(미입차·노쇼·물량조율) + 사유 · 기사스케줄 칸과 자동 연동 (스케줄 DB issues 탭) ─────
   const IS = { list: [], codes: ['질병', '부상', '사고', '고장', '물량조율', '노쇼'], miDef: {}, drivers: [], camps: [], code: '전체', drv: '', seq: 0, cur: null, cellSeq: 0,
-    results: ['미입차', '노쇼', '물량조율'], reasons: ['차량고장', '차량사고', '질병', '부상', '경조사', '개인사정', '기타'], subs: ['쿠친', '업체백업', '품앗이', '외부용차', '캠프 반납', '없음'], unset: '사유 미정', ruleFrom: '2026-11-01', today: '' };
+    results: ['미입차', '노쇼', '병가', '물량조율'], reasons: ['차량고장', '차량사고', '질병', '부상', '경조사', '개인사정', '기타'], subs: ['쿠친', '업체백업', '품앗이', '외부용차', '캠프 반납', '없음'], unset: '사유 미정', ruleFrom: '2026-11-01', today: '' };
   const isYmd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const isMd = (s) => s ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8)) + ' (' + '일월화수목금토'[new Date(s + 'T00:00:00').getDay()] + ')' : '';
   const isMd0 = (s) => s ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8)) : '';
@@ -4461,16 +4463,29 @@
     if (!a || !d) { $('#isMCell').innerHTML = ''; return; }
     const span = a === b ? isMd0(a) : isMd0(a) + '~' + isMd0(b);
     let put = '';
-    if (ISM.res === '미입차' || ISM.res === '노쇼') put = ISM.res;
+    if (ISM.res === '미입차' || ISM.res === '노쇼' || ISM.res === '병가') put = ISM.res;
     else if (ISM.res === '물량조율' && ISM.cut.length) {
       const rots = isCampRots(d.campId), u = isUnits(d.baseRoute, rots);
       if (u) { Object.keys(u).forEach((rt) => { u[rt] = u[rt].filter((q) => !ISM.cut.includes(q)); }); const left = Array.from(new Set(Object.values(u).map((x) => x.join(',')))); const keys = Object.keys(u).filter((rt) => u[rt].length);
         put = keys.length ? groupRoutes(keys.join(',')) + (left.length === 1 && left[0] !== rots.join(',') ? ' (' + left[0] + ')' : '') : '미입차'; }
     }
     const old = a < IS.ruleFrom;
+    // 대신 뛴 우리 기사(업체백업·품앗이) 칸: PDD(내일)부터
+    let subLine = '';
+    const who = IS_OURS(ISM.sub) ? $('#isMSubWho').value : '';
+    if (who && ISM.res && !old) {
+      const sd = IS.drivers.find((x) => x.name === who) || {};
+      const pdd = isYmd(new Date(new Date((IS.today || isYmd(new Date())) + 'T00:00:00').getTime() + 86400000));
+      const from = a > pdd ? a : pdd;
+      const mc = shortCampSafe(d.camp || ''), sc = shortCampSafe(sd.camp || '');
+      const cutRots = ISM.res === '물량조율' && !ISM.cutText ? IS_ROTS.filter((r) => ISM.cut.includes(r)).join(',') : '';
+      const what = (sc !== mc && mc ? mc + ' ' : '') + (ISM.res === '물량조율' ? (ISM.cutText || (d.baseRoute + (cutRots ? ' (' + cutRots + ')' : ''))) : d.baseRoute);
+      subLine = from <= b ? '<br>' + esc(who) + ' ' + esc(from === b ? isMd0(from) : isMd0(from) + '~' + isMd0(b)) + ' 칸 → <b>' + esc(what) + '</b> 자동 배정 <span class="sub">(PDD ' + esc(isMd0(pdd)) + '부터 · 오늘까지는 실제 기록이라 그대로)</span>'
+        : '<br><span class="sub">' + esc(who) + ': 기간이 PDD(' + esc(isMd0(pdd)) + ') 전이라 칸은 바꾸지 않고 기록만</span>';
+    }
     $('#isMCell').innerHTML = (old ? '<span class="w">' + esc(isMd0(IS.ruleFrom)) + ' 이전 날짜는 기사스케줄 칸을 바꾸지 않습니다 (기록만).</span><br>' : '') +
       (put && !old ? '기사스케줄 ' + esc(span) + ' 칸 → <b>' + esc(put) + '</b> 로 바뀝니다 (지우면 원래 값으로 돌아감)' : ISM.res === '물량조율' ? '뺀 회전을 고르면 기사스케줄 칸에 뛴 회전만 남깁니다.' : '') +
-      ($('#isMCellNow').textContent ? '<br>' + esc($('#isMCellNow').textContent) : '');
+      subLine + ($('#isMCellNow').textContent ? '<br>' + esc($('#isMCellNow').textContent) : '');
   }
   function isOpen(x) {
     IS.cur = x || null;
@@ -4518,10 +4533,11 @@
   $('#isMDrv').addEventListener('change', () => { isFillSubWho($('#isMSubWho').value); isPaintModal(); isLoadCell(); });
   $('#isMDate').addEventListener('change', () => { if (!$('#isMEnd').value || $('#isMEnd').value < $('#isMDate').value) $('#isMEnd').value = $('#isMDate').value; isPaintModal(); isLoadCell(); });
   $('#isMEnd').addEventListener('change', isPaintModal);
-  $('#isMRes').addEventListener('click', (e) => { const b = e.target.closest('[data-res]'); if (!b) return; ISM.res = b.dataset.res; if (ISM.res === '물량조율' && !ISM.cut.length && !ISM.cutText) ISM.cut = ['F3']; isPaintModal(); });
+  $('#isMRes').addEventListener('click', (e) => { const b = e.target.closest('[data-res]'); if (!b) return; ISM.res = b.dataset.res; if (ISM.res === '물량조율' && !ISM.cut.length && !ISM.cutText) ISM.cut = ['F3']; if (ISM.res === '병가' && !ISM.kind) ISM.kind = '질병'; isPaintModal(); });
   $('#isMCut').addEventListener('click', (e) => { const b = e.target.closest('[data-rot]'); if (!b) return; const r = b.dataset.rot; ISM.cutText = ''; ISM.cut = ISM.cut.includes(r) ? ISM.cut.filter((q) => q !== r) : ISM.cut.concat(r); isPaintModal(); });
   $('#isMKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; ISM.kind = ISM.kind === b.dataset.k ? '' : b.dataset.k; isPaintModal(); });
   $('#isMSub').addEventListener('click', (e) => { const b = e.target.closest('[data-sub]'); if (!b) return; ISM.sub = ISM.sub === b.dataset.sub ? '' : b.dataset.sub; isPaintModal(); });
+  $('#isMSubWho').addEventListener('change', isPreview);
   const isClose = () => $('#isModal').classList.add('hidden');
   $('#isMCancel').addEventListener('click', isClose);
   $('#isModal').addEventListener('click', (e) => { if (e.target.id === 'isModal') isClose(); });
@@ -4531,7 +4547,7 @@
     return api('adm_schIssueSave', Object.assign({}, o, { force: !!force })).then((r) => {
       if (!r.ok) { toast(r.msg); return null; }
       if (r.need === 'confirm') {
-        const l = r.conflicts.slice(0, 8).map((c) => '· ' + isMd0(c.date) + ' "' + c.current + '" → "' + c.next + '"').join('\n');
+        const l = r.conflicts.slice(0, 8).map((c) => '· ' + (c.name ? c.name + ' ' : '') + isMd0(c.date) + ' "' + c.current + '" → "' + c.next + '"').join('\n');
         if (!confirm('기사스케줄에 이미 적힌 칸을 바꿉니다.\n\n' + l + (r.conflicts.length > 8 ? '\n… 외 ' + (r.conflicts.length - 8) + '칸' : '') + '\n\n바꿀까요?')) return null;
         return isSave(o, true);
       }
@@ -4552,7 +4568,7 @@
     const b = $('#isMGo'); b.disabled = true; b.textContent = '저장 중…';
     isSave(o).then((r) => {
       if (!r) return;
-      isClose(); toast('이슈를 ' + (o.id ? '고쳤습니다' : '기록했습니다') + (r.cells && r.cells.length ? ' · 기사스케줄 ' + r.cells.length + '칸 바꿈' : '') + '.'); loadIssue();
+      isClose(); toast('이슈를 ' + (o.id ? '고쳤습니다' : '기록했습니다') + (r.cells && r.cells.length ? ' · 기사스케줄 ' + r.cells.length + '칸 바꿈' + (o.subWho && r.cells.some((c) => c.row !== o.driverId) ? ' (' + o.subWho + ' 칸 포함)' : '') : '') + '.'); loadIssue();
     }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
   });
   $('#isMDel').addEventListener('click', () => {
@@ -4570,6 +4586,7 @@
     if (!sync || sync.error) { if (sync && sync.error) console.warn('issueSync', sync.error); return; }
     (sync.removed || []).forEach((id) => isSyncSched(null, id));
     (sync.changed || []).concat(sync.created || []).forEach((x) => isSyncSched(x));
+    if (sync.cells && sync.cells.length) isApplyCells(sync.cells);
     const ask = (sync.created || []).concat(sync.changed || []).filter((x) => x.kind === IS.unset);
     const n = (sync.created || []).length, m = (sync.removed || []).length;
     if (n || m) toast((n ? '이슈 ' + n + '건 자동 생성 (' + (sync.created || []).map((x) => x.name + ' ' + x.result).slice(0, 2).join(', ') + ')' : '') + (n && m ? ' · ' : '') + (m ? '이슈 ' + m + '건 정리' : ''));
@@ -4584,7 +4601,7 @@
     if (!IQ.cur) { $('#iqModal').classList.add('hidden'); return; }
     const x = IQ.cur; IQ.kind = ''; IQ.sub = '';
     const go = () => {
-      const what = x.result === '물량조율' ? (x.cut || '') + '를 뺐어요' : x.result + '이에요';
+      const what = x.result === '물량조율' ? (x.cut || '') + '를 뺐어요' : x.result + '예요';
       $('#iqTitle').textContent = x.name + ' · ' + what;
       $('#iqSub').textContent = (x.end && x.end !== x.date ? isMd0(x.date) + ' ~ ' + isMd0(x.end) : isMd(x.date)) + ' · 사유를 골라 주세요' + (IQ.queue.length ? ' (남은 ' + IQ.queue.length + '건)' : '');
       $('#iqReason').value = '';
