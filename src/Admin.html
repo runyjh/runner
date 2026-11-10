@@ -8171,7 +8171,8 @@
     if (pm) cls.push('pmk');
     const nov = noAssign(r, dt, v);
     const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
-    if (iss.length) { /* 이슈가 있는 칸은 미배정·배정 안 됨 ⚠ 를 붙이지 않음 (이슈 빨간 표시로 충분) */ } else if (mis) cls.push('mis'); else if (nov) cls.push('nov');
+    // 이슈가 있는 칸 · PDD 이전(이미 지난 날) 칸은 미배정·배정 안 됨 ⚠ 를 붙이지 않음
+    if (iss.length || dt < pddDate()) { /* 표시 안 함 */ } else if (mis) cls.push('mis'); else if (nov) cls.push('nov');
     const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
     return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="품' + esc(pm) + '"' : '') + '>' + cellHtml(v, r.row) + '</td>';
   }
@@ -8246,7 +8247,7 @@
     const dup = scalc ? dupTipHtml(r.key || r.row, ci) : '';
     if (dup) secs.push('<div class="cc-sec cc-dup">' + dup + '</div>');
     const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
-    if (iss.length) { /* 이슈가 있으면 미배정 안내는 생략 */ } else if (mis) secs.push('<div class="cc-sec cc-warn">⚠ 미배정 노선 <b>' + esc(mis.join(', ')) + '</b> — 그날 아무도 안 뜀</div>');
+    if (iss.length || dt < pddDate()) { /* 이슈가 있거나 PDD 이전이면 미배정 안내는 생략 */ } else if (mis) secs.push('<div class="cc-sec cc-warn">⚠ 미배정 노선 <b>' + esc(mis.join(', ')) + '</b> — 그날 아무도 안 뜀</div>');
     else if (noAssign(r, dt, v)) secs.push('<div class="cc-sec cc-warn">⚠ 배정 안 됨 — 출근·휴무 등을 입력해 주세요</div>');
     const longV = !!cellTipRaw(v);
     if (!secs.length && !longV) return '';
@@ -8317,7 +8318,7 @@
       const v = sget(r.row, dt), k = r.row + '|' + dt;
       const ins = r.kind === 'd' ? instOf(r.row, dt) : null, pm = r.kind === 'd' ? pmMark(r.row, dt) : '', iss = r.kind === 'd' ? issOf(r.row, dt) : [];
       const nov = noAssign(r, dt, v), mis = scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
-      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', iss.length ? '' : mis ? 'mis' : nov ? 'nov' : '']
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', iss.length || dt < pdd ? '' : mis ? 'mis' : nov ? 'nov' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
       if (td.__v !== v || td.__vr !== r.row) { td.innerHTML = cellHtml(v, r.row); td.__v = v; td.__vr = r.row; }
