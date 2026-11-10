@@ -7682,18 +7682,21 @@
     // 노선관리에 있는 캠프만 (그 밖의 캠프 줄은 빼고 몇 줄 뺐는지 알려 줌)
     const campOk = new Set((SD.camps || []).map((c) => String(c.name || '').replace(/\s*캠프\s*$/, '').trim()).filter(Boolean));
     const okCamp = (c) => !campOk.size || campOk.has(String(c || '').replace(/\s*캠프\s*$/, '').trim());
-    const work0 = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근'), work = work0.filter((r) => okCamp(r[2]));
+    // 운영자 아이디는 출력하지 않음 (출근 줄·쿠팡 등록 목록 휴무 줄 모두)
+    const opIds = new Set((SD.drivers || []).filter((d) => d.loginId && (d.type === '운영자' || d.title === '운영자')).map((d) => String(d.loginId).toLowerCase()));
+    const notOp = (id) => !opIds.has(String(id || '').toLowerCase());
+    const work0 = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근' && notOp(r[4])), work = work0.filter((r) => okCamp(r[2]));
     const skipCamps = Array.from(new Set(work0.filter((r) => !okCamp(r[2])).map((r) => r[2])));
     const dates = upRes.dates.slice(w * 7, w * 7 + 7).filter((d) => d >= upRes.target);
     if (!dates.length) return { rows: [], extra: [], dates };
     const sc = (c) => String(c || '').replace(/\s*캠프\s*$/, '').trim();
     const rSeen = {};
-    let roster = (upRes.roster || []).map((x) => ({ camp: sc(x.camp), id: x.id, name: x.name })).filter((x) => { const k = x.camp + '|' + x.id; if (rSeen[k] || !okCamp(x.camp)) return false; rSeen[k] = 1; return true; });
+    let roster = (upRes.roster || []).map((x) => ({ camp: sc(x.camp), id: x.id, name: x.name })).filter((x) => { const k = x.camp + '|' + x.id; if (rSeen[k] || !okCamp(x.camp) || !notOp(x.id)) return false; rSeen[k] = 1; return true; });
     const fromCp = roster.length > 0;
     if (!fromCp) { // 쿠팡 목록이 없으면: 재직 기사의 소속 캠프(추가 배정 줄은 그 캠프)
       const seen = {};
       SD.drivers.forEach((d) => {
-        if (!d.loginId || d.status !== '승인' || (d.workStatus === '퇴사' && (!d.leaveDate || d.leaveDate <= dates[0])) || !d.camp || !okCamp(d.camp)) return;
+        if (!d.loginId || d.status !== '승인' || (d.workStatus === '퇴사' && (!d.leaveDate || d.leaveDate <= dates[0])) || !d.camp || !okCamp(d.camp) || !notOp(d.loginId)) return;
         const k = sc(d.camp) + '|' + d.loginId; if (seen[k]) return; seen[k] = 1;
         roster.push({ camp: sc(d.camp), id: d.loginId, name: d.ex ? ((SD.drivers.find((x) => x.id === d.mainId) || {}).name || d.name) : d.name });
       });

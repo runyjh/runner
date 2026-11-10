@@ -5864,6 +5864,7 @@ function schBuildUpload_(data, opt) {
 
   // 운영시트 C~F열에 해당하는 줄: 캠프, 이름, 아이디, 기본노선
   const info = data.drivers.filter(function (d) {
+    if (str_(d.type) === '운영자' || str_(d.title) === '운영자') return false; // 운영자는 업로드 표·쿠팡 업로드에 출력하지 않음
     return d.status === ST.ACTIVE || Object.keys(data.cells[d.id] || {}).some(function (k) { return data.dates.indexOf(k) >= 0; });
   }).map(function (d) {
     // 소속 캠프가 없거나 직원(관리자·운영자·대표) 캠프인 사람은 '백업'으로 두고, 그날 칸에 적힌 캠프·노선·회전으로 출력한다
