@@ -5814,7 +5814,9 @@
   }
   const thumbCampDone = {}, thumbUp = [];
   let thumbUpT = 0;
+  const thumbSent = {};
   function thumbUpload(item) {
+    if (thumbSent[item.id]) return; thumbSent[item.id] = 1; // 같은 이미지는 한 번만 올림
     thumbUp.push(item); clearTimeout(thumbUpT);
     thumbUpT = setTimeout(() => { const list = thumbUp.splice(0, 40); if (list.length) api('adm_campThumbSave', list).catch(() => {}); }, 1500);
   }

@@ -3883,16 +3883,17 @@ function adm_campImageDelete(token, id) {
 
 /** 잠금 안에서: 미리보기 저장 (이미지ID 기준 덮어쓰기) */
 function ctSave_(items, now) {
-  const have = {};
-  readAll_(SH.CTHUMB).forEach(function (x) { have[x.id] = x._row; });
-  const add = [];
+  const have = {}, dup = [];
+  readAll_(SH.CTHUMB).forEach(function (x) { if (have[x.id]) dup.push(x._row); else have[x.id] = x._row; });
+  const add = {};
   items.forEach(function (t) {
     const data = String(t.data || '');
     if (!t.id || !data || data.length > 45000 || !/^[A-Za-z0-9+/=]+$/.test(data)) return; // 칸 한 개(5만 자)에 들어가는 크기만
     const o = { id: String(t.id), campId: String(t.campId || ''), fileId: String(t.fileId || ''), data: data, updatedAt: now };
-    if (have[o.id]) writeFields_(SH.CTHUMB, have[o.id], o); else add.push(o);
+    if (have[o.id]) writeFields_(SH.CTHUMB, have[o.id], o); else add[o.id] = o; // 같은 묶음 안에 같은 이미지가 두 번 와도 한 줄
   });
-  add.forEach(function (o) { appendObj_(SH.CTHUMB, o); });
+  Object.keys(add).forEach(function (k) { appendObj_(SH.CTHUMB, add[k]); });
+  if (dup.length) delRows_(sheet_(SH.CTHUMB), dup); // 예전에 겹쳐 생긴 줄 정리
 }
 /** 캠프 참고 이미지 미리보기 한꺼번에: { thumbs: { 이미지ID: { fileId, data } } } (캠프ID 없으면 전체) */
 function adm_campThumbs(token, campId) {
