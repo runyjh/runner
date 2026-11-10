@@ -1053,9 +1053,10 @@
     const rows = Object.values(PERF.m); if (!rows.length || PERF.busy) return;
     PERF.m = {}; PERF.busy = true;
     rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); });
-    Promise.resolve().then(() => store.get(TOKEN) && gsCall0('api_perf', [store.get(TOKEN), rows])).catch(() => {}).finally(() => { PERF.busy = false; });
+    const bid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); // 묶음 번호: 같은 묶음이 두 번 도착해도 서버가 한 번만 적는다
+    Promise.resolve().then(() => store.get(TOKEN) && gsCall0('api_perf', [store.get(TOKEN), rows, bid])).catch(() => {}).finally(() => { PERF.busy = false; });
   }
-  setInterval(perfFlush, 60000);
+  setInterval(perfFlush, 300000); // 5분마다 (전에는 1분 · 화면이 가려질 때도 보냄)
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') perfFlush(); });
   function gsCall(fn, args) {
     const t0 = performance.now();

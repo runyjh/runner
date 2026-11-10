@@ -2446,9 +2446,11 @@
     const rows = Object.values(PERF.m); if (!rows.length || PERF.busy) return;
     PERF.m = {}; PERF.busy = true;
     rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); });
-    Promise.resolve().then(() => store.get() && gsCall0('adm_perf', [store.get(), rows])).catch(() => {}).finally(() => { PERF.busy = false; });
+    // 묶음 번호를 같이 보낸다 → 같은 묶음이 두 번 도착해도 서버가 한 번만 적는다
+    const bid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    Promise.resolve().then(() => store.get() && gsCall0('adm_perf', [store.get(), rows, false, bid])).catch(() => {}).finally(() => { PERF.busy = false; });
   }
-  setInterval(perfFlush, 60000);
+  setInterval(perfFlush, 300000); // 5분마다 (전에는 1분 · 화면이 가려질 때도 보냄)
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') perfFlush(); });
   function gsCall(fn, args) {
     const t0 = performance.now();
@@ -3774,9 +3776,11 @@
     $('#dsMemoDay').value = DSB.memoDay;
     $('#dsMemoT').textContent = dsDay(DSB.memoDay) + (DSB.memoDay === ymdLocal(new Date()) ? ' · 오늘' : '');
     if (DSB.memoYm === ym && DSB.memos) return dsMemoPaint();
-    $('#dsMemoList').innerHTML = dsLoad;
+    // 새로고침·배포 뒤 첫 화면: 이 창에 보관해 둔 같은 달 메모를 먼저 보여 주고 뒤에서 새로 받는다
+    const km = admKeep.get('memo');
+    if (km && km.ym === ym && Array.isArray(km.memos)) { DSB.memoYm = ym; DSB.memos = km.memos; dsMemoPaint(); } else $('#dsMemoList').innerHTML = dsLoad;
     const seq = DSB.memoSeq = (DSB.memoSeq || 0) + 1;
-    api('adm_memoMonth', ym).then((r) => { if (seq !== DSB.memoSeq) return; if (!r.ok) return toast(r.msg); DSB.memoYm = ym; DSB.memos = r.memos || []; dsMemoPaint(); }).catch(() => {});
+    api('adm_memoMonth', ym).then((r) => { if (seq !== DSB.memoSeq) return; if (!r.ok) return toast(r.msg); DSB.memoYm = ym; DSB.memos = r.memos || []; admKeep.set('memo', { ym: ym, memos: DSB.memos }); dsMemoPaint(); }).catch(() => {});
   }
   function dsMemoPaint() {
     const list = (DSB.memos || []).filter((m) => m.date === DSB.memoDay);
@@ -3796,10 +3800,13 @@
   const tmHl = (t, rx) => { const h = esc(t); return rx ? h.replace(rx, '<mark class="tm-m">$1</mark>') : h; };
   function tmLoad() {
     const seq = ++TM.seq;
+    // 새로고침·배포 뒤 첫 화면: 이 창에 보관해 둔 팀즈 소식을 먼저 보여 주고 뒤에서 새로 받는다 (숨김 보기는 제외)
+    if (TM.st !== '숨김' && !(TM.rows && TM.rows.length)) { const kt = admKeep.get('teams'); if (kt && Array.isArray(kt.rows)) { try { Object.assign(TM, kt); tmPaint(); } catch (e) { /* 보관본이 옛 모양이면 무시 */ } } }
     return api('adm_teamsList', { status: TM.st === '숨김' ? '숨김' : '', limit: 500 }).then((r) => {
       if (seq !== TM.seq) return;
       if (!r.ok) { $('#tmCardList').innerHTML = '<div class="db-empty">' + esc(r.msg || '불러오지 못했습니다.') + '</div>'; return; }
       Object.assign(TM, { rows: r.rows || [], counts: r.counts || {}, cfg: r.cfg, hb: r.hb, keySet: r.keySet });
+      if (TM.st !== '숨김') admKeep.set('teams', { rows: TM.rows, counts: TM.counts, cfg: TM.cfg, hb: TM.hb, keySet: TM.keySet });
       tmPaint();
     }).catch(() => {});
   }
@@ -7228,8 +7235,10 @@
         } catch (e) { res(this.db = null); }
       });
     },
-    get(k) { return this.open().then((db) => db ? new Promise((res) => { try { const r = db.transaction('img').objectStore('img').get(k); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch (e) { res(null); } }) : null).catch(() => null); },
-    set(k, v) { return this.open().then((db) => { if (!db) return; try { db.transaction('img', 'readwrite').objectStore('img').put(v, k); } catch (e) {} }).catch(() => {}); }
+    // 진단(2026-11-11): 보관함이 왜 안 먹는지 보려고 결과를 속도 기록에 같이 남긴다 — idb_nodb(보관함 못 엶) · idb_hit(찾음) · idb_miss(없음) · idb_geterr(읽기 오류) · idb_set(넣음) · idb_seterr(넣기 실패)
+    mark(n) { try { perfAdd(n, 0, 0); } catch (e) {} },
+    get(k) { return this.open().then((db) => { if (!db) { this.mark('idb_nodb'); return null; } return new Promise((res) => { try { const r = db.transaction('img').objectStore('img').get(k); r.onsuccess = () => { this.mark(r.result ? 'idb_hit' : 'idb_miss'); res(r.result || null); }; r.onerror = () => { this.mark('idb_geterr'); res(null); }; } catch (e) { this.mark('idb_geterr'); res(null); } }); }).catch(() => null); },
+    set(k, v) { return this.open().then((db) => { if (!db) return; try { const tx = db.transaction('img', 'readwrite'); tx.oncomplete = () => this.mark('idb_set'); tx.onerror = tx.onabort = () => this.mark('idb_seterr'); tx.objectStore('img').put(v, k); } catch (e) { this.mark('idb_seterr'); } }).catch(() => {}); }
   };
   const IMG_KEEP = 30 * 864e5;
   function getImg(im, full) {

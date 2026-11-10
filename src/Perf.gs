@@ -10,6 +10,13 @@
 /** 측정용 임시 세션: 이 실행 안에서만 (무작위 글자 · 화면에서 맞힐 수 없음) */
 var PERF_BENCH_ = null;
 
+/** 같은 묶음 번호를 10분 안에 또 받았으면 true (두 번 적지 않게) */
+function perfSeen_(bid) {
+  const b = str_(bid).replace(/[^\w]/g, '').slice(0, 24);
+  if (!b) return false;
+  try { const c = cache_(), k = 'pfb:' + b; if (c.get(k)) return true; c.put(k, '1', 600); } catch (e) { /* 캐시가 안 되면 그냥 적는다 */ }
+  return false;
+}
 function perfRows_(rows, app, who) {
   if (!Array.isArray(rows)) return 0;
   const now = nowText_();
@@ -29,10 +36,11 @@ function perfRows_(rows, app, who) {
   return out.length;
 }
 /** 기사 앱: 측정값 보내기 (로그인한 기사만 · 기사 이름은 남기지 않음) */
-function api_perf(token, rows) {
+function api_perf(token, rows, bid) {
   return run_(function () {
     const s = getSession_(token);
     if (!s) return { ok: true, n: 0 };
+    if (perfSeen_(bid)) return { ok: true, n: 0, dup: true };
     // 한 기기에서 1분에 3번까지만 (앱은 1분에 1번 보냄 · 마구 보내 시트를 키우지 못하게)
     const k = 'pf:' + s.th, c = cache_(), n = +(c.get(k) || 0);
     if (n >= 3) return { ok: true, n: 0 };
@@ -41,9 +49,10 @@ function api_perf(token, rows) {
   });
 }
 /** 관리자 앱: 측정값 보내기 */
-function adm_perf(token, rows, bench) {
+function adm_perf(token, rows, bench, bid) {
   return run_(function () {
     const a = requireAdmin_(token);
+    if (perfSeen_(bid)) return { ok: true, n: 0, dup: true };
     return { ok: true, n: perfRows_(rows, bench ? '측정' : '관리자앱', a.name) };
   });
 }
