@@ -1041,6 +1041,20 @@
     setInterval(check, 5 * 60000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   })();
+  // ───── 오류 기록: 화면 오류 · 60초 초과 · 서버 응답 이상을 모아 속도 기록과 같이 보낸다 (error_log 탭 · 한 번에 10건까지) ─────
+  const UPD = String((window.RUNNER_CONFIG && window.RUNNER_CONFIG.upd) || '');
+  const ERRQ = [];
+  function errAdd(k, f, m) {
+    try {
+      m = String(m || '').slice(0, 300);
+      if (ERRQ.length >= 10 || !m || /ResizeObserver|^Script error\.?$|EXPIRED|NO_API|Failed to fetch|NetworkError|Load failed|FS_TIMEOUT|FS_LOAD/i.test(m)) return;
+      if (ERRQ.some((e) => e.k === k && e.f === f && e.m === m)) return;
+      let v = ''; try { v = String(curView || ''); } catch (e) { v = ''; }
+      ERRQ.push({ k: k, f: f || '', m: m, v: v, u: UPD });
+    } catch (e) { /* 기록 실패는 무시 */ }
+  }
+  window.addEventListener('error', (e) => { if (e && e.message) errAdd('client', '', e.message + (e.filename ? ' @ ' + String(e.filename).split('/').pop().split('?')[0] + ':' + e.lineno : '')); });
+  window.addEventListener('unhandledrejection', (e) => { const r = e && e.reason; if (r && r.name === 'AbortError') return; errAdd('client', '', '(promise) ' + (r && (r.message || r) || '')); });
   // ───── 속도 측정: 호출마다 [화면, 함수, 왕복 ms, 서버 ms] 를 모아 1분마다 서버 perf_log 탭으로 (화면·함수별 합계) ─────
   const PERF = { m: {}, busy: false };
   function perfAdd(fn, ms, sv) {
@@ -1050,17 +1064,21 @@
     o.n++; o.rt += ms; o.mx = Math.max(o.mx, ms); o.sv += +sv || 0;
   }
   function perfFlush() {
-    const rows = Object.values(PERF.m); if (!rows.length || PERF.busy) return;
+    const rows = Object.values(PERF.m); if ((!rows.length && !ERRQ.length) || PERF.busy) return;
     PERF.m = {}; PERF.busy = true;
-    rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); });
+    const errs = ERRQ.splice(0);
+    rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); r.u = UPD; });
     const bid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); // 묶음 번호: 같은 묶음이 두 번 도착해도 서버가 한 번만 적는다
-    Promise.resolve().then(() => store.get(TOKEN) && gsCall0('api_perf', [store.get(TOKEN), rows, bid])).catch(() => {}).finally(() => { PERF.busy = false; });
+    Promise.resolve().then(() => store.get(TOKEN) && gsCall0('api_perf', [store.get(TOKEN), rows, bid, errs])).catch(() => {}).finally(() => { PERF.busy = false; });
   }
   setInterval(perfFlush, 300000); // 5분마다 (전에는 1분 · 화면이 가려질 때도 보냄)
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') perfFlush(); });
   function gsCall(fn, args) {
     const t0 = performance.now();
-    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); return r; });
+    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); return r; }, (e) => {
+      if (e && e.name === 'AbortError') errAdd('timeout', fn, Math.round((performance.now() - t0) / 1000) + '초 기다리다 끊음'); else if (e && e.message === 'BAD_RESPONSE') errAdd('badresp', fn, '서버가 정상 응답 대신 다른 내용을 보냄');
+      throw e;
+    });
   }
   function gsCall0(fn, args) {
     if (window.google && google.script && google.script.run) {

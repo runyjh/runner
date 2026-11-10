@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes', CPROS: 'coupang_roster', INVCHK: 'inv_checks', INSREP: 'ins_reports' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', ERR: 'error_log', PDAY: 'perf_daily', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes', CPROS: 'coupang_roster', INVCHK: 'inv_checks', INSREP: 'ins_reports' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -373,7 +373,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs', 'route_notes', 'coupang_roster', 'inv_checks', 'ins_reports']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'error_log', 'perf_daily', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs', 'route_notes', 'coupang_roster', 'inv_checks', 'ins_reports']);
 
 /** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
 const HEAD_RENAME = {};
@@ -427,8 +427,12 @@ SCHEMA[SH.INSREP] = INR;
 SCHEMA[SH.TAXINV] = TI;
 SCHEMA[SH.RCHG] = RC;
 // 속도 측정 (Perf.gs): 1분마다 화면·함수별 합계 한 줄
-const PF = { at: '시각', app: '앱', view: '화면', fn: '함수', n: '횟수', rt: '왕복 합계(ms)', rtMax: '왕복 최대(ms)', srv: '서버 합계(ms)', who: '누가' };
+const PF = { at: '시각', app: '앱', view: '화면', fn: '함수', n: '횟수', rt: '왕복 합계(ms)', rtMax: '왕복 최대(ms)', srv: '서버 합계(ms)', who: '누가', upd: '업데이트' };
 SCHEMA[SH.PERF] = PF;
+// 오류 기록: 서버 오류 · 화면 오류 · 저장 충돌(처리 중) · 60초 초과 (Perf.gs errLog_) — 운영 중 문제를 그날 안에 알기 위한 기록
+SCHEMA[SH.ERR] = { at: '시각', app: '앱', kind: '종류', view: '화면', fn: '함수', msg: '내용', upd: '업데이트', who: '누가' };
+// 속도 기록 하루 요약: 7일 지난 perf_log 줄을 날짜·앱·함수별로 줄여 남긴다 (Perf.gs perfRollup_)
+SCHEMA[SH.PDAY] = { day: '날짜', app: '앱', fn: '함수', n: '횟수', rt: '왕복 합계(ms)', rtMax: '왕복 최대(ms)', srv: '서버 합계(ms)' };
 const HIDDEN = {};
 HIDDEN[SH.DRIVERS] = D_HIDDEN;
 HIDDEN[SH.ADMINS] = ['pwHash', 'pwSalt'];
@@ -459,6 +463,7 @@ function doPost(e) {
     const f = /^(api|adm)_[A-Za-z0-9_]+$/.test(fn) && !/_$/.test(fn) ? GLOBAL_[fn] : null;
     if (typeof f !== 'function') out = { ok: false, code: 'UNKNOWN_FN', msg: '알 수 없는 요청입니다. 화면을 새로고침해 주세요.' };
     else {
+      _curFn = fn;
       out = f.apply(null, Array.isArray(req.args) ? req.args : []);
       if (out === undefined) out = null;
       // Firestore 사본: 읽기 전용으로 등록된 함수가 아니면(= 새로 만든 기능 포함) '데이터가 바뀌었을 수 있음' 으로 표시
@@ -466,6 +471,7 @@ function doPost(e) {
       if (out && out.ok !== false && FS_READ_FNS.indexOf(fn) < 0) fsMark_(/^(adm_notice|adm_bd|api_bd)/.test(fn) ? 'nb' : '');
     }
   } catch (err) {
+    try { errLog_('서버 오류', _curFn, '입구: ' + String(err && err.message || err)); } catch (x) { /* 무시 */ }
     out = { ok: false, msg: '서버 오류: ' + (err && err.message || err) };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
@@ -776,6 +782,7 @@ function scriptLock_() {
 }
 
 // ───────────────────────── 응답 래퍼 ─────────────────────────
+var _curFn = ''; // 지금 처리 중인 서버 함수 이름 (doPost 가 적어 둠 · 오류 기록용)
 function run_(fn) {
   const t0 = Date.now();
   try {
@@ -787,9 +794,11 @@ function run_(fn) {
     if (err && err.userMsg) return err.code ? { ok: false, code: err.code, msg: err.userMsg } : { ok: false, msg: err.userMsg };
     if (/lock timeout|lock.*too long|잠금.*(시간|초과)/i.test(String(err && err.message || err))) {
       console.warn('잠금 대기 시간 초과: ' + (err && err.message));
+      errLog_('저장 충돌', _curFn, '다른 저장이 진행 중이라 20초 안에 잠금을 못 잡음');
       return { ok: false, code: 'BUSY', msg: '다른 저장 작업이 처리 중입니다. 잠시 후 다시 시도해 주세요.' };
     }
     console.error(err && err.stack ? err.stack : err);
+    errLog_('서버 오류', _curFn, String(err && err.message || err) + (err && err.stack ? ' @ ' + String(err.stack).split('\n').slice(1, 3).join(' | ').replace(/\s+/g, ' ') : ''));
     return { ok: false, msg: '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' };
   }
 }
@@ -1658,7 +1667,9 @@ function adm_check(token) {
   return run_(function () {
     const a = requireAdmin_(token);
     try { if (typeof fsEnsureTrigger_ === 'function') fsEnsureTrigger_(); } catch (e) { /* 사본 트리거 확인 (6시간에 한 번만 실제 확인) */ }
-    return { ok: true, admin: { name: a.name, loginId: a.loginId } };
+    let check = null;
+    try { check = JSON.parse(appSet_().dataCheck || 'null'); } catch (e) { check = null; } // 새벽 자료 점검 결과 (대시보드에 표시)
+    return { ok: true, admin: { name: a.name, loginId: a.loginId }, check: check };
   });
 }
 function adm_logout(token) { return api_logout(token); }
@@ -3534,6 +3545,8 @@ function cleanupSessions() {
     lock.releaseLock();
     try { pmAlertCleanup_(); } catch (e) { console.error('품앗이 알림 정리 실패: ' + (e && e.message)); } // 60일 지난 품앗이 알림 정리
     try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); } // 적용일이 된 노선 변경
+    try { dataCheck_(); } catch (e) { console.error('자료 점검 실패: ' + (e && e.message)); errLog_('서버 오류', 'dataCheck_', String(e && e.message || e)); } // 자료 점검 (읽기만)
+    try { perfRollup_(); } catch (e) { console.error('속도 기록 요약 실패: ' + (e && e.message)); } // 7일 지난 속도 기록 → 하루 요약으로 · 60일 지난 오류 기록 정리
   }
 }
 

@@ -75,8 +75,11 @@ copyDir(path.join(ROOT, 'site'), OUT);
 })();
 
 const ver = (process.env.GITHUB_SHA || String(Date.now())).slice(0, 7);
+// 업데이트 번호: 마지막 커밋 제목의 '[업데이트 N]' (화면 구석에 보여 주고 속도·오류 기록에 같이 남긴다 · 못 찾으면 빈칸)
+let upd = '';
+try { const m = require('child_process').execSync('git log -1 --format=%s', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().match(/업데이트\s*(\d+)/); upd = m ? m[1] : ''; } catch (e) { upd = ''; }
 const common = [
-  '<script>window.RUNNER_CONFIG = ' + JSON.stringify({ api: api, ver: ver }) + ';</script>',
+  '<script>window.RUNNER_CONFIG = ' + JSON.stringify({ api: api, ver: ver, upd: upd }) + ';</script>',
   '<link rel="preconnect" href="https://script.google.com">',
   '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',
   '<meta name="theme-color" content="#1b64da">',

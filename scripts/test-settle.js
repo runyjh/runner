@@ -136,6 +136,41 @@ scenario('업로드 표', null, function (r) {
   eq('이관 예약으로 떠난 안양1 110 은 올리지 않음', out.filter(function (x) { return /안양1/.test(x); }).length, 0);
 });
 
+// 8) 새벽 자료 점검 · 오류 기록 · 속도 기록 요약 (읽기만 하는지 · 중복 억제 · 요약 뒤에만 지우는지)
+scenario('자료 점검·오류 기록·속도 요약', function (M) {
+  M.main.drivers.push({ id: 'd9', name: '신입', loginId: '', status: '승인', driverType: '고정', schCampId: 'C1', schCamp: '군포1캠프', baseRoute: '555A' });
+  M.main.drivers.push({ id: 'd8', name: '퇴사자', loginId: 'gone', status: '승인', workStatus: '퇴사', driverType: '고정', schCampId: 'C1', baseRoute: '777A' });
+  M.main.routes.push({ id: 'R9', campId: 'C1', code: '300A', g1: '300', g2: 'A', status: '사용' });
+  M.jobs.push({ id: 'J9', status: '배차 확정', posterId: 'd1', poster: '이현모', acceptedId: 'd8', accepted: '퇴사자', date: '2099-01-02', route: '212C', camp: '군포1캠프', campId: 'C1', price: '1300' });
+  const old = function (d, fn, n, rt) { return { at: d + ' 10:00:00', app: '관리자앱', view: 'sched', fn: fn, n: String(n), rt: String(rt), rtMax: String(rt), srv: '100', who: 'x' }; };
+  M.main.perf_log = [old('2020-01-01', 'adm_a', 2, 500), old('2020-01-01', 'adm_a', 3, 700), old('2020-01-02', 'adm_b', 1, 100), old('2099-01-01', 'adm_a', 1, 50)];
+  M.main.error_log = [{ at: '2020-01-01 00:00:00', kind: '서버 오류', fn: 'x', msg: 'old' }, { at: '2099-01-01 00:00:00', kind: '화면 오류', fn: '', msg: 'new' }];
+}, function (r) {
+  const out = vm.runInContext(`(function () {
+    var put = {}, app = [], del = {}, rows = [];
+    appSetPut_ = function (k, v) { put[k] = v; };
+    appendObjs_ = function (n, o) { app.push([n, o]); };
+    scriptLock_ = function () { return { tryLock: function () { return true; }, waitLock: function () {}, releaseLock: function () {} }; };
+    cols_ = function (n) { var c = { __w: 0 }; Object.keys(SCHEMA[n]).forEach(function (k) { c[k] = c.__w++; }); return c; };
+    sheet_ = function (n) { return { getLastRow: function () { return 1; }, appendRow: function (a) { rows.push(a); }, deleteRows: function (a, b) { del[n] = [a, b]; } }; };
+    Utilities.base64Encode = function (x) { return String(x); }; Utilities.computeDigest = function (a, s) { return s; }; Utilities.DigestAlgorithm = {}; Utilities.Charset = {};
+    var res = dataCheck_(); perfRollup_();
+    errLog_('서버 오류', 'adm_x', '전화 010-1234-5678 a@b.co 실패'); errLog_('서버 오류', 'adm_x', '전화 010-1234-5678 a@b.co 실패'); errLog_('', '', '');
+    errRows_([{ k: 'client', f: '', m: 'boom', v: 'sched', u: '424' }, { k: 'nope', m: 'x' }], '관리자앱', '유');
+    var by = {}; res.items.forEach(function (x) { by[x.k] = x.list; });
+    return { by: by, saved: !!put.dataCheck, day: app.map(function (a) { return a[0] + ':' + a[1].map(function (o) { return [o.day, o.fn, o.n, o.rt, o.rtMax].join('/'); }).join(','); }), del: del, rows: rows.map(function (a) { return a.slice(1).join('|'); }) };
+  })()`, r.ctx);
+  eq('기본노선이 노선관리에 없음 (퇴사자는 제외)', out.by.base, ['신입 · 군포1 555']);
+  eq('사용 중 노선인데 단가 없음', out.by.price, ['군포1 300']);
+  eq('쿠팡 아이디 없는 승인 기사', out.by.login, ['신입']);
+  eq('확정 품앗이의 받은 기사가 퇴사', out.by.pm, ['01-02 군포1 212C → 퇴사자']);
+  eq('어제부터의 오류만 셈', out.by.err, ['화면 오류 1건']);
+  eq('점검 결과 저장', out.saved, true);
+  eq('7일 지난 속도 기록 3줄을 날짜·함수별로 요약', out.day, ['perf_daily:2020-01-01/adm_a/5/1200/700,2020-01-02/adm_b/1/100/100']);
+  eq('요약한 3줄 · 60일 지난 오류 1줄만 지움', out.del, { perf_log: [2, 3], error_log: [2, 1] });
+  eq('오류 기록: 같은 내용은 한 번 · 번호·메일 가림 · 모르는 종류는 버림', out.rows, ['서버|서버 오류||adm_x|전화 # (메일) 실패||', '관리자앱|화면 오류|sched||boom|424|유']);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n정산 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   정산 시험 ' + count + '개');

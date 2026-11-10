@@ -23,7 +23,7 @@ function perfRows_(rows, app, who) {
   const out = rows.slice(0, 120).map(function (r) {
     return { at: now, app: app, view: str_(r && r.v).slice(0, 40), fn: str_(r && r.f).replace(/[^\w]/g, '').slice(0, 40),
       n: Math.max(0, Math.min(9999, Math.round(+r.n || 0))), rt: Math.max(0, Math.round(+r.rt || 0)), rtMax: Math.max(0, Math.round(+r.mx || 0)),
-      srv: Math.max(0, Math.round(+r.sv || 0)), who: str_(who).slice(0, 40) };
+      srv: Math.max(0, Math.round(+r.sv || 0)), who: str_(who).slice(0, 40), upd: str_(r && r.u).replace(/[^\d]/g, '').slice(0, 6) };
   }).filter(function (o) { return o.fn && o.n; });
   if (!out.length) return 0;
   const c = cols_(SH.PERF, true), sh = sheet_(SH.PERF);
@@ -36,11 +36,115 @@ function perfRows_(rows, app, who) {
   return out.length;
 }
 /** 기사 앱: 측정값 보내기 (로그인한 기사만 · 기사 이름은 남기지 않음) */
-function api_perf(token, rows, bid) {
+/** 오류 내용 다듬기: 길이 300자 · 긴 숫자열(전화·주민·계좌일 수 있음)과 메일 주소는 가린다 */
+function errClean_(m) { return str_(m).replace(/[\w.+-]+@[\w.-]+/g, '(메일)').replace(/\d[\d\s-]{5,}\d/g, '#').replace(/\s+/g, ' ').slice(0, 300); }
+/**
+ * 오류 기록 한 줄 (error_log 탭). 절대 예외를 내지 않는다 — 기록이 실패해도 원래 기능에는 영향이 없어야 한다.
+ *  · 같은 (종류·함수·내용)은 10분에 한 번만 적는다 (같은 오류가 몰려도 탭이 불어나지 않게) · 5천 줄이 넘으면 더 적지 않는다
+ *  kind: '서버 오류' · '저장 충돌' · '화면 오류' · '시간 초과' · '응답 오류'
+ */
+function errLog_(kind, fn, msg, x) {
+  try {
+    x = x || {};
+    const m = errClean_(msg), f = str_(fn).replace(/[^\w]/g, '').slice(0, 40), k = str_(kind).slice(0, 10);
+    if (!k || (!f && !m)) return;
+    const c = cache_(), ck = 'el:' + Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, k + '|' + f + '|' + m, Utilities.Charset.UTF_8)).slice(0, 20);
+    if (c.get(ck)) return;
+    c.put(ck, '1', 600);
+    const cols = cols_(SH.ERR, true), sh = sheet_(SH.ERR);
+    if (sh.getLastRow() > 5000) return;
+    const o = { at: nowText_(), app: str_(x.app).slice(0, 10) || '서버', kind: k, view: str_(x.view).slice(0, 40), fn: f, msg: m, upd: str_(x.upd).replace(/[^\d]/g, '').slice(0, 6), who: str_(x.who).slice(0, 40) };
+    const a = new Array(cols.__w).fill('');
+    Object.keys(o).forEach(function (key) { if (cols[key] !== undefined) a[cols[key]] = safeText_(o[key]); });
+    sh.appendRow(a); // 동시에 여러 실행이 적어도 줄이 겹치지 않는다
+  } catch (e) { try { console.error('오류 기록 실패: ' + (e && e.message)); } catch (x2) { /* 무시 */ } }
+}
+/** 화면이 보낸 오류 목록 [{ k: 종류, v: 화면, f: 함수, m: 내용, u: 업데이트 }] (한 번에 10건까지) */
+function errRows_(errs, app, who) {
+  if (!Array.isArray(errs)) return;
+  const KIND = { client: '화면 오류', timeout: '시간 초과', badresp: '응답 오류' };
+  errs.slice(0, 10).forEach(function (e) { if (e && KIND[e.k]) errLog_(KIND[e.k], e.f, e.m, { app: app, view: e.v, upd: e.u, who: who }); });
+}
+/**
+ * 매일 새벽: 7일 지난 속도 기록(perf_log)을 날짜·앱·함수별 합계(perf_daily)로 줄여 남기고 상세 줄은 지운다 · 60일 지난 오류 기록도 지운다.
+ * perf_log 는 시간순으로 쌓이므로 위에서부터 기준일 이전인 줄만 한 덩어리로 지운다 (요약을 먼저 적고 나서 지움 — 중간에 실패하면 상세가 남는다).
+ */
+function perfRollup_() {
+  const lock = scriptLock_();
+  if (!lock.tryLock(5000)) return;
+  try {
+    const cut = Utilities.formatDate(new Date(Date.now() - 7 * 864e5), CFG.TZ, 'yyyy-MM-dd') + ' 00:00:00';
+    const rows = readAll_(SH.PERF);
+    let n = 0;
+    while (n < rows.length && rows[n].at && str_(rows[n].at) < cut) n++;
+    if (n) {
+      const by = {};
+      rows.slice(0, n).forEach(function (r) {
+        const k = str_(r.at).slice(0, 10) + '|' + r.app + '|' + r.fn, o = by[k] || (by[k] = { day: str_(r.at).slice(0, 10), app: r.app, fn: r.fn, n: 0, rt: 0, rtMax: 0, srv: 0 });
+        o.n += +r.n || 0; o.rt += +r.rt || 0; o.srv += +r.srv || 0; o.rtMax = Math.max(o.rtMax, +r.rtMax || 0);
+      });
+      appendObjs_(SH.PDAY, Object.keys(by).sort().map(function (k) { return by[k]; }));
+      SpreadsheetApp.flush();
+      sheet_(SH.PERF).deleteRows(2, n);
+    }
+    const cut2 = Utilities.formatDate(new Date(Date.now() - 60 * 864e5), CFG.TZ, 'yyyy-MM-dd');
+    const er = readAll_(SH.ERR);
+    let m = 0;
+    while (m < er.length && er[m].at && str_(er[m].at).slice(0, 10) < cut2) m++;
+    if (m) sheet_(SH.ERR).deleteRows(2, m);
+  } finally { lock.releaseLock(); }
+}
+/**
+ * 매일 새벽 자료 점검 (읽기만 함 · 아무것도 고치지 않는다). 결과는 app_settings 의 dataCheck 에 적어 두고 관리자 앱 대시보드가 보여 준다.
+ *  ① 기본노선이 노선관리에 없음  ② 사용 중 노선인데 단가 없음  ③ 승인 기사인데 쿠팡 아이디 없음  ④ 앞으로 할 확정 품앗이의 받은 기사가 퇴사·정지  ⑤ 어제 오류 기록
+ */
+function dataCheck_() {
+  const items = [], add = function (k, label, list, hint) { if (list.length) items.push({ k: k, label: label, n: list.length, list: list.slice(0, 30), hint: hint || '' }); };
+  const m = master_(), campName = {}, today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
+  m.camps.forEach(function (c) { campName[c.id] = String(c.name || '').replace(/\s*캠프$/, ''); });
+  const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
+  const working = function (o) { return o.status === ST.ACTIVE && str_(o.workStatus) !== '퇴사' && str_(o.workStatus) !== '휴직'; };
+  const on = {}, anyRoute = {}, priced = {};
+  m.routes.forEach(function (r) { anyRoute[r.campId] = 1; if (r.status === RST.ON) on[r.campId + '|' + r.g1] = 1; });
+  const money = function (v) { return Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')) || 0; };
+  m.prices.forEach(function (p) { if (money(p.p2) > 0 || money(p.p3) > 0) priced[p.campId + '|' + p.num] = 1; });
+  // ① 기본노선의 숫자가 그 캠프 노선관리(사용)에 없음 (노선을 하나도 등록하지 않은 캠프는 건너뜀)
+  const a1 = [];
+  drivers.forEach(function (o) {
+    if (!working(o) || !o.schCampId || !anyRoute[o.schCampId] || !str_(o.baseRoute)) return;
+    const u = rcUnits_(o.baseRoute); if (u.special) return;
+    const miss = {};
+    u.units.forEach(function (x) { if (!on[o.schCampId + '|' + x.num]) miss[x.num] = 1; });
+    if (Object.keys(miss).length) a1.push(o.name + ' · ' + (campName[o.schCampId] || '') + ' ' + Object.keys(miss).join(', '));
+  });
+  add('base', '기본노선이 노선관리에 없음 (정지됐거나 없는 노선)', a1, '기사 정보관리에서 기본노선을 고치거나, 노선관리에 노선을 등록하세요.');
+  // ② 사용 중 노선인데 고정·백업 단가가 하나도 없음 → 정산 때 0원으로 계산됨
+  const a2 = [], seen = {};
+  m.routes.forEach(function (r) { const k = r.campId + '|' + r.g1; if (r.status !== RST.ON || priced[k] || seen[k]) return; seen[k] = 1; a2.push((campName[r.campId] || '') + ' ' + r.g1); });
+  add('price', '사용 중 노선인데 단가 없음', a2.sort(), '노선관리 → 노선 단가에서 고정·백업 단가를 넣으세요. 없으면 정산이 0원으로 계산됩니다.');
+  // ③ 승인·재직 기사인데 쿠팡 아이디가 없음 (직원 제외) → 정산서에 실적이 붙지 않음
+  add('login', '승인 기사인데 쿠팡 아이디 없음', drivers.filter(function (o) { return working(o) && !isStaff_(o) && !str_(o.loginId); }).map(function (o) { return o.name; }), '기사 정보관리에서 쿠팡플렉스 아이디를 넣으세요.');
+  // ④ 오늘 이후 확정 품앗이인데 받은 기사가 퇴사·휴직·정지·삭제
+  const byId = {}; drivers.forEach(function (o) { byId[o.id] = o; });
+  const a4 = [];
+  try { pmData_().jobs.forEach(function (j) { if (j.status !== PST.DONE || !j.acceptedId || !(j.date >= today)) return; const o = byId[j.acceptedId]; if (!o || !working(o)) a4.push(j.date.slice(5) + ' ' + str_(j.camp).replace(/\s*캠프$/, '') + ' ' + str_(j.route) + ' → ' + (j.accepted || '?')); }); } catch (e) { /* 품앗이 탭 없음 */ }
+  add('pm', '확정 품앗이의 받은 기사가 퇴사·휴직·정지', a4, '품앗이 관리에서 그 일감을 다른 기사에게 다시 맡기세요.');
+  // ⑤ 어제 0시부터 지금까지 오류 기록 (종류별 건수)
+  try {
+    const y = Utilities.formatDate(new Date(Date.now() - 864e5), CFG.TZ, 'yyyy-MM-dd'), cnt = {};
+    readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y) { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
+    add('err', '어제부터 기록된 오류', Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).map(function (k) { return k + ' ' + cnt[k] + '건'; }), '자세한 내용은 error_log 탭에 있습니다.');
+  } catch (e) { /* 탭 없음 */ }
+  const res = { at: nowText_(), items: items };
+  appSetPut_('dataCheck', JSON.stringify(res), '매일 새벽 자료 점검 결과 (자동 · 지워도 다음 날 다시 만들어짐)');
+  return res;
+}
+function api_perf(token, rows, bid, errs) {
   return run_(function () {
     const s = getSession_(token);
     if (!s) return { ok: true, n: 0 };
     if (perfSeen_(bid)) return { ok: true, n: 0, dup: true };
+    errRows_(errs, '기사앱', '');
     // 한 기기에서 1분에 3번까지만 (앱은 1분에 1번 보냄 · 마구 보내 시트를 키우지 못하게)
     const k = 'pf:' + s.th, c = cache_(), n = +(c.get(k) || 0);
     if (n >= 3) return { ok: true, n: 0 };
@@ -49,10 +153,11 @@ function api_perf(token, rows, bid) {
   });
 }
 /** 관리자 앱: 측정값 보내기 */
-function adm_perf(token, rows, bench, bid) {
+function adm_perf(token, rows, bench, bid, errs) {
   return run_(function () {
     const a = requireAdmin_(token);
     if (perfSeen_(bid)) return { ok: true, n: 0, dup: true };
+    errRows_(errs, '관리자앱', a.name);
     return { ok: true, n: perfRows_(rows, bench ? '측정' : '관리자앱', a.name) };
   });
 }

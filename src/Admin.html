@@ -90,6 +90,9 @@
   .db-list li.done .t { color: var(--faint); text-decoration: line-through; }
   .db-tbl { width: 100%; min-width: 0; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .db-card { overflow: hidden; }
+  .dc-it { border-top: 1px solid #f0f1f3; padding: 6px 0 2px; font-size: 12.5px; } .dc-it:first-of-type { border-top: 0; }
+  .dc-it summary { cursor: pointer; display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; } .dc-it summary span { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; } .dc-it summary b { color: #c81e1e; flex: none; }
+  .dc-l { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; } .dc-l span { background: #f5f6f8; border-radius: 6px; padding: 2px 7px; white-space: normal; overflow-wrap: anywhere; } .dc-it p { margin: 2px 0 6px; font-size: 11.5px; white-space: normal; }
   .db-tbl th, .db-tbl td { padding: 4px 6px; text-align: right; border-top: 1px solid var(--line); white-space: nowrap; }
   .db-tbl th:first-child, .db-tbl td:first-child { text-align: left; } .db-tbl thead th { border-top: 0; color: var(--sub); font-weight: 600; font-size: 11.5px; }
   .db-tbl tr.today td { background: var(--cw); font-weight: 700; } .db-tbl td.sun { color: var(--danger); } .db-tbl td.neg { color: var(--danger); }
@@ -1326,7 +1329,7 @@
         <a data-view="uiset">올인원 설정</a>
       </div>
     </nav>
-    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a><br><a id="uiSw"></a> · <a id="pfOpen">⏱ 속도 측정</a></div>
+    <div class="me"><button type="button" class="ainst hidden" id="aInst" title="바탕화면·홈 화면에 관리자 앱 바로가기를 만듭니다">📲 관리자 앱 설치</button><b id="meName">관리자</b><a id="apOpen">비밀번호 변경</a> · <a id="logoutBtn">로그아웃</a><br><a id="uiSw"></a> · <a id="pfOpen">⏱ 속도 측정</a><span id="updNo" title="지금 화면의 프로그램 업데이트 번호"></span></div>
   </aside>
 
   <main>
@@ -1387,6 +1390,7 @@
         <div id="dsRes"></div>
       </div>
       <div class="ds-side">
+        <aside class="db-card hidden" id="dcCard"></aside>
         <aside class="db-card ds-memo-card">
           <div class="db-top"><b>러너 업무스케줄</b><a id="dsMemoGo">열기 →</a></div>
           <div class="ds-mnav"><button class="btn sm ghost" id="dsMemoPrev" type="button" aria-label="전날">◀</button><b id="dsMemoT"></b><button class="btn sm ghost" id="dsMemoNext" type="button" aria-label="다음날">▶</button><span class="grow"></span><button class="btn sm ghost" id="dsMemoToday" type="button">오늘</button><input class="inp" type="date" id="dsMemoDay" style="width:140px;height:30px"></div>
@@ -2434,6 +2438,20 @@
     setInterval(check, 5 * 60000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   })();
+  // ───── 오류 기록: 화면 오류 · 60초 초과 · 서버 응답 이상을 모아 속도 기록과 같이 보낸다 (error_log 탭 · 한 번에 10건까지) ─────
+  const UPD = String((window.RUNNER_CONFIG && window.RUNNER_CONFIG.upd) || '');
+  const ERRQ = [];
+  function errAdd(k, f, m) {
+    try {
+      m = String(m || '').slice(0, 300);
+      if (ERRQ.length >= 10 || !m || /ResizeObserver|^Script error\.?$|EXPIRED|NO_API|Failed to fetch|NetworkError|Load failed|FS_TIMEOUT|FS_LOAD/i.test(m)) return;
+      if (ERRQ.some((e) => e.k === k && e.f === f && e.m === m)) return;
+      let v = ''; try { v = String(currentView || ''); } catch (e) { v = ''; }
+      ERRQ.push({ k: k, f: f || '', m: m, v: v, u: UPD });
+    } catch (e) { /* 기록 실패는 무시 */ }
+  }
+  window.addEventListener('error', (e) => { if (e && e.message) errAdd('client', '', e.message + (e.filename ? ' @ ' + String(e.filename).split('/').pop().split('?')[0] + ':' + e.lineno : '')); });
+  window.addEventListener('unhandledrejection', (e) => { const r = e && e.reason; if (r && r.name === 'AbortError') return; errAdd('client', '', '(promise) ' + (r && (r.message || r) || '')); });
   // ───── 속도 측정: 호출마다 [화면, 함수, 왕복 ms, 서버 ms] 를 모아 1분마다 서버 perf_log 탭으로 (화면·함수별 합계) ─────
   const PERF = { m: {}, busy: false };
   function perfAdd(fn, ms, sv) {
@@ -2443,18 +2461,22 @@
     o.n++; o.rt += ms; o.mx = Math.max(o.mx, ms); o.sv += +sv || 0;
   }
   function perfFlush() {
-    const rows = Object.values(PERF.m); if (!rows.length || PERF.busy) return;
+    const rows = Object.values(PERF.m); if ((!rows.length && !ERRQ.length) || PERF.busy) return;
     PERF.m = {}; PERF.busy = true;
-    rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); });
+    const errs = ERRQ.splice(0);
+    rows.forEach((r) => { r.rt = Math.round(r.rt); r.mx = Math.round(r.mx); r.u = UPD; });
     // 묶음 번호를 같이 보낸다 → 같은 묶음이 두 번 도착해도 서버가 한 번만 적는다
     const bid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    Promise.resolve().then(() => store.get() && gsCall0('adm_perf', [store.get(), rows, false, bid])).catch(() => {}).finally(() => { PERF.busy = false; });
+    Promise.resolve().then(() => store.get() && gsCall0('adm_perf', [store.get(), rows, false, bid, errs])).catch(() => {}).finally(() => { PERF.busy = false; });
   }
   setInterval(perfFlush, 300000); // 5분마다 (전에는 1분 · 화면이 가려질 때도 보냄)
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') perfFlush(); });
   function gsCall(fn, args) {
     const t0 = performance.now();
-    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); return r; });
+    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); return r; }, (e) => {
+      if (e && e.name === 'AbortError') errAdd('timeout', fn, Math.round((performance.now() - t0) / 1000) + '초 기다리다 끊음'); else if (e && e.message === 'BAD_RESPONSE') errAdd('badresp', fn, '서버가 정상 응답 대신 다른 내용을 보냄');
+      throw e;
+    });
   }
   function gsCall0(fn, args) {
     if (window.google && google.script && google.script.run) {
@@ -2669,6 +2691,7 @@
     me = admin;
     $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
+    if (UPD) $('#updNo').textContent = ' · 업데이트 ' + UPD;
     driversLoaded = false;
     uiLoad();
     setTimeout(() => { try { liveStart(); } catch (e) {} }, 3000); // 실시간 갱신 구독 (Firestore pub/meta)
@@ -12655,6 +12678,16 @@
     const bn = e.target.closest('[data-bmban]');
     if (bn) { $('#bmModal').classList.add('hidden'); $('#bmBanDrv').value = bn.dataset.bmban; $('#bmBanMemo').focus(); toast(bn.dataset.n + ' 기사님: 기간·사유를 정하고 [정지]를 누르세요.'); }
   });
+  // ───── 자료 점검 (매일 새벽 서버가 확인한 결과 · 대시보드 오른쪽 맨 위 · 이상 없으면 한 줄) ─────
+  function dcPaint(c) {
+    const box = $('#dcCard'); if (!box) return;
+    if (!c || !c.at) { box.classList.add('hidden'); return; }
+    const items = c.items || [], at = String(c.at).slice(5, 16).replace('-', '/');
+    box.classList.remove('hidden');
+    box.innerHTML = '<div class="db-top"><b>자료 점검</b><span class="sub" style="font-size:11.5px">' + esc(at) + ' 확인</span></div>' +
+      (!items.length ? '<div class="sub" style="font-size:12.5px">이상 없음 ✅</div>' :
+        items.map((x) => '<details class="dc-it"><summary><span>' + esc(x.label) + '</span><b>' + x.n + '</b></summary><div class="dc-l">' + (x.list || []).map((t) => '<span>' + esc(t) + '</span>').join('') + (x.n > (x.list || []).length ? '<span class="sub">외 ' + (x.n - x.list.length) + '건</span>' : '') + '</div>' + (x.hint ? '<p class="sub">' + esc(x.hint) + '</p>' : '') + '</details>').join(''));
+  }
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
   (function boot() {
     const t = store.get();
@@ -12664,7 +12697,7 @@
     const kept = admKeep.me();
     if (kept && kept.name) showApp(kept);
     call('adm_check', t).then((r) => {
-      if (r.ok) { admKeep.me(r.admin); if (!kept || !kept.name) showApp(r.admin); else if (me && (me.name !== r.admin.name || me.loginId !== r.admin.loginId)) { me = r.admin; $('#meName').textContent = r.admin.name + ' (' + r.admin.loginId + ')'; } }
+      if (r.ok) { dcPaint(r.check); admKeep.me(r.admin); if (!kept || !kept.name) showApp(r.admin); else if (me && (me.name !== r.admin.name || me.loginId !== r.admin.loginId)) { me = r.admin; $('#meName').textContent = r.admin.name + ' (' + r.admin.loginId + ')'; } }
       else { store.del(); showLogin(); }
     }).catch(() => { if (!kept || !kept.name) showLogin(); toast('연결이 원활하지 않습니다.'); });
   })();
