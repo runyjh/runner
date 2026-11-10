@@ -1036,7 +1036,16 @@
   .sg td.num { text-align: center; font-weight: 700; color: var(--ink); }
   .sg tr.unas td { background: #fff5f5; } .sg tr.unas td.fx { color: #8b95a1; } .sg tr.unas td.f4 { color: var(--ink); font-weight: 700; }
   .sg tr.unas .unlab { color: #e03131; font-weight: 800; font-size: 12px; }
-  .sg tr.unas td.uc { background: repeating-linear-gradient(45deg, #fff5f5, #fff5f5 5px, #ffe3e3 5px, #ffe3e3 7px); }
+  .sg tr.unas td.uc { background: repeating-linear-gradient(45deg, #fff5f5, #fff5f5 5px, #ffe3e3 5px, #ffe3e3 7px); cursor: pointer; text-align: center; vertical-align: middle; font-size: 12px; font-weight: 700; padding: 3px; line-height: 1.3; }
+  .sg tr.unas td.uc:hover { outline: 2px solid #1b64da; outline-offset: -2px; }
+  .sg tr.unas td.uc.uc-ok { background: #eef6ff; color: #1d4ed8; } .sg tr.unas td.uc.uc-part { background: #fff7ed; color: #9a3412; }
+  .sg tr.unas td.uc .ucw { display: block; } .sg tr.unas td.uc .ucm { display: block; color: #e03131; font-weight: 800; }
+  .sg tr.unas td.uc .ct { font-size: 10px; border-radius: 3px; padding: 0 3px; margin-left: 2px; background: rgba(0,0,0,.07); }
+  .sg tr.unas td.uc .cid { display: inline-block; font-size: 10px; border-radius: 3px; padding: 0 4px; margin-left: 2px; background: #e4e4e1; color: #444441; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .ua-w { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f2f4f6; } .ua-w .btn { margin-left: auto; }
+  .ua-miss { margin-top: 8px; color: #c2410c; font-weight: 700; } .ua-ok { margin-top: 8px; color: #0b6b3a; font-weight: 700; }
+  #uaRots { display: flex; gap: 8px; } #uaRots button { min-width: 70px; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; } #uaRots button.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand); }
+  #uaPrev { margin-top: 10px; background: #f6f8fb; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 700; min-height: 20px; }
   .sg tr.note td.lab, .sg tr.calc td.lab { color: var(--sub); font-weight: 700; background: #f7f8fa; }
   /* 품앗이 줄(대신 뛰는 기사 · 배차 확정 때 자동) · 품앗이 표시 칸: 준 기사 = 품▶ 받은 기사, 받은 기사 = 품◀ 준 기사 */
   .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
@@ -1955,6 +1964,18 @@
     <div class="field"><label class="lb" for="isMAction">조치 · 메모</label><textarea class="inp" id="isMAction" style="height:44px" maxlength="200" placeholder="예: 기사에게 주의 · 캠프에 연락함"></textarea></div>
     <div class="is-prev" id="isMCell"></div>
     <div class="m-actions"><button type="button" class="btn ghost danger-t hidden" id="isMDel" style="margin-right:auto">삭제</button><button type="button" class="btn ghost" id="isMCancel">취소</button><button type="button" class="btn" id="isMGo">저장</button></div>
+  </div>
+</div>
+
+<!-- 기사스케줄 '담당 없음' 노선 칸: 그날 뛸 기사 배정 -->
+<div class="modal hidden" id="uaModal">
+  <div class="m-box" style="width:min(480px,100%)">
+    <h3 style="margin:0 0 4px" id="uaTitle">담당 없음 노선</h3>
+    <div class="db-note" style="margin:0 0 10px">담당 기사가 없는 노선입니다. 고른 기사 줄 칸에 이 노선을 적습니다 (올인원 규칙: 칸 = 그 사람이 한 일).</div>
+    <div class="field"><span class="lb">지금 뛰는 기사</span><div id="uaNow"></div></div>
+    <div class="field"><label class="lb" for="uaDrv">배정할 기사 <span class="sub">(그날 비었거나 휴무인 백업 기사가 위)</span></label><select class="inp" id="uaDrv"></select></div>
+    <div class="field"><span class="lb">회전</span><div id="uaRots"></div><div id="uaPrev"></div></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="uaCancel">닫기</button><button type="button" class="btn" id="uaGo">배정</button></div>
   </div>
 </div>
 
@@ -8113,7 +8134,8 @@
         '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + (scalc.counts[r.key || d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
         '<td class="ex">' + esc(d.workPattern || '') + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
     });
-    // 노선관리 노선인데 기본노선으로 맡은 기사가 없는 노선: 그 캠프 기사 줄 바로 아래 '담당 없음' 줄 (보기 전용 · 칸 선택·입력 대상 아님)
+    // 노선관리 노선인데 기본노선으로 맡은 기사가 없는 노선: 그 캠프 기사 줄 바로 아래 '담당 없음' 줄
+    //  칸 = 그날 이 노선을 뛰는 기사(다른 기사 줄 칸에서 자동) · 아무도 없으면 미입차 · 칸을 누르면 배정 창 → 고른 기사 줄 칸에 노선을 적음 (올인원 규칙: 칸 = 그 사람이 한 일)
     const UN = unassignedRoutes(), unDone = {}, campOf = {};
     SD.camps.forEach((c) => { campOf[c.id] = c; });
     const qs0 = nfc(sf.q || '').toLowerCase().split(/[,，、]/).map((x) => x.trim().replace(/\s/g, '')).filter(Boolean);
@@ -8122,7 +8144,7 @@
       if (!cid || unDone[cid] || !UN[cid] || !campOf[cid]) return '';
       unDone[cid] = 1;
       return UN[cid].filter((code) => unShow(cid, code)).map((code) => '<tr class="unas"><td class="fx f1">' + esc(shortCamp(campOf[cid].name)) + '</td><td class="fx f2"><span class="unlab" title="노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f3"></td><td class="fx f4">' + esc(code) + '</td>' +
-        dates.map((dt, ci) => '<td class="uc' + (sepCol(ci) ? ' wk2' : '') + '"></td>').join('') + '<td class="ex" colspan="5"></td></tr>').join('');
+        dates.map((dt, ci) => { const c = unCellInfo(cid, code, dt); return '<td class="uc ' + c.cls + (sepCol(ci) ? ' wk2' : '') + (dt === pddDate() ? ' today' : '') + '" data-ucid="' + esc(cid) + '" data-ucode="' + esc(code) + '" data-c="' + ci + '" title="눌러서 이 노선을 뛸 기사 배정">' + c.html + '</td>'; }).join('') + '<td class="ex" colspan="5"></td></tr>').join('');
     };
     const restUn = () => SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => unRows(c.id)).join('');
     let body = '', lastCamp = null, flushed = false;
@@ -8160,6 +8182,101 @@
     });
     return out;
   }
+  // ── 담당 없음 노선: 그날 누가 뛰는지 (다른 기사 줄 칸에서) ──
+  function unRotsOf(cid) { const c = SD.camps.find((x) => x.id === cid); const r = String((c && c.rot) || 'D1,D2,F3').split(',').map((x) => x.trim()).filter(Boolean); return r.length ? r : ['D1', 'D2', 'F3']; }
+  function unDrvOfKey(key) {
+    const k = String(key);
+    if (k.indexOf('PM') === 0) { const d = SD.drivers.find((x) => x.id === k.slice(2)); return d ? { d, pm: true } : null; }
+    const d = SD.drivers.find((x) => x.id === k) || SD.drivers.find((x) => x.id === k.split('~')[0]);
+    return d ? { d, pm: false } : null;
+  }
+  /** { need: ['919C|D1',…], who: [{ key, name, units: ['919C|D1',…], id }], miss: [...] } */
+  function unCover(cid, code, dt) {
+    const rots = unRotsOf(cid), camp = shortCamp((SD.camps.find((c) => c.id === cid) || {}).name || '');
+    const need = [];
+    SchedCalc.routeExpand(code).forEach((u) => rots.forEach((r) => need.push(u + '|' + r)));
+    const who = [];
+    Object.keys(SD.cells || {}).forEach((key) => {
+      if (/^NOTE/.test(key)) return;
+      let v = String((SD.cells[key] || {})[dt] || '').trim(); if (!v || v === '출근' || /휴무|휴가|병가|미입차|노쇼|퇴사/.test(v)) return;
+      const o = unDrvOfKey(key); if (!o) return;
+      const mc = v.match(/^([가-힣]+\d)\s*/), vc = mc ? mc[1] : (o.pm ? '' : shortCamp(o.d.camp || ''));
+      if (vc !== camp) return;
+      const idm = v.match(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/);
+      const u = isUnits(v, rots); if (!u) return;
+      const got = [];
+      Object.keys(u).forEach((rt) => u[rt].forEach((r) => { if (need.includes(rt + '|' + r)) got.push(rt + '|' + r); }));
+      if (got.length) who.push({ key, name: o.d.name + (o.pm ? ' (품앗이)' : ''), units: got, id: idm ? idm[1] : '' });
+    });
+    const have = new Set(); who.forEach((w) => w.units.forEach((x) => have.add(x)));
+    return { need, who, miss: need.filter((x) => !have.has(x)), rots, camp };
+  }
+  /** 칸 표시: 뛰는 기사 이름 (회전 일부면 회전) · 못 채운 물량은 '미입차' */
+  function unCellInfo(cid, code, dt) {
+    const c = unCover(cid, code, dt);
+    const part = (units) => { const rs = Array.from(new Set(units.map((x) => x.split('|')[1]))); const us = Array.from(new Set(units.map((x) => x.split('|')[0]))); const allU = SchedCalc.routeExpand(code);
+      return (us.length < allU.length ? groupRoutes(us.sort().join(',')) + ' ' : '') + (rs.length < c.rots.length ? rs.join('·') : ''); };
+    const names = c.who.map((w) => '<span class="ucw">' + esc(w.name) + (w.units.length < c.need.length ? '<span class="ct">' + esc(part(w.units).trim()) + '</span>' : '') + (w.id ? '<span class="cid etc">' + esc(w.id) + '</span>' : '') + '</span>').join('');
+    const miss = c.miss.length ? (c.miss.length === c.need.length ? '<span class="ucm">미입차</span>' : '<span class="ucm">' + esc(part(c.miss).trim()) + ' 미입차</span>') : '';
+    return { html: names + miss, cls: c.who.length ? (c.miss.length ? 'uc-part' : 'uc-ok') : 'uc-mi' };
+  }
+  function paintUnassigned() {
+    $$('#sGrid td.uc[data-ucid]').forEach((td) => {
+      const dt = SD.dates[+td.dataset.c], c = unCellInfo(td.dataset.ucid, td.dataset.ucode, dt);
+      if (td.__h !== c.html) { td.innerHTML = c.html; td.__h = c.html; }
+      td.classList.remove('uc-ok', 'uc-part', 'uc-mi'); td.classList.add(c.cls);
+    });
+  }
+  // 배정 창
+  const UA = { cid: '', code: '', dt: '', rots: [] };
+  function uaOpen(cid, code, dt) {
+    Object.assign(UA, { cid, code, dt });
+    const c = unCover(cid, code, dt);
+    UA.rots = c.rots.filter((r) => c.miss.some((x) => x.endsWith('|' + r)));
+    if (!UA.rots.length) UA.rots = c.rots.slice();
+    const md = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8)) + ' (' + '일월화수목금토'[new Date(d + 'T00:00:00').getDay()] + ')';
+    $('#uaTitle').textContent = c.camp + ' ' + code + ' · ' + md(dt);
+    $('#uaNow').innerHTML = (c.who.length ? c.who.map((w) => '<div class="ua-w"><b>' + esc(w.name) + '</b> <span class="sub">' + esc(sget(w.key, dt)) + '</span> <button type="button" class="btn sm ghost" data-uadel="' + esc(w.key) + '">배정 빼기</button></div>').join('') : '<div class="sub">아직 뛰는 기사가 없습니다.</div>') +
+      (c.miss.length ? '<div class="ua-miss">⚠ 비어 있는 물량: ' + esc(Array.from(new Set(c.miss.map((x) => x.split('|')[0]))).join(',')) + ' · ' + esc(Array.from(new Set(c.miss.map((x) => x.split('|')[1]))).join('·')) + '</div>' : '<div class="ua-ok">✓ 모든 회전이 채워졌습니다</div>');
+    // 후보: 승인 기사 (그날 칸이 비었거나 휴무인 백업 기사 먼저)
+    const free = (v) => !v || /^(휴무|고정휴무|추가휴무)$/.test(v);
+    const cands = SD.drivers.filter((d) => d.status === '승인' && !d.ex && !(d.workStatus === '퇴사')).map((d) => {
+      const v = sget(d.id, dt), bk = /백업|용차/.test(d.baseRoute || '') || d.type === '백업';
+      return { d, v, rank: (bk ? 0 : 2) + (free(v) ? 0 : 1) };
+    }).sort((a, b) => a.rank - b.rank || koSort(a.d.name, b.d.name));
+    $('#uaDrv').innerHTML = '<option value="">기사 고르기</option>' + cands.map((x) => '<option value="' + esc(x.d.id) + '">' + esc(x.d.name) + ' · ' + esc(shortCamp(x.d.camp || '') || '-') + (x.rank % 2 === 0 ? ' · ' + (x.v ? x.v : '빈 칸') : ' · 지금: ' + x.v) + (x.rank < 2 ? '  [백업]' : '') + '</option>').join('');
+    uaPaintRots(); $('#uaModal').classList.remove('hidden');
+  }
+  function uaPaintRots() {
+    const all = unRotsOf(UA.cid);
+    $('#uaRots').innerHTML = all.map((r) => '<button type="button" data-uar="' + r + '" class="' + (UA.rots.includes(r) ? 'on' : '') + '">' + r + '</button>').join('');
+    const id = $('#uaDrv').value, d = id && SD.drivers.find((x) => x.id === id);
+    $('#uaPrev').textContent = d ? d.name + ' ' + Number(UA.dt.slice(5, 7)) + '/' + Number(UA.dt.slice(8)) + ' 칸 → ' + uaValue(d) + (sget(d.id, UA.dt) ? '  (지금: ' + sget(d.id, UA.dt) + ')' : '') : '';
+  }
+  function uaValue(d) {
+    const all = unRotsOf(UA.cid), camp = shortCamp((SD.camps.find((c) => c.id === UA.cid) || {}).name || '');
+    const rs = all.filter((r) => UA.rots.includes(r));
+    return (shortCamp(d.camp || '') !== camp ? camp + ' ' : '') + UA.code + (rs.length && rs.length < all.length ? ' (' + rs.join(',') + ')' : '');
+  }
+  $('#uaRots').addEventListener('click', (e) => { const b = e.target.closest('[data-uar]'); if (!b) return; const r = b.dataset.uar; UA.rots = UA.rots.includes(r) ? UA.rots.filter((x) => x !== r) : UA.rots.concat(r); uaPaintRots(); });
+  $('#uaDrv').addEventListener('change', uaPaintRots);
+  const uaClose = () => $('#uaModal').classList.add('hidden');
+  $('#uaCancel').addEventListener('click', uaClose);
+  $('#uaModal').addEventListener('click', (e) => { if (e.target.id === 'uaModal') uaClose(); });
+  $('#uaGo').addEventListener('click', () => {
+    const id = $('#uaDrv').value; if (!id) return toast('기사를 고르세요.');
+    if (!UA.rots.length) return toast('회전을 고르세요.');
+    const d = SD.drivers.find((x) => x.id === id), now = sget(id, UA.dt), v = uaValue(d);
+    if (now && !/^(휴무|고정휴무|추가휴무|출근)$/.test(now) && !confirm(d.name + ' 칸에 이미 "' + now + '" 이(가) 있습니다. "' + v + '" 로 바꿀까요?')) return;
+    setCells([{ row: id, date: UA.dt, value: v }]); uaClose(); toast(d.name + ' ' + Number(UA.dt.slice(5, 7)) + '/' + Number(UA.dt.slice(8)) + ' 칸에 ' + v + ' 배정');
+  });
+  $('#uaNow').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-uadel]'); if (!b) return;
+    const key = b.dataset.uadel, o = unDrvOfKey(key), now = sget(key, UA.dt);
+    if (!confirm((o ? o.d.name : '') + ' ' + Number(UA.dt.slice(5, 7)) + '/' + Number(UA.dt.slice(8)) + ' 칸 "' + now + '" 을 비울까요?')) return;
+    setCells([{ row: key, date: UA.dt, value: '' }]); uaOpen(UA.cid, UA.code, UA.dt);
+  });
+  $('#sWrap').addEventListener('click', (e) => { const td = e.target.closest('#sGrid td.uc[data-ucid]'); if (!td) return; uaOpen(td.dataset.ucid, td.dataset.ucode, SD.dates[+td.dataset.c]); });
   /** 배정 안 된 칸: 소속 캠프가 있는 재직 기사(추가 배정 줄·휴직·퇴사일 이후 제외)의 빈 칸 */
   function noAssign(r, dt, v) {
     if (v || r.kind !== 'd') return false;
@@ -8340,6 +8457,7 @@
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
     $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });
+    try { paintUnassigned(); } catch (e) { /* 무시 */ }
     renderCalc();
   }
 
