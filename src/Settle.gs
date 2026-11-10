@@ -3059,6 +3059,12 @@ function adm_stlPaySet(token, month, list) {
  */
 function adm_stlTaxCheck(token, month, rows, dry) {
   return run_(function () {
+    try { return stlTaxCheck_(token, month, rows, dry); }
+    catch (e) { if (e && e.userMsg) throw e; console.error(e && e.stack); return { ok: false, msg: '홈택스 대조 오류: ' + (e && e.message) + ' · ' + String(e && e.stack || '').split('\n').slice(1, 3).join(' ').replace(/\s+/g, ' ').slice(0, 200) }; }
+  });
+}
+function stlTaxCheck_(token, month, rows, dry) {
+  {
     const a = requireAdmin_(token);
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     rows = Array.isArray(rows) ? rows : [];
@@ -3125,7 +3131,7 @@ function adm_stlTaxCheck(token, month, rows, dry) {
     const cnt = function (re) { return out.filter(function (x) { return re.test(x.status); }).length; };
     return { ok: true, month: month, rows: out.sort(function (p, q) { return (p.status === '완료') - (q.status === '완료') || Math.abs(q.diff) - Math.abs(p.diff); }), unmatched: unmatched,
       n: { total: out.length, done: cnt(/^완료$/), round: cnt(/1원차/), diff: cnt(/금액다름/), none: cnt(/미발행/), hometax: rows.length, hometaxSum: rows.reduce(function (s0, x) { return s0 + stlNum_(x.total); }, 0) } };
-  });
+  }
 }
 function adm_stlPayList(token, month) {
   return run_(function () {
