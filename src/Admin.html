@@ -7518,11 +7518,11 @@
     const start = sMode === 'month' && SD.dates.length ? SD.dates[0] : (SD.start || '');
     $('#upModal').classList.remove('hidden');
     $('#upWrap').innerHTML = '<div class="empty">만드는 중…</div>'; $('#upInfo').textContent = ''; $('#upTabs').innerHTML = '';
-    api('adm_schUploadTable', '', '4w').then((r) => {
+    api('adm_schUploadTable', (SD.dates && SD.dates[0]) || SD.start || '', '4w').then((r) => {
       if (!r.ok) { $('#upWrap').innerHTML = ''; return toast(r.msg); }
       upRes = r;
       const d0 = r.dates[0], d1 = r.dates[r.dates.length - 1];
-      $('#upTitle').textContent = '어드민 업로드 테이블 · PDD ' + r.target.slice(5).replace('-', '/') + '부터 2·3·4주일 치';
+      $('#upTitle').textContent = '어드민 업로드 테이블 · 기사스케줄 화면 첫 날짜 ' + r.target.slice(5).replace('-', '/') + '부터 2·3·4주일 치';
       $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
       if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
       upTab = 'w' + (upRange || 2);

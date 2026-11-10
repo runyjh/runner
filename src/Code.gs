@@ -5474,12 +5474,14 @@ function adm_schUploadTable(token, start, scope) {
     const today = new Date(), tmr = ymd_(addDays_(today, 1));
     let base = parseYmd_(start) || today;
     if (scope === 'nextweek') base = addDays_(sundayOf_(new Date(today.getFullYear(), today.getMonth(), today.getDate())), 7);
-    if (scope === 'thisweek' || scope === '4w' || (scope === 'month' && !parseYmd_(start))) base = addDays_(today, 1);
+    if (scope === 'thisweek' || (scope === '4w' && !parseYmd_(start)) || (scope === 'month' && !parseYmd_(start))) base = addDays_(today, 1);
+    // 4w + start: 기사스케줄 편집기에 보이는 첫 날짜부터 (지난 날도 포함)
+    const from4 = scope === '4w' ? ymd_(base) : '';
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
     // 한 달: 그 달(start 가 있으면 그 날짜의 달)을 덮는 주(일~토)들 → 1주차 ~ 5·6주차 (한 주 시작은 항상 일요일)
     let nDays = SCH_DAYS;
     // 4w: 내일(PDD)부터 28일 (화면에서 2주일 치 · 3주일 치 · 4주일 치로 골라 봄)
-    if (scope === '4w') nDays = Math.round((addDays_(today, 28) - sun) / 86400000) + 1; // 내일(PDD)부터 4주일 치(28일)까지 덮도록
+    if (scope === '4w') nDays = Math.round((addDays_(base, 28) - sun) / 86400000) + 1; // 시작일부터 4주일 치(28일)까지 덮도록
     if (scope === 'month') {
       const m0 = parseYmd_(start) || base, last = new Date(m0.getFullYear(), m0.getMonth() + 1, 0);
       const satEnd = addDays_(last, 6 - last.getDay());
@@ -5490,7 +5492,7 @@ function adm_schUploadTable(token, start, scope) {
     const res = schBuildUpload_(data, {
       bizNo: co.branchBizNo || '654-37-01141', // company 탭 '영업점 사업자번호'
       wave: 'WAVE1',
-      target: scope === 'nextweek' ? (ymd_(sun) > tmr ? ymd_(sun) : tmr) : tmr,
+      target: scope === '4w' ? from4 : scope === 'nextweek' ? (ymd_(sun) > tmr ? ymd_(sun) : tmr) : tmr,
       maxDays: schMaxDays_()
     });
     res.scope = scope || 'tomorrow';
