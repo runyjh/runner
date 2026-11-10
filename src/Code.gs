@@ -5480,8 +5480,7 @@ function adm_schUploadTable(token, start, scope) {
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
     // 한 달: 그 달(start 가 있으면 그 날짜의 달)을 덮는 주(일~토)들 → 1주차 ~ 5·6주차 (한 주 시작은 항상 일요일)
     let nDays = SCH_DAYS;
-    // 4w: 내일(PDD)부터 28일 (화면에서 2주일 치 · 3주일 치 · 4주일 치로 골라 봄)
-    if (scope === '4w') nDays = Math.round((addDays_(base, 28) - sun) / 86400000) + 1; // 시작일부터 4주일 치(28일)까지 덮도록
+    if (scope === '4w') nDays = 28; // 시작일이 든 주(일~토)부터 4주 → 화면에서 주차별 탭
     if (scope === 'month') {
       const m0 = parseYmd_(start) || base, last = new Date(m0.getFullYear(), m0.getMonth() + 1, 0);
       const satEnd = addDays_(last, 6 - last.getDay());

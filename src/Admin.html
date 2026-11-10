@@ -7523,34 +7523,26 @@
       if (!r.ok) { $('#upWrap').innerHTML = ''; return toast(r.msg); }
       upRes = r;
       const d0 = r.dates[0], d1 = r.dates[r.dates.length - 1];
-      $('#upTitle').textContent = '어드민 업로드 테이블 · 기사스케줄 화면 첫 날짜 ' + r.target.slice(5).replace('-', '/') + '부터 2·3·4주일 치';
+      $('#upTitle').textContent = '어드민 업로드 테이블 · 기사스케줄 화면 첫 날짜 ' + r.target.slice(5).replace('-', '/') + '부터 4주 (주차별)';
       $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
       if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
-      upTab = 'w' + (upRange || 2);
+      upTab = 'w1';
       upTabsRender(); upRender(); upRosterInfo();
     }).catch(() => { $('#upWrap').innerHTML = ''; });
   }
-  // 탭 w2 · w3 · w4 = 내일(PDD)부터 2주일 치(14일) · 3주일 치(21일) · 4주일 치(28일). 미입차·중복은 마지막에 고른 기간 안에서
+  // 주차별 탭 w1 ~ w4 (한 주 = 일~토 · 기사스케줄 편집기 첫 날짜가 든 주부터 4주 · 첫 날짜 이전 날은 빼고)
   const upWk = (tab) => /^w(\d+)$/.test(tab) ? +tab.slice(1) - 1 : -1;
-  let upRange = 2;
-  const upEnd = (n) => { const t = upRes.target, d = new Date(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10) + n * 7 - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-  function upPick(n) { // [줄, 파란 표시] (내일 ~ n주일 치 끝)
-    const end = upEnd(n), rows = [], keys = [];
-    (upRes.weeks || []).forEach((w, wi) => w.forEach((r, i) => { if (r[0] >= upRes.target && r[0] <= end) { rows.push(r); keys.push(upRes.keys[wi][i]); } }));
-    return { rows, keys, end };
-  }
   function upRows(tab) {
     if (!upRes) return [];
     const w = upWk(tab);
-    if (w >= 0) return upPick(w + 1).rows;
-    const end = upEnd(upRange), inR = (r) => !r[0] || String(r[0]) <= end;
-    if (tab === 'mi') return upRes.missing.filter(inR);
-    return upRes.dups.filter(inR);
+    if (w >= 0) return upRes.weeks[w] || [];
+    if (tab === 'mi') return upRes.missing;
+    return upRes.dups;
   }
   function upTabsRender() {
     // 주차(일~토) 탭: '2주차 (11/8~11/14) 출근 170건' — 한 주 시작은 항상 일요일 · 그 주 일요일이 든 달의 N주차 (표 머리글과 같은 셈법)
     const md = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
-    const t = [2, 3, 4].map((n) => ['w' + n, n + '주일 치 (' + md(upRes.target) + '~' + md(upEnd(n)) + ') 출근', '건'])
+    const t = (upRes.weeks || []).slice(0, 4).map((rows, i) => { const ds = upRes.dates.slice(i * 7, i * 7 + 7).filter((d) => d >= upRes.target); return ['w' + (i + 1), (ds[0] ? weekOfMonth(ds[0]) : i + 1) + '주차 (' + md(ds[0] || upRes.dates[i * 7]) + '~' + md(upRes.dates[Math.min(upRes.dates.length - 1, i * 7 + 6)]) + ') 출근', '건']; })
       .concat([['mi', '미입차', '건'], ['dup', '중복', '건']]);
     $('#upTabs').innerHTML = t.map(([k, l, u]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
   }
@@ -7560,7 +7552,7 @@
       if (upTab === 'mi' || r[4] === '미입차') return 'mi';
       if (upTab === 'dup') return 'dup';
       const w = upWk(upTab);
-      return w >= 0 && upPick(w + 1).keys[i] ? 'key' : '';
+      return w >= 0 && upRes.keys[w][i] ? 'key' : '';
     };
     const sepAt = -1;
     $('#upInfo').textContent = upTab === 'dup' ? '같은 날 같은 캠프·노선·회전에 2명 이상 — 업로드 전에 정리하세요.'
@@ -7639,7 +7631,7 @@
     const w = upWk(tab);
     if (w < 0) return null;
     const work = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근');
-    const end = upEnd(w + 1), dates = upRes.dates.filter((d) => d >= upRes.target && d <= end);
+    const dates = upRes.dates.slice(w * 7, w * 7 + 7).filter((d) => d >= upRes.target);
     if (!dates.length) return { rows: [], extra: [], dates };
     const sc = (c) => String(c || '').replace(/\s*캠프\s*$/, '').trim();
     const rSeen = {};
@@ -7692,7 +7684,7 @@
   $('#sUpload').addEventListener('click', upMake);
   $('#upRegen').addEventListener('click', upMake);
   $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
-  $('#upTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-up]'); if (!b) return; upTab = b.dataset.up; if (upWk(upTab) >= 0) upRange = upWk(upTab) + 1; upTabsRender(); upRender(); });
+  $('#upTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-up]'); if (!b) return; upTab = b.dataset.up; upTabsRender(); upRender(); });
   $('#upCopy').addEventListener('click', () => {
     const rows = upRows(upTab);
     if (!rows.length) return toast('복사할 줄이 없습니다.');
