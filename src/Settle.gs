@@ -2355,6 +2355,35 @@ function adm_stlPnl(token, month) {
     return { ok: true, year: y, rows: rows };
   });
 }
+/**
+ * 최종 리포트 보조 자료 (정산 결과·손익은 화면이 이미 가진 것으로 그림): 세금계산서 발행 현황 · 통장 내역 미분류 · 쿠팡 입금(자금) · 마감 기록
+ */
+function adm_stlReportExtra(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const out = { ok: true, month: month, ti: { n: 0, total: 0, byDriver: {} }, bank: { rows: 0, none: 0, check: 0 }, deposit: null, closed: null };
+    try {
+      readAll_(SH.TAXINV).forEach(function (r) {
+        if (!r.id || r.month !== month || r.pub === 'N') return;
+        out.ti.n++; out.ti.total += stlNum_(r.total);
+        const k = str_(r.supDriverId) || str_(r.supId); if (k) out.ti.byDriver[k] = (out.ti.byDriver[k] || 0) + stlNum_(r.total);
+      });
+    } catch (e) { /* 세금계산서 탭 없음 */ }
+    try {
+      // 통장 거래는 거래가 있던 달 기준으로 저장됨 → 정산월 다음 달(기사 지급·쿠팡 입금이 있는 달)까지 본다
+      [month, stlAddMonth_(month, 1)].forEach(function (m) {
+        stlReadMonth_('stl_bankrows', m).forEach(function (x) { out.bank.rows++; if (x.status === '미분류') out.bank.none++; else if (x.status === '확인') out.bank.check++; });
+      });
+    } catch (e) { /* 통장 내역 없음 */ }
+    try {
+      const f = stlRead_('stl_fund').filter(function (x) { return x.month === month && x.item === '쿠팡 입금'; })[0];
+      if (f) out.deposit = { amt: stlNum_(f.amt), date: stlYmd_(f.date) || '', done: stlYes_(f.done) };
+    } catch (e) { /* 자금 없음 */ }
+    try { const c = stlClosedInfo_(month); if (c) out.closed = { at: c.at || '', admin: c.admin || '' }; } catch (e) { /* 무시 */ }
+    return out;
+  });
+}
 // ───────────────────────── 통장 · 자금배분 ─────────────────────────
 function stlBanks_() { return stlRead_('stl_bank').filter(function (b) { return b.name; }); }
 /** 배분 설정 줄이 빠져 있으면 채운다 (새 항목이 생겨도) */

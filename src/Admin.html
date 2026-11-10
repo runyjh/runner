@@ -545,6 +545,30 @@
     .slip { overflow: visible; padding: 0; }
     .noprint { display: none !important; }
   }
+  /* 최종 리포트 */
+  .rp-wrap { background: #fff; border-radius: 12px; padding: 18px 20px; }
+  .rp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+  .rp-head h3 { margin: 0 0 4px; font-size: 18px; }
+  .rp-closed { color: var(--brand); } .rp-open { color: var(--danger); }
+  .rp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .rp-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .rp-card.wide { margin-top: 12px; }
+  .rp-card h4 { margin: 0 0 8px; font-size: 14px; } .rp-card h4 small { font-weight: 500; color: var(--sub); margin-left: 6px; }
+  .rp-t { width: 100%; min-width: 0; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  .rp-t td { padding: 5px 2px; border-bottom: 1px dashed var(--line); vertical-align: top; white-space: normal; min-width: 0; } .rp-t td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; width: 34%; }
+  .rp-t .smemo { font-size: 11.5px; color: var(--sub); margin-top: 1px; }
+  .rp-t tr.sum td { border-bottom: 0; border-top: 2px solid var(--ink); font-weight: 800; padding-top: 7px; } .rp-t tr.sum.neg td.n { color: var(--danger); }
+  .rp-chk { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px 14px; font-size: 13px; }
+  .rp-chk li { display: flex; gap: 8px; align-items: baseline; padding: 4px 0 4px 18px; position: relative; } .rp-chk li::before { content: ''; position: absolute; left: 2px; top: 10px; width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
+  .rp-chk li.ok::before { background: var(--brand); } .rp-chk li.warn::before { background: var(--danger); }
+  .rp-chk li b { white-space: nowrap; } .rp-chk li span { color: var(--sub); }
+  .rp-drv td.n, .rp-drv th.n { text-align: right; } .rp-drv tr.dim { color: var(--faint); } .rp-drv tfoot td { font-weight: 800; border-top: 2px solid var(--ink); }
+  body.print-report * { visibility: hidden; }
+  @media print {
+    body.print-report #rpBox, body.print-report #rpBox * { visibility: visible; }
+    body.print-report #rpBox { position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
+    body.print-report .rp-grid { grid-template-columns: 1fr 1fr; }
+  }
   /* 모달 */
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; }
   .m-box { background: #fff; border-radius: 14px; width: min(420px, 100%); padding: 20px; }
@@ -1382,6 +1406,7 @@
     <div class="tabs" id="stTabs">
       <button class="tab" data-st="ids">아이디 관리</button>
       <button class="tab on" data-st="list">정산서</button>
+      <button class="tab" data-st="report">최종 리포트</button>
       <button class="tab" data-st="vendors">용차업체</button>
       <button class="tab" data-st="usage">아이디 사용 기록 (한 아이디 여러 기사)</button>
       <button class="tab" data-st="yongcha">품앗이/용차 지정</button>
@@ -1737,7 +1762,19 @@
 </div>
 
 <!-- ───────────── 노선관리: 참고 이미지 올리기 ───────────── -->
-<div class="modal hidden" id="imgAddModal">
+<div class="modal hidden" id="bpwModal" role="dialog" aria-modal="true" aria-labelledby="bpwTitle">
+    <div class="m-box" style="width:min(560px,100%)">
+      <h3 id="bpwTitle">비밀번호 일괄 변경</h3>
+      <p class="sub" id="bpwList" style="margin:0 0 10px"></p>
+      <label class="check"><input type="radio" name="bpwMode" id="bpwSame" checked> 모두 같은 임시 비밀번호로</label>
+      <div id="bpwPwRow" style="margin:6px 0 10px 24px"><input class="inp" id="bpwPw" type="text" autocomplete="off" placeholder="임시 비밀번호 (영문+숫자 8~30자)" style="width:100%"></div>
+      <label class="check"><input type="radio" name="bpwMode" id="bpwAuto"> 기사마다 다른 임시 비밀번호 자동 생성 (결과 표에 한 번 보여 줌)</label>
+      <p class="sub" style="margin:10px 0 0;font-size:12.5px">바꾼 기사는 다음 로그인 때 새 비밀번호를 정해야 합니다. 지금 쓰던 비밀번호로는 들어올 수 없으니 바꾸기 전에 기사에게 알려 주세요.</p>
+      <div id="bpwResult"></div>
+      <div class="m-actions"><button type="button" class="btn ghost" id="bpwClose">닫기</button><button type="button" class="btn" id="bpwGo">바꾸기</button></div>
+    </div>
+  </div>
+  <div class="modal hidden" id="imgAddModal">
   <form class="m-box" id="imgAddForm" novalidate style="width:min(640px,100%)">
     <h3>참고 이미지 추가</h3>
     <div class="ia-list" id="iaList"></div>
@@ -2358,7 +2395,7 @@
       sel('driverType', '단가코드', DTYPES.map((x) => [x, x])) +
       sel('title', '직급', [['', '기사']].concat(TITLES.map((x) => [x, x]))) +
       (camps.length ? sel('schCampId', '배정 캠프', [['', '(배정 안 함)']].concat(camps)) : '') +
-      '<span class="bksp"></span><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button><button type="button" class="btn sm danger" id="dBulkDel"' + (dDeleting ? ' disabled>삭제 중…' : '>선택한 기사 삭제') + '</button>';
+      '<span class="bksp"></span><button type="button" class="btn sm ghost" id="dBulkPw">비밀번호 일괄 변경</button><button type="button" class="btn sm ghost" id="dBulkClear">선택 해제</button><button type="button" class="btn sm danger" id="dBulkDel"' + (dDeleting ? ' disabled>삭제 중…' : '>선택한 기사 삭제') + '</button>';
   }
   $('#rows').addEventListener('change', (e) => {
     const c = e.target.closest('[data-dck]'); if (!c) return;
@@ -2391,7 +2428,39 @@
       }).catch(() => {}).finally(() => { $$('select', $('#dBulk')).forEach((x) => { x.disabled = false; }); });
     });
   });
+  // 비밀번호 일괄 변경: 고른 기사 전부에 임시 비밀번호 (같은 것 또는 기사마다 자동 생성) → 다음 로그인 때 새 비밀번호로 바꾸게 됨
+  let bpwBusy = false;
+  function openBulkPw() {
+    const names = all.filter((r) => dsel.has(r.id));
+    if (!names.length) return;
+    $('#bpwList').textContent = names.length + '명: ' + names.slice(0, 15).map((r) => r.name).join(', ') + (names.length > 15 ? ' 외 ' + (names.length - 15) + '명' : '');
+    $('#bpwPw').value = ''; $('#bpwResult').innerHTML = ''; $('#bpwSame').checked = true; paintBpwMode();
+    $('#bpwGo').disabled = false; $('#bpwGo').textContent = '바꾸기';
+    $('#bpwModal').classList.remove('hidden');
+  }
+  function paintBpwMode() { $('#bpwPwRow').classList.toggle('hidden', !$('#bpwSame').checked); }
+  $('#bpwSame').addEventListener('change', paintBpwMode); $('#bpwAuto').addEventListener('change', paintBpwMode);
+  $('#bpwClose').addEventListener('click', () => { if (!bpwBusy) $('#bpwModal').classList.add('hidden'); });
+  $('#bpwGo').addEventListener('click', () => {
+    if (bpwBusy) return;
+    const ids = [...dsel], auto = $('#bpwAuto').checked, pw = $('#bpwPw').value;
+    if (!ids.length) return toast('기사를 골라 주세요.');
+    if (!auto && !/^(?=.*[A-Za-z])(?=.*\d)[\x21-\x7e]{8,30}$/.test(pw)) return toast('비밀번호는 영문과 숫자를 포함해 8~30자로 입력해 주세요.');
+    if (!confirm(ids.length + '명의 비밀번호를 ' + (auto ? '기사마다 다른 임시 비밀번호로' : '입력한 임시 비밀번호로') + ' 바꿀까요?\n\n기사들은 다음 로그인 때 새 비밀번호를 정해야 합니다. 지금 쓰던 비밀번호로는 들어올 수 없습니다.')) return;
+    bpwBusy = true; $('#bpwGo').disabled = true; $('#bpwGo').textContent = '바꾸는 중…';
+    api('adm_setTempPasswordBulk', ids, auto ? { mode: 'auto' } : { mode: 'same', password: pw }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      const rows = r.done || [];
+      $('#bpwResult').innerHTML = '<p class="sub" style="margin:10px 0 6px"><b>' + rows.length + '명</b> 바꿨습니다' + (r.missing ? ' · 못 찾음 ' + r.missing : '') + '. 아래 표는 이 창을 닫으면 다시 볼 수 없습니다 — 기사에게 전달할 분은 지금 복사해 두세요.</p>' +
+        '<div class="table-wrap" style="max-height:260px"><table class="sttbl"><thead><tr><th>기사</th><th>아이디</th><th>임시 비밀번호</th></tr></thead><tbody>' + rows.map((x) => '<tr><td>' + esc(x.name) + '</td><td>' + esc(x.loginId) + '</td><td><code>' + esc(x.pw) + '</code></td></tr>').join('') + '</tbody></table></div>' +
+        '<button type="button" class="btn ghost sm" id="bpwCopy" style="margin-top:8px">표 복사 (이름 · 아이디 · 임시 비밀번호)</button>';
+      $('#bpwCopy').addEventListener('click', () => { navigator.clipboard.writeText(rows.map((x) => x.name + '\t' + x.loginId + '\t' + x.pw).join('\n')).then(() => toast('복사했습니다.'), () => toast('복사하지 못했습니다.')); });
+      $('#bpwGo').textContent = '완료';
+      toast(rows.length + '명의 비밀번호를 바꿨습니다.');
+    }).catch(() => { $('#bpwGo').disabled = false; $('#bpwGo').textContent = '바꾸기'; }).finally(() => { bpwBusy = false; });
+  });
   $('#dBulk').addEventListener('click', (e) => {
+    if (e.target.id === 'dBulkPw') return openBulkPw();
     if (e.target.id === 'dBulkClear') { dsel.clear(); renderRows(); return; }
     if (e.target.id !== 'dBulkDel' || dDeleting) return;
     const ids = [...dsel], n = ids.length, names = all.filter((r) => dsel.has(r.id)).map((r) => r.name);
@@ -7527,6 +7596,7 @@
   const mdTxt = (d) => (d ? +d.slice(5, 7) + '/' + +d.slice(8, 10) : '');
   
   const ST_HELP = {
+    report: '이 달 정산 결과 한 장: 쿠팡 매출 → 기사 지급 → 회사 손익 → 세금 예상 → 확인할 것 → 기사별 요약. 숫자는 정산서·러너 손익 화면과 같은 값이고, 마감 뒤에는 마감 때 저장한 결과입니다. [인쇄 · PDF 저장]으로 종이 한 장, [엑셀]로 세무사 전달용 파일을 만듭니다.',
     adjust: '이 정산월에 기사별로 더 주거나 빼는 돈. 항목에 따라 세금계산서에 반영(지급·계산서 차감)되거나 입금액에서만 빠집니다(가불금 상환·기타 공제). 차감도 양수로 입력. 배송 기본 같은 자동 항목을 고르면 그 금액에 ± 조정됩니다. 정산서 메모는 기사 정산서(기사 앱 포함)에 그 항목 밑에 보이고, 관리자 메모는 여기서만 보입니다.',
     advance: '기사에게 내준 가불금. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제됩니다 (예: 지급일 20일 → 상환일 11/20 은 10월 정산, 11/21 은 11월 정산). 그 달을 마감하면 상환금 칸에 자동으로 적히고, 마감을 풀면 되돌립니다. 정산 밖에서 현금으로 받았으면 상환금에 직접 적으세요. 그 달 [공제·가감]에 "가불금 상환"을 손으로 넣으면 자동 공제는 하지 않습니다.',
     yongcha: '이 정산기간 날짜의 품앗이·용차 지정. 우리 기사가 대신 뛰면(품앗이) 수행자에 그 기사 → 단가 칸을 비우면 노선관리의 그 노선 「품앗이단가」(프백 가중치까지 포함한 건당 금액)로 지급하고, 수행자 단가코드(고정/백업/품앗이 …)의 노선 단가와의 차액만 추가 지급. 품앗이단가가 빈 노선은 원래 단가로만 지급하고 확인 필요에 띄웁니다. 차액부담 기사를 넣으면 (단가 − 부담 기준단가) × 건수를 그 기사 계산서에서 뺍니다 (부담 기준단가를 비우면 수행자 단가코드 기준). 용차업체(외부용차)는 업체 건당 단가로만 지급하고, 단가 칸은 차액부담 기사에게 청구할 단가입니다: (청구 단가 − 기사 본인 단가) × 건수를 차감하고, 청구 단가 − 업체 단가는 러너 몫 (예: 청구 1,350 · 업체 1,320 · 내 단가 880 → 기사 470원 차감, 러너 30원). 품앗이도 [차액 처리]를 「러너 몫」으로 고르면 같은 방식: 수행 기사는 원래 단가만, 차액부담 기사는 (단가 − 본인 단가) 차감, 단가 − 수행 기사 단가는 러너 몫.',
@@ -7849,9 +7919,9 @@
     $('#stp-list').classList.toggle('hidden', tab !== 'list');
     if (STX.idt === 'usage') STX.idt = 'ids'; // 아이디 사용 기록은 정산관리 탭으로 옮김
     const idSub = tab === 'ids' ? (STX.idt || 'ids') : '';
-    $('#stp-edit').classList.toggle('hidden', !(['adjust', 'advance', 'yongcha', 'vendors', 'usage', 'tmp', 'cfg', 'pnl'].includes(tab) || (tab === 'ids' && idSub !== 'drv')));
+    $('#stp-edit').classList.toggle('hidden', !(['adjust', 'advance', 'yongcha', 'vendors', 'usage', 'tmp', 'cfg', 'pnl', 'report'].includes(tab) || (tab === 'ids' && idSub !== 'drv')));
     setFin(tab === 'pnl');
-    if (tab !== 'pnl') $('#stPnl').classList.add('hidden');
+    if (tab !== 'pnl' && tab !== 'report') $('#stPnl').classList.add('hidden');
     navMark();
     $('#stIdTabs').classList.toggle('hidden', tab !== 'ids' || idSub === 'drv');
     $$('#stIdTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.idt === idSub));
@@ -7863,7 +7933,71 @@
     else if (tab === 'ids') { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.remove('hidden'); if (idSub === 'drv') loadStDrivers(); else loadEditor(idSub); }
     else if (tab === 'cfg') stCfgTab(STX.cfg);
     else if (tab === 'pnl') stPnlTab(STX.pnlT || 'pnl');
+    else if (tab === 'report') { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.add('hidden'); $('#stPnl').classList.remove('hidden'); paintHelp('report'); loadReport(); }
     else { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.remove('hidden'); loadEditor(tab); }
+  }
+  // ── 최종 리포트: 이 달 정산 결과를 한 장으로 (매출 → 기사 지급 → 회사 손익 → 세금 → 확인할 것 → 기사별 요약) ──
+  function loadReport() {
+    const ps = STX.paneSeq, el = $('#stPnl');
+    if (!STX.sum || STX.sum.month !== STX.month) { el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>'; return loadSettle(STX.month); }
+    el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    api('adm_stlReportExtra', STX.month).then((r) => { if (ps !== STX.paneSeq) return; STX.rpx = r && r.ok ? r : null; renderReport(); })
+      .catch(() => { if (ps !== STX.paneSeq) return; STX.rpx = null; renderReport(); });
+  }
+  function renderReport() {
+    const S = STX.sum, P = STX.pnl || {}, X = STX.rpx || {}, t = S.total || {}, c = S.company || {}, el = $('#stPnl');
+    const D = (S.drivers || []).filter((d) => !d.legacyNote || d.sales), paid = D.filter((d) => d.net || d.invoice);
+    const n = (v) => wn(v || 0), sgn = (v) => (v < 0 ? '−' : '') + n(Math.abs(v || 0));
+    const row = (lab, v, sub, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + lab + (sub ? '<div class="smemo">' + sub + '</div>' : '') + '</td><td class="n">' + v + '</td></tr>';
+    const box = (title, rows, extra) => '<div class="rp-card"><h4>' + title + '</h4><table class="rp-t" data-tk-off>' + rows + '</table>' + (extra || '') + '</div>';
+    const ded = (t.depDed || 0), otherInc = (P.otherInc || {}), ins = P.ins || {};
+    const closed = X.closed || (S.closed ? { at: S.closed.at, admin: S.closed.admin } : null);
+    const legacy = S.legacy ? '기존 급여정산서 금액 그대로 이식' : '';
+    // 확인할 것
+    const unpaid = paid.filter((d) => !d.checked).length, noAcct = paid.filter((d) => !d.hasAccount && !d.vendor).length, noBiz = paid.filter((d) => !d.bizNo && !d.vendor && d.invoice).length;
+    const adv = D.filter((d) => d.advLeft > 0), zero = (S.drivers || []).filter((d) => d.legacyNote), warns = S.warnings || [];
+    const tiN = X.ti ? X.ti.n : null, tiMiss = X.ti ? paid.filter((d) => d.invoice && !(X.ti.byDriver[d.ownerId] || X.ti.byDriver[d.id])).length : null;
+    const chk = [];
+    chk.push([unpaid ? 'warn' : 'ok', '기사 입금 체크', unpaid ? unpaid + '명 아직 체크 안 함' : paid.length + '명 모두 체크']);
+    if (X.deposit) chk.push([X.deposit.done ? 'ok' : 'warn', '쿠팡 입금', (X.deposit.done ? '확인 ' : '예정 ') + n(X.deposit.amt) + (X.deposit.date ? ' · ' + esc(X.deposit.date) : '')]); else chk.push(['info', '쿠팡 입금', '자금배분에 기록 없음']);
+    if (tiN != null) chk.push([tiMiss ? 'warn' : 'ok', '세금계산서 (역발행)', tiN + '장 발행 · ' + n(X.ti.total) + (tiMiss ? ' · 미발행 ' + tiMiss + '명' : '')]);
+    if (X.bank && X.bank.rows) chk.push([X.bank.none ? 'warn' : 'ok', '통장 내역', X.bank.rows + '줄' + (X.bank.none ? ' · 미분류 ' + X.bank.none : '') + (X.bank.check ? ' · 확인 필요 ' + X.bank.check : '')]);
+    if (noAcct) chk.push(['warn', '계좌 없음', noAcct + '명']);
+    if (noBiz) chk.push(['warn', '사업자번호 없음', noBiz + '명 (계산서 대상)']);
+    if (adv.length) chk.push(['info', '가불 잔액', adv.length + '명 · ' + n(adv.reduce((a, d) => a + d.advLeft, 0))]);
+    if (zero.length) chk.push(['info', '정산서 없는 아이디 (0원)', zero.map((d) => esc(d.name)).join(', ')]);
+    warns.slice(0, 8).forEach((w) => chk.push(['warn', '확인 필요', esc(typeof w === 'string' ? w : w.msg || w.text || JSON.stringify(w))]));
+    const head = '<div class="rp-head noprint-keep"><div><h3>' + esc(ymTitle(S.month)) + ' 정산 최종 리포트</h3><div class="sub">정산기간 ' + esc(S.period.from) + ' ~ ' + esc(S.period.to) +
+      ' · ' + (closed ? '<b class="rp-closed">마감</b> ' + esc(closed.at || '') + (closed.admin ? ' · ' + esc(closed.admin) : '') : '<b class="rp-open">열림 (마감 전)</b>') + (legacy ? ' · ' + legacy : '') +
+      (S.round ? ' · 쿠팡 정산서 ' + S.round + '차' + (S.roundAt ? ' (' + esc(String(S.roundAt).slice(0, 10)) + ')' : '') : ' · 쿠팡 정산서 없음') + ' · 만든 시각 ' + esc(ymdLocal(new Date()) + ' ' + String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')) + '</div></div>' +
+      '<div class="noprint"><button type="button" class="btn ghost sm" id="rpPrint">인쇄 · PDF 저장</button> <button type="button" class="btn ghost sm" id="rpXlsx">엑셀</button></div></div>';
+    const k1 = box('① 쿠팡 매출', row('쿠팡 매출 (VAT포함)', n(c.sales), '배송 ' + n(t.qty) + '건 · 기사 ' + D.length + '명') + row('공급가', n(c.supplyCp)) + row('매출 부가세', n(P.salesVat != null ? P.salesVat : Math.round((c.supplyCp || 0) * 0.1))) +
+      row('분실파손 (쿠팡 · 소비자가)', '− ' + n(c.lossCp), '공급가 환산 ' + n(c.lossSup)) + (c.vendorCut ? row('쿠팡 프로그램 사용료', '− ' + n(c.vendorCut)) : '') +
+      row('쿠팡 입금 예상', n(Math.round((c.supplyCp || 0) * 1.1) - (c.lossCp || 0) - (c.vendorCut || 0)), '공급가×1.1 − 분실 − 사용료', 'sum'));
+    const k2 = box('② 기사 지급', row('세금계산서 합계 (매입)', n(t.invoice), '공급가 ' + n(t.supply) + ' · 세액 ' + n(t.tax) + ' · ' + paid.length + '명') +
+      row('산재보험 (기사분)', '− ' + n(t.san)) + row('고용보험 (기사분)', '− ' + n(t.goy)) + row('공제 (분실 변상·용차·가불·기타)', '− ' + n(ded), '분실 변상 ' + n(t.loss)) + (t.depAdd ? row('계산서 외 지급', '+ ' + n(t.depAdd)) : '') +
+      row('기사 실입금 합계', n(t.net), '', 'sum'));
+    const k3 = box('③ 회사 손익 (공급가 · 세전)', row('회사이익금', sgn(P.profit != null ? P.profit : t.profit), '쿠팡 공급가 − 분실 − 기사 공급가 + 기타수익' + ((c.promoBase || 0) + (c.promoRunner || 0) ? ' + 러너 몫 프로모션 ' + n((c.promoBase || 0) + (c.promoRunner || 0)) : '')) +
+      row('기타수익 (세무사 전달 · 부가세 없음)', n(otherInc.total), '분실 변상 ' + n(otherInc.loss) + ' · 용차 차액 ' + n(otherInc.yong) + ' · 보험 차액 ' + sgn(otherInc.ins)) +
+      row('러너 산재·고용 부담', '− ' + n(P.runnerIns)) + row('직원 인건비', '− ' + n(P.staff), P.staffN ? P.staffN + '명 · 원천세 ' + n(P.staffWht) : '') + row('운영비 (고정 ' + n(P.fixed) + ' + 지출 ' + n(P.varCost) + ')', '− ' + n(P.cost)) +
+      row('당기순이익', sgn(P.net), '매출 공급가 대비 ' + (P.rate ? (Math.round(P.rate * 1000) / 10) + '%' : '-'), 'sum' + ((P.net || 0) < 0 ? ' neg' : '')));
+    const k4 = box('④ 세금·보험 예상', row('부가세 (이 달 몫)', sgn(P.vatDue), '매출세액 − 기사 매입세액 ' + n(P.drvVat) + ' − 운영비 매입세액 ' + n((P.fixedVat || 0) + (P.varVat || 0))) +
+      row('산재·고용 신고액', n(ins.total), '기사분 ' + n((ins.sanD || 0) + (ins.goyD || 0)) + ' + 러너 ' + Math.round((ins.runner || 0) * 100) + '% ' + n(ins.runnerAmt)) +
+      row('직원 원천세', n(P.staffWht), '다음 달 10일') + (P.taxPaid ? row('이 달 낸 세금·보험', n(P.taxPaid)) : ''));
+    const k5 = '<div class="rp-card"><h4>⑤ 확인할 것</h4><ul class="rp-chk">' + chk.map((x) => '<li class="' + x[0] + '"><b>' + x[1] + '</b><span>' + x[2] + '</span></li>').join('') + '</ul></div>';
+    const tbl = '<div class="rp-card wide"><h4>⑥ 기사별 요약 <small>매출 많은 순</small></h4><div class="table-wrap"><table class="sttbl rp-drv"><thead><tr><th>#</th><th>기사</th><th>아이디</th><th class="n">배송</th><th class="n">쿠팡 매출</th><th class="n">계산서</th><th class="n">산재·고용</th><th class="n">공제</th><th class="n">실입금</th><th class="n">회사이익</th><th>입금</th></tr></thead><tbody>' +
+      D.map((d, i) => '<tr' + (d.legacyNote ? ' class="dim"' : '') + '><td>' + (i + 1) + '</td><td><b>' + esc(d.name) + '</b>' + (d.vendor ? ' <small class="sub">용차</small>' : '') + (d.legacyNote ? ' <small class="sub">' + esc(d.legacyNote) + '</small>' : '') + '</td><td class="sub">' + esc((d.cids || []).join(', ')) + '</td><td class="n">' + n(d.qty) + '</td><td class="n">' + n(d.sales) + '</td><td class="n">' + n(d.invoice) + '</td><td class="n">' + n((d.san || 0) + (d.goy || 0)) + '</td><td class="n">' + n(d.depDed) + '</td><td class="n"><b>' + n(d.net) + '</b></td><td class="n">' + sgn(d.profit) + '</td><td>' + (d.net ? (d.checked ? '✓' : '<span class="rp-open">미체크</span>') : '') + '</td></tr>').join('') +
+      '</tbody><tfoot><tr><td colspan="3">합계 ' + D.length + '명</td><td class="n">' + n(t.qty) + '</td><td class="n">' + n(t.sales) + '</td><td class="n">' + n(t.invoice) + '</td><td class="n">' + n((t.san || 0) + (t.goy || 0)) + '</td><td class="n">' + n(t.depDed) + '</td><td class="n"><b>' + n(t.net) + '</b></td><td class="n">' + sgn(t.profit) + '</td><td></td></tr></tfoot></table></div></div>';
+    el.innerHTML = '<div id="rpBox" class="rp-wrap">' + head + '<div class="rp-grid">' + k1 + k2 + k3 + k4 + '</div>' + k5 + tbl + '</div>';
+    $('#rpPrint').addEventListener('click', () => { document.body.classList.add('print-report'); window.print(); setTimeout(() => document.body.classList.remove('print-report'), 500); });
+    $('#rpXlsx').addEventListener('click', () => {
+      const H = ['기사', '아이디', '배송', '쿠팡 매출', '계산서', '공급가', '세액', '산재', '고용', '공제', '실입금', '회사이익', '입금체크'];
+      const rows = [H].concat(D.map((d) => [d.name, (d.cids || []).join(', '), d.qty || 0, d.sales || 0, d.invoice || 0, d.supply || 0, d.tax || 0, d.san || 0, d.goy || 0, d.depDed || 0, d.net || 0, d.profit || 0, d.checked ? 'Y' : '']));
+      rows.push(['합계', '', t.qty || 0, t.sales || 0, t.invoice || 0, t.supply || 0, t.tax || 0, t.san || 0, t.goy || 0, t.depDed || 0, t.net || 0, t.profit || 0, '']);
+      const sum = [['항목', '금액'], ['쿠팡 매출 (VAT포함)', c.sales || 0], ['쿠팡 공급가', c.supplyCp || 0], ['분실파손 (쿠팡)', c.lossCp || 0], ['세금계산서 합계', t.invoice || 0], ['산재 (기사분)', t.san || 0], ['고용 (기사분)', t.goy || 0], ['공제', ded], ['기사 실입금', t.net || 0], ['회사이익금', P.profit != null ? P.profit : t.profit || 0], ['기타수익', otherInc.total || 0], ['러너 산재·고용', P.runnerIns || 0], ['직원 인건비', P.staff || 0], ['운영비', P.cost || 0], ['당기순이익', P.net || 0], ['부가세 예상', P.vatDue || 0]];
+      const blob = ZIPW.xlsx([{ name: '요약', rows: sum, widths: [28, 16] }, { name: '기사별', rows: rows, widths: [14, 22, 8, 14, 14, 14, 12, 10, 10, 12, 14, 14, 8] }]);
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '러너_최종리포트_' + S.month.replace('-', '') + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    });
   }
   /** 러너 손익·통장 = 정산관리와 같은 정산월을 쓰는 별도 화면 (정산관리 탭·버튼은 숨김) */
   function setFin(on) {

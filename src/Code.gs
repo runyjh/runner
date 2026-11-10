@@ -2325,6 +2325,45 @@ function adm_setTempPassword(token, id, password) {
   });
 }
 
+/**
+ * 임시 비밀번호 일괄 지정: ids = 기사ID 목록, opt = { mode: 'same'|'auto', password }
+ *  same = 입력한 비밀번호를 모두에게 · auto = 기사마다 다른 임시 비밀번호를 만들어 줌 (결과에 한 번만 보여 줌)
+ *  모두 다음 로그인 때 비밀번호를 바꿔야 함(pwMustChange). 한 번에 200명까지.
+ */
+function adm_setTempPasswordBulk(token, ids, opt) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    opt = opt || {}; ids = (ids || []).map(String).filter(Boolean);
+    if (!ids.length) fail_('기사를 골라 주세요.');
+    if (ids.length > 200) fail_('한 번에 200명까지 바꿀 수 있습니다.');
+    const same = opt.mode !== 'auto' ? checkPw_(opt.password) : '';
+    const gen = function () { // 영문 소문자 + 숫자 8자 (헷갈리는 글자 l·o·0·1 제외) — 영문·숫자 둘 다 들어가게
+      const L = 'abcdefghjkmnpqrstuvwxyz', N = '23456789', b = randomBytes_(8); let out = '';
+      for (let i = 0; i < 8; i++) { const pool = (i % 2 === 0) ? L : N, v = Number(b[i]); out += pool.charAt((isFinite(v) ? Math.abs(v) : Math.floor(Math.random() * 256)) % pool.length); }
+      return out;
+    };
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    const done = [], miss = [];
+    try {
+      const now = nowText_();
+      ids.forEach(function (id) {
+        const o = driverById_(id);
+        if (!o) { miss.push(id); return; }
+        const pw = same || gen(), f = passwordFields_(pw);
+        f.pwMustChange = 'Y'; f.updatedAt = now;
+        const row = writeByKey_(SH.DRIVERS, 'id', o.id, o._row, f);
+        if (!row) { miss.push(id); return; }
+        forgetDriver_(o);
+        done.push({ id: o.id, name: o.name, loginId: o.loginId, pw: pw });
+      });
+      SpreadsheetApp.flush();
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '임시 비밀번호 일괄 지정', done.length + '명' + (opt.mode === 'auto' ? ' (자동 생성)' : ''), done.map(function (d) { return d.name; }).join(', ').slice(0, 300));
+    return { ok: true, done: done, missing: miss.length };
+  });
+}
+
 /** 서류 이미지·PDF 를 화면에 보여주기 위해 내려준다 (관리자가 드라이브 권한이 없어도 볼 수 있게) */
 function adm_getDoc(token, id, kind) {
   return run_(function () {
