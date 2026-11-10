@@ -138,6 +138,7 @@ function pmJobById_(id) {
 function api_pmList(token, f) {
   return run_(function () {
     const u = pmUser_(token);
+    pmOfficeAuto_();
     f = f || {};
     const today = todayText_(), d = pmData_();
     const q = str_(f.q).replace(/\s+/g, '').toLowerCase();
@@ -1166,6 +1167,25 @@ function pmAdminMarks_(cells, dates, byDrv, tips) {
   return out;
 }
 
+/**
+ * 사무실 등록 일감인데 지원만 되어 있고 확정이 안 된 것(바로 확정 기능 전에 지원했거나 처리 중 오류) → 먼저 지원한 기사로 확정.
+ * 품앗이 목록·관리자 목록을 열 때 확인한다 (해당 일감이 없으면 시트를 쓰지 않음).
+ */
+function pmOfficeAuto_() {
+  let n = 0;
+  try {
+    const d = pmData_();
+    d.jobs.forEach(function (j) {
+      if (!j.byOffice || (j.status !== PST.OPEN && j.status !== PST.TALK) || pmPast_(j)) return;
+      const a = d.apps.filter(function (x) { return x.jobId === j.id && (x.status === PAST.APPLY || x.status === PAST.TALK); })
+        .sort(function (x, y) { return String(x.createdAt).localeCompare(String(y.createdAt)); })[0];
+      if (!a) return;
+      try { pmDecide_('', j.id, a.id, 'accept'); n++; } catch (e) { console.log('사무실 품앗이 자동 확정 실패 ' + j.id + ': ' + (e && e.message)); }
+    });
+  } catch (e) { /* 무시 */ }
+  return n;
+}
+
 // ───────────────────────── 관리자: 사무실에서 품앗이 일감 등록 (기사스케줄에서) ─────────────────────────
 /** 등록 창에 필요한 목록 */
 function adm_pmMeta(token) {
@@ -1249,13 +1269,15 @@ function adm_pmCreate(token, job) {
 function adm_pmList(token, f) {
   return run_(function () {
     requireAdmin_(token);
+    pmOfficeAuto_();
     f = f || {};
     const today = todayText_(), d = pmData_();
     const from = pmDate_(f.from) || ymd_(addDays_(new Date(), -14)), to = pmDate_(f.to) || ymd_(addDays_(new Date(), 30));
     const q = str_(f.q).replace(/\s+/g, '').toLowerCase();
     const apps = {};
     d.apps.forEach(function (a) { (apps[a.jobId] = apps[a.jobId] || []).push(a); });
-    const all = d.jobs.filter(function (j) { return j.date >= from && j.date <= to; });
+    // 기간 안 + 기간 밖이라도 아직 안 지난 진행 중 일감(모집·협의·확정)은 늘 보인다 (예: 사무실이 몇 달 뒤 날짜로 올린 일감)
+    const all = d.jobs.filter(function (j) { return (j.date >= from && j.date <= to) || (j.date > to && (j.status === PST.OPEN || j.status === PST.TALK || j.status === PST.DONE) && !pmPast_(j, today)); });
     const count = {};
     const rows = all.map(function (j) {
       const st = pmView_(j, today), list = apps[j.id] || [];
