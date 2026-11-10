@@ -3074,7 +3074,7 @@ function stlTaxCheck_(token, month, rows, dry) {
     const nm = function (v) { return str_(v).replace(/\s*\(.*\)\s*$/, '').replace(/\s+/g, ''); };
     const byBiz = {}, byName = {};
     const targets = (r.summary.drivers || []).filter(function (d) { return d.invoice; }).map(function (d) {
-      const vv = d.vendor ? V.by[stlVendorKey_(d.vendor)] : null, o = vv ? null : (D.byId[d.ownerId] || {});
+      const vv = d.vendor ? V.by[stlVendorKey_(d.vendor)] : null, o = vv ? {} : (D.byId[d.ownerId] || {});
       const biz = norm(vv ? vv.bizNo : (o.bizNo || d.bizNo));
       const t = { id: d.id, name: d.name, invoice: d.invoice, biz: biz, names: [nm(d.name), nm(vv ? vv.name : o.name), nm(vv ? vv.ceo : o.bizCeo), nm(o.bizName)].filter(Boolean), hits: [] };
       if (biz) (byBiz[biz] = byBiz[biz] || []).push(t);
