@@ -380,6 +380,7 @@
   #view-settle.st-check #stKpi, #view-settle.st-check #stp-list .st-tools, #view-settle.st-check #stp-list .table-wrap, #view-settle.st-check #stCards { display: none; }
   .st-checkok { background: #f5fcf8; border: 1px solid #bfe5cf; border-radius: 12px; padding: 16px 18px; font-size: 14px; color: #0a7a3d; font-weight: 700; margin-bottom: 12px; }
   .st-checkok small { display: block; font-weight: 500; color: var(--sub); margin-top: 4px; }
+  .earlybar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; } .earlybar > .sub { flex: 1 1 320px; font-size: 12.5px; }
   .cf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
   .cf-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px 6px; } .cf-card h4 { margin: 0 0 6px; font-size: 15px; } .cf-card h4 small { display: block; font-weight: 500; font-size: 12px; color: var(--sub); margin-top: 2px; }
   .cf-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px dashed var(--line); } .cf-l { flex: 1; min-width: 0; } .cf-l b { font-size: 13.5px; } .cf-l small { display: block; color: var(--sub); font-size: 12px; line-height: 1.45; margin-top: 2px; }
@@ -8503,6 +8504,19 @@
     if (g) { const G = ST_STEPS[5].groups.find((x) => x.k === g.dataset.stg); STX.last.cfgG = G.k; return stGo(STX.last[G.k] || G.sub[0][0]); }
     const b = e.target.closest('[data-go]'); if (b) stGo(b.dataset.go);
   });
+  // 15일 선지급 기사 입력줄 (자금배분 · 배분 설정 위) — 저장하면 세부정산 설정 '15일 선지급 기사'와 같은 값
+  const earlyBar = (v, names) => '<div class="inssum earlybar"><b>⏱ 15일 선지급 기사 (운영자)</b><span class="sub">기사로도 일하는 운영자·관리자 — 정산금을 20일 기사정산 통장이 아니라 <b>쿠팡 입금일에 쿠팡정산 통장에서 바로</b> 지급</span>' +
+    '<input class="inp" id="earlyIn" value="' + esc(v || '') + '" placeholder="이름 또는 아이디 · 여러 명은 콤마 (예: 유정근)" style="width:260px" list="stPersonDL"><button type="button" class="btn sm" id="earlySave">저장</button><span class="sub" id="earlyMsg">' + (names && names.length ? '지금 적용: ' + esc(names.join(', ')) : v ? '이 달 정산에 해당 기사 없음' : '') + '</span></div>';
+  $('#stPnl').addEventListener('click', (e) => {
+    if (!e.target.closest('#earlySave')) return;
+    const v = $('#earlyIn').value, msg = $('#earlyMsg'); msg.textContent = '저장 중…';
+    api('adm_stlEarlyPaySet', v).then((r) => { if (!r.ok) { msg.textContent = r.msg || '실패'; return; } toast('15일 선지급 기사를 저장했습니다.'); STX.fund = null; if (STX.pnlT === 'fund') loadFund(); else msg.textContent = '저장됨'; }).catch(() => { msg.textContent = '저장하지 못했습니다.'; });
+  });
+  $('#stEditor').addEventListener('click', (e) => {
+    if (!e.target.closest('#earlySave')) return;
+    const v = $('#earlyIn').value, msg = $('#earlyMsg'); msg.textContent = '저장 중…';
+    api('adm_stlEarlyPaySet', v).then((r) => { if (!r.ok) { msg.textContent = r.msg || '실패'; return; } toast('15일 선지급 기사를 저장했습니다 — 자금배분에 "운영자 선지급" 줄이 생깁니다.'); msg.textContent = '저장됨'; STX.fund = null; }).catch(() => { msg.textContent = '저장하지 못했습니다.'; });
+  });
   // 1단계 가져오기 창
   function impOpen() {
     const s = STX.sum || {};
@@ -8789,7 +8803,7 @@
       '<td><input class="inp" data-fk="' + x.key + '" data-ff="memo" value="' + esc(x.memo || '') + '" style="min-width:140px"></td></tr>';
     const sent = F.items.filter((x) => x.done).reduce((a, x) => a + x.amt, 0), total = F.items.reduce((a, x) => a + x.amt, 0);
     const rest = F.items.find((x) => x.key === 'rest') || {};
-    $('#stPnl').innerHTML = reserveBox() + dep +
+    $('#stPnl').innerHTML = reserveBox() + earlyBar(F.earlyPay, (F.early || []).map((e) => e.name)) + dep +
       (rest.amt < 0 ? '<div class="stw bad" style="margin-bottom:10px">쿠팡 입금보다 배분할 돈이 ' + wn(-rest.amt) + '원 많습니다. 금액을 조정하거나 유보금에서 채워 주세요.</div>' : '') +
       '<div class="table-wrap"><table class="sttbl fund-tbl"><thead><tr><th>항목</th><th>보낼 통장</th><th class="n">계산 금액</th><th class="n">보낼 금액 <small>(비우면 계산 금액)</small></th><th>이체</th><th>이체일</th><th>메모</th></tr></thead><tbody>' +
       F.items.map(row).join('') + '</tbody><tfoot><tr><td colspan="3">배분 합계 <small>(이체 완료 ' + wn(sent) + ')</small></td><td class="n"><b>' + wn(total) + '</b></td><td colspan="3" class="sub">쿠팡 입금 ' + wn(F.base) + (d.done ? ' (받음)' : ' (예정)') + '</td></tr></tfoot></table></div>';
@@ -9223,6 +9237,7 @@
         advSum = '<div class="inssum"><b>' + esc(mt) + (T.name === 'cost' ? ' 고정 운영비' : ' 지출 기록') + '</b><span>' + act.length + (T.name === 'cost' ? '개 항목' : '건') + '</span><span>나가는 돈 <em>' + wn(a) + '원</em></span><span>손익 반영 (공급가) <em>' + wn(sp) + '원</em></span><span>부가세 공제 <em>' + wn(vt) + '원</em></span></div>';
       }
     }
+    if (T.name === 'alloc') advSum = earlyBar(T.earlyPay || '', null) + advSum;
     if (T.name === 'camps' && T.calcSum) {
       const c = T.calcSum, d = c.diff;
       advSum = '<div class="inssum"><b>' + esc(ymTitle(T.month || STX.month)) + ' 정산 산재·고용</b>' +

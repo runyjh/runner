@@ -2521,7 +2521,7 @@ function stlFund_(month) {
   const base = deposit.amt || deposit.plan, rr = rows['유보금 (나머지)'] || {}, ra = alloc['유보금 (나머지)'] || {};
   const restPlan = base - used;
   items.push({ key: 'rest', label: '유보금 (나머지)', bank: ra.bank || roleBank('유보금'), plan: restPlan, amt: str_(rr.amt) !== '' ? stlNum_(rr.amt) : restPlan, adj: str_(rr.amt) !== '', done: stlYes_(rr.done), date: rr.date || '', memo: rr.memo || '', desc: STL_FUND_ITEMS[STL_FUND_ITEMS.length - 1][3], rule: '' });
-  return { month: month, closed: !!sum.closed, source: source, deposit: deposit, items: items, used: used, base: base, pnlNet: pnl.net, dates: sum.dates || {}, early: Object.keys(early).map(function (k) { return { id: k, name: early[k].name, net: early[k].net }; }) };
+  return { month: month, closed: !!sum.closed, source: source, deposit: deposit, items: items, used: used, base: base, pnlNet: pnl.net, dates: sum.dates || {}, earlyPay: stlCfg_().earlyPay, early: Object.keys(early).map(function (k) { return { id: k, name: early[k].name, net: early[k].net }; }) };
 }
 /** 통장별 움직임: 기초잔액 · 직접 입출금 · 자금배분 완료 · 입금확인(기사 지급) */
 function stlBankMoves_() {
@@ -3195,7 +3195,7 @@ function stlTableView_(name, month) {
       }
     }
     return {
-      ok: true, name: name, month: month, cols: E.cols.map(function (c) {
+      ok: true, name: name, month: month, earlyPay: name === 'alloc' ? stlCfg_().earlyPay : undefined, cols: E.cols.map(function (c) {
         if (c[2] === 'vendor') return { k: c[0], label: c[1], type: 'select', opts: [''].concat(X.vendors.list.map(function (v) { return v.name; })), idk: '' };
         if (c[2] === 'bank') return { k: c[0], label: c[1], type: 'select', opts: [''].concat(stlBanks_().map(function (b) { return b.name; })), idk: '' };
         return { k: c[0], label: c[1], type: Array.isArray(c[2]) ? 'select' : c[2], opts: Array.isArray(c[2]) ? c[2] : null, idk: c[3] || '', when: c[4] || '', ph: stlColPh_(name, c[0]) };
@@ -3767,6 +3767,24 @@ function stlAppMonths_(cfg) {
   return list.map(function (m) { return { month: m, closed: !!closed[m] }; });
 }
 /** 세부정산 설정 위의 단추: 기사 앱 정산서 표시 범위 */
+/** 15일 선지급 기사(운영자) 이름·아이디 저장 (세부정산 설정 earlyPay 와 같은 값 · 배분 설정·자금배분 화면에서도 고침) */
+function adm_stlEarlyPaySet(token, text) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const v = str_(text).slice(0, 200);
+    const label = STL_CFG.filter(function (d) { return d[0] === 'earlyPay'; })[0][1];
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      stlCfg_();
+      const rows = stlRead_('stl_config'), r = rows.filter(function (x) { return x.label === label; })[0];
+      if (r) stlSetRow_('stl_config', r._row, { value: v }); else stlAppend_('stl_config', [{ label: label, value: v, desc: '' }]);
+      stlBump_();
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '15일 선지급 기사', v, '');
+    return { ok: true, value: v };
+  });
+}
 function adm_stlAppRangeSet(token, range) {
   return run_(function () {
     const a = requireAdmin_(token);
