@@ -8781,10 +8781,10 @@
     // 기사정산금: 입금확인 진행 (정산서 목록의 입금 체크)
     const dl = ((STX.sum && STX.sum.drivers) || []).filter((v) => v.net), dDone = dl.filter((v) => v.checked);
     const payProg = '<div class="pay-prog">입금확인 <b>' + dDone.length + ' / ' + dl.length + '명</b> · 남은 <b>' + wn(dl.reduce((a, v) => a + v.net, 0) - dDone.reduce((a, v) => a + v.net, 0)) + '원</b> <a data-go-pay>입금확인 열기 →</a></div>';
-    const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '') + '</div>' + (x.key === 'driver' ? payProg : '') + '</td>' +
+    const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + (x.key === 'early' ? esc((F.early || []).map((e) => e.name + ' ' + wn(e.net)).join(' · ')) + ' · 쿠팡 입금일에 쿠팡정산 통장에서 바로 · 대상은 ⚙ 세부정산 설정 "15일 선지급 기사"' : esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '')) + '</div>' + (x.key === 'driver' ? payProg : '') + '</td>' +
       '<td>' + (x.bank ? esc(x.bank) + (x.bank === F.source && ['staff', 'owner'].includes(x.key) ? '<div class="smemo" style="color:var(--brand)">쿠팡정산 통장에서 바로 ' + (x.key === 'owner' ? '인출' : '지급') + '</div>' : bal[x.bank] != null ? '<div class="smemo">잔액 ' + wn(bal[x.bank]) + '</div>' : '') : '<span style="color:var(--danger)">통장 없음</span>') + '</td>' +
       '<td class="n">' + wn(x.plan) + '</td><td class="n">' + amtIn(x.key, x.adj ? x.amt : '', x.plan, x.done) + '</td>' +
-      '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? (['staff', 'owner'].includes(x.key) ? ' title="쿠팡정산 통장에서 바로 지급·인출 — 보냈으면 체크 (잔액에서 빠짐)"' : ' title="받는 통장과 같아 이체할 필요 없음 (돈이 그대로 남음)"') : '') + '></td>' +
+      (x.key === 'early' ? '<td class="sub" style="text-align:center;font-size:12px">입금확인에서<br>체크</td>' : '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? (['staff', 'owner'].includes(x.key) ? ' title="쿠팡정산 통장에서 바로 지급·인출 — 보냈으면 체크 (잔액에서 빠짐)"' : ' title="받는 통장과 같아 이체할 필요 없음 (돈이 그대로 남음)"') : '') + '></td>') +
       '<td><input class="inp" type="date" data-fk="' + x.key + '" data-ff="date" value="' + esc(x.date || '') + '" style="width:140px"></td>' +
       '<td><input class="inp" data-fk="' + x.key + '" data-ff="memo" value="' + esc(x.memo || '') + '" style="min-width:140px"></td></tr>';
     const sent = F.items.filter((x) => x.done).reduce((a, x) => a + x.amt, 0), total = F.items.reduce((a, x) => a + x.amt, 0);
@@ -8890,14 +8890,14 @@
     rows = rows || ((STX.pnlYear && STX.pnlYear.rows) || []);
     const by = {}; (F.items || []).forEach((x) => { by[x.key] = x; });
     const pick = (keys) => keys.map((k) => by[k]).filter(Boolean);
-    const when = { driver: '기사 지급일 ' + (mdTxt((F.dates || {}).pay) || ''), vat: '1/25 · 7/25', ins: '다음 달 10일', staff: '급여일 · 원천세 10일', fixed: '결제일', var: '결제일', tax: '다음 해 5월' };
+    const when = { early: '쿠팡 입금일 ' + (mdTxt((F.dates || {}).coupang) || '15일') + ' · 바로 지급', driver: '기사 지급일 ' + (mdTxt((F.dates || {}).pay) || ''), vat: '1/25 · 7/25', ins: '다음 달 10일', staff: '급여일 · 원천세 10일', fixed: '결제일', var: '결제일', tax: '다음 해 5월' };
     const mon = Number(String(STX.month).slice(5)), half = mon <= 6 ? [1, 6] : [7, 12];
     const vatAcc = (rows || []).filter((x) => { const m = Number(x.month.slice(5)); return m >= half[0] && m <= mon && x.hasData; }).reduce((a, x) => a + Math.max(0, x.vatDue || 0), 0);
     const line = (lab, items, extra) => {
       const amt = items.reduce((a, x) => a + (x.amt || 0), 0), done = items.length && items.every((x) => x.done), bank = [...new Set(items.map((x) => x.bank).filter(Boolean))].join(' · ');
       return '<tr class="' + (done ? 'ok' : amt ? 'todo' : '') + '"><td>' + (done ? '✓ ' : '') + lab + '</td><td class="sub">' + (extra || when[items[0] && items[0].key] || '') + (bank ? ' · ' + esc(bank) : '') + '</td><td class="n">' + wn(amt) + '</td></tr>';
     };
-    const groups = [['기사정산금', pick(['driver'])], ['부가세', pick(['vat']), '1/25 · 7/25 · ' + half[0] + '~' + mon + '월 누계 ' + wn(vatAcc)], ['산재·고용 (공단 신고액)', pick(['ins'])], ['급여 (세전 · 원천세 포함)', pick(['staff'])], ['운영비 (고정 + 지출)', pick(['fixed', 'var'])], ['종합소득세 적립', pick(['tax'])]].filter((g) => g[1].length);
+    const groups = [['운영자 선지급 (15일)', pick(['early'])], ['기사정산금 (20일)', pick(['driver'])], ['부가세', pick(['vat']), '1/25 · 7/25 · ' + half[0] + '~' + mon + '월 누계 ' + wn(vatAcc)], ['산재·고용 (공단 신고액)', pick(['ins'])], ['급여 (세전 · 원천세 포함)', pick(['staff'])], ['운영비 (고정 + 지출)', pick(['fixed', 'var'])], ['종합소득세 적립', pick(['tax'])]].filter((g) => g[1].length);
     const total = groups.reduce((a, g) => a + g[1].reduce((x, y) => x + (y.amt || 0), 0), 0), dep = F.deposit || {}, base = dep.amt || dep.plan || 0, left = base - total;
     const owner = by.owner ? by.owner.amt || 0 : 0, rest = left - owner;
     return '<div class="pnl-box pnl-reserve" id="pnlReserve"><h4>' + esc(ymTitle(STX.month)) + ' 빼둘 돈 요약 <small>쿠팡 입금 ' + wn(base) + (dep.done ? ' (받음)' : ' (' + (mdTxt(dep.due) || '예정') + ')') + ' 에서 미리 떼어 둘 돈 · 아래 표에서 이체 체크하면 ✓</small></h4><table>' +
@@ -9246,6 +9246,7 @@
         if (/공급가\/부가세포함/.test(L)) return sel(['공급가', '부가세포함']);
         if (/마감한 달만/.test(L)) return sel(['마감한 달만', '계산 중인 달도']);
         if (/이메일/.test(L)) return '<input class="inp" type="email"' + at + ' value="' + esc(v) + '" style="min-width:220px">';
+        if (/선지급/.test(L)) return '<input class="inp" type="text"' + at + ' value="' + esc(v) + '" placeholder="이름 또는 아이디 · 콤마" style="width:220px;text-align:left" list="stPersonDL">';
         return '<input class="inp cf-num" type="text" inputmode="decimal"' + at + ' value="' + esc(v) + '">';
       };
       const nice = (L) => L.replace(/\s*\((Y\/N|공급가\/부가세포함|마감한 달만 \/ 계산 중인 달도|전부 \/ 최근 3개월 \/ 정산 당월만 \/ 전부 숨김)\)\s*/, '').replace(/\(익월, 일\)/, '(익월)');
@@ -9450,11 +9451,12 @@
   function renderPay() {
     const P = STX.pay; if (!P) return;
     const only = $('#payOnlyLeft').checked;
-    const list = P.list.filter((x) => !only || !x.checked);
+    const list = P.list.filter((x) => !only || !x.checked).slice().sort((a, b) => (b.early ? 1 : 0) - (a.early ? 1 : 0));
     const total = P.list.reduce((a, x) => a + x.net, 0), done = P.list.filter((x) => x.checked).reduce((a, x) => a + x.net, 0);
-    $('#payInfo').innerHTML = '총 입금액 <b>' + wn(total) + '</b> · 입금 완료 <b>' + wn(done) + '</b> · 남은 금액 <b style="color:var(--danger)">' + wn(total - done) + '</b> · 미입금 <b>' + P.list.filter((x) => !x.checked).length + '명</b> · 지급일 ' + esc((P.dates || {}).pay || '');
+    const eN = P.list.filter((x) => x.early).length, eAmt = P.list.filter((x) => x.early).reduce((a, x) => a + x.net, 0);
+    $('#payInfo').innerHTML = '총 입금액 <b>' + wn(total) + '</b> · 입금 완료 <b>' + wn(done) + '</b> · 남은 금액 <b style="color:var(--danger)">' + wn(total - done) + '</b> · 미입금 <b>' + P.list.filter((x) => !x.checked).length + '명</b>' + (eN ? ' · <span style="color:var(--brand)">15일 선지급 ' + eN + '명 ' + wn(eAmt) + ' (쿠팡정산 통장에서)</span>' : '') + ' · 지급일 ' + esc((P.dates || {}).pay || '');
     $('#payTable').innerHTML = '<thead><tr><th>입금</th><th>이름</th><th>은행</th><th>계좌번호</th><th>예금주</th><th class="n">지급총액</th><th class="n">공제</th><th class="n">입금액</th><th>입금일</th><th>메모</th><th class="n">계산서 공급가</th><th class="n">세액</th><th>사업자번호</th></tr></thead><tbody>' +
-      list.map((x) => '<tr><td><input type="checkbox" data-pay="' + esc(x.id) + '"' + (x.checked ? ' checked' : '') + '></td><td><b>' + esc(x.name) + '</b><br><small class="sub">' + esc((x.cids || []).map((c) => c.replace(/@.*/, '')).join(', ')) + '</small></td><td>' + esc(x.bank) + '</td><td>' + (x.account ? esc(x.account) : '<span style="color:var(--danger)">미입력</span>') + '</td><td>' + esc(x.holder) + '</td>' +
+      list.map((x) => '<tr' + (x.early ? ' class="early"' : '') + '><td><input type="checkbox" data-pay="' + esc(x.id) + '"' + (x.checked ? ' checked' : '') + '></td><td><b>' + esc(x.name) + '</b>' + (x.early ? ' <span class="badge" style="background:var(--brand-weak);color:var(--brand)" title="운영자 · 쿠팡 입금일(15일)에 쿠팡정산 통장에서 바로 지급">15일 선지급</span>' : '') + '<br><small class="sub">' + esc((x.cids || []).map((c) => c.replace(/@.*/, '')).join(', ')) + '</small></td><td>' + esc(x.bank) + '</td><td>' + (x.account ? esc(x.account) : '<span style="color:var(--danger)">미입력</span>') + '</td><td>' + esc(x.holder) + '</td>' +
         '<td class="n">' + wn(x.pay) + '</td><td class="n">' + wnz(x.ded) + '</td><td class="n' + (x.net < 0 ? ' neg' : '') + '"><b>' + wn(x.net) + '</b></td><td>' + esc(x.payDate || '') + '</td>' +
         '<td><input class="inp" style="height:30px;min-width:120px" data-pmemo="' + esc(x.id) + '" value="' + esc(x.memo || '') + '"></td><td class="n">' + wn(x.supply) + '</td><td class="n">' + wn(x.tax) + '</td><td class="sub">' + esc(x.bizNo || '') + '</td></tr>').join('') + '</tbody>';
     tsApply($('#payTable'));
