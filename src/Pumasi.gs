@@ -108,7 +108,7 @@ function pmCard_(j, me, apps, today) {
   return {
     id: j.id, status: pmView_(j, today), kind: j.kind, date: j.date, time: j.time, area: j.area, camp: j.camp, route: j.route, qty: j.qty, top: j.top,
     price: j.price, pay: j.pay, mine: mine, poster: j.poster, myApp: my ? my.status : '', applicants: mine ? cnt : undefined,
-    accepted: j.acceptedId === me, hasAttach: !!j.attach,
+    accepted: j.acceptedId === me, hasAttach: !!j.attach, office: !!j.byOffice,
     offerToMe: j.offerToId === me && !!my && my.status === PAST.OFFER, offerTo: mine && j.offerToId ? j.offerTo : '', offered: j.offerToId === me
   };
 }
@@ -371,8 +371,14 @@ function api_pmApply(token, id, memo) {
       const apps = readAll_(SH.PAPP);
       const why = pmCanApply_(j, u.id, apps, today);
       if (why) fail_(why);
-      const now = nowText_();
-      appendObj_(SH.PAPP, { id: uniqId_('A'), jobId: j.id, driverId: u.id, name: u.info.name, date: j.date, status: PAST.APPLY, memo: String(memo || '').trim().slice(0, 200), createdAt: now, updatedAt: now });
+      const now = nowText_(), appId = uniqId_('A');
+      appendObj_(SH.PAPP, { id: appId, jobId: j.id, driverId: u.id, name: u.info.name, date: j.date, status: PAST.APPLY, memo: String(memo || '').trim().slice(0, 200), createdAt: now, updatedAt: now });
+      // 사무실에서 올린 일감: 지원하면 바로 배차 확정 (먼저 지원한 기사 · 잠금 안에서 처리해 두 명이 동시에 확정되지 않게)
+      //  → 확정 알림(지원 기사 · 맡긴 기사) · 기사스케줄 품앗이 줄에 표시 (pmDecide_ 'accept' 와 같은 길)
+      if (j.byOffice) {
+        pmDecide_('', j.id, appId, 'accept');
+        return { ok: true, confirmed: true };
+      }
       out.push(pmA_(j.posterId, j.poster, j, 'apply', u.info.name));
       pmAlertAdd_(out);
       pmTouch_();
@@ -1224,7 +1230,7 @@ function adm_pmCreate(token, job) {
         appendObj_(SH.PAPP, { id: appId, jobId: id, driverId: tgt.id, name: tgt.name, date: f.date, status: mode === 'offer' ? PAST.OFFER : PAST.APPLY, memo: str_(job.memo).slice(0, 200) || '사무실 등록', createdAt: now, updatedAt: now });
         if (mode === 'offer') out.push(pmA_(tgt.id, tgt.name, row, 'offer', poster.name));
       }
-      if (mode !== 'confirm') out.push(pmA_(poster.id, poster.name, row, 'office', mode === 'open' ? '올렸습니다. 지원자는 품앗이 관리에서 볼 수 있습니다.' : '올려 ' + tgt.name + ' 기사님께 제안했습니다.'));
+      if (mode !== 'confirm') out.push(pmA_(poster.id, poster.name, row, 'office', mode === 'open' ? '올렸습니다. 먼저 지원한 기사님으로 바로 배차 확정됩니다.' : '올려 ' + tgt.name + ' 기사님께 제안했습니다.'));
       pmAlertAdd_(out);
       pmTouch_();
     } finally {

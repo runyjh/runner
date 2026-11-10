@@ -1712,7 +1712,7 @@
     </div>
     <div class="field"><label class="lb" for="pmcDesc">상세 설명 (선택)</label><textarea class="inp" id="pmcDesc" style="height:70px"></textarea></div>
     <div class="field"><span class="lb">받는 기사</span>
-      <div class="seg" id="pmcMode"><button type="button" data-m="confirm" class="on">바로 배차 확정</button><button type="button" data-m="offer">제안 (기사 앱에서 수락)</button><button type="button" data-m="open">모든 기사에게 모집</button></div>
+      <div class="seg" id="pmcMode"><button type="button" data-m="confirm" class="on">바로 배차 확정</button><button type="button" data-m="offer">제안 (기사 앱에서 수락)</button><button type="button" data-m="open">모든 기사에게 모집 (지원 = 바로 확정)</button></div>
     </div>
     <div class="field" id="pmcToWrap"><label class="lb" for="pmcTo">받는 기사 (대신 뛰는 기사)</label><select class="inp" id="pmcTo"></select></div>
     <div class="db-note" id="pmcNote"></div>
@@ -7425,7 +7425,7 @@
     const m = PMC.mode, to = $('#pmcTo'), toName = to.value ? to.options[to.selectedIndex].text.replace(/\s*\(.*$/, '') : '받는 기사';
     $('#pmcToWrap').classList.toggle('hidden', m === 'open');
     $('#pmcNote').textContent = m === 'confirm' ? '등록하면 바로 배차 확정됩니다 → ' + toName + ' 기사님 품앗이 줄에 적히고, 두 기사님께 알림이 갑니다.'
-      : m === 'offer' ? toName + ' 기사님께 제안 알림이 가고, 기사 앱에서 수락하면 배차 확정됩니다.' : '모든 기사님이 품앗이 목록에서 보고 지원합니다. 지원자 확정은 품앗이 관리에서.';
+      : m === 'offer' ? toName + ' 기사님께 제안 알림이 가고, 기사 앱에서 수락하면 배차 확정됩니다.' : '모든 기사님이 품앗이 목록에서 봅니다. 사무실 등록 일감이라 먼저 지원한 기사님으로 바로 배차 확정되고 기사스케줄 품앗이 줄에 적힙니다.';
   };
   function pmcOpen() {
     const go = () => {
