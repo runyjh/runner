@@ -977,6 +977,12 @@
   .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; text-overflow: ellipsis; cursor: cell; user-select: none; text-align: center; font-weight: 600; white-space: pre; line-height: 1.25; }
   .sg td.wk2, .sg th.wk2 { border-left: 2px solid #c9d1da; }
   .sg td.today { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.04); }
+  /* PDD 열: 머리글부터 맨 아래까지 좌우 파란 테두리 (칸의 테두리·그림자 표시와 겹치지 않게 바탕 그림으로 그림) */
+  .sg td.today, .sg th.dc.today { background-image: linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da) !important; background-size: 2px 100%, 2px 100% !important; background-position: left top, right top !important; background-repeat: no-repeat !important; }
+  .sg th.dc.today { background-image: linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da) !important; background-size: 2px 100%, 2px 100%, 100% 3px !important; background-position: left top, right top, left top !important; }
+  .sg td.c.today.iss { background-image: linear-gradient(135deg, #e5484d 0 6px, transparent 6px), linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da) !important; background-size: 100% 100%, 2px 100%, 2px 100% !important; background-position: 0 0, left top, right top !important; }
+  #sGrid > tbody:not(#sCalc) > tr:hover > td.today:not(.rcoff) { background-image: linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da), linear-gradient(rgba(27,100,218,.09), rgba(27,100,218,.09)) !important; background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%, 100% 100% !important; background-position: top, bottom, left top, right top, 0 0 !important; }
+  #sGrid > #sCalc > tr:last-child > td.today { background-image: linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da) !important; background-size: 2px 100%, 2px 100%, 100% 2px !important; background-position: left top, right top, left bottom !important; }
   .k-work { background: #d9edfa; color: #2f6db5; } /* 바탕 #bfe1f6 에서 40% 옅게 · 글씨 #0a53a8 에서 15% 연하게 */
   .k-off { background: #f6baba; color: #F03737; }
   .k-sick { background: #d4edbc; color: #11734b; }
@@ -7804,8 +7810,9 @@
   function instOf(row, dt) { return (SD.issues || []).find((x) => x.driverId === row && x.date === dt && x.kind === '지시') || null; }
   function renderCalc() {
     const dates = SD.dates, campOk = (short) => !sf.camp || shortCamp((SD.camps.find((c) => c.id === sf.camp) || {}).name) === short;
+    const pdd = pddDate();
     const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f1 lab">' + lab + '</td><td class="fx f2 lab" colspan="3">' + sub + '</td>' +
-      vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="5"></td></tr>';
+      vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + (dates[i] === pdd ? ' today' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="5"></td></tr>';
     let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l) => l.filter((x) => campOk(x.split(' ')[0])).map(esc).join('<br>')));
     html += line('du', '중복', '같은 노선·회전 2명 이상', scalc.dups.map((l) => l.filter((x) => campOk(x.camp)).map((x) => esc(x.camp + ' ' + x.route + '(' + x.rot + ') ' +
       x.keys.map((k) => (SD.drivers.find((d) => d.id === String(k).split('~')[0]) || {}).name || k).join('·'))).join('<br>')));
@@ -12014,7 +12021,7 @@
   }
   // 화면 맨 위 '사용법' — 접었다 펼 수 있음 (접은 상태는 이 기기에 기억)
   const PG_NAV = { dash: '대시보드', drivers: '기사 정보관리', sched: '기사스케줄', bib: '배번호 관리', route: '노선관리', perf: '수행률 · SLA', memo: '업무스케줄', settle: '정산관리', pnl: '매입·매출', uiset: '올인원 설정' };
-  const pgOpen = (v) => { try { return localStorage.getItem('runner.pgHelp.' + v) !== '0'; } catch (e) { return true; } };
+  const pgOpen = (v) => { if (v === 'sched') return false; try { return localStorage.getItem('runner.pgHelp.' + v) !== '0'; } catch (e) { return true; } };
   function pageHelpAll() {
     Object.keys(PG_NAV).forEach((v) => {
       const sec = $('#view-' + (v === 'pnl' ? 'settle' : v)); if (!sec) return;
