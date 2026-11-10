@@ -2459,7 +2459,8 @@ function stlBanks_() { return stlRead_('stl_bank').filter(function (b) { return 
 function stlAllocRows_() {
   const rows = stlRead_('stl_alloc'), have = {};
   rows.forEach(function (r) { have[r.label] = 1; });
-  const banks = stlBanks_(), miss = STL_FUND_ITEMS.filter(function (f) { return !have[f[1]]; });
+  const extra = [['advance', '가불금 상환', '대표', '지급 통장을 안 적은 가불(기존 정산서 포함)의 상환금을 되돌려 넣을 통장 · 가불금 표에 지급 통장을 적은 건은 그 통장으로']];
+  const banks = stlBanks_(), miss = STL_FUND_ITEMS.concat(extra).filter(function (f) { return !have[f[1]]; });
   if (miss.length) {
     const lock = scriptLock_();
     lock.waitLock(20000);
@@ -2522,12 +2523,19 @@ function stlFund_(month) {
   const advBy = {}; stlRead_('stl_advance').forEach(function (a) { advBy[a._row] = a; });
   const advAmt = {};
   (sum.advAuto || []).forEach(function (x) { const a = advBy[x.row]; const b = a ? str_(a.bank) : ''; advAmt[b] = (advAmt[b] || 0) + (x.amt || 0); });
-  Object.keys(advAmt).sort().forEach(function (b) {
-    if (!advAmt[b]) return;
+  if (!Object.keys(advAmt).length) { // 가불금 표에 없는 상환 (기존 정산서 이식 달 · 수기 공제): 정산서 명세의 '가불' 공제 줄에서
+    let m = 0;
+    Object.keys(res.slips || {}).forEach(function (k) { ((res.slips[k] || {}).lines || []).forEach(function (l) { if (l.side === '차감' && /가불/.test(str_(l.name))) m += stlNum_(l.amt); }); });
+    if (m) advAmt[''] = m;
+  }
+  const advDefault = (alloc['가불금 상환'] || {}).bank || '';
+  Object.keys(advAmt).sort().forEach(function (b0) {
+    if (!advAmt[b0]) return;
+    const b = b0 || advDefault;
     const label = '가불금 상환 → ' + (b || '(지급 통장 미지정)'), r = rows[label] || {};
     const amt = str_(r.amt) !== '' ? stlNum_(r.amt) : advAmt[b];
     used += amt;
-    items.push({ key: 'advance|' + b, label: label, bank: b, plan: advAmt[b], amt: amt, adj: str_(r.amt) !== '', done: stlYes_(r.done), date: r.date || '', memo: r.memo || '', desc: '이 달 정산서에서 공제한 가불금 상환 · 원래 가불을 내준 통장으로 되돌려 넣기' + (b ? '' : ' · 가불금 표의 지급 통장을 채우면 그 통장으로'), rule: '' });
+    items.push({ key: 'advance|' + b, label: label, bank: b, plan: advAmt[b0], amt: amt, adj: str_(r.amt) !== '', done: stlYes_(r.done), date: r.date || '', memo: r.memo || '', desc: '이 달 정산서에서 공제한 가불금 상환 · 원래 가불을 내준 통장으로 되돌려 넣기' + (b0 ? '' : ' · 통장은 배분 규칙 "가불금 상환"에서'), rule: '' });
   });
   const base = deposit.amt || deposit.plan, rr = rows['유보금 (나머지)'] || {}, ra = alloc['유보금 (나머지)'] || {};
   const restPlan = base - used;
