@@ -8428,7 +8428,19 @@
     const subLines = (dt) => (SD.issues || []).filter((x) => x.result && x.sub && x.date <= dt && dt <= (x.end || x.date) && x.kind !== '지시').map((x) => '<div class="cc-sub">↳ ' + esc(x.name + ' · ' + x.sub + (x.subWho ? ' ' + x.subWho : '')) + '</div>').join('');
     const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f1 lab">' + lab + '</td><td class="fx f2 lab" colspan="3">' + sub + '</td>' +
       vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + (dates[i] === pdd ? ' today' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="5"></td></tr>';
-    let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l, i) => l.filter((x) => campOk(x.split(' ')[0])).map((x) => esc(groupRoutes(x)).replace(/,/g, ',<wbr>')).join('<br>') + subLines(dates[i])));
+    // 담당 없음 노선(기본노선 주인 없음)도 그날 아무도 안 뛴 물량은 미입차로 · 용차업체가 맡은 노선은 미입차 아님 → 보라색 안내 줄
+    const UN = unassignedRoutes(), unMi = dates.map(() => []), unVd = dates.map(() => []);
+    Object.keys(UN).forEach((cid) => UN[cid].forEach((code) => dates.forEach((dt, i) => {
+      const c = unCover(cid, code, dt); if (!c.miss.length || !campOk(c.camp)) return;
+      const us = Array.from(new Set(c.miss.map((x) => x.split('|')[0]))), rs = Array.from(new Set(c.miss.map((x) => x.split('|')[1])));
+      const txt = c.camp + ' ' + groupRoutes(us.sort().join(',')) + (rs.length < c.rots.length ? '(' + c.rots.filter((r) => rs.includes(r)).join(',') + ')' : '');
+      const vd = unVendor(c.camp, us, dt);
+      if (vd) unVd[i].push(txt + ' · ' + vd); else unMi[i].push(txt);
+    })));
+    // 같은 캠프·같은 회전 줄은 하나로 (강서1 527B,529A + 강서1 530A → 강서1 527B,529A,530A)
+    const unMerge = (arr) => { const m = new Map(); arr.forEach((x) => { const mm = String(x).match(/^(\S+)\s+([0-9A-Z,]+)(\(.*\))?$/); if (!mm) { m.set(x, null); return; } const k = mm[1] + '|' + (mm[3] || ''); if (!m.has(k)) m.set(k, { c: mm[1], r: [], t: mm[3] || '' }); mm[2].split(',').forEach((u) => { if (!m.get(k).r.includes(u)) m.get(k).r.push(u); }); });
+      return Array.from(m.entries()).map(([k, v]) => (v ? v.c + ' ' + SchedCalc.routeExpand(v.r.join(',')).sort().join(',') + v.t : k)); };
+    let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l, i) => unMerge(l.filter((x) => campOk(x.split(' ')[0])).concat(unMi[i])).map((x) => esc(groupRoutes(x)).replace(/,/g, ',<wbr>')).join('<br>') + unVd[i].map((x) => '<div class="cc-sub" style="color:#5f3dc4">🚚 ' + esc(x) + ' 용차</div>').join('') + subLines(dates[i])));
     // 중복: 같은 캠프·회전·사람이면 노선을 묶어 한 줄로 (529A(D1) 홍·황 + 529B(D1) 홍·황 → 529AB(D1) 홍·황)
     const nameOf = (k) => (SD.drivers.find((d) => d.id === String(k).split('~')[0]) || {}).name || k;
     html += line('du', '중복', '같은 노선·회전 2명 이상', scalc.dups.map((l) => {
