@@ -4112,7 +4112,20 @@
   function irCfgPut(o, msg) {
     return api('adm_insRepCfg', o).then((r) => { if (!r.ok) return toast(r.msg); if (IR.info) IR.info.cfg = r.cfg; irCfgPaint(); renderInsRep(); toast(msg); }).catch(() => {});
   }
-  $('#irCfgSave').addEventListener('click', () => irCfgPut({ jobCode: $('#irJob').value, bizMgmtNo: $('#irBizNo').value.trim() }, '신고 설정을 저장했습니다.'));
+  $('#irCfgSave').addEventListener('click', () => {
+    const o = Object.assign({ jobCode: $('#irJob').value, bizMgmtNo: $('#irBizNo').value.trim() }, IR.pendTpl || {});
+    const had = !!IR.pendTpl;
+    api('adm_insRepCfg', o).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      IR.pendTpl = null; if (IR.info) IR.info.cfg = r.cfg; IR.enrSet = null;
+      irCfgPaint(); renderInsRep();
+      // 올린 양식의 성명과 기사 명단 대조 결과
+      if (r.cfg && r.cfg.enrolled) {
+        const tg = IR.rows.filter((x) => irTarget(x)), done = tg.filter((x) => irEnrolled(x) === true), need = tg.filter((x) => irEnrolled(x) === false);
+        toast((had ? '양식을 저장하고 ' : '설정을 저장하고 ') + '대조했습니다 — 입직신고 완료 ' + done.length + '명 · 입직신고 대상 ' + need.length + '명' + (need.length ? ' (' + need.slice(0, 6).map((x) => x.name).join(', ') + (need.length > 6 ? ' 외' : '') + ')' : ''));
+      } else toast('신고 설정을 저장했습니다.' + (had ? '' : ' (대조하려면 토탈서비스 양식을 먼저 올려 주세요)'));
+    }).catch(() => {});
+  });
   $('#irTplPick').addEventListener('click', () => $('#irTplFile').click());
   $('#irTplDel').addEventListener('click', () => { if (confirm('올린 공단 양식을 지우고 기본 양식으로 내보낼까요? (입직신고 여부 표시도 지워집니다)')) irCfgPut({ tpl: null, enrolled: null }, '양식을 지웠습니다.'); });
   /** 입직신고 여부: 토탈서비스 양식에 성명이 있으면 신고됨 · 없으면 입직신고 대상 · 양식 안 올렸으면 — */
@@ -4157,7 +4170,9 @@
       if (!keys.includes('bosu')) return toast('양식에서 월보수액 칸을 찾지 못했습니다.');
       // 머리글 아래 성명 = 이미 입직신고된 노무제공자
       const nameCol = keys.indexOf('name'), names = nameCol < 0 ? [] : rows.slice(h + 1).map((r) => String((r || [])[nameCol] == null ? '' : r[nameCol]).trim()).filter((v) => v && !/^(성명|이름|예시|예\))/.test(v));
-      irCfgPut({ tpl: { file: f.name.slice(0, 80), sheet: (sheets[0] || {}).name || 'Sheet1', top, h, head }, enrolled: { file: f.name.slice(0, 80), names } }, '공단 양식을 올렸습니다 · 성명 ' + names.length + '명 → 없는 기사는 "입직신고 대상"으로 표시');
+      IR.pendTpl = { tpl: { file: f.name.slice(0, 80), sheet: (sheets[0] || {}).name || 'Sheet1', top, h, head }, enrolled: { file: f.name.slice(0, 80), names } };
+      $('#irTplName').innerHTML = '<b style="color:var(--brand)">새로 고른 양식: ' + esc(f.name) + ' · 성명 ' + names.length + '명</b> — <b>[설정 저장]</b>을 누르면 저장하고 기사 명단과 대조합니다';
+      toast('양식을 읽었습니다 (성명 ' + names.length + '명). [설정 저장]을 누르면 대조합니다.');
     } catch (err) { toast('양식을 읽지 못했습니다: ' + (err.message || err)); }
   });
   /** 공단 업로드 엑셀: 양식이 있으면 그 머리글 순서, 없으면 신고서 항목 순서 */
