@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes', CPROS: 'coupang_roster' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -373,7 +373,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs', 'route_notes']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs', 'route_notes', 'coupang_roster']);
 
 /** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
 const HEAD_RENAME = {};
@@ -413,9 +413,12 @@ SCHEMA[SH.TEAMS] = TMS;
 // camp_thumbs: 참고 이미지 미리보기(작은 JPEG, base64) — 노선관리 목록은 캠프마다 이 탭 한 번 읽기로 끝 (원본은 크게 볼 때만)
 // 기사 노선 정보 (RouteInfo.gs): 기사 앱 '내 캠프'에서 기사들이 자유롭게 쓰는 노선·캠프 정보 (route = 라우트 코드 · 비우면 캠프 전체)
 const RNT = { id: '정보ID', campId: '캠프ID', campName: '캠프명', route: '라우트', text: '내용', photos: '사진', authorId: '작성자ID', author: '작성자', status: '상태', createdAt: '등록일시', updatedAt: '수정일시' };
+// 쿠팡 어드민 등록 목록 (아이디 × 캠프): 쿠팡 어드민에서 받은 기사스케줄 엑셀을 올려 갱신 → 쿠팡 업로드 엑셀의 휴무 줄을 만든다
+const CRS = { camp: '캠프명', loginId: '아이디', name: '이름', updatedAt: '올린 날짜' };
 const CTH = { id: '이미지ID', campId: '캠프ID', fileId: '파일ID', data: '미리보기', updatedAt: '만든일시' };
 SCHEMA[SH.CTHUMB] = CTH;
 SCHEMA[SH.RNOTE] = RNT;
+SCHEMA[SH.CPROS] = CRS;
 SCHEMA[SH.TAXINV] = TI;
 SCHEMA[SH.RCHG] = RC;
 // 속도 측정 (Perf.gs): 1분마다 화면·함수별 합계 한 줄
@@ -5496,6 +5499,11 @@ function adm_schUploadTable(token, start, scope) {
       res.missing = res.missing.filter(inWk); res.dups = res.dups.filter(inWk); res.over7 = res.over7.filter(inWk);
     }
     schCheckIds_(res);
+    // 쿠팡 업로드 엑셀(양식 그대로)용: 쿠팡 등록 목록(아이디 × 캠프) · 벤더명 · 사업자번호
+    try { res.roster = readAll_(SH.CPROS).filter(function (o) { return o.loginId && o.camp; }).map(function (o) { return { camp: o.camp, id: o.loginId, name: o.name || '', at: o.updatedAt || '' }; }); } catch (e) { res.roster = []; }
+    const aps = appSet_();
+    res.cpVendor = str_(aps.cpVendor) || '러너/RUNNER';
+    res.cpBizNo = (str_(aps.cpBizNo) || str_(co.branchBizNo) || '654-37-01141').replace(/\D/g, '');
     let url = '';
     const lock = scriptLock_();
     try { lock.waitLock(20000); url = schWriteUpload_(res); } catch (e) { res.sheetError = String(e && e.message || e); } finally { lock.releaseLock(); }
@@ -5504,6 +5512,39 @@ function adm_schUploadTable(token, start, scope) {
     logAdmin_(a, '어드민 업로드 테이블 생성', data.dates[0] + ' ~ ' + data.dates[data.dates.length - 1],
       '출근 ' + res.weeks.reduce(function (a, w) { return a + w.length; }, 0) + '건 · 미입차 ' + res.missing.length + '건 · 중복 ' + res.dups.length + '건 · 주7일 ' + res.over7.length + '건 · 아이디 ' + res.badId.length + '건');
     return res;
+  });
+}
+
+/**
+ * 쿠팡 등록 목록 저장: 쿠팡 어드민에서 받은 기사스케줄 엑셀(업무일·벤더명·사업자등록번호·캠프명·웨이브·이름·아이디·…)을
+ * 화면에서 읽어 (캠프명, 아이디, 이름) 목록만 보낸다 → coupang_roster 탭을 통째로 바꾼다 (시트에서 직접 고쳐도 됨).
+ * p = { rows: [{ camp, id, name }], vendor, bizNo }
+ */
+function adm_cpRosterSave(token, p) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    p = p || {};
+    const seen = {}, rows = [], now = nowText_();
+    (Array.isArray(p.rows) ? p.rows : []).slice(0, 3000).forEach(function (x) {
+      const camp = str_(x && x.camp).replace(/\s*캠프\s*$/, '').trim(), id = str_(x && x.id).trim();
+      if (!camp || !id || seen[camp + '|' + id]) return;
+      seen[camp + '|' + id] = 1;
+      rows.push({ camp: camp, loginId: id, name: str_(x.name).trim().slice(0, 30), updatedAt: now });
+    });
+    if (!rows.length) fail_('엑셀에서 캠프명·아이디를 찾지 못했습니다. 쿠팡 어드민에서 받은 기사스케줄 엑셀인지 확인해 주세요.');
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const sh = sheet_(SH.CPROS), last = sh.getLastRow();
+      if (last >= 2) sh.getRange(2, 1, last - 1, sh.getLastColumn()).clearContent();
+      appendObjs_(SH.CPROS, rows);
+      if (str_(p.vendor)) appSetPut_('cpVendor', str_(p.vendor).slice(0, 40), '쿠팡 업로드 엑셀 벤더명 (쿠팡 등록 목록을 올릴 때 자동)');
+      if (str_(p.bizNo)) appSetPut_('cpBizNo', str_(p.bizNo).replace(/\D/g, '').slice(0, 10), '쿠팡 업로드 엑셀 사업자등록번호 (숫자만 · 쿠팡 등록 목록을 올릴 때 자동)');
+    } finally {
+      lock.releaseLock();
+    }
+    logAdmin_(a, '쿠팡 등록 목록 올림', '', rows.length + '개 (아이디 × 캠프)');
+    return { ok: true, roster: rows.map(function (o) { return { camp: o.camp, id: o.loginId, name: o.name, at: o.updatedAt }; }) };
   });
 }
 

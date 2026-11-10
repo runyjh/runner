@@ -1976,7 +1976,12 @@
       <div class="seg" id="upTabs"></div>
       <span class="up-info" id="upInfo"></span>
       <label class="check"><input type="checkbox" id="upWithName"> 명단 열 포함</label>
-      <button type="button" class="btn" id="upCopy">이 표 복사</button>
+      <button type="button" class="btn ghost" id="upCopy">이 표 복사</button>
+      <button type="button" class="btn" id="upXlsx" title="쿠팡 어드민 업로드 양식 그대로 (업무일·벤더명·사업자등록번호·캠프명·웨이브·이름·아이디·업무상태·회전·업무라우트) · 고른 주차 · 등록된 아이디는 일 안 하는 날 휴무 줄까지">⬇ 쿠팡 업로드 엑셀</button>
+    </div>
+    <div class="up-bar" style="margin-top:-4px">
+      <span class="up-info" id="upRoster"></span>
+      <label class="btn ghost sm" style="cursor:pointer" title="쿠팡 어드민에서 받은 기사스케줄 엑셀을 올리면 등록된 아이디 × 캠프 목록을 기억합니다 (휴무 줄·경고에 사용)">쿠팡 등록 목록 올리기<input type="file" id="upRosterIn" accept=".xlsx" hidden></label>
     </div>
     <div class="up-wrap" id="upWrap"></div>
   </div>
@@ -7522,7 +7527,7 @@
       $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
       if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
       upTab = 'w1';
-      upTabsRender(); upRender();
+      upTabsRender(); upRender(); upRosterInfo();
     }).catch(() => { $('#upWrap').innerHTML = ''; });
   }
   const upWk = (tab) => /^w(\d+)$/.test(tab) ? +tab.slice(1) - 1 : -1;
@@ -7557,6 +7562,88 @@
       rows.map((r, i) => (i === sepAt ? '<tr class="sep"><td colspan="12"></td></tr>' : '') +
         '<tr class="' + cls(r, i) + '"><td class="n">' + (i + 1) + '</td>' + r.map((v) => '<td>' + esc(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
   }
+  // ───── 쿠팡 업로드 엑셀 (쿠팡 어드민 양식 그대로) ─────
+  const CP_HEAD = ['업무일', '벤더명', '사업자등록번호', '캠프명', '웨이브', '이름', '아이디', '업무상태', '회전', '업무라우트'];
+  function upRosterInfo() {
+    const R = (upRes && upRes.roster) || [], at = R.reduce((m, x) => (x.at > m ? x.at : m), '');
+    $('#upRoster').innerHTML = R.length ? '쿠팡 등록 목록 <b>' + new Set(R.map((x) => x.id)).size + '개 아이디 · ' + R.length + '줄</b> (' + esc(String(at).slice(5, 16)) + ' 올림) — 일 안 하는 날은 이 목록대로 휴무 줄을 넣습니다.'
+      : '<span style="color:#b45309">쿠팡 등록 목록이 없습니다.</span> 기사 정보(소속 캠프)로 휴무 줄을 만듭니다. 쿠팡 어드민에서 받은 기사스케줄 엑셀을 올려 두면 쿠팡 등록과 정확히 맞춥니다.';
+  }
+  $('#upRosterIn').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const sheets = await readXlsx(await f.arrayBuffer()), rows = (sheets[0] && sheets[0].rows) || [];
+      const hi = rows.findIndex((r) => r && r.indexOf('아이디') >= 0 && r.indexOf('캠프명') >= 0);
+      if (hi < 0) return toast('첫 시트에서 "캠프명"·"아이디" 머리글을 찾지 못했습니다. 쿠팡 어드민에서 받은 기사스케줄 엑셀을 올려 주세요.');
+      const H = rows[hi], ix = (n) => H.indexOf(n), list = [];
+      let vendor = '', bizNo = '';
+      rows.slice(hi + 1).forEach((r) => {
+        if (!r || !r[ix('아이디')]) return;
+        list.push({ camp: String(r[ix('캠프명')] || ''), id: String(r[ix('아이디')]), name: ix('이름') >= 0 ? String(r[ix('이름')] || '') : '' });
+        if (!vendor && ix('벤더명') >= 0) vendor = String(r[ix('벤더명')] || '');
+        if (!bizNo && ix('사업자등록번호') >= 0) bizNo = String(r[ix('사업자등록번호')] || '');
+      });
+      const r = await api('adm_cpRosterSave', { rows: list, vendor, bizNo });
+      if (!r.ok) return toast(r.msg);
+      if (upRes) { upRes.roster = r.roster; if (vendor) upRes.cpVendor = vendor; if (bizNo) upRes.cpBizNo = bizNo.replace(/\D/g, ''); }
+      upRosterInfo(); toast('쿠팡 등록 목록을 저장했습니다 (' + r.roster.length + '줄).');
+    } catch (err) { toast('엑셀을 읽지 못했습니다: ' + (err && err.message || err)); }
+  });
+  /** 고른 주차 → 쿠팡 양식 줄. 등록 목록(아이디 × 캠프)마다 매일 1줄: 일하면 출근(회전·라우트), 아니면 휴무 */
+  function upCoupang(tab) {
+    const w = upWk(tab);
+    if (w < 0) return null;
+    const work = (upRes.weeks[w] || []).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근');
+    const dates = upRes.dates.slice(w * 7, w * 7 + 7).filter((d) => d >= upRes.target);
+    if (!dates.length) return { rows: [], extra: [], dates };
+    const sc = (c) => String(c || '').replace(/\s*캠프\s*$/, '').trim();
+    const rSeen = {};
+    let roster = (upRes.roster || []).map((x) => ({ camp: sc(x.camp), id: x.id, name: x.name })).filter((x) => { const k = x.camp + '|' + x.id; if (rSeen[k]) return false; rSeen[k] = 1; return true; });
+    const fromCp = roster.length > 0;
+    if (!fromCp) { // 쿠팡 목록이 없으면: 재직 기사의 소속 캠프(추가 배정 줄은 그 캠프)
+      const seen = {};
+      SD.drivers.forEach((d) => {
+        if (!d.loginId || d.status !== '승인' || (d.workStatus === '퇴사' && (!d.leaveDate || d.leaveDate <= dates[0])) || !d.camp) return;
+        const k = sc(d.camp) + '|' + d.loginId; if (seen[k]) return; seen[k] = 1;
+        roster.push({ camp: sc(d.camp), id: d.loginId, name: d.ex ? ((SD.drivers.find((x) => x.id === d.mainId) || {}).name || d.name) : d.name });
+      });
+    }
+    const nameOf = {}; roster.forEach((x) => { if (x.name) nameOf[x.id] = x.name; });
+    SD.drivers.forEach((d) => { if (d.loginId && !nameOf[d.loginId] && !d.ex) nameOf[d.loginId] = d.name; });
+    work.forEach((r) => { if (!nameOf[r[4]] && r[10]) nameOf[r[4]] = String(r[10]).split('(')[0].trim(); });
+    const inRoster = new Set(roster.map((x) => x.camp + '|' + x.id));
+    const byKey = {}; work.forEach((r) => { (byKey[r[0] + '|' + sc(r[2]) + '|' + r[4]] = byKey[r[0] + '|' + sc(r[2]) + '|' + r[4]] || []).push(r); });
+    const extra = [], seenExtra = {};
+    work.forEach((r) => { const k = sc(r[2]) + '|' + r[4]; if (!inRoster.has(k) && dates.indexOf(r[0]) >= 0) { extra.push(r); if (!seenExtra[k]) { seenExtra[k] = 1; roster.push({ camp: sc(r[2]), id: r[4], name: '' }); } } });
+    roster.sort((a, b) => koSort(a.camp, b.camp) || koSort(nameOf[a.id] || a.id, nameOf[b.id] || b.id));
+    const vendor = upRes.cpVendor || '러너/RUNNER', biz = String(upRes.cpBizNo || '6543701141').replace(/\D/g, ''), wave = 'WAVE1';
+    const rows = [CP_HEAD];
+    dates.forEach((d) => {
+      const dt = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+      roster.forEach((x) => {
+        const hit = byKey[d + '|' + x.camp + '|' + x.id];
+        if (hit) hit.forEach((r) => rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '출근', r[6] || '', String(r[7] || '').replace(/\s+/g, '')]));
+        else rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '휴무', '', '']);
+      });
+    });
+    return { rows, extra, dates, fromCp };
+  }
+  $('#upXlsx').addEventListener('click', () => {
+    if (!upRes) return;
+    if (upWk(upTab) < 0) return toast('주차 탭(출근)을 고른 뒤 받아 주세요.');
+    const c = upCoupang(upTab);
+    if (!c.dates.length) return toast('이 주차에는 내일(PDD) 이후 날짜가 없습니다.');
+    if (c.fromCp && c.extra.length) {
+      const lines = Array.from(new Set(c.extra.map((r) => r[0].slice(5).replace('-', '/') + ' ' + r[2] + ' ' + r[4] + ' (' + String(r[10] || '').trim() + ')')));
+      if (!confirm('쿠팡 등록 목록에 없는 아이디 × 캠프가 ' + lines.length + '건 있습니다. 쿠팡에서 거절될 수 있습니다:\n\n' + lines.slice(0, 15).join('\n') + (lines.length > 15 ? '\n… 외 ' + (lines.length - 15) + '건' : '') +
+        '\n\n쿠팡에 먼저 등록하거나 스케줄을 고치세요. 그래도 이 줄들을 넣어 받을까요?')) return;
+    }
+    const blob = ZIPW.xlsx([{ name: 'Sheet0', rows: c.rows, widths: [12, 14, 14, 10, 9, 10, 16, 9, 12, 26], filter: false, dateFmt: 'slash' }]);
+    const md = (d) => d.slice(5).replace('-', '');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '쿠팡_기사스케줄_업로드_' + md(c.dates[0]) + '-' + md(c.dates[c.dates.length - 1]) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    const nW = c.rows.filter((r) => r[7] === '출근').length;
+    toast('받았습니다: ' + c.dates.length + '일 · 출근 ' + nW + '줄 · 휴무 ' + (c.rows.length - 1 - nW) + '줄' + (c.fromCp ? '' : ' (쿠팡 등록 목록 없이 기사 정보로)'));
+  });
   $('#sUpload').addEventListener('click', upMake);
   $('#upRegen').addEventListener('click', upMake);
   $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
@@ -10423,7 +10510,7 @@
           const cells = r.map((v, ci) => {
             if (v === '' || v == null) return k === 'h' || k === 'd' || k === 't' ? '<c r="' + colName(ci) + (ri + 1) + '" s="' + (k === 'h' ? 2 : k === 't' ? 5 : 4) + '"/>' : ''; // 빈 칸도 테두리
             const ref = colName(ci) + (ri + 1);
-            if (v instanceof Date) return '<c r="' + ref + '" s="1"><v>' + serial(v) + '</v></c>';
+            if (v instanceof Date) return '<c r="' + ref + '" s="' + (sh.dateFmt === 'slash' ? 12 : 1) + '"><v>' + serial(v) + '</v></c>';
             if (typeof v === 'object' && v.pct != null) return '<c r="' + ref + '" s="' + (k === 't' ? 10 : 9) + '"><v>' + (Number(v.v) || 0) + '</v></c>';
             if (typeof v === 'number') return '<c r="' + ref + '" s="' + (k === 'h' ? 2 : k === 't' ? 6 : k === 'n' ? 8 : k === 's' ? 7 : 3) + '"><v>' + v + '</v></c>';
             const st = k === 'h' ? 2 : k === 't' ? 5 : k === 's' ? 7 : k === 'n' ? 8 : (/^[✓○×-]$/.test(String(v)) ? 11 : 4);
@@ -10442,14 +10529,14 @@
       const f = (name, x) => ({ name, data: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + x) });
       const FONT = '<name val="맑은 고딕"/><family val="2"/>';
       const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-        '<numFmts count="3"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/><numFmt numFmtId="165" formatCode="#,##0;[Red]\\-#,##0"/><numFmt numFmtId="166" formatCode="0.0%;[Red]\\-0.0%"/></numFmts>' +
+        '<numFmts count="4"><numFmt numFmtId="167" formatCode="yyyy/mm/dd"/><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/><numFmt numFmtId="165" formatCode="#,##0;[Red]\\-#,##0"/><numFmt numFmtId="166" formatCode="0.0%;[Red]\\-0.0%"/></numFmts>' +
         '<fonts count="5"><font><sz val="10"/>' + FONT + '</font><font><b/><sz val="10"/>' + FONT + '</font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/>' + FONT + '</font><font><b/><sz val="11"/><color rgb="FF1F4E79"/>' + FONT + '</font><font><i/><sz val="9"/><color rgb="FF808080"/>' + FONT + '</font></fonts>' +
         '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF305496"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill></fills>' +
         '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
         '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>' +
         '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="medium"><color rgb="FF305496"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>' +
         '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-        '<cellXfs count="12">' +
+        '<cellXfs count="13">' +
         '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' + // 0 기본
         '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>' + // 1 날짜
         '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' + // 2 머리글
@@ -10462,6 +10549,7 @@
         '<xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment vertical="center"/></xf>' + // 9 퍼센트
         '<xf numFmtId="166" fontId="1" fillId="3" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>' + // 10 합계 퍼센트
         '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' + // 11 가운데 글자
+        '<xf numFmtId="167" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>' + // 12 날짜 yyyy/mm/dd (쿠팡 양식)
         '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
       return zip([
         f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheets.map((_, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('') + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
