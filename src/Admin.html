@@ -10655,7 +10655,15 @@
   function loadSheetJs() {
     if (sheetJs) return Promise.resolve(sheetJs);
     if (window.XLSX) return Promise.resolve(sheetJs = window.XLSX);
-    return new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = () => window.XLSX ? ok(sheetJs = window.XLSX) : no(new Error('엑셀 읽기 도구를 불러오지 못했습니다.')); sc.onerror = () => no(new Error('엑셀 읽기 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.')); document.head.appendChild(sc); });
+    const SRC = ['../lib/xlsx.full.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'];
+    const tryAt = (i) => new Promise((ok, no) => {
+      if (i >= SRC.length) return no(new Error('엑셀 읽기 도구를 불러오지 못했습니다. 관리자앱을 새로고침(Ctrl+Shift+R)한 뒤 다시 시도해 주세요.'));
+      const sc = document.createElement('script'); sc.src = SRC[i];
+      sc.onload = () => { if (!window.XLSX) return tryAt(i + 1).then(ok, no); ok(sheetJs = window.XLSX); };
+      sc.onerror = () => { sc.remove(); tryAt(i + 1).then(ok, no); };
+      document.head.appendChild(sc);
+    });
+    return tryAt(0);
   }
   async function htParse(file) {
     const X = await loadSheetJs();

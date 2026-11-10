@@ -56,6 +56,24 @@ copyDir(path.join(ROOT, 'site'), OUT);
   }
 })();
 
+// 홈택스 계산서 엑셀(.xls) 읽기용 SheetJS — 같은 이유로 lib/ 에 둔다
+(function bundleSheetJs() {
+  const { execSync } = require('child_process');
+  const os = require('os');
+  const ver = '0.18.5', lib = path.join(OUT, 'lib');
+  fs.mkdirSync(lib, { recursive: true });
+  try {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'xlsx-'));
+    execSync('npm pack xlsx@' + ver + ' --silent', { cwd: tmp, stdio: 'pipe' });
+    const tgz = fs.readdirSync(tmp).find((f) => /\.tgz$/.test(f));
+    execSync('tar -xzf ' + JSON.stringify(tgz) + ' package/dist/xlsx.full.min.js', { cwd: tmp, stdio: 'pipe' });
+    fs.copyFileSync(path.join(tmp, 'package', 'dist', 'xlsx.full.min.js'), path.join(lib, 'xlsx.full.min.js'));
+    console.log('OK   _site/lib/xlsx.full.min.js (xlsx ' + ver + ')');
+  } catch (e) {
+    console.log('::warning::SheetJS 를 받지 못했습니다 (' + String(e && e.message || e).slice(0, 120) + ') — 홈택스 엑셀 읽기는 cdnjs 로 대신 시도합니다');
+  }
+})();
+
 const ver = (process.env.GITHUB_SHA || String(Date.now())).slice(0, 7);
 const common = [
   '<script>window.RUNNER_CONFIG = ' + JSON.stringify({ api: api, ver: ver }) + ';</script>',
