@@ -10494,6 +10494,7 @@
     tn.__uiSet = want;
   }
   // 화면 맨 위 '사용법' — 접었다 펼 수 있음 (접은 상태는 이 기기에 기억)
+  const PG_NAV = { dash: '대시보드', drivers: '기사 정보관리', sched: '기사스케줄', bib: '배번호 관리', route: '노선관리', perf: '수행률 · SLA', memo: '업무스케줄', settle: '정산관리', pnl: '러너 손익·통장', uiset: '올인원 설정' };
   const pgOpen = (v) => { try { return localStorage.getItem('runner.pgHelp.' + v) !== '0'; } catch (e) { return true; } };
   function pageHelpAll() {
     Object.keys(PG_NAV).forEach((v) => {
@@ -10511,7 +10512,7 @@
   }
   function uiApplyAll() {
     $$(UI_SEL).forEach(uiApplyEl);
-    pageHelpAll();
+    try { pageHelpAll(); } catch (e) { console.warn('pageHelp', e); }
     // 같은 글자면 다시 넣지 않는다 (넣으면 MutationObserver 가 또 불러 무한 반복)
     const setT = (el, t) => { if (el && t && el.textContent !== t) el.textContent = t; };
     const on = $$('.nav a.on'); setT($('#navCur'), on.length ? on[on.length - 1].textContent.trim() : '');
@@ -10534,7 +10535,6 @@
     const o = UI.map['guide:' + name]; if (!o || !o.text) return null;
     return o.text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf('|'); return i < 0 ? ['', uiMd(l)] : [l.slice(0, i).trim(), uiMd(l.slice(i + 1).trim())]; });
   }
-  const PG_NAV = { dash: '대시보드', drivers: '기사 정보관리', sched: '기사스케줄', bib: '배번호 관리', route: '노선관리', perf: '수행률 · SLA', memo: '업무스케줄', settle: '정산관리', pnl: '러너 손익·통장', uiset: '올인원 설정' };
   const uiGuideWhere = (name) => { if (name.startsWith('page:')) return '화면 맨 위 사용법 → ' + (PG_NAV[name.slice(5)] || name.slice(5)); const b = $('#stCfgTabs [data-cfg="' + name + '"], #stPnlTabs [data-pnl="' + name + '"], #stIdTabs [data-idt="' + name + '"]'); return b ? (b.closest('#stPnlTabs') ? '러너 손익·통장 → ' : '정산 설정 → ') + b.textContent.trim() : name === 'pnlSum' ? '러너 손익·통장 → 월별 손익' : name; };
   function uiRepaint() {
     try { localStorage.setItem('runner.uiText', JSON.stringify(UI.map)); } catch (e) { /* 저장소가 막혀도 화면은 바꾼다 */ }
