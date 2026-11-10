@@ -45,7 +45,8 @@ function adm_einvList(token, month) {
     try {
       readAll_(SH.TAXINV).forEach(function (r) {
         if (!r.id || r.month !== month || r.pub === 'N') return;
-        [str_(r.supDriverId), str_(r.supId)].filter(Boolean).forEach(function (k) {
+        // supId 와 supDriverId 가 같은 기사 ID 인 경우가 많아 한 장을 두 번 더하지 않게 중복 제거
+        [str_(r.supDriverId), str_(r.supId)].filter(function (k, i, a) { return k && a.indexOf(k) === i; }).forEach(function (k) {
           const o = ti[k] || (ti[k] = { total: 0, n: 0, nts: true, date: '' });
           o.total += stlNum_(r.total); o.n++; if (r.nts !== '등록') o.nts = false; if (!o.date || str_(r.date) > o.date) o.date = str_(r.date);
         });
