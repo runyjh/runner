@@ -379,6 +379,20 @@
   .st-sub { margin: -6px 0 14px; } .st-subrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .st-subright { margin-left: auto; display: flex; gap: 6px; align-items: center; }
   #stSub .tabs { margin: 0; } .st-subdesc { font-size: 12.5px; margin-top: 4px; }
   .strp-tabs { display: none; }
+  .banks { display: flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 0 0 18px; font-size: 12.5px; background: #fff; }
+  .banks > div { flex: 1; padding: 9px 12px; border-right: 1px solid var(--line); min-width: 0; } .banks > div:last-child { border-right: 0; } .banks small { display: block; color: var(--sub); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .banks b { font-size: 14px; font-variant-numeric: tabular-nums; } .banks b.neg { color: var(--danger); }
+  .banks .lnk { flex: 0 0 auto; display: flex; align-items: center; color: var(--brand); font-weight: 700; cursor: pointer; padding: 0 14px; } .banks .lnk:hover { background: var(--brand-weak); } .banks .lnk.on { background: #1f2937; color: #fff; }
+  .st-steps.fin:before { left: calc(16.7% + 20px); right: calc(16.7% + 20px); }
+  .cash { max-width: 1100px; } .cash h3 { margin: 0 0 4px; font-size: 18px; } .cash .d { color: var(--sub); font-size: 13.5px; margin: 0 0 10px; }
+  .cash .csec { font-size: 12px; font-weight: 800; color: var(--sub); margin: 16px 0 2px; }
+  .cash .row { display: flex; align-items: center; gap: 14px; padding: 10px 4px; border-top: 1px solid #f0f1f3; font-size: 14px; } .cash .row input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 auto; }
+  .cash .row .t { flex: 1; min-width: 0; } .cash .row .t small { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; } .cash .row .b { color: var(--sub); font-size: 12.5px; min-width: 150px; } .cash .row .m { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 130px; text-align: right; }
+  .cash .row .m input { width: 130px; text-align: right; } .cash .row .dt { width: 130px; }
+  .cash .row.done .t { color: var(--sub); } .cash .row.done .m { color: var(--sub); }
+  .cash .row.tot { font-weight: 800; border-top: 2px solid #1f2937; border-bottom: 1px solid #f0f1f3; } .cash .row.left .m { color: var(--brand); } .cash .row.left.neg .m { color: var(--danger); }
+  .cash .tag { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px; background: var(--gray-weak); color: var(--sub); margin-left: 6px; } .cash .tag.draft { background: var(--warn-weak); color: var(--warn); } .cash .tag.diff { background: var(--danger-weak); color: var(--danger); } .cash .tag.ok { background: #f0fdf4; color: #16a34a; }
+  .pay-kp { grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; gap: 0; } .pay-kp .kpi { border: 0; border-right: 1px solid var(--line); border-radius: 0; box-shadow: none; } .pay-kp .kpi:last-child { border-right: 0; }
+  .close-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-bottom: 14px; } .close-grid b { font-size: 15px; } .close-grid p { margin: 5px 0 10px; font-size: 13px; color: var(--sub); line-height: 1.55; }
   .stp-h { margin: 0 0 14px; font-size: 18px; } .stp-h small { font-weight: 500; font-size: 13px; color: var(--sub); margin-left: 8px; }
   #view-settle.st-check #stKpi, #view-settle.st-check #stp-list .st-tools, #view-settle.st-check #stp-list .table-wrap, #view-settle.st-check #stCards { display: none; }
   #view-settle.st-list #stWarn { display: none; }
@@ -1154,7 +1168,7 @@
       </div>
       <div class="ng g-fin"><p class="ngt">정산 · 회계</p>
         <a data-view="settle">정산관리</a>
-        <a data-view="settle" data-st-go="pnl">러너 손익·통장</a>
+        <a data-view="settle" data-st-go="pnl">매입·매출</a>
         <a data-view="taxinv">세금계산서 역발행</a>
       </div>
       <div class="ng g-com"><p class="ngt">소통</p>
@@ -1475,7 +1489,8 @@
     </div>
     <!-- 정산관리: 이번 달 할 일 5단계 + ⚙ 설정 (예전 탭 10개는 아래 #stTabs 에 숨겨 두고 그대로 씀) -->
     <div class="st-steps" id="stSteps"></div>
-    <!-- 러너 손익·통장: 3묶음 + ⚙ -->
+    <!-- 매입·매출: 통장 잔액 줄 + 3단계(15일 · 20일 · 월말) + 통장 · ⚙ -->
+    <div class="banks hidden" id="stBanks"></div>
     <div class="st-steps fin hidden" id="stFinG"></div>
     <div class="st-sub hidden" id="stSubWrap"><div class="st-subrow"><div id="stSub"></div><div class="st-subright" id="stSubRight"><button class="btn ghost sm hidden" id="stLegCmp" title="기존 정산서(마감 기록)와 올인원이 지금 설정·쿠팡 정산서로 다시 계산한 결과를 기사별로 비교 — 마감은 그대로">올인원 계산과 비교</button><button class="btn ghost sm" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기</button><button class="btn sm" id="stCloseBtn">마감</button></div></div><div class="sub st-subdesc" id="stSubDesc"></div></div>
     <div class="st-info" id="stInfo"></div>
@@ -1560,6 +1575,7 @@
       </div>
     </div>
     <div id="stp-pay" class="hidden">
+      <div class="kpis pay-kp" id="payKp"></div>
       <div class="st-tools">
         <span class="sub" id="payInfo"></span>
         <label class="check" style="margin:0"><input type="checkbox" id="payOnlyLeft" checked> 미입금만</label>
@@ -8270,7 +8286,7 @@
       ['세무', '5단계 [세무자료 내보내기] = 세무사에게 보낼 엑셀 한 파일 · 기존 정산(1~10월) 자료는 1단계 창 아래 "지난 자료"']
     ],
     'page:pnl': [
-      ['하는 일', '정산월마다 <b>빼둘 돈</b>(기사정산 · 부가세 · 산재고용 · 급여 · 운영비 · 종소세 적립) · 러너가 <b>실제로 남긴 돈(순이익)</b> · 세금 일정 · 통장 잔액'],
+      ['하는 일', '달마다 돈이 움직이는 순서 그대로 — <b>15일 입금과 배분</b> → <b>20일 기사 지급</b> → <b>월말 결산</b>(지출 · 세금) · 위 한 줄은 통장 잔액'],
       ['순서', '① 15일 쿠팡 입금 → <b>자금배분</b>에서 받음 · 빼둘 돈 통장별 이체 체크 (대표 인출·직원 급여는 쿠팡정산 통장에서 바로) ② 20일 기사 급여 → <b>입금확인</b>에서 체크 ③ <b>월별 손익</b> 확인 ④ [통장 내역 올리기]로 은행 거래내역 자동 분류 ⑤ 세금은 [세금 일정]에 낸 금액 입력'],
       ['묶음', '<b>이번 달 돈</b>(자금배분·빼둘 돈 → 입금확인 → 월별 손익) · <b>통장</b>(잔액 · 내역 올리기 · 입출금 기록) · <b>손익·세금</b>(세금 일정 · 지출) · <b>⚙ 설정</b>(통장 목록 · 배분 설정 · 고정 운영비 · 직원)']
     ],
@@ -8467,10 +8483,11 @@
     ] }
   ];
   const ST_FIN = [
-    { k: 'now', n: 1, t: '이번 달 돈', sub: [['pnl:fund', '자금배분 · 빼둘 돈', '쿠팡 입금(15일)이 쿠팡정산 통장에 들어오면 [받음] → 빼둘 돈을 통장별로 이체하고 체크 · 운영자 선지급 · 대표 인출·직원 급여는 쿠팡정산 통장에서 바로'], ['pnl:pay', '입금확인 (기사 지급 20일)', '20일 기사 급여를 보내면서 입금체크 · 대량이체용 복사 · 체크하면 기사정산 통장에서 빠짐'], ['pnl:pnl', '월별 손익', '이 달 러너 순이익 · 산재고용 신고 · 그 해 월별 추이']] },
-    { k: 'bank', n: 2, t: '통장', sub: [['pnl:bal', '통장 잔액', '통장별 지금 잔액 = 기초잔액 + 들어온 돈 − 나간 돈 (자금배분 · 기사 지급 · 고정비 · 지출 · 세금 자동 반영)'], ['pnl:bank', '통장 내역 올리기', '은행 거래내역(PDF·엑셀) 한 줄씩 자동 분류'], ['pnl:banktx', '입·출금 기록', '자금배분·기사 지급 말고 직접 넣는 입·출금']] },
-    { k: 'tax', n: 3, t: '손익 · 세금', sub: [['pnl:tax', '세금 일정', '부가세 · 원천세 · 산재고용 · 종합소득세 납부기한 순 · 낸 금액 기록'], ['pnl:expense', '지출 기록', '이 정산월에 넣을 그 달 실제 지출']] },
-    { k: 'cfg', gear: true, t: '⚙ 설정', sub: [['pnl:banks', '통장 목록'], ['pnl:alloc', '배분 설정'], ['pnl:cost', '고정 운영비'], ['pnl:staff', '직원 (원천세)']] }
+    { k: 'cash', n: 1, t: '15일 · 입금과 배분', sub: [['pnl:fund', '입금과 배분', '쿠팡 입금이 들어오면 위에서 아래로 체크 — 받음 → 쿠팡정산 통장에서 바로 나가는 돈 → 다른 통장으로 옮기는 돈 · 체크하면 통장 잔액이 바로 움직임']] },
+    { k: 'pay', n: 2, t: '20일 · 기사 지급', sub: [['pnl:pay', '기사 지급', '기사정산 통장에서 급여 · 대량이체용 복사 → 보내고 체크 · 통장 내역을 올리면 자동 체크']] },
+    { k: 'close', n: 3, t: '월말 · 결산', sub: [['pnl:expense', '이 달 지출', '은행 내역을 올리면 자동으로 들어오고 빠진 건 직접 추가 · 통장을 적은 줄은 잔액에서 빠짐'], ['pnl:tax', '세금 일정', '부가세 · 원천세 · 산재고용 · 종합소득세 — 낸 금액·납부일을 넣으면 출금 통장에서 빠짐 · 산재고용 신고표']] },
+    { k: 'bank', side: true, t: '통장', sub: [['pnl:bal', '통장 잔액 · 움직임', '통장별 지금 잔액 = 기초잔액 + 들어온 돈 − 나간 돈 · 어느 단계에서 생긴 움직임인지 표시'], ['pnl:bank', '통장 내역 올리기', '은행 거래내역(PDF·엑셀) 한 줄씩 자동 분류 → 입금체크 · 쿠팡 입금 · 지출 기록'], ['pnl:banktx', '입·출금 기록', '자금배분·기사 지급 말고 직접 넣는 입·출금']] },
+    { k: 'cfg', gear: true, t: '⚙ 설정', sub: [['pnl:banks', '통장 목록'], ['pnl:alloc', '배분 규칙 · 선지급'], ['pnl:cost', '고정 운영비'], ['pnl:staff', '직원 (원천세)']] }
   ];
   STX.last = STX.last || {}; // 묶음마다 마지막으로 연 하위 탭
   function stGo(code) {
@@ -8484,7 +8501,7 @@
   }
   /** 지금 열린 탭이 어느 단계(묶음)·어느 하위인지 */
   function stWhere() {
-    if (STX.fin || STX.tab === 'pnl') { const code = 'pnl:' + (STX.pnlT || 'pnl'); const g = ST_FIN.find((x) => x.sub.some((s) => s[0] === code)) || ST_FIN[0]; return { fin: true, g: g, code: code }; }
+    if (STX.fin || STX.tab === 'pnl') { const code = 'pnl:' + (STX.pnlT || 'fund'); const g = ST_FIN.find((x) => x.sub.some((s) => s[0] === code)) || ST_FIN[0]; return { fin: true, g: g, code: code }; }
     const t = STX.tab;
     if (t === 'cfg') { const code = 'cfg:' + (STX.cfg || 'config'); const S = ST_STEPS[4], g = S.groups.find((x) => x.sub.some((s) => s[0] === code)) || S.groups[0]; return { step: S, g: g, code: code }; }
     if (t === 'ids' || t === 'vendors') { const code = t === 'vendors' ? 'tab:vendors' : STX.idt === 'drv' ? 'idt:drv' : 'tab:ids'; return { step: ST_STEPS[4], g: ST_STEPS[4].groups[2], code: code }; }
@@ -8510,14 +8527,15 @@
       const st = stStepStatus(S.k), on = w.step && w.step.k === S.k;
       return '<button type="button" class="st-step' + (on ? ' on' : '') + (st[0] === 'done' ? ' done' : '') + '" data-step="' + S.k + '">' + circ(S, st, on) + '<span class="stt">' + esc(S.t) + '</span><span class="sts' + (st[0] === 'warn' ? ' warn' : '') + '">' + esc(st[1] || '—') + '</span></button>';
     }).join('');
-    $('#stFinG').innerHTML = ST_FIN.filter((G) => !G.gear).map((G) => '<button type="button" class="st-step' + (w.fin && w.g.k === G.k ? ' on' : '') + '" data-fin="' + G.k + '"><span class="sc">' + G.n + '</span><span class="stt">' + esc(G.t) + '</span><span class="sts">' + esc(G.sub.map((x) => x[1].replace(/\s*\(.*\)$/, '')).join(' · ')) + '</span></button>').join('');
+    $('#stFinG').innerHTML = ST_FIN.filter((G) => !G.gear && !G.side).map((G) => { const st = finStatus(G.k), on = w.fin && w.g.k === G.k; return '<button type="button" class="st-step' + (on ? ' on' : '') + (st[0] === 'done' ? ' done' : '') + '" data-fin="' + G.k + '"><span class="sc">' + (st[0] === 'done' && !on ? '✓' : G.n) + '</span><span class="stt">' + esc(G.t) + '</span><span class="sts' + (st[0] === 'warn' ? ' warn' : '') + '">' + esc(st[1] || '—') + '</span></button>'; }).join('');
     $('#stGearBtn').classList.toggle('on', !!(w.step && w.step.k === 'cfg') || !!(w.fin && w.g.k === 'cfg'));
+    if (w.fin) paintBanks(w.g.k === 'bank');
     // 하위 탭 (조정 · 마감·리포트 · 설정 묶음 · 손익 묶음)
     const g = w.g, subs = g && g.sub;
     $('#stSubWrap').classList.toggle('hidden', !subs);
     if (subs) {
       const groups = !w.fin && w.step && w.step.groups ? '<div class="tabs sub2" style="margin-bottom:6px">' + w.step.groups.map((x) => '<button type="button" class="tab' + (x.k === g.k ? ' on' : '') + '" data-stg="' + x.k + '">' + esc(x.t) + '</button>').join('') + '</div>' : '';
-      $('#stSub').innerHTML = (!w.fin && w.step && w.step.k === 'adjust') ? '' : groups + '<div class="tabs sub2">' + subs.map((x) => '<button type="button" class="tab' + (x[0] === w.code ? ' on' : '') + '" data-go="' + esc(x[0]) + '">' + esc(x[1]) + '</button>').join('') + '</div>';
+      $('#stSub').innerHTML = ((!w.fin && w.step && w.step.k === 'adjust') || subs.length < 2) ? '' : groups + '<div class="tabs sub2">' + subs.map((x) => '<button type="button" class="tab' + (x[0] === w.code ? ' on' : '') + '" data-go="' + esc(x[0]) + '">' + esc(x[1]) + '</button>').join('') + '</div>';
       const cur = subs.find((x) => x[0] === w.code);
       $('#stSubDesc').textContent = (cur && cur[2]) || g.d || '';
       STX.last[g.k] = w.code;
@@ -8531,7 +8549,22 @@
     $('#stCondBox').classList.toggle('hidden', !condOn);
     if (condOn) loadCond();
   }
-  // 3단계 조정 카드 (건수 · 요약 2줄 · 누르면 그 표)
+  // 매입·매출 단계 상태 · 통장 잔액 줄
+  function finStatus(k) {
+    const F = STX.fund && STX.fund.month === STX.month ? STX.fund : null, s = STX.sum;
+    if (k === 'cash') { if (!F) return ['', '']; const items = F.items.filter((x) => x.key !== 'rest'), n = items.length + 1, d = items.filter((x) => x.done).length + (F.deposit.done ? 1 : 0); return [d >= n ? 'done' : '', (F.deposit.done ? '' : '받음 전 · ') + d + '/' + n + ' 완료' + (s && !s.closed ? ' · 가안' : '')]; }
+    if (k === 'pay') { if (!s) return ['', '']; const dl = (s.drivers || []).filter((v) => v.net), dn = dl.filter((v) => v.checked); return [dl.length && dn.length >= dl.length ? 'done' : '', dn.length + '/' + dl.length + '명']; }
+    if (k === 'close') { const a = STX.adjSum; return ['', (STX.pnl && STX.pnl.varN ? '지출 ' + STX.pnl.varN + '건' : '지출 · 세금')]; }
+    return ['', ''];
+  }
+  function paintBanks(onBank) {
+    const el = $('#stBanks'); el.classList.remove('hidden');
+    const F = STX.fund && STX.fund.month === STX.month ? STX.fund : null;
+    if (!F) { if (!el.innerHTML) el.innerHTML = '<div><small>통장 잔액</small><b class="sub">불러오는 중…</b></div><div class="lnk' + (onBank ? ' on' : '') + '" data-go="pnl:bal">통장 ▸</div>'; if (!STX.fundLoading) { STX.fundLoading = true; api('adm_stlFund', STX.month).then((r) => { STX.fundLoading = false; if (r && r.ok && r.month === STX.month) { STX.fund = r; paintBanks(onBank); stRenderSteps(); } }).catch(() => { STX.fundLoading = false; }); } return; }
+    el.innerHTML = (F.banks || []).map((b) => '<div title="' + esc(b.name) + (b.role ? ' · ' + esc(b.role) : '') + '"><small>' + esc(b.name.replace(/^러너\s*/, '')) + '</small><b' + (b.balance < 0 ? ' class="neg"' : '') + '>' + wn(b.balance) + '</b></div>').join('') + '<div class="lnk' + (onBank ? ' on' : '') + '" data-go="pnl:bal">통장 ▸</div>';
+  }
+  $('#stBanks').addEventListener('click', (e) => { const a = e.target.closest('[data-go]'); if (a) stGo(a.dataset.go); });
+  // 3단계 조정 카드 (건수 · 요약 2줄 · 누르면 표)
   function loadAdjCards(fresh) {
     const m = STX.month, el = $('#stAdjCards');
     if (!fresh && STX.adjSum && STX.adjSum.month === m && STX.adjAt === STX.sumAt) return renderAdjCards();
@@ -8549,7 +8582,7 @@
   $('#stAdjCards').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) stGo(b.dataset.go); });
   $('#stp-imp').addEventListener('click', (e) => { const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); stGo(a.dataset.go); } });
   $('#stGearBtn').addEventListener('click', () => {
-    if (STX.fin) { const G = ST_FIN[3]; return stGo(STX.last[G.k] || G.sub[0][0]); }
+    if (STX.fin) { const G = ST_FIN.find((x) => x.gear); return stGo(STX.last[G.k] || G.sub[0][0]); }
     const S = ST_STEPS[4], gk = STX.last.cfgG || S.groups[0].k, g = S.groups.find((x) => x.k === gk) || S.groups[0]; stGo(STX.last[g.k] || g.sub[0][0]);
   });
   $('#stSteps').addEventListener('click', (e) => {
@@ -8758,9 +8791,10 @@
   function setFin(on) {
     STX.fin = on;
     const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!on);
-    $('#stTitle').textContent = na ? na.textContent.trim() : on ? '러너 손익·통장' : '정산관리';
+    $('#stTitle').textContent = na ? na.textContent.trim() : on ? '매입·매출' : '정산관리';
     $('#stSteps').classList.toggle('hidden', on);
     $('#stFinG').classList.toggle('hidden', !on);
+    $('#stBanks').classList.toggle('hidden', !on);
     $('#stRecalc').classList.toggle('hidden', on);
     if (!on) paintStInfo();
   }
@@ -8783,7 +8817,7 @@
     const pane = ['pnl', 'fund', 'bal', 'tax', 'bank'].includes(name);
     $('#stPnl').classList.toggle('hidden', !pane);
     $('#stEditor').classList.toggle('hidden', pane);
-    paintHelp(name === 'pnl' ? 'pnlSum' : name);
+    paintHelp(name === 'pnl' ? 'pnlSum' : name === 'fund' || name === 'pay' ? '' : name);
     stRenderSteps();
     if (name === 'pnl') loadPnl(); else if (name === 'fund') loadFund(); else if (name === 'bal') loadBal(); else if (name === 'tax') loadTaxPlan(); else if (name === 'bank') BK.load(STX.month); else loadEditor(name);
   }
@@ -8823,7 +8857,12 @@
       line('낼 세금 예상', wn(I.due), '종합소득세 + 지방소득세 − 중간예납 낸 금액 ' + wn(I.mid), 'net') +
       line('종합소득세 적립 (자금배분)', wn(I.reserve), '올해 자금배분에서 이체 완료한 적립액') +
       line(I.short > 0 ? '더 모아야 할 돈' : '여유', wn(Math.abs(I.short)), I.short > 0 ? '배분 설정의 종합소득세 적립률을 올리거나 유보금에서' : '적립액이 예상보다 많음', I.short > 0 ? 'net neg' : 'net') + '</div>';
-    $('#stPnl').innerHTML = '<div class="table-wrap"><table class="sttbl fund-tbl tax-tbl"><thead><tr><th>납부기한</th><th>세금</th><th>기간</th><th class="n">예상 금액</th><th class="n">낸 금액</th><th>납부일</th><th>출금 통장</th><th>메모</th></tr></thead><tbody>' + rows + '</tbody></table></div>' + inc;
+    const IN = STX.pnl && STX.pnl.ins, rp2 = (v) => (Math.round(v * 10000) / 100) + '%';
+    const insBox = IN ? '<div class="pnl-box pnl-ins" style="margin-top:12px"><h4>' + esc(ymTitle(STX.month)) + ' 산재·고용 신고 <small>기사 매입 공급가 기준 · 다음 달 10일 납부</small></h4><table>' +
+      '<tr><td>기준금액</td><td class="sub">기사 매입 합계 (공급가)</td><td class="n">' + wn(IN.base) + '</td></tr><tr><td>월보수액</td><td class="sub">기준금액 × (1 − 경비율 ' + rp2(IN.exp) + ')</td><td class="n">' + wn(IN.bosu) + '</td></tr>' +
+      '<tr><td>기사 산재보험</td><td class="sub">보수 × ' + rp2(IN.san) + ' × ' + rp2(1 - IN.runner) + '</td><td class="n">' + wn(IN.sanD) + '</td></tr><tr><td>기사 고용보험</td><td class="sub">보수 × ' + rp2(IN.goy) + ' × ' + rp2(1 - IN.runner) + '</td><td class="n">' + wn(IN.goyD) + '</td></tr>' +
+      '<tr class="em"><td>러너 고용·산재보험</td><td class="sub">러너 부담 ' + rp2(IN.runner) + '</td><td class="n">' + wn(IN.runnerAmt) + '</td></tr><tr class="tot"><td>합계</td><td class="sub">공단 신고액 · 15일 배분에서 산재고용 통장으로</td><td class="n">' + wn(IN.total) + '</td></tr></table></div>' : '';
+    $('#stPnl').innerHTML = insBox + '<div class="table-wrap"><table class="sttbl fund-tbl tax-tbl"><thead><tr><th>납부기한</th><th>세금</th><th>기간</th><th class="n">예상 금액</th><th class="n">낸 금액</th><th>납부일</th><th>출금 통장</th><th>메모</th></tr></thead><tbody>' + rows + '</tbody></table></div>' + inc;
   }
   $('#stPnl').addEventListener('change', (e) => {
     const el = e.target.closest('[data-tk]'); if (!el || !STX.taxp) return;
@@ -8850,35 +8889,40 @@
   }
   function renderFund() {
     const F = STX.fund; if (!F) return;
-    const d = F.deposit, mt = ymTitle(F.month), bal = {};
-    (F.banks || []).forEach((b) => { bal[b.name] = b.balance; });
-    const today = ymdLocal(new Date());
+    const d = F.deposit, s = STX.sum || {}, draft = !s.closed;
     const amtIn = (key, v, ph, dis) => '<input class="inp fnum" data-fk="' + key + '" data-ff="amt" inputmode="numeric" value="' + (v === '' || v == null ? '' : wn(v)) + '" placeholder="' + esc(wn(ph)) + '"' + (dis ? ' disabled' : '') + '>';
-    const dep = '<div class="fund-dep' + (d.done ? ' ok' : '') + '"><div><b>쿠팡 입금</b> <small>' + esc(mt) + ' 정산 · 입금 예정 ' + esc(mdTxt(d.due)) + ' · 받는 통장 ' + esc(d.bank || '(통장 목록에 \'쿠팡 입금\' 용도 통장 없음)') + '</small>' +
-      '<div class="sub" style="font-size:12px">입금액 ' + wn(d.plan) + ' = 쿠팡 세금계산서 합계 (공급가 − 분실 차감, 세액 끝자리 버림) · 실제 입금과 같아야 하며 다르면 그 금액을 넣어 주세요</div></div>' +
-      '<div class="fund-ctl">' + amtIn('deposit', d.amt || '', d.plan, d.done) + '<input class="inp" type="date" data-fk="deposit" data-ff="date" value="' + esc(d.date || '') + '"><label class="check"><input type="checkbox" data-fk="deposit" data-ff="done"' + (d.done ? ' checked' : '') + '> 받음</label></div></div>';
-    // 기사정산금: 입금확인 진행 (정산서 목록의 입금 체크)
-    const dl = ((STX.sum && STX.sum.drivers) || []).filter((v) => v.net), dDone = dl.filter((v) => v.checked);
-    const payProg = '<div class="pay-prog">입금확인 <b>' + dDone.length + ' / ' + dl.length + '명</b> · 남은 <b>' + wn(dl.reduce((a, v) => a + v.net, 0) - dDone.reduce((a, v) => a + v.net, 0)) + '원</b> <a data-go-pay>입금확인 열기 →</a></div>';
-    const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + (x.key === 'early' ? esc((F.early || []).map((e) => e.name + ' ' + wn(e.net)).join(' · ')) + ' · 쿠팡 입금일에 쿠팡정산 통장에서 바로 · 대상은 ⚙ 세부정산 설정 "15일 선지급 기사"' : esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '')) + '</div>' + (x.key === 'driver' ? payProg : '') + '</td>' +
-      '<td>' + (x.bank ? esc(x.bank) + (x.bank === F.source && ['staff', 'owner'].includes(x.key) ? '<div class="smemo" style="color:var(--brand)">쿠팡정산 통장에서 바로 ' + (x.key === 'owner' ? '인출' : '지급') + '</div>' : bal[x.bank] != null ? '<div class="smemo">잔액 ' + wn(bal[x.bank]) + '</div>' : '') : '<span style="color:var(--danger)">통장 없음</span>') + '</td>' +
-      '<td class="n">' + wn(x.plan) + '</td><td class="n">' + amtIn(x.key, x.adj ? x.amt : '', x.plan, x.done) + '</td>' +
-      (x.key === 'early' ? '<td style="text-align:center"><input type="checkbox" data-fk="early" data-ff="done"' + ((F.early || []).length && (F.early || []).every((e) => e.checked) ? ' checked' : '') + ' title="체크하면 입금확인에도 같이 체크됨 (쿠팡정산 통장에서 출금)"></td>' : '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? (['staff', 'owner'].includes(x.key) ? ' title="쿠팡정산 통장에서 바로 지급·인출 — 보냈으면 체크 (잔액에서 빠짐)"' : ' title="받는 통장과 같아 이체할 필요 없음 (돈이 그대로 남음)"') : '') + '></td>') +
-      (x.key === 'early' ? '<td><input class="inp" type="date" data-fk="early" data-ff="date" value="' + esc(((F.early || [])[0] || {}).payDate || '') + '" style="width:140px" title="지급일 (비우면 쿠팡 입금일)"></td><td class="sub" style="font-size:12px">' + esc((F.early || []).map((e) => e.name + (e.checked ? ' ✓' : '')).join(' · ')) + ' · 입금확인과 같은 체크</td></tr>' :
-      '<td><input class="inp" type="date" data-fk="' + x.key + '" data-ff="date" value="' + esc(x.date || '') + '" style="width:140px"></td>' +
-      '<td><input class="inp" data-fk="' + x.key + '" data-ff="memo" value="' + esc(x.memo || '') + '" style="min-width:140px"></td></tr>');
-    const sent = F.items.filter((x) => x.done).reduce((a, x) => a + x.amt, 0), total = F.items.reduce((a, x) => a + x.amt, 0);
+    const dateIn = (key, v) => '<input class="inp dt" type="date" data-fk="' + key + '" data-ff="date" value="' + esc(v || '') + '">';
+    const tag = (t, c) => '<span class="tag' + (c ? ' ' + c : '') + '">' + t + '</span>';
+    const diffTag = (x) => x.done && x.adj && x.amt !== x.plan ? tag('계산 ' + wn(x.plan) + ' · 보냄 ' + wn(x.amt) + ' · 차이 ' + (x.amt - x.plan > 0 ? '+' : '') + wn(x.amt - x.plan), 'diff') : '';
+    const dl = ((s.drivers) || []).filter((v) => v.net), dDone = dl.filter((v) => v.checked);
+    const row = (x) => {
+      const direct = x.bank === F.source && ['staff', 'owner'].includes(x.key);
+      const sub = x.key === 'early' ? esc((F.early || []).map((e) => e.name + ' ' + wn(e.net)).join(' · ')) + ' · 입금확인에도 같이 체크됨'
+        : x.key === 'driver' ? '선지급 제외 ' + dl.filter((v) => !(F.early || []).some((e) => e.id === v.id)).length + '명 · 20일 지급은 2단계에서 (' + dDone.length + '/' + dl.length + '명 완료)'
+        : x.key === 'vat' ? '매출세액 − 기사 매입세액 − 운영비 매입세액 · 1/25 · 7/25 납부' : x.key === 'ins' ? '공단 신고액 (기사분 + 러너분) · 다음 달 10일' : x.key === 'staff' ? '세전 급여 · 원천세는 다음 달 10일 세금 일정에' : x.key === 'owner' ? (x.rule ? '규칙 ' + esc(x.rule) : '배분 규칙에 금액 또는 %') : x.key === 'tax' ? (x.rule ? '규칙 ' + esc(x.rule) + ' · 다음 해 5월' : '배분 규칙에 20% 처럼 (비우면 0)') : x.key === 'fixed' ? '고정 운영비 · 결제일마다 운영비 통장에서 자동 출금' : x.key === 'var' ? '이 달 지출 기록' : esc(x.desc);
+      const ck = x.key === 'early' ? '<input type="checkbox" data-fk="early" data-ff="done"' + ((F.early || []).length && (F.early || []).every((e) => e.checked) ? ' checked' : '') + '>' : '<input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + '>';
+      const done = x.key === 'early' ? (F.early || []).length && (F.early || []).every((e) => e.checked) : x.done;
+      return '<div class="row' + (done ? ' done' : '') + '">' + ck + '<span class="t"><b>' + esc(x.label.replace(/\s*\(15일\)$/, '')) + '</b>' + (draft ? tag('가안', 'draft') : '') + diffTag(x) + '<small>' + sub + '</small></span>' +
+        '<span class="b">' + (x.bank ? (direct ? '쿠팡정산에서 바로 ' + (x.key === 'owner' ? '인출' : '지급') : x.key === 'early' ? '쿠팡정산에서 바로 지급' : '→ ' + esc(x.bank.replace(/^러너\s*/, ''))) : '<span style="color:var(--danger)">통장 없음</span>') + '</span>' +
+        '<span class="m">' + (x.key === 'early' ? '<b>' + wn(x.plan) + '</b>' : amtIn(x.key, x.adj ? x.amt : '', x.plan, x.done)) + '</span>' + (x.key === 'early' ? dateIn('early', ((F.early || [])[0] || {}).payDate) : dateIn(x.key, x.date)) + '</div>';
+    };
+    const direct = F.items.filter((x) => x.key === 'early' || (x.bank === F.source && ['staff', 'owner'].includes(x.key)));
+    const move = F.items.filter((x) => x.key !== 'rest' && !direct.includes(x));
     const rest = F.items.find((x) => x.key === 'rest') || {};
-    $('#stPnl').innerHTML = reserveBox() + earlyBar(F.earlyPay, (F.early || []).map((e) => e.name)) + dep +
-      (rest.amt < 0 ? '<div class="stw bad" style="margin-bottom:10px">쿠팡 입금보다 배분할 돈이 ' + wn(-rest.amt) + '원 많습니다. 금액을 조정하거나 유보금에서 채워 주세요.</div>' : '') +
-      '<div class="table-wrap"><table class="sttbl fund-tbl"><thead><tr><th>항목</th><th>보낼 통장</th><th class="n">계산 금액</th><th class="n">보낼 금액 <small>(비우면 계산 금액)</small></th><th>이체</th><th>이체일</th><th>메모</th></tr></thead><tbody>' +
-      F.items.map(row).join('') + '</tbody><tfoot><tr><td colspan="3">배분 합계 <small>(이체 완료 ' + wn(sent) + ')</small></td><td class="n"><b>' + wn(total) + '</b></td><td colspan="3" class="sub">쿠팡 입금 ' + wn(F.base) + (d.done ? ' (받음)' : ' (예정)') + '</td></tr></tfoot></table></div>';
+    const used = F.items.filter((x) => x.key !== 'rest').reduce((a, x) => a + x.amt, 0), doneN = F.items.filter((x) => x.key !== 'rest' && x.done).length + (d.done ? 1 : 0);
+    $('#stPnl').innerHTML = '<div class="cash"><h3>' + esc(ymTitle(F.month)) + ' · 15일 입금과 배분' + (draft ? ' <span class="tag draft" style="font-size:12px">정산 마감 전 · 금액이 바뀔 수 있음</span>' : '') + '</h3>' +
+      '<p class="d">쿠팡 입금이 쿠팡정산 통장에 들어오면 위에서 아래로 체크 · 체크하면 통장 잔액이 바로 움직입니다 · 금액이 다르면 칸에 실제 금액</p>' +
+      '<div class="row' + (d.done ? ' done' : '') + '"><input type="checkbox" data-fk="deposit" data-ff="done"' + (d.done ? ' checked' : '') + '><span class="t"><b>쿠팡 입금 받음</b>' + (d.done && d.amt && d.amt !== d.plan ? tag('계산 ' + wn(d.plan) + ' · 실제 ' + wn(d.amt), 'diff') : '') + '<small>세금계산서 합계 = 입금액 · 입금 예정 ' + esc(mdTxt(d.due)) + (d.memo ? ' · ' + esc(d.memo) : '') + '</small></span><span class="b">→ ' + esc((d.bank || '').replace(/^러너\s*/, '') || '쿠팡 입금 통장 없음') + '</span><span class="m">' + amtIn('deposit', d.amt || '', d.plan, d.done) + '</span>' + dateIn('deposit', d.date) + '</div>' +
+      (direct.length ? '<div class="csec">쿠팡정산 통장에서 바로 나가는 돈</div>' + direct.map(row).join('') : '') +
+      '<div class="csec">다른 통장으로 옮겨 두는 돈</div>' + move.map(row).join('') +
+      '<div class="row tot"><span style="width:18px"></span><span class="t">나간 돈 합계</span><span class="b">' + doneN + ' / ' + (F.items.length) + ' 완료</span><span class="m">' + wn(used) + '</span><span class="dt"></span></div>' +
+      '<div class="row left' + (rest.amt < 0 ? ' neg' : '') + '"><span style="width:18px"></span><span class="t"><b>남는 돈 = 유보금</b><small>' + (rest.amt < 0 ? '나간 돈이 쿠팡 입금보다 ' + wn(-rest.amt) + '원 많습니다 — 금액을 조정하거나 유보금에서 채우세요' : '쿠팡 입금 − 나간 돈 · 쿠팡정산 통장에 그대로 두거나 ' + esc((rest.bank || '잉여금').replace(/^러너\s*/, '')) + ' 통장으로') + '</small></span><span class="b">' + (rest.bank ? '→ ' + esc(rest.bank.replace(/^러너\s*/, '')) : '') + '</span><span class="m">' + wn(rest.amt) + '</span><span class="dt"></span></div></div>';
   }
   $('#stPnl').addEventListener('change', (e) => {
     const el = e.target.closest('[data-fk]'); if (!el || !STX.fund) return;
     const key = el.dataset.fk, ff = el.dataset.ff, f = {};
     if (key === 'early') { // 운영자 선지급: 입금확인의 체크와 같은 기록 (쿠팡 입금일 기준 · 쿠팡정산 통장에서 출금)
-      const F = STX.fund, box = el.closest('tr'), dt = box.querySelector('[data-ff="date"]'), ck = box.querySelector('[data-ff="done"]');
+      const F = STX.fund, box = el.closest('tr, .row'), dt = box.querySelector('[data-ff="date"]'), ck = box.querySelector('[data-ff="done"]');
       const checked = ff === 'done' ? el.checked : ck.checked, date = (dt && dt.value) || ((F.dates || {}).coupang || '').slice(0, 10) || ymdLocal(new Date());
       if (ff === 'date' && !checked) return; // 날짜만 바꾸고 체크 전이면 저장 안 함
       el.disabled = true;
@@ -8893,7 +8937,8 @@
     if (ff === 'done') f.done = el.checked;
     else if (ff === 'amt') f.amt = el.value.replace(/[^\d-]/g, '');
     else f[ff] = el.value;
-    if (ff === 'done' && el.checked) { const box = el.closest('tr, .fund-dep'), a = box && box.querySelector('[data-ff="amt"]'), dt = box && box.querySelector('[data-ff="date"]'); if (a && a.value) f.amt = a.value.replace(/[^\d-]/g, ''); if (dt && dt.value) f.date = dt.value; }
+    if (ff === 'done' && el.checked) { const box = el.closest('tr, .fund-dep, .row'), a = box && box.querySelector('[data-ff="amt"]'), dt = box && box.querySelector('[data-ff="date"]'); if (a && a.value) f.amt = a.value.replace(/[^\d-]/g, ''); else { const it = key === 'deposit' ? STX.fund.deposit : STX.fund.items.find((x) => x.key === key); if (it) f.amt = String(it.plan); } if (dt && dt.value) f.date = dt.value; else f.date = ymdLocal(new Date()); }
+    if (ff === 'done' && !el.checked) f.amt = '';
     el.disabled = true;
     api('adm_stlFundSave', STX.month, key, f).then((r) => {
       if (!r.ok) { el.disabled = false; return toast(r.msg); }
@@ -9348,10 +9393,10 @@
       const item = (r, i) => '<div class="cf-row"><div class="cf-l"><b>' + esc(nice(String(r.label || ''))) + '</b>' + (r.desc ? '<small>' + esc(r.desc) + '</small>' : '') + '</div><div class="cf-c">' + ctl(r, i) + (/일\)$/.test(String(r.label || '')) || /\(익월/.test(String(r.label || '')) ? '<span class="cf-u">일</span>' : '') + '</div></div>';
       const used = {};
       const cards = CARD.map((cd) => {
-        const its = order.filter((i) => cd[1].includes(rows[i]._group || '') && !/^기사 앱 정산서 표시 범위/.test(String(rows[i].label || ''))).map((i) => { used[i] = 1; return item(rows[i], i); });
+        const its = order.filter((i) => cd[1].includes(rows[i]._group || '') && !/^기사 앱 정산서 표시 범위|^15일 선지급 기사/.test(String(rows[i].label || ''))).map((i) => { used[i] = 1; return item(rows[i], i); });
         return '<div class="cf-card"><h4>' + esc(cd[0]) + '<small>' + esc(cd[2]) + '</small></h4>' + its.join('') + (cd[0] === '기사 앱 공개' ? '<div class="cf-row"><div class="cf-l"><b>정산서 표시 범위</b><small>위 📱 단추로 고르면 바로 저장</small></div><div class="cf-c sub">' + esc((rows.find((r) => /^기사 앱 정산서 표시 범위/.test(String(r.label || ''))) || {}).value || '전부') + '</div></div>' : '') + '</div>';
       });
-      const rest = order.filter((i) => !used[i] && !/^기사 앱 정산서 표시 범위/.test(String(rows[i].label || '')));
+      const rest = order.filter((i) => !used[i] && !/^기사 앱 정산서 표시 범위|^15일 선지급 기사/.test(String(rows[i].label || '')));
       if (rest.length) cards.push('<div class="cf-card"><h4>기타<small>묶음이 없는 항목</small></h4>' + rest.map((i) => item(rows[i], i)).join('') + '</div>');
       $('#stEditor').innerHTML = dl + advSum + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button><span class="sub">저장하면 마감하지 않은 달 전체가 다시 계산됩니다</span>') + '</div><div class="cf-grid">' + cards.join('') + '</div>';
       return;
@@ -9549,6 +9594,9 @@
     const list = P.list.filter((x) => !only || !x.checked).slice().sort((a, b) => (b.early ? 1 : 0) - (a.early ? 1 : 0));
     const total = P.list.reduce((a, x) => a + x.net, 0), done = P.list.filter((x) => x.checked).reduce((a, x) => a + x.net, 0);
     const eN = P.list.filter((x) => x.early).length, eAmt = P.list.filter((x) => x.early).reduce((a, x) => a + x.net, 0);
+    const F = STX.fund && STX.fund.month === STX.month ? STX.fund : null, drvB = F && (F.banks || []).find((b) => b.role === '기사정산');
+    const k4 = (lab, v, sub, cls) => '<div class="kpi"><small>' + lab + '</small><b' + (cls ? ' style="color:var(--danger)"' : '') + '>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
+    $('#payKp').innerHTML = k4('보낼 금액 (20일)', wn(total - eAmt), eN ? '선지급 ' + eN + '명 ' + wn(eAmt) + ' 별도 (15일)' : '') + k4('입금 완료', wn(done), P.list.filter((x) => x.checked).length + '명') + k4('남은 금액', wn(total - done), P.list.filter((x) => !x.checked).length + '명', total - done > 0) + k4('기사정산 통장 잔액', drvB ? wn(drvB.balance) : '—', drvB ? esc(drvB.name) : '통장 목록에 기사정산 용도 통장 없음');
     $('#payInfo').innerHTML = '총 입금액 <b>' + wn(total) + '</b> · 입금 완료 <b>' + wn(done) + '</b> · 남은 금액 <b style="color:var(--danger)">' + wn(total - done) + '</b> · 미입금 <b>' + P.list.filter((x) => !x.checked).length + '명</b>' + (eN ? ' · <span style="color:var(--brand)">15일 선지급 ' + eN + '명 ' + wn(eAmt) + ' (쿠팡정산 통장에서)</span>' : '') + ' · 지급일 ' + esc((P.dates || {}).pay || '');
     $('#payTable').innerHTML = '<thead><tr><th>입금</th><th>이름</th><th>은행</th><th>계좌번호</th><th>예금주</th><th class="n">지급총액</th><th class="n">공제</th><th class="n">입금액</th><th>입금일</th><th>메모</th><th class="n">계산서 공급가</th><th class="n">세액</th><th>사업자번호</th></tr></thead><tbody>' +
       list.map((x) => '<tr' + (x.early ? ' class="early"' : '') + '><td><input type="checkbox" data-pay="' + esc(x.id) + '"' + (x.checked ? ' checked' : '') + '></td><td><b>' + esc(x.name) + '</b>' + (x.early ? ' <span class="badge" style="background:var(--brand-weak);color:var(--brand)" title="운영자 · 쿠팡 입금일(15일)에 쿠팡정산 통장에서 바로 지급">15일 선지급</span>' : '') + '<br><small class="sub">' + esc((x.cids || []).map((c) => c.replace(/@.*/, '')).join(', ')) + '</small></td><td>' + esc(x.bank) + '</td><td>' + (x.account ? esc(x.account) : '<span style="color:var(--danger)">미입력</span>') + '</td><td>' + esc(x.holder) + '</td>' +
@@ -11164,7 +11212,7 @@
     tn.__uiSet = want;
   }
   // 화면 맨 위 '사용법' — 접었다 펼 수 있음 (접은 상태는 이 기기에 기억)
-  const PG_NAV = { dash: '대시보드', drivers: '기사 정보관리', sched: '기사스케줄', bib: '배번호 관리', route: '노선관리', perf: '수행률 · SLA', memo: '업무스케줄', settle: '정산관리', pnl: '러너 손익·통장', uiset: '올인원 설정' };
+  const PG_NAV = { dash: '대시보드', drivers: '기사 정보관리', sched: '기사스케줄', bib: '배번호 관리', route: '노선관리', perf: '수행률 · SLA', memo: '업무스케줄', settle: '정산관리', pnl: '매입·매출', uiset: '올인원 설정' };
   const pgOpen = (v) => { try { return localStorage.getItem('runner.pgHelp.' + v) !== '0'; } catch (e) { return true; } };
   function pageHelpAll() {
     Object.keys(PG_NAV).forEach((v) => {
@@ -11411,7 +11459,7 @@
       ['route', '', [['#xpOpen', '버튼'], ['[data-rcopen="move"]', '버튼'], ['#campNew', '버튼']]],
       ['perf', '', [['#rpUpBtn', '버튼']]],
       ['settle', '', [['#stSteps .st-step', '단계', { adjust: '#stTabs [data-st="yongcha"], #stTabs [data-st="adjust"], #stTabs [data-st="advance"], #stTabs [data-st="tmp"], #stTabs [data-st="usage"]', list: '#stTabs [data-st="report"]' }], ['#stGearBtn', '버튼', { }], ['#stCfgTabs .tab', '설정'], ['#stTabs [data-st="ids"], #stTabs [data-st="vendors"]', '설정'], ['#stRecalc', '버튼'], ['#stCloseBtn', '버튼'], ['#stTaxPack', '버튼']]],
-      ['settle', 'pnl', [['#stPnlTabs .tab', '탭']]],
+      ['settle', 'pnl', [['#stFinG .st-step', '단계'], ['#stPnlTabs .tab', '탭']]],
       ['taxinv', '', [['#tiTabs .tab', '탭'], ['#tiFromStl', '버튼'], ['#tiNew', '버튼']]],
       ['notice', '', [['#ntNew', '버튼']]],
       ['acc', '', [['#acNew', '버튼'], ['#acCatEdit', '버튼']]]
