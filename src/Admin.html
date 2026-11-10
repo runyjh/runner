@@ -1056,6 +1056,27 @@
   /* 지시사항 있는 칸: 오른쪽 위 주황 삼각 */
   .sg td.c.inst { position: relative; }
   .sg td.c.iss { background-image: linear-gradient(135deg, #e5484d 0 6px, transparent 6px); } /* 이슈(이슈 관리) 있는 칸: 왼쪽 위 빨간 삼각 */
+  /* 계산서/산재 관리 (메뉴 묶음 · 화면) */
+  .nsubt { margin: 4px 0 1px; padding: 6px 10px 3px; font-size: 13px; font-weight: 800; color: #4e5968; display: flex; align-items: center; gap: 6px; }
+  .nsubt::before { content: '▾'; font-size: 10px; color: var(--c); }
+  .nav a.nsub { padding-left: 24px; font-size: 13.5px; }
+  .dc-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .dc-sum .dcs { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 8px 14px; min-width: 130px; }
+  .dc-sum .dcs small { display: block; color: var(--sub); font-size: 12px; font-weight: 700; }
+  .dc-sum .dcs b { font-size: 16px; } .dc-sum .dcs em { font-style: normal; color: var(--sub); font-size: 12px; margin-left: 4px; }
+  .dc-sum .dcs.ok b { color: #0b6b3a; } .dc-sum .dcs.bad b { color: #c81e1e; }
+  .dc-tb td { vertical-align: middle; }
+  .dc-tb td.num, .dc-tb th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dc-tb td.sm { font-size: 12.5px; color: var(--sub); white-space: nowrap; }
+  .dc-tb input.inp { height: 30px; padding: 0 8px; font-size: 13px; }
+  .dc-tb input.dcd { width: 130px; } .dc-tb input.dca { width: 130px; } .dc-tb input.dcm { width: 160px; }
+  .dc-st { display: inline-flex; align-items: center; justify-content: center; min-width: 74px; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12.5px; font-weight: 800; color: #c81e1e; cursor: pointer; white-space: nowrap; }
+  .dc-st.on { background: #12a150; border-color: #12a150; color: #fff; }
+  .dc-st.ti { background: #e8f0fd; border-color: #b9d0f7; color: var(--brand); cursor: default; }
+  .dc-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: #eef1f4; color: #4e5968; white-space: nowrap; }
+  .dc-tag.y { background: #e7f6ee; color: #0b6b3a; } .dc-tag.n { background: #f3f4f6; color: #9aa4b2; } .dc-tag.w { background: #fff0e6; color: #c2410c; }
+  .dc-tb tr.done td:first-child { box-shadow: inset 3px 0 0 #12a150; }
+  .dc-cfg { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 14px 16px; margin: 0 0 12px; }
   /* 이슈 관리 */
   .is-mionly, .is-mi { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .is-mi input, .is-mionly input { width: 16px; height: 16px; accent-color: #e5484d; }
@@ -1116,7 +1137,7 @@
     .side .logo { padding: 0 8px 0 0; white-space: nowrap; }
     .nav { display: flex; gap: 4px; overflow: visible; margin: 0; padding: 0; flex: none; }
     .ng { display: contents; }
-    .ngt { display: none; }
+    .ngt, .nsubt { display: none; } .nav a.nsub { padding-left: 10px; }
     .nav a { white-space: nowrap; }
     .nav a small { display: none; }
     .side .me { position: static; border: 0; margin: 0; padding: 0 0 0 8px; white-space: nowrap; }
@@ -1148,6 +1169,8 @@
   html.m .side.open .nav { display: block; width: 100%; max-height: calc(100vh - 120px); overflow-y: auto; margin: 4px 0 0; padding: 4px 0; flex: none; }
   html.m .side.open .ng { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 12px; }
   html.m .side.open .ngt { display: flex; grid-column: 1 / -1; font-size: 12px; margin-bottom: 2px; }
+  html.m .nsubt { display: none; } html.m .side.open .nsubt { display: flex; grid-column: 1 / -1; font-size: 12.5px; margin: 2px 0 0; padding: 2px 4px; }
+  html.m .side.open .nav a.nsub { padding-left: 10px; }
   html.m .side.open .nav a { padding: 11px 10px; font-size: 14.5px; border: 1px solid var(--line); margin: 0; background: #fff; }
   html.m .side.open .nav a.on { border-color: var(--brand); }
   html.m .nav a small { display: none; }
@@ -1197,7 +1220,10 @@
       <div class="ng g-fin"><p class="ngt">정산 · 회계</p>
         <a data-view="settle">정산관리</a>
         <a data-view="settle" data-st-go="pnl">매입·매출</a>
-        <a data-view="taxinv">세금계산서 역발행</a>
+        <p class="nsubt">계산서/산재 관리</p>
+        <a data-view="taxinv" class="nsub">세금계산서 역발행</a>
+        <a data-view="einv" class="nsub">전자세금계산서 발행</a>
+        <a data-view="insrep" class="nsub">산재/고용 신고 상황</a>
       </div>
       <div class="ng g-com"><p class="ngt">소통</p>
         <a data-view="notice">공지사항</a>
@@ -1297,6 +1323,62 @@
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">메뉴 · 탭 · 화면 제목 · 설명서 글자를 직접 바꿉니다. <b>기능과 계산은 그대로</b>이고, 바꾼 문구를 비우면 기본 문구가 나옵니다. 화면에서 바로 고치려면 <b>✏️ 문구 편집 모드</b>를 켜세요.</p>
     <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="form">창 · 입력칸</button><button class="tab" data-uit="warn">경고 문구</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
     <div id="uiBody"></div>
+   </section>
+   <section id="view-einv" class="hidden">
+    <div class="head">
+      <h2>전자세금계산서 발행 <small id="evCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools">
+        <select class="inp" id="evMonth" title="정산월"></select>
+        <input class="inp search" id="evQ" placeholder="기사·사업자번호·상호 검색" style="width:200px">
+        <button class="btn ghost" id="evReload">새로고침</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 10px;font-size:13px" id="evInfo"></p>
+    <div class="dc-sum" id="evSum"></div>
+    <div class="tabs" id="evTabs"></div>
+    <div class="rbulk hidden" id="evBulk"></div>
+    <div class="table-wrap">
+      <table class="dc-tb">
+        <thead><tr><th class="ck"><input type="checkbox" id="evAll" aria-label="보이는 줄 모두 선택"></th><th>기사</th><th>사업자번호 · 상호</th><th class="num">공급가액</th><th class="num">세액</th><th class="num">합계금액</th><th>발행 여부</th><th>발행일</th><th>승인번호</th><th>메모</th><th>처리</th></tr></thead>
+        <tbody id="evRows"></tbody>
+      </table>
+      <div class="empty hidden" id="evEmpty"></div>
+    </div>
+   </section>
+   <section id="view-insrep" class="hidden">
+    <div class="head">
+      <h2>산재/고용 신고 상황 <small id="irCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools">
+        <select class="inp" id="irMonth" title="정산월 (= 노무제공월)"></select>
+        <input class="inp search" id="irQ" placeholder="기사 검색" style="width:160px">
+        <button class="btn ghost" id="irReload">새로고침</button>
+        <button class="btn ghost" id="irCfgBtn" type="button">⚙ 신고 설정</button>
+        <button class="btn" id="irXlsx" type="button" title="근로복지공단 고용·산재보험 토탈서비스 '노무제공자 월 보수액 신고' 일괄 등록용 엑셀">⬇ 공단 업로드 엑셀</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 10px;font-size:13px" id="irInfo"></p>
+    <div class="dc-cfg hidden" id="irCfg">
+      <div class="grid2">
+        <div class="field"><label class="lb" for="irJob">직종부호</label>
+          <select class="inp" id="irJob"><option value="944">944 · 택배기사</option><option value="964">964 · 유통배송기사</option><option value="961">961 · 화물차주(택배 지선·간선)</option><option value="985">985 · 화물차주(기타 품목)</option></select></div>
+        <div class="field"><label class="lb" for="irBizNo">사업장관리번호 (엑셀 양식에 칸이 있으면 들어감)</label><input class="inp" id="irBizNo" placeholder="예: 12345678900"></div>
+      </div>
+      <div class="field"><span class="lb">공단 엑셀 양식 (선택)</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn sm ghost" type="button" id="irTplPick">토탈서비스에서 받은 양식 올리기</button><button class="btn sm ghost danger-t hidden" type="button" id="irTplDel">양식 지우기</button><span class="sub" id="irTplName" style="font-size:12.5px"></span><input type="file" id="irTplFile" accept=".xlsx" class="hidden"></div>
+        <div class="db-note" style="margin-top:6px">토탈서비스 일괄 등록 화면에서 받은 엑셀 양식을 한 번 올려 두면, 그 양식의 머리글(성명·주민등록번호·직종부호·자격취득일·월보수액·고용/산재 등) 순서대로 채워서 내보냅니다. 올리지 않으면 신고서(별지 제55호의2) 항목 순서의 기본 양식으로 내보냅니다.</div>
+      </div>
+      <div class="m-actions" style="margin-top:8px"><button class="btn sm ghost" type="button" id="irCfgClose">닫기</button><button class="btn sm" type="button" id="irCfgSave">설정 저장</button></div>
+    </div>
+    <div class="dc-sum" id="irSum"></div>
+    <div class="tabs" id="irTabs"></div>
+    <div class="rbulk hidden" id="irBulk"></div>
+    <div class="table-wrap">
+      <table class="dc-tb">
+        <thead><tr><th class="ck"><input type="checkbox" id="irAll" aria-label="보이는 줄 모두 선택"></th><th>기사</th><th>주민등록번호</th><th title="노무제공 개시일 (공단 신고서의 자격취득일)">자격취득일</th><th class="num" title="정산 보험 기준금액">기준금액</th><th class="num" title="기준금액 × (1 − 경비율)">월보수액</th><th>산재</th><th>고용</th><th class="num" title="기사 정산서에서 공제한 산재+고용">기사 공제</th><th class="num" title="공단 납부 전체 (기사분 + 러너분)">공단 납부</th><th>신고 여부</th><th>신고일</th><th>메모</th></tr></thead>
+        <tbody id="irRows"></tbody>
+      </table>
+      <div class="empty hidden" id="irEmpty"></div>
+    </div>
    </section>
    <section id="view-taxinv" class="hidden">
     <div class="head">
@@ -3350,6 +3432,10 @@
     $('#view-board').classList.toggle('hidden', v !== 'board');
     $('#view-taxinv').classList.toggle('hidden', v !== 'taxinv');
     if (v === 'taxinv') loadTax();
+    $('#view-einv').classList.toggle('hidden', v !== 'einv');
+    if (v === 'einv') loadEinv();
+    $('#view-insrep').classList.toggle('hidden', v !== 'insrep');
+    if (v === 'insrep') loadInsRep();
     if (v === 'board') loadBoardAdm();
     $('#view-acc').classList.toggle('hidden', v !== 'acc');
     $('#view-uiset').classList.toggle('hidden', v !== 'uiset');
@@ -3705,6 +3791,312 @@
   const paKind = { '주간': '주간 ☀️', '야간': '야간 🌙', '일택': '일택 📦' };
   const paBadge = (st) => '<span class="badge p-' + esc(String(st).replace(/\s/g, '')) + '">' + esc(st) + '</span>';
   const paDay = (d) => { const p = String(d || '').split('-'); if (p.length !== 3) return esc(d || ''); return +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
+  // ───── 계산서/산재 관리: 전자세금계산서 발행 체크 · 산재/고용 신고 상황 (DocCheck.gs) ─────
+  const dWon = (v) => (Number(v) || 0).toLocaleString('ko-KR');
+  const dMon = (m) => m ? m.slice(0, 4) + '년 ' + Number(m.slice(5, 7)) + '월' : '';
+  const dMd = (d) => d ? Number(d.slice(5, 7)) + '/' + Number(d.slice(8, 10)) : '';
+  const dToday = () => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); };
+  function dcMonthSel(sel, months, cur) {
+    const list = (months || []).slice().sort().reverse();
+    if (cur && !list.includes(cur)) list.unshift(cur);
+    sel.innerHTML = list.map((m) => '<option value="' + esc(m) + '"' + (m === cur ? ' selected' : '') + '>' + esc(dMon(m)) + '</option>').join('');
+  }
+  /** 선택(체크박스) 공통: 보이는 줄 전체 선택 · 몇 개 골랐는지 막대 */
+  function dcSel(set, rowsSel, allSel, bulkSel, keyAttr, html) {
+    const vis = $$(rowsSel + ' [' + keyAttr + ']').map((c) => c.getAttribute(keyAttr));
+    $(allSel).checked = vis.length > 0 && vis.every((k) => set.has(k));
+    $(bulkSel).classList.toggle('hidden', !set.size);
+    if (set.size) $(bulkSel).innerHTML = '<b>' + set.size + '명 선택</b>' + html + '<button type="button" class="btn sm ghost" data-dcclr>선택 풀기</button>';
+  }
+
+  // ── 전자세금계산서 발행 ──
+  const EV = { month: '', rows: [], tab: '전체', sel: new Set(), seq: 0 };
+  const evState = (r) => r.ti ? 'ti' : r.done ? 'done' : 'no';
+  const evGap = (r) => r.ti && Math.abs((r.ti.total || 0) - r.total) >= 1;
+  function loadEinv(month) {
+    const seq = ++EV.seq;
+    if (!EV.rows.length) $('#evRows').innerHTML = '<tr><td colspan="11" class="sub">정산 결과를 불러오는 중…</td></tr>';
+    api('adm_einvList', month || EV.month || '').then((r) => {
+      if (seq !== EV.seq) return;
+      if (!r.ok) return toast(r.msg);
+      if (r.month !== EV.month) EV.sel.clear();
+      EV.month = r.month; EV.rows = r.rows || []; EV.info = r;
+      dcMonthSel($('#evMonth'), r.months, r.month);
+      renderEinv();
+    }).catch(() => {});
+  }
+  function renderEinv() {
+    const r = EV.info || {}, all = EV.rows;
+    $('#evInfo').innerHTML = dMon(EV.month) + ' 정산서의 <b>합계금액</b>(세금계산서 금액)을 기사님이 러너 앞으로 전자세금계산서를 발행했는지 체크합니다. 작성일자 <b>' + esc(r.writeDate || '-') + '</b> · 발행 기한 <b>' + esc(r.due || '-') + '</b>' +
+      (r.closed ? '' : ' · <span style="color:#c2410c;font-weight:700">아직 마감 전 (금액이 바뀔 수 있음)</span>') + ' · 러너가 역발행한 계산서는 자동으로 <b>역발행</b>으로 잡힙니다.';
+    const ok = all.filter((x) => evState(x) !== 'no'), no = all.filter((x) => evState(x) === 'no'), gap = all.filter((x) => evGap(x) || (x.done && x.savedTotal && x.savedTotal !== x.total));
+    const sumOf = (l) => l.reduce((a, x) => a + x.total, 0);
+    $('#evSum').innerHTML = '<div class="dcs"><small>전체</small><b>' + all.length + '명</b><em>' + dWon(sumOf(all)) + '원</em></div>' +
+      '<div class="dcs ok"><small>발행 완료 (역발행 포함)</small><b>' + ok.length + '명</b><em>' + dWon(sumOf(ok)) + '원</em></div>' +
+      '<div class="dcs' + (no.length ? ' bad' : '') + '"><small>미발행</small><b>' + no.length + '명</b><em>' + dWon(sumOf(no)) + '원</em></div>' +
+      (gap.length ? '<div class="dcs bad"><small>금액 다름 (확인 필요)</small><b>' + gap.length + '명</b></div>' : '');
+    const tabs = [['전체', all.length], ['미발행', no.length], ['발행 완료', all.filter((x) => x.done && !x.ti).length], ['역발행', all.filter((x) => x.ti).length]].concat(gap.length ? [['금액 다름', gap.length]] : []);
+    $('#evTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (EV.tab === k ? ' on' : '') + '" data-evt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
+    const q = $('#evQ').value.trim().toLowerCase();
+    const list = all.filter((x) => (EV.tab === '전체' || (EV.tab === '미발행' && evState(x) === 'no') || (EV.tab === '발행 완료' && x.done && !x.ti) || (EV.tab === '역발행' && x.ti) || (EV.tab === '금액 다름' && gap.includes(x))) &&
+      (!q || [x.name, x.bizNo, x.bizName, x.vendor, x.memo, x.approvalNo].join(' ').toLowerCase().includes(q)));
+    $('#evCount').textContent = dMon(EV.month) + ' · ' + ok.length + '/' + all.length + '명 발행';
+    $('#evRows').innerHTML = list.map((x) => {
+      const st = evState(x), warn = evGap(x) ? '역발행 ' + dWon(x.ti.total) + '원 ≠ 정산 ' + dWon(x.total) + '원' : x.done && x.savedTotal && x.savedTotal !== x.total ? '체크할 때 ' + dWon(x.savedTotal) + '원 → 지금 ' + dWon(x.total) + '원' : '';
+      return '<tr data-acct="' + esc(x.acct) + '"' + (st !== 'no' ? ' class="done"' : '') + '>' +
+        '<td class="ck"><input type="checkbox" data-evck="' + esc(x.acct) + '"' + (EV.sel.has(x.acct) ? ' checked' : '') + '></td>' +
+        '<td style="white-space:nowrap"><b>' + esc(x.name) + '</b>' + (x.vendor ? ' <span class="dc-tag">용차업체</span>' : '') + (x.tiOn && !x.ti ? ' <span class="dc-tag w" title="기사 정보에서 역발행 대상으로 되어 있지만 이 달 역발행 계산서가 없습니다">역발행 대상</span>' : '') + '</td>' +
+        '<td class="sm">' + esc(x.bizNo || '사업자번호 없음') + (x.bizName ? '<br>' + esc(x.bizName) : '') + '</td>' +
+        '<td class="num">' + dWon(x.supply) + '</td><td class="num">' + dWon(x.tax) + '</td><td class="num"><b>' + dWon(x.total) + '</b>' + (warn ? '<div style="color:#c2410c;font-size:11.5px;font-weight:700">⚠ ' + esc(warn) + '</div>' : '') + '</td>' +
+        '<td>' + (st === 'ti' ? '<span class="dc-st ti" title="러너가 역발행한 계산서 ' + x.ti.n + '장 · ' + (x.ti.nts ? '국세청 등록' : '국세청 미등록') + '">역발행 ✓</span>' : '<button type="button" class="dc-st' + (st === 'done' ? ' on' : '') + '" data-evtog="' + esc(x.acct) + '">' + (st === 'done' ? '발행 완료' : '미발행') + '</button>') + '</td>' +
+        '<td>' + (st === 'ti' ? '<span class="sm">' + esc(x.ti.date || '') + '</span>' : '<input class="inp dcd" type="date" data-evf="date" value="' + esc(x.date) + '"' + (x.done ? '' : ' disabled') + '>') + '</td>' +
+        '<td><input class="inp dca" data-evf="approvalNo" value="' + esc(x.approvalNo) + '" placeholder="국세청 승인번호" maxlength="40"></td>' +
+        '<td><input class="inp dcm" data-evf="memo" value="' + esc(x.memo) + '" maxlength="200"></td>' +
+        '<td class="sm" title="' + esc(x.at) + '">' + esc(x.by ? x.by + ' ' + dMd(x.at) : '') + '</td></tr>';
+    }).join('');
+    $('#evEmpty').textContent = all.length ? '조건에 맞는 기사가 없습니다.' : '이 달 정산 결과에 세금계산서 금액이 있는 기사가 없습니다.';
+    $('#evEmpty').classList.toggle('hidden', list.length > 0);
+    evSelPaint();
+  }
+  function evSelPaint() { dcSel(EV.sel, '#evRows', '#evAll', '#evBulk', 'data-evck', '<button type="button" class="btn sm" data-evbulk="1">발행 완료로</button><button type="button" class="btn sm ghost" data-evbulk="0">미발행으로</button>'); }
+  function evSave(list) {
+    const pay = list.map((x) => ({ acct: x.acct, driverId: x.driverId, name: x.name, total: x.total, done: x.done, date: x.date, approvalNo: x.approvalNo, memo: x.memo }));
+    return api('adm_einvSet', EV.month, pay).then((r) => { if (!r.ok) { toast(r.msg); loadEinv(); } return r; });
+  }
+  $('#evMonth').addEventListener('change', (e) => { EV.rows = []; loadEinv(e.target.value); });
+  $('#evReload').addEventListener('click', () => loadEinv());
+  $('#evQ').addEventListener('input', (e) => { if (!e.isComposing) renderEinv(); });
+  $('#evTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-evt]'); if (b) { EV.tab = b.dataset.evt; renderEinv(); } });
+  $('#evAll').addEventListener('change', (e) => { $$('#evRows [data-evck]').forEach((c) => { c.checked = e.target.checked; if (e.target.checked) EV.sel.add(c.dataset.evck); else EV.sel.delete(c.dataset.evck); }); evSelPaint(); });
+  $('#evRows').addEventListener('change', (e) => {
+    const ck = e.target.closest('[data-evck]');
+    if (ck) { if (ck.checked) EV.sel.add(ck.dataset.evck); else EV.sel.delete(ck.dataset.evck); return evSelPaint(); }
+    const f = e.target.closest('[data-evf]'); if (!f) return;
+    const x = EV.rows.find((i) => i.acct === f.closest('tr').dataset.acct); if (!x) return;
+    x[f.dataset.evf] = f.value.trim();
+    evSave([x]).then((r) => { if (r && r.ok) toast(x.name + ' 저장했습니다.'); }).catch(() => {});
+  });
+  $('#evRows').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-evtog]'); if (!b) return;
+    const x = EV.rows.find((i) => i.acct === b.dataset.evtog); if (!x) return;
+    x.done = !x.done; x.date = x.done ? (x.date || dToday()) : ''; x.savedTotal = x.done ? x.total : 0; x.by = me ? me.name : x.by; x.at = new Date().toISOString().slice(0, 10);
+    renderEinv();
+    evSave([x]).then((r) => { if (r && r.ok) toast(x.name + (x.done ? ' 발행 완료로 체크했습니다.' : ' 미발행으로 바꿨습니다.')); }).catch(() => {});
+  });
+  $('#evBulk').addEventListener('click', (e) => {
+    if (e.target.closest('[data-dcclr]')) { EV.sel.clear(); return renderEinv(); }
+    const b = e.target.closest('[data-evbulk]'); if (!b) return;
+    const on = b.dataset.evbulk === '1';
+    const list = EV.rows.filter((x) => EV.sel.has(x.acct) && !x.ti && x.done !== on);
+    if (!list.length) return toast('바꿀 줄이 없습니다 (역발행 줄은 자동입니다).');
+    list.forEach((x) => { x.done = on; x.date = on ? (x.date || dToday()) : ''; x.savedTotal = on ? x.total : 0; });
+    EV.sel.clear(); renderEinv();
+    evSave(list).then((r) => { if (r && r.ok) toast(list.length + '명을 ' + (on ? '발행 완료로' : '미발행으로') + ' 바꿨습니다.'); }).catch(() => {});
+  });
+
+  // ── 산재/고용 신고 상황 ──
+  const IR = { month: '', rows: [], tab: '신고 대상', sel: new Set(), seq: 0, info: null };
+  const irTarget = (x) => !x.excluded && (x.sanOn || x.goyOn);
+  function loadInsRep(month) {
+    const seq = ++IR.seq;
+    if (!IR.rows.length) $('#irRows').innerHTML = '<tr><td colspan="13" class="sub">정산 결과를 불러오는 중…</td></tr>';
+    api('adm_insRepList', month || IR.month || '').then((r) => {
+      if (seq !== IR.seq) return;
+      if (!r.ok) return toast(r.msg);
+      if (r.month !== IR.month) IR.sel.clear();
+      IR.month = r.month; IR.rows = r.rows || []; IR.info = r;
+      dcMonthSel($('#irMonth'), r.months, r.month);
+      renderInsRep();
+    }).catch(() => {});
+  }
+  function renderInsRep() {
+    const r = IR.info || {}, rt = r.rates || {}, all = IR.rows, tg = all.filter(irTarget);
+    const pct = (v) => (Math.round((v || 0) * 10000) / 100) + '%';
+    $('#irInfo').innerHTML = dMon(IR.month) + ' 노무제공분 · 신고 기한 <b>' + esc(r.due || '-') + '</b> (다음 달 말일) · 월보수액 = ' + esc(rt.basis || '공급가') + ' × (1 − 경비율 ' + pct(rt.expense) + ') · 산재 ' + pct(rt.san) + ' · 고용 ' + pct(rt.goy) +
+      ' (월보수 ' + dWon(rt.goyMin) + '원 미만 제외) · 러너 부담 ' + pct(rt.runner) + ' · 직종부호 <b>' + esc((r.cfg || {}).jobCode || '') + '</b>' + (r.closed ? '' : ' · <span style="color:#c2410c;font-weight:700">아직 마감 전</span>');
+    const done = tg.filter((x) => x.done), sum = (l, k) => l.reduce((a, x) => a + (x[k] || 0), 0), noRrn = tg.filter((x) => !x.hasRrn);
+    $('#irSum').innerHTML = '<div class="dcs"><small>신고 대상</small><b>' + tg.length + '명</b><em>제외 ' + (all.length - tg.length) + '</em></div>' +
+      '<div class="dcs"><small>월보수액 합계</small><b>' + dWon(sum(tg, 'bosu')) + '</b></div>' +
+      '<div class="dcs"><small>산재 (공단 전체)</small><b>' + dWon(sum(tg, 'sanAll')) + '</b><em>고용 대상 ' + tg.filter((x) => x.goyOn).length + '명</em></div>' +
+      '<div class="dcs"><small>고용 (공단 전체)</small><b>' + dWon(sum(tg, 'goyAll')) + '</b></div>' +
+      '<div class="dcs' + (done.length >= tg.length && tg.length ? ' ok' : ' bad') + '"><small>신고 완료</small><b>' + done.length + '/' + tg.length + '명</b></div>' +
+      (noRrn.length ? '<div class="dcs bad"><small>주민등록번호 없음</small><b>' + noRrn.length + '명</b><em>기사 정보관리에서 입력</em></div>' : '');
+    const tabs = [['신고 대상', tg.length], ['미신고', tg.filter((x) => !x.done).length], ['신고 완료', done.length], ['제외', all.length - tg.length], ['전체', all.length]];
+    $('#irTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (IR.tab === k ? ' on' : '') + '" data-irt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
+    const q = $('#irQ').value.trim().toLowerCase();
+    const list = all.filter((x) => (IR.tab === '전체' || (IR.tab === '신고 대상' && irTarget(x)) || (IR.tab === '미신고' && irTarget(x) && !x.done) || (IR.tab === '신고 완료' && irTarget(x) && x.done) || (IR.tab === '제외' && !irTarget(x))) &&
+      (!q || [x.name, x.memo].join(' ').toLowerCase().includes(q)));
+    $('#irCount').textContent = dMon(IR.month) + ' · ' + done.length + '/' + tg.length + '명 신고';
+    const yn = (on, why) => on ? '<span class="dc-tag y">적용</span>' : '<span class="dc-tag n"' + (why ? ' title="' + esc(why) + '"' : '') + '>—</span>';
+    $('#irRows').innerHTML = list.map((x) => {
+      const tgt = irTarget(x), chg = x.done && x.savedBosu && x.savedBosu !== x.bosu;
+      return '<tr data-acct="' + esc(x.acct) + '"' + (x.done && tgt ? ' class="done"' : '') + (tgt ? '' : ' style="opacity:.6"') + '>' +
+        '<td class="ck">' + (tgt ? '<input type="checkbox" data-irck="' + esc(x.acct) + '"' + (IR.sel.has(x.acct) ? ' checked' : '') + '>' : '') + '</td>' +
+        '<td style="white-space:nowrap"><b>' + esc(x.name) + '</b>' + (x.leave ? ' <span class="dc-tag w" title="퇴사일">퇴사 ' + esc(dMd(x.leave)) + '</span>' : '') + '</td>' +
+        '<td class="sm">' + (x.hasRrn ? esc(x.rrn || '등록됨') : '<span style="color:#c81e1e;font-weight:700">⚠ 없음</span>') + '</td>' +
+        '<td><input class="inp dcd" type="date" data-irf="start" value="' + esc(x.start) + '"></td>' +
+        '<td class="num">' + dWon(x.supply) + '</td><td class="num"><b>' + dWon(x.bosu) + '</b>' + (chg ? '<div style="color:#c2410c;font-size:11.5px;font-weight:700">⚠ 신고 때 ' + dWon(x.savedBosu) + '</div>' : '') + '</td>' +
+        '<td>' + (x.excluded ? '<span class="dc-tag n" title="정산 설정에서 산재·고용 제외">제외</span>' : yn(x.sanOn, '산재 OFF')) + '</td>' +
+        '<td>' + (x.excluded ? '' : yn(x.goyOn, x.bosu < (rt.goyMin || 0) ? '월보수액 ' + dWon(rt.goyMin) + '원 미만' : '고용 OFF')) + '</td>' +
+        '<td class="num">' + dWon(x.sanD + x.goyD) + '</td><td class="num">' + dWon(x.sanAll + x.goyAll) + '</td>' +
+        '<td>' + (tgt ? '<button type="button" class="dc-st' + (x.done ? ' on' : '') + '" data-irtog="' + esc(x.acct) + '">' + (x.done ? '신고 완료' : '미신고') + '</button>' : '<span class="sm">대상 아님</span>') + '</td>' +
+        '<td>' + (tgt ? '<input class="inp dcd" type="date" data-irf="date" value="' + esc(x.date) + '"' + (x.done ? '' : ' disabled') + '>' : '') + '</td>' +
+        '<td><input class="inp dcm" data-irf="memo" value="' + esc(x.memo) + '" maxlength="200"></td></tr>';
+    }).join('');
+    $('#irEmpty').textContent = all.length ? '조건에 맞는 기사가 없습니다.' : '이 달 정산 결과에 기사 지급이 없습니다.';
+    $('#irEmpty').classList.toggle('hidden', list.length > 0);
+    irSelPaint();
+  }
+  function irSelPaint() { dcSel(IR.sel, '#irRows', '#irAll', '#irBulk', 'data-irck', '<button type="button" class="btn sm" data-irbulk="1">신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="0">미신고로</button><button type="button" class="btn sm ghost" data-irbulk="x">⬇ 고른 기사만 엑셀</button>'); }
+  function irSave(list) {
+    const pay = list.map((x) => ({ acct: x.acct, driverId: x.driverId, name: x.name, bosu: x.bosu, san: x.sanOn, goy: x.goyOn, start: x.start, done: x.done, date: x.date, memo: x.memo }));
+    return api('adm_insRepSet', IR.month, pay).then((r) => { if (!r.ok) { toast(r.msg); loadInsRep(); } return r; });
+  }
+  $('#irMonth').addEventListener('change', (e) => { IR.rows = []; loadInsRep(e.target.value); });
+  $('#irReload').addEventListener('click', () => loadInsRep());
+  $('#irQ').addEventListener('input', (e) => { if (!e.isComposing) renderInsRep(); });
+  $('#irTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-irt]'); if (b) { IR.tab = b.dataset.irt; renderInsRep(); } });
+  $('#irAll').addEventListener('change', (e) => { $$('#irRows [data-irck]').forEach((c) => { c.checked = e.target.checked; if (e.target.checked) IR.sel.add(c.dataset.irck); else IR.sel.delete(c.dataset.irck); }); irSelPaint(); });
+  $('#irRows').addEventListener('change', (e) => {
+    const ck = e.target.closest('[data-irck]');
+    if (ck) { if (ck.checked) IR.sel.add(ck.dataset.irck); else IR.sel.delete(ck.dataset.irck); return irSelPaint(); }
+    const f = e.target.closest('[data-irf]'); if (!f) return;
+    const x = IR.rows.find((i) => i.acct === f.closest('tr').dataset.acct); if (!x) return;
+    x[f.dataset.irf] = f.value.trim();
+    irSave([x]).then((r) => { if (r && r.ok) toast(x.name + ' 저장했습니다.'); }).catch(() => {});
+  });
+  $('#irRows').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-irtog]'); if (!b) return;
+    const x = IR.rows.find((i) => i.acct === b.dataset.irtog); if (!x) return;
+    x.done = !x.done; x.date = x.done ? (x.date || dToday()) : ''; x.savedBosu = x.done ? x.bosu : 0;
+    renderInsRep();
+    irSave([x]).then((r) => { if (r && r.ok) toast(x.name + (x.done ? ' 신고 완료로 체크했습니다.' : ' 미신고로 바꿨습니다.')); }).catch(() => {});
+  });
+  $('#irBulk').addEventListener('click', (e) => {
+    if (e.target.closest('[data-dcclr]')) { IR.sel.clear(); return renderInsRep(); }
+    const b = e.target.closest('[data-irbulk]'); if (!b) return;
+    if (b.dataset.irbulk === 'x') return irExport(Array.from(IR.sel));
+    const on = b.dataset.irbulk === '1';
+    const list = IR.rows.filter((x) => IR.sel.has(x.acct) && irTarget(x) && x.done !== on);
+    if (!list.length) return toast('바꿀 줄이 없습니다.');
+    list.forEach((x) => { x.done = on; x.date = on ? (x.date || dToday()) : ''; x.savedBosu = on ? x.bosu : 0; });
+    IR.sel.clear(); renderInsRep();
+    irSave(list).then((r) => { if (r && r.ok) toast(list.length + '명을 ' + (on ? '신고 완료로' : '미신고로') + ' 바꿨습니다.'); }).catch(() => {});
+  });
+  // 신고 설정 (직종부호 · 사업장관리번호 · 공단 양식)
+  function irCfgPaint() {
+    const c = (IR.info && IR.info.cfg) || {};
+    const job = $('#irJob');
+    if (c.jobCode && !Array.from(job.options).some((o) => o.value === c.jobCode)) job.insertAdjacentHTML('beforeend', '<option value="' + esc(c.jobCode) + '">' + esc(c.jobCode) + '</option>');
+    job.value = c.jobCode || '944'; $('#irBizNo').value = c.bizMgmtNo || '';
+    const tpl = c.tpl;
+    $('#irTplName').textContent = tpl ? '올린 양식: ' + (tpl.file || '') + ' · 머리글 ' + (tpl.head || []).filter(Boolean).length + '칸' : '올린 양식 없음 (기본 양식으로 내보냄)';
+    $('#irTplDel').classList.toggle('hidden', !tpl);
+  }
+  $('#irCfgBtn').addEventListener('click', () => { const p = $('#irCfg'); p.classList.toggle('hidden'); if (!p.classList.contains('hidden')) irCfgPaint(); });
+  $('#irCfgClose').addEventListener('click', () => $('#irCfg').classList.add('hidden'));
+  function irCfgPut(o, msg) {
+    return api('adm_insRepCfg', o).then((r) => { if (!r.ok) return toast(r.msg); if (IR.info) IR.info.cfg = r.cfg; irCfgPaint(); renderInsRep(); toast(msg); }).catch(() => {});
+  }
+  $('#irCfgSave').addEventListener('click', () => irCfgPut({ jobCode: $('#irJob').value, bizMgmtNo: $('#irBizNo').value.trim() }, '신고 설정을 저장했습니다.'));
+  $('#irTplPick').addEventListener('click', () => $('#irTplFile').click());
+  $('#irTplDel').addEventListener('click', () => { if (confirm('올린 공단 양식을 지우고 기본 양식으로 내보낼까요?')) irCfgPut({ tpl: null }, '양식을 지웠습니다.'); });
+  /** 공단 양식 머리글 → 채울 값 종류 */
+  function irKey(h) {
+    const t = String(h || '').replace(/\s+/g, '');
+    if (!t) return '';
+    if (/주민|외국인등록|거소/.test(t)) return 'rrn';
+    if (/성명|이름/.test(t)) return 'name';
+    if (/직종/.test(t)) return 'job';
+    if (/취득일|개시일|시작일/.test(t)) return 'start';
+    if (/보수/.test(t)) return 'bosu';
+    if (/사업장관리번호|관리번호/.test(t)) return 'biz';
+    if (/^(순번|번호|연번|no\.?)$/i.test(t)) return 'seq';
+    if (/년월|귀속|노무제공월|해당월|신고월/.test(t)) return 'ym';
+    if (/보험구분|보험종류|적용보험/.test(t)) return 'kind';
+    if (/고용/.test(t) && !/산재/.test(t)) return 'goy';
+    if (/산재/.test(t) && !/고용/.test(t)) return 'san';
+    return '';
+  }
+  $('#irTplFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const sheets = await readXlsx(await f.arrayBuffer()), rows = (sheets[0] || {}).rows || [];
+      let h = -1;
+      for (let i = 0; i < Math.min(rows.length, 20); i++) { const r = (rows[i] || []).map((v) => String(v == null ? '' : v)); if (r.some((v) => /성명|이름/.test(v)) && r.some((v) => /주민|외국인/.test(v))) { h = i; break; } }
+      if (h < 0) return toast('양식에서 성명·주민등록번호 머리글을 찾지 못했습니다.');
+      const top = rows.slice(0, h + 1).map((r) => Array.from({ length: (r || []).length }, (_, i) => String(r[i] == null ? '' : r[i]).slice(0, 60)));
+      const head = top[h], keys = head.map(irKey);
+      if (!keys.includes('bosu')) return toast('양식에서 월보수액 칸을 찾지 못했습니다.');
+      irCfgPut({ tpl: { file: f.name.slice(0, 80), sheet: (sheets[0] || {}).name || 'Sheet1', top, h, head } }, '공단 양식을 올렸습니다: ' + head.filter(Boolean).join(' · '));
+    } catch (err) { toast('양식을 읽지 못했습니다: ' + (err.message || err)); }
+  });
+  /** 공단 업로드 엑셀: 양식이 있으면 그 머리글 순서, 없으면 신고서 항목 순서 */
+  function irExport(accts) {
+    const want = (accts && accts.length ? accts : IR.rows.filter((x) => irTarget(x) && !x.done).map((x) => x.acct));
+    const list = IR.rows.filter((x) => want.includes(x.acct) && irTarget(x));
+    if (!list.length) return toast(accts && accts.length ? '고른 기사 중 신고 대상이 없습니다.' : '미신고 대상이 없습니다. (다시 받으려면 기사를 골라 \'고른 기사만 엑셀\')');
+    const over = {}; list.forEach((x) => { over[x.acct] = { start: x.start }; });
+    const b = $('#irXlsx'); b.disabled = true;
+    api('adm_insRepExport', IR.month, list.map((x) => x.acct), over).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      const cfg = r.cfg || {}, ym = r.month.replace('-', ''), d8 = (v) => String(v || '').replace(/\D/g, '').slice(0, 8);
+      const val = (k, x, i) => ({ seq: i + 1, name: x.name, rrn: String(x.rrn || '').replace(/\D/g, ''), job: x.jobCode, start: d8(x.start), bosu: x.bosu, biz: String(cfg.bizMgmtNo || '').replace(/\D/g, ''),
+        ym: ym, kind: [x.goy ? '고용' : '', x.san ? '산재' : ''].filter(Boolean).join(','), goy: x.goy ? 'Y' : 'N', san: x.san ? 'Y' : 'N' }[k]);
+      let out;
+      if (cfg.tpl && cfg.tpl.head) {
+        const keys = cfg.tpl.head.map(irKey);
+        out = cfg.tpl.top.map((row) => row.slice()).concat(r.rows.map((x, i) => keys.map((k) => (k ? val(k, x, i) : ''))));
+      } else {
+        const keys = ['seq', 'goy', 'san', 'name', 'rrn', 'job', 'start', 'bosu', 'ym'];
+        out = [['순번', '보험구분(고용)', '보험구분(산재)', '성명', '주민등록번호', '직종부호', '자격취득일', '월보수액', '노무제공월']].concat(r.rows.map((x, i) => keys.map((k) => val(k, x, i))));
+      }
+      const blob = ssXlsx(out, { sheet: (cfg.tpl && cfg.tpl.sheet) || '노무제공자 월보수액', head: cfg.tpl ? cfg.tpl.h + 1 : 1, textCols: (cfg.tpl ? cfg.tpl.head.map(irKey) : ['seq', 'goy', 'san', 'name', 'rrn', 'job', 'start', 'bosu', 'ym']).map((k) => k !== 'bosu' && k !== 'seq') });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '노무제공자_월보수액신고_' + ym + '_' + r.rows.length + '명.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast(r.rows.length + '명 엑셀을 받았습니다.' + (r.noRrn.length ? ' 주민등록번호 없음: ' + r.noRrn.join(', ') : ''));
+    }).catch(() => {}).finally(() => { b.disabled = false; });
+  }
+  $('#irXlsx').addEventListener('click', () => irExport(IR.sel.size ? Array.from(IR.sel) : null));
+  /**
+   * 일반 엑셀(.xlsx): 글자는 sharedStrings, 숫자는 숫자 칸 (공공기관 업로드가 inlineStr 을 못 읽는 경우가 있어서)
+   * opt = { sheet, head(머리글 줄 수 · 회색), textCols[ci] = true 면 숫자도 글자로 }
+   */
+  function ssXlsx(rows, opt) {
+    opt = opt || {};
+    const enc = new TextEncoder(), xe = (v) => String(v).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    const col = (i) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+    const sst = [], sIdx = new Map(), si = (v) => { v = String(v == null ? '' : v); if (!sIdx.has(v)) { sIdx.set(v, sst.length); sst.push(v); } return sIdx.get(v); };
+    let refs = 0;
+    const W = Math.max(1, ...rows.map((r) => r.length)), H = opt.head || 1, tc = opt.textCols || [];
+    const body = rows.map((r, ri) => '<row r="' + (ri + 1) + '">' + Array.from({ length: W }, (_, ci) => {
+      const v = r[ci], ref = col(ci) + (ri + 1), hs = ri < H ? ' s="1"' : '';
+      if (v === '' || v == null) return ri < H ? '<c r="' + ref + '"' + hs + '/>' : '';
+      if (typeof v === 'number' && ri >= H && !tc[ci]) return '<c r="' + ref + '"><v>' + v + '</v></c>';
+      refs++;
+      return '<c r="' + ref + '" t="s"' + hs + '><v>' + si(v) + '</v></c>';
+    }).join('') + '</row>').join('');
+    const widths = Array.from({ length: W }, (_, ci) => Math.min(30, Math.max(8, ...rows.map((r) => String(r[ci] == null ? '' : r[ci]).length * 1.6 + 2))));
+    const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const f = (name, x) => ({ name, data: enc.encode(X + x) });
+    const sheet = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:' + col(W - 1) + rows.length + '"/><sheetViews><sheetView workbookViewId="0" tabSelected="true"/></sheetViews><sheetFormatPr defaultRowHeight="15.0"/>' +
+      '<cols>' + widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + Math.round(w) + '" customWidth="true"/>').join('') + '</cols><sheetData>' + body + '</sheetData><pageMargins bottom="0.75" footer="0.3" header="0.3" left="0.7" right="0.7" top="0.75"/></worksheet>';
+    const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11.0"/><color indexed="8"/><name val="맑은 고딕"/><family val="2"/></font></fonts>' +
+      '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor indexed="22"/></patternFill></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="true"/></cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    const sn = String(opt.sheet || 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31);
+    return ZIPW.zip([
+      f('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default ContentType="application/vnd.openxmlformats-package.relationships+xml" Extension="rels"/><Default ContentType="application/xml" Extension="xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml" PartName="/xl/sharedStrings.xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml" PartName="/xl/styles.xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" PartName="/xl/workbook.xml"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml" PartName="/xl/worksheets/sheet1.xml"/></Types>'),
+      f('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="xl/workbook.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"/></Relationships>'),
+      f('xl/workbook.xml', '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="false"/><bookViews><workbookView activeTab="0"/></bookViews><sheets><sheet name="' + xe(sn) + '" r:id="rId3" sheetId="1"/></sheets></workbook>'),
+      f('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="sharedStrings.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings"/><Relationship Id="rId2" Target="styles.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"/><Relationship Id="rId3" Target="worksheets/sheet1.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"/></Relationships>'),
+      f('xl/sharedStrings.xml', '<sst count="' + refs + '" uniqueCount="' + sst.length + '" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + sst.map((v) => '<si><t xml:space="preserve">' + xe(v) + '</t></si>').join('') + '</sst>'),
+      f('xl/styles.xml', styles),
+      f('xl/worksheets/sheet1.xml', sheet)
+    ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }
+
   // ───── 이슈 관리: 기사별 이슈(이슈 항목 코드) · 미입차 체크 (스케줄 DB issues 탭) ─────
   const IS = { list: [], codes: ['질병', '부상', '사고', '고장', '물량조율', '노쇼'], miDef: {}, drivers: [], code: '전체', drv: '', seq: 0, cur: null, miTouched: false, cellSeq: 0 };
   const isYmd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');

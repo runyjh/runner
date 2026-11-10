@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes', CPROS: 'coupang_roster' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes', CPROS: 'coupang_roster', INVCHK: 'inv_checks', INSREP: 'ins_reports' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -373,7 +373,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs', 'route_notes', 'coupang_roster']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs', 'route_notes', 'coupang_roster', 'inv_checks', 'ins_reports']);
 
 /** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
 const HEAD_RENAME = {};
@@ -419,6 +419,11 @@ const CTH = { id: '이미지ID', campId: '캠프ID', fileId: '파일ID', data: '
 SCHEMA[SH.CTHUMB] = CTH;
 SCHEMA[SH.RNOTE] = RNT;
 SCHEMA[SH.CPROS] = CRS;
+// 계산서/산재 관리 (DocCheck.gs): 기사 전자세금계산서 발행 체크 · 산재/고용 월보수액 신고 상황 (정산월 × 정산ID 한 줄)
+const IVC = { month: '정산월', acct: '정산ID', driverId: '기사ID', name: '이름', total: '합계금액', done: '발행', date: '발행일', approvalNo: '승인번호', memo: '메모', by: '처리자', at: '처리일시' };
+const INR = { month: '정산월', acct: '정산ID', driverId: '기사ID', name: '이름', bosu: '월보수액', san: '산재', goy: '고용', start: '자격취득일', done: '신고', date: '신고일', memo: '메모', by: '처리자', at: '처리일시' };
+SCHEMA[SH.INVCHK] = IVC;
+SCHEMA[SH.INSREP] = INR;
 SCHEMA[SH.TAXINV] = TI;
 SCHEMA[SH.RCHG] = RC;
 // 속도 측정 (Perf.gs): 1분마다 화면·함수별 합계 한 줄
@@ -789,7 +794,7 @@ function run_(fn) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_live', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
