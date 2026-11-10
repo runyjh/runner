@@ -467,6 +467,7 @@
   .bmc .h { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .bmc .h .grow { margin-left: auto; display: flex; gap: 4px; }
   .bmc .b { white-space: pre-wrap; word-break: break-all; margin-top: 3px; } .bmc.off .b { color: var(--faint); text-decoration: line-through; }
   .advsum { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: #fff7e6; border: 1px solid #ffd591; color: #7a4f00; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
+  .advsum table.pmauto { width: 100%; border-collapse: collapse; margin-top: 8px; background: #fff; border-radius: 8px; font-size: 12.5px; color: var(--ink); } .advsum table.pmauto th, .advsum table.pmauto td { padding: 5px 8px; border-bottom: 1px solid #f1e3c4; text-align: left; white-space: nowrap; } .advsum table.pmauto .n { text-align: right; } .advsum b .sub { background: none; border: 0; padding: 0; }
   .advsum b { width: 100%; } .advsum span { background: #fff; border-radius: 8px; padding: 3px 8px; border: 1px solid #ffe7ba; } .advsum em { font-style: normal; font-weight: 800; color: var(--danger); }
   .stw .vset { display: inline-block; width: auto; height: 26px; padding: 0 6px; font-size: 12px; margin-left: 6px; vertical-align: middle; font-weight: 600; }
   .vtag { display: inline-block; padding: 1px 6px; border-radius: 8px; background: #eef4ff; color: #1d4ed8; font-size: 11px; font-weight: 700; vertical-align: middle; }
@@ -1051,6 +1052,7 @@
   /* 품앗이 줄(대신 뛰는 기사 · 배차 확정 때 자동) · 품앗이 표시 칸: 준 기사 = 품▶ 받은 기사, 받은 기사 = 품◀ 준 기사 */
   .sg tr.pmr td.lab { color: #8a5a00; font-weight: 700; background: #fff8e6; }
   .sg tr.pmr td.c { background: #fffbef; }
+  .sg tr.pmr td.c.pmlk { background: #fff3cd; cursor: not-allowed; } .sg tr.pmr td.c.pmlk::before { content: '🔒'; font-size: 10px; margin-right: 2px; }
   .sg td.c.pmk { box-shadow: inset 0 0 0 2px #12a150; } /* 품앗이 준/받은 칸 = 초록 테두리 (중복 표시와 같은 방식) */
   .sg td.c.dup.pmk { box-shadow: inset 0 0 0 2px #8b5cf6, inset 0 0 0 4px #12a150; }
   .sg td.c.pmk::after { content: attr(data-pm); display: block; font-size: 10px; font-weight: 800; color: #0b6b3a; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1976,7 +1978,7 @@
     <div class="field"><span class="lb">지금 뛰는 기사</span><div id="uaNow"></div></div>
     <div class="field"><label class="lb" for="uaDrv">배정할 기사 <span class="sub">(그날 비었거나 휴무인 백업 기사가 위)</span></label><select class="inp" id="uaDrv"></select></div>
     <div class="field"><span class="lb">회전</span><div id="uaRots"></div><div id="uaPrev"></div></div>
-    <div class="m-actions"><button type="button" class="btn ghost" id="uaCancel">닫기</button><button type="button" class="btn" id="uaGo">배정</button></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="uaPm" title="이 노선을 러너(회사)가 맡기는 품앗이로 등록합니다 · 단가를 적으면 정산에 자동 반영">🤝 품앗이로 등록</button><button type="button" class="btn ghost" id="uaCancel">닫기</button><button type="button" class="btn" id="uaGo">배정</button></div>
   </div>
 </div>
 
@@ -1998,7 +2000,7 @@
     <h3 style="margin:0 0 4px">🤝 품앗이 일감 등록 <small class="sub" style="font-weight:600;font-size:12.5px">사무실 등록</small></h3>
     <div class="db-note" style="margin:0 0 12px">맡기는 기사 이름으로 일감을 올립니다. 기사 앱의 일감 올리기·제안 스위치와 상관없이 등록됩니다.</div>
     <div class="grid2">
-      <div class="field"><label class="lb" for="pmcPoster">맡기는 기사 (일을 주는 기사)</label><select class="inp" id="pmcPoster"></select></div>
+      <div class="field"><label class="lb" for="pmcPoster">맡기는 쪽 (일을 주는 기사 · 회사 노선이면 러너)</label><select class="inp" id="pmcPoster"></select></div>
       <div class="field"><label class="lb" for="pmcDate">배차일자 (PDD)</label><input class="inp" type="date" id="pmcDate"></div>
       <div class="field"><span class="lb">구분</span><div class="seg" id="pmcKind"></div></div>
       <div class="field"><label class="lb" for="pmcTime">입차시간</label><input class="inp" id="pmcTime" placeholder="예: 20:30 / 8시반"></div>
@@ -8114,7 +8116,7 @@
     const parts = srows.map((r, ri) => {
       if (r.kind === 'p') {
         const first = !ri || srows[ri - 1].kind !== 'p';
-        return '<tr class="pmr' + (first ? ' gtop' : '') + '"><td class="fx f1 lab" title="품앗이 배차 확정 때 자동으로 적힙니다. 직접 고쳐도 됩니다.">품앗이</td>' +
+        return '<tr class="pmr' + (first ? ' gtop' : '') + '"><td class="fx f1 lab" title="품앗이 배차 확정 때 자동으로 적힙니다. 확정된 칸(🔒)은 잠겨 있습니다 · 취소·변경은 품앗이에서 (칸 우클릭)">품앗이</td>' +
           '<td class="fx f2 lab">' + esc(r.p.name) + '</td><td class="fx f3">' + esc(r.p.loginId || '') + '</td><td class="fx f4"></td>' +
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex num">' + dates.filter((dt) => sget(r.row, dt)).length + '</td><td class="ex" colspan="4"></td></tr>';
       }
@@ -8311,6 +8313,7 @@
     if (iss.length) cls.push('iss');
     const pm = r.kind === 'd' ? pmMark(r.row, dt) : '';
     if (pm) cls.push('pmk');
+    if (r.kind === 'p' && pmLockOf(r.row, dt)) cls.push('pmlk');
     const nov = noAssign(r, dt, v);
     const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
     // 이슈가 있는 칸 · PDD 이전(이미 지난 날) 칸은 미배정·배정 안 됨 ⚠ 를 붙이지 않음
@@ -8320,6 +8323,11 @@
   }
   /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
   function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || ''; }
+  /** 배차 확정 품앗이가 적힌 품앗이 줄 칸 (잠금) → [{ id, text, from, to }] · 없으면 null */
+  function pmLockOf(row, dt) { const l = ((SD.pmLocks || {})[row] || {})[dt]; return l && l.length ? l : null; }
+  /** 잠긴 칸에 넣으려는 값이 확정 글자를 그대로 두는지 */
+  function pmLockKeeps(row, dt, v) { const l = pmLockOf(row, dt); if (!l) return true; const lines = String(v || '').split('\n').map((x) => x.trim()); return l.every((o) => lines.includes(o.text)); }
+  const PM_LOCK_MSG = '배차 확정된 품앗이 칸입니다. 취소·변경은 품앗이에서 해 주세요. (칸 우클릭 → 품앗이 상세)';
   // 중복 칸(주황 테두리)에 마우스를 올리면 어디와 겹치는지 작은 창으로 보여 줌
   function dupTipHtml(row, ci) {
     const list = (scalc && scalc.dupInfo && scalc.dupInfo.get(row + '|' + ci)) || [];
@@ -8488,10 +8496,12 @@
   // ── 값 바꾸기 · 자동 저장 ──
   function setCells(list, opts) {
     const undo = [];
+    let lockHit = 0;
     list.forEach((x) => {
       const v = String(x.value == null ? '' : x.value).replace(/\r\n?/g, '\n').trim();
       const before = sget(x.row, x.date);
       if (v === before) return;
+      if (!(opts && opts.force) && !pmLockKeeps(x.row, x.date, v)) { lockHit++; return; } // 배차 확정 품앗이 칸은 못 바꿈 (지우기·붙여넣기·끌어 채우기 모두)
       (SD.cells[x.row] = SD.cells[x.row] || {})[x.date] = v;
       if (!v) delete SD.cells[x.row][x.date];
       const k = x.row + '|' + x.date;
@@ -8499,6 +8509,7 @@
       else sPending[k] = { row: x.row, date: x.date, value: v };
       undo.push({ row: x.row, date: x.date, value: before });
     });
+    if (lockHit) toast(PM_LOCK_MSG);
     if (!undo.length) return;
     if (!(opts && opts.noUndo)) { sUndo.push(undo); if (sUndo.length > 50) sUndo.shift(); }
     refreshAfterChange();
@@ -8535,6 +8546,10 @@
           if (!c.current) delete SD.cells[c.row][c.date];
         });
         toast('다른 곳에서 먼저 바뀐 칸 ' + r.conflicts.length + '개는 저장하지 않고 최신 값으로 바꿨습니다.');
+      }
+      if (r.pmLocked && r.pmLocked.length) { // 서버가 막은 확정 품앗이 칸 → 확정 글자로 되돌림
+        r.pmLocked.forEach((c) => { const k = c.row + '|' + c.date; sBase[k] = c.current; delete sPending[k]; (SD.cells[c.row] = SD.cells[c.row] || {})[c.date] = c.current; });
+        toast(PM_LOCK_MSG);
       }
       refreshAfterChange();
       if (r.issueSync) { try { isFromSchedSave(r.issueSync); refreshAfterChange(); } catch (e) { console.warn(e); } }
@@ -8597,6 +8612,8 @@
   $('#sWrap').addEventListener('contextmenu', (e) => {
     const td = e.target.closest('#sGrid td.c[data-c]'); if (!td) return;
     const r = srows[+td.dataset.r], dt = SD.dates[+td.dataset.c];
+    // 품앗이 줄의 확정 칸: 우클릭 → 품앗이 상세 (확정 취소·변경은 거기서)
+    if (r && r.kind === 'p' && dt && pmLockOf(r.row, dt)) { e.preventDefault(); if (sEdit) commitEdit(); try { const t = $('#cellTip'); if (t) t.style.display = 'none'; } catch (er) { /* 무시 */ } return openPumasi(pmLockOf(r.row, dt)[0].id); }
     if (!r || r.kind !== 'd' || !dt) return;
     e.preventDefault();
     if (sEdit) commitEdit();
@@ -8702,6 +8719,7 @@
     if (!sAct || sEdit) return;
     if (segOff(sAct.r, sAct.c)) { const sg = srows[sAct.r].seg; return toast('이 날은 ' + (SD.dates[sAct.c] < sg.from ? '이전' : '새') + ' 캠프 줄에서 입력해 주세요. (노선 변경 예약)'); }
     const r = srows[sAct.r], dt = SD.dates[sAct.c];
+    if (r && r.kind === 'p' && pmLockOf(r.row, dt)) return toast(PM_LOCK_MSG);
     const td = $('#sGrid').querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]'); if (!td) return;
     const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
     const box = document.createElement('div'); box.className = 'sed';
@@ -8879,18 +8897,19 @@
     const go = () => {
       const M = PMC.meta, r = sAct && srows[sAct.r], dt = sAct ? SD.dates[sAct.c] : '';
       const d0 = r && r.kind === 'd' ? r.d : r && r.kind === 'p' ? null : null;
-      const did = d0 ? d0.mainId || d0.id : '';
+      const did = PMC.pre && PMC.pre.runner ? '' : d0 ? d0.mainId || d0.id : '';
       const drvs = SD.drivers.filter((d) => !d.ex && d.status === '승인').sort((a, b) => koSort(a.name, b.name));
       const opt = (sel) => '<option value="">— 고르기 —</option>' + drvs.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + (d.camp ? ' (' + esc(shortCamp(d.camp)) + ')' : '') + '</option>').join('');
-      $('#pmcPoster').innerHTML = opt(did); $('#pmcTo').innerHTML = opt('');
-      $('#pmcDate').value = dt || pddDate();
+      const pre = PMC.pre || null; PMC.pre = null;
+      $('#pmcPoster').innerHTML = opt(did).replace('</option>', '</option><option value="RUNNER"' + (pre && pre.runner ? ' selected' : '') + '>🏢 러너 (회사 노선 · 차액 러너 부담)</option>'); $('#pmcTo').innerHTML = opt('');
+      $('#pmcDate').value = (pre && pre.date) || dt || pddDate();
       let kind = ''; try { kind = localStorage.getItem('runner.pmcKind') || ''; } catch (e) {}
       if (M.kinds.indexOf(kind) < 0) kind = M.kinds[0];
       $('#pmcKind').innerHTML = M.kinds.map((k) => '<button type="button" data-k="' + esc(k) + '"' + (k === kind ? ' class="on"' : '') + '>' + esc(k) + '</button>').join('');
-      const campId = d0 ? d0.campId : '';
+      const campId = pre && pre.campId ? pre.campId : d0 ? d0.campId : '';
       $('#pmcCamp').innerHTML = '<option value="">— 캠프 —</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => '<option value="' + esc(c.id) + '"' + (c.id === campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
       const v = r && dt ? sget(r.row, dt) : '', m = /\b(\d{3,4}[A-Z]{1,4})\b/.exec(String(v).toUpperCase());
-      $('#pmcRoute').value = m ? m[1] : d0 ? d0.baseRoute || '' : '';
+      $('#pmcRoute').value = pre && pre.route ? pre.route : m ? m[1] : d0 ? d0.baseRoute || '' : '';
       ['#pmcTime', '#pmcArea', '#pmcQty', '#pmcDesc'].forEach((x) => { $(x).value = ''; });
       $('#pmcPrice').value = '';
       $('#pmcPay').innerHTML = M.pays.map((x) => '<option' + (x === '협의' ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
@@ -8904,7 +8923,8 @@
     if (PMC.meta) return go();
     api('adm_pmMeta').then((r) => { if (!r.ok) return toast(r.msg); PMC.meta = r; go(); }).catch(() => {});
   }
-  $('#sPmNew').addEventListener('click', pmcOpen);
+  $('#sPmNew').addEventListener('click', () => { PMC.pre = null; pmcOpen(); });
+  $('#uaPm').addEventListener('click', () => { PMC.pre = { runner: true, campId: UA.cid, route: UA.code, date: UA.dt }; $('#uaModal').classList.add('hidden'); pmcOpen(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#pmcModal').classList.contains('hidden')) $('#pmcModal').classList.add('hidden'); });
   $('#pmcCancel').addEventListener('click', () => $('#pmcModal').classList.add('hidden'));
   $('#pmcModal').addEventListener('click', (e) => { if (e.target.id === 'pmcModal') $('#pmcModal').classList.add('hidden'); });
@@ -8916,7 +8936,7 @@
     const kb = $('#pmcKind .on'), kind = kb ? kb.dataset.k : '';
     const job = { posterId: $('#pmcPoster').value, date: $('#pmcDate').value, kind, time: $('#pmcTime').value, campId: $('#pmcCamp').value, route: $('#pmcRoute').value, area: $('#pmcArea').value,
       qty: $('#pmcQty').value, price: $('#pmcPrice').value, pay: $('#pmcPay').value, useId: $('#pmcUse').value, top: $('#pmcTop').value, desc: $('#pmcDesc').value, mode: PMC.mode, toId: $('#pmcTo').value };
-    if (!job.posterId) return toast('맡기는 기사를 골라 주세요.');
+    if (!job.posterId) return toast('맡기는 쪽을 골라 주세요. (기사 또는 러너)');
     if (PMC.mode !== 'open' && !job.toId) return toast('받는 기사를 골라 주세요.');
     if (!job.campId) return toast('캠프를 골라 주세요.');
     try { localStorage.setItem('runner.pmcKind', kind); } catch (e) {}
@@ -10753,6 +10773,13 @@
         let a = 0, sp = 0, vt = 0; act.forEach((r) => { const x = pnlSplit(r.amt, r.proof); a += pnlNum(r.amt); sp += x[0]; vt += x[1]; });
         advSum = '<div class="inssum"><b>' + esc(mt) + (T.name === 'cost' ? ' 고정 운영비' : ' 지출 기록') + '</b><span>' + act.length + (T.name === 'cost' ? '개 항목' : '건') + '</span><span>나가는 돈 <em>' + wn(a) + '원</em></span><span>손익 반영 (공급가) <em>' + wn(sp) + '원</em></span><span>부가세 공제 <em>' + wn(vt) + '원</em></span></div>';
       }
+    }
+    if (T.name === 'yongcha' && T.autoYong && T.autoYong.length) {
+      // 품앗이 자동 줄 (배차 확정 + 쿠팡 정산서에 실제 수행) — 보기 전용 · 바꾸려면 같은 날·수행자·노선을 아래 표에 직접 적으면 그 줄이 우선
+      advSum = '<div class="advsum" style="display:block"><b>🤝 품앗이 자동 반영 ' + T.autoYong.length + '건 <span class="sub" style="font-weight:400">배차 확정 + 실제 수행 · 일감 단가(비우면 품앗이단가) · 금액을 바꾸려면 아래 표에 같은 날·수행자·노선을 직접 적으세요 (직접 적은 줄 우선)</span></b>' +
+        '<table class="pmauto"><thead><tr><th>날짜</th><th>맡긴 쪽 → 수행자</th><th>노선</th><th class="n">건수</th><th class="n">단가</th><th class="n">지급액</th><th class="n">기존지급</th><th class="n">추가지급</th><th>차액 부담</th><th class="n">부담 차감</th></tr></thead><tbody>' +
+        T.autoYong.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map((y) => '<tr><td>' + esc(String(y.date).slice(5)) + '</td><td>' + esc(y.from) + ' → ' + esc(y.who) + '</td><td>' + esc((y.camp || '') + ' ' + (y.route || '')) + '</td><td class="n">' + wn(y.qty) + '</td><td class="n">' + wn(y.qty ? Math.round(y.charge / y.qty) : 0) + '</td><td class="n">' + wn(y.payAmt) + '</td><td class="n">' + wnz(y.existing) + '</td><td class="n">' + wnz(y.extra) + '</td><td>' + esc(y.bear) + '</td><td class="n">' + wnz(y.cut) + '</td></tr>').join('') +
+        '</tbody></table></div>' + advSum;
     }
     if (T.name === 'alloc') advSum = earlyBar(T.earlyPay || '', null) + advSum;
     if (T.name === 'camps' && T.calcSum) {

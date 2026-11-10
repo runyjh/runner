@@ -1159,6 +1159,40 @@ function stlAutoVendorIdx_(X, VR, r, warn) {
   a[r.cid] = (a[r.cid] || '') || (stlShort_(r.camp) + ' ' + normCode_(r.route));
   return idx;
 }
+/**
+ * 품앗이 자동 줄: 이 정산월의 배차 확정 품앗이 → 품앗이·용차 줄 모양으로 (시트에는 안 적음 · 계산 때마다 일감에서 다시 만듦)
+ *  수행자 = 받은 기사 · 단가 = 일감 단가(비우면 노선관리 품앗이단가) · 차액부담 = 맡긴 기사 (맡긴 쪽이 러너·대표·운영자·관리자면 비움 = 러너 부담)
+ *  같은 날·같은 수행자·겹치는 노선을 직접 적은 줄(또는 메모에 일감ID)이 있으면 만들지 않는다.
+ */
+function stlPmAuto_(month, D, X, manual) {
+  let jobs;
+  try { jobs = pmData_().jobs; } catch (e) { return []; }
+  const out = [];
+  jobs.forEach(function (j) {
+    if (j.status !== PST.DONE || !j.acceptedId || !j.route || !j.date || stlMonthOfDate_(j.date) !== month) return;
+    const doer = D.byId[j.acceptedId];
+    if (!doer) return;
+    const whoKey = stlAcct_(X, D, doer.name, doer.loginId);
+    const poster = j.posterId ? D.byId[j.posterId] : null;
+    const runner = !poster || isStaff_(poster);
+    const routes = stlYongRoutes_(j.route);
+    const dup = manual.some(function (y) {
+      if (stlYmd_(y.date) !== j.date) return false;
+      if (str_(y.memo).indexOf(j.id) >= 0) return true;
+      if (!whoKey || stlAcct_(X, D, y.who, y.whoId) !== whoKey) return false;
+      const r = stlYongRoutes_(y.route);
+      return !r.length || r.some(function (x) { return routes.indexOf(x) >= 0; });
+    });
+    if (dup) return;
+    const from = poster ? poster.name + (runner ? ' (러너)' : '') : '러너';
+    out.push({
+      date: j.date, who: doer.name, whoId: doer.loginId || '', route: j.route, mode: '건당', price: stlNum_(j.price) || '', qty: '', vendorPay: '',
+      payer: runner ? '' : poster.name, payerId: runner ? '' : (poster.loginId || ''), payerPrice: '', gain: '', memo: '품앗이 자동 · ' + from + ' → ' + doer.name,
+      _row: 'pm:' + j.id, _auto: true, _job: j.id, _from: from, _camp: stlShort_(j.camp), _hitLogin: j.useId === '주는 기사 아이디' && poster && poster.loginId ? poster.loginId : ''
+    });
+  });
+  return out;
+}
 /** 정산서·입금용 '명의자' 정보 (용차업체) */
 function stlVendorOwner_(v) {
   return { name: v.name, bankName: v.bank, accountHolder: v.holder || v.name, account: v.account ? String(v.account).replace(/\d(?=\d{4})/g, '*') : '', accountRaw: v.account, bizNo: v.bizNo, bizName: v.name, bizEmail: v.email, phone: v.phone, vendor: true };
@@ -1416,8 +1450,10 @@ function stlCompute_(month, opts) {
   const company = { sales: 0, supplyCp: 0, lossCp: 0, lossSup: 0, unregSales: 0, vendorCut: 0, progFee: 0, yongGain: 0, promoBase: 0, promoRunner: 0, promoDrv: 0 };
   const byDateLogin = {}, lastDel = {}, cutIds = {}; // lastDel[로그인] = 이 정산기간 마지막 배송일 · cutIds = 업체차감 줄의 쿠팡ID 칸(영업점 수수료 등, 아이디 아님)
 
+  let rawMax = ''; // 쿠팡 정산서에 들어온 마지막 날짜 (그 뒤 날짜의 품앗이는 아직 판단하지 않음)
   raw.forEach(function (r) {
     r.date = stlYmd_(r.date);
+    if (r.date > rawMax) rawMax = r.date;
     const qty = stlNum_(r.qty) + stlNum_(r.ret), total = stlNum_(r.total), fresh = stlNum_(r.fresh);
     const sales = stlR0_((total + fresh) * (1 + cfg.vat));
     company.sales += sales; company.supplyCp += total + fresh;
@@ -1547,8 +1583,10 @@ function stlCompute_(month, opts) {
   });
 
   // 용차
-  const yong = stlRead_('stl_yongcha').filter(function (y) { return y.date && stlMonthOfDate_(y.date) === month; });
-  const yongOut = [], yongNoP = [], yongNoP5 = [];
+  const yongMan = stlRead_('stl_yongcha').filter(function (y) { return y.date && stlMonthOfDate_(y.date) === month; });
+  // 품앗이 자동: 배차 확정된 품앗이 일감 → 쿠팡 정산서에 실제 수행이 잡힌 것만 품앗이 줄로 (직접 적은 줄이 있으면 그 줄이 우선)
+  const yong = yongMan.concat(stlPmAuto_(month, D, X, yongMan));
+  const yongOut = [], yongNoP = [], yongNoP5 = [], pmNoPerf = [], pmApplied = [];
   yong.forEach(function (y) {
     const date = stlYmd_(y.date), routes = stlYongRoutes_(y.route);
     const route = routes.length === 1 ? routes[0] : '';                 // 라우트 하나
@@ -1558,8 +1596,11 @@ function stlCompute_(month, opts) {
     const wg = whoKey ? X.groups[whoKey] : null;
     let autoQty = 0, sales = 0, camp = '', perfUnitSum = 0, found = false;
     const hits = [];
+    // 품앗이 자동 · 배송 아이디가 '주는 기사 아이디'면 준 기사 아이디에 잡힌 배송에서 건수를 센다
+    const hitIx = y._hitLogin ? X.by[stlLogin_(y._hitLogin)] : null;
+    const hitCids = hitIx && X.groups[hitIx.mainKey] ? X.groups[hitIx.mainKey].cids : wg ? wg.cids : [];
     if (wg) {
-      wg.cids.forEach(function (c) {
+      hitCids.forEach(function (c) {
         (byDateLogin[date + '|' + stlLogin_(c)] || []).forEach(function (x) {
           if (route && x.route !== route) return;
           if (rset && !rset[x.route]) return;
@@ -1568,6 +1609,10 @@ function stlCompute_(month, opts) {
           found = true; autoQty += x.qty; sales += x.sales; camp = camp || x.camp; perfUnitSum += x.qty * (x.unit + (x.inc || 0));
         });
       });
+    }
+    if (y._auto && !(wg && found && autoQty)) { // 실제 수행 기록이 없으면 정산하지 않음 (쿠팡 정산서가 그 날짜까지 들어온 뒤에만 경고)
+      if (date <= rawMax) pmNoPerf.push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + y._from + ' → ' + y.who + ' · ' + y._camp + ' ' + routeLabel + (wg ? '' : ' (받은 기사 정산 아이디 없음)'));
+      return;
     }
     const qty = stlNum_(y.qty) || autoQty;
     const isAmt = str_(y.mode) === '금액';
@@ -1643,8 +1688,10 @@ function stlCompute_(month, opts) {
     const line = {
       date: date, who: wg ? stlAcctLabel_(X, D, whoKey) : y.who, whoId: whoKey, route: routeLabel, mode: isAmt ? '금액' : '건당', price: y.price, vendorPay: vPay, qty: qty, autoQty: found ? autoQty : '',
       payAmt: paid, charge: charge, defUnit: defUnit, vendor: isVendor, whoStaff: !!(wg && !isVendor && isStaff_(D.byId[wg.ownerId])), toRunner: toRunner, gain: toRunner ? '러너 몫' : '수행자 지급', runnerGain: (toRunner || vPay) && payerOwner ? charge - paid : 0, sales: sales, profit: sales - paid, camp: camp, existing: existing, extra: extra,
-      payer: payerOwner ? stlAcctLabel_(X, D, payerOwner) : y.payer, payerId: payerOwner, payerPrice: payerPrice, cut: cut, memo: y.memo, _row: y._row
+      payer: payerOwner ? stlAcctLabel_(X, D, payerOwner) : y.payer, payerId: payerOwner, payerPrice: payerPrice, cut: cut, memo: y.memo, _row: y._row,
+      auto: !!y._auto, jobId: y._job || '', from: y._from || '', bear: y._auto ? (payerOwner ? stlAcctLabel_(X, D, payerOwner) : '러너') : ''
     };
+    if (y._auto) pmApplied.push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + ' ' + y._from + ' → ' + y.who + ' · ' + (camp || y._camp) + ' ' + routeLabel + ' · ' + won_(qty) + '건 × ' + won_(qty ? Math.round(charge / qty) : 0) + ' · 추가지급 ' + won_(extra) + '원 · 부담 ' + (payerOwner ? stlAcctLabel_(X, D, payerOwner) + ' ' + won_(cut) + '원' : '러너'));
     yongOut.push(line);
     if (wg && !(toRunner && !extra)) { const s = sum(whoKey); s.yongPay += extra; s.yongLines.push(line); }
     if (payerOwner && cut) { const s = sum(payerOwner); s.yongCut += cut; s.yongLines.push(line); }
@@ -1837,6 +1884,8 @@ function stlCompute_(month, opts) {
   // links[i] = 그 줄 이름을 누르면 갈 곳 { t: 'drv'(기사 정보), id } · { t: 'vendor' } (용차업체) · { t: 'slip', id } (정산서) · { t: 'route' } (노선관리)
   const W = function (key, label, list, level, acts, links) { const n = key === 'manual' ? 1000 : 50; if (list.length) warnings.push({ key: key, label: label, count: list.length, items: list.slice(0, n), level: level || 'warn', acts: acts ? acts.slice(0, n) : null, links: links ? links.slice(0, n) : null }); };
   const lnk = function (d) { return d.vendor ? { t: 'vendor' } : d.ownerId ? { t: 'drv', id: d.ownerId } : { t: 'slip', id: d.id }; };
+  W('pmNoPerf', '품앗이 배차 확정인데 쿠팡 정산서에 수행 기록 없음 (정산 안 함 · 실제로 뛰었으면 캠프·노선·배송 아이디를 확인하거나 품앗이 · 용차에 직접 적어 주세요)', pmNoPerf, 'warn');
+  W('pmAuto', '품앗이 자동 반영 (배차 확정 + 실제 수행 · 일감 단가 · 비우면 노선관리 품앗이단가 · 맡긴 쪽이 러너·직원이면 러너 부담)', pmApplied, 'info');
   W('yongNoP', '품앗이 단가 없음 (노선관리 품앗이단가가 비어 있어 원래 단가로만 지급 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP, 'warn');
   W('yongNoP5', '외부용차단가 없음 (용차업체·외부 수행 노선의 노선관리 외부용차단가가 비어 있어 업체 단가로만 청구 · 러너 몫 0 · 단가 칸에 직접 넣거나 노선관리에서 채워 주세요)', yongNoP5, 'warn');
   W('advPrepaid', '이번 정산에 상계할 가불금인데 상환금이 이미 적혀 있어 자동 공제 안 됨 (아직 안 받은 돈이면 가불금 목록에서 상환금을 지우거나 받은 만큼만 남겨 주세요)', advPrepaid, 'warn');
@@ -3396,6 +3445,7 @@ function stlTableView_(name, month) {
         if (name === 'camps') o.kind = stlInsKind_(r);
         return o;
       }),
+      autoYong: name === 'yongcha' && calc ? Object.keys(calc).filter(function (k) { return calc[k].auto; }).map(function (k) { return calc[k]; }) : undefined,
       seen: stlRowsHash_(rows, E.cols), fixed: !!E.fixed, closed: E.scope !== 'all' ? !!stlClosedInfo_(month) : false,
       accts: accts, persons: persons, items: stlItems_().list.map(function (i) { return i.name; }),
       itemsInfo: stlItems_().list.map(function (i) { return { name: i.name, side: i.side, taxCut: i.taxCut, method: i.method }; }),

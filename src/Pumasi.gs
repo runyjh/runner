@@ -15,6 +15,7 @@
 const PM_KINDS = ['주간', '야간', '일택'];
 const PM_TOPS = ['탑무관', '하이탑', '로우탑', '냉탑'];
 const PM_PAYS = ['당일지급', '주급', '월급', '협의'];
+const PM_RUNNER_ID = 'RUNNER', PM_RUNNER = '러너'; // 맡기는 쪽이 회사(러너)인 일감: 등록 기사ID 빈칸 · 등록 기사 '러너'
 const PM_MAX_APPLY = 2; // 한 기사가 같은 배차일에 지원할 수 있는 횟수
 const PM_DESC_TEMPLATE = [
   '📋 배송 정보', '벤더사명 : ', '아파트/지번 비율 : ', '평균 물량 : ', '사용 날짜 (PDD 기준) : ', '주간/야간 : ', '캠프명 : ', '캠프 주소 : ',
@@ -1055,7 +1056,7 @@ function pmDoneOf_(me, cells, myCamp) {
 /** 처리 뒤 (잠금을 푼 다음): 휴대폰 푸시 + 기사스케줄 품앗이 줄 반영 */
 function pmAfter_(out) {
   pmPushSend_(out);
-  if (out && out.sch && out.sch.length) { pmSchApply_(out.sch); pmStlUsageApply_(out.sch); }
+  if (out && out.sch && out.sch.length) { pmSchApply_(out.sch); pmStlUsageApply_(out.sch); try { if (typeof stlBump_ === 'function') stlBump_(); } catch (e) { /* 무시 */ } } // 정산 품앗이 자동 줄도 다시 계산되게
 }
 /**
  * 정산 연동 (모두 러너 소속 기사): 배송 아이디가 '주는 기사 아이디'인 품앗이가 배차 확정되면
@@ -1144,6 +1145,19 @@ function pmSchApply_(ops) {
     console.error('기사스케줄 품앗이 반영 실패: ' + (e && e.message));
   }
 }
+/** 배차 확정 품앗이가 적힌 품앗이 줄 칸 (잠금): { 'PM기사ID': { 날짜: [{ id, text, from, to }] } } */
+function pmSchLocks_(dates) {
+  const set = {}, out = {};
+  (dates || []).forEach(function (d) { set[d] = 1; });
+  pmData_().jobs.forEach(function (j) {
+    if (j.status !== PST.DONE || !j.acceptedId || !set[j.date]) return;
+    const text = pmSchText_(j);
+    if (!text) return;
+    const m = out[SCH_PM_PREFIX + j.acceptedId] || (out[SCH_PM_PREFIX + j.acceptedId] = {});
+    (m[j.date] = m[j.date] || []).push({ id: j.id, text: text, from: j.poster || '', to: j.accepted || '' });
+  });
+  return out;
+}
 /**
  * 어드민 기사스케줄: 품앗이로 맡겨 배차 확정된 칸 { 기사ID: { 날짜: '품앗이 → 이지원' } }
  * 그날 그 기사 칸의 캠프·라우트가 일감과 같을 때만 (기사 앱 '배차확정 완료' 와 같은 규칙)
@@ -1205,8 +1219,10 @@ function adm_pmCreate(token, job) {
     const a = requireAdmin_(token);
     job = job || {};
     const t = function (v, n, label) { const s = String(v == null ? '' : v).trim(); if (s.length > n) fail_(label + '이(가) 너무 깁니다.'); return s; };
-    const poster = driverById_(str_(job.posterId));
-    if (!poster) fail_('맡기는 기사를 골라 주세요.');
+    // 맡기는 쪽 = 러너(회사): 담당 없음 노선처럼 회사 노선을 맡길 때 · 등록 기사ID 는 비우고 이름만 '러너' (정산 차액 = 러너 부담)
+    const byRunner = str_(job.posterId) === PM_RUNNER_ID;
+    const poster = byRunner ? { id: '', name: PM_RUNNER } : driverById_(str_(job.posterId));
+    if (!poster) fail_('맡기는 쪽을 골라 주세요.');
     const mode = ['open', 'offer', 'confirm'].indexOf(job.mode) >= 0 ? job.mode : 'open';
     const f = {};
     f.kind = PM_KINDS.indexOf(str_(job.kind)) >= 0 ? str_(job.kind) : fail_('구분(' + PM_KINDS.join('/') + ')을 골라 주세요.');
@@ -1225,6 +1241,7 @@ function adm_pmCreate(token, job) {
     f.price = pr || '';
     f.pay = PM_PAYS.indexOf(str_(job.pay)) >= 0 ? str_(job.pay) : '협의';
     f.useId = PM_USE_IDS.indexOf(str_(job.useId)) >= 0 ? str_(job.useId) : '';
+    if (byRunner && f.useId === '주는 기사 아이디') f.useId = '받는 기사 아이디'; // 러너는 쿠팡 아이디가 없음
     f.desc = t(job.desc, 3000, '상세 설명');
     f.secret = t(job.secret, 1500, '비공개 정보');
     f.byOffice = a.name + ' · ' + nowText_().slice(0, 16);

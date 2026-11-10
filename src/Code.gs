@@ -4834,6 +4834,24 @@ function schRead_(sun, end) {
   // 품앗이 줄 (대신 뛰는 기사) + 내 일을 품앗이로 맡겨 배차 확정된 칸 표시
   const byDrv = {};
   drivers.forEach(function (d) { byDrv[d.id] = d; });
+  // 배차 확정 품앗이 칸 = 잠금 (취소·변경은 품앗이에서만) · 칸 글자가 빠져 있으면 다시 채움 (실수로 지웠거나 시트에서 직접 고친 경우)
+  let pmLocks = {};
+  try {
+    pmLocks = pmSchLocks_(dates);
+    const fix = [];
+    Object.keys(pmLocks).forEach(function (id) {
+      if (!byDrv[id.slice(SCH_PM_PREFIX.length)]) return;
+      Object.keys(pmLocks[id]).forEach(function (dt) {
+        pmLocks[id][dt].forEach(function (L) {
+          const cur = str_((cells[id] || {})[dt]);
+          if (cur.split(/\r?\n/).map(function (x) { return x.trim(); }).indexOf(L.text) >= 0) return;
+          fix.push({ op: 'set', driverId: id.slice(SCH_PM_PREFIX.length), date: dt, value: L.text });
+          (cells[id] = cells[id] || {})[dt] = cur ? cur + '\n' + L.text : L.text;
+        });
+      });
+    });
+    if (fix.length) pmSchApply_(fix);
+  } catch (e) { console.error('품앗이 칸 잠금·복구 실패: ' + (e && e.message)); }
   const pmRows = Object.keys(cells).filter(function (id) { return id.indexOf(SCH_PM_PREFIX) === 0 && byDrv[id.slice(SCH_PM_PREFIX.length)]; }).map(function (id) {
     const d = byDrv[id.slice(SCH_PM_PREFIX.length)];
     return { id: id, driverId: d.id, name: d.name, loginId: d.loginId || '', campId: d.campId || '' };
@@ -4844,7 +4862,7 @@ function schRead_(sun, end) {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
-    issues: issues, issueKinds: SCH_ISSUE.KINDS,
+    issues: issues, issueKinds: SCH_ISSUE.KINDS, pmLocks: pmLocks,
     vendorRoutes: (typeof vendorRoutes_ === 'function' ? vendorRoutes_() : []).map(function (v) { return { name: v.name, camp: v.camp, code: v.code, units: v.units, from: v.from, to: v.to }; })
   };
 }
@@ -4859,6 +4877,24 @@ function adm_schSave(token, changes) {
     changes = (changes || []).filter(function (x) { return x && x.row && parseYmd_(x.date); });
     if (!changes.length) return { ok: true, saved: 0, conflicts: [] };
     if (changes.length > 3000) fail_('한 번에 3000칸까지 저장할 수 있습니다.');
+    // 배차 확정 품앗이 칸은 스케줄에서 못 바꾼다 (화면이 늦게 갱신된 상태에서 저장해도 서버가 막음 · 확정 글자를 그대로 둔 채 덧붙이는 것만 허용)
+    const pmLocked = [];
+    try {
+      const pmCh = changes.filter(function (x) { return x.row.indexOf(SCH_PM_PREFIX) === 0; });
+      if (pmCh.length) {
+        const dset = {}; pmCh.forEach(function (x) { dset[x.date] = 1; });
+        const L = pmSchLocks_(Object.keys(dset));
+        changes = changes.filter(function (x) {
+          const l = x.row.indexOf(SCH_PM_PREFIX) === 0 ? (L[x.row] || {})[x.date] : null;
+          if (!l) return true;
+          const lines = String(x.value == null ? '' : x.value).split(/\r?\n/).map(function (v) { return v.trim(); });
+          if (l.every(function (o) { return lines.indexOf(o.text) >= 0; })) return true;
+          pmLocked.push({ row: x.row, date: x.date, current: l.map(function (o) { return o.text; }).join('\n') });
+          return false;
+        });
+      }
+    } catch (e) { /* 품앗이 자료를 못 읽으면 그대로 저장 */ }
+    if (!changes.length) return { ok: true, saved: 0, conflicts: [], pmLocked: pmLocked };
     changes.forEach(function (x) {
       x.value = String(x.value == null ? '' : x.value).replace(/\r\n?/g, '\n').trim();
       x.old = String(x.old == null ? '' : x.old).replace(/\r\n?/g, '\n').trim();
@@ -4965,7 +5001,7 @@ function adm_schSave(token, changes) {
           if (r.created.length || r.changed.length || r.removed.length) issueSync = { created: r.created.map(issView_), changed: r.changed.map(issView_), removed: r.removed, cells: r.cells || [] };
         } catch (e) { issueSync = { error: String(e && e.message || e) }; }
       }
-      return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts), issueSync: issueSync }, rcExtra);
+      return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts), issueSync: issueSync, pmLocked: pmLocked }, rcExtra);
     } finally {
       lock.releaseLock();
     }
