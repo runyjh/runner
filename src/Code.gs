@@ -5913,7 +5913,7 @@ function schMaxDays_() { const v = Number(PropertiesService.getScriptProperties(
 /** 계산만 (시트·화면 공용). data = schRead_ 결과 */
 function schBuildUpload_(data, opt) {
   const SCHED_WORK_WORD = '업무', KEYWORDS = ['업무', '선탑', '신규'];
-  const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
+  const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '추가휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
   const ALL = ['D1', 'D2', 'F3'];
   const short = function (n) { return str_(n).replace(/\s*캠프\s*$/, '').trim(); };
   const campRot = {};

@@ -7203,7 +7203,7 @@
   // 출근일수(V열 COUNTIFS), 백업 명단(updateBackupRoster), 미입차 노선, 중복 배정
   const SchedCalc = (function () {
     const KEYWORDS = ['업무', '선탑', '신규'];
-    const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
+    const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '추가휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
     const ALL_ROTS = ['D1', 'D2', 'F3'];
     const isValidRouteList = (s) => { const p = String(s || '').split(',').map((v) => v.trim()).filter(Boolean); return !!p.length && p.every((x) => /^\d+[A-Za-z]$/.test(x)); };
     const normRot = (s) => String(s || '').split(',').map((v) => v.trim().toUpperCase()).filter((v) => ALL_ROTS.includes(v));
@@ -7406,7 +7406,7 @@
   })();
 
   // ───── 기사스케줄 (2주 표 · 처음 상태로 되돌림 2026-11-06) ─────
-  const SOPTS = ['출근', '휴무', '고정휴무', '계획된휴무', '병가', '휴가', '미입차', '용차', '노선변경', '라우트변경'];
+  const SOPTS = ['출근', '휴무', '고정휴무', '추가휴무', '병가', '휴가', '미입차', '용차', '노선변경', '라우트변경'];
   const TYPE_ORDER = { '고정': 0, '품앗이': 1, '백업': 2, '외부용차': 3 };
   const SD = { start: '', today: '', dates: [], holidays: {}, camps: [], routes: {}, drivers: [], cells: {}, notes: [] };
   let srows = [], scalc = null, sAct = null, sAnchor = null, sEdit = null, sUndo = [], sBusy = false;
