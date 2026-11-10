@@ -363,6 +363,28 @@
 
   /* 정산관리 */
   .st-info { font-size: 13px; color: var(--sub); margin: -4px 0 12px; display: flex; gap: 6px 14px; flex-wrap: wrap; }
+  /* 정산관리 5단계 · 손익 3묶음 */
+  #stTabs, #stPnlTabs, #stCfgTabs, #stIdTabs, #stIdTabs2 { display: none !important; }
+  .st-steps { display: flex; gap: 10px; align-items: stretch; margin: 0 0 12px; flex-wrap: wrap; }
+  .st-step { flex: 1 1 150px; min-width: 150px; text-align: left; background: #fafbfd; border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px 9px; cursor: pointer; font: inherit; color: var(--ink); position: relative; transition: border-color .15s, background .15s; }
+  .st-step:hover { border-color: #b9c6de; } .st-step.on { border-color: var(--brand); background: #f0f6ff; box-shadow: 0 0 0 3px var(--brand-weak); }
+  .st-step.done { border-color: #bfe5cf; background: #f5fcf8; } .st-step.done.on { border-color: var(--brand); background: #f0f6ff; }
+  .st-step .sn { font-size: 11px; font-weight: 800; color: var(--sub); } .st-step .sn b { color: var(--brand); }
+  .st-step .stt { display: block; font-size: 16px; font-weight: 800; margin: 1px 0 2px; } .st-step .std { display: block; font-size: 11.5px; color: var(--sub); line-height: 1.4; }
+  .st-step .sts { display: inline-block; margin-top: 7px; font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 2px 9px; background: var(--gray-weak); color: var(--sub); }
+  .st-step.done .sts { background: #d9f3e3; color: #0a7a3d; } .st-step.on .sts { background: var(--brand); color: #fff; } .st-step .sts.warn { background: var(--danger-weak); color: var(--danger); } .st-step.on .sts.warn { background: var(--danger); color: #fff; }
+  .st-step.gear { flex: 0 0 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 16px; background: #fff; }
+  .st-step.gear .stt { font-size: 15px; } .st-step.gear .std { text-align: center; }
+  .st-steps.fin .st-step { flex: 1 1 200px; }
+  .st-sub { margin: -2px 0 12px; } .st-sub .tabs { margin-bottom: 4px; } .st-subdesc { font-size: 12.5px; }
+  #view-settle.st-check #stKpi, #view-settle.st-check #stp-list .st-tools, #view-settle.st-check #stp-list .table-wrap, #view-settle.st-check #stCards { display: none; }
+  .st-checkok { background: #f5fcf8; border: 1px solid #bfe5cf; border-radius: 12px; padding: 16px 18px; font-size: 14px; color: #0a7a3d; font-weight: 700; margin-bottom: 12px; }
+  .st-checkok small { display: block; font-weight: 500; color: var(--sub); margin-top: 4px; }
+  .imp-drop { border: 2px dashed #b9c6de; border-radius: 12px; padding: 18px; text-align: center; color: var(--sub); font-size: 14px; font-weight: 700; margin-bottom: 12px; background: #fafbfd; }
+  .imp-drop small { display: block; font-weight: 500; font-size: 12px; margin-top: 3px; } .imp-drop.over { border-color: var(--brand); background: #f0f6ff; color: var(--brand); }
+  .imp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 640px) { .imp-grid { grid-template-columns: 1fr; } }
+  .imp-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: #fff; } .imp-box b { font-size: 15px; } .imp-box p { margin: 6px 0 10px; font-size: 12.5px; color: var(--sub); line-height: 1.5; }
+  .imp-btns { display: flex; gap: 8px; flex-wrap: wrap; } .imp-old { margin-top: 12px; font-size: 13px; color: var(--sub); } .imp-old summary { cursor: pointer; font-weight: 700; } .imp-old .imp-btns { margin-top: 8px; }
   .st-info b { color: var(--ink); }
   .st-info .closed { color: #fff; background: var(--ink); border-radius: 6px; padding: 1px 8px; font-weight: 700; }
   #view-settle .head { flex-wrap: wrap; gap: 8px; }
@@ -1432,17 +1454,16 @@
         <select class="inp" id="stMonth" aria-label="정산월" style="width:auto"></select>
         <button class="btn ghost sm" id="stNext" aria-label="다음 달">▶</button>
         <button class="btn ghost" id="stRecalc" title="시트에서 직접 고친 내용까지 다시 계산">다시 계산</button>
-        <button class="btn ghost" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기</button>
-        <button class="btn ghost" id="stCloseBtn">마감</button>
-        <button class="btn ghost" id="stDrvBtn" title="드라이브 폴더의 쿠팡 정산서 엑셀을 여러 달 한 번에">드라이브에서 가져오기</button>
-        <button class="btn ghost" id="stLegBtn" title="기존 급여정산서 결과를 그대로 옮겨 마감 (1~10월 이식)">기존 정산 이식</button>
-        <button class="btn ghost hidden" id="stLegCmp" title="기존 정산서(마감 기록)와 올인원이 지금 설정·쿠팡 정산서로 다시 계산한 결과를 기사별로 비교 — 마감은 그대로">올인원 계산과 비교</button>
-        <button class="btn" id="stUpBtn">쿠팡 정산서 올리기</button>
         <input type="file" id="stFile" accept=".xlsx,.csv" class="hidden">
       </div>
     </div>
     <div class="st-info" id="stInfo"></div>
-    <div class="tabs" id="stTabs">
+    <!-- 정산관리: 이번 달 할 일 5단계 + ⚙ 설정 (예전 탭 10개는 아래 #stTabs 에 숨겨 두고 그대로 씀) -->
+    <div class="st-steps" id="stSteps"></div>
+    <!-- 러너 손익·통장: 3묶음 + ⚙ -->
+    <div class="st-steps fin hidden" id="stFinG"></div>
+    <div class="st-sub hidden" id="stSubWrap"><div class="tabs sub2" id="stSub"></div><div class="sub st-subdesc" id="stSubDesc"></div></div>
+    <div class="tabs st-legacy" id="stTabs">
       <button class="tab" data-st="ids">아이디 관리</button>
       <button class="tab on" data-st="list">정산서</button>
       <button class="tab" data-st="report">최종 리포트</button>
@@ -1473,7 +1494,9 @@
     <div id="stp-list">
       <div class="kpis" id="stKpi"></div>
       <div id="stWarn"></div>
-      <div class="st-tools"><input class="inp search" id="stQ" placeholder="이름·쿠팡ID 검색" autocomplete="off"><span class="sub" id="stCnt"></span></div>
+      <div class="st-tools"><input class="inp search" id="stQ" placeholder="이름·쿠팡ID 검색" autocomplete="off"><span class="sub" id="stCnt"></span><span class="grow"></span>
+        <button class="btn ghost sm hidden" id="stLegCmp" title="기존 정산서(마감 기록)와 올인원이 지금 설정·쿠팡 정산서로 다시 계산한 결과를 기사별로 비교 — 마감은 그대로">올인원 계산과 비교</button>
+        <button class="btn sm" id="stCloseBtn">마감</button></div>
       <div class="table-wrap"><table class="sttbl" id="stTable" data-tk-nocard></table><div class="empty hidden" id="stEmpty"></div></div>
       <div class="st-cards" id="stCards"></div>
     </div>
@@ -1495,6 +1518,7 @@
         <button class="tab" data-cfg="migrate">기존 정산 시트 가져오기</button>
       </div>
       <div class="sub st-help" id="stEditHelp"></div>
+      <div class="st-tools hidden" id="stRepTools"><span class="sub">최종 리포트(이 달 · 연간)는 아래에서 · 엑셀·인쇄는 리포트 오른쪽 위</span><span class="grow"></span><button class="btn sm" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기 (엑셀)</button></div>
       <div id="stPnl" class="hidden"></div>
       <div id="stEditor"></div>
       <div id="stMigrate" class="hidden">
@@ -1800,6 +1824,22 @@
     <p class="sub" style="font-size:12.5px;margin:0 0 8px">왼쪽 = 마감된 <b>기존 정산서</b> 금액 · 오른쪽 = 올인원이 <b>지금 설정과 쿠팡 정산서로 다시 계산</b>한 금액 · 차액 = 올인원 − 기존. 마감은 바뀌지 않습니다.</p>
     <div id="lcBody" style="flex:1;overflow:auto"></div>
     <div class="m-actions"><label class="check" style="margin-right:auto"><input type="checkbox" id="lcNoFb"> 프백 차감 빼고 보기 <small class="sub">(기사별 프레시백 차감 금액을 적용하지 않고 회수 인센티브 전액 지급으로 계산)</small></label><button type="button" class="btn ghost" id="lcXlsx">⬇ 엑셀</button><span class="grow"></span><button type="button" class="btn" id="lcClose">닫기</button></div>
+  </div>
+</div>
+<!-- ───────────── 정산관리 1단계: 가져오기 (쿠팡 정산서 · 통장 내역 · 지난 자료) ───────────── -->
+<div class="modal hidden" id="impModal">
+  <div class="m-box" style="width:min(720px,100%)">
+    <h3>가져오기 <small class="sub" id="impMonth" style="font-size:13px;font-weight:500"></small></h3>
+    <div class="imp-drop" id="impDrop">📂 파일을 여기에 끌어다 놓으면 종류를 알아서 구분합니다 <small>쿠팡 정산서 엑셀 · 은행 거래내역(PDF·엑셀)</small></div>
+    <div class="imp-grid">
+      <div class="imp-box"><b>쿠팡 정산서</b><p>이 달 기사별 배송·프레시백·분실 원천 자료. 여러 번 올리면 차수가 올라가며 덮어씁니다. 마감한 달은 매출만 반영.</p>
+        <div class="imp-btns"><button class="btn" id="stDrvBtn" title="드라이브 폴더의 쿠팡 정산서 엑셀을 여러 달 한 번에">드라이브 폴더에서</button><button class="btn ghost" id="stUpBtn">내 PC 파일</button></div>
+        <div class="sub" id="impStatus" style="font-size:12px;margin-top:8px"></div></div>
+      <div class="imp-box"><b>통장 내역</b><p>카카오뱅크 거래내역서 · 우리은행 거래실적증명서(PDF·엑셀). 한 줄씩 자동 분류되어 입금체크·쿠팡 입금 확인·지출 기록으로 들어갑니다.</p>
+        <div class="imp-btns"><button class="btn ghost" id="impBank">통장 내역 올리기</button></div></div>
+    </div>
+    <details class="imp-old"><summary>지난 자료 (기존 정산 · 1~10월 끝)</summary><div class="imp-btns"><button class="btn ghost sm" id="stLegBtn" title="기존 급여정산서 결과를 그대로 옮겨 마감">기존 정산 이식 (JSON)</button><button class="btn ghost sm" id="impMigrate">기존 정산 시트 가져오기</button></div></details>
+    <div class="m-actions"><button type="button" class="btn ghost" id="impClose">닫기</button></div>
   </div>
 </div>
 <!-- ───────────── 정산관리: 세무자료 내보내기 ───────────── -->
@@ -8014,15 +8054,15 @@
     ],
     'page:settle': [
       ['하는 일', '쿠팡 정산서(엑셀)를 반영해 <b>기사별 정산서 · 세금계산서 금액 · 실지급액</b>을 만들고 기사 앱에 공개 · 마감'],
-      ['순서', '① [드라이브에서 가져오기] 또는 [쿠팡 정산서 올리기] ② 확인 필요 경고 처리(아이디 연결 · 구분값) ③ 공제·가감 · 품앗이/용차 확인 ④ 정산서 검토 ⑤ <b>마감</b> → 기사 앱 공개 · 입금체크'],
+      ['순서', '위 단계를 왼쪽부터: ① <b>가져오기</b>(쿠팡 정산서 · 통장 내역) ② <b>확인</b>(경고 처리) ③ <b>조정</b>(품앗이·용차 · 공제·가감 · 가불 · 일시단가) ④ <b>정산서·마감</b> → 기사 앱 공개 ⑤ <b>리포트·내보내기</b>'],
       ['금액', '쿠팡 세금계산서 = 총합계 − 분실 차감 · 세액 10% 끝자리 버림 (쿠팡 발행 계산서와 1원까지 같음) · 기사 = 지급 합계 전액 계산서 → 공제 → 실지급'],
-      ['탭', '아이디 관리 · 정산서 · 최종 리포트(월 · 연간) · 용차업체 · 품앗이/용차 지정 · 가불금 · 지급 및 공제 · 기사별 일시단가 · 정산 설정 — 각 탭 위에 설명'],
-      ['세무', '[세무자료 내보내기] = 세무사에게 보낼 엑셀 한 파일 · [기존 정산 이식] = 예전 정산서 PDF 자료 올리기']
+      ['⚙ 설정', '자주 안 바꾸는 것: 기본(지급률·산재고용·일정·앱 공개) · 기사별 조건(프백·고정수당·보류금) · 아이디·업체 · 항목·지난 자료 — 각 표 위에 설명'],
+      ['세무', '5단계 [세무자료 내보내기] = 세무사에게 보낼 엑셀 한 파일 · 기존 정산(1~10월) 자료는 1단계 창 아래 "지난 자료"']
     ],
     'page:pnl': [
       ['하는 일', '정산월마다 <b>빼둘 돈</b>(기사정산 · 부가세 · 산재고용 · 급여 · 운영비 · 종소세 적립) · 러너가 <b>실제로 남긴 돈(순이익)</b> · 세금 일정 · 통장 잔액'],
       ['순서', '① 맨 위 <b>빼둘 돈</b> 카드 확인 ② 쿠팡 입금 들어오면 [자금배분] 받음 → 항목별 이체 체크(카드에 ✓) ③ [통장 내역 올리기]로 은행 거래내역 자동 분류 ④ 세금은 [세금 일정]에 낸 금액 입력'],
-      ['설정', '[고정 운영비] · [직원] · [지출 기록] · [배분 설정] · [통장 목록] — 각 탭 위에 설명이 있음']
+      ['묶음', '<b>이번 달 돈</b>(월별 손익·빼둘 돈 · 자금배분 · 입금확인) · <b>통장</b>(잔액 · 내역 올리기 · 입출금 기록) · <b>손익·세금</b>(세금 일정 · 지출) · <b>⚙ 설정</b>(통장 목록 · 배분 설정 · 고정 운영비 · 직원)']
     ],
     'page:uiset': [
       ['하는 일', '관리자 화면의 <b>메뉴 · 탭 · 제목 · 입력칸 이름 · 설명서 · 경고 문구 · 기사 앱 문구</b>를 코드 수정 없이 바꾸기'],
@@ -8185,7 +8225,13 @@
     $('#stCnt').textContent = list.length + '명';
     tsApply($('#stTable'));
     $('#stEmpty').classList.toggle('hidden', !!s.drivers.length);
-    $('#stEmpty').textContent = s.round ? '정산할 기사가 없습니다.' : '이 달 쿠팡 정산서가 아직 없습니다. 오른쪽 위 [쿠팡 정산서 올리기]로 엑셀을 넣어 주세요.';
+    $('#stEmpty').textContent = s.round ? '정산할 기사가 없습니다.' : '이 달 쿠팡 정산서가 아직 없습니다. 1단계 [가져오기]로 쿠팡 정산서 엑셀을 넣어 주세요.';
+    // 2단계 확인: 경고가 없으면 안내 한 줄
+    let ok = $('#stCheckOk'); if (!ok) { ok = document.createElement('div'); ok.id = 'stCheckOk'; ok.className = 'st-checkok'; $('#stWarn').insertAdjacentElement('beforebegin', ok); }
+    const wn_ = (s.warnings || []).length;
+    ok.classList.toggle('hidden', STX.tab !== 'check' || wn_ > 0);
+    ok.innerHTML = s.round ? '✓ 확인할 경고가 없습니다 — 3단계 조정으로 넘어가세요.<small>미등록 아이디 · 새 구분값 · 정지/휴직 아이디 · 아이디 사용 기록이 모두 정리된 상태입니다.</small>' : '아직 쿠팡 정산서가 없습니다.<small>1단계 가져오기에서 이 달 쿠팡 정산서를 먼저 넣어 주세요.</small>';
+    stRenderSteps();
   }
   /** 정산관리에서 저장하지 않은 표 편집·기사 정산정보가 있으면 버릴지 묻는다 */
   function stLeaveOk() {
@@ -8193,12 +8239,130 @@
     if (!confirm('정산관리에 저장하지 않은 변경이 있습니다. 버리고 넘어갈까요?')) return false;
     STX.edDirty = false; STX.drvDirty = {}; return true;
   }
+  // ── 정산관리 5단계 + ⚙ · 러너 손익·통장 3묶음 + ⚙ (예전 탭·편집기는 그대로 두고 들어가는 문만 재배치) ──
+  //  go 코드: tab:<정산 탭> · cfg:<정산 설정 표> · idt:drv(명의자) · pnl:<손익 탭> · btn:<버튼 id> · modal:imp
+  const ST_STEPS = [
+    { k: 'import', n: 1, t: '가져오기', d: '쿠팡 정산서 · 통장 내역', go: 'modal:imp' },
+    { k: 'check', n: 2, t: '확인', d: '미등록 아이디 · 새 구분값 · 정지 아이디 경고 처리', go: 'tab:check' },
+    { k: 'adjust', n: 3, t: '조정', d: '품앗이·용차 · 공제·가감 · 가불금 · 일시단가', sub: [['tab:yongcha', '품앗이 · 용차', '이 정산기간에 대신 뛴 날 · 수행자 · 단가 (빈칸 = 노선관리 단가)'], ['tab:adjust', '공제 · 가감', '이 달만 더 주거나 빼는 돈 · 항목에 따라 계산서 반영 또는 입금액만'], ['tab:advance', '가불금', '내준 가불 · 상계 예정일이 지나면 그 달 정산에서 자동 상환'], ['tab:tmp', '일시단가', '정해진 기간만 다른 단가로 일한 기사'], ['tab:usage', '아이디 사용 기록', '한 아이디로 여러 기사가 일한 기간 (기록 없는 날 = 명의자)']] },
+    { k: 'list', n: 4, t: '정산서 · 마감', d: '기사별 정산서 검토 → 마감 → 기사 앱 공개', go: 'tab:list' },
+    { k: 'report', n: 5, t: '리포트 · 내보내기', d: '최종 리포트 (이 달 · 연간) · 세무자료 엑셀', go: 'tab:report' },
+    { k: 'cfg', gear: true, t: '⚙ 설정', d: '자주 안 바꾸는 것', groups: [
+      { k: 'basic', t: '기본', d: '지급률 · 산재고용 요율 · 일정 · 기사 앱 공개 — 바꾸면 마감 안 한 달이 다시 계산됨', sub: [['cfg:config', '세부정산 설정'], ['cfg:camps', '캠프 · 기사별 산재고용']] },
+      { k: 'drv', t: '기사별 조건', d: '기본 규칙과 다르게 적용되는 기사 — 프백 차감 · 매달 고정 수당/공제 · 퇴사 보류금 · 매출 목표/분할', sub: [['cfg:fbcut', '프레시백 차감'], ['cfg:regular', '고정수당 · 공제'], ['cfg:leave', '퇴사 보류금'], ['cfg:target', '매출 목표 (자동 분배)'], ['cfg:split', '사업자 매출 분할']] },
+      { k: 'ids', t: '아이디 · 업체', d: '정산의 기준은 쿠팡 아이디 — 메인·서브·명의자·단가코드 · 용차업체는 업체 단위로 정산', sub: [['tab:ids', '쿠팡 아이디'], ['idt:drv', '명의자 사업자 정보 (보기)'], ['tab:vendors', '용차업체']] },
+      { k: 'etc', t: '항목 · 지난 자료', d: '정산서에 나오는 줄 이름과 쿠팡 구분값 → 계산 분류 · 1~10월 기존 정산 자료', sub: [['cfg:items', '정산서 항목'], ['cfg:kinds', '쿠팡 구분값'], ['cfg:migrate', '기존 정산 시트 가져오기'], ['btn:stLegBtn', '기존 정산 이식 (JSON)']] }
+    ] }
+  ];
+  const ST_FIN = [
+    { k: 'now', t: '이번 달 돈', d: '빼둘 돈 · 자금배분 · 기사 입금확인', sub: [['pnl:pnl', '월별 손익 · 빼둘 돈', '정산월마다 빼둘 돈(기사정산·부가세·산재고용·급여·운영비·종소세 적립)과 러너 순이익'], ['pnl:fund', '자금배분', '쿠팡 입금을 통장별로 나눠 보내기 · 받음·이체 체크'], ['pnl:pay', '입금확인', '기사 지급 입금체크 · 대량이체용 복사']] },
+    { k: 'bank', t: '통장', d: '잔액 · 거래내역 올리기 · 직접 입력', sub: [['pnl:bal', '통장 잔액', '통장별 지금 잔액 = 기초잔액 + 들어온 돈 − 나간 돈'], ['pnl:bank', '통장 내역 올리기', '은행 거래내역(PDF·엑셀) 한 줄씩 자동 분류'], ['pnl:banktx', '입·출금 기록', '자금배분·기사 지급 말고 직접 넣는 입·출금']] },
+    { k: 'tax', t: '손익 · 세금', d: '세금 일정 · 이 달 지출', sub: [['pnl:tax', '세금 일정', '부가세 · 원천세 · 산재고용 · 종합소득세 납부기한 순 · 낸 금액 기록'], ['pnl:expense', '지출 기록', '이 정산월에 넣을 그 달 실제 지출']] },
+    { k: 'cfg', gear: true, t: '⚙ 설정', d: '통장 · 배분 규칙 · 고정비 · 직원', sub: [['pnl:banks', '통장 목록'], ['pnl:alloc', '배분 설정'], ['pnl:cost', '고정 운영비'], ['pnl:staff', '직원 (원천세)']] }
+  ];
+  STX.last = STX.last || {}; // 묶음마다 마지막으로 연 하위 탭
+  function stGo(code) {
+    const i = code.indexOf(':'), kind = code.slice(0, i), v = code.slice(i + 1);
+    if (kind === 'modal') { if (v === 'imp') impOpen(); return; }
+    if (kind === 'btn') { const b = $('#' + v); if (b) b.click(); return; }
+    if (kind === 'tab') { if (v === 'ids') { STX.idt = 'ids'; } return stShowTab(v); }
+    if (kind === 'idt') { STX.idt = v; STX.tab = ''; return stShowTab('ids'); }
+    if (kind === 'cfg') { STX.cfg = v; return STX.tab === 'cfg' ? stCfgTab(v) : stShowTab('cfg'); }
+    if (kind === 'pnl') { STX.pnlT = v; return STX.tab === 'pnl' ? stPnlTab(v) : stShowTab('pnl'); }
+  }
+  /** 지금 열린 탭이 어느 단계(묶음)·어느 하위인지 */
+  function stWhere() {
+    if (STX.fin || STX.tab === 'pnl') { const code = 'pnl:' + (STX.pnlT || 'pnl'); const g = ST_FIN.find((x) => x.sub.some((s) => s[0] === code)) || ST_FIN[0]; return { fin: true, g: g, code: code }; }
+    const t = STX.tab;
+    if (t === 'cfg') { const code = 'cfg:' + (STX.cfg || 'config'); const S = ST_STEPS[5], g = S.groups.find((x) => x.sub.some((s) => s[0] === code)) || S.groups[0]; return { step: S, g: g, code: code }; }
+    if (t === 'ids' || t === 'vendors') { const code = t === 'vendors' ? 'tab:vendors' : STX.idt === 'drv' ? 'idt:drv' : 'tab:ids'; return { step: ST_STEPS[5], g: ST_STEPS[5].groups[2], code: code }; }
+    if (['yongcha', 'adjust', 'advance', 'tmp', 'usage'].includes(t)) return { step: ST_STEPS[2], g: ST_STEPS[2], code: 'tab:' + t };
+    if (t === 'check') return { step: ST_STEPS[1], code: 'tab:check' };
+    if (t === 'report') return { step: ST_STEPS[4], code: 'tab:report' };
+    return { step: ST_STEPS[3], code: 'tab:list' };
+  }
+  function stStepStatus(k) {
+    const s = STX.sum; if (!s) return ['', ''];
+    const warnN = (s.warnings || []).length, red = (s.warnings || []).filter((w) => w.level === 'bad' || w.level === 'danger').length;
+    if (k === 'import') return s.round ? ['done', '✓ ' + s.round + '차 반영'] : ['', s.closed ? '마감됨' : '정산서 없음'];
+    if (k === 'check') return warnN ? [red ? 'warn' : '', '경고 ' + warnN + '건'] : s.round ? ['done', '✓ 경고 없음'] : ['', '—'];
+    if (k === 'adjust') return ['', s.closed ? '마감 · 보기만' : '이 달 조정'];
+    if (k === 'list') return s.closed ? ['done', '✓ 마감 · ' + (s.drivers || []).length + '명'] : ['', (s.drivers || []).length + '명 · 마감 전'];
+    if (k === 'report') return s.closed ? ['done', '확정 리포트'] : ['', '마감 전 · 가안'];
+    return ['', ''];
+  }
+  function stRenderSteps() {
+    const w = stWhere();
+    $('#stSteps').innerHTML = ST_STEPS.map((S) => {
+      const st = S.gear ? ['', ''] : stStepStatus(S.k), on = w.step && w.step.k === S.k;
+      return '<button type="button" class="st-step' + (S.gear ? ' gear' : '') + (on ? ' on' : '') + (st[0] === 'done' && !on ? ' done' : st[0] === 'done' ? ' done' : '') + '" data-step="' + S.k + '">' +
+        (S.gear ? '' : '<span class="sn"><b>' + S.n + '</b>단계</span>') + '<span class="stt">' + esc(S.t) + '</span><span class="std">' + esc(S.d) + '</span>' + (st[1] ? '<span class="sts' + (st[0] === 'warn' ? ' warn' : '') + '">' + esc(st[1]) + '</span>' : '') + '</button>';
+    }).join('');
+    $('#stFinG').innerHTML = ST_FIN.map((G) => '<button type="button" class="st-step' + (G.gear ? ' gear' : '') + (w.fin && w.g.k === G.k ? ' on' : '') + '" data-fin="' + G.k + '"><span class="stt">' + esc(G.t) + '</span><span class="std">' + esc(G.d) + '</span></button>').join('');
+    // 하위 탭 (조정 · 설정 묶음 · 손익 묶음)
+    const g = w.g, subs = g && g.sub;
+    $('#stSubWrap').classList.toggle('hidden', !subs);
+    if (subs) {
+      const groups = !w.fin && w.step && w.step.groups ? '<div class="tabs sub2" style="margin-bottom:6px">' + w.step.groups.map((x) => '<button type="button" class="tab' + (x.k === g.k ? ' on' : '') + '" data-stg="' + x.k + '">' + esc(x.t) + '</button>').join('') + '</div>' : '';
+      $('#stSub').outerHTML = '<div id="stSub">' + groups + '<div class="tabs sub2">' + subs.map((x) => '<button type="button" class="tab' + (x[0] === w.code ? ' on' : '') + '" data-go="' + esc(x[0]) + '">' + esc(x[1]) + '</button>').join('') + '</div></div>';
+      const cur = subs.find((x) => x[0] === w.code);
+      $('#stSubDesc').textContent = (cur && cur[2]) || g.d || '';
+      STX.last[g.k] = w.code;
+      if (!w.fin && w.step && w.step.groups) STX.last.cfgG = g.k;
+    }
+  }
+  stRenderSteps();
+  $('#stSteps').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-step]'); if (!b) return;
+    const S = ST_STEPS.find((x) => x.k === b.dataset.step); if (!S) return;
+    if (S.go) return stGo(S.go);
+    if (S.groups) { const gk = STX.last.cfgG || S.groups[0].k, g = S.groups.find((x) => x.k === gk) || S.groups[0]; return stGo(STX.last[g.k] || g.sub[0][0]); }
+    stGo(STX.last[S.k] || S.sub[0][0]);
+  });
+  $('#stFinG').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-fin]'); if (!b) return;
+    const G = ST_FIN.find((x) => x.k === b.dataset.fin); if (!G) return;
+    stGo(STX.last[G.k] || G.sub[0][0]);
+  });
+  $('#stSubWrap').addEventListener('click', (e) => {
+    const g = e.target.closest('[data-stg]');
+    if (g) { const G = ST_STEPS[5].groups.find((x) => x.k === g.dataset.stg); STX.last.cfgG = G.k; return stGo(STX.last[G.k] || G.sub[0][0]); }
+    const b = e.target.closest('[data-go]'); if (b) stGo(b.dataset.go);
+  });
+  // 1단계 가져오기 창
+  function impOpen() {
+    const s = STX.sum || {};
+    $('#impMonth').textContent = ymTitle(STX.month) + ' 정산' + (s.closed ? ' · 마감됨 (매출만 반영)' : '');
+    $('#impStatus').textContent = s.round ? '지금 ' + s.round + '차 반영' + (s.roundAt ? ' (' + String(s.roundAt).slice(0, 16) + ')' : '') + ' · 정산기간 ' + (s.period ? s.period.from + ' ~ ' + s.period.to : '') : '아직 이 달 쿠팡 정산서가 없습니다.';
+    $('#impModal').classList.remove('hidden');
+  }
+  const impClose = () => $('#impModal').classList.add('hidden');
+  $('#impClose').addEventListener('click', impClose);
+  ['#stDrvBtn', '#stUpBtn', '#stLegBtn'].forEach((id) => $(id).addEventListener('click', impClose));
+  $('#impBank').addEventListener('click', () => { impClose(); stGo('pnl:bank'); });
+  $('#impMigrate').addEventListener('click', () => { impClose(); stGo('cfg:migrate'); });
+  // 끌어다 놓기: 파일 이름·종류로 쿠팡 정산서 / 통장 내역 구분
+  const impIsBank = (f) => /거래내역|거래실적|입출금|통장|카카오|우리은행|\.pdf$/i.test(f.name);
+  (function () {
+    const z = $('#impDrop');
+    ['dragenter', 'dragover'].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.remove('over'); }));
+    z.addEventListener('drop', (e) => {
+      const files = [...(e.dataTransfer.files || [])]; if (!files.length) return;
+      const bank = files.filter(impIsBank), cp = files.filter((f) => !impIsBank(f));
+      if (cp.length) { const dt = new DataTransfer(); cp.forEach((f) => dt.items.add(f)); $('#stFile').files = dt.files; $('#stFile').dispatchEvent(new Event('change')); }
+      if (bank.length) { stGo('pnl:bank'); setTimeout(() => BK.onFile(bank[0]), 300); if (bank.length > 1) toast('통장 내역은 한 번에 한 파일씩 올려 주세요. 첫 파일만 올립니다.'); }
+      impClose();
+    });
+  })();
   function stShowTab(tab, keep) {
     if (STX.tab !== tab && (STX.edDirty || Object.keys(STX.drvDirty).length) && !stLeaveOk()) return;
     STX.paneSeq = (STX.paneSeq || 0) + 1; // 탭을 옮기면 이전 탭의 늦은 응답은 버린다 (표가 뒤바뀌거나 입력 중인 줄이 지워지지 않게)
     STX.tab = tab; STX.edDirty = false;
     $$('#stTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.st === tab));
-    $('#stp-list').classList.toggle('hidden', tab !== 'list');
+    $('#stp-list').classList.toggle('hidden', tab !== 'list' && tab !== 'check');
+    $('#view-settle').classList.toggle('st-check', tab === 'check');
+    $('#stRepTools').classList.toggle('hidden', tab !== 'report');
     if (STX.idt === 'usage') STX.idt = 'ids'; // 아이디 사용 기록은 정산관리 탭으로 옮김
     const idSub = tab === 'ids' ? (STX.idt || 'ids') : '';
     $('#stp-edit').classList.toggle('hidden', !(['adjust', 'advance', 'yongcha', 'vendors', 'usage', 'tmp', 'cfg', 'pnl', 'report'].includes(tab) || (tab === 'ids' && idSub !== 'drv')));
@@ -8210,13 +8374,14 @@
     $('#stp-pay').classList.toggle('hidden', tab !== 'pay');
     $('#stp-drv').classList.toggle('hidden', !(tab === 'ids' && idSub === 'drv'));
     $('#stCfgTabs').classList.toggle('hidden', tab !== 'cfg');
-    if (tab === 'list') { if (STX.sum) renderStList(); else loadSettle(STX.month); }
+    if (tab === 'list' || tab === 'check') { if (STX.sum) renderStList(); else loadSettle(STX.month); }
     else if (tab === 'pay') loadPay();
     else if (tab === 'ids') { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.remove('hidden'); if (idSub === 'drv') loadStDrivers(); else loadEditor(idSub); }
     else if (tab === 'cfg') stCfgTab(STX.cfg);
     else if (tab === 'pnl') stPnlTab(STX.pnlT || 'pnl');
     else if (tab === 'report') { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.add('hidden'); $('#stPnl').classList.remove('hidden'); paintHelp('report'); if ((STX.rpT || 'month') === 'year') loadReportYear(); else loadReport(); }
     else { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.remove('hidden'); loadEditor(tab); }
+    stRenderSteps();
   }
   // ── 최종 리포트: 이 달 정산 결과를 한 장으로 (매출 → 기사 지급 → 회사 손익 → 세금 → 확인할 것 → 기사별 요약) ──
   function strpTabs(cur) {
@@ -8341,9 +8506,10 @@
     STX.fin = on;
     const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!on);
     $('#stTitle').textContent = na ? na.textContent.trim() : on ? '러너 손익·통장' : '정산관리';
-    $('#stTabs').classList.toggle('hidden', on);
-    ['#stRecalc', '#stCloseBtn', '#stUpBtn', '#stTaxPack', '#stDrvBtn', '#stLegBtn'].forEach((id) => $(id).classList.toggle('hidden', on)); if (on) $('#stLegCmp').classList.add('hidden'); else paintStInfo();
-    $('#stPnlTabs').classList.toggle('hidden', !on);
+    $('#stSteps').classList.toggle('hidden', on);
+    $('#stFinG').classList.toggle('hidden', !on);
+    $('#stRecalc').classList.toggle('hidden', on);
+    if (!on) paintStInfo();
   }
   /** 사이드바: 정산관리 / 러너 손익·통장 중 지금 보는 쪽 표시 */
   function navMark() {
@@ -8365,6 +8531,7 @@
     $('#stPnl').classList.toggle('hidden', !pane);
     $('#stEditor').classList.toggle('hidden', pane);
     paintHelp(name === 'pnl' ? 'pnlSum' : name);
+    stRenderSteps();
     if (name === 'pnl') loadPnl(); else if (name === 'fund') loadFund(); else if (name === 'bal') loadBal(); else if (name === 'tax') loadTaxPlan(); else if (name === 'bank') BK.load(STX.month); else loadEditor(name);
   }
   // 세금 일정 (부가세 · 원천세 · 산재고용 · 종합소득세)
@@ -8575,6 +8742,7 @@
     $('#stMigrate').classList.toggle('hidden', name !== 'migrate');
     $('#stEditor').classList.toggle('hidden', name === 'migrate');
     paintHelp(name);
+    stRenderSteps();
     if (name === 'fbcut') return loadFbView();
     if (name !== 'migrate') loadEditor(name);
   }
@@ -10944,7 +11112,7 @@
       ['bib', '', [['#bibNew', '버튼'], ['#coBtn', '버튼']]],
       ['route', '', [['#xpOpen', '버튼'], ['[data-rcopen="move"]', '버튼'], ['#campNew', '버튼']]],
       ['perf', '', [['#rpUpBtn', '버튼']]],
-      ['settle', '', [['#stTabs .tab', '탭', { ids: '#stIdTabs .tab', cfg: '#stCfgTabs .tab' }], ['#stUpBtn', '버튼'], ['#stRecalc', '버튼'], ['#stCloseBtn', '버튼']]],
+      ['settle', '', [['#stSteps .st-step', '단계', { adjust: '#stTabs [data-st="yongcha"], #stTabs [data-st="adjust"], #stTabs [data-st="advance"], #stTabs [data-st="tmp"], #stTabs [data-st="usage"]', cfg: '#stCfgTabs .tab, #stTabs [data-st="ids"], #stTabs [data-st="vendors"]' }], ['#stRecalc', '버튼'], ['#stCloseBtn', '버튼'], ['#stTaxPack', '버튼']]],
       ['settle', 'pnl', [['#stPnlTabs .tab', '탭']]],
       ['taxinv', '', [['#tiTabs .tab', '탭'], ['#tiFromStl', '버튼'], ['#tiNew', '버튼']]],
       ['notice', '', [['#ntNew', '버튼']]],
@@ -10959,10 +11127,10 @@
           out.push({ kind: 'menu', d: 0, group: gname, col, label, path: label, steps: [a] });
           SUB.filter((x) => x[0] === view && x[1] === go).forEach((x) => x[2].forEach(([sel, tag, kids]) => {
             $$(sel).forEach((b) => {
-              const bl = tx(b).replace(/^[⬆📅⚠📖+\s]+/u, '').replace(/\s*\d+$/, '').trim(); if (!bl) return;
+              const bl = (b.querySelector('.stt') ? tx(b.querySelector('.stt')) : tx(b)).replace(/^[⬆📅⚠📖+\s]+/u, '').replace(/\s*\d+$/, '').trim(); if (!bl) return;
               const steps = [a].concat(tag === '더보기' ? [$('#sMoreBtn'), b] : [b]);
               out.push({ kind: 'sub', d: 1, group: gname, col, label: bl, path: label + ' › ' + bl, tag: tag === '탭' || tag === '보기' ? '' : tag, steps, kw: b.title || '' });
-              const k = kids && kids[b.dataset.st];
+              const k = kids && kids[b.dataset.st || b.dataset.step];
               if (k) $$(k).forEach((c) => out.push({ kind: 'sub', d: 2, group: gname, col, label: tx(c), path: label + ' › ' + bl + ' › ' + tx(c), steps: steps.concat([c]), kw: c.title || '' }));
             });
           }));
