@@ -172,7 +172,8 @@ function adm_tiBulk(token, ids, action) {
  * 이미 그 정산월·공급자 계산서가 있으면 건너뜀 (overwrite = true 면 금액·공급자 정보를 새로 고침).
  * 작성일자 = 정산월 말일, 품목 = 'N월 용역비', 수량 1, 단가 = 합계(부가세 포함), 공급가액·세액은 정산서 그대로.
  */
-function adm_tiFromSettle(token, month, overwrite) {
+/** only = 정산ID 목록이면 그 기사만 (전자세금계산서 발행 화면의 '정산 금액으로 고치기') */
+function adm_tiFromSettle(token, month, overwrite, only) {
   return run_(function () {
     const a = requireAdmin_(token);
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
@@ -191,6 +192,7 @@ function adm_tiFromSettle(token, month, overwrite) {
       const next = tiNewId_(), now = nowText_(), add = [];
       res.summary.drivers.forEach(function (d) {
         if (!(d.invoice > 0)) return;
+        if (Array.isArray(only) && only.indexOf(d.id) < 0) return;
         const key = d.vendor ? stlVendorKey_(d.vendor) : d.ownerId;
         if (d.vendor || !on[String(key)]) { notOn.push(d.name); return; }
         const s = sups[key];
@@ -205,6 +207,8 @@ function adm_tiFromSettle(token, month, overwrite) {
         const o = old[key];
         if (o) {
           if (!overwrite) { skipped.push(d.name + ' (이미 있음)'); return; }
+          // 국세청에 이미 등록한 계산서는 고치지 않음 (수정세금계산서로 처리해야 함)
+          if (str_(o.nts) === '등록') { skipped.push(d.name + ' (국세청 등록됨 · 수정세금계산서 필요)'); return; }
           row.updatedAt = now; row.admin = a.name;
           writeFields_(SH.TAXINV, o._row, row);
           made.push(d.name);
