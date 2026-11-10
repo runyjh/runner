@@ -1387,6 +1387,7 @@
         <input class="inp" type="month" id="tiMonth" title="정산월" style="width:auto">
         <button class="btn" id="tiFromStl" title="이 정산월의 세금계산서 발행 금액으로, 기사 정보에서 '역발행 기사'로 지정한 기사만 1장씩 만듭니다">정산서에서 만들기</button>
         <button class="btn ghost" id="tiNew">+ 직접 작성</button>
+        <button class="btn ghost" id="stHtBtn" title="홈택스 → 전자세금계산서 → 매입 목록조회 엑셀을 올리면 위 정산월의 기사별 계산서 금액을 대조해 발행 완료 표시">홈택스 대조</button><input type="file" id="stHtFile" accept=".xls,.xlsx,.csv" class="hidden">
         <button class="btn ghost" id="tiReload">새로고침</button>
       </div>
     </div>
@@ -1626,7 +1627,7 @@
     <!-- 매입·매출: 통장 잔액 줄 + 3단계(15일 · 20일 · 월말) + 통장 · ⚙ -->
     <div class="banks hidden" id="stBanks"></div>
     <div class="st-steps fin hidden" id="stFinG"></div>
-    <div class="st-sub hidden" id="stSubWrap"><div class="st-subrow"><div id="stSub"></div><div class="st-subright" id="stSubRight"><button class="btn ghost sm hidden" id="stLegCmp" title="기존 정산서(마감 기록)와 올인원이 지금 설정·쿠팡 정산서로 다시 계산한 결과를 기사별로 비교 — 마감은 그대로">올인원 계산과 비교</button><button class="btn ghost sm" id="stHtBtn" title="홈택스 → 전자세금계산서 → 매입 목록조회 엑셀을 올리면 기사별 계산서 금액을 대조해 발행 완료 표시">홈택스 대조</button><input type="file" id="stHtFile" accept=".xls,.xlsx" class="hidden"><button class="btn ghost sm" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기</button><button class="btn sm" id="stCloseBtn">마감</button></div></div><div class="sub st-subdesc" id="stSubDesc"></div></div>
+    <div class="st-sub hidden" id="stSubWrap"><div class="st-subrow"><div id="stSub"></div><div class="st-subright" id="stSubRight"><button class="btn ghost sm hidden" id="stLegCmp" title="기존 정산서(마감 기록)와 올인원이 지금 설정·쿠팡 정산서로 다시 계산한 결과를 기사별로 비교 — 마감은 그대로">올인원 계산과 비교</button><button class="btn ghost sm" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기</button><button class="btn sm" id="stCloseBtn">마감</button></div></div><div class="sub st-subdesc" id="stSubDesc"></div></div>
     <div class="st-info" id="stInfo"></div>
     <div id="stp-imp" class="hidden">
       <h3 class="stp-h">가져오기 <small id="impMonth"></small></h3>
@@ -2015,7 +2016,7 @@
 <div class="modal hidden" id="htModal">
   <div class="m-box" style="width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column">
     <h3 id="htTitle">홈택스 계산서 대조</h3>
-    <p class="sub" style="font-size:12.5px;margin:0 0 8px">홈택스 → 조회/발급 → 전자세금계산서 <b>매입 목록조회</b>(공급받는자 러너)에서 내려받은 엑셀(.xls)로 기사별 계산서 금액을 맞춰 봅니다. [저장]하면 기사별 정산서 표에 <b>✓ 발행 · 금액다름 · 미발행</b>이 표시되고, 다시 올리면 덮어씁니다.</p>
+    <p class="sub" style="font-size:12.5px;margin:0 0 8px">홈택스 → 조회/발급 → 전자세금계산서 <b>매입 목록조회</b>(공급받는자 러너)에서 내려받은 엑셀(.xls)로 기사별 계산서 금액을 맞춰 봅니다. [저장]하면 정산관리 4단계 기사별 정산서 표에 <b>✓ 발행 · 금액다름 · 미발행</b>이 표시되고, 다시 올리면 덮어씁니다.</p>
     <div id="htBody" style="flex:1;overflow:auto"></div>
     <div class="m-actions"><button type="button" class="btn ghost" id="htClose">닫기</button><span class="grow"></span><button type="button" class="btn" id="htSave">저장 · 발행 완료 표시</button></div>
   </div>
@@ -10697,14 +10698,16 @@
     try { rows = await htParse(f); } catch (err) { return toast(err.message || '엑셀을 읽지 못했습니다.'); }
     if (!rows.length) return toast('계산서 줄을 찾지 못했습니다. 홈택스 → 전자세금계산서 → 매입 목록조회에서 내려받은 엑셀인지 확인해 주세요.');
     HT.rows = rows;
-    const r = await api('adm_stlTaxCheck', STX.month, rows, true);
+    const m = $('#tiMonth').value; if (!m) return toast('위에서 정산월을 골라 주세요.');
+    HT.month = m;
+    const r = await api('adm_stlTaxCheck', m, rows, true);
     if (!r.ok) return toast(r.msg);
     HT.r = r; htRender(r, false);
   });
   function htRender(r, saved) {
     const n = r.n, st = (x) => /^완료$/.test(x.status) ? '<span style="color:var(--ok);font-weight:700">✓ 완료</span>' : /1원차/.test(x.status) ? '<span style="color:var(--ok)">✓ 완료 <small>(1원차)</small></span>' : x.status === '금액다름' ? '<span style="color:var(--danger);font-weight:700">금액다름</span>' : '<span style="color:var(--warn);font-weight:700">미발행</span>';
     const d = (v) => v ? '<span style="color:' + (v > 0 ? 'var(--brand)' : 'var(--danger)') + '">' + (v > 0 ? '+' : '') + wn(v) + '</span>' : '<span class="sub">0</span>';
-    $('#htTitle').textContent = ymTitle(STX.month) + ' 홈택스 계산서 대조' + (saved ? ' — 저장됨' : ' — 미리보기');
+    $('#htTitle').textContent = ymTitle(HT.month || r.month) + ' 홈택스 계산서 대조' + (saved ? ' — 저장됨' : ' — 미리보기');
     $('#htBody').innerHTML = '<div class="kpis" style="margin-bottom:10px">' +
       '<div class="kpi"><small>발행 완료</small><b style="color:var(--ok)">' + (n.done + n.round) + ' / ' + n.total + '명</b><em>' + (n.round ? '1원차 ' + n.round + ' 포함 · ' : '') + '정산서 계산서 있는 기사 기준</em></div>' +
       '<div class="kpi"><small>금액 다름</small><b' + (n.diff ? ' style="color:var(--danger)"' : '') + '>' + n.diff + '명</b><em>홈택스 합계 ≠ 정산서 계산서</em></div>' +
@@ -10720,10 +10723,10 @@
   $('#htSave').addEventListener('click', async () => {
     if (!HT.rows) return;
     $('#htSave').disabled = true;
-    const r = await api('adm_stlTaxCheck', STX.month, HT.rows, false).finally(() => { $('#htSave').disabled = false; });
+    const r = await api('adm_stlTaxCheck', HT.month, HT.rows, false).finally(() => { $('#htSave').disabled = false; });
     if (!r.ok) return toast(r.msg);
     toast('계산서 발행 상태를 저장했습니다 — 기사별 표의 "계산서 발행" 칸에 표시됩니다.');
-    htRender(r, true); STX.sum = null; loadSettle(STX.month);
+    htRender(r, true); if (STX.month === HT.month) STX.sum = null;
   });
   $('#htClose').addEventListener('click', () => $('#htModal').classList.add('hidden'));
   // ── 기존 정산서 vs 올인원 계산 비교 (기존 정산 이식으로 마감한 달)
