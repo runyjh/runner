@@ -370,6 +370,16 @@
   .st-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
   .st-tools .search { max-width: 260px; }
   .st-help { font-size: 13px; margin: 0 0 10px; }
+  .pg-help { margin: -4px 0 12px; font-size: 13px; }
+  .pg-help > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--sub); font-weight: 700; font-size: 12px; user-select: none; }
+  .pg-help > summary::-webkit-details-marker { display: none; }
+  .pg-help > summary:hover { color: var(--brand); border-color: var(--brand); }
+  .pg-help > summary small { font-weight: 500; color: var(--sub); }
+  .pg-help .pgh-i { color: var(--brand); font-weight: 800; }
+  .pg-help .pgh-tg::before { content: '펼치기 ▾'; font-weight: 500; font-size: 11px; margin-left: 4px; }
+  .pg-help[open] .pgh-tg::before { content: '접기 ▴'; }
+  .pg-help[open] > summary { margin-bottom: 8px; }
+  .pg-help .stg { margin: 0; }
   .stg { display: grid; gap: 5px; background: #fafbfd; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; color: var(--ink); line-height: 1.55; }
   .stg-r { display: flex; gap: 10px; align-items: baseline; }
   .stg-t { flex: 0 0 auto; min-width: 92px; text-align: center; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 1px 8px; background: var(--gray-weak); color: var(--sub); }
@@ -7770,7 +7780,7 @@
       ['주의', '원천세·산재고용은 정산월 다음 달에 지급한 것으로 보고 그 다음 달 10일 · 종합소득세는 연환산 추정이라 <b>세무사 확인</b>']
     ],
     fund: [
-      ['하는 일', '쿠팡 입금을 <b>통장별로 나눠 보내기</b> — 항목마다 보낼 통장과 계산 금액이 자동'],
+      ['하는 일', '쿠팡 입금(= 쿠팡 세금계산서 합계)을 <b>통장별로 나눠 보내기</b> — 항목마다 보낼 통장과 계산 금액이 자동'],
       ['순서', '① 쿠팡 입금이 들어오면 실제 금액 확인 후 <b>받음</b> ② 항목별로 보내고 <b>이체</b> 체크 → 통장 잔액에 바로 반영'],
       ['금액', '보낼 금액을 비우면 <b>계산 금액</b> 그대로 · 다르게 보냈으면 그 금액을 넣기 · 유보금 = 쿠팡 입금 − 나머지 합계'],
       ['바꾸는 곳', '보낼 통장·금액 규칙(종소세 적립률 · 대표 인출) → <b>[배분 설정]</b> · 통장 → <b>[통장 목록]</b>']
@@ -7820,6 +7830,66 @@
       ['금액', '실제 나간 돈(VAT포함) · 증빙이 세금계산서·카드·현금영수증이면 부가세 공제'],
       ['귀속월', '위에서 고른 <b>정산월</b>로 저장 · 마감한 달은 못 고침'],
       ['매달 같으면', '[고정 운영비]에 한 번만']
+    ],
+    // ── 메뉴(화면)마다 맨 위 '사용법' (접었다 펼 수 있음 · 올인원 설정 → 설명서에서 문구 수정)
+    'page:dash': [
+      ['하는 일', '기사 이름 · 아이디 · 연락처 · 캠프 · 노선 코드를 <b>한 칸에서 검색</b> → 기사 정보 · 스케줄 · 노선 · 정산서로 바로 이동 (여러 개는 콤마)'],
+      ['칩', '검색 범위를 기사 · 노선 · 노선 단가 · 기사 스케줄 · 정산서 등으로 좁히기'],
+      ['오른쪽', '오늘 <b>러너 업무스케줄</b>과 쿠팡 <b>팀즈 소식</b> 최신 글 — 누르면 그 화면으로']
+    ],
+    'page:drivers': [
+      ['하는 일', '기사 <b>기본 정보 · 연락처 · 차량 · 캠프/라우트 · 정산 아이디 · 계좌</b>를 한 곳에서 — 기사 앱 로그인 계정도 여기서 만들어짐'],
+      ['등록', '[+ 새 기사 등록] → 아이디 · 임시 비밀번호 → 기사가 앱 첫 로그인 때 비밀번호를 바꿈'],
+      ['여러 명', '왼쪽 체크 → 아래 묶음 메뉴에서 근무상태 · 캠프 · <b>비밀번호 일괄 변경</b> (임시 비밀번호 표는 창을 닫으면 다시 못 봄)'],
+      ['퇴사', '줄을 지우지 말고 <b>근무상태 = 퇴사</b> (퇴사일 입력) — 지난 스케줄 · 정산 기록이 그대로 남음'],
+      ['탭', '위 탭 = 근무상태 · 캠프 · 직급 등으로 거르기 · 열 머리글을 누르면 정렬']
+    ],
+    'page:sched': [
+      ['하는 일', '기사별 <b>출근 · 휴무 · 병가 · 용차 · 노선변경</b>을 날짜 칸에 적는 표 — 기사 앱 "내 스케줄"에 그대로 보임'],
+      ['입력', '칸을 누르고 입력 (Enter 저장 · Alt+Enter 줄바꿈) · 드래그로 여러 칸 · Ctrl+C / Ctrl+V 로 엑셀과 복사 · Ctrl+Z 되돌리기 · <b>고치면 자동 저장</b>'],
+      ['빠르게', '[빈칸 자동 채우기] = 오늘 이후 빈칸을 고정 · 품앗이 기사는 출근/고정휴무, 백업 기사는 고정휴무만 · [어드민 업로드 테이블] = 쿠팡 어드민에 올릴 표'],
+      ['비고 줄', '[+ 비고 줄] 에 적은 일정은 업무스케줄과 연결 · 캠프 · 날짜 · 이름으로 찾기 (여러 개는 콤마)'],
+      ['주의', '중복(보라 테두리) · 미배정 노선(⚠) · 노선변경 예약은 적용일 전까지만 표시']
+    ],
+    'page:bib': [
+      ['하는 일', '쿠팡 캠프 <b>차량 출입(배번호) 신청서</b> 만들기 · 진행상태 관리'],
+      ['순서', '[새 신청서] 기사 · 차량번호 → <b>출력</b>(PDF) → 캠프에 제출한 날 <b>제출일</b> → 허가 나면 <b>허가 차량번호</b> 입력'],
+      ['회사 정보', '[회사 정보] 에 넣은 상호 · 대표 · 사업자번호 · 직인이 신청서에 찍힘'],
+      ['탭', '진행상태별로 거르기 · 이름 · 차량번호 검색']
+    ],
+    'page:route': [
+      ['하는 일', '캠프마다 <b>노선 코드 · 정산코드(단가) · 담당 기사 · 참고 이미지 · 주소</b> 관리 — 정산서 단가와 기사 앱 "내 캠프"가 여기 값을 씀'],
+      ['순서', '[+ 캠프 추가] → 캠프 안에서 노선 추가 · 단가 코드 지정 · 기사 배정 · 참고 이미지(자동으로 저용량 미리보기) 올리기'],
+      ['노선 바뀔 때', '<b>노선변경 예약</b> = 날짜부터 기사의 노선이 바뀜 (기사스케줄 · 정산에 자동 반영) · [노선 이관] = 쿠팡이 노선을 통째로 옮길 때 (안양1 110 → 군포1 212)'],
+      ['단가', '[전체 단가표] 에서 모든 캠프 정산코드별 단가를 한 표로 · 외부용차단가 = 용차 · 품앗이 청구 기본값'],
+      ['기사 노선 정보', '캠프 화면 아래 = 기사들이 앱에 남긴 글 · 숨기기 · 되살리기 · 삭제']
+    ],
+    'page:perf': [
+      ['하는 일', '쿠팡 주간 <b>수행률 안내</b> · 월간 <b>SLA 점수</b> 엑셀을 올려 노선 · 기사별 수행률 추이 보기'],
+      ['올리기', '[수행률·SLA 업로드] — 파일 종류 자동 인식 · 같은 기간은 덮어씀 · 기사 앱 "내 수행률"에 바로 반영'],
+      ['보기', '캠프 · 기간 고르기 · 낮은 노선부터 정렬 · 기사 정보의 라우트 배정으로 기사와 연결 (배정이 없으면 노선만)']
+    ],
+    'page:memo': [
+      ['하는 일', '러너 사무실 <b>할 일 · 일정</b> 달력 — 대시보드 오른쪽과 기사스케줄 비고 줄에 보임'],
+      ['추가', '날짜 클릭 → 시간(선택) · 분류 · 내용 → [추가] (Ctrl+Enter) · 분류 = 기사스케줄의 어느 비고 줄에 보일지'],
+      ['완료', '메모를 누르면 완료 · 수정 · 삭제 · 지난 날짜에 완료 안 된 메모가 있으면 위에 알림 줄']
+    ],
+    'page:settle': [
+      ['하는 일', '쿠팡 정산서(엑셀)를 반영해 <b>기사별 정산서 · 세금계산서 금액 · 실지급액</b>을 만들고 기사 앱에 공개 · 마감'],
+      ['순서', '① [드라이브에서 가져오기] 또는 [쿠팡 정산서 올리기] ② 확인 필요 경고 처리(아이디 연결 · 구분값) ③ 공제·가감 · 품앗이/용차 확인 ④ 정산서 검토 ⑤ <b>마감</b> → 기사 앱 공개 · 입금체크'],
+      ['금액', '쿠팡 세금계산서 = 총합계 − 분실 차감 · 세액 10% 끝자리 버림 (쿠팡 발행 계산서와 1원까지 같음) · 기사 = 지급 합계 전액 계산서 → 공제 → 실지급'],
+      ['탭', '아이디 관리 · 정산서 · 최종 리포트(월 · 연간) · 용차업체 · 품앗이/용차 지정 · 가불금 · 지급 및 공제 · 기사별 일시단가 · 정산 설정 — 각 탭 위에 설명'],
+      ['세무', '[세무자료 내보내기] = 세무사에게 보낼 엑셀 한 파일 · [기존 정산 이식] = 예전 정산서 PDF 자료 올리기']
+    ],
+    'page:pnl': [
+      ['하는 일', '정산월마다 러너가 <b>실제로 남긴 돈(당기순이익)</b> · 세금 일정 · 쿠팡 입금을 통장별로 나누기 · 통장 잔액'],
+      ['순서', '① 손익 요약 확인 ② 쿠팡 입금 들어오면 [자금배분] 받음 → 항목별 이체 체크 ③ [통장 내역 올리기]로 은행 거래내역 자동 분류 ④ 세금은 [세금 일정]에 낸 금액 입력'],
+      ['설정', '[고정 운영비] · [직원] · [지출 기록] · [배분 설정] · [통장 목록] — 각 탭 위에 설명이 있음']
+    ],
+    'page:uiset': [
+      ['하는 일', '관리자 화면의 <b>메뉴 · 탭 · 제목 · 입력칸 이름 · 설명서 · 경고 문구 · 기사 앱 문구</b>를 코드 수정 없이 바꾸기'],
+      ['순서', '[✏️ 문구 편집 모드] → 바꿀 문구 입력 → [저장 · 바로 반영] · 비우면 기본값 · [전체 기본값으로] = 이 탭의 바꾼 문구 모두 비움'],
+      ['찾기', '위 검색칸에 단어(보험 · 정산서 …) → 그 문구가 있는 줄만 · 바꾼 이력은 아래 기록에']
     ],
     kinds: [
       ['하는 일', '쿠팡 정산서의 <b>구분</b> 값 → 계산 분류(배송 · 프레시백 · 분실파손 …)로 바꾸는 표'],
@@ -8228,7 +8298,7 @@
     const today = ymdLocal(new Date());
     const amtIn = (key, v, ph, dis) => '<input class="inp fnum" data-fk="' + key + '" data-ff="amt" inputmode="numeric" value="' + (v === '' || v == null ? '' : wn(v)) + '" placeholder="' + esc(wn(ph)) + '"' + (dis ? ' disabled' : '') + '>';
     const dep = '<div class="fund-dep' + (d.done ? ' ok' : '') + '"><div><b>쿠팡 입금</b> <small>' + esc(mt) + ' 정산 · 입금 예정 ' + esc(mdTxt(d.due)) + ' · 받는 통장 ' + esc(d.bank || '(통장 목록에 \'쿠팡 입금\' 용도 통장 없음)') + '</small>' +
-      '<div class="sub" style="font-size:12px">계산 금액 ' + wn(d.plan) + ' = 쿠팡 공급가 × 1.1 − 분실파손(소비자가) · 실제로 들어온 금액이 다르면 넣어 주세요</div></div>' +
+      '<div class="sub" style="font-size:12px">입금액 ' + wn(d.plan) + ' = 쿠팡 세금계산서 합계 (공급가 − 분실 차감, 세액 끝자리 버림) · 실제 입금과 같아야 하며 다르면 그 금액을 넣어 주세요</div></div>' +
       '<div class="fund-ctl">' + amtIn('deposit', d.amt || '', d.plan, d.done) + '<input class="inp" type="date" data-fk="deposit" data-ff="date" value="' + esc(d.date || '') + '"><label class="check"><input type="checkbox" data-fk="deposit" data-ff="done"' + (d.done ? ' checked' : '') + '> 받음</label></div></div>';
     // 기사정산금: 입금확인 진행 (정산서 목록의 입금 체크)
     const dl = ((STX.sum && STX.sum.drivers) || []).filter((v) => v.net), dDone = dl.filter((v) => v.checked);
@@ -9603,7 +9673,7 @@
     C.push([]); C.push(['※ 증빙이 세금계산서·카드·현금영수증이면 ÷1.1 로 공급가·부가세(매입세액) 구분 · "세금·보험 납부"는 손익 제외 · 종이 세금계산서는 실물 스캔 첨부']);
     sheets.push({ name: '운영비지출', rows: C, widths: [12, 12, 14, 12, 24, 14, 14, 13, 11, 12, 12, 9, 20] });
     // ⑦ 쿠팡 입금
-    const D = [H(['정산월', '쿠팡 세금계산서 합계 (계산값)', '실제 입금액', '입금 예정일', '입금일', '확인', '받는 통장'])];
+    const D = [H(['정산월', '쿠팡 세금계산서 합계 (= 입금액)', '실제 입금액', '입금 예정일', '입금일', '확인', '받는 통장'])];
     r.deposits.forEach((x) => D.push([mt(x.month), n(x.plan), n(x.amt), x.due, x.date, x.done ? '✓' : '', x.bank]));
     sheets.push({ name: '쿠팡 입금', rows: D, widths: [12, 26, 16, 12, 12, 6, 14] });
     // ⑧ 가불
@@ -10423,8 +10493,25 @@
     if (tn.nodeValue !== want) tn.nodeValue = want;
     tn.__uiSet = want;
   }
+  // 화면 맨 위 '사용법' — 접었다 펼 수 있음 (접은 상태는 이 기기에 기억)
+  const pgOpen = (v) => { try { return localStorage.getItem('runner.pgHelp.' + v) !== '0'; } catch (e) { return true; } };
+  function pageHelpAll() {
+    Object.keys(PG_NAV).forEach((v) => {
+      const sec = $('#view-' + (v === 'pnl' ? 'settle' : v)); if (!sec) return;
+      const head = sec.querySelector(':scope > .head'); if (!head) return;
+      let box = sec.querySelector(':scope > .pg-help');
+      if (v === 'settle' || v === 'pnl') { if ((v === 'pnl') !== !!STX.fin) { return; } }
+      const g = uiGuide('page:' + v) || ST_GUIDE['page:' + v]; if (!g) return;
+      const html = g.map((x) => '<div class="stg-r"><span class="stg-t g-' + (ST_GTAG[x[0]] || 'info') + '">' + esc(x[0]) + '</span><span>' + x[1] + '</span></div>').join('');
+      if (!box) { box = document.createElement('details'); box.className = 'pg-help'; head.insertAdjacentElement('afterend', box); box.addEventListener('toggle', () => { try { localStorage.setItem('runner.pgHelp.' + box.dataset.pg, box.open ? '1' : '0'); } catch (e) {} }); }
+      if (box.dataset.pg !== v) { box.dataset.pg = v; box.open = pgOpen(v); }
+      const want = '<summary><span class="pgh-i">ⓘ</span> 사용법 <small>' + esc(PG_NAV[v]) + '</small><span class="pgh-tg"></span></summary><div class="stg">' + html + '</div>';
+      if (box.__pg !== want) { box.innerHTML = want; box.__pg = want; }
+    });
+  }
   function uiApplyAll() {
     $$(UI_SEL).forEach(uiApplyEl);
+    pageHelpAll();
     // 같은 글자면 다시 넣지 않는다 (넣으면 MutationObserver 가 또 불러 무한 반복)
     const setT = (el, t) => { if (el && t && el.textContent !== t) el.textContent = t; };
     const on = $$('.nav a.on'); setT($('#navCur'), on.length ? on[on.length - 1].textContent.trim() : '');
@@ -10447,7 +10534,8 @@
     const o = UI.map['guide:' + name]; if (!o || !o.text) return null;
     return o.text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf('|'); return i < 0 ? ['', uiMd(l)] : [l.slice(0, i).trim(), uiMd(l.slice(i + 1).trim())]; });
   }
-  const uiGuideWhere = (name) => { const b = $('#stCfgTabs [data-cfg="' + name + '"], #stPnlTabs [data-pnl="' + name + '"], #stIdTabs [data-idt="' + name + '"]'); return b ? (b.closest('#stPnlTabs') ? '러너 손익·통장 → ' : '정산 설정 → ') + b.textContent.trim() : name === 'pnlSum' ? '러너 손익·통장 → 월별 손익' : name; };
+  const PG_NAV = { dash: '대시보드', drivers: '기사 정보관리', sched: '기사스케줄', bib: '배번호 관리', route: '노선관리', perf: '수행률 · SLA', memo: '업무스케줄', settle: '정산관리', pnl: '러너 손익·통장', uiset: '올인원 설정' };
+  const uiGuideWhere = (name) => { if (name.startsWith('page:')) return '화면 맨 위 사용법 → ' + (PG_NAV[name.slice(5)] || name.slice(5)); const b = $('#stCfgTabs [data-cfg="' + name + '"], #stPnlTabs [data-pnl="' + name + '"], #stIdTabs [data-idt="' + name + '"]'); return b ? (b.closest('#stPnlTabs') ? '러너 손익·통장 → ' : '정산 설정 → ') + b.textContent.trim() : name === 'pnlSum' ? '러너 손익·통장 → 월별 손익' : name; };
   function uiRepaint() {
     try { localStorage.setItem('runner.uiText', JSON.stringify(UI.map)); } catch (e) { /* 저장소가 막혀도 화면은 바꾼다 */ }
     uiApplyAll();
