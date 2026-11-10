@@ -2357,12 +2357,66 @@ function stlSnapRows_(month, res) {
   Object.keys(res.slips).forEach(function (id) { add(id, res.slips[id]); });
   return out;
 }
+/**
+ * 기존 정산 이식으로 마감한 달의 일자별 '그날 노선' 되살리기 (한 달에 한 번).
+ * 이식할 때 그날 노선 글자가 빠져 정산서 일자별 표의 '노선 · 스케줄' 칸이 비어 있었다 → 쿠팡 정산서 원본으로 다시 계산한 노선 글자만 채워 넣는다.
+ * 금액·건수·줄은 건드리지 않는다. 저장 뒤 다시 읽어 정산서 수·실지급 합계가 그대로인지 확인하고, 다르면 원래 줄로 되돌린다. 반환 = 채운 날 수 (-1 = 대상 아님)
+ */
+function stlLegacyRouteFix_(month) {
+  const snap = stlClosedLoad_(month), sum = snap.summary, slips = snap.slips;
+  if (!sum || !sum.legacy || sum.legacy.routeFix) return -1;
+  const lock = scriptLock_();
+  if (!lock.tryLock(3000)) return -1;
+  try {
+    const oldRows = stlReadMonth_('stl_closed', month).map(function (r) { return { month: r.month, acct: r.acct, data: r.data }; });
+    const res = stlCompute_(month), byCid = {};
+    Object.keys(res.slips).forEach(function (k) { const c = res.slips[k]; ((c.row || {}).cids || []).concat((c.row || {}).usedCids || []).forEach(function (x) { if (!byCid[stlLogin_(x)]) byCid[stlLogin_(x)] = c; }); });
+    const netOf = function (ss) { return Object.keys(ss).reduce(function (a, k) { return a + (Number((ss[k].row || {}).net) || 0); }, 0); };
+    let n = 0;
+    Object.keys(slips).forEach(function (k) {
+      const sl = slips[k], row = sl.row || {};
+      if (!sl.daily) return;
+      let c = res.slips[row.id] || null;
+      if (!c) (row.cids || []).concat(row.usedCids || [], [row.cid, row.id]).some(function (x) { const y = byCid[stlLogin_(x)]; if (y) { c = y; return true; } return false; });
+      Object.keys(sl.daily).forEach(function (d) {
+        const v = sl.daily[d]; if (!v) return;
+        delete v.rt;
+        if (!v.route && c && c.daily && c.daily[d] && c.daily[d].route) { v.route = c.daily[d].route; n++; }
+      });
+    });
+    sum.legacy.routeFix = nowText_(); sum.legacy.routeFixDays = n;
+    delete sum.closed;
+    const before = { n: Object.keys(slips).length, net: netOf(slips) };
+    stlReplaceMonth_('stl_closed', month, stlSnapRows_(month, { summary: sum, slips: slips }));
+    const chk = stlClosedLoad_(month);
+    if (!chk.summary || Object.keys(chk.slips).length !== before.n || netOf(chk.slips) !== before.net) { // 저장이 온전하지 않음 → 원래대로
+      stlReplaceMonth_('stl_closed', month, oldRows);
+      errLog_('서버 오류', 'stlLegacyRouteFix_', month + ' 마감 기록 저장 확인 실패 → 원래대로 되돌림');
+      stlBump_();
+      return -1;
+    }
+    stlBump_();
+    return n;
+  } finally { lock.releaseLock(); }
+}
+/** 새벽: 기존 정산 이식 달의 그날 노선 되살리기 (한 번에 3분까지 · 남으면 다음 날 이어서) */
+function stlLegacyRouteFixAll_() {
+  if (!props_().STL_DB_ID) return;
+  const t0 = Date.now();
+  stlRead_('stl_close').forEach(function (r) {
+    if (Date.now() - t0 > 180000 || !stlMonthOk_(r.month) || !/기존 정산 이식/.test(str_(r.admin))) return;
+    try { stlLegacyRouteFix_(r.month); } catch (e) { errLog_('서버 오류', 'stlLegacyRouteFix_', r.month + ' ' + String(e && e.message || e)); }
+  });
+}
 function stlResult_(month, fresh) {
   const closed = stlClosedInfo_(month);
   if (closed) {
+
     const key = 'stl:cl:' + month + ':' + stlVer_();
     let hit = stlCacheGet_(key);
     if (hit) return hit;
+    // 관리자가 열었을 때 그 달의 '그날 노선'이 아직 비어 있으면 그 자리에서 한 번 채운다 (기사 앱에서는 기다리게 하지 않음 · 새벽 작업이 나머지를 채움)
+    if (/^adm_/.test(_curFn) && /기존 정산 이식/.test(str_(closed.admin))) { try { stlLegacyRouteFix_(month); } catch (e) { errLog_('서버 오류', 'stlLegacyRouteFix_', month + ' ' + String(e && e.message || e)); } }
     const snap = stlClosedLoad_(month), summary = snap.summary, slips = snap.slips;
     if (summary) {
       summary.closed = closed;
@@ -4486,7 +4540,8 @@ function stlLegacyMerge_(month, leg) {
     if ((L.routes || []).length) slip.routes = L.routes.map(function (r) { return { camp: r.camp || '', route: r.route || '', how: '기존', unit: Number(r.unit) || 0, inc: Number(r.inc) || 0, base: Number(r.base) || 0, qty: Number(r.qty) || 0, amt: Number(r.amt) || 0, worker: r.worker || '' }; });
     if ((L.daily || []).length) {
       const old = slip.daily || {}, nd = {};
-      L.daily.forEach(function (x) { const o = nd[x.date] || (nd[x.date] = { qty: 0, amt: (old[x.date] || {}).amt || 0, rt: (old[x.date] || {}).rt }); o.qty += Number(x.qty) || 0; if (x.worker) o.who = x.worker; });
+      // route = 그날 노선 글자 (계산 끝에서 rt → route 로 바뀌어 있음 · 예전엔 rt 를 옮겨 적어 노선이 빠졌음)
+      L.daily.forEach(function (x) { const o = nd[x.date] || (nd[x.date] = { qty: 0, amt: (old[x.date] || {}).amt || 0, route: (old[x.date] || {}).route || '' }); o.qty += Number(x.qty) || 0; if (x.worker) o.who = x.worker; });
       slip.daily = nd;
     }
     slip.loss = (L.loss || []).map(function (x) { return { date: x.date || '', type: '분실파손', item: x.note || '', waybill: x.waybill || '', amt: Number(x.amt) || 0, qty: Number(x.qty) || 0 }; });

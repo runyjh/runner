@@ -3549,6 +3549,7 @@ function cleanupSessions() {
     try { pmAlertCleanup_(); } catch (e) { console.error('품앗이 알림 정리 실패: ' + (e && e.message)); } // 60일 지난 품앗이 알림 정리
     try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); } // 적용일이 된 노선 변경
     try { dataCheck_(); } catch (e) { console.error('자료 점검 실패: ' + (e && e.message)); errLog_('서버 오류', 'dataCheck_', String(e && e.message || e)); } // 자료 점검 (읽기만)
+    try { if (typeof stlLegacyRouteFixAll_ === 'function') stlLegacyRouteFixAll_(); } catch (e) { console.error('그날 노선 되살리기 실패: ' + (e && e.message)); } // 기존 정산 이식 달 (한 번씩만)
     try { perfRollup_(); } catch (e) { console.error('속도 기록 요약 실패: ' + (e && e.message)); } // 7일 지난 속도 기록 → 하루 요약으로 · 60일 지난 오류 기록 정리
   }
 }

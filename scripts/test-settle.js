@@ -280,6 +280,29 @@ scenario('기사앱 정산서 한 번에', null, function (r) {
   eq('단계별 시간이 같이 옴', out.st, 'auth,load,groups,slip');
 });
 
+// 14) 기존 정산 이식 달: 일자별 '그날 노선' 되살리기 (금액은 그대로 · 한 번만)
+scenario('이식 달 그날 노선 되살리기', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var res = stlCompute_('2026-11'), slips = JSON.parse(JSON.stringify(res.slips)), sum = JSON.parse(JSON.stringify(res.summary));
+    var want = {}, had = 0;
+    Object.keys(slips).forEach(function (k) { Object.keys(slips[k].daily || {}).forEach(function (d) { if (slips[k].daily[d].route) { want[k + d] = slips[k].daily[d].route; had++; delete slips[k].daily[d].route; } }); });
+    sum.legacy = { at: 'x' };
+    __M.stl.stl_closed = stlSnapRows_('2026-11', { summary: sum, slips: slips });
+    var writes = 0;
+    stlReplaceMonth_ = function (n, m, objs) { writes++; __M.stl[n] = (__M.stl[n] || []).filter(function (o) { return o.month !== m; }).concat(objs); };
+    scriptLock_ = function () { return { tryLock: function () { return true; }, waitLock: function () {}, releaseLock: function () {} }; };
+    stlBump_ = function () {};
+    var net0 = Object.keys(slips).reduce(function (a, k) { return a + (Number(slips[k].row.net) || 0); }, 0);
+    var n = stlLegacyRouteFix_('2026-11'), after = stlClosedLoad_('2026-11'), ok = 0, net1 = 0;
+    Object.keys(after.slips).forEach(function (k) { net1 += Number(after.slips[k].row.net) || 0; Object.keys(after.slips[k].daily || {}).forEach(function (d) { if (want[k + d] && after.slips[k].daily[d].route === want[k + d]) ok++; }); });
+    var again = stlLegacyRouteFix_('2026-11');
+    return { had: had, n: n, ok: ok, sameNet: net0 === net1, slips: Object.keys(after.slips).length === Object.keys(slips).length, mark: !!after.summary.legacy.routeFix, again: again, writes: writes };
+  })()`, r.ctx);
+  eq('비어 있던 그날 노선을 모두 채움 (있던 만큼)', [out.had > 0, out.n === out.had, out.ok === out.had], [true, true, true]);
+  eq('금액·정산서 수는 그대로 · 한 번 했다는 표시', [out.sameNet, out.slips, out.mark], [true, true, true]);
+  eq('두 번째는 아무것도 안 함 (저장 1번뿐)', [out.again, out.writes], [-1, 1]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
