@@ -188,6 +188,8 @@ function adm_tiFromSettle(token, month, overwrite, only) {
     const on = {}; readAll_(SH.DRIVERS).forEach(function (o) { if (str_(o.tiOn) === 'Y') on[String(o.id)] = 1; });
     try {
       const old = {};
+      // 손으로 만든 계산서는 supId 가 공급자 목록 ID 일 수 있어 supDriverId(기사 ID)로도 찾음
+      readAll_(SH.TAXINV).forEach(function (r) { if (r.month === month && r.supDriverId && !old[r.supDriverId]) old[r.supDriverId] = r; });
       readAll_(SH.TAXINV).forEach(function (r) { if (r.month === month && r.supId) old[r.supId] = r; });
       const next = tiNewId_(), now = nowText_(), add = [];
       res.summary.drivers.forEach(function (d) {
