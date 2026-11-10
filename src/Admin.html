@@ -6792,12 +6792,22 @@
     if (t.id === 'rAll') { filteredRoutes().forEach((r) => (t.checked ? rsel.add(r.id) : rsel.delete(r.id))); renderRoutes(); }
     else if (t.dataset.rck) { t.checked ? rsel.add(t.dataset.rck) : rsel.delete(t.dataset.rck); $('#rAll').checked = filteredRoutes().every((r) => rsel.has(r.id)); renderBulk(); }
   });
+  // 참고 이미지 여러 장 선택: 다시 그리지 않고 체크 표시·막대만 고침 (미리보기 이미지가 깜빡이지 않게)
+  function imgSelPaint() {
+    const n = RT.imgSel ? RT.imgSel.size : 0, all = $$('#campMain .img-grid.selmode .img-tile').length;
+    $$('#campMain .img-grid.selmode .img-tile').forEach((t) => { const on = RT.imgSel.has(t.dataset.img); t.classList.toggle('sel', on); const ck = t.querySelector('.img-ck'); if (ck) ck.textContent = on ? '✓' : ''; });
+    const bar = $('#imgBulk'); if (!bar) return;
+    bar.querySelector('b').textContent = n + '장 선택';
+    const sa = bar.querySelector('[data-ract="img-selall"]'); if (sa) sa.textContent = n === all ? '모두 풀기' : '모두 선택';
+    const del = bar.querySelector('[data-ract="img-seldel"]'); if (del) { del.disabled = !n; del.textContent = '선택한 ' + n + '장 삭제'; }
+  }
   $('#campMain').addEventListener('click', (e) => {
     if (e.target.closest('td.ck, th.ck')) return; // 체크박스 칸은 선택만
     const tile = e.target.closest('[data-img]');
     if (tile) {
-      if (!RT.imgSel && (e.ctrlKey || e.metaKey)) RT.imgSel = new Set();
-      if (RT.imgSel) { const id = tile.dataset.img; RT.imgSel.has(id) ? RT.imgSel.delete(id) : RT.imgSel.add(id); return renderCampMain(); }
+      if (!RT.imgSel && (e.ctrlKey || e.metaKey)) { RT.imgSel = new Set([tile.dataset.img]); return renderCampMain(); }
+      if (RT.imgSel && tile.closest('.img-grid.selmode')) { const id = tile.dataset.img; RT.imgSel.has(id) ? RT.imgSel.delete(id) : RT.imgSel.add(id); return imgSelPaint(); }
+      if (RT.imgSel) return renderCampMain();
       return openViewer(tile.dataset.img);
     }
     const tr = e.target.closest('tr[data-rid]');
@@ -6808,7 +6818,7 @@
     else if (act === 'camp-del') deleteCamp(c);
     else if (act === 'img-add') { iaFiles = []; $('#imgFile').click(); }
     else if (act === 'img-sel') { RT.imgSel = RT.imgSel ? null : new Set(); renderCampMain(); }
-    else if (act === 'img-selall') { const ids = RT.images.filter((i) => i.campId === curCamp && !i.delAt).map((i) => i.id); RT.imgSel = RT.imgSel && RT.imgSel.size === ids.length ? new Set() : new Set(ids); renderCampMain(); }
+    else if (act === 'img-selall') { const ids = $$('#campMain .img-grid.selmode .img-tile').map((t) => t.dataset.img); RT.imgSel = RT.imgSel && RT.imgSel.size === ids.length ? new Set() : new Set(ids); imgSelPaint(); }
     else if (act === 'img-seldel') {
       const ids = Array.from(RT.imgSel || []); if (!ids.length) return;
       if (!confirm('선택한 이미지 ' + ids.length + '장을 삭제할까요? (드라이브 파일은 휴지통으로 옮겨집니다)')) return;
