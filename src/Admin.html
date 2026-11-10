@@ -4946,7 +4946,7 @@
     if (window.innerWidth <= 900) $('#campMain').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-  // 오른쪽: 캠프 정보 + 참고 이미지 + 노선
+  // 오른쪽: 캠프 정보 + 노선 + 참고 이미지 + 노선 정보
   function renderCampMain() {
     const m = $('#campMain');
     if (!curCamp) {
@@ -4967,6 +4967,17 @@
             '<span>기본 회전</span><span>' + esc(String(c.rot || 'D1,D2,F3').split(',').join(' · ')) + '</span>' +
             '<span>메모</span><span class="pre">' + (c.memo ? esc(c.memo) : '<em>없음</em>') + '</span></div>') +
       '</div>' +
+      '<div class="sec"><div class="sec-h"><div class="rtabs">' +
+          '<button class="tab' + (rtab === 'routes' ? ' on' : '') + '" data-rtab="routes">노선 <b id="rCount"></b></button>' +
+          (orphan ? '' : '<button class="tab' + (rtab === 'prices' ? ' on' : '') + '" data-rtab="prices">구분별 단가 <b id="pCount"></b></button>' +
+            '<button class="tab' + (rtab === 'ln' ? ' on' : '') + '" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 없어진 라우트는 종료 (수행률·SLA 이력이 이어집니다)">변경이력 <b id="lnCount"></b></button>') + '</div>' +
+          (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
+        '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
+        '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
+        '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th title="쿠팡 정산서 최근 2개월 · 라우트별 배송건수 ÷ 배송한 날 수">1일 평균물량</th><th title="쿠팡 주간 수행률 최신 등급 (1~2 우수 · 3~4 위탁 조정 대상) · 누르면 이력">수행률</th><th>메모</th><th>수정일시</th></tr></thead>' +
+        '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div></div>' +
+        (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div><div id="tabLn"' + (rtab === 'ln' ? '' : ' class="hidden"') + '></div>') +
+      '</div>' +
       (orphan ? '' :
       '<div class="sec"><div class="sec-h"><h4>참고 이미지<small>' + imgs.length + '장</small></h4><button class="btn sm" data-ract="img-add">+ 이미지 추가</button></div>' +
         (imgs.length ? '<div class="img-grid">' + imgs.map((im) =>
@@ -4979,17 +4990,7 @@
           '<span class="sub" style="font-size:11.5px">🗑 ' + esc(String(im.delBy).replace(/\s*\(.*\)$/, '')) + ' · ' + esc(String(im.delAt).slice(5, 16)) + '</span>' +
           '<span style="display:flex;gap:4px"><button class="btn sm ghost" data-imrestore="' + esc(im.id) + '">되살리기</button><button class="btn sm ghost danger-t" data-impurge="' + esc(im.id) + '">완전 삭제</button></span></div>').join('') + '</div>' : ''; })() + '</div>' +
       '<div class="sec" id="rnSec"></div>') +
-      '<div class="sec"><div class="sec-h"><div class="rtabs">' +
-          '<button class="tab' + (rtab === 'routes' ? ' on' : '') + '" data-rtab="routes">노선 <b id="rCount"></b></button>' +
-          (orphan ? '' : '<button class="tab' + (rtab === 'prices' ? ' on' : '') + '" data-rtab="prices">구분별 단가 <b id="pCount"></b></button>' +
-            '<button class="tab' + (rtab === 'ln' ? ' on' : '') + '" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 없어진 라우트는 종료 (수행률·SLA 이력이 이어집니다)">변경이력 <b id="lnCount"></b></button>') + '</div>' +
-          (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
-        '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
-        '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
-        '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th title="쿠팡 정산서 최근 2개월 · 라우트별 배송건수 ÷ 배송한 날 수">1일 평균물량</th><th title="쿠팡 주간 수행률 최신 등급 (1~2 우수 · 3~4 위탁 조정 대상) · 누르면 이력">수행률</th><th>메모</th><th>수정일시</th></tr></thead>' +
-        '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div></div>' +
-        (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div><div id="tabLn"' + (rtab === 'ln' ? '' : ' class="hidden"') + '></div>') +
-      '</div>';
+      '';
     renderFilters(); renderRoutes(); loadThumbs();
     if (!orphan) { renderPrices(); renderLnTab(); rnLoad(curCamp); }
   }
