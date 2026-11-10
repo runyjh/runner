@@ -764,7 +764,7 @@
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
   </section>
-  <div class="ihelp center hidden" id="riView" role="dialog" aria-modal="true"><div class="ibox"><div id="riViewImg"></div><p id="riViewDesc"></p><button class="btn ghost" type="button" id="riViewNo" style="width:100%">닫기</button></div></div>
+  <div class="ihelp center hidden" id="riView" role="dialog" aria-modal="true"><div class="ibox"><div id="riViewImg"></div><p id="riViewDesc"></p><button class="btn ghost hidden" type="button" id="riViewDel" style="width:100%;margin-bottom:8px;color:#e03131">🗑 이 참고 이미지 지우기</button><button class="btn ghost" type="button" id="riViewNo" style="width:100%">닫기</button></div></div>
   <div class="ihelp hidden" id="instHelp" role="dialog"><div class="ibox">
     <b>홈 화면에 추가하기</b><ol id="instSteps"></ol>
     <button class="btn" type="button" id="instClose">확인</button></div></div>
@@ -1843,6 +1843,7 @@
       (RI.ph.length < RI_PH_MAX ? '<label class="add"><b>📷</b>사진 ' + RI.ph.length + '/' + RI_PH_MAX + '<input type="file" accept="image/*" multiple id="riPhIn" hidden></label>' : '');
   }
   function riView(src, desc) {
+    RI.viewImg = ''; $('#riViewDel').classList.add('hidden');
     $('#riViewDesc').textContent = desc || '';
     $('#riViewImg').innerHTML = '<img alt="사진" src="' + src + '">';
     if ($('#riView').classList.contains('hidden')) { $('#riView').classList.remove('hidden'); syncBack(); }
@@ -1858,6 +1859,7 @@
   function riImg(id) {
     const r = RI.cache[RI.campId], im = r && r.images.find((x) => x.id === id); if (!im) return;
     $('#riViewDesc').textContent = im.desc || '';
+    RI.viewImg = id; $('#riViewDel').classList.remove('hidden');
     const put = (src) => { $('#riViewImg').innerHTML = '<img alt="' + escH(im.desc || '참고 이미지') + '" src="' + src + '">'; };
     put(im.thumb ? 'data:image/jpeg;base64,' + im.thumb : 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
     $('#riView').classList.remove('hidden'); syncBack();
@@ -1869,6 +1871,19 @@
       if (!$('#riView').classList.contains('hidden') && $('#riViewDesc').textContent === (im.desc || '')) put(RI.big[id]);
     }).catch(() => netErr());
   }
+  $('#riViewDel').addEventListener('click', () => {
+    const id = RI.viewImg, campId = RI.campId; if (!id) return;
+    $('#riView').classList.add('hidden'); syncBack();
+    pmAsk('이 참고 이미지를 지울까요?', '모든 기사님 화면에서 사라집니다. 잘못 지웠으면 사무실에서 되살릴 수 있습니다.', '지우기').then((ok) => {
+      if (ok === null) return;
+      api('api_campImageDel', pmTok(), id).then((x) => {
+        if (!pmOk(x)) return;
+        const r = RI.cache[campId]; if (r) r.images = r.images.filter((im) => im.id !== id);
+        if (RI.campId === campId) riPaint();
+        toast('지웠습니다.');
+      }).catch(() => netErr());
+    });
+  });
   $('#riViewNo').addEventListener('click', () => { $('#riView').classList.add('hidden'); syncBack(); });
   $('#riView').addEventListener('click', (e) => { if (e.target.id === 'riView') { $('#riView').classList.add('hidden'); syncBack(); } });
   $('#scBody').addEventListener('click', (e) => {

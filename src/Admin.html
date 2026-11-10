@@ -4521,7 +4521,7 @@
     if (id === ORPHAN) { const ids = new Set(RT.camps.map((c) => c.id)); return RT.routes.filter((r) => !ids.has(r.campId)); }
     return RT.routes.filter((r) => r.campId === id);
   }
-  const imagesOf = (id) => RT.images.filter((i) => i.campId === id)
+  const imagesOf = (id) => RT.images.filter((i) => i.campId === id && !i.delAt)
     .sort((a, b) => (a.order || 1e9) - (b.order || 1e9) || koSort(a.createdAt, b.createdAt));
   const addrsOf = (id) => RT.addresses.filter((a) => a.campId === id).sort((a, b) => (a.order || 1e9) - (b.order || 1e9));
   const mapLink = (addr) => '<a class="maplink" target="_blank" rel="noopener" href="https://map.naver.com/p/search/' + encodeURIComponent(addr) + '">지도 ↗</a>';
@@ -4601,7 +4601,11 @@
           '<button class="img-tile" data-img="' + esc(im.id) + '"><div class="ph" data-ph="' + esc(im.id) + '"><div class="spin" style="width:20px;height:20px"></div></div>' +
           '<span>' + (im.desc ? esc(im.desc) : '<em>설명 없음</em>') + '</span></button>').join('') + '</div>'
           : '<div class="no-memo">참고 이미지가 없습니다. 출입구, 주차 위치, 상차 위치 사진 등을 올려 두세요.</div>') +
-      '<div class="db-note" style="margin-top:6px">참고 이미지와 설명은 기사 앱 → 내 스케줄 → 내 캠프 → 노선 정보에도 보입니다.</div></div>' +
+      '<div class="db-note" style="margin-top:6px">참고 이미지와 설명은 기사 앱 → 내 스케줄 → 내 캠프 → 노선 정보에도 보입니다. 기사님도 지울 수 있습니다 (아래 기사가 지운 이미지에서 되살리기).</div>' +
+      (() => { const del = RT.images.filter((i) => i.campId === curCamp && i.delAt).sort((a, b) => String(b.delAt).localeCompare(String(a.delAt))); return del.length ? '<div class="sec-h" style="margin-top:14px"><h4>기사가 지운 이미지<small>' + del.length + '장</small></h4></div><div class="img-grid">' +
+        del.map((im) => '<div class="img-tile" style="opacity:.85;cursor:default"><div class="ph" data-ph="' + esc(im.id) + '"><div class="spin" style="width:20px;height:20px"></div></div><span>' + (im.desc ? esc(im.desc) : '<em>설명 없음</em>') + '</span>' +
+          '<span class="sub" style="font-size:11.5px">🗑 ' + esc(String(im.delBy).replace(/\s*\(.*\)$/, '')) + ' · ' + esc(String(im.delAt).slice(5, 16)) + '</span>' +
+          '<span style="display:flex;gap:4px"><button class="btn sm ghost" data-imrestore="' + esc(im.id) + '">되살리기</button><button class="btn sm ghost danger-t" data-impurge="' + esc(im.id) + '">완전 삭제</button></span></div>').join('') + '</div>' : ''; })() + '</div>' +
       '<div class="sec" id="rnSec"></div>') +
       '<div class="sec"><div class="sec-h"><div class="rtabs">' +
           '<button class="tab' + (rtab === 'routes' ? ' on' : '') + '" data-rtab="routes">노선 <b id="rCount"></b></button>' +
@@ -4617,6 +4621,18 @@
     renderFilters(); renderRoutes(); loadThumbs();
     if (!orphan) { renderPrices(); renderLnTab(); rnLoad(curCamp); }
   }
+  // 기사가 지운 참고 이미지: 되살리기 · 완전 삭제
+  document.addEventListener('click', (e) => {
+    const rs = e.target.closest('[data-imrestore]'), pg = e.target.closest('[data-impurge]');
+    if (!rs && !pg) return;
+    const id = (rs || pg).dataset[rs ? 'imrestore' : 'impurge'];
+    if (pg && !confirm('이 이미지를 완전히 삭제할까요? (드라이브 파일은 휴지통으로 옮겨집니다)')) return;
+    api(rs ? 'adm_campImageRestore' : 'adm_campImageDelete', id).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      if (rs) RT.images = RT.images.map((x) => (x.id === id ? r.image : x)); else RT.images = RT.images.filter((x) => x.id !== id);
+      renderCampList(); renderCampMain(); toast(rs ? '되살렸습니다.' : '삭제했습니다.');
+    }).catch(() => {});
+  });
   // ── 기사 노선 정보 (기사 앱 내 캠프에서 기사들이 쓴 글 · 숨기기/되살리기/삭제) ──
   const RN = { campId: '', notes: [], open: false, seq: 0 };
   function rnLoad(campId) {

@@ -264,7 +264,7 @@ const CP_NOTES = {
 // camp_images 시트: 캠프 참고 이미지 (파일은 드라이브 "캠프 참고 이미지" 폴더)
 const CI = {
   id: '이미지ID', campId: '캠프ID', campName: '캠프명', file: '이미지 링크', desc: '설명', order: '순서',
-  createdAt: '등록일시', updatedAt: '수정일시'
+  createdAt: '등록일시', updatedAt: '수정일시', delBy: '삭제한 기사', delAt: '삭제 시각'
 };
 const CI_NOTES = {
   campName: '캠프명을 입력하면 캠프ID가 자동으로 채워집니다.',
@@ -3612,7 +3612,7 @@ function routeView_(o) {
 function imageView_(o) {
   return {
     id: o.id, campId: o.campId, fileId: fileIdOf_(o.file), url: o.file, desc: o.desc,
-    order: Number(o.order) || 0, createdAt: o.createdAt, updatedAt: o.updatedAt
+    order: Number(o.order) || 0, createdAt: o.createdAt, updatedAt: o.updatedAt, delBy: o.delBy || '', delAt: o.delAt || ''
   };
 }
 function conflict_(seen, o) {

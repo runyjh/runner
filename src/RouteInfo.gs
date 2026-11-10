@@ -83,7 +83,7 @@ function api_routeInfo(token, campId) {
     const c = rnCampOf_(campId);
     const thumbs = {};
     try { readAll_(SH.CTHUMB).forEach(function (x) { if (x.campId === c.id && x.data) thumbs[x.id] = x.data; }); } catch (e) { /* 미리보기 없음 */ }
-    const images = master_().images.filter(function (im) { return im.campId === c.id; })
+    const images = master_().images.filter(function (im) { return im.campId === c.id && !im.delAt; })
       .sort(function (a, b) { return (a.order || 0) - (b.order || 0); })
       .map(function (im) { return { id: im.id, desc: im.desc || '', thumb: thumbs[im.id] || '' }; });
     const notes = rnNotes_(c.id).filter(function (o) { return o.status !== RN_ST.HIDE; }).slice(0, 300).map(function (o) { return rnView_(o, u.id); });
@@ -97,6 +97,48 @@ function api_campImage(token, id) {
     const r = campImageData_(id, true);
     delete r.url; // 드라이브 주소는 기사 앱에 주지 않는다
     return r;
+  });
+}
+/**
+ * 기사 앱: 캠프 참고 이미지 지우기 — 바로 없애지 않고 '삭제한 기사·시각'만 적는다 (기사 앱·관리자 목록에서 빠짐).
+ * 관리자는 노선관리 → 캠프 → '기사가 지운 이미지'에서 되살리거나 완전히 지운다.
+ */
+function api_campImageDel(token, id) {
+  return run_(function () {
+    const u = pmUser_(token);
+    bdCanWrite_(u);
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.CIMG, 'id', String(id || ''));
+      if (!row) return { ok: true };
+      const o = readObj_(SH.CIMG, row);
+      if (o.delAt) return { ok: true };
+      writeFields_(SH.CIMG, row, { delBy: u.info.name + ' (' + u.id + ')', delAt: nowText_() });
+      bumpMaster_();
+      return { ok: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+/** 관리자: 기사가 지운 이미지 되살리기 */
+function adm_campImageRestore(token, id) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const row = findRow_(SH.CIMG, 'id', String(id || ''));
+      if (!row) fail_('이미지를 찾을 수 없습니다. 새로고침해 주세요.');
+      const o = readObj_(SH.CIMG, row);
+      writeFields_(SH.CIMG, row, { delBy: '', delAt: '' });
+      logAdmin_(a, '기사가 지운 참고 이미지 되살림', o.campName, (o.desc || '').slice(0, 40) + ' · 지운 사람 ' + (o.delBy || ''));
+      bumpMaster_();
+      return { ok: true, image: imageView_(readObj_(SH.CIMG, row)) };
+    } finally {
+      lock.releaseLock();
+    }
   });
 }
 /**
