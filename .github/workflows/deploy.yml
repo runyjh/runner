@@ -68,6 +68,19 @@ jobs:
           fi
           clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "${GITHUB_SHA::7} $(date -u +%Y-%m-%dT%H:%MZ)"
 
+      # 앱스 스크립트는 버전을 200개까지만 둔다. 다 차면 새 버전 배포가 거부된다 (409~431 이 이 때문에 반영되지 않았음)
+      #  → 남은 자리가 적으면 미리 알린다. 정리: 앱스 스크립트 편집기 → 프로젝트 기록 → 오래된 버전 삭제
+      - name: 버전 개수 확인 (200개 한도)
+        if: always()
+        run: |
+          n=$(clasp versions 2>/dev/null | grep -cE '^[0-9]+ ' || true)
+          echo "지금 버전 ${n}개 / 200개"
+          if [ "${n:-0}" -ge 195 ]; then
+            echo "::error::앱스 스크립트 버전이 ${n}개입니다 (한도 200). 지금 정리하지 않으면 곧 배포가 멈춥니다: 편집기 → 프로젝트 기록 → 오래된 버전 삭제"
+          elif [ "${n:-0}" -ge 170 ]; then
+            echo "::warning::앱스 스크립트 버전이 ${n}개입니다 (한도 200). 편집기 → 프로젝트 기록에서 오래된 버전을 지워 주세요."
+          fi
+
       - name: 인증 파일 삭제
         if: always()
         run: rm -f ~/.clasprc.json .clasp.json
