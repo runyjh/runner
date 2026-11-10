@@ -7680,8 +7680,9 @@
     const w = upWk(tab);
     if (w < 0) return null;
     // 노선관리에 있는 캠프만 (그 밖의 캠프 줄은 빼고 몇 줄 뺐는지 알려 줌)
-    const campOk = new Set((SD.camps || []).map((c) => String(c.name || '').replace(/\s*캠프\s*$/, '').trim()).filter(Boolean));
-    const okCamp = (c) => !campOk.size || campOk.has(String(c || '').replace(/\s*캠프\s*$/, '').trim());
+    // '운영자'(직원) 캠프는 쿠팡 캠프가 아니므로 늘 뺌
+    const campOk = new Set((SD.camps || []).map((c) => String(c.name || '').replace(/\s*캠프\s*$/, '').trim()).filter((n) => n && !/^운영자/.test(n.replace(/\s/g, ''))));
+    const okCamp = (c) => !/^운영자/.test(String(c || '').replace(/\s/g, '')) && (!campOk.size || campOk.has(String(c || '').replace(/\s*캠프\s*$/, '').trim()));
     // 운영자 아이디는 출력하지 않음 (출근 줄·쿠팡 등록 목록 휴무 줄 모두)
     const opIds = new Set((SD.drivers || []).filter((d) => d.loginId && (d.type === '운영자' || d.title === '운영자')).map((d) => String(d.loginId).toLowerCase()));
     const notOp = (id) => !opIds.has(String(id || '').toLowerCase());
