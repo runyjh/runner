@@ -5360,10 +5360,13 @@ function api_campSchedule(token, month, campId) {
     if (staff) out.camps = realCamps.map(function (c) { return { id: c.id, name: String(c.name).replace(/\s*캠프\s*$/, '').trim() }; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
     const myCampId = pickCamp || (me ? at(me, ref).campId : '');
     if (staff && !pickCamp && (!myCampId || isStaffCamp_(info.camp))) { out.noCamp = true; out.pick = true; return out; }
-    if (!me || !myCampId) { out.noCamp = true; return out; }
+    if (!me) { out.noCamp = true; return out; }
+    // 소속 캠프가 없는 기사(백업 계정 등): 날짜마다 '그날 가는 캠프'(내 칸의 캠프 · 받은 품앗이 캠프) 기준으로 보여 준다
+    const noHome = !myCampId;
+    if (noHome) out.noHome = true;
     out.campId = myCampId;
     const campNameOf = function (cid) { const c = master_().camps.filter(function (x) { return x.id === cid; })[0]; return c ? String(c.name).replace(/\s*캠프\s*$/, '').trim() : ''; };
-    out.camp = campNameOf(myCampId) || (me.schCamp || '');
+    out.camp = noHome ? '' : campNameOf(myCampId) || (me.schCamp || '');
     // 스케줄 시트는 한 번만 읽는다 (캠프가 여러 개여도)
     let h = null, sh = null, ids = [], block = [], c0 = 0, c1 = 0, hasSheet = false;
     if (props_().SCH_DB_ID && schSS_().getSheetByName(SCH.SHEET)) {
@@ -5439,14 +5442,19 @@ function api_campSchedule(token, month, campId) {
       const drivers = Object.keys(byId).map(function (k) { return byId[k]; }).sort(function (a, b) { return a.order - b.order || a.name.localeCompare(b.name, 'ko'); }).map(function (x) { delete x.order; return x; });
       return { camp: campNameOf(cid), campId: cid, drivers: drivers, backup: backup, pm: pm };
     };
-    const home = buildCamp(myCampId, false);
+    const home = noHome ? (function () {
+      // 소속 없음: 내 줄만 (그날 칸 그대로) · 갈 캠프가 없는 날은 앱이 '입차 캠프 없음'으로 보여 줌
+      const cells = {};
+      if (hasSheet) dates.forEach(function (d) { const v = cellAt(String(me.id), d); if (v) cells[d] = v; });
+      return { drivers: [{ id: me.id, name: me.name, route: me.baseRoute || '', type: me.driverType || '', me: true, guest: false, homeCamp: '', cells: cells, away: {} }], backup: {}, pm: {} };
+    })() : buildCamp(myCampId, false);
     out.drivers = home.drivers; out.backup = home.backup; out.pm = home.pm;
     try { out.pumasi = pmScheduleOf_(String(me.id), dates); } catch (e) { out.pumasi = {}; }
     // 백업 기사(기본노선 없음 · 직함자 캠프 선택 아님): 내 칸에 적힌 캠프가 소속과 다른 날은 그 캠프의 기사·백업을 같이 내려준다 → 앱에서 날짜마다 '그날 입차 캠프' 기준으로 보여 줌
     //  + 다른 캠프 품앗이를 받은 날(내 칸이 비었거나 휴무)은 그 캠프가 그날 입차 캠프 (고정 기사도)
     if (!pickCamp && hasSheet) {
       const byDay = {}, need = {};
-      if (!rpfBaseCodes_(me.baseRoute || '').length) dates.forEach(function (d) { const cid = campInCell(cellAt(String(me.id), d)); if (cid && cid !== myCampId) { byDay[d] = cid; need[cid] = 1; } });
+      if (noHome || !rpfBaseCodes_(me.baseRoute || '').length) dates.forEach(function (d) { const cid = campInCell(cellAt(String(me.id), d)); if (cid && cid !== myCampId) { byDay[d] = cid; need[cid] = 1; } });
       pmJobs.forEach(function (j) {
         if (j.acceptedId !== String(me.id) || !j.campId || byDay[j.date]) return;
         const mine = rcBy[me.id] ? at(me, j.date).campId : myCampId;

@@ -1781,8 +1781,8 @@
         (pmCell(r, dd).work && (!mv || /휴무|휴가/.test(mv)) ? '' : chip) + pmCell(r, dd).html +
         ((w || nb) ? '<span class="cwk">' + (w ? '<span>근무 ' + w + '</span>' : '') + (nb ? '<b class="bkdot">백업 ' + nb + '</b>' : '') + '</span>' : '') + '</button>');
     });
-    const chips = '<div class="mcal"><div class="mnav"><button type="button" data-cmv="-1" aria-label="이전 달">◀</button><b>' + yy + '년 ' + mo + '월 · ' + escH(r.camp) + (r.multi ? ' <small style="font-size:12px;color:var(--sub);font-weight:600">(소속)</small>' : '') + '</b><button type="button" data-cmv="1" aria-label="다음 달">▶</button></div>' +
-      '<div class="msum">' + (r.multi ? '백업 기사: 칸의 캠프 = <b style="color:var(--brand)">그날 입차 캠프</b> · 근무/백업 인원도 그 캠프 기준' : '기사 ' + r.drivers.length + '명 · 칸: 내 스케줄 / 근무 인원 / 백업 인원') + '</div>' +
+    const chips = '<div class="mcal"><div class="mnav"><button type="button" data-cmv="-1" aria-label="이전 달">◀</button><b>' + yy + '년 ' + mo + '월 · ' + (r.noHome ? '소속 없음 <small style="font-size:12px;color:var(--sub);font-weight:600">(백업)</small>' : escH(r.camp) + (r.multi ? ' <small style="font-size:12px;color:var(--sub);font-weight:600">(소속)</small>' : '')) + '</b><button type="button" data-cmv="1" aria-label="다음 달">▶</button></div>' +
+      '<div class="msum">' + (r.noHome ? '소속 캠프 없음 · 칸의 캠프 = <b style="color:var(--brand)">그날 입차 캠프</b> · 날짜를 누르면 그 캠프 기사·백업이 보입니다' : r.multi ? '백업 기사: 칸의 캠프 = <b style="color:var(--brand)">그날 입차 캠프</b> · 근무/백업 인원도 그 캠프 기준' : '기사 ' + r.drivers.length + '명 · 칸: 내 스케줄 / 근무 인원 / 백업 인원') + '</div>' +
       '<div class="mgrid">' + DOWK.map((wd, i) => '<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + wd + '</div>').join('') + cells.join('') + '</div></div>';
     const d = scCampDay, p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
     const sunThis = (() => { const t = new Date(+r.today.slice(0, 4), +r.today.slice(5, 7) - 1, +r.today.slice(8, 10)); t.setDate(t.getDate() - t.getDay() + 6); return ymdOf(t); })();
@@ -1807,10 +1807,20 @@
     }).join('');
     const bk = (D.backup || {})[d] || [];
     const prevD = new Date(+p[0], +p[1] - 1, +p[2] - 1);
+    // 소속 없는 기사 · 그날 갈 캠프가 없는 날(휴무·빈칸): 내 상태만
+    if (!D.camp) {
+      const mv = me ? me.cells[d] || '' : '';
+      $('#scBody').innerHTML = picker + chips +
+        '<div class="wk"><h3>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') + '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
+        '<p class="hint" style="margin:-2px 0 6px">이날은 입차 캠프가 없습니다. 칸에 캠프·노선이 적히거나 품앗이가 확정되면 그 캠프 기사님들과 백업 일정이 보입니다.</p>' +
+        '<div class="day cmate me"><div class="dt"><b class="rt none">—</b><span class="nm">' + escH(me ? me.name : '') + ' <small style="display:inline;color:#b7791f">(나)</small></span></div>' +
+        '<div class="vc"><div class="val ' + (mv ? schKind(mv) : 'none') + '">' + (mv ? escH(mv) : '미정') + '</div></div></div></div><div id="riBox"></div>';
+      return;
+    }
     $('#scBody').innerHTML = picker + chips +
       '<div class="wk"><h3>' + escH(D.camp) + ' · ' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (d === pdd ? ' <em class="pddt" style="font-style:normal;font-size:11px;font-weight:800;color:#fff;background:var(--brand);border-radius:6px;padding:2px 7px;vertical-align:middle">PDD</em>' : '') + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') +
         '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
-        (guest ? '<div class="camptag">🚚 이날 입차 캠프 <b>' + escH(D.camp) + '</b> <small>· 소속은 ' + escH(r.camp) + '</small></div>' : '') +
+        (guest ? '<div class="camptag">🚚 이날 입차 캠프 <b>' + escH(D.camp) + '</b>' + (r.camp ? ' <small>· 소속은 ' + escH(r.camp) + '</small>' : '') + '</div>' : '') +
         '<p class="hint" style="margin:-2px 0 6px">실제 출근일 ' + (prevD.getMonth() + 1) + '/' + prevD.getDate() + ' (' + DOWK[prevD.getDay()] + ') 저녁 입차 · ' + (guest ? escH(D.camp) + ' ' : '') + '기사 ' + list.length + '명 · 근무 ' + work + '명 · 백업 ' + bk.length + '명</p>' +
         ((rows + pmRows) || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(D.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
