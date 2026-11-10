@@ -35,7 +35,8 @@ const STL_TABS = {
   // 용차업체: 업체가 등록한 쿠팡 아이디는 아이디 관리에서 명의자 대신 '용차업체'를 고르면 업체별 정산서 1장으로 묶인다 (기사정보 등록 없음)
   stl_vendors: {
     name: '업체명', price: '건당 단가', ins: '산재·고용 공제', bizNo: '사업자번호', ceo: '대표자', phone: '연락처', addr: '사업장 주소', bizType: '업태', bizItem: '종목',
-    bank: '은행', account: '계좌번호', holder: '예금주', email: '이메일', status: '상태', memo: '메모', ids: '쿠팡 아이디'
+    bank: '은행', account: '계좌번호', holder: '예금주', email: '이메일', status: '상태', memo: '메모', ids: '쿠팡 아이디',
+    routes: '맡은 노선', rFrom: '노선 시작일', rTo: '노선 종료일'
   },
   // 한 아이디로 여러 기사가 일할 때: 그 기간 그 아이디로 일한 기사 (지급은 명의자, 일시단가·근무일 판단에 씀)
   stl_usage: { cid: '쿠팡ID', name: '일한 기사', driverId: '기사ID', from: '시작일', to: '종료일', memo: '메모', settle: '정산' },
@@ -1099,11 +1100,64 @@ function stlVendors_() {
     const v = {
       key: k, name: name, price: stlNum_(r.price), ins: !/^n/i.test(str_(r.ins)), bizNo: str_(r.bizNo), ceo: str_(r.ceo), phone: str_(r.phone),
       bank: str_(r.bank), account: str_(r.account), holder: str_(r.holder), email: str_(r.email), addr: str_(r.addr), bizType: str_(r.bizType), bizItem: str_(r.bizItem), stopped: r.status === '정지' || r.status === '중지',
-      ids: str_(r.ids).split(/[,\s]+/).map(function (x) { return x.trim(); }).filter(Boolean), _row: r._row
+      ids: str_(r.ids).split(/[,\s]+/).map(function (x) { return x.trim(); }).filter(Boolean), _row: r._row,
+      // 맡은 노선 (장기 용차): '인천7 919CD, 시흥2 708CD' · 기간 안에 그 노선을 배송한 모르는 아이디는 이 업체 정산으로 · 기사스케줄 담당 없음 줄 '업체 용차' · 쿠팡 업로드는 미입차
+      routes: stlVendorRoutes_(r.routes), rFrom: stlYmd_(r.rFrom) || '', rTo: stlYmd_(r.rTo) || ''
     };
     by[k] = v; list.push(v);
   });
   return { list: list, by: by };
+}
+/** '인천7 919CD, 시흥2 708CD' → [{ camp: '인천7', code: '919CD', units: ['919C','919D'] }] */
+function stlVendorRoutes_(t) {
+  const out = [];
+  let camp = '';
+  str_(t).split(/[,\n\/·]+/).forEach(function (part) {
+    const m = str_(part).match(/^([가-힣]+\d)?\s*(?:캠프)?\s*([0-9A-Za-z]+)$/);
+    if (!m) return;
+    if (m[1]) camp = m[1];
+    if (!camp) return;
+    const units = issExpand_(m[2]);
+    if (units.length) out.push({ camp: camp, code: m[2].toUpperCase(), units: units });
+  });
+  return out;
+}
+/** 맡은 노선이 있는 업체 [{ name, key, camp, code, units, from, to }] (정산 DB 를 못 읽으면 빈 목록) */
+function vendorRoutes_() {
+  try {
+    const out = [];
+    stlVendors_().list.forEach(function (v) {
+      if (v.stopped) return;
+      (v.routes || []).forEach(function (r) { out.push({ name: v.name, key: v.key, camp: r.camp, code: r.code, units: r.units, from: v.rFrom || '', to: v.rTo || '' }); });
+    });
+    return out;
+  } catch (e) { return []; }
+}
+/** 그날 그 캠프·노선을 맡은 업체 (모르는 아이디 자동 묶음용) */
+function stlVendorForRoute_(VR, date, camp, route) {
+  const c = stlShort_(camp), u = issExpand_(normCode_(route));
+  if (!c || !u.length) return null;
+  for (let i = 0; i < VR.length; i++) {
+    const v = VR[i];
+    if (stlShort_(v.camp) !== c || (v.from && date < v.from) || (v.to && date > v.to)) continue;
+    if (u.some(function (x) { return v.units.indexOf(x) >= 0; })) return v;
+  }
+  return null;
+}
+/** 모르는 아이디 → 그 노선을 맡은 업체 아이디로 X 에 끼워 넣는다 (정산 계산 안에서만 · 기록은 warn.autoVendor) */
+function stlAutoVendorIdx_(X, VR, r, warn) {
+  const v = stlVendorForRoute_(VR, r.date, r.camp, r.route);
+  if (!v) return null;
+  const login = stlLogin_(r.cid);
+  if (!X.groups[v.key]) {
+    const vi = X.vendors.by[v.key] || { name: v.name, price: 0, ins: true };
+    X.groups[v.key] = { key: v.key, cids: [], main: { key: v.key, cid: v.name, role: '메인', ownerId: '', ownerName: v.name, type: '외부용차', mode: '', insEx: !vi.ins, fbCut: '', stopped: false, vendor: v.name, vinfo: vi }, cid: v.name, ownerId: '', vendor: v.name };
+  }
+  const idx = X.by[login] = { key: login, cid: r.cid, role: '메인', ownerId: '', ownerName: v.name, type: '외부용차', mode: '', insEx: false, fbCut: '', stopped: false, vendor: v.name, mainKey: v.key, auto: true };
+  if (X.groups[v.key].cids.indexOf(r.cid) < 0) X.groups[v.key].cids.push(r.cid);
+  const a = warn.autoVendor[v.name] || (warn.autoVendor[v.name] = {});
+  a[r.cid] = (a[r.cid] || '') || (stlShort_(r.camp) + ' ' + normCode_(r.route));
+  return idx;
 }
 /** 정산서·입금용 '명의자' 정보 (용차업체) */
 function stlVendorOwner_(v) {
@@ -1345,7 +1399,8 @@ function stlCompute_(month, opts) {
   const raw = stlReadMonth_('stl_raw', month);
   const loss = stlReadMonth_('stl_loss', month);
   const sched = stlSchedule_(P.from, P.to);
-  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {}, stoppedSub: {}, moveNo: {}, manual: [], noRtPrice: [], promo: [] };
+  const warn = { unreg: {}, kind: {}, noPrice: {}, noCamp: {}, noRoute: {}, stopped: {}, stoppedSub: {}, moveNo: {}, manual: [], noRtPrice: [], promo: [], autoVendor: {} };
+  const VR = vendorRoutes_(); // 맡은 노선이 있는 용차업체 (모르는 아이디 자동 묶음)
   const S = {};
   /** 정산 묶음(메인 아이디) 하나의 합계. 정산금은 메인 아이디 명의자에게 */
   const sum = function (gkey) {
@@ -1389,7 +1444,7 @@ function stlCompute_(month, opts) {
       warn.promo.push({ kind: 'drv', key: pk, label: '🙋 기사 직접 신청 · ' + who + ' · ' + String(r.date).slice(5) + ' · ' + (r.camp || '') + ' ' + (normCode_(r.route) || '') + ' · ' + won_(qty) + '건 · ' + won_(total) + '원 → 기사 지급' + (ov ? ' (직접 지정)' : '') });
     }
     const login = stlLogin_(r.cid);
-    const idx = X.by[login];
+    const idx = X.by[login] || (VR.length ? stlAutoVendorIdx_(X, VR, r, warn) : null);
     if (!idx) { const u = warn.unreg[r.cid] || (warn.unreg[r.cid] = { cid: r.cid, sales: 0, qty: 0 }); u.sales += sales; u.qty += qty; company.unregSales += sales; return; }
     // 정지된 아이디: 서브로 등록된 아이디(메인 정산에 합산)는 따로, 메인(실제 정지)은 그대로
     if (idx.stopped && (!idx.stopFrom || r.date >= idx.stopFrom)) { if (idx.role === '서브' && idx.mainKey && idx.mainKey !== idx.key) warn.stoppedSub[r.cid] = idx.mainKey; else warn.stopped[r.cid] = idx.mainKey; }
@@ -1789,6 +1844,9 @@ function stlCompute_(month, opts) {
   W('unreg', stlIdsV2_() ? '기사 정보관리에 없는 쿠팡 ID (지급 계산 안 됨 — [기사에 연결] 또는 [용차업체로 지정])' : '아이디 관리에 없는 쿠팡 ID (지급 계산 안 됨 — 정산관리 → 아이디 관리에 추가)',
     Object.keys(warn.unreg).map(function (k) { const u = warn.unreg[k]; return cidNm(u.cid) + ' · ' + won_(u.sales) + '원' + (u.loss ? ' · 분실 ' + won_(u.loss) : ''); }), 'bad',
     Object.keys(warn.unreg).map(function (k) { return { cids: [warn.unreg[k].cid] }; }));
+  const avL = [];
+  Object.keys(warn.autoVendor).forEach(function (vn) { Object.keys(warn.autoVendor[vn]).forEach(function (c) { avL.push(vn + ' ← ' + cidNm(c) + ' · ' + warn.autoVendor[vn][c]); }); });
+  W('autoVendor', '맡은 노선으로 용차업체에 자동 묶은 쿠팡 ID (용차업체 목록의 맡은 노선·기간 기준 · 계속 쓰는 아이디면 업체 쿠팡 아이디 칸에 적어 두세요)', avL, 'info', null, avL.map(function () { return { t: 'vendor' }; }));
   const noOwn = drivers.filter(function (d) { return !d.ownerId && !d.vendor; });
   W('noOwner', '명의자가 없는 아이디 (아이디 관리에서 명의자 지정 · 용차업체 아이디면 [용차업체로 지정])', noOwn.map(function (d) { return d.cids.map(cidNm).join(', ') + ' · ' + won_(d.sales) + '원'; }), 'bad',
     noOwn.map(function (d) { return { cids: d.cids.slice() }; }));
@@ -3200,7 +3258,8 @@ const STL_EDIT = {
   ids: { sheet: 'stl_ids', scope: 'all', cols: [['owner', '명의자 (정산금 받는 기사)', 'person', 'ownerId'], ['vendor', '용차업체 (명의자 대신)', 'vendor'], ['cid', '쿠팡ID', 'cid'], ['role', '구분', STL_ROLES], ['main', '메인 아이디 (서브일 때)', 'text'],
     ['type', '단가코드', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=단가코드별 노선 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
   vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['ids', '쿠팡 아이디 (쉼표로 여러 개)', 'text'], ['price', '지급 단가 (러너 → 업체 · VAT포함 · 비우면 외부용차단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'], ['addr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'],
-    ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['holder', '예금주', 'text'], ['email', '이메일 (계산서)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
+    ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['holder', '예금주', 'text'], ['email', '이메일 (계산서)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text'],
+    ['routes', '맡은 노선 (예: 인천7 919CD · 기간 안 모르는 아이디 자동 묶음 · 스케줄 업체 용차 · 쿠팡 업로드 미입차)', 'text'], ['rFrom', '노선 시작일', 'date'], ['rTo', '노선 종료일 (비우면 계속)', 'date']] },
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text'], ['settle', '정산 (비우면 일한 기사 본인 정산 · 명의자 = 서브 인원)', ['', '명의자']]] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
   adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '정산서 메모 (기사 정산서에 보임)', 'text'], ['note', '관리자 메모 (정산서에 안 보임)', 'text']] },

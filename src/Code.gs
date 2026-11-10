@@ -4844,7 +4844,8 @@ function schRead_(sun, end) {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
-    issues: issues, issueKinds: SCH_ISSUE.KINDS
+    issues: issues, issueKinds: SCH_ISSUE.KINDS,
+    vendorRoutes: (typeof vendorRoutes_ === 'function' ? vendorRoutes_() : []).map(function (v) { return { name: v.name, camp: v.camp, code: v.code, units: v.units, from: v.from, to: v.to }; })
   };
 }
 
@@ -6036,7 +6037,7 @@ function schBuildUpload_(data, opt) {
   const res = { bizNo: opt.bizNo, wave: opt.wave, target: opt.target, dates: data.dates, weeks: weeks.map(function () { return []; }), keys: weeks.map(function () { return []; }), missing: [], dups: [], over7: [], badId: [] };
 
   weeks.forEach(function (dates, widx) {
-    const baseRouteSet = {}, baseOwner = {}, entries = [], present = {}, dupe = {}, explicitMi = [];
+    const baseRouteSet = {}, baseOwner = {}, vendorOwner = {}, entries = [], present = {}, dupe = {}, explicitMi = [];
     // 중복 규칙: 쿠팡은 아이디 한 줄에 회전 하나라 '205C,205D' + '205C (D2,F3)' 처럼 겹쳐 올린다.
     //   회전을 좁게 적은 사람(부분)이 그 회전의 주인 → 전체 회전으로 적힌 사람은 나머지 회전만 맡은 것으로 본다.
     //   중복 = 같은 회전에 부분끼리 2명, 또는 부분 없이 전체끼리 2명
@@ -6203,7 +6204,7 @@ function schBuildUpload_(data, opt) {
     // 미입차 사유: 그 노선 주인(기본노선 기사)에게 그날 이슈가 있으면 비고에
     const whyOf = function (k) {
       const dt = k.split('|')[0];
-      return (baseOwner[k] || []).map(function (id) { return issueBy[dt + '|' + id] || (leftInfo[id] && dt >= leftInfo[id].from ? leftInfo[id].name + ' 퇴사' : ''); }).filter(Boolean);
+      return (vendorOwner[k] || []).map(function (n) { return '용차업체 ' + n; }).concat((baseOwner[k] || []).map(function (id) { return issueBy[dt + '|' + id] || (leftInfo[id] && dt >= leftInfo[id].from ? leftInfo[id].name + ' 퇴사' : ''); })).filter(Boolean);
     };
     const byRoute = {};
     Object.keys(present).forEach(function (p) {
@@ -6219,6 +6220,14 @@ function schBuildUpload_(data, opt) {
         defRotArr(x.baseCamp).forEach(function (rot) { if (!present[[x.date, x.baseCamp, rt, rot].join('|')]) addMissing(x.date, x.baseCamp, rt, rot); });
       });
     });
+    // 용차업체 맡은 노선 (러너가 직접 쓰는 장기 용차): 우리 인원이 안 들어간 날은 쿠팡엔 미입차로 · 비고 '용차업체 OOO'
+    (data.vendorRoutes || []).forEach(function (v) {
+      const camp = short(v.camp);
+      dates.forEach(function (date) {
+        if (date < opt.target || (v.from && date < v.from) || (v.to && date > v.to)) return;
+        v.units.forEach(function (rt) { const bk = [date, camp, rt].join('|'); baseRouteSet[bk] = 1; const a = vendorOwner[bk] || (vendorOwner[bk] = []); if (a.indexOf(v.name) < 0) a.push(v.name); });
+      });
+    });
     Object.keys(baseRouteSet).forEach(function (k) {
       const s = k.split('|');
       const covered = defRotArr(s[1]).some(function (rot) { return present[[s[0], s[1], s[2], rot].join('|')]; });
@@ -6227,7 +6236,7 @@ function schBuildUpload_(data, opt) {
     const byRot = {};
     Object.keys(gm).forEach(function (k) {
       const s = k.split('|'), rotText = Object.keys(gm[k]).sort().join(',');
-      const g = [s[0], s[1], rotText].join('|');
+      const g = [s[0], s[1], rotText, (vendorOwner[k] || []).join(',')].join('|'); // 용차업체 노선은 따로 한 줄 (사유가 섞이지 않게)
       const x = byRot[g] = byRot[g] || { date: s[0], camp: s[1], rotText: rotText, routes: [], why: [] };
       x.routes.push(s[2]);
       whyOf(k).forEach(function (w) { if (x.why.indexOf(w) < 0) x.why.push(w); });
