@@ -4035,7 +4035,7 @@
     if (!confirm(names.join(', ') + '\n\n역발행 계산서(국세청 미등록)를 지금 정산서 합계금액으로 다시 만듭니다. 진행할까요?')) return;
     api('adm_tiFromSettle', EV.month, true, accts).then((r) => {
       if (!r.ok) return toast(r.msg);
-      toast(r.made.length + '장 정산 금액으로 고쳤습니다.' + (r.skipped.length ? ' 건너뜀: ' + r.skipped.join(', ') : ''));
+      toast(r.made.length + '장 정산 금액으로 고쳤습니다.' + (r.skipped.length ? ' 건너뜀: ' + r.skipped.join(', ') : '') + (r.noBiz && r.noBiz.length ? ' 사업자번호 없음: ' + r.noBiz.join(', ') : '') + (r.notOn && r.notOn.length ? ' 역발행 계산서 없음: ' + r.notOn.join(', ') : ''));
       loadEinv();
     }).catch(() => {});
   }

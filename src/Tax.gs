@@ -194,7 +194,8 @@ function adm_tiFromSettle(token, month, overwrite, only) {
         if (!(d.invoice > 0)) return;
         if (Array.isArray(only) && only.indexOf(d.id) < 0) return;
         const key = d.vendor ? stlVendorKey_(d.vendor) : d.ownerId;
-        if (d.vendor || !on[String(key)]) { notOn.push(d.name); return; }
+        // 고치기(only)로 부른 경우: 이미 역발행 계산서가 있으면 '역발행 기사' 지정이 꺼져 있어도 금액을 맞춤
+        if (d.vendor || (!on[String(key)] && !(Array.isArray(only) && old[key]))) { notOn.push(d.name); return; }
         const s = sups[key];
         if (!key || !s) { skipped.push(d.name + ' (명의자 없음)'); return; }
         if (str_(s.no).replace(/\D/g, '').length !== 10) { noBiz.push(d.name); return; }
