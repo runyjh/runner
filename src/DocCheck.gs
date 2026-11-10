@@ -90,7 +90,9 @@ function docInsCfg_() {
   const s = appSet_();
   let tpl = null;
   try { tpl = s.insTpl ? JSON.parse(s.insTpl) : null; } catch (e) { tpl = null; }
-  return { jobCode: str_(s.insJobCode) || DOC_JOB_DEFAULT, bizMgmtNo: str_(s.insBizMgmtNo) || '', tpl: tpl };
+  let enr = null;
+  try { enr = s.insEnrolled ? JSON.parse(s.insEnrolled) : null; } catch (e) { enr = null; }
+  return { jobCode: str_(s.insJobCode) || DOC_JOB_DEFAULT, bizMgmtNo: str_(s.insBizMgmtNo) || '', tpl: tpl, enrolled: enr };
 }
 function adm_insRepList(token, month) {
   return run_(function () {
@@ -164,6 +166,16 @@ function adm_insRepCfg(token, o) {
         if (t.length > 40000) fail_('양식 머리글이 너무 깁니다.');
       }
       appSetPut_('insTpl', t, '산재/고용 신고: 공단 엑셀 양식 머리글 (관리자 화면에서 올림)');
+    }
+    // 토탈서비스 양식에 이미 들어 있는 노무제공자 성명 = 입직신고된 사람 (없으면 입직신고 대상)
+    if (o.enrolled !== undefined) {
+      let t2 = '';
+      if (o.enrolled && Array.isArray(o.enrolled.names)) {
+        const names = o.enrolled.names.map(function (v) { return str_(v).replace(/\s+/g, '').slice(0, 30); }).filter(Boolean).slice(0, 2000);
+        t2 = JSON.stringify({ file: str_(o.enrolled.file).slice(0, 80), at: todayText_(), names: names });
+        if (t2.length > 45000) fail_('양식의 성명이 너무 많습니다.');
+      }
+      appSetPut_('insEnrolled', t2, '산재/고용 신고: 토탈서비스 양식에 들어 있는 노무제공자 성명 (입직신고 여부 판단)');
     }
     const c = docInsCfg_();
     logAdmin_(a, '산재·고용 신고 설정', '', '직종부호 ' + c.jobCode + ' · 관리번호 ' + c.bizMgmtNo + (c.tpl ? ' · 양식 ' + c.tpl.file : ''));
