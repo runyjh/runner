@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -373,7 +373,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs']);
 
 /** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
 const HEAD_RENAME = {};
@@ -410,6 +410,9 @@ SCHEMA[SH.RSLA] = RSL;
 SCHEMA[SH.RLIN] = RLN;
 SCHEMA[SH.RFB] = RFB;
 SCHEMA[SH.TEAMS] = TMS;
+// camp_thumbs: 참고 이미지 미리보기(작은 JPEG, base64) — 노선관리 목록은 캠프마다 이 탭 한 번 읽기로 끝 (원본은 크게 볼 때만)
+const CTH = { id: '이미지ID', campId: '캠프ID', fileId: '파일ID', data: '미리보기', updatedAt: '만든일시' };
+SCHEMA[SH.CTHUMB] = CTH;
 SCHEMA[SH.TAXINV] = TI;
 SCHEMA[SH.RCHG] = RC;
 // 속도 측정 (Perf.gs): 1분마다 화면·함수별 합계 한 줄
@@ -3802,6 +3805,7 @@ function adm_campImageAdd(token, campId, img) {
         id: id, campId: camp.id, campName: camp.name, file: file.getUrl(), desc: desc, order: String(max + 1),
         createdAt: now, updatedAt: now
       });
+      if (img.thumb) ctSave_([{ id: id, campId: camp.id, fileId: file.getId(), data: img.thumb }], now);
       bumpMaster_();
       return { ok: true, image: imageView_(readObj_(SH.CIMG, r)) };
     } catch (e) {
@@ -3867,6 +3871,7 @@ function adm_campImageDelete(token, id) {
       if (!row) return { ok: true };
       fileId = fileIdOf_(readObj_(SH.CIMG, row).file);
       sheet_(SH.CIMG).deleteRow(row);
+      try { const tr = findRow_(SH.CTHUMB, 'id', String(id)); if (tr) sheet_(SH.CTHUMB).deleteRow(tr); } catch (e) { /* 미리보기 없음 */ }
       bumpMaster_();
     } finally {
       lock.releaseLock();
@@ -3876,6 +3881,40 @@ function adm_campImageDelete(token, id) {
   });
 }
 
+/** 잠금 안에서: 미리보기 저장 (이미지ID 기준 덮어쓰기) */
+function ctSave_(items, now) {
+  const have = {};
+  readAll_(SH.CTHUMB).forEach(function (x) { have[x.id] = x._row; });
+  const add = [];
+  items.forEach(function (t) {
+    const data = String(t.data || '');
+    if (!t.id || !data || data.length > 45000 || !/^[A-Za-z0-9+/=]+$/.test(data)) return; // 칸 한 개(5만 자)에 들어가는 크기만
+    const o = { id: String(t.id), campId: String(t.campId || ''), fileId: String(t.fileId || ''), data: data, updatedAt: now };
+    if (have[o.id]) writeFields_(SH.CTHUMB, have[o.id], o); else add.push(o);
+  });
+  add.forEach(function (o) { appendObj_(SH.CTHUMB, o); });
+}
+/** 캠프 참고 이미지 미리보기 한꺼번에: { thumbs: { 이미지ID: { fileId, data } } } (캠프ID 없으면 전체) */
+function adm_campThumbs(token, campId) {
+  return run_(function () {
+    requireAdmin_(token);
+    const out = {};
+    readAll_(SH.CTHUMB).forEach(function (x) { if (!campId || x.campId === campId) out[x.id] = { fileId: x.fileId, data: x.data }; });
+    return { ok: true, thumbs: out };
+  });
+}
+/** 화면에서 만든 미리보기 저장 (예전에 올린 이미지는 처음 볼 때 화면이 만들어 올림): items = [{ id, campId, fileId, data }] */
+function adm_campThumbSave(token, items) {
+  return run_(function () {
+    requireAdmin_(token);
+    items = (items || []).slice(0, 40);
+    if (!items.length) return { ok: true, saved: 0 };
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try { ctSave_(items, nowText_()); } finally { lock.releaseLock(); }
+    return { ok: true, saved: items.length };
+  });
+}
 /** 이미지 내용. full=false 면 목록용 (큰 파일은 드라이브 썸네일, 작은 결과는 캐시) */
 function adm_campImage(token, id, full) {
   return run_(function () {

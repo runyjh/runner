@@ -5793,11 +5793,65 @@
       ? (imgCache[key] = { src: b64Url(c.data, c.mime), thumb: !!c.thumb }) : fromServer());
     return (imgPending[pk] = p.finally(() => { delete imgPending[pk]; }));
   }
+  // ── 미리보기(작은 JPEG): 목록은 캠프마다 서버 한 번(adm_campThumbs)으로 전부 · 예전 이미지는 원본을 받은 김에 화면이 미리보기를 만들어 올려 둔다 ──
+  function makeThumb(src) {
+    return new Promise((res) => {
+      const img = new Image();
+      img.onload = () => {
+        const tries = [[360, 0.7], [360, 0.55], [280, 0.55], [220, 0.5]];
+        for (const [max, q] of tries) {
+          const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), w = Math.max(1, Math.round(img.naturalWidth * sc)), h = Math.max(1, Math.round(img.naturalHeight * sc));
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+          const b64 = c.toDataURL('image/jpeg', q).split(',')[1];
+          if (b64.length <= 44000) return res(b64);
+        }
+        res('');
+      };
+      img.onerror = () => res('');
+      img.src = src;
+    });
+  }
+  const thumbCampDone = {}, thumbUp = [];
+  let thumbUpT = 0;
+  function thumbUpload(item) {
+    thumbUp.push(item); clearTimeout(thumbUpT);
+    thumbUpT = setTimeout(() => { const list = thumbUp.splice(0, 40); if (list.length) api('adm_campThumbSave', list).catch(() => {}); }, 1500);
+  }
+  function campThumbs(campId) {
+    if (!thumbCampDone[campId]) thumbCampDone[campId] = api('adm_campThumbs', campId).then((r) => (r && r.ok ? r.thumbs : {})).catch(() => { delete thumbCampDone[campId]; return {}; });
+    return thumbCampDone[campId];
+  }
   function loadThumbs() {
-    $$('[data-ph]', $('#campMain')).forEach((ph) => {
-      const im = RT.images.find((x) => x.id === ph.dataset.ph); if (!im) return;
-      getImg(im, false).then((v) => { if (ph.isConnected) ph.innerHTML = '<img src="' + v.src + '" alt="" loading="lazy">'; })
-        .catch(() => { if (ph.isConnected) ph.innerHTML = '<i>불러오지 못함</i>'; });
+    const box = $('#campMain'), phs = $$('[data-ph]', box);
+    if (!phs.length) return;
+    const show = (ph, src) => { if (ph.isConnected) ph.innerHTML = '<img src="' + src + '" alt="" loading="lazy">'; };
+    const tkey = (im) => (im.fileId || im.id) + ':p';
+    // 1) 이 PC 보관분 → 2) 없으면 캠프 미리보기 한 번에 → 3) 그래도 없으면 예전처럼 한 장씩 받고 미리보기를 만들어 올림
+    Promise.all(phs.map((ph) => {
+      const im = RT.images.find((x) => x.id === ph.dataset.ph); if (!im) return null;
+      const mem = imgCache[tkey(im)]; if (mem) { show(ph, mem.src); return null; }
+      return IDB.get(tkey(im)).then((c) => {
+        if (c && c.data && Date.now() - (c.at || 0) < IMG_KEEP) { const src = (imgCache[tkey(im)] = { src: b64Url(c.data, 'image/jpeg') }).src; show(ph, src); return null; }
+        return { ph, im };
+      });
+    })).then((rest) => {
+      rest = rest.filter(Boolean); if (!rest.length) return;
+      const campId = rest[0].im.campId;
+      return campThumbs(campId).then((th) => {
+        rest.forEach(({ ph, im }) => {
+          const t = th[im.id];
+          if (t && t.data && (!t.fileId || !im.fileId || t.fileId === im.fileId)) {
+            IDB.set(tkey(im), { mime: 'image/jpeg', data: t.data, at: Date.now() });
+            show(ph, (imgCache[tkey(im)] = { src: b64Url(t.data, 'image/jpeg') }).src);
+            return;
+          }
+          getImg(im, false).then((v) => {
+            show(ph, v.src);
+            makeThumb(v.src).then((b64) => { if (!b64) return; IDB.set(tkey(im), { mime: 'image/jpeg', data: b64, at: Date.now() }); thumbUpload({ id: im.id, campId: im.campId, fileId: im.fileId || '', data: b64 }); });
+          }).catch(() => { if (ph.isConnected) ph.innerHTML = '<i>불러오지 못함</i>'; });
+        });
+      });
     });
   }
 
@@ -5856,9 +5910,14 @@
     for (const x of todo) {
       $('#iaMsg').textContent = (++n) + ' / ' + todo.length + ' 올리는 중…';
       try {
-        const r = await api('adm_campImageAdd', camp, { data: x.data, mime: x.mime, desc: x.desc.trim() });
+        const thumb = await makeThumb(x.preview); // 올릴 때 미리보기도 같이 (목록은 이것만 받음)
+        const r = await api('adm_campImageAdd', camp, { data: x.data, mime: x.mime, desc: x.desc.trim(), thumb });
         if (!r.ok) { x.err = r.msg; }
-        else { x.done = true; x.err = ''; okN++; RT.images.push(r.image); imgCache[r.image.fileId || r.image.id] = { src: x.preview, thumb: false }; }
+        else {
+          x.done = true; x.err = ''; okN++; RT.images.push(r.image); imgCache[r.image.fileId || r.image.id] = { src: x.preview, thumb: false };
+          if (thumb) { const k = (r.image.fileId || r.image.id) + ':p'; imgCache[k] = { src: 'data:image/jpeg;base64,' + thumb }; IDB.set(k, { mime: 'image/jpeg', data: thumb, at: Date.now() }); }
+          delete thumbCampDone[camp];
+        }
       } catch (err) { x.err = '연결 오류'; }
       renderIa();
     }
