@@ -4166,6 +4166,15 @@
       const blob = ssXlsx(out, { sheet: (cfg.tpl && cfg.tpl.sheet) || '노무제공자 월보수액', head: cfg.tpl ? cfg.tpl.h + 1 : 1, textCols: (cfg.tpl ? cfg.tpl.head.map(irKey) : ['seq', 'goy', 'san', 'name', 'rrn', 'job', 'start', 'bosu', 'ym']).map((k) => k !== 'bosu' && k !== 'seq') });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '노무제공자_월보수액신고_' + ym + '_' + r.rows.length + '명.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
       toast(r.rows.length + '명 엑셀을 받았습니다.' + (r.noRrn.length ? ' 주민등록번호 없음: ' + r.noRrn.join(', ') : ''));
+      // 엑셀에 들어간 미신고 기사 → 신고 완료로 일괄 전환할지 묻기
+      const got = r.rows.map((x) => x.acct), left = IR.rows.filter((x) => got.includes(x.acct) && irTarget(x) && !x.done);
+      if (left.length) setTimeout(() => {
+        if (!confirm('공단 업로드 엑셀에 들어간 ' + left.length + '명을 [미신고 → 신고 완료]로 바꿀까요?\n\n' + left.slice(0, 12).map((x) => x.name).join(', ') + (left.length > 12 ? ' 외 ' + (left.length - 12) + '명' : '') + '\n\n신고일은 오늘(' + dToday() + ')로 들어갑니다. 공단 사이트에 업로드한 뒤 확인을 누르세요.')) return;
+        const today = dToday();
+        left.forEach((x) => { x.done = true; if (!x.date) x.date = today; });
+        renderInsRep();
+        irSave(left).then((s2) => { if (s2 && s2.ok) toast(left.length + '명을 신고 완료로 바꿨습니다.'); });
+      }, 300);
     }).catch(() => {}).finally(() => { b.disabled = false; });
   }
   $('#irXlsx').addEventListener('click', () => irExport(IR.sel.size ? Array.from(IR.sel) : null));
