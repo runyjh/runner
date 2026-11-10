@@ -58,11 +58,12 @@ function adm_einvList(token, month) {
     readAll_(SH.DRIVERS).forEach(function (d) { if (d.id) drv[d.id] = d; });
     const rows = (sum.drivers || []).filter(function (d) { return !d.ceo && d.invoice > 0; }).map(function (d) {
       const c = chk[d.id] || {}, o = drv[d.ownerId] || {};
-      const t = ti[d.id] || (d.ownerId && ti[d.ownerId]) || null;
+      // 역발행 대상(기사 정보 '세금계산서 역발행' 지정) 기사만 역발행 계산서로 인정. 아니면 기사 본인 발행으로 체크
+      const t0 = ti[d.id] || (d.ownerId && ti[d.ownerId]) || null, t = t0 && stlYes_(o.tiOn) ? t0 : null;
       return {
         acct: d.id, driverId: d.ownerId || '', name: d.name, vendor: d.vendor || '', bizNo: d.bizNo || '', bizName: d.bizName || '',
         supply: d.supply, tax: d.tax, total: d.invoice, tiOn: stlYes_(o.tiOn),
-        ti: t ? { total: t.total, n: t.n, nts: t.nts, date: t.date } : null,
+        ti: t ? { total: t.total, n: t.n, nts: t.nts, date: t.date } : null, tiIgnored: t0 && !t ? t0.n : 0,
         done: docYn_(c.done), date: c.date || '', approvalNo: c.approvalNo || '', memo: c.memo || '', by: c.by || '', at: c.at || '',
         savedTotal: stlNum_(c.total) || 0
       };
