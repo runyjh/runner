@@ -1087,6 +1087,16 @@
   .is-tb .mirange { font-size: 11.5px; color: #c81e1e; font-weight: 700; margin-top: 3px; }
   #isQuick button { white-space: nowrap; padding: 0 10px; }
   .is-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .is-sum.list { display: block; border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; max-height: 420px; overflow-y: auto; }
+  .is-sum.list .isr { display: grid; grid-template-columns: 34px minmax(120px, 1.1fr) 90px 60px 74px minmax(200px, 3fr) 110px; align-items: center; gap: 10px; width: 100%; padding: 8px 14px; border: 0; border-bottom: 1px solid #f0f1f3; background: #fff; font: inherit; text-align: left; cursor: pointer; color: var(--ink); }
+  .is-sum.list .isr:last-child { border-bottom: 0; } .is-sum.list .isr:hover { background: #f8fafc; } .is-sum.list .isr.on { background: var(--brand-weak); }
+  .is-sum.list .isr.hd { position: sticky; top: 0; z-index: 1; background: #fafbfd; font-size: 11.5px; font-weight: 700; color: var(--sub); cursor: default; padding: 7px 14px; }
+  .is-sum.list .isr .rk { font-weight: 800; color: var(--sub); text-align: center; } .is-sum.list .isr.top .rk { color: #c81e1e; }
+  .is-sum.list .isr .nm b { font-size: 14px; } .is-sum.list .isr .cp { color: var(--sub); font-size: 12.5px; } .is-sum.list .isr .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .is-sum.list .isr .mi { text-align: right; font-weight: 700; color: #c81e1e; font-variant-numeric: tabular-nums; } .is-sum.list .isr .mi.z { color: #c3cad8; font-weight: 500; }
+  .is-sum.list .isr .k { display: flex; flex-wrap: wrap; gap: 4px; }
+  .is-sum.list .isr .sc { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; } .is-sum.list .isr .sc i { flex: 1; height: 6px; border-radius: 3px; background: #eef1f4; position: relative; overflow: hidden; } .is-sum.list .isr .sc i em { position: absolute; left: 0; top: 0; bottom: 0; background: #e5484d; border-radius: 3px; }
+  @media (max-width: 760px) { .is-sum.list .isr { grid-template-columns: 26px 1fr 54px 60px; } .is-sum.list .isr .cp, .is-sum.list .isr .k { display: none; } .is-sum.list .isr .sc { grid-column: 4; } .is-sum.list .isr .mi { display: none; } }
   .is-sum .isd { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 8px 12px; min-width: 150px; cursor: pointer; text-align: left; font: inherit; }
   .is-sum .isd:hover { border-color: var(--brand); }
   .is-sum .isd.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak, rgba(49,130,246,.18)); }
@@ -4179,10 +4189,18 @@
     const drvBase = IS.list.filter((x) => (IS.code === '전체' || x.kind === IS.code) && (!$('#isMiOnly').checked || x.mi));
     const by = new Map();
     drvBase.forEach((x) => { const g = by.get(x.driverId) || { id: x.driverId, name: x.name, camp: x.camp, n: 0, mi: 0, k: {} }; g.n++; if (x.mi) g.mi += (x.miDays || 1); g.k[x.kind] = (g.k[x.kind] || 0) + 1; by.set(x.driverId, g); });
-    const sums = Array.from(by.values()).sort((a, b) => b.n - a.n || b.mi - a.mi || String(a.name).localeCompare(String(b.name), 'ko'));
-    $('#isSum').innerHTML = sums.map((g) => '<button type="button" class="isd' + (IS.drv === g.id ? ' on' : '') + '" data-idrv="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><small>' + esc(g.camp ? shortCampSafe(g.camp) : '') + ' · ' + g.n + '건' + (g.mi ? ' · 미입차 ' + g.mi + '일' : '') + '</small><div class="k">' +
-      Object.keys(g.k).sort((a, b) => g.k[b] - g.k[a]).map((k) => '<span class="ikc k-' + esc(k) + '">' + esc(k) + ' ' + g.k[k] + '</span>').join('') + '</div></button>').join('') +
-      (IS.drv ? '<button type="button" class="btn sm ghost" data-idrv="" style="align-self:center">기사 선택 풀기</button>' : '');
+    // 이슈 순위: 무거운 이슈일수록 점수 높게 (노쇼 5 · 사고 4 · 부상 3 · 질병 2 · 고장 2 · 그 밖 1 · 물량조율 0.5) + 미입차 1일당 1점
+    const W = { '노쇼': 5, '사고': 4, '부상': 3, '질병': 2, '고장': 2, '물량조율': 0.5 };
+    by.forEach((g) => { g.score = Object.keys(g.k).reduce((a, k) => a + (W[k] != null ? W[k] : 1) * g.k[k], 0) + g.mi; });
+    const sums = Array.from(by.values()).sort((a, b) => b.score - a.score || b.mi - a.mi || b.n - a.n || String(a.name).localeCompare(String(b.name), 'ko'));
+    const maxSc = Math.max(1, ...sums.map((g) => g.score));
+    $('#isSum').className = 'is-sum list';
+    $('#isSum').innerHTML = (sums.length ? '<div class="isr hd"><span class="rk">#</span><span>기사</span><span>캠프</span><span class="n">건수</span><span class="mi">미입차</span><span>이슈</span><span title="노쇼 5 · 사고 4 · 부상 3 · 질병·고장 2 · 그 밖 1 · 물량조율 0.5 · 미입차 1일 1점">위험 점수 ⓘ</span></div>' : '') +
+      sums.map((g, i) => '<button type="button" class="isr' + (IS.drv === g.id ? ' on' : '') + (i < 3 && g.score >= 5 ? ' top' : '') + '" data-idrv="' + esc(g.id) + '" title="' + (IS.drv === g.id ? '다시 누르면 선택 풀기' : '이 기사 이슈만 보기') + '">' +
+        '<span class="rk">' + (i + 1) + '</span><span class="nm"><b>' + esc(g.name) + '</b></span><span class="cp">' + esc(g.camp ? shortCampSafe(g.camp) : '') + '</span><span class="n">' + g.n + '건</span>' +
+        '<span class="mi' + (g.mi ? '' : ' z') + '">' + (g.mi ? g.mi + '일' : '—') + '</span><span class="k">' +
+        Object.keys(g.k).sort((a, b) => (W[b] != null ? W[b] : 1) * g.k[b] - (W[a] != null ? W[a] : 1) * g.k[a]).map((k) => '<span class="ikc k-' + esc(k) + '">' + esc(k) + ' ' + g.k[k] + '</span>').join('') + '</span>' +
+        '<span class="sc"><i><em style="width:' + Math.round(g.score / maxSc * 100) + '%"></em></i>' + (Math.round(g.score * 10) / 10) + '</span></button>').join('');
     const list = isFiltered(false);
     const miN = list.filter((x) => x.mi).reduce((a, x) => a + (x.miDays || 1), 0);
     $('#isCount').textContent = list.length + '건' + (miN ? ' · 미입차 ' + miN + '일' : '');
