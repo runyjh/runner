@@ -7718,11 +7718,24 @@
     });
     return { rows, extra, dates, fromCp, skipCamps };
   }
+  // 받을 때마다 서버에서 업로드 표를 새로 만든 뒤(지금 기사스케줄 칸 그대로 · 직원 줄 포함) 엑셀로 만든다 — 창을 연 뒤 고친 칸·업데이트도 반영
   $('#upXlsx').addEventListener('click', () => {
     if (!upRes) return;
     if (upWk(upTab) < 0) return toast('주차 탭(출근)을 고른 뒤 받아 주세요.');
+    if (Object.keys(sPending).length) return toast('저장 중인 칸이 있습니다. "모두 저장됨" 이 된 뒤 다시 눌러 주세요.');
+    const b = $('#upXlsx'), tab = upTab, roster = upRes.roster, keepV = upRes.cpVendor, keepB = upRes.cpBizNo;
+    b.disabled = true; const t0 = b.textContent; b.textContent = '새로 만드는 중…';
+    api('adm_schUploadTable', (SD.dates && SD.dates[0]) || SD.start || '', '4w').then((r) => {
+      b.disabled = false; b.textContent = t0;
+      if (!r.ok) return toast(r.msg);
+      upRes = r; if (!upRes.roster || !upRes.roster.length) { upRes.roster = roster; upRes.cpVendor = upRes.cpVendor || keepV; upRes.cpBizNo = upRes.cpBizNo || keepB; }
+      upTab = tab; upTabsRender(); upRender();
+      upXlsxNow();
+    }).catch(() => { b.disabled = false; b.textContent = t0; });
+  });
+  function upXlsxNow() {
     const c = upCoupang(upTab);
-    if (!c.dates.length) return toast('이 주차에는 내일(PDD) 이후 날짜가 없습니다.');
+    if (!c.dates.length) return toast('이 주차에는 출력할 날짜가 없습니다.');
     if (c.fromCp && c.extra.length) {
       const lines = Array.from(new Set(c.extra.map((r) => r[0].slice(5).replace('-', '/') + ' ' + r[2] + ' ' + r[4] + ' (' + String(r[10] || '').trim() + ')')));
       if (!confirm('쿠팡 등록 목록에 없는 아이디 × 캠프가 ' + lines.length + '건 있습니다. 쿠팡에서 거절될 수 있습니다:\n\n' + lines.slice(0, 15).join('\n') + (lines.length > 15 ? '\n… 외 ' + (lines.length - 15) + '건' : '') +
@@ -7733,7 +7746,7 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '쿠팡_기사스케줄_업로드_' + md(c.dates[0]) + '-' + md(c.dates[c.dates.length - 1]) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     const nW = c.rows.filter((r) => r[7] === '출근').length;
     toast('받았습니다: ' + c.dates.length + '일 · 출근 ' + nW + '줄 · 휴무 ' + (c.rows.length - 1 - nW) + '줄' + (c.fromCp ? '' : ' (쿠팡 등록 목록 없이 기사 정보로)') + (c.skipCamps.length ? ' · 노선관리에 없는 캠프 뺌: ' + c.skipCamps.join(', ') : ''));
-  });
+  }
   $('#sUpload').addEventListener('click', upMake);
   $('#upRegen').addEventListener('click', upMake);
   $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
