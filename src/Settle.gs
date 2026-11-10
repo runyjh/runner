@@ -153,7 +153,9 @@ const STL_CFG = [
   ['invDay', '세금계산서 발행기한 (익월, 일)', '10', '', '지급일 · 입금일 · 세금계산서'],
   ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일', '지급일 · 입금일 · 세금계산서'],
   ['leaveAmt', '퇴사 보류금 기본 금액', '100000', '', '퇴사 보류금'],
-  ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임', '기사 앱']
+  ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임', '기사 앱'],
+  ['appFrom', '기사 앱 정산서 공개 시작 월 (YYYY-MM · 비우면 전체)', '', '이 달부터 기사 앱에 보임. 예) 2026-11 → 1~10월(기존 정산 이식분)은 기사 앱에 안 보임', '기사 앱'],
+  ['appHide', '기사 앱에서 숨길 정산월 (YYYY-MM, 쉼표로 여러 개)', '', '예) 2026-04, 2026-05 → 그 달만 기사 앱에서 숨김 (관리자 화면은 그대로)', '기사 앱']
 ];
 
 const STL_DRIVER_EDIT = ['stlMode', 'insEx']; // 명의자 사업자 정보 표에서 고칠 수 있는 칸 (사업자 정보는 읽기만 · 기사 정보관리 DB 값)
@@ -655,7 +657,8 @@ function stlCfg_() {
     expense: rate('expense'), san: rate('san'), commute: rate('commute'), goy: rate('goy'), goyMin: stlNum_(g.goyMin),
     runner: rate('runner'), insBasis: str_(g.insBasis) === '부가세포함' ? '부가세포함' : '공급가',
     payDay: stlNum_(g.payDay) || 20, cpDay: stlNum_(g.cpDay) || 15, payShift: stlYes_(g.payShift), invDay: stlNum_(g.invDay) || 10,
-    leaveAmt: stlNum_(g.leaveAmt) || 100000, email: str_(g.email), appOpen: /계산|모두|전부|y/i.test(str_(g.appShow))
+    leaveAmt: stlNum_(g.leaveAmt) || 100000, email: str_(g.email), appOpen: /계산|모두|전부|y/i.test(str_(g.appShow)),
+    appFrom: (str_(g.appFrom).match(/\d{4}-\d{2}/) || [''])[0], appHide: (str_(g.appHide).match(/\d{4}-\d{2}/g) || [])
   };
 }
 function stlItems_() {
@@ -2384,6 +2387,54 @@ function adm_stlReportExtra(token, month) {
     return out;
   });
 }
+/**
+ * 최종 리포트 연간 보기: 그 해 월별 추이 + 조회월의 캠프별·기사 TOP·일별 (옛 운영정산 시트의 표들)
+ */
+function adm_stlReportYear(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const y = month.slice(0, 4), ms = stlMonths_().withData.filter(function (m) { return m.slice(0, 4) === y; });
+    if (ms.indexOf(month) < 0) { ms.push(month); ms.sort(); }
+    const cfg = stlCfg_(), kinds = stlKinds_();
+    const rows = ms.map(function (m) {
+      let sum = null;
+      try { sum = stlResult_(m, false).summary; } catch (e) { sum = null; }
+      const p = stlPnl_(m, sum), t = (sum && sum.total) || {}, c = (sum && sum.company) || {};
+      return { month: m, closed: p.closed, hasData: p.hasData, qty: p.qty, sales: c.sales || 0, salesSupply: p.salesSupply, loss: p.loss, drvInvoice: t.invoice || 0, drvSupply: p.drvSupply, drvNet: t.net || 0, drivers: (sum && sum.drivers || []).filter(function (d) { return d.invoice || d.net; }).length,
+        profit: p.profit, otherInc: (p.otherInc || {}).total || 0, runnerIns: p.runnerIns, staff: p.staff, cost: p.cost, opex: (p.runnerIns || 0) + (p.staff || 0) + (p.cost || 0), net: p.net, rate: p.rate, vatDue: p.vatDue };
+    });
+    // 조회월: 캠프별 · 일별 (쿠팡 원천) · 기사 TOP (정산 결과)
+    const camps = {}, daily = {}, short = function (v) { return str_(v).replace(/\s*캠프$/, ''); };
+    stlReadMonth_('stl_raw', month).forEach(function (r) {
+      const kind = stlKindOf_(kinds, r.kind);
+      if (kind === '업체차감' || kind === '프로모션베이스') return;
+      const qty = stlNum_(r.qty) + stlNum_(r.ret), total = stlNum_(r.total), fresh = stlNum_(r.fresh), sales = stlR0_((total + fresh) * (1 + cfg.vat));
+      const cp = short(r.camp) || '(캠프 없음)', c = camps[cp] || (camps[cp] = { camp: cp, qty: 0, sales: 0, pay: 0 });
+      c.qty += qty; c.sales += sales;
+      const d = stlYmd_(r.date); if (d) { const x = daily[d] || (daily[d] = { date: d, qty: 0, sales: 0 }); x.qty += qty; x.sales += sales; }
+    });
+    let top = [], res = null;
+    try { res = stlResult_(month, false); } catch (e) { res = null; }
+    if (res) {
+      const drivers = (res.summary.drivers || []).filter(function (d) { return !d.legacyNote && (d.sales || d.invoice); });
+      top = drivers.slice().sort(function (a, b) { return (b.sales || 0) - (a.sales || 0); }).slice(0, 10).map(function (d) { return { name: d.name, sales: d.sales || 0, pay: d.pay || d.invoice || 0, profit: d.profit || 0, workDays: d.workDays || 0, qty: d.qty || 0 }; });
+      // 캠프별 기사 지급: 노선별 줄은 그 캠프, 나머지(프레시백·수당 등)는 그 기사의 캠프 건수 비율로 나눔
+      drivers.forEach(function (d) {
+        const sl = res.slips[d.id]; if (!sl) return;
+        const byCamp = {}, routeSum = (sl.routes || []).reduce(function (a, r) { const cp = short(r.camp) || '(캠프 없음)'; byCamp[cp] = (byCamp[cp] || 0) + (Number(r.qty) || 0); return a + (Number(r.amt) || 0); }, 0);
+        const rest = (d.pay || 0) - routeSum, qsum = Object.keys(byCamp).reduce(function (a, k) { return a + byCamp[k]; }, 0) || 1;
+        (sl.routes || []).forEach(function (r) { const cp = short(r.camp) || '(캠프 없음)', c = camps[cp] || (camps[cp] = { camp: cp, qty: 0, sales: 0, pay: 0 }); c.pay += Number(r.amt) || 0; });
+        Object.keys(byCamp).forEach(function (cp) { const c = camps[cp] || (camps[cp] = { camp: cp, qty: 0, sales: 0, pay: 0 }); c.pay += Math.round(rest * byCamp[cp] / qsum); });
+      });
+    }
+    const campList = Object.keys(camps).map(function (k) { const c = camps[k]; c.pay = Math.round(c.pay); c.margin = c.sales - c.pay; c.rate = c.sales ? c.margin / c.sales : 0; return c; }).sort(function (a, b) { return koCmp_(a.camp, b.camp); });
+    const period = stlPeriod_(month), days = [];
+    for (let d = parseYmd_(period.from); d && ymd_(d) <= period.to; d = addDays_(d, 1)) days.push(ymd_(d));
+    const dailyList = (days.length ? days : Object.keys(daily).sort()).map(function (d) { return daily[d] || { date: d, qty: 0, sales: 0 }; });
+    return { ok: true, year: y, month: month, rows: rows, camps: campList, top: top, daily: dailyList, period: period };
+  });
+}
 // ───────────────────────── 통장 · 자금배분 ─────────────────────────
 function stlBanks_() { return stlRead_('stl_bank').filter(function (b) { return b.name; }); }
 /** 배분 설정 줄이 빠져 있으면 채운다 (새 항목이 생겨도) */
@@ -3668,6 +3719,12 @@ function stlMyGroups_(driverId, X) {
   return Object.keys(X.groups).filter(function (k) { return X.groups[k].ownerId === driverId; });
 }
 /** 기사 앱: 볼 수 있는 정산월 목록 (마감한 달, 설정에 따라 계산 중인 달도) */
+/** 기사 앱 공개 월 설정(공개 시작 월 · 숨길 달)에 맞는 달인지 */
+function stlAppMonthOk_(cfg, month) {
+  if (cfg.appFrom && month < cfg.appFrom) return false;
+  if ((cfg.appHide || []).indexOf(month) >= 0) return false;
+  return true;
+}
 function api_mySettle(token) {
   return run_(function () {
     const u = pmUser_(token);
@@ -3677,7 +3734,7 @@ function api_mySettle(token) {
     if (!groups.length) return { ok: true, months: [], noId: true };
     const closed = {};
     stlRead_('stl_close').forEach(function (x) { if (stlMonthOk_(x.month)) closed[x.month] = 1; });
-    const months = stlMonths_().withData.filter(function (m) { return closed[m] || cfg.appOpen; }).sort().reverse()
+    const months = stlMonths_().withData.filter(function (m) { return (closed[m] || cfg.appOpen) && stlAppMonthOk_(cfg, m); }).sort().reverse()
       .map(function (m) { return { month: m, closed: !!closed[m] }; });
     return { ok: true, months: months };
   });
@@ -3689,6 +3746,7 @@ function api_mySlip(token, month) {
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     const cfg = stlCfg_(), closed = stlClosedInfo_(month);
     if (!closed && !cfg.appOpen) fail_('아직 마감되지 않은 달입니다. 사무실에서 마감하면 볼 수 있습니다.');
+    if (!stlAppMonthOk_(cfg, month)) fail_('이 달 정산서는 기사 앱에서 보여 주지 않습니다.');
     const r = stlResult_(month, false), XD = stlIds_(stlDrivers_()), groups = stlMyGroups_(u.id, XD); // 기사·아이디 표는 한 번만 읽음
     let co = {};
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }

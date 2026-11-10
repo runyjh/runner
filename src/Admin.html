@@ -563,6 +563,14 @@
   .rp-chk li.ok::before { background: var(--brand); } .rp-chk li.warn::before { background: var(--danger); }
   .rp-chk li b { margin-right: 6px; } .rp-chk li span { color: var(--sub); overflow-wrap: anywhere; }
   .rp-drv td.n, .rp-drv th.n { text-align: right; } .rp-drv tr.dim { color: var(--faint); } .rp-drv tfoot td { font-weight: 800; border-top: 2px solid var(--ink); }
+  .strp-tabs { margin-bottom: 10px; }
+  .rp-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 12px; margin-top: 12px; }
+  .rp-card .table-wrap { max-height: none; }
+  .rp-year, .rp-camp, .rp-top10, .rp-daily { min-width: 0; font-size: 13px; } .rp-year td, .rp-year th, .rp-camp td, .rp-camp th, .rp-top10 td, .rp-top10 th, .rp-daily td, .rp-daily th { padding: 7px 8px; }
+  .rp-year tr.cur td { background: var(--brand-weak, #eef4ff); } .rp-year tr.dim td, .rp-daily tr.dim td { color: var(--faint); }
+  .rp-year td.neg, .rp-camp td.neg, .rp-top10 td.neg { color: var(--danger); }
+  .rp-barcell { position: relative; } .rp-barcell > span { position: relative; } .rp-barcell .rp-bar { position: absolute; left: 4px; right: auto; top: 50%; height: 60%; transform: translateY(-50%); opacity: .13; border-radius: 3px; pointer-events: none; }
+  .rp-year tfoot td, .rp-camp tfoot td, .rp-daily tfoot td { font-weight: 800; border-top: 2px solid var(--ink); }
   body.print-report * { visibility: hidden; }
   @media print {
     body.print-report #rpBox, body.print-report #rpBox * { visibility: visible; }
@@ -7596,7 +7604,7 @@
   const mdTxt = (d) => (d ? +d.slice(5, 7) + '/' + +d.slice(8, 10) : '');
   
   const ST_HELP = {
-    report: '이 달 정산 결과 한 장: 쿠팡 매출 → 기사 지급 → 회사 손익 → 세금 예상 → 확인할 것 → 기사별 요약. 숫자는 정산서·러너 손익 화면과 같은 값이고, 마감 뒤에는 마감 때 저장한 결과입니다. [인쇄 · PDF 저장]으로 종이 한 장, [엑셀]로 세무사 전달용 파일을 만듭니다.',
+    report: '이 달 리포트 = 이 달 정산 결과 한 장(쿠팡 매출 → 기사 지급 → 회사 손익 → 세금 예상 → 확인할 것 → 기사별 요약) · 연간 추이 = 그 해 월별 추이와 조회월의 캠프별·기사 TOP 10·일별 배송. 숫자는 정산서·러너 손익 화면과 같은 값이고, 마감 뒤에는 마감 때 저장한 결과입니다. [인쇄 · PDF 저장]으로 종이 한 장, [엑셀]로 세무사 전달용 파일을 만듭니다.',
     adjust: '이 정산월에 기사별로 더 주거나 빼는 돈. 항목에 따라 세금계산서에 반영(지급·계산서 차감)되거나 입금액에서만 빠집니다(가불금 상환·기타 공제). 차감도 양수로 입력. 배송 기본 같은 자동 항목을 고르면 그 금액에 ± 조정됩니다. 정산서 메모는 기사 정산서(기사 앱 포함)에 그 항목 밑에 보이고, 관리자 메모는 여기서만 보입니다.',
     advance: '기사에게 내준 가불금. 상계 예정일(상환일)을 적으면 그 날 이후 첫 지급 정산월에 남은 금액(가불금 − 상환금)이 "가불금 상환"으로 자동 공제됩니다 (예: 지급일 20일 → 상환일 11/20 은 10월 정산, 11/21 은 11월 정산). 그 달을 마감하면 상환금 칸에 자동으로 적히고, 마감을 풀면 되돌립니다. 정산 밖에서 현금으로 받았으면 상환금에 직접 적으세요. 그 달 [공제·가감]에 "가불금 상환"을 손으로 넣으면 자동 공제는 하지 않습니다.',
     yongcha: '이 정산기간 날짜의 품앗이·용차 지정. 우리 기사가 대신 뛰면(품앗이) 수행자에 그 기사 → 단가 칸을 비우면 노선관리의 그 노선 「품앗이단가」(프백 가중치까지 포함한 건당 금액)로 지급하고, 수행자 단가코드(고정/백업/품앗이 …)의 노선 단가와의 차액만 추가 지급. 품앗이단가가 빈 노선은 원래 단가로만 지급하고 확인 필요에 띄웁니다. 차액부담 기사를 넣으면 (단가 − 부담 기준단가) × 건수를 그 기사 계산서에서 뺍니다 (부담 기준단가를 비우면 수행자 단가코드 기준). 용차업체(외부용차)는 업체 건당 단가로만 지급하고, 단가 칸은 차액부담 기사에게 청구할 단가입니다: (청구 단가 − 기사 본인 단가) × 건수를 차감하고, 청구 단가 − 업체 단가는 러너 몫 (예: 청구 1,350 · 업체 1,320 · 내 단가 880 → 기사 470원 차감, 러너 30원). 품앗이도 [차액 처리]를 「러너 몫」으로 고르면 같은 방식: 수행 기사는 원래 단가만, 차액부담 기사는 (단가 − 본인 단가) 차감, 단가 − 수행 기사 단가는 러너 몫.',
@@ -7767,7 +7775,7 @@
     return api('adm_stlMonth', month || STX.month || '', !!fresh).then((r) => {
       if (seq !== STX.seq) return;
       if (!r.ok) return toast(r.msg);
-      STX.month = r.month; STX.months = r.months; STX.sum = r.summary; STX.pnl = r.pnl || null; STX.items = r.items || [];
+      STX.month = r.month; STX.months = r.months; STX.sum = r.summary; STX.pnl = r.pnl || null; STX.items = r.items || []; STX.sumAt = Date.now();
       const sel = $('#stMonth');
       sel.innerHTML = STX.months.slice().reverse().map((m) => '<option value="' + m + '"' + (m === STX.month ? ' selected' : '') + '>' + ymTitle(m) + ' 정산</option>').join('');
       paintStInfo();
@@ -7933,14 +7941,68 @@
     else if (tab === 'ids') { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.remove('hidden'); if (idSub === 'drv') loadStDrivers(); else loadEditor(idSub); }
     else if (tab === 'cfg') stCfgTab(STX.cfg);
     else if (tab === 'pnl') stPnlTab(STX.pnlT || 'pnl');
-    else if (tab === 'report') { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.add('hidden'); $('#stPnl').classList.remove('hidden'); paintHelp('report'); loadReport(); }
+    else if (tab === 'report') { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.add('hidden'); $('#stPnl').classList.remove('hidden'); paintHelp('report'); if ((STX.rpT || 'month') === 'year') loadReportYear(); else loadReport(); }
     else { $('#stMigrate').classList.add('hidden'); $('#stEditor').classList.remove('hidden'); loadEditor(tab); }
   }
   // ── 최종 리포트: 이 달 정산 결과를 한 장으로 (매출 → 기사 지급 → 회사 손익 → 세금 → 확인할 것 → 기사별 요약) ──
+  function strpTabs(cur) {
+    return '<div class="tabs sub2 strp-tabs noprint"><button type="button" class="tab' + (cur === 'month' ? ' on' : '') + '" data-rpt="month">이 달 리포트</button><button type="button" class="tab' + (cur === 'year' ? ' on' : '') + '" data-rpt="year">연간 추이 · 캠프별 · 기사 TOP · 일별</button></div>';
+  }
+  $('#stPnl').addEventListener('click', (e) => { const b = e.target.closest('[data-rpt]'); if (!b || STX.tab !== 'report') return; STX.rpT = b.dataset.rpt; if (STX.rpT === 'year') loadReportYear(); else loadReport(); });
+  function loadReportYear() {
+    const ps = STX.paneSeq, el = $('#stPnl');
+    el.innerHTML = strpTabs('year') + '<div style="padding:30px"><div class="spin"></div></div>';
+    const m = STX.month;
+    if (STX.rpy && STX.rpy.month === m && STX.rpyAt === STX.sumAt) return renderReportYear();
+    api('adm_stlReportYear', m).then((r) => { if (ps !== STX.paneSeq || STX.month !== m) return; if (!r.ok) { el.innerHTML = strpTabs('year'); return toast(r.msg); } STX.rpy = r; STX.rpyAt = STX.sumAt; renderReportYear(); }).catch(() => {});
+  }
+  function renderReportYear() {
+    const R = STX.rpy, el = $('#stPnl'), n = (v) => wn(v || 0), sgn = (v) => (v < 0 ? '−' : '') + n(Math.abs(v || 0)), pct = (v) => (v ? (Math.round(v * 1000) / 10).toFixed(1) + '%' : '-');
+    const cls = (v) => (v < 0 ? ' class="n neg"' : ' class="n"');
+    const bar = (v, max, color) => '<i class="rp-bar" style="width:' + (max ? Math.max(0, Math.min(100, Math.round(v / max * 100))) : 0) + '%;background:' + (color || 'var(--brand)') + '"></i>';
+    // ① 월별 추이 (그 해 12달)
+    const byM = {}; R.rows.forEach((x) => { byM[x.month] = x; });
+    const months = []; for (let i = 1; i <= 12; i++) months.push(R.year + '-' + String(i).padStart(2, '0'));
+    const has = R.rows.filter((x) => x.hasData), maxS = Math.max(1, ...has.map((x) => x.salesSupply)), maxN = Math.max(1, ...has.map((x) => Math.abs(x.net)));
+    const sum = (k) => has.reduce((a, x) => a + (x[k] || 0), 0);
+    const mrow = (m) => { const x = byM[m]; const cur = m === R.month; if (!x || !x.hasData) return '<tr class="dim' + (cur ? ' cur' : '') + '"><td>' + (+m.slice(5)) + '월</td><td colspan="8" class="sub">자료 없음</td></tr>';
+      return '<tr' + (cur ? ' class="cur"' : '') + '><td><b>' + (+m.slice(5)) + '월</b>' + (x.closed ? ' <small class="rp-closed">마감</small>' : ' <small class="rp-open">열림</small>') + '</td>' +
+        '<td class="n rp-barcell">' + bar(x.salesSupply, maxS) + '<span>' + n(x.salesSupply) + '</span></td><td class="n">' + n(x.drvSupply) + '</td><td' + cls(x.profit) + '>' + sgn(x.profit) + '</td><td class="n">' + n(x.opex) + '</td>' +
+        '<td' + cls(x.net) + '><span class="rp-barcell">' + bar(Math.abs(x.net), maxN, x.net < 0 ? 'var(--danger)' : 'var(--ok, #15803d)') + '<span><b>' + sgn(x.net) + '</b></span></span></td><td class="n">' + pct(x.rate) + '</td><td class="n">' + n(x.qty) + '</td><td class="n">' + n(x.drivers) + '</td></tr>'; };
+    const t1 = '<div class="rp-card wide"><h4>① ' + esc(R.year) + '년 월별 추이 <small>공급가 · 세전</small></h4><div class="table-wrap"><table class="sttbl rp-year" data-tk-off><thead><tr><th>월</th><th class="n">쿠팡 매출</th><th class="n">기사 매입</th><th class="n">회사이익</th><th class="n">운영경비</th><th class="n">당기순이익</th><th class="n">이익률</th><th class="n">배송건수</th><th class="n">기사</th></tr></thead><tbody>' +
+      months.map(mrow).join('') + '</tbody><tfoot><tr><td>합계 (' + has.length + '개월)</td><td class="n">' + n(sum('salesSupply')) + '</td><td class="n">' + n(sum('drvSupply')) + '</td><td' + cls(sum('profit')) + '>' + sgn(sum('profit')) + '</td><td class="n">' + n(sum('opex')) + '</td><td' + cls(sum('net')) + '><b>' + sgn(sum('net')) + '</b></td><td class="n">' + pct(sum('salesSupply') ? sum('net') / sum('salesSupply') : 0) + '</td><td class="n">' + n(sum('qty')) + '</td><td></td></tr></tfoot></table></div>' +
+      '<p class="sub" style="margin:8px 0 0;font-size:12px">운영경비 = 러너 산재·고용 부담 + 직원 인건비 + 고정 운영비·지출. 당기순이익 = 회사이익 − 운영경비 + 보험 차액. 기사 매입 = 세금계산서 공급가 합계.</p></div>';
+    // ② 캠프별 (조회월)
+    const C = R.camps || [], maxCS = Math.max(1, ...C.map((c) => c.sales)), tq = C.reduce((a, c) => a + c.qty, 0), ts = C.reduce((a, c) => a + c.sales, 0), tp = C.reduce((a, c) => a + c.pay, 0);
+    const t2 = '<div class="rp-card"><h4>② 캠프별 <small>' + esc(ymTitle(R.month)) + ' · VAT포함</small></h4><table class="sttbl rp-camp" data-tk-off><thead><tr><th>캠프</th><th class="n">배송건수</th><th class="n">매출</th><th class="n">기사 지급</th><th class="n">회사 몫</th><th class="n">비율</th></tr></thead><tbody>' +
+      C.map((c) => '<tr><td><b>' + esc(c.camp) + '</b></td><td class="n">' + n(c.qty) + '</td><td class="n rp-barcell">' + bar(c.sales, maxCS) + '<span>' + n(c.sales) + '</span></td><td class="n">' + n(c.pay) + '</td><td' + cls(c.margin) + '>' + sgn(c.margin) + '</td><td' + cls(c.rate) + '>' + pct(c.rate) + '</td></tr>').join('') +
+      '</tbody><tfoot><tr><td>합계</td><td class="n">' + n(tq) + '</td><td class="n">' + n(ts) + '</td><td class="n">' + n(tp) + '</td><td' + cls(ts - tp) + '>' + sgn(ts - tp) + '</td><td class="n">' + pct(ts ? (ts - tp) / ts : 0) + '</td></tr></tfoot></table>' +
+      '<p class="sub" style="margin:8px 0 0;font-size:12px">기사 지급은 노선별 줄은 그 캠프에, 프레시백·수당 등은 기사의 캠프 건수 비율로 나눠 넣은 참고값입니다.</p></div>';
+    // ③ 기사 TOP 10
+    const T = R.top || [], maxT = Math.max(1, ...T.map((d) => d.sales));
+    const t3 = '<div class="rp-card"><h4>③ 기사 TOP 10 <small>' + esc(ymTitle(R.month)) + ' 매출 · VAT포함</small></h4><table class="sttbl rp-top10" data-tk-off><thead><tr><th>#</th><th>기사</th><th class="n">매출</th><th class="n">기사 지급</th><th class="n">회사이익</th><th class="n">근무</th><th class="n">배송</th></tr></thead><tbody>' +
+      T.map((d, i) => '<tr><td>' + (i + 1) + '</td><td><b>' + esc(d.name) + '</b></td><td class="n rp-barcell">' + bar(d.sales, maxT) + '<span>' + n(d.sales) + '</span></td><td class="n">' + n(d.pay) + '</td><td' + cls(d.profit) + '>' + sgn(d.profit) + '</td><td class="n">' + d.workDays + '일</td><td class="n">' + n(d.qty) + '</td></tr>').join('') + '</tbody></table></div>';
+    // ④ 일별
+    const Dy = R.daily || [], maxD = Math.max(1, ...Dy.map((d) => d.qty)), today = ymdLocal(new Date());
+    const t4 = '<div class="rp-card"><h4>④ 일별 배송건수 · 매출 <small>' + esc(R.period.from) + ' ~ ' + esc(R.period.to) + ' · VAT포함</small></h4><table class="sttbl rp-daily" data-tk-off><thead><tr><th>날짜</th><th class="n">배송건수</th><th class="n">매출</th></tr></thead><tbody>' +
+      Dy.map((d) => { const dt = new Date(d.date + 'T00:00:00'), wd = '일월화수목금토'[dt.getDay()], fut = d.date > today; return '<tr' + (fut && !d.qty ? ' class="dim"' : '') + '><td>' + esc(d.date.slice(5)) + ' <small class="sub' + (wd === '일' ? ' rp-open' : '') + '">' + wd + '</small></td><td class="n rp-barcell">' + bar(d.qty, maxD) + '<span>' + (d.qty ? n(d.qty) : '-') + '</span></td><td class="n">' + (d.sales ? n(d.sales) : '-') + '</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td>합계</td><td class="n">' + n(Dy.reduce((a, d) => a + d.qty, 0)) + '</td><td class="n">' + n(Dy.reduce((a, d) => a + d.sales, 0)) + '</td></tr></tfoot></table></div>';
+    el.innerHTML = strpTabs('year') + '<div id="rpBox" class="rp-wrap"><div class="rp-head"><div><h3>' + esc(R.year) + '년 연간 리포트</h3><div class="sub">조회월 ' + esc(ymTitle(R.month)) + ' · 캠프별·기사 TOP·일별은 조회월 기준 · 만든 시각 ' + esc(ymdLocal(new Date()) + ' ' + String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')) + '</div></div>' +
+      '<div class="noprint"><button type="button" class="btn ghost sm" id="rpPrint">인쇄 · PDF 저장</button> <button type="button" class="btn ghost sm" id="rpXlsx">엑셀</button></div></div>' + t1 + '<div class="rp-grid2">' + t2 + t3 + '</div>' + t4 + '</div>';
+    $('#rpPrint').addEventListener('click', () => { document.body.classList.add('print-report'); window.print(); setTimeout(() => document.body.classList.remove('print-report'), 500); });
+    $('#rpXlsx').addEventListener('click', () => {
+      const s1 = [['월', '마감', '쿠팡 매출(공급가)', '쿠팡 매출(VAT포함)', '기사 매입(공급가)', '기사 계산서', '기사 실입금', '회사이익', '기타수익', '러너 산재고용', '인건비', '운영비', '당기순이익', '이익률', '배송건수', '기사 수']].concat(has.map((x) => [x.month, x.closed ? 'Y' : '', x.salesSupply, x.sales, x.drvSupply, x.drvInvoice, x.drvNet, x.profit, x.otherInc, x.runnerIns, x.staff, x.cost, x.net, Math.round((x.rate || 0) * 10000) / 100, x.qty, x.drivers]));
+      const s2 = [['캠프', '배송건수', '매출(VAT포함)', '기사 지급', '회사 몫', '비율']].concat(C.map((c) => [c.camp, c.qty, c.sales, c.pay, c.margin, Math.round(c.rate * 10000) / 100]));
+      const s3 = [['순위', '기사', '매출(VAT포함)', '기사 지급', '회사이익', '근무일수', '배송건수']].concat(T.map((d, i) => [i + 1, d.name, d.sales, d.pay, d.profit, d.workDays, d.qty]));
+      const s4 = [['날짜', '배송건수', '매출(VAT포함)']].concat(Dy.map((d) => [d.date, d.qty, d.sales]));
+      const blob = ZIPW.xlsx([{ name: '월별 추이', rows: s1, widths: [10, 6, 16, 16, 16, 14, 14, 14, 12, 12, 12, 12, 14, 8, 10, 8] }, { name: '캠프별', rows: s2, widths: [12, 10, 14, 14, 14, 8] }, { name: '기사 TOP10', rows: s3, widths: [6, 12, 14, 14, 12, 8, 10] }, { name: '일별', rows: s4, widths: [12, 10, 14] }]);
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '러너_연간리포트_' + R.year + '_' + R.month.replace('-', '') + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    });
+  }
   function loadReport() {
     const ps = STX.paneSeq, el = $('#stPnl');
     if (!STX.sum || STX.sum.month !== STX.month) { el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>'; return loadSettle(STX.month); }
-    el.innerHTML = '<div style="padding:30px"><div class="spin"></div></div>';
+    el.innerHTML = strpTabs('month') + '<div style="padding:30px"><div class="spin"></div></div>';
     api('adm_stlReportExtra', STX.month).then((r) => { if (ps !== STX.paneSeq) return; STX.rpx = r && r.ok ? r : null; renderReport(); })
       .catch(() => { if (ps !== STX.paneSeq) return; STX.rpx = null; renderReport(); });
   }
@@ -7988,7 +8050,7 @@
     const tbl = '<div class="rp-card wide"><h4>⑥ 기사별 요약 <small>매출 많은 순</small></h4><div class="table-wrap"><table class="sttbl rp-drv"><thead><tr><th>#</th><th>기사</th><th>아이디</th><th class="n">배송</th><th class="n">쿠팡 매출</th><th class="n">계산서</th><th class="n">산재·고용</th><th class="n">공제</th><th class="n">실입금</th><th class="n">회사이익</th><th>입금</th></tr></thead><tbody>' +
       D.map((d, i) => '<tr' + (d.legacyNote ? ' class="dim"' : '') + '><td>' + (i + 1) + '</td><td><b>' + esc(d.name) + '</b>' + (d.vendor ? ' <small class="sub">용차</small>' : '') + (d.legacyNote ? ' <small class="sub">' + esc(d.legacyNote) + '</small>' : '') + '</td><td class="sub">' + esc((d.cids || []).join(', ')) + '</td><td class="n">' + n(d.qty) + '</td><td class="n">' + n(d.sales) + '</td><td class="n">' + n(d.invoice) + '</td><td class="n">' + n((d.san || 0) + (d.goy || 0)) + '</td><td class="n">' + n(d.depDed) + '</td><td class="n"><b>' + n(d.net) + '</b></td><td class="n">' + sgn(d.profit) + '</td><td>' + (d.net ? (d.checked ? '✓' : '<span class="rp-open">미체크</span>') : '') + '</td></tr>').join('') +
       '</tbody><tfoot><tr><td colspan="3">합계 ' + D.length + '명</td><td class="n">' + n(t.qty) + '</td><td class="n">' + n(t.sales) + '</td><td class="n">' + n(t.invoice) + '</td><td class="n">' + n((t.san || 0) + (t.goy || 0)) + '</td><td class="n">' + n(t.depDed) + '</td><td class="n"><b>' + n(t.net) + '</b></td><td class="n">' + sgn(t.profit) + '</td><td></td></tr></tfoot></table></div></div>';
-    el.innerHTML = '<div id="rpBox" class="rp-wrap">' + head + '<div class="rp-grid">' + k1 + k2 + k3 + k4 + '</div>' + k5 + tbl + '</div>';
+    el.innerHTML = strpTabs('month') + '<div id="rpBox" class="rp-wrap">' + head + '<div class="rp-grid">' + k1 + k2 + k3 + k4 + '</div>' + k5 + tbl + '</div>';
     $('#rpPrint').addEventListener('click', () => { document.body.classList.add('print-report'); window.print(); setTimeout(() => document.body.classList.remove('print-report'), 500); });
     $('#rpXlsx').addEventListener('click', () => {
       const H = ['기사', '아이디', '배송', '쿠팡 매출', '계산서', '공급가', '세액', '산재', '고용', '공제', '실입금', '회사이익', '입금체크'];
