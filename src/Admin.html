@@ -1141,7 +1141,9 @@
   .is-res button b { display: block; font-size: 14.5px; color: var(--ink); } .is-res button small { font-size: 11.5px; }
   .is-res button.on { border: 2px solid var(--brand); background: var(--brand-weak); padding: 8px 5px; } .is-res button.on b { color: var(--brand); }
   .is-res button[data-res="미입차"].on, .is-res button[data-res="노쇼"].on, .is-res button[data-res="병가"].on { border-color: #e5484d; background: #fff1f1; } .is-res button[data-res="미입차"].on b, .is-res button[data-res="노쇼"].on b { color: #c81e1e; }
-  .is-rot { display: flex; gap: 8px; flex-wrap: wrap; }
+  .is-rot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .is-rot .is-rotl { width: 36px; font-size: 12px; font-weight: 700; color: var(--sub); } .is-rot .is-rotbr { flex-basis: 100%; height: 0; }
+  .is-rot .is-cutnow { flex-basis: 100%; font-size: 12.5px; color: var(--ink); margin-top: 2px; }
   .is-rot button { min-width: 74px; height: 38px; border-radius: 9px; border: 1px solid #b7e0c6; background: #e9f7ef; color: #0b6b3a; font: inherit; font-weight: 800; cursor: pointer; }
   .is-rot button.cut { border: 2px solid #e5484d; background: #fff1f1; color: #c81e1e; }
   .is-qty { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--sub); } .is-qty input { width: 130px; height: 32px; }
@@ -1933,7 +1935,7 @@
       <button type="button" data-res="노쇼"><b>노쇼</b><small>연락 없이 미입차</small></button>
       <button type="button" data-res="병가"><b>병가</b><small>아파서 쉼 · 전부 뺌</small></button>
       <button type="button" data-res="물량조율"><b>물량조율</b><small>일부 회전만 뺌</small></button></div></div>
-    <div class="field hidden" id="isMCutW"><span class="lb">2. 뺀 회전</span><div class="is-rot" id="isMCut"></div>
+    <div class="field hidden" id="isMCutW"><span class="lb">2. 뺀 물량 — 노선 · 회전</span><div class="is-rot" id="isMCut"></div>
       <div class="is-qty"><label for="isMQty">뺀 수량 (선택)</label><input class="inp" id="isMQty" placeholder="예: 80개" maxlength="20"></div></div>
     <div class="field"><span class="lb" id="isMReasonLb">3. 사유 — 왜 그랬나</span><div class="is-chips" id="isMKind"></div>
       <textarea class="inp" id="isMReason" style="height:54px;margin-top:8px" maxlength="200" placeholder="상세 사유 (예: 몸살 호소, 허리 통증으로 병원)"></textarea></div>
@@ -4440,13 +4442,38 @@
     try { if ($('#sGrid') && !$('#view-sched').classList.contains('hidden')) refreshAfterChange(); } catch (e) { /* 무시 */ }
   }
   // ── 등록 · 수정 창 ──
-  const ISM = { res: '', cut: [], kind: '', sub: '' };
+  const ISM = { res: '', cut: [], cutU: [], kind: '', sub: '' };
+  /** 뺀 물량 글자: 노선만 → '405C' · 회전만 → 'D2,F3' · 둘 다 → '405C (D2)' (그 노선의 그 회전만) */
+  function isCutStr() {
+    const u = ISM.cutU.slice().sort(), r = IS_ROTS.filter((q) => ISM.cut.includes(q));
+    if (u.length && r.length) return groupRoutes(u.join(',')) + ' (' + r.join(',') + ')';
+    if (u.length) return groupRoutes(u.join(','));
+    return r.join(',');
+  }
+  /** units 에서 뺀 물량을 빼고 남은 칸 글자 */
+  function isLeftAfterCut(base, rots) {
+    const u = isUnits(base, rots); if (!u) return '';
+    const cu = ISM.cutU, cr = ISM.cut;
+    Object.keys(u).forEach((rt) => {
+      const hitU = !cu.length || cu.includes(rt);
+      if (!hitU) return;
+      u[rt] = cr.length ? u[rt].filter((q) => !cr.includes(q)) : [];
+    });
+    const keys = Object.keys(u).filter((rt) => u[rt].length).sort();
+    if (!keys.length) return '미입차';
+    const all = rots.join(','), sets = Array.from(new Set(keys.map((rt) => u[rt].join(','))));
+    if (sets.length === 1) return groupRoutes(keys.join(',')) + (sets[0] !== all ? ' (' + sets[0] + ')' : '');
+    return keys.map((rt) => rt + (u[rt].join(',') !== all ? '(' + u[rt].join(',') + ')' : '')).join(',');
+  }
   function isDrvOf(id) { return IS.drivers.find((d) => d.id === id) || null; }
   function isPaintModal() {
     $$('#isMRes button').forEach((b) => b.classList.toggle('on', b.dataset.res === ISM.res));
     const d = isDrvOf($('#isMDrv').value), rots = d ? isCampRots(d.campId) : IS_ROTS;
     $('#isMCutW').classList.toggle('hidden', ISM.res !== '물량조율');
-    $('#isMCut').innerHTML = rots.map((r) => '<button type="button" data-rot="' + r + '" class="' + (ISM.cut.includes(r) ? 'cut' : '') + '">' + r + (ISM.cut.includes(r) ? ' 뺌' : '') + '</button>').join('');
+    const units = d ? Object.keys(isUnits(d.baseRoute, rots) || {}).sort() : [];
+    $('#isMCut').innerHTML = (units.length > 1 ? '<div class="is-rotl">노선</div>' + units.map((u) => '<button type="button" data-unit="' + u + '" class="' + (ISM.cutU.includes(u) ? 'cut' : '') + '">' + u + (ISM.cutU.includes(u) ? ' 뺌' : '') + '</button>').join('') + '<div class="is-rotbr"></div>' : '') +
+      '<div class="is-rotl">회전</div>' + rots.map((r) => '<button type="button" data-rot="' + r + '" class="' + (ISM.cut.includes(r) ? 'cut' : '') + '">' + r + (ISM.cut.includes(r) ? ' 뺌' : '') + '</button>').join('') +
+      '<div class="is-cutnow">' + (isCutStr() ? '뺀 물량: <b>' + esc(isCutStr()) + '</b>' + (ISM.cutU.length && ISM.cut.length ? ' <span class="sub">(고른 노선의 고른 회전만)</span>' : '') : '<span class="sub">뺀 노선이나 회전을 고르세요 (노선만 = 그 노선 전부 · 회전만 = 모든 노선의 그 회전)</span>') + '</div>';
     const reasons = IS.reasons.concat(ISM.kind && !IS.reasons.includes(ISM.kind) ? [ISM.kind] : []);
     $('#isMKind').innerHTML = reasons.map((k) => '<button type="button" data-k="' + esc(k) + '" class="' + (ISM.kind === k ? 'on' : '') + '">' + esc(k) + '</button>').join('');
     $('#isMReasonLb').textContent = '3. 사유 — 왜 그랬나' + (ISM.res === '노쇼' ? ' (노쇼는 선택)' : '');
@@ -4464,11 +4491,7 @@
     const span = a === b ? isMd0(a) : isMd0(a) + '~' + isMd0(b);
     let put = '';
     if (ISM.res === '미입차' || ISM.res === '노쇼' || ISM.res === '병가') put = ISM.res;
-    else if (ISM.res === '물량조율' && ISM.cut.length) {
-      const rots = isCampRots(d.campId), u = isUnits(d.baseRoute, rots);
-      if (u) { Object.keys(u).forEach((rt) => { u[rt] = u[rt].filter((q) => !ISM.cut.includes(q)); }); const left = Array.from(new Set(Object.values(u).map((x) => x.join(',')))); const keys = Object.keys(u).filter((rt) => u[rt].length);
-        put = keys.length ? groupRoutes(keys.join(',')) + (left.length === 1 && left[0] !== rots.join(',') ? ' (' + left[0] + ')' : '') : '미입차'; }
-    }
+    else if (ISM.res === '물량조율' && (ISM.cut.length || ISM.cutU.length)) put = isLeftAfterCut(d.baseRoute, isCampRots(d.campId));
     const old = a < IS.ruleFrom;
     // 대신 뛴 우리 기사(업체백업·품앗이) 칸: PDD(내일)부터
     let subLine = '';
@@ -4478,8 +4501,8 @@
       const pdd = isYmd(new Date(new Date((IS.today || isYmd(new Date())) + 'T00:00:00').getTime() + 86400000));
       const from = a > pdd ? a : pdd;
       const mc = shortCampSafe(d.camp || ''), sc = shortCampSafe(sd.camp || '');
-      const cutRots = ISM.res === '물량조율' && !ISM.cutText ? IS_ROTS.filter((r) => ISM.cut.includes(r)).join(',') : '';
-      const what = (sc !== mc && mc ? mc + ' ' : '') + (ISM.res === '물량조율' ? (ISM.cutText || (d.baseRoute + (cutRots ? ' (' + cutRots + ')' : ''))) : d.baseRoute);
+      const cs = isCutStr();
+      const what = (sc !== mc && mc ? mc + ' ' : '') + (ISM.res === '물량조율' ? (ISM.cutU.length ? cs : d.baseRoute + (cs ? ' (' + cs + ')' : '')) : d.baseRoute);
       subLine = from <= b ? '<br>' + esc(who) + ' ' + esc(from === b ? isMd0(from) : isMd0(from) + '~' + isMd0(b)) + ' 칸 → <b>' + esc(what) + '</b> 자동 배정 <span class="sub">(PDD ' + esc(isMd0(pdd)) + '부터 · 오늘까지는 실제 기록이라 그대로)</span>'
         : '<br><span class="sub">' + esc(who) + ': 기간이 PDD(' + esc(isMd0(pdd)) + ') 전이라 칸은 바꾸지 않고 기록만</span>';
     }
@@ -4497,10 +4520,17 @@
       $('#isMDate').value = x ? x.date : isYmd(new Date());
       $('#isMEnd').value = x ? (x.end || x.date) : $('#isMDate').value;
       ISM.res = x ? (x.result || (x.kind === '노쇼' ? '노쇼' : x.mi ? '미입차' : x.kind === '물량조율' ? '물량조율' : '')) : '';
-      ISM.cut = x && x.cut && !/\d{3}/.test(x.cut) ? isNormRot(x.cut) : [];
+      ISM.cut = []; ISM.cutU = [];
+      if (x && x.cut) {
+        if (/\d{3}/.test(x.cut)) {
+          const xd = isDrvOf(x.driverId), xr = xd ? isCampRots(xd.campId) : IS_ROTS, cu = isUnits(x.cut, xr) || {};
+          ISM.cutU = Object.keys(cu).sort();
+          const sets = Array.from(new Set(ISM.cutU.map((u) => cu[u].join(','))));
+          if (sets.length === 1 && sets[0] !== xr.join(',')) ISM.cut = sets[0].split(',');
+        } else ISM.cut = isNormRot(x.cut);
+      }
       ISM.kind = x ? (x.kind === '사고' ? '차량사고' : x.kind === '고장' ? '차량고장' : /^(물량조율|노쇼|미분류)$/.test(x.kind) ? '' : x.kind === IS.unset ? '' : x.kind) : '';
       ISM.sub = x ? (x.sub || '') : '';
-      ISM.cutText = x && x.cut && /\d{3}/.test(x.cut) ? x.cut : '';
       $('#isMQty').value = x ? (x.qty || '') : '';
       $('#isMReason').value = x ? x.reason : ''; $('#isMAction').value = x ? x.action : '';
       isFillSubWho(x ? x.subWho : '');
@@ -4533,8 +4563,13 @@
   $('#isMDrv').addEventListener('change', () => { isFillSubWho($('#isMSubWho').value); isPaintModal(); isLoadCell(); });
   $('#isMDate').addEventListener('change', () => { if (!$('#isMEnd').value || $('#isMEnd').value < $('#isMDate').value) $('#isMEnd').value = $('#isMDate').value; isPaintModal(); isLoadCell(); });
   $('#isMEnd').addEventListener('change', isPaintModal);
-  $('#isMRes').addEventListener('click', (e) => { const b = e.target.closest('[data-res]'); if (!b) return; ISM.res = b.dataset.res; if (ISM.res === '물량조율' && !ISM.cut.length && !ISM.cutText) ISM.cut = ['F3']; if (ISM.res === '병가' && !ISM.kind) ISM.kind = '질병'; isPaintModal(); });
-  $('#isMCut').addEventListener('click', (e) => { const b = e.target.closest('[data-rot]'); if (!b) return; const r = b.dataset.rot; ISM.cutText = ''; ISM.cut = ISM.cut.includes(r) ? ISM.cut.filter((q) => q !== r) : ISM.cut.concat(r); isPaintModal(); });
+  $('#isMRes').addEventListener('click', (e) => { const b = e.target.closest('[data-res]'); if (!b) return; ISM.res = b.dataset.res; if (ISM.res === '병가' && !ISM.kind) ISM.kind = '질병'; isPaintModal(); });
+  $('#isMCut').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rot],[data-unit]'); if (!b) return;
+    if (b.dataset.rot) { const r = b.dataset.rot; ISM.cut = ISM.cut.includes(r) ? ISM.cut.filter((q) => q !== r) : ISM.cut.concat(r); }
+    else { const u = b.dataset.unit; ISM.cutU = ISM.cutU.includes(u) ? ISM.cutU.filter((q) => q !== u) : ISM.cutU.concat(u); }
+    isPaintModal();
+  });
   $('#isMKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; ISM.kind = ISM.kind === b.dataset.k ? '' : b.dataset.k; isPaintModal(); });
   $('#isMSub').addEventListener('click', (e) => { const b = e.target.closest('[data-sub]'); if (!b) return; ISM.sub = ISM.sub === b.dataset.sub ? '' : b.dataset.sub; isPaintModal(); });
   $('#isMSubWho').addEventListener('change', isPreview);
@@ -4557,13 +4592,13 @@
   }
   $('#isMGo').addEventListener('click', () => {
     const o = { id: IS.cur ? IS.cur.id : '', driverId: $('#isMDrv').value, date: $('#isMDate').value, end: $('#isMEnd').value || $('#isMDate').value,
-      result: ISM.res, cut: ISM.res === '물량조율' ? (ISM.cutText || IS_ROTS.filter((r) => ISM.cut.includes(r)).join(',')) : '', kind: ISM.kind || (ISM.res === '노쇼' ? '노쇼' : ''), reason: $('#isMReason').value.trim(),
+      result: ISM.res, cut: ISM.res === '물량조율' ? isCutStr() : '', kind: ISM.kind || (ISM.res === '노쇼' ? '노쇼' : ''), reason: $('#isMReason').value.trim(),
       sub: ISM.sub, subWho: IS_OURS(ISM.sub) ? $('#isMSubWho').value : '', qty: ISM.res === '물량조율' ? $('#isMQty').value.trim() : '', action: $('#isMAction').value.trim() };
     if (!o.driverId) return toast('기사를 고르세요.');
     if (!o.date) return toast('시작일을 고르세요.');
     if (o.end < o.date) return toast('종료일이 시작일보다 빠릅니다.');
     if (!o.result) return toast('결과(미입차 · 노쇼 · 물량조율)를 고르세요.');
-    if (o.result === '물량조율' && !o.cut) return toast('뺀 회전을 고르세요.');
+    if (o.result === '물량조율' && !o.cut) return toast('뺀 노선이나 회전을 고르세요.');
     if (!o.kind) return toast('사유를 고르세요.');
     const b = $('#isMGo'); b.disabled = true; b.textContent = '저장 중…';
     isSave(o).then((r) => {
