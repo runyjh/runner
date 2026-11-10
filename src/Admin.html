@@ -1095,6 +1095,7 @@
   .dc-st.on { background: #12a150; border-color: #12a150; color: #fff; }
   .dc-st.ti { background: #e8f0fd; border-color: #b9d0f7; color: var(--brand); cursor: default; }
   .dc-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: #eef1f4; color: #4e5968; white-space: nowrap; }
+  .irpar-b { border: 1px dashed #cbd5e1; background: #fff; color: #64748b; border-radius: 6px; font-size: 11px; padding: 1px 6px; cursor: pointer; opacity: .55; } tr:hover .irpar-b { opacity: 1; } .irpar-b:hover { border-color: #2563eb; color: #2563eb; }
   .dc-tag.y { background: #e7f6ee; color: #0b6b3a; } .dc-tag.n { background: #f3f4f6; color: #9aa4b2; } .dc-tag.w { background: #fff0e6; color: #c2410c; }
   .dc-tb tr.done td:first-child { box-shadow: inset 3px 0 0 #12a150; }
   .dc-cfg { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 14px 16px; margin: 0 0 12px; }
@@ -4015,8 +4016,8 @@
   });
 
   // ── 산재/고용 신고 상황 ──
-  const IR = { month: '', rows: [], tab: '신고 대상', sel: new Set(), seq: 0, info: null };
-  const irTarget = (x) => !x.excluded && (x.sanOn || x.goyOn);
+  const IR = { month: '', rows: [], tab: '신고 대상', sel: new Set(), seq: 0, info: null, parEdit: '' };
+  const irTarget = (x) => !x.parent && !x.excluded && (x.sanOn || x.goyOn);
   function loadInsRep(month) {
     const seq = ++IR.seq;
     if (!IR.rows.length) $('#irRows').innerHTML = '<tr><td colspan="14" class="sub">정산 결과를 불러오는 중…</td></tr>';
@@ -4045,19 +4046,37 @@
     const tabs = [['신고 대상', tg.length], ['미신고', tg.filter((x) => !x.done).length], ['신고 완료', done.length], ['제외', all.length - tg.length], ['전체', all.length]];
     $('#irTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (IR.tab === k ? ' on' : '') + '" data-irt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
     const q = $('#irQ').value.trim().toLowerCase();
-    const list = all.filter((x) => (IR.tab === '전체' || (IR.tab === '신고 대상' && irTarget(x)) || (IR.tab === '미신고' && irTarget(x) && !x.done) || (IR.tab === '신고 완료' && irTarget(x) && x.done) || (IR.tab === '제외' && !irTarget(x))) &&
-      (!q || [x.name, x.memo].join(' ').toLowerCase().includes(q)));
+    const list0 = all.filter((x) => !x.parent && (IR.tab === '전체' || (IR.tab === '신고 대상' && irTarget(x)) || (IR.tab === '미신고' && irTarget(x) && !x.done) || (IR.tab === '신고 완료' && irTarget(x) && x.done) || (IR.tab === '제외' && !irTarget(x))) &&
+      (!q || [x.name, x.memo].concat((x.kids || []).map((k) => (all.find((y) => y.acct === k) || {}).name)).join(' ').toLowerCase().includes(q)));
+    // 하위 기사는 상위 기사 바로 밑에 붙여 보여 줌 (보험료는 상위 기사에 합산)
+    const list = [];
+    list0.forEach((x) => { list.push(x); all.filter((y) => y.parent === x.acct).forEach((y) => list.push(y)); });
     $('#irCount').textContent = dMon(IR.month) + ' · ' + done.length + '/' + tg.length + '명 신고';
     const yn = (on, why) => on ? '<span class="dc-tag y">적용</span>' : '<span class="dc-tag n"' + (why ? ' title="' + esc(why) + '"' : '') + '>—</span>';
+    const parSel = (x) => '<select class="inp" data-irpar="' + esc(x.acct) + '" style="height:28px;font-size:12.5px;margin-top:4px;max-width:150px"><option value="">— 상위 기사 고르기 —</option>' +
+      all.filter((y) => y.acct !== x.acct && !y.parent && !y.parentMissing).map((y) => '<option value="' + esc(y.acct) + '">' + esc(y.name) + '</option>').join('') + '</select>';
     $('#irRows').innerHTML = list.map((x) => {
+      if (x.parent) {
+        const o = x.own || {};
+        return '<tr data-acct="' + esc(x.acct) + '" class="irkid" style="background:#f8fafc;color:#64748b">' +
+          '<td class="ck"></td><td style="white-space:nowrap;padding-left:22px">↳ <b>' + esc(x.name) + '</b> <span class="dc-tag n" title="이 기사의 보험료는 상위 기사 한 사람으로 합쳐 신고합니다">' + esc(x.parentName) + '에 합산</span>' +
+          ' <button type="button" class="btn sm ghost" data-irunpar="' + esc(x.acct) + '" style="height:24px;padding:0 8px;font-size:11.5px">풀기</button></td>' +
+          '<td></td><td class="sm">' + (x.hasRrn ? esc(x.rrn || '등록됨') : '') + '</td><td></td>' +
+          '<td class="num">' + dWon(o.supply) + '</td><td class="num">' + dWon(o.bosu) + '</td><td colspan="2" class="sm">상위에 합산</td>' +
+          '<td class="num">' + dWon((o.sanD || 0) + (o.goyD || 0)) + '</td><td class="num">' + dWon((o.sanAll || 0) + (o.goyAll || 0)) + '</td>' +
+          '<td colspan="2" class="sm">' + esc(x.parentName) + ' 신고에 포함</td><td><input class="inp dcm" data-irf="memo" value="' + esc(x.memo) + '" maxlength="200"></td></tr>';
+      }
       const tgt = irTarget(x), chg = x.done && x.savedBosu && x.savedBosu !== x.bosu;
       return '<tr data-acct="' + esc(x.acct) + '"' + (x.done && tgt ? ' class="done"' : '') + (tgt ? '' : ' style="opacity:.6"') + '>' +
         '<td class="ck">' + (tgt ? '<input type="checkbox" data-irck="' + esc(x.acct) + '"' + (IR.sel.has(x.acct) ? ' checked' : '') + '>' : '') + '</td>' +
-        '<td style="white-space:nowrap"><b>' + esc(x.name) + '</b>' + (x.leave ? ' <span class="dc-tag w" title="퇴사일">퇴사 ' + esc(dMd(x.leave)) + '</span>' : '') + '</td>' +
+        '<td style="white-space:nowrap"><b>' + esc(x.name) + '</b>' + (x.leave ? ' <span class="dc-tag w" title="퇴사일">퇴사 ' + esc(dMd(x.leave)) + '</span>' : '') +
+          (x.kids ? ' <span class="dc-tag y" title="하위 기사 보험료를 이 기사에 합쳐 신고">+ 하위 ' + x.kids.length + '명</span>' : '') +
+          (x.parentMissing ? ' <span class="dc-tag w" title="지정한 상위 기사가 이번 달 정산에 없어 따로 신고합니다">상위 없음</span> <button type="button" class="btn sm ghost" data-irunpar="' + esc(x.acct) + '" style="height:24px;padding:0 8px;font-size:11.5px">풀기</button>' : '') +
+          (!x.kids && !x.parentMissing ? (IR.parEdit === x.acct ? '<div>' + parSel(x) + '</div>' : ' <button type="button" class="irpar-b" data-irpared="' + esc(x.acct) + '" title="이 기사를 다른 기사의 하위로 넣어 보험료를 합쳐 신고">하위로</button>') : '') + '</td>' +
         '<td>' + irEnrTag(x) + '</td>' +
         '<td class="sm">' + (x.hasRrn ? esc(x.rrn || '등록됨') : '<span style="color:#c81e1e;font-weight:700">⚠ 없음</span>') + '</td>' +
         '<td><input class="inp dcd" type="date" data-irf="start" value="' + esc(x.start) + '"></td>' +
-        '<td class="num">' + dWon(x.supply) + '</td><td class="num"><b>' + dWon(x.bosu) + '</b>' + (chg ? '<div style="color:#c2410c;font-size:11.5px;font-weight:700">⚠ 신고 때 ' + dWon(x.savedBosu) + '</div>' : '') + '</td>' +
+        '<td class="num">' + dWon(x.supply) + '</td><td class="num"><b>' + dWon(x.bosu) + '</b>' + (x.kids ? '<div class="sm" style="font-size:11px">본인 ' + dWon((x.own || {}).bosu) + ' + 하위 ' + dWon(x.bosu - ((x.own || {}).bosu || 0)) + '</div>' : '') + (chg ? '<div style="color:#c2410c;font-size:11.5px;font-weight:700">⚠ 신고 때 ' + dWon(x.savedBosu) + '</div>' : '') + '</td>' +
         '<td>' + (x.excluded ? '<span class="dc-tag n" title="정산 설정에서 산재·고용 제외">제외</span>' : yn(x.sanOn, '산재 OFF')) + '</td>' +
         '<td>' + (x.excluded ? '' : yn(x.goyOn, x.bosu < (rt.goyMin || 0) ? '월보수액 ' + dWon(rt.goyMin) + '원 미만' : '고용 OFF')) + '</td>' +
         '<td class="num">' + dWon(x.sanD + x.goyD) + '</td><td class="num">' + dWon(x.sanAll + x.goyAll) + '</td>' +
@@ -4087,7 +4106,20 @@
     x[f.dataset.irf] = f.value.trim();
     irSave([x]).then((r) => { if (r && r.ok) toast(x.name + ' 저장했습니다.'); }).catch(() => {});
   });
+  function irMerge(child, parent) {
+    const c = IR.rows.find((i) => i.acct === child), p = IR.rows.find((i) => i.acct === parent);
+    api('adm_insRepCfg', { merge: { child: child, parent: parent || '' } }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      IR.parEdit = ''; IR.sel.delete(child);
+      toast(parent ? (c ? c.name : '') + ' → ' + (p ? p.name : '') + ' 하위로 넣었습니다. 보험료를 합쳐 신고합니다.' : (c ? c.name : '') + ' 따로 신고로 풀었습니다.');
+      loadInsRep();
+    }).catch(() => {});
+  }
+  $('#irRows').addEventListener('change', (e) => { const s = e.target.closest('[data-irpar]'); if (s && s.value) irMerge(s.dataset.irpar, s.value); });
   $('#irRows').addEventListener('click', (e) => {
+    const pe = e.target.closest('[data-irpared]');
+    if (pe) { IR.parEdit = IR.parEdit === pe.dataset.irpared ? '' : pe.dataset.irpared; renderInsRep(); const s = $('#irRows [data-irpar]'); if (s) s.focus(); return; }
+    const up = e.target.closest('[data-irunpar]'); if (up) return irMerge(up.dataset.irunpar, '');
     const b = e.target.closest('[data-irtog]'); if (!b) return;
     const x = IR.rows.find((i) => i.acct === b.dataset.irtog); if (!x) return;
     x.done = !x.done; x.date = x.done ? (x.date || dToday()) : ''; x.savedBosu = x.done ? x.bosu : 0;

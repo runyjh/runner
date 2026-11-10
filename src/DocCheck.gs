@@ -92,7 +92,9 @@ function docInsCfg_() {
   try { tpl = s.insTpl ? JSON.parse(s.insTpl) : null; } catch (e) { tpl = null; }
   let enr = null;
   try { enr = s.insEnrolled ? JSON.parse(s.insEnrolled) : null; } catch (e) { enr = null; }
-  return { jobCode: str_(s.insJobCode) || DOC_JOB_DEFAULT, bizMgmtNo: str_(s.insBizMgmtNo) || '', tpl: tpl, enrolled: enr };
+  let mg = {};
+  try { mg = s.insMerge ? JSON.parse(s.insMerge) || {} : {}; } catch (e) { mg = {}; }
+  return { jobCode: str_(s.insJobCode) || DOC_JOB_DEFAULT, bizMgmtNo: str_(s.insBizMgmtNo) || '', tpl: tpl, enrolled: enr, merge: mg };
 }
 function adm_insRepList(token, month) {
   return run_(function () {
@@ -114,7 +116,8 @@ function adm_insRepList(token, month) {
       const bosu = Math.round(base * (1 - cfg.expense));
       const excluded = !!ins.excluded;
       const sanOn = !excluded && ((ins.san0 || 0) > 0 || (d.san || 0) > 0);
-      const goyOn = !excluded && bosu >= cfg.goyMin && ((ins.goy0 || 0) > 0 || (d.goy || 0) > 0);
+      const goyFlag = (ins.goy0 || 0) > 0 || (d.goy || 0) > 0;
+      const goyOn = !excluded && bosu >= cfg.goyMin && goyFlag;
       // 공단 납부(전체) = 기사분 ÷ (1 − 러너 부담률)
       const sanAll = sanOn ? Math.round(bosu * (cfg.san + cfg.commute)) : 0, goyAll = goyOn ? Math.round(bosu * cfg.goy) : 0;
       const start0 = c.start || (lastStart[d.id] && lastStart[d.id].v) || stlYmd_(o.approvedAt) || stlYmd_(o.createdAt) || '';
@@ -123,13 +126,32 @@ function adm_insRepList(token, month) {
         supply: d.supply, invoice: d.invoice, bosu: bosu, excluded: excluded, sanOn: sanOn, goyOn: goyOn,
         sanD: d.san || 0, goyD: d.goy || 0, runner: d.runnerIns || 0, sanAll: sanAll, goyAll: goyAll,
         start: start0, done: docYn_(c.done), date: c.date || '', memo: c.memo || '', by: c.by || '', at: c.at || '',
-        savedBosu: stlNum_(c.bosu) || 0
+        savedBosu: stlNum_(c.bosu) || 0, goyFlag: goyFlag
       };
     });
     rows.sort(function (a, b) { return koCmp_(a.name, b.name); });
+    // 하위 기사: 보험료를 상위 기사 한 사람으로 합쳐 신고 (설정 insMerge = { 하위 정산ID: 상위 정산ID })
+    const icfg = docInsCfg_(), mg = icfg.merge || {}, byAcct = {};
+    rows.forEach(function (x) { byAcct[x.acct] = x; x.own = { supply: x.supply, invoice: x.invoice, bosu: x.bosu, sanD: x.sanD, goyD: x.goyD, runner: x.runner, sanAll: x.sanAll, goyAll: x.goyAll }; });
+    rows.forEach(function (x) {
+      const pa = mg[x.acct]; if (!pa) return;
+      const p = byAcct[pa];
+      if (!p || p === x || mg[pa]) { x.parentMissing = pa; return; }
+      x.parent = pa; x.parentName = p.name;
+      (p.kids = p.kids || []).push(x.acct);
+      ['supply', 'invoice', 'bosu', 'sanD', 'goyD', 'runner'].forEach(function (k) { p[k] = (p[k] || 0) + (x.own[k] || 0); });
+      p.kidSan = p.kidSan || (!x.excluded && x.sanOn); p.kidGoy = p.kidGoy || (!x.excluded && x.goyFlag);
+    });
+    rows.forEach(function (p) {
+      if (!p.kids) return;
+      p.sanOn = !p.excluded && (p.sanOn || !!p.kidSan);
+      p.goyOn = !p.excluded && p.bosu >= cfg.goyMin && (p.goyFlag || !!p.kidGoy);
+      p.sanAll = p.sanOn ? Math.round(p.bosu * (cfg.san + cfg.commute)) : 0; p.goyAll = p.goyOn ? Math.round(p.bosu * cfg.goy) : 0;
+      delete p.kidSan; delete p.kidGoy;
+    });
     const p = stlAddMonth_(month, 1).split('-').map(Number);
     const due = ymd_(new Date(p[0], p[1], 0)); // 다음 달 말일
-    return { ok: true, month: month, months: mm.months, due: due, closed: !!sum.closed, cfg: docInsCfg_(),
+    return { ok: true, month: month, months: mm.months, due: due, closed: !!sum.closed, cfg: icfg,
       rates: { expense: cfg.expense, san: cfg.san + cfg.commute, goy: cfg.goy, runner: rr, goyMin: cfg.goyMin, basis: cfg.insBasis }, rows: rows };
   });
 }
@@ -177,6 +199,19 @@ function adm_insRepCfg(token, o) {
       }
       appSetPut_('insEnrolled', t2, '산재/고용 신고: 토탈서비스 양식에 들어 있는 노무제공자 성명 (입직신고 여부 판단)');
     }
+    // 하위 기사 합치기: { child, parent } — parent 비우면 풀기
+    if (o.merge !== undefined) {
+      const ch = str_((o.merge || {}).child), pa = str_((o.merge || {}).parent);
+      if (!ch) fail_('하위로 넣을 기사를 확인해 주세요.');
+      const mg = docInsCfg_().merge || {};
+      if (pa) {
+        if (pa === ch) fail_('자기 자신을 상위로 지정할 수 없습니다.');
+        if (mg[pa]) fail_('상위 기사가 이미 다른 기사의 하위입니다. 맨 위 기사를 고르세요.');
+        if (Object.keys(mg).some(function (k) { return mg[k] === ch; })) fail_('이 기사 밑에 하위 기사가 있습니다. 하위를 먼저 풀어 주세요.');
+        mg[ch] = pa;
+      } else delete mg[ch];
+      appSetPut_('insMerge', Object.keys(mg).length ? JSON.stringify(mg) : '', '산재/고용 신고: 하위 기사 → 상위 기사 합산 신고 { 하위 정산ID: 상위 정산ID }');
+    }
     const c = docInsCfg_();
     logAdmin_(a, '산재·고용 신고 설정', '', '직종부호 ' + c.jobCode + ' · 관리번호 ' + c.bizMgmtNo + (c.tpl ? ' · 양식 ' + c.tpl.file : ''));
     return { ok: true, cfg: docInsCfg_() };
@@ -197,7 +232,7 @@ function adm_insRepExport(token, month, accts, over) {
     readAll_(SH.DRIVERS).forEach(function (d) { if (d.id) drv[d.id] = d; });
     const out = [], noRrn = [];
     r.rows.forEach(function (x) {
-      if (!want[x.acct] || x.excluded || (!x.sanOn && !x.goyOn)) return;
+      if (!want[x.acct] || x.parent || x.excluded || (!x.sanOn && !x.goyOn)) return;
       const d = drv[x.driverId] || {};
       let rrn = '';
       try { rrn = d.rrnEnc ? decrypt_(d.rrnEnc) : ''; } catch (e) { rrn = ''; }
