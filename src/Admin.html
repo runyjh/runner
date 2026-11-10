@@ -380,6 +380,17 @@
   #view-settle.st-check #stKpi, #view-settle.st-check #stp-list .st-tools, #view-settle.st-check #stp-list .table-wrap, #view-settle.st-check #stCards { display: none; }
   .st-checkok { background: #f5fcf8; border: 1px solid #bfe5cf; border-radius: 12px; padding: 16px 18px; font-size: 14px; color: #0a7a3d; font-weight: 700; margin-bottom: 12px; }
   .st-checkok small { display: block; font-weight: 500; color: var(--sub); margin-top: 4px; }
+  .cf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
+  .cf-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px 6px; } .cf-card h4 { margin: 0 0 6px; font-size: 15px; } .cf-card h4 small { display: block; font-weight: 500; font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .cf-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px dashed var(--line); } .cf-l { flex: 1; min-width: 0; } .cf-l b { font-size: 13.5px; } .cf-l small { display: block; color: var(--sub); font-size: 12px; line-height: 1.45; margin-top: 2px; }
+  .cf-c { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; } .cf-c .inp { width: 120px; min-width: 0; text-align: right; } .cf-c select.inp { width: auto; text-align: left; } .cf-c input[type=email] { width: 220px; text-align: left; } .cf-c input.dirty { border-color: var(--brand); background: var(--brand-weak); } .cf-u { color: var(--sub); font-size: 12px; }
+  .cond-box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; }
+  .cond-box > summary { cursor: pointer; font-weight: 800; font-size: 14px; list-style: none; display: flex; align-items: center; gap: 10px; } .cond-box > summary::-webkit-details-marker { display: none; }
+  .cond-box > summary small { font-weight: 500; color: var(--sub); font-size: 12.5px; } .cond-box > summary .tg { margin-left: auto; font-size: 12px; color: var(--sub); font-weight: 500; }
+  .cond-box table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; } .cond-box th { text-align: left; font-size: 12px; color: var(--sub); font-weight: 700; padding: 6px 8px; border-bottom: 2px solid var(--line); background: #fafbfd; }
+  .cond-box td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; } .cond-box td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .cond-box td[data-go] { cursor: pointer; } .cond-box td[data-go]:hover { background: var(--brand-weak); } .cond-box .dash { color: #c3cad8; }
+  .cond-box .pl { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 700; background: #e9f7f6; color: #0f7b75; margin: 1px 2px 1px 0; } .cond-box .pl.w { background: var(--warn-weak); color: var(--warn); } .cond-box .pl.r { background: var(--danger-weak); color: var(--danger); }
   .imp-drop { border: 2px dashed #b9c6de; border-radius: 12px; padding: 18px; text-align: center; color: var(--sub); font-size: 14px; font-weight: 700; margin-bottom: 12px; background: #fafbfd; }
   .imp-drop small { display: block; font-weight: 500; font-size: 12px; margin-top: 3px; } .imp-drop.over { border-color: var(--brand); background: #f0f6ff; color: var(--brand); }
   .imp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 640px) { .imp-grid { grid-template-columns: 1fr; } }
@@ -1517,6 +1528,7 @@
         <button class="tab" data-cfg="kinds">쿠팡 구분항목설정</button>
         <button class="tab" data-cfg="migrate">기존 정산 시트 가져오기</button>
       </div>
+      <div id="stCondBox" class="hidden"></div>
       <div class="sub st-help" id="stEditHelp"></div>
       <div class="st-tools hidden" id="stRepTools"><span class="sub">최종 리포트(이 달 · 연간)는 아래에서 · 엑셀·인쇄는 리포트 오른쪽 위</span><span class="grow"></span><button class="btn sm" id="stTaxPack" title="세무소(기장)에 보낼 자료를 엑셀 한 파일로">세무자료 내보내기 (엑셀)</button></div>
       <div id="stPnl" class="hidden"></div>
@@ -8310,7 +8322,38 @@
       STX.last[g.k] = w.code;
       if (!w.fin && w.step && w.step.groups) STX.last.cfgG = g.k;
     }
+    const condOn = !w.fin && g && g.k === 'drv' && STX.tab === 'cfg';
+    $('#stCondBox').classList.toggle('hidden', !condOn);
+    if (condOn) loadCond();
   }
+  // ⚙ 기사별 조건 한눈에 (한 기사 = 한 줄 · 칸을 누르면 그 표로 가서 이름으로 검색)
+  function loadCond(fresh) {
+    const el = $('#stCondBox'), m = STX.month;
+    if (!fresh && STX.cond && STX.cond.month === m && STX.condAt === STX.sumAt) return renderCond();
+    if (!el.innerHTML) el.innerHTML = '<details class="cond-box" open><summary>기사별 조건 한눈에 <small>불러오는 중…</small></summary></details>';
+    api('adm_stlDrvCond', m).then((r) => { if (STX.month !== m) return; if (!r.ok) return; STX.cond = r; STX.condAt = STX.sumAt; renderCond(); }).catch(() => {});
+  }
+  function renderCond() {
+    const r = STX.cond; if (!r) return;
+    const open = $('#stCondBox details') ? $('#stCondBox details').open : true;
+    const pl = (t, c) => '<span class="pl' + (c ? ' ' + c : '') + '">' + esc(t) + '</span>', dash = '<span class="dash">—</span>';
+    const td = (go, html, cls) => '<td' + (cls ? ' class="' + cls + '"' : '') + ' data-go="' + go + '" title="누르면 그 표에서 이 기사만 보기">' + (html || dash) + '</td>';
+    const rows = r.rows.map((x) => '<tr data-nm="' + esc(x.name) + '"><td><b>' + esc(x.name) + '</b></td><td class="sub">' + esc(x.acct) + '</td>' +
+      td('cfg:fbcut', x.fb ? (/%/.test(x.fb) ? pl(x.fb, 'w') : wn(x.fb)) + (x.fbMemo ? ' <small class="sub">' + esc(x.fbMemo) + '</small>' : '') : '', 'n') +
+      td('cfg:regular', x.regular.map((g) => esc(g.item) + ' ' + (g.amt > 0 ? '+' : '') + wn(g.amt) + (g.to ? ' <small class="sub">~' + esc(g.to) + '</small>' : '')).join('<br>')) +
+      td('cfg:camps', x.ins ? pl(x.ins) : '') +
+      td('tab:tmp', x.tmp.map((t) => pl(t.from + '~' + (t.to || '') + ' · ' + wn(t.price) + '원' + (t.routes ? ' ' + t.routes : ''), 'w')).join(' ')) +
+      td('cfg:leave', x.leave ? pl(x.leave, 'r') : '') +
+      td('cfg:target', [x.target].filter(Boolean).map((t) => pl(t)).concat(x.split.map((t) => pl(t))).join(' ')) + '</tr>').join('');
+    $('#stCondBox').innerHTML = '<details class="cond-box"' + (open ? ' open' : '') + '><summary>기사별 조건 한눈에 <small>' + r.rows.length + '명 · 기본 규칙과 다르게 적용되는 기사만 · 프백 ' + r.n.fb + ' · 고정 ' + r.n.regular + ' · 보험 예외 ' + r.n.ins + ' · 일시단가 ' + r.n.tmp + ' · 보류금 ' + r.n.leave + ' · 목표/분할 ' + r.n.target + '</small><span class="tg">칸을 누르면 그 표로 · 고치는 곳은 아래 탭</span></summary>' +
+      (r.rows.length ? '<div class="table-wrap"><table><thead><tr><th>기사</th><th>정산 아이디</th><th class="n">프백 차감</th><th>고정수당 · 공제 (매달)</th><th>산재 · 고용</th><th>일시단가 (이 달)</th><th>퇴사 보류금</th><th>매출 목표 · 분할</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="sub" style="margin:8px 0 0">기본 규칙과 다르게 적용되는 기사가 없습니다.</p>') + '</details>';
+  }
+  $('#stCondBox').addEventListener('click', (e) => {
+    const c = e.target.closest('td[data-go]'); if (!c) return;
+    const nm = c.closest('tr').dataset.nm, go = c.dataset.go;
+    STX.condQ = nm;
+    stGo(go);
+  });
   stRenderSteps();
   $('#stSteps').addEventListener('click', (e) => {
     const b = e.target.closest('[data-step]'); if (!b) return;
@@ -8755,6 +8798,7 @@
       if (STX.cfg !== 'fbcut') return; // 그새 다른 탭으로 옮김
       if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
       FB.rows = r.rows; FB.edit = {}; FB.sel = new Set(); FB.closed = r.closed;
+      if (STX.condQ) { FB.q = STX.condQ; STX.condQ = ''; }
       if (r.moved) toast('기사 정보의 프레시백 차감 ' + r.moved + '명을 이 표로 옮겼습니다.');
       renderFbView();
     }).catch(() => {});
@@ -8911,6 +8955,7 @@
       if (STX.cfg === 'fbcut' && !$('#stCfgTabs').classList.contains('hidden') && name !== 'fbcut') return; // 그새 다른 탭(프레시백)으로 옮김
       if (!r.ok) { $('#stEditor').innerHTML = ''; return toast(r.msg); }
       STX.table = r; STX.edRows = r.rows.map((x) => Object.assign({}, x)); STX.edDirty = false;
+      if (STX.condQ) { STX.edQ = STX.condQ; STX.condQ = ''; }
       renderEditor();
     }).catch(() => {});
   }
@@ -9059,6 +9104,30 @@
       const cur = (rows.find((r) => /^기사 앱 정산서 표시 범위/.test(String(r.label || ''))) || {}).value || '전부';
       const opts = [['전부', '마감된 달 전부'], ['최근 3개월', '최근 3개월만'], ['정산 당월만', '정산 당월(가장 최근 1개월)만'], ['전부 숨김', '전부 숨김 (기사 앱에 정산서 메뉴만, 목록 없음)']];
       advSum = '<div class="inssum apprange"><b>📱 기사 앱 정산서 표시</b>' + opts.map((o) => '<label class="check"><input type="radio" name="appRange" value="' + o[0] + '"' + (o[0] === cur ? ' checked' : '') + '> ' + o[1] + '</label>').join('') + '<span class="sub" id="appRangeMsg"></span></div>';
+    }
+    // 세부정산 설정: 26줄 표 대신 4칸 양식 (지급률·단가 / 산재·고용 / 일정 / 기사 앱 공개) — 입력칸은 같은 data-r/data-k 라 저장 방식 동일
+    if (T.name === 'config') {
+      const CARD = [['지급률 · 단가', ['금액 환산 · 기사 지급률', '분실파손'], '쿠팡 정산서 금액에서 기사에게 주는 비율 · 분실 부담'], ['산재 · 고용', ['산재 · 고용보험'], '공단 신고 기준 · 캠프·기사별 예외는 옆 탭'], ['일정', ['지급일 · 입금일 · 세금계산서', '퇴사 보류금'], '익월 며칠 · 휴일 처리 · 기본 금액'], ['기사 앱 공개', ['기사 앱'], '기사 앱 정산서 메뉴에 무엇을 언제 보일지']];
+      const ctl = (r, i) => {
+        const v = r.value == null ? '' : String(r.value), at = ' data-r="' + i + '" data-k="value"' + (ro ? ' disabled' : ''), L = String(r.label || '');
+        const sel = (opts) => '<select class="inp"' + at + '>' + opts.concat(v && !opts.includes(v) ? [v] : []).map((o) => '<option value="' + esc(o) + '"' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>';
+        if (/\(Y\/N\)/.test(L)) return sel(['Y', 'N']);
+        if (/공급가\/부가세포함/.test(L)) return sel(['공급가', '부가세포함']);
+        if (/마감한 달만/.test(L)) return sel(['마감한 달만', '계산 중인 달도']);
+        if (/이메일/.test(L)) return '<input class="inp" type="email"' + at + ' value="' + esc(v) + '" style="min-width:220px">';
+        return '<input class="inp cf-num" type="text" inputmode="decimal"' + at + ' value="' + esc(v) + '">';
+      };
+      const nice = (L) => L.replace(/\s*\((Y\/N|공급가\/부가세포함|마감한 달만 \/ 계산 중인 달도|전부 \/ 최근 3개월 \/ 정산 당월만 \/ 전부 숨김)\)\s*/, '').replace(/\(익월, 일\)/, '(익월)');
+      const item = (r, i) => '<div class="cf-row"><div class="cf-l"><b>' + esc(nice(String(r.label || ''))) + '</b>' + (r.desc ? '<small>' + esc(r.desc) + '</small>' : '') + '</div><div class="cf-c">' + ctl(r, i) + (/일\)$/.test(String(r.label || '')) || /\(익월/.test(String(r.label || '')) ? '<span class="cf-u">일</span>' : '') + '</div></div>';
+      const used = {};
+      const cards = CARD.map((cd) => {
+        const its = order.filter((i) => cd[1].includes(rows[i]._group || '') && !/^기사 앱 정산서 표시 범위/.test(String(rows[i].label || ''))).map((i) => { used[i] = 1; return item(rows[i], i); });
+        return '<div class="cf-card"><h4>' + esc(cd[0]) + '<small>' + esc(cd[2]) + '</small></h4>' + its.join('') + (cd[0] === '기사 앱 공개' ? '<div class="cf-row"><div class="cf-l"><b>정산서 표시 범위</b><small>위 📱 단추로 고르면 바로 저장</small></div><div class="cf-c sub">' + esc((rows.find((r) => /^기사 앱 정산서 표시 범위/.test(String(r.label || ''))) || {}).value || '전부') + '</div></div>' : '') + '</div>';
+      });
+      const rest = order.filter((i) => !used[i] && !/^기사 앱 정산서 표시 범위/.test(String(rows[i].label || '')));
+      if (rest.length) cards.push('<div class="cf-card"><h4>기타<small>묶음이 없는 항목</small></h4>' + rest.map((i) => item(rows[i], i)).join('') + '</div>');
+      $('#stEditor').innerHTML = dl + advSum + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button><span class="sub">저장하면 마감하지 않은 달 전체가 다시 계산됩니다</span>') + '</div><div class="cf-grid">' + cards.join('') + '</div>';
+      return;
     }
     $('#stEditor').innerHTML = dl + advSum + '<div class="ed-bar">' + (ro ? '<b style="color:var(--danger)">마감된 달이라 고칠 수 없습니다.</b>' : addBtn +
       '<button class="btn sm" id="edSave"' + (STX.edDirty ? '' : ' disabled') + '>저장</button><button class="btn ghost sm" id="edUndo"' + (STX.edDirty ? '' : ' disabled') + '>되돌리기</button>') +

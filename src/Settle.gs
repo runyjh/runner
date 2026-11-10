@@ -3879,6 +3879,50 @@ function stlFbMigrate_(a) {
   return add.length;
 }
 /** 관리자: 기사별 프레시백 (쿠팡 원래 금액 · 차감 설정 · 기사 지급 · 러너 몫 · 이익률) */
+/** ⚙ 기사별 조건 한눈에: 기본 규칙과 다르게 적용되는 기사만 (프백 차감 · 고정수당/공제 · 산재고용 예외 · 일시단가 · 퇴사 보류금 · 매출 목표/분할) */
+function adm_stlDrvCond(token, month) {
+  return run_(function () {
+    requireAdmin_(token);
+    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
+    const D = stlDrivers_(), X = stlIds_(D);
+    const rows = {}, order = [];
+    const key = function (name, acct) { const id = stlAcct_(X, D, name, acct); return id || ('n:' + str_(name)); };
+    const get = function (name, acct) {
+      const k = key(name, acct);
+      if (!rows[k]) { rows[k] = { id: k, name: str_(name).replace(/\s*\([^)]*\)\s*$/, '') || str_(name), acct: stlLogin_(acct) || '', fb: '', fbMemo: '', regular: [], ins: '', tmp: [], leave: '', target: '', split: [] }; order.push(k); }
+      return rows[k];
+    };
+    const inMonth = function (from, to) { const f = str_(from).slice(0, 7), t = str_(to).slice(0, 7); return (!f || f <= month) && (!t || t >= month); };
+    stlRead_('stl_fbcut').forEach(function (o) { if (!str_(o.cut)) return; const r = get(o.name, o.acct); r.fb = str_(o.cut); r.fbMemo = str_(o.memo); });
+    stlRead_('stl_regular').forEach(function (o) { if (!stlNum_(o.amt) || !inMonth(o.from, o.to)) return; get(o.name, o.acct).regular.push({ item: str_(o.item), amt: stlNum_(o.amt), to: str_(o.to) }); });
+    stlRead_('stl_camps').forEach(function (o) {
+      if (str_(o.kind) === '캠프' || !str_(o.name)) return;
+      const parts = [];
+      if (str_(o.runner)) parts.push('러너 ' + str_(o.runner));
+      if (/^(n|off|아니오|x)$/i.test(str_(o.sanOn))) parts.push('산재 제외');
+      if (/^(n|off|아니오|x)$/i.test(str_(o.goyOn))) parts.push('고용 제외');
+      if (str_(o.expense)) parts.push('경비율 ' + str_(o.expense));
+      if (str_(o.basis)) parts.push(str_(o.basis));
+      if (parts.length) get(o.name, o.acct).ins = parts.join(' · ');
+    });
+    stlRead_('stl_tmp').forEach(function (o) { if (!stlNum_(o.price) || !inMonth(o.from, o.to)) return; get(o.name, '').tmp.push({ from: str_(o.from).slice(5), to: str_(o.to).slice(5), price: stlNum_(o.price), routes: str_(o.routes) }); });
+    stlRead_('stl_leave').forEach(function (o) { if (str_(o.month).slice(0, 7) < month.slice(0, 7)) return; get(o.name, o.acct).leave = str_(o.month).slice(0, 7) + ' 퇴사 · ' + won_(stlNum_(o.amt)); });
+    stlRead_('stl_target').forEach(function (o) { if (!stlNum_(o.goal)) return; get(o.name, o.acct).target = '연 목표 ' + won_(stlNum_(o.goal)) + (str_(o.item) ? ' (' + str_(o.item) + ')' : ''); });
+    stlRead_('stl_split').forEach(function (o) {
+      if (str_(o.month) && str_(o.month).slice(0, 7) !== month && !stlYes_(o.repeat)) return;
+      get(o.from, o.fromId).split.push('→ ' + str_(o.to) + ' (목표 ' + won_(stlNum_(o.target)) + ')');
+      get(o.to, o.toId).split.push('← ' + str_(o.from));
+    });
+    // 기사 정보의 예전 칸 (산재고용 제외 · 프레시백 차감) 도 같이
+    D.all.forEach(function (o) {
+      if (!(o.status === ST.ACTIVE)) return;
+      if (stlYes_(o.insEx)) { const r = get(o.name, o.loginId); if (!r.ins) r.ins = '산재·고용 제외 (기사 정보)'; }
+    });
+    const out = order.map(function (k) { return rows[k]; }).filter(function (r) { return r.fb || r.regular.length || r.ins || r.tmp.length || r.leave || r.target || r.split.length; });
+    out.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+    return { ok: true, month: month, rows: out, n: { fb: out.filter(function (r) { return r.fb; }).length, regular: out.filter(function (r) { return r.regular.length; }).length, ins: out.filter(function (r) { return r.ins; }).length, tmp: out.filter(function (r) { return r.tmp.length; }).length, leave: out.filter(function (r) { return r.leave; }).length, target: out.filter(function (r) { return r.target || r.split.length; }).length } };
+  });
+}
 function adm_stlFbView(token, month) {
   return run_(function () {
     const a = requireAdmin_(token);
