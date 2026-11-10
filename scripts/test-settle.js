@@ -73,10 +73,10 @@ let failed = 0, count = 0;
 function eq(label, got, want) {
   count++;
   if (JSON.stringify(got) === JSON.stringify(want)) return;
-  failed++; console.error('FAIL 정산 시험 · ' + label + '\n     기대 ' + JSON.stringify(want) + '\n     실제 ' + JSON.stringify(got));
+  failed++; console.error('FAIL 자동 시험 · ' + label + '\n     기대 ' + JSON.stringify(want) + '\n     실제 ' + JSON.stringify(got));
 }
 function scenario(name, change, check) {
-  try { check(run(change)); } catch (e) { count++; failed++; console.error('FAIL 정산 시험 · ' + name + ' (실행 오류)\n     ' + (e && e.stack ? e.stack.split('\n').slice(0, 4).join('\n     ') : e)); }
+  try { check(run(change)); } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · ' + name + ' (실행 오류)\n     ' + (e && e.stack ? e.stack.split('\n').slice(0, 4).join('\n     ') : e)); }
 }
 
 // 1) 기본: 품앗이 자동(받는 기사 아이디 · 주는 기사 아이디+운영자) · 용차업체 맡은 노선 줄만 묶음
@@ -171,8 +171,91 @@ scenario('자료 점검·오류 기록·속도 요약', function (M) {
   eq('오류 기록: 같은 내용은 한 번 · 번호·메일 가림 · 모르는 종류는 버림', out.rows, ['서버|서버 오류||adm_x|전화 # (메일) 실패||', '관리자앱|화면 오류|sched||boom|424|유']);
 });
 
+// ───── 기사스케줄 저장 · 이슈 연동 · 품앗이 확정/취소 (가짜 스케줄 시트로 끝까지 실행) ─────
+/** 가짜 스케줄 시트(1행 머리글 · 열: 행ID 구분 캠프 이름 기본노선 + 날짜) 와 주변 함수 */
+const OPS = `
+  var __dates = ['2026-11-16','2026-11-17','2026-11-18','2026-11-19','2026-11-20'];
+  var __grid = [['행ID','구분','캠프','이름','기본노선'].concat(__dates),
+    ['d1','기사','군포1캠프','이현모','212CD','','','','',''], ['d2','기사','군포1캠프','강준길','백업','','','','',''], ['NOTE1','비고','','업무 관련','','','','','','']];
+  var __w = { set: 0, reads: {} }, __ISS = [], __seq = 0;
+  var __rng = function (r, c, nr, nc) { nr = nr || 1; nc = nc || 1; var self = {
+    getValues: function () { var o = []; for (var i = 0; i < nr; i++) { var row = []; for (var j = 0; j < nc; j++) row.push((__grid[r - 1 + i] || [])[c - 1 + j] === undefined ? '' : __grid[r - 1 + i][c - 1 + j]); o.push(row); } return o; },
+    getValue: function () { return self.getValues()[0][0]; },
+    setValues: function (v) { __w.set++; for (var i = 0; i < nr; i++) for (var j = 0; j < nc; j++) { while (__grid.length < r + i) __grid.push([]); __grid[r - 1 + i][c - 1 + j] = v[i][j]; } return self; },
+    setValue: function (v) { return self.setValues([[v]]); }, setNumberFormat: function () { return self; } }; return self; };
+  var __sh = { getLastRow: function () { return __grid.length; }, getMaxRows: function () { return 1000; }, getLastColumn: function () { return __grid[0].length; }, getRange: __rng,
+    insertRowBefore: function (r) { __grid.splice(r - 1, 0, []); }, insertRowsAfter: function () {}, deleteRow: function (r) { __ISS.splice(r - 2, 1); } };
+  var __h = { fixed: { '행ID': 0, '구분': 1, '캠프': 2, '이름': 3, '기본노선': 4 }, dates: {} }; __dates.forEach(function (d, i) { __h.dates[d] = 5 + i; });
+  schSheet_ = function () { return __sh; }; schHeader_ = function () { return __h; }; schEnsureDates_ = function () { return __h; };
+  props_ = function () { return { STL_IDS_V2: '', SCH_DB_ID: 'x' }; };
+  scriptLock_ = function () { return { tryLock: function () { return true; }, waitLock: function () {}, releaseLock: function () {} }; };
+  requireAdmin_ = function () { return { name: '관리자', loginId: 'adm' }; }; fsMark_ = function () {}; logAdmin_ = function () {}; stlBump_ = function () {}; flushBeforeBump_ = function () {};
+  var __readAll = readAll_; readAll_ = function (n) { __w.reads[n] = (__w.reads[n] || 0) + 1; return __readAll(n); };
+  driverById_ = function (id) { return __M.main.drivers.filter(function (o) { return o.id === id; })[0] || null; };
+  rcByDriver_ = function () { __w.reads.rc = (__w.reads.rc || 0) + 1; return {}; };
+  schIssueSheet_ = function () { return __sh; }; schIssueHeadFix_ = function () { __w.reads.head = (__w.reads.head || 0) + 1; };
+  schIssues_ = function () { return __ISS.map(function (x, i) { return Object.assign(JSON.parse(JSON.stringify(x)), { row: i + 2 }); }); };
+  issWriteRow_ = function (sh, x) { var c = JSON.parse(JSON.stringify(x)); if (!x.row) { __ISS.push(c); x.row = __ISS.length + 1; } else __ISS[x.row - 2] = c; };
+  issNewId_ = function () { return 'I' + (++__seq); };
+  var __cell = function (id, d) { for (var i = 1; i < __grid.length; i++) if (__grid[i][0] === id) return __grid[i][__h.dates[d]] || ''; return null; };
+  var __save = function (list) { var r = adm_schSave('t', list); return r; };
+  var __iss = function () { return __ISS.map(function (x) { return [x.driverId, x.date, x.end, x.result, x.cut || '-', x.kind].join(' '); }); };
+  // 품앗이
+  var __apps = [{ id: 'A1', jobId: 'J3', driverId: 'd2', name: '강준길', status: '지원', _row: 2 }, { id: 'A2', jobId: 'J3', driverId: 'd3', name: '유정근', status: '지원', _row: 3 }];
+  var __usage = [];
+  pmJobById_ = function (id) { var j = __M.jobs.filter(function (x) { return x.id === id; })[0]; if (!j) fail_('일감을 찾을 수 없습니다.'); return Object.assign({}, j); };
+  findRow_ = function (n, k, v) { var L = n === SH.PJOB ? __M.jobs : n === SH.PAPP ? __apps : []; for (var i = 0; i < L.length; i++) if (L[i][k] === v) return i + 2; return 0; };
+  writeFields_ = function (n, row, f) { var L = n === SH.PJOB ? __M.jobs : n === SH.PAPP ? __apps : null; if (L && L[row - 2]) Object.assign(L[row - 2], f); };
+  __M.main[SH.PAPP] = __apps;
+  pmAlertAdd_ = function () {}; pmTouch_ = function () {}; pmPushSend_ = function () {}; pmPast_ = function () { return false; };
+  stlRead_ = function (n) { return n === 'stl_usage' ? __usage.map(function (x, i) { return Object.assign({ _row: i + 2 }, x); }) : []; };
+  stlWriteAll_ = function (n, rows) { if (n === 'stl_usage') __usage = rows; };
+`;
+function ops(name, check) {
+  scenario(name, function (M) { M.jobs[2].date = '2026-11-20'; M.jobs[2].status = '모집 중'; M.jobs[2].acceptedId = ''; M.jobs[2].accepted = ''; M.jobs[2].useId = '주는 기사 아이디'; }, function (r) {
+    vm.runInContext(OPS, r.ctx);
+    check(function (code) { return vm.runInContext('(function () { ' + code + ' })()', r.ctx); });
+  });
+}
+
+// 9) 스케줄 저장: 칸 쓰기 · 충돌 · 비고 줄 제외 · 확정 품앗이 칸 잠금
+ops('스케줄 저장', function (run) {
+  const a = run("var r = __save([{ row: 'd1', date: '2026-11-16', value: '휴무', old: '' }, { row: 'd1', date: '2026-11-17', value: '휴무', old: '' }, { row: 'd1', date: '2026-11-18', value: '휴무', old: '' }, { row: 'd2', date: '2026-11-16', value: '군포1 212C', old: '' }]); return [r.ok, r.saved, r.conflicts.length, __cell('d1', '2026-11-17'), __cell('d2', '2026-11-16'), __iss().length];");
+  eq('4칸 저장 · 이슈 없음', a, [true, 4, 0, '휴무', '군포1 212C', 0]);
+  eq('이슈가 될 수 있는 글자(노선)는 그 기사 줄만 읽음 · 기사 전체 목록은 안 읽음', run("return [__w.reads.drivers || 0, __w.reads.rc || 0];"), [0, 1]);
+  eq('한 줄에서 이어진 3칸은 한 번에 씀 (쓰기 2번)', run("return __w.set;"), 2);
+  eq('휴무만 고치면 이슈 연동이 아무것도 더 읽지 않음', run("__w.reads = {}; __save([{ row: 'd1', date: '2026-11-19', value: '휴무', old: '' }]); return [__w.reads.drivers || 0, __w.reads.rc || 0, __w.reads.head || 0];"), [0, 0, 0]);
+  eq('남이 먼저 고친 칸은 충돌로 돌려주고 쓰지 않음', run("var r = __save([{ row: 'd1', date: '2026-11-16', value: '출근', old: '' }]); return [r.saved, r.conflicts[0].current, __cell('d1', '2026-11-16')];"), [0, '휴무', '휴무']);
+  eq('같은 값이면 저장 0', run("return __save([{ row: 'd1', date: '2026-11-16', value: '휴무', old: '휴무' }]).saved;"), 0);
+  eq('없는 기사 줄은 무시', run("return __save([{ row: 'zz', date: '2026-11-16', value: '휴무', old: '' }]).saved;"), 0);
+});
+
+// 10) 칸 → 이슈: 미입차 생성 · 다음 날 이어 붙임 · 정상으로 고치면 뺌 · 회전 줄임 = 물량조율
+ops('칸 → 이슈 연동', function (run) {
+  eq('미입차 칸 → 사유 미정 이슈 1건', run("var r = __save([{ row: 'd1', date: '2026-11-16', value: '미입차', old: '' }]); return [r.issueSync.created.length, __iss()];"), [1, ['d1 2026-11-16 2026-11-16 미입차 - 사유 미정']]);
+  eq('다음 날도 미입차 → 기간을 늘림 (새 이슈 아님)', run("var r = __save([{ row: 'd1', date: '2026-11-17', value: '미입차', old: '' }]); return [r.issueSync.changed.length, __iss()];"), [1, ['d1 2026-11-16 2026-11-17 미입차 - 사유 미정']]);
+  eq('끝 날을 출근으로 → 기간을 줄임', run("var r = __save([{ row: 'd1', date: '2026-11-17', value: '출근', old: '미입차' }]); return __iss();"), ['d1 2026-11-16 2026-11-16 미입차 - 사유 미정']);
+  eq('하루짜리를 출근으로 → 이슈 삭제', run("var r = __save([{ row: 'd1', date: '2026-11-16', value: '출근', old: '미입차' }]); return [r.issueSync.removed.length, __iss()];"), [1, []]);
+  eq('기본노선 212CD 중 212C 만 → 물량조율 (뺀 것 212D)', run("__save([{ row: 'd1', date: '2026-11-19', value: '212C', old: '' }]); return __iss().map(function (x) { return x.replace(/\\s*\\(.*?\\)/g, ''); });"), ['d1 2026-11-19 2026-11-19 물량조율 212D 사유 미정']);
+  eq('백업 기사는 노선을 적어도 이슈 아님', run("__save([{ row: 'd2', date: '2026-11-19', value: '212C', old: '' }]); return __iss().length;"), 1);
+  eq('4명 넘게 한꺼번에 고치면 기사 목록을 한 번만 읽음', run("__w.reads = {}; __M.main.drivers.forEach(function (o, i) { if (i > 1) __grid.splice(3, 0, [o.id, '기사', '군포1캠프', o.name, '212CD', '', '', '', '', '']); }); __save(__M.main.drivers.map(function (o) { return { row: o.id, date: '2026-11-18', value: '미입차', old: '' }; })); return [__w.reads.drivers, __iss().length];"), [1, 5]);
+});
+
+// 11) 품앗이 확정 → 품앗이 줄 칸 + 아이디 사용 기록 · 확정 칸은 스케줄에서 못 지움 · 확정 풀기/취소 → 칸·기록 지움
+ops('품앗이 확정·취소', function (run) {
+  eq('확정: 일감·지원 상태 · 품앗이 줄 칸 · 아이디 사용 기록', run("pmDecide_('d1', 'J3', 'A1', 'accept'); var j = __M.jobs[2]; return [j.status, j.accepted, __apps[0].status, __apps[1].status, __cell('PMd2', '2026-11-20'), __usage.map(function (u) { return [u.cid, u.name, u.from].join(' '); })];"),
+    ['배차 확정', '강준길', '확정', '미선정', '군포1 212CD', ['lhm 강준길 2026-11-20']]);
+  eq('품앗이 줄은 비고 줄 위에 생김', run("return __grid.map(function (r) { return r[0]; });"), ['행ID', 'd1', 'd2', 'PMd2', 'NOTE1']);
+  eq('확정된 칸은 스케줄 저장으로 못 지움', run("var r = __save([{ row: 'PMd2', date: '2026-11-20', value: '', old: '군포1 212CD' }]); return [r.saved, r.pmLocked.length, __cell('PMd2', '2026-11-20')];"), [0, 1, '군포1 212CD']);
+  eq('확정 글자 뒤에 덧붙이는 것은 됨', run("var r = __save([{ row: 'PMd2', date: '2026-11-20', value: '군포1 212CD 07시', old: '군포1 212CD' }]); return [r.saved, __cell('PMd2', '2026-11-20')];"), [1, '군포1 212CD 07시']);
+  eq('남이 올린 일감은 못 정함', run("try { pmDecide_('d3', 'J3', 'A1', 'back'); return 'ok'; } catch (e) { return e.userMsg || String(e); }"), '내가 올린 일감만 정할 수 있습니다.');
+  run("__save([{ row: 'PMd2', date: '2026-11-20', value: '군포1 212CD', old: '군포1 212CD 07시' }]);");
+  eq('확정 풀기: 다시 모집 · 칸·기록 지움 · 미선정이던 지원 되살림', run("pmDecide_('d1', 'J3', 'A1', 'back'); var j = __M.jobs[2]; return [j.status, j.acceptedId, __apps[0].status, __apps[1].status, __cell('PMd2', '2026-11-20'), __usage.length];"), ['모집 중', '', '지원', '지원', '', 0]);
+  eq('다시 확정 뒤 일감 취소: 칸·기록 지움', run("pmDecide_('d1', 'J3', 'A2', 'accept'); var mid = [__cell('PMd3', '2026-11-20'), __usage.length]; pmClose_('d1', 'J3', 'cancel'); return [mid, __M.jobs[2].status, __cell('PMd3', '2026-11-20'), __usage.length, __apps[1].status];"), [['군포1 212CD', 1], '취소', '', 0, '미선정']);
+});
+
 if (require.main === module) {
-  if (failed) { console.error('\n정산 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
-  console.log('OK   정산 시험 ' + count + '개');
+  if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
+  console.log('OK   자동 시험 ' + count + '개');
 }
 module.exports = { failed: failed, count: count };

@@ -50,9 +50,9 @@ if (!failed) {
   try {
     const t = require('./test-settle.js');
     count += t.count;
-    if (t.failed) { console.error('\n정산 시험 실패 ' + t.failed + '건. 배포하지 않습니다. (규칙을 일부러 바꿨으면 scripts/test-settle.js 의 기대값도 고쳐 주세요)'); process.exit(1); }
-    console.log('OK   정산 시험 ' + t.count + '개');
-  } catch (e) { console.error('\n정산 시험을 돌리지 못했습니다: ' + (e && e.stack || e)); process.exit(1); }
+    if (t.failed) { console.error('\n자동 시험 실패 ' + t.failed + '건. 배포하지 않습니다. (규칙을 일부러 바꿨으면 scripts/test-settle.js 의 기대값도 고쳐 주세요)'); process.exit(1); }
+    console.log('OK   자동 시험 ' + t.count + '개');
+  } catch (e) { console.error('\n자동 시험을 돌리지 못했습니다: ' + (e && e.stack || e)); process.exit(1); }
 }
 
 if (failed) {

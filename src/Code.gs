@@ -783,11 +783,14 @@ function scriptLock_() {
 
 // ───────────────────────── 응답 래퍼 ─────────────────────────
 var _curFn = ''; // 지금 처리 중인 서버 함수 이름 (doPost 가 적어 둠 · 오류 기록용)
+// 단계별 걸린 시간 (ms). stg_() = 시작, stg_('이름') = 앞 단계 뒤부터 지금까지를 그 이름에 더함. run_ 이 응답의 _st 로 실어 보내고 화면이 속도 기록에 'st_함수_단계' 로 남긴다
+var _stg = null, _stgT = 0;
+function stg_(name) { const t = Date.now(); if (!name) { _stg = {}; _stgT = t; return; } if (!_stg) return; _stg[name] = (_stg[name] || 0) + (t - _stgT); _stgT = t; }
 function run_(fn) {
   const t0 = Date.now();
   try {
     const r = fn();
-    if (r && typeof r === 'object' && !Array.isArray(r)) r._ms = Date.now() - t0; // 서버 처리 시간 (속도 측정)
+    if (r && typeof r === 'object' && !Array.isArray(r)) { r._ms = Date.now() - t0; if (_stg) { r._st = _stg; _stg = null; } } // 서버 처리 시간 (속도 측정)
     return r;
   }
   catch (err) {
@@ -4893,7 +4896,8 @@ function schRead_(sun, end) {
  */
 function adm_schSave(token, changes) {
   return run_(function () {
-    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
+    stg_();
+    const a = requireAdmin_(token); stg_('auth'); fsMark_('sch', { by: a.loginId }); stg_('mark');
     changes = (changes || []).filter(function (x) { return x && x.row && parseYmd_(x.date); });
     if (!changes.length) return { ok: true, saved: 0, conflicts: [] };
     if (changes.length > 3000) fail_('한 번에 3000칸까지 저장할 수 있습니다.');
@@ -4946,9 +4950,12 @@ function adm_schSave(token, changes) {
     }
     const dmin = changes.reduce(function (m, x) { return x.date < m ? x.date : m; }, changes[0].date);
     const dmax = changes.reduce(function (m, x) { return x.date > m ? x.date : m; }, changes[0].date);
+    stg_('pre');
     let h = schEnsureDates_(parseYmd_(dmin), parseYmd_(dmax));
+    stg_('dates');
     const lock = scriptLock_();
     lock.waitLock(20000);
+    stg_('lock');
     try {
       const sh = schSheet_();
       // 비고 줄은 업무스케줄 메모로 저장
@@ -5002,6 +5009,7 @@ function adm_schSave(token, changes) {
       const c0 = Math.min.apply(null, cs), c1 = Math.max.apply(null, cs);
       const area = (r1 - r0 + 1) * (c1 - c0 + 1);
       const cur = area <= 60000 ? sh.getRange(r0, c0, r1 - r0 + 1, c1 - c0 + 1).getValues() : null;
+      stg_('read');
       let saved = 0;
       const savedList = [];
       ok.forEach(function (x) {
@@ -5009,10 +5017,22 @@ function adm_schSave(token, changes) {
         const now = str_(cur ? cur[r - r0][c - c0] : sh.getRange(r, c).getValue()).replace(/\r\n?/g, '\n');
         if (now === x.value) return;
         if (now !== x.old) { conflicts.push({ row: x.row, date: x.date, current: now }); return; }
-        sh.getRange(r, c).setNumberFormat('@').setValue(safeText_(x.value));
-        saved++; savedList.push({ row: x.row, date: x.date, value: x.value, old: now });
+        saved++; savedList.push({ row: x.row, date: x.date, value: x.value, old: now, _r: r, _c: c });
       });
+      // 쓰기: 같은 줄에서 옆으로 이어진 칸은 한 번에 (한 주를 끌어 채우면 7번 → 1번). 같은 칸이 두 번 오면 나중 값
+      const cellOf = {};
+      savedList.forEach(function (x) { cellOf[x._r + ':' + x._c] = x; });
+      const cells = Object.keys(cellOf).map(function (k) { return cellOf[k]; }).sort(function (p, q) { return p._r - q._r || p._c - q._c; });
+      for (let i = 0; i < cells.length;) {
+        let j = i + 1;
+        while (j < cells.length && cells[j]._r === cells[i]._r && cells[j]._c === cells[j - 1]._c + 1) j++;
+        sh.getRange(cells[i]._r, cells[i]._c, 1, j - i).setNumberFormat('@').setValues([cells.slice(i, j).map(function (x) { return safeText_(x.value); })]);
+        i = j;
+      }
+      savedList.forEach(function (x) { delete x._r; delete x._c; });
+      stg_('write');
       if (saved) { logSchChange_(a, ok, saved); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } } // 정산서 근무일수는 기사스케줄에서 세므로 정산 캐시도 새로
+      stg_('log');
       // 칸 → 이슈 (2026-11-01 이후 · 미입차·노쇼·회전 줄임이면 '사유 미정' 이슈를 만들고, 정상으로 고치면 이슈에서 뺌)
       let issueSync = null;
       if (savedList.length) {
@@ -5021,6 +5041,7 @@ function adm_schSave(token, changes) {
           if (r.created.length || r.changed.length || r.removed.length) issueSync = { created: r.created.map(issView_), changed: r.changed.map(issView_), removed: r.removed, cells: r.cells || [] };
         } catch (e) { issueSync = { error: String(e && e.message || e) }; }
       }
+      stg_('iss');
       return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts), issueSync: issueSync, pmLocked: pmLocked }, rcExtra);
     } finally {
       lock.releaseLock();

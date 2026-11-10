@@ -293,19 +293,29 @@ function issFromCells_(a, saved) {
   const out = { created: [], changed: [], removed: [] };
   const list = (saved || []).filter(function (x) { return x.date >= ISS.RULE_FROM && x.row && !/^NOTE\d+$/.test(x.row) && x.row.indexOf(SCH_PM_PREFIX) !== 0 && !schExParse_(x.row); });
   if (!list.length) return out;
-  const drv = {};
-  readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) drv[o.id] = o; });
+  // 이슈와 상관없는 칸은 건너뛴다 (결과는 같고 읽기만 줄임): 그날 걸친 연동 이슈가 없고, 글자가 이슈가 될 수 없는 것(빈칸·휴무·출근 등)이면 할 일이 없다
+  let issues = schIssues_();
+  const cantBe = function (v) { v = str_(v); return !v || (!/노쇼|미입차|^병가/.test(v) && /휴무|휴가|퇴사|출근|용차|변경/.test(v)); }; // issClassify_ 가 기본노선을 보지 않고 null 을 내는 경우와 같음
+  const hitOf = function (id, date) { return issues.filter(function (x) { return x.driverId === id && x.link !== 'N' && x.result && x.date <= date && date <= (x.end || x.date) && x.kind !== '지시'; })[0]; };
+  const idle = function (ch) { return cantBe(ch.value) && !hitOf(ch.row, ch.date); }; // 이 칸은 할 일이 없음
+  if (list.every(idle)) return out;
+  // 기사 정보: 고친 기사가 몇 명 안 되면 그 줄만 읽고, 전체 목록은 필요할 때(여러 명 · 다른 기사 칸과 견줄 때)만 읽는다
+  let all = null;
+  const allDrv = function () { if (!all) { all = {}; readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) all[o.id] = o; }); } return all; };
+  const ids = {}; list.forEach(function (ch) { if (!idle(ch)) ids[ch.row] = 1; });
+  const few = Object.keys(ids).length <= 3, one = {};
+  const drvOf = function (id) { if (all || !few) return allDrv()[id]; if (!(id in one)) one[id] = driverById_(id); return one[id]; };
   const ctxOf = issCtxMaker_();
   const sh = schIssueSheet_();
-  schIssueHeadFix_(sh);
-  let issues = schIssues_();
+  if (!cache_().get('iss:headok')) { schIssueHeadFix_(sh); cache_().put('iss:headok', '1', 21600); } // 머리글 확인은 6시간에 한 번
   const save = function (x) { issWriteRow_(sh, x); };
   list.sort(function (p, q) { return p.row < q.row ? -1 : p.row > q.row ? 1 : p.date < q.date ? -1 : 1; }).forEach(function (ch) {
-    const o = drv[ch.row]; if (!o) return;
+    if (idle(ch)) return; // (앞 칸 처리로 이슈가 바뀌었을 수 있어 그때그때 다시 봄)
+    const o = drvOf(ch.row); if (!o) return;
     const ctx = ctxOf(o, ch.date);
     const cls = issClassify_(ch.value, ctx.base, ctx.rots, ctx.camp);
     // 그날 걸친 연동 이슈
-    const hit = issues.filter(function (x) { return x.driverId === o.id && x.link !== 'N' && x.result && x.date <= ch.date && ch.date <= (x.end || x.date) && x.kind !== '지시'; })[0];
+    const hit = hitOf(o.id, ch.date);
     if (hit) {
       const expect = issCellFor_(hit, (hit.orig || {}).hasOwnProperty(ch.date) ? hit.orig[ch.date] : ch.old, ctx);
       if (expect !== null && expect === ch.value) return; // 그대로
@@ -334,7 +344,7 @@ function issFromCells_(a, saved) {
     }
     if (!cls) return;
     // 물량조율인데 뺀 회전을 같은 캠프 다른 기사가 그날 뛰기로 되어 있으면 (205C(D1),205D + 205C (D2,F3) 처럼 나눠 뛰는 날) 이슈 아님
-    if (cls.result === '물량조율' && issCoveredByOthers_(o.id, ch.date, ctx, cls.cut, drv, ctxOf)) return;
+    if (cls.result === '물량조율' && issCoveredByOthers_(o.id, ch.date, ctx, cls.cut, allDrv(), ctxOf)) return;
     // 전날 같은 결과의 연동 이슈가 있으면 기간을 늘림
     const prevDay = schAddDays_(ch.date, -1);
     const near = issues.filter(function (x) { return x.driverId === o.id && x.link !== 'N' && x.result === cls.result && (cls.result !== '물량조율' || x.cut === cls.cut) && (x.end || x.date) === prevDay; })[0];

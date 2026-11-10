@@ -2473,7 +2473,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') perfFlush(); });
   function gsCall(fn, args) {
     const t0 = performance.now();
-    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); return r; }, (e) => {
+    return gsCall0(fn, args).then((r) => { perfAdd(fn, performance.now() - t0, r && r._ms); if (r && r._st) { try { Object.keys(r._st).forEach((k) => perfAdd('st_' + fn.replace(/^(adm|api)_/, '') + '_' + k, +r._st[k] || 0, +r._st[k] || 0)); } catch (e) { /* 무시 */ } delete r._st; } return r; }, (e) => {
       if (e && e.name === 'AbortError') errAdd('timeout', fn, Math.round((performance.now() - t0) / 1000) + '초 기다리다 끊음'); else if (e && e.message === 'BAD_RESPONSE') errAdd('badresp', fn, '서버가 정상 응답 대신 다른 내용을 보냄');
       throw e;
     });
