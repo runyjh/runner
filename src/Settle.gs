@@ -42,7 +42,7 @@ const STL_TABS = {
   // 기사 일시단가: 그 기사가 일한 날(아이디 사용 기록 기준)의 배송에만 적용
   stl_tmp: { name: '기사', driverId: '기사ID', from: '시작일', to: '종료일', price: '일시단가', routes: '적용 노선', memo: '메모' },
   stl_adjust: { month: '정산월', name: '명의자', acct: '정산 아이디', item: '항목', amt: '금액', memo: '메모', note: '관리자 메모' },
-  stl_advance: { name: '명의자', acct: '정산 아이디', date: '지급일', amt: '가불금', due: '상계 예정일', paid: '상환금', memo: '메모' },
+  stl_advance: { name: '명의자', acct: '정산 아이디', date: '지급일', amt: '가불금', due: '상계 예정일', paid: '상환금', memo: '메모', bank: '지급 통장' },
   stl_yongcha: {
     date: '날짜', who: '수행자', whoId: '수행 정산 아이디', route: '라우트', mode: '지급구분', price: '단가/금액', qty: '건수',
     payer: '차액부담', payerId: '차액부담 정산 아이디', payerPrice: '부담 기준단가', memo: '메모', gain: '차액 처리', vendorPay: '업체 실지급액'
@@ -2518,6 +2518,17 @@ function stlFund_(month) {
     used += amt;
     items.push({ key: f[0], label: f[1], bank: a.bank || roleBank(f[2]), plan: plan, amt: amt, adj: str_(r.amt) !== '', done: stlYes_(r.done), date: r.date || '', memo: r.memo || '', desc: f[3], rule: a.rule || '' });
   });
+  // 가불금 상환: 이 달 정산에서 공제된 상환금은 원래 가불을 내준 통장으로 되돌려 넣기 (지급 통장별 한 줄)
+  const advBy = {}; stlRead_('stl_advance').forEach(function (a) { advBy[a._row] = a; });
+  const advAmt = {};
+  (sum.advAuto || []).forEach(function (x) { const a = advBy[x.row]; const b = a ? str_(a.bank) : ''; advAmt[b] = (advAmt[b] || 0) + (x.amt || 0); });
+  Object.keys(advAmt).sort().forEach(function (b) {
+    if (!advAmt[b]) return;
+    const label = '가불금 상환 → ' + (b || '(지급 통장 미지정)'), r = rows[label] || {};
+    const amt = str_(r.amt) !== '' ? stlNum_(r.amt) : advAmt[b];
+    used += amt;
+    items.push({ key: 'advance|' + b, label: label, bank: b, plan: advAmt[b], amt: amt, adj: str_(r.amt) !== '', done: stlYes_(r.done), date: r.date || '', memo: r.memo || '', desc: '이 달 정산서에서 공제한 가불금 상환 · 원래 가불을 내준 통장으로 되돌려 넣기' + (b ? '' : ' · 가불금 표의 지급 통장을 채우면 그 통장으로'), rule: '' });
+  });
   const base = deposit.amt || deposit.plan, rr = rows['유보금 (나머지)'] || {}, ra = alloc['유보금 (나머지)'] || {};
   const restPlan = base - used;
   items.push({ key: 'rest', label: '유보금 (나머지)', bank: ra.bank || roleBank('유보금'), plan: restPlan, amt: str_(rr.amt) !== '' ? stlNum_(rr.amt) : restPlan, adj: str_(rr.amt) !== '', done: stlYes_(rr.done), date: rr.date || '', memo: rr.memo || '', desc: STL_FUND_ITEMS[STL_FUND_ITEMS.length - 1][3], rule: '' });
@@ -2546,8 +2557,9 @@ function stlBankMoves_() {
     if (r.item === '운영자 선지급 (15일)') return; // 선지급 기사 정산금은 입금확인 체크로 빠짐 (아래)
     if ((r.item === '인건비' || r.item === '대표 인출') && (!r.bank || r.bank === src)) { add(r.date, src, -a, mt + r.item + ' (바로 ' + (r.item === '대표 인출' ? '인출' : '지급') + ')', '자금배분', r.month); return; }
     if (!r.bank || r.bank === src) return;
-    add(r.date, src, -a, mt + r.item + ' → ' + r.bank, '자금배분', r.month);
-    add(r.date, r.bank, a, mt + r.item + ' ← ' + src, '자금배분', r.month);
+    const lab = r.item.indexOf('→') >= 0 ? r.item.replace(/\s*→.*$/, '') : r.item;
+    add(r.date, src, -a, mt + lab + ' → ' + r.bank, '자금배분', r.month);
+    add(r.date, r.bank, a, mt + lab + ' ← ' + src, '자금배분', r.month);
   });
   // 세금 일정에서 '낸 금액·납부일'을 넣은 세금 (출금 통장에서 빠짐)
   stlRead_('stl_taxpay').forEach(function (x) { if (x.date && stlNum_(x.amt) && !/^prior\|/.test(x.key)) add(x.date, x.bank, -stlNum_(x.amt), '세금 · ' + x.kind + ' ' + x.period, '세금', ''); });
@@ -2567,6 +2579,8 @@ function stlBankMoves_() {
     Object.keys(byDate).forEach(function (k) { add(k, drvBank, -byDate[k].amt, Number(m.slice(5)) + '월 기사 정산금 입금 ' + byDate[k].n + '명', '기사 지급', m); });
     Object.keys(byDateE).forEach(function (k) { add(k, src, -byDateE[k].amt, Number(m.slice(5)) + '월 운영자 선지급 (15일) ' + byDateE[k].n + '명', '기사 지급', m); });
   });
+  // 가불금 지급: 지급 통장을 적은 가불은 지급일에 그 통장에서 빠짐 (상환은 자금배분 '가불금 상환 →' 줄로 되돌아옴)
+  stlRead_('stl_advance').forEach(function (a) { const amt = stlNum_(a.amt), bank = str_(a.bank); if (!amt || !bank || !a.date) return; add(a.date, bank, -amt, '가불금 지급 · ' + str_(a.name).replace(/\s*\(.*\)\s*$/, ''), '가불', ''); });
   // 고정 운영비: 결제일마다 결제 통장에서 빠짐 (오늘까지 · 은행 내역을 올리기 전에도 '예정'으로 잔액에 반영) · 결제 통장이 비어 있으면 안 셈
   const today = ymd_(new Date()), tm = today.slice(0, 7);
   const dayOf = function (m, day) { const last = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0).getDate(); return m + '-' + String(Math.min(last, Math.max(1, day))).padStart(2, '0'); };
@@ -2723,9 +2737,9 @@ function adm_stlFundSave(token, month, key, f) {
     const a = requireAdmin_(token);
     if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
     f = f || {};
-    const it = key === 'deposit' ? ['deposit', '쿠팡 입금'] : STL_FUND_ITEMS.filter(function (x) { return x[0] === key; })[0];
-    if (!it) fail_('알 수 없는 항목입니다.');
     const cur = stlFund_(month);
+    const it = key === 'deposit' ? ['deposit', '쿠팡 입금'] : STL_FUND_ITEMS.filter(function (x) { return x[0] === key; })[0] || (function () { const x = cur.items.filter(function (y) { return y.key === key; })[0]; return x ? [x.key, x.label] : null; })();
+    if (!it) fail_('알 수 없는 항목입니다.');
     const plan = key === 'deposit' ? cur.deposit.plan : cur.items.filter(function (x) { return x.key === key; })[0].plan;
     const bank = key === 'deposit' ? cur.source : cur.items.filter(function (x) { return x.key === key; })[0].bank;
     const lock = scriptLock_();
@@ -3099,7 +3113,7 @@ const STL_EDIT = {
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text'], ['settle', '정산 (비우면 일한 기사 본인 정산 · 명의자 = 서브 인원)', ['', '명의자']]] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
   adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '정산서 메모 (기사 정산서에 보임)', 'text'], ['note', '관리자 메모 (정산서에 안 보임)', 'text']] },
-  advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
+  advance: { sheet: 'stl_advance', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['date', '지급일', 'date'], ['amt', '가불금', 'money'], ['bank', '지급 통장', 'bank'], ['due', '상계 예정일', 'date'], ['paid', '상환금', 'money'], ['memo', '메모', 'text']] },
   yongcha: { sheet: 'stl_yongcha', scope: 'date', cols: [['date', '날짜', 'date'], ['who', '수행자 (정산 아이디/용차업체)', 'acctOrText', 'whoId'], ['route', '라우트 (비우면 그날 전체 · 119AB 처럼 여러 개)', 'text'], ['mode', '지급구분', ['건당', '금액']], ['price', '단가/금액 (비우면 기본: 품앗이단가 · 용차업체 외부용차단가)', 'money'], ['vendorPay', '업체 실지급액 (일당 등 · 용차업체만)', 'money'], ['qty', '건수 (비우면 자동)', 'money'], ['payer', '차액부담 (정산 아이디)', 'acct', 'payerId'], ['payerPrice', '부담 기준단가 (비우면: 품앗이 = 수행자 단가코드 · 용차업체·러너 몫 = 차액부담자 본인 단가)', 'money'], ['gain', '차액 처리 (비우면: 품앗이 = 수행자 지급 · 용차업체 = 러너 몫)', ['', '러너 몫', '수행자 지급']], ['memo', '메모', 'text']] },
   regular: { sheet: 'stl_regular', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '월 금액', 'money'], ['from', '시작월', 'month'], ['to', '종료월', 'month'], ['memo', '메모', 'text']] },
   target: { sheet: 'stl_target', scope: 'all', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['goal', '연 목표 계산서 (VAT포함)', 'money'], ['unit', '단위', 'money']] },
