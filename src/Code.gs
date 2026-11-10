@@ -5467,17 +5467,19 @@ const UPLOAD = {
   COLOR: { KEY: '#E3F2FD', MI: '#FFEBEE', DUP: '#FFF8E1', SEP: '#000000' },
   LEFT_COL: 2, RIGHT_COL: 14, START_ROW: 3, GAP: 5
 };
-/** scope: 'tomorrow'(보고 있는 2주 중 내일부터) · 'nextweek'(다음 주 일~토 전체) · 'thisweek'(이번 주 내일부터 토요일까지) · 'month'(내일부터 5주 토요일까지, 한 달치) */
+/** scope: '4w'(내일이 든 주부터 4주) · 'tomorrow'(보고 있는 2주 중 내일부터) · 'nextweek'(다음 주 일~토 전체) · 'thisweek'(이번 주 내일부터 토요일까지) · 'month'(내일부터 5주 토요일까지, 한 달치) */
 function adm_schUploadTable(token, start, scope) {
   return run_(function () {
     const a = requireAdmin_(token);
     const today = new Date(), tmr = ymd_(addDays_(today, 1));
     let base = parseYmd_(start) || today;
     if (scope === 'nextweek') base = addDays_(sundayOf_(new Date(today.getFullYear(), today.getMonth(), today.getDate())), 7);
-    if (scope === 'thisweek' || (scope === 'month' && !parseYmd_(start))) base = addDays_(today, 1);
+    if (scope === 'thisweek' || scope === '4w' || (scope === 'month' && !parseYmd_(start))) base = addDays_(today, 1);
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
     // 한 달: 그 달(start 가 있으면 그 날짜의 달)을 덮는 주(일~토)들 → 1주차 ~ 5·6주차 (한 주 시작은 항상 일요일)
     let nDays = SCH_DAYS;
+    // 4주: 내일(PDD)이 든 주 일요일부터 28일 → 화면에서 1주 · 2주(1+2) · 3주 · 4주로 쌓아 봄
+    if (scope === '4w') nDays = 28;
     if (scope === 'month') {
       const m0 = parseYmd_(start) || base, last = new Date(m0.getFullYear(), m0.getMonth() + 1, 0);
       const satEnd = addDays_(last, 6 - last.getDay());

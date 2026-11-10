@@ -7519,11 +7519,11 @@
     const start = sMode === 'month' && SD.dates.length ? SD.dates[0] : (SD.start || '');
     $('#upModal').classList.remove('hidden');
     $('#upWrap').innerHTML = '<div class="empty">만드는 중…</div>'; $('#upInfo').textContent = ''; $('#upTabs').innerHTML = '';
-    api('adm_schUploadTable', start, sMode === 'month' ? 'month' : '').then((r) => {
+    api('adm_schUploadTable', '', '4w').then((r) => {
       if (!r.ok) { $('#upWrap').innerHTML = ''; return toast(r.msg); }
       upRes = r;
       const d0 = r.dates[0], d1 = r.dates[r.dates.length - 1];
-      $('#upTitle').textContent = '어드민 업로드 테이블 · ' + d0.slice(5).replace('-', '/') + ' ~ ' + d1.slice(5).replace('-', '/') + ' (PDD ' + r.target.slice(5).replace('-', '/') + '부터)';
+      $('#upTitle').textContent = '어드민 업로드 테이블 (최대 4주) · ' + d0.slice(5).replace('-', '/') + ' ~ ' + d1.slice(5).replace('-', '/') + ' (PDD ' + r.target.slice(5).replace('-', '/') + '부터)';
       $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
       if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
       upTab = 'w1';
@@ -7534,15 +7534,15 @@
   function upRows(tab) {
     if (!upRes) return [];
     const w = upWk(tab);
-    if (w >= 0) return upRes.weeks[w] || [];
+    if (w >= 0) return [].concat(...(upRes.weeks || []).slice(0, w + 1)); // N주 = 1주차부터 N주차까지 합친 것
     if (tab === 'mi') return upRes.missing;
     return upRes.dups;
   }
   function upTabsRender() {
     // 주차(일~토) 탭: '2주차 (11/8~11/14) 출근 170건' — 한 주 시작은 항상 일요일 · 그 주 일요일이 든 달의 N주차 (표 머리글과 같은 셈법)
     const md = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
-    const t = (upRes.weeks || []).map((rows, i) => { const ds = upRes.dates.slice(i * 7, i * 7 + 7); return ['w' + (i + 1), (ds[0] ? weekOfMonth(ds[0]) : i + 1) + '주차 (' + md(ds[0]) + '~' + md(ds[ds.length - 1]) + ') 출근', '건']; })
-      .filter((x, i) => (upRes.weeks[i] || []).length || i < 2)
+    // 1주 · 2주(1주+2주) · 3주 · 4주 — 내일(PDD)이 든 주 일요일부터 쌓아 감
+    const t = (upRes.weeks || []).slice(0, 4).map((rows, i) => { const ds = upRes.dates.slice(0, i * 7 + 7); return ['w' + (i + 1), (i + 1) + '주 (' + md(ds[0]) + '~' + md(ds[ds.length - 1]) + ') 출근', '건']; })
       .concat([['mi', '미입차', '건'], ['dup', '중복', '건']]);
     $('#upTabs').innerHTML = t.map(([k, l, u]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
   }
@@ -7552,7 +7552,7 @@
       if (upTab === 'mi' || r[4] === '미입차') return 'mi';
       if (upTab === 'dup') return 'dup';
       const w = upWk(upTab);
-      return w >= 0 && keyOf(w, i) ? 'key' : '';
+      return w >= 0 && [].concat(...upRes.keys.slice(0, w + 1))[i] ? 'key' : '';
     };
     const sepAt = -1;
     $('#upInfo').textContent = upTab === 'dup' ? '같은 날 같은 캠프·노선·회전에 2명 이상 — 업로드 전에 정리하세요.'
@@ -7593,8 +7593,8 @@
   function upCoupang(tab) {
     const w = upWk(tab);
     if (w < 0) return null;
-    const work = (upRes.weeks[w] || []).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근');
-    const dates = upRes.dates.slice(w * 7, w * 7 + 7).filter((d) => d >= upRes.target);
+    const work = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근');
+    const dates = upRes.dates.slice(0, w * 7 + 7).filter((d) => d >= upRes.target);
     if (!dates.length) return { rows: [], extra: [], dates };
     const sc = (c) => String(c || '').replace(/\s*캠프\s*$/, '').trim();
     const rSeen = {};
