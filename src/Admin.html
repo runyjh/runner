@@ -8429,7 +8429,7 @@
       td('cfg:fbcut', x.fb ? (/%/.test(x.fb) ? pl(x.fb, 'w') : wn(x.fb)) + (x.fbMemo ? ' <small class="sub">' + esc(x.fbMemo) + '</small>' : '') : '', 'n') +
       td('cfg:regular', x.regular.map((g) => esc(g.item) + ' ' + (g.amt > 0 ? '+' : '') + wn(g.amt) + (g.to ? ' <small class="sub">~' + esc(g.to) + '</small>' : '')).join('<br>')) +
       td('cfg:camps', x.ins ? pl(x.ins) : '') +
-      td('tab:tmp', x.tmp.map((t) => pl(t.from + '~' + (t.to || '') + ' · ' + wn(t.price) + '원' + (t.routes ? ' ' + t.routes : ''), 'w')).join(' ')) +
+      td('tab:tmp', x.tmp.map((t) => pl((t.from || t.to ? t.from + '~' + (t.to || '') : '상시') + ' · ' + wn(t.price) + '원' + (t.routes ? ' ' + t.routes : ''), 'w')).join(' ')) +
       td('cfg:leave', x.leave ? pl(x.leave, 'r') : '') +
       td('cfg:target', [x.target].filter(Boolean).map((t) => pl(t)).concat(x.split.map((t) => pl(t))).join(' ')) + '</tr>').join('');
     $('#stCondBox').innerHTML = '<details class="cond-box"' + (open ? ' open' : '') + '><summary>기사별 조건 한눈에 <small>' + r.rows.length + '명 · 기본 규칙과 다르게 적용되는 기사만 · 프백 ' + r.n.fb + ' · 고정 ' + r.n.regular + ' · 보험 예외 ' + r.n.ins + ' · 일시단가 ' + r.n.tmp + ' · 보류금 ' + r.n.leave + ' · 목표/분할 ' + r.n.target + '</small><span class="tg">칸을 누르면 그 표로 · 고치는 곳은 아래 탭</span></summary>' +
