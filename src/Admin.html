@@ -1977,9 +1977,9 @@
       <span class="up-info" id="upInfo"></span>
       <label class="check"><input type="checkbox" id="upWithName"> 명단 열 포함</label>
       <button type="button" class="btn ghost" id="upCopy">이 표 복사</button>
-      <button type="button" class="btn" id="upXlsx" title="쿠팡 어드민 업로드 양식 그대로 (업무일·벤더명·사업자등록번호·캠프명·웨이브·이름·아이디·업무상태·회전·업무라우트) · 고른 주차 · 등록된 아이디는 일 안 하는 날 휴무 줄까지">⬇ 쿠팡 업로드 엑셀</button>
+      <button type="button" class="btn" id="upXlsx" title="지금 보고 있는 주차 표의 줄 그대로 쿠팡 어드민 업로드 양식(업무일·벤더명·사업자등록번호·캠프명·웨이브·이름·아이디·업무상태·회전·업무라우트)으로">⬇ 쿠팡 업로드 엑셀</button>
     </div>
-    <div class="up-bar" style="margin-top:-4px">
+    <div class="up-bar hidden" style="margin-top:-4px">
       <span class="up-info" id="upRoster"></span>
       <label class="btn ghost sm" style="cursor:pointer" title="쿠팡 어드민에서 받은 기사스케줄 엑셀을 올리면 등록된 아이디 × 캠프 목록을 기억합니다 (휴무 줄·경고에 사용)">쿠팡 등록 목록 올리기<input type="file" id="upRosterIn" accept=".xlsx" hidden></label>
     </div>
@@ -7731,19 +7731,20 @@
       upXlsxNow();
     }).catch(() => { b.disabled = false; b.textContent = t0; });
   });
+  /**
+   * 쿠팡 업로드 엑셀 = 지금 고른 주차 표의 줄을 그대로 (표와 같은 규칙 · 같은 줄 · 같은 순서) 쿠팡 양식 10열로만 바꿈.
+   * 업무일 → 날짜 · 벤더명 · 사업자등록번호(숫자만) · 캠프명 · 웨이브 · 이름(명단, '이용(김대현)' 이면 아이디 주인 '이용') · 아이디 · 업무상태 · 회전 · 업무라우트. 비고·명단 열은 뺌.
+   * 아이디가 없는 줄(미입차 묶음)만 뺀다. 휴무 줄을 따로 만들거나 줄을 더하지 않는다.
+   */
   function upXlsxNow() {
-    const c = upCoupang(upTab);
-    if (!c.dates.length) return toast('이 주차에는 출력할 날짜가 없습니다.');
-    if (c.fromCp && c.extra.length) {
-      const lines = Array.from(new Set(c.extra.map((r) => r[0].slice(5).replace('-', '/') + ' ' + r[2] + ' ' + r[4] + ' (' + String(r[10] || '').trim() + ')')));
-      if (!confirm('쿠팡 등록 목록에 없는 아이디 × 캠프가 ' + lines.length + '건 있습니다. 쿠팡에서 거절될 수 있습니다:\n\n' + lines.slice(0, 15).join('\n') + (lines.length > 15 ? '\n… 외 ' + (lines.length - 15) + '건' : '') +
-        '\n\n쿠팡에 먼저 등록하거나 스케줄을 고치세요. 그래도 이 줄들을 넣어 받을까요?')) return;
-    }
-    const blob = cpXlsx(c.rows);
-    const md = (d) => d.slice(5).replace('-', '');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '쿠팡_기사스케줄_업로드_' + md(c.dates[0]) + '-' + md(c.dates[c.dates.length - 1]) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    const nW = c.rows.filter((r) => r[7] === '출근').length;
-    toast('받았습니다: ' + c.dates.length + '일 · 출근 ' + nW + '줄 · 휴무 ' + (c.rows.length - 1 - nW) + '줄' + (c.fromCp ? '' : ' (쿠팡 등록 목록 없이 기사 정보로)') + (c.skipCamps.length ? ' · 노선관리에 없는 캠프 뺌: ' + c.skipCamps.join(', ') : ''));
+    const src = upRows(upTab).filter((r) => r && r[4] && r[4] !== '미입차');
+    if (!src.length) return toast('이 주차 표에 출력할 줄이 없습니다.');
+    const vendor = upRes.cpVendor || '러너/RUNNER', biz = String(upRes.cpBizNo || src[0][1] || '6543701141').replace(/\D/g, '');
+    const toDate = (d) => { const p = String(d).slice(0, 10).split('-'); return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : String(d); };
+    const rows = [CP_HEAD].concat(src.map((r) => [toDate(r[0]), vendor, biz, String(r[2] || '').replace(/\s*캠프\s*$/, '').trim(), r[3] || 'WAVE1', String(r[10] || '').split('(')[0].trim(), r[4], r[5] || '출근', r[6] || '', String(r[7] || '').replace(/\s+/g, '')]));
+    const ds = src.map((r) => String(r[0]).slice(0, 10)).sort(), md = (d) => d.slice(5).replace('-', '');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(cpXlsx(rows)); a.download = '쿠팡_기사스케줄_업로드_' + md(ds[0]) + '-' + md(ds[ds.length - 1]) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('받았습니다: 표와 같은 ' + src.length + '줄 (' + md(ds[0]) + '~' + md(ds[ds.length - 1]) + ')');
   }
   $('#sUpload').addEventListener('click', upMake);
   $('#upRegen').addEventListener('click', upMake);
