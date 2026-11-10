@@ -4463,14 +4463,22 @@
     if (!keys.length) return '미입차';
     const all = rots.join(','), sets = Array.from(new Set(keys.map((rt) => u[rt].join(','))));
     if (sets.length === 1) return groupRoutes(keys.join(',')) + (sets[0] !== all ? ' (' + sets[0] + ')' : '');
-    return keys.map((rt) => rt + (u[rt].join(',') !== all ? '(' + u[rt].join(',') + ')' : '')).join(',');
+    const g = [];
+    keys.forEach((rt) => { const n = rt.slice(0, -1), c = rt.slice(-1), k = u[rt].join(','), x = g.find((y) => y.n === n && y.k === k); if (x) x.c += c; else g.push({ n, c, k }); });
+    return g.map((x) => x.n + x.c + (x.k !== all ? '(' + x.k + ')' : '')).join(',');
   }
   function isDrvOf(id) { return IS.drivers.find((d) => d.id === id) || null; }
+  /** 이슈를 넣을 노선: 고른 날 칸이 노선이면 그 칸(백업 기사·다른 캠프 일), 아니면 기본노선 */
+  function isSrcRoute(d) {
+    const c = String(IS.cellNow || '').trim();
+    if (c && c !== '출근' && !/미입차|노쇼|병가|휴무|휴가/.test(c) && isUnits(c, isCampRots(d.campId))) return c.replace(/\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)/g, '').replace(/추가업무등록|업무등록/g, '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+    return d.baseRoute || '';
+  }
   function isPaintModal() {
     $$('#isMRes button').forEach((b) => b.classList.toggle('on', b.dataset.res === ISM.res));
     const d = isDrvOf($('#isMDrv').value), rots = d ? isCampRots(d.campId) : IS_ROTS;
     $('#isMCutW').classList.toggle('hidden', ISM.res !== '물량조율');
-    const units = d ? Object.keys(isUnits(d.baseRoute, rots) || {}).sort() : [];
+    const units = d ? Object.keys(isUnits(isSrcRoute(d), rots) || {}).sort() : [];
     $('#isMCut').innerHTML = (units.length > 1 ? '<div class="is-rotl">노선</div>' + units.map((u) => '<button type="button" data-unit="' + u + '" class="' + (ISM.cutU.includes(u) ? 'cut' : '') + '">' + u + (ISM.cutU.includes(u) ? ' 뺌' : '') + '</button>').join('') + '<div class="is-rotbr"></div>' : '') +
       '<div class="is-rotl">회전</div>' + rots.map((r) => '<button type="button" data-rot="' + r + '" class="' + (ISM.cut.includes(r) ? 'cut' : '') + '">' + r + (ISM.cut.includes(r) ? ' 뺌' : '') + '</button>').join('') +
       '<div class="is-cutnow">' + (isCutStr() ? '뺀 물량: <b>' + esc(isCutStr()) + '</b>' + (ISM.cutU.length && ISM.cut.length ? ' <span class="sub">(고른 노선의 고른 회전만)</span>' : '') : '<span class="sub">뺀 노선이나 회전을 고르세요 (노선만 = 그 노선 전부 · 회전만 = 모든 노선의 그 회전)</span>') + '</div>';
@@ -4479,7 +4487,7 @@
     $('#isMReasonLb').textContent = '3. 사유 — 왜 그랬나' + (ISM.res === '노쇼' ? ' (노쇼는 선택)' : '');
     $('#isMSub').innerHTML = IS.subs.map((k) => '<button type="button" data-sub="' + esc(k) + '" class="' + (ISM.sub === k ? 'on' : '') + '">' + esc(k === '품앗이' ? '품앗이 (우리 인원)' : k === '업체백업' ? '업체백업 (우리 백업 기사)' : k) + '</button>').join('');
     $('#isMSubWho').classList.toggle('hidden', !IS_OURS(ISM.sub));
-    $('#isMBase').textContent = d ? '기본노선: ' + (d.baseRoute || '없음') + (d.camp ? ' · ' + shortCampSafe(d.camp) : '') : '';
+    $('#isMBase').textContent = d ? '기본노선: ' + (d.baseRoute || '없음') + (d.camp ? ' · ' + shortCampSafe(d.camp) : '') + (isSrcRoute(d) !== (d.baseRoute || '') ? ' · 이날 칸: ' + isSrcRoute(d) : '') : '';
     const a = $('#isMDate').value, b = $('#isMEnd').value || a;
     $('#isMRange').textContent = a && b >= a ? '(' + isDays(a, b).length + '일)' : '';
     isPreview();
@@ -4491,7 +4499,7 @@
     const span = a === b ? isMd0(a) : isMd0(a) + '~' + isMd0(b);
     let put = '';
     if (ISM.res === '미입차' || ISM.res === '노쇼' || ISM.res === '병가') put = ISM.res;
-    else if (ISM.res === '물량조율' && (ISM.cut.length || ISM.cutU.length)) put = isLeftAfterCut(d.baseRoute, isCampRots(d.campId));
+    else if (ISM.res === '물량조율' && (ISM.cut.length || ISM.cutU.length)) { const src = isSrcRoute(d), mc = (src.match(/^([가-힣]+\d)\s/) || [])[1]; put = (mc ? mc + ' ' : '') + isLeftAfterCut(src, isCampRots(d.campId)); }
     const old = a < IS.ruleFrom;
     // 대신 뛴 우리 기사(업체백업·품앗이) 칸: PDD(내일)부터
     let subLine = '';
@@ -4502,7 +4510,8 @@
       const from = a > pdd ? a : pdd;
       const mc = shortCampSafe(d.camp || ''), sc = shortCampSafe(sd.camp || '');
       const cs = isCutStr();
-      const what = (sc !== mc && mc ? mc + ' ' : '') + (ISM.res === '물량조율' ? (ISM.cutU.length ? cs : d.baseRoute + (cs ? ' (' + cs + ')' : '')) : d.baseRoute);
+      const src = isSrcRoute(d), srcCamp = (src.match(/^([가-힣]+\d)\s/) || [])[1] || mc, srcR = src.replace(/^[가-힣]+\d\s+/, '');
+      const what = (sc !== srcCamp && srcCamp ? srcCamp + ' ' : '') + (ISM.res === '물량조율' ? (ISM.cutU.length ? cs : srcR + (cs ? ' (' + cs + ')' : '')) : srcR);
       subLine = from <= b ? '<br>' + esc(who) + ' ' + esc(from === b ? isMd0(from) : isMd0(from) + '~' + isMd0(b)) + ' 칸 → <b>' + esc(what) + '</b> 자동 배정 <span class="sub">(PDD ' + esc(isMd0(pdd)) + '부터 · 오늘까지는 실제 기록이라 그대로)</span>'
         : '<br><span class="sub">' + esc(who) + ': 기간이 PDD(' + esc(isMd0(pdd)) + ') 전이라 칸은 바꾸지 않고 기록만</span>';
     }
@@ -4511,7 +4520,7 @@
       subLine + ($('#isMCellNow').textContent ? '<br>' + esc($('#isMCellNow').textContent) : '');
   }
   function isOpen(x) {
-    IS.cur = x || null;
+    IS.cur = x || null; IS.cellNow = '';
     const done = () => {
       $('#isMTitle').textContent = x ? (isUnsetOf(x) ? '사유 입력' : '이슈 수정') : '이슈 등록';
       $('#isMDrv').innerHTML = '<option value="">기사 선택</option>' + IS.drivers.map((d) => '<option value="' + esc(d.id) + '">' + esc(d.name) + (d.camp ? ' · ' + esc(shortCampSafe(d.camp)) : '') + '</option>').join('') +
@@ -4550,13 +4559,14 @@
   function isLoadCell() {
     const id = $('#isMDrv').value, dt = $('#isMDate').value;
     let el = $('#isMCellNow'); if (!el) { el = document.createElement('span'); el.id = 'isMCellNow'; el.className = 'hidden'; document.body.appendChild(el); }
-    el.textContent = '';
-    if (!id || !dt) return isPreview();
+    el.textContent = ''; IS.cellNow = '';
+    if (!id || !dt) return isPaintModal();
     const seq = ++IS.cellSeq;
     api('adm_issueCell', id, dt).then((r) => {
       if (seq !== IS.cellSeq) return;
-      el.textContent = '지금 ' + isMd0(dt) + ' 칸: ' + ((r && r.cell) || '(빈 칸)');
-      isPreview();
+      IS.cellNow = (r && r.cell) || '';
+      el.textContent = '지금 ' + isMd0(dt) + ' 칸: ' + (IS.cellNow || '(빈 칸)');
+      isPaintModal();
     }).catch(() => {});
   }
   $('#isAdd').addEventListener('click', () => isOpen(null));

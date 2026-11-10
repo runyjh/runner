@@ -187,9 +187,12 @@ function issSubDrv_(x) {
   return all.filter(function (o) { return o.status === ST.ACTIVE; })[0] || all[0] || null;
 }
 /** 대신 뛴 기사 칸에 넣는 글자 = 원래 기사가 못 뛴 물량 (다른 캠프면 캠프 이름을 앞에) */
-function issSubCell_(iss, mctx, sctx) {
-  const bu = issUnits_(mctx.base, mctx.rots);
+function issSubCell_(iss, mctx, sctx, src) {
+  // 원래 기사의 그날 칸(이슈 넣기 전)이 노선이면 그것, 아니면(비었거나 출근) 기본노선 · 백업 기사는 그날 칸으로
+  const s0 = str_(src) && str_(src) !== '출근' && issUnits_(src, mctx.rots) ? str_(src) : mctx.base;
+  const bu = issUnits_(s0, mctx.rots);
   if (!bu) return null;
+  const mcamp = bu.camp || mctx.camp;
   let units = bu.units;
   if (iss.result === '물량조율') {
     units = {};
@@ -200,7 +203,7 @@ function issSubCell_(iss, mctx, sctx) {
       Object.keys(cu.units).forEach(function (rt) { if (bu.units[rt]) { const k = bu.units[rt].filter(function (r) { return cu.units[rt].indexOf(r) >= 0; }); if (k.length) units[rt] = k; } });
     }
   }
-  return issCompose_(units, mctx.rots, sctx.camp !== mctx.camp ? mctx.camp : '') || null;
+  return issCompose_(units, mctx.rots, sctx.camp !== mcamp ? mcamp : '') || null;
 }
 /**
  * 이슈를 칸에 반영 (저장·수정·삭제 공통 · 잠금 안에서)
@@ -261,13 +264,13 @@ function issSyncCells_(a, drv, prev, next, dry, subOnly) {
     const mctx = ctxOf(drv, d);
     let mineP = false;
     if (sPrev && ssPrev.indexOf(d) >= 0) {
-      const now = curP[d] || '', vp = issSubCell_(prev, mctx, ctxOf(sPrev, d));
+      const now = curP[d] || '', vp = issSubCell_(prev, mctx, ctxOf(sPrev, d), (prev.orig || {})[d]);
       mineP = vp !== null && now === vp;
       const stay = sameSub && ssNext.indexOf(d) >= 0;
       if (!stay && mineP && so.hasOwnProperty(d)) put(sPrev.id, d, so[d]);
     }
     if (sNext && ssNext.indexOf(d) >= 0) {
-      const now = curN[d] || '', v = issSubCell_(next, mctx, ctxOf(sNext, d));
+      const now = curN[d] || '', v = issSubCell_(next, mctx, ctxOf(sNext, d), orig.hasOwnProperty(d) ? orig[d] : (prev && prev.orig || {})[d]);
       if (v === null) return;
       const base0 = sameSub && mineP && so.hasOwnProperty(d) ? so[d] : now;
       nso[d] = base0;
