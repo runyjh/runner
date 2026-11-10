@@ -564,7 +564,7 @@ function api_myInfo(token) {
     };
   });
 }
-/** 내 스케줄에 붙일 품앗이: { 날짜: [{ role: '수행'|'맡김'|'지원', text, status }] } (내가 뛰는 확정 일감 + 모집 중인 내 일감 + 지원·협의 중인 일감. 내 일감이 배차 확정되면 빼기) */
+/** 내 스케줄에 붙일 품앗이: { 날짜: [{ role: '수행'|'맡김'|'지원', text, status }] } (내가 뛰는 확정 일감 + 내가 맡긴 일감(모집 중·확정) + 지원·협의 중인 일감) */
 function pmScheduleOf_(me, dates) {
   const out = {};
   if (!dates.length) return out;
@@ -575,7 +575,10 @@ function pmScheduleOf_(me, dates) {
   d.jobs.forEach(function (j) {
     if (!set[j.date] || j.status === PST.CANCEL) return;
     const base = (j.camp ? j.camp.replace(/\s*캠프$/, '') + ' ' : '') + (j.route || j.area) + ' · ' + j.time;
-    if (j.status === PST.DONE && j.acceptedId === me) (out[j.date] = out[j.date] || []).push({ role: '수행', id: j.id, text: base + ' (' + j.poster + ' 기사님 일)', status: '확정' });
+    const sc = String(j.camp || '').replace(/\s*캠프$/, ''), rt = j.route || '';
+    if (j.status === PST.DONE && j.acceptedId === me) (out[j.date] = out[j.date] || []).push({ role: '수행', id: j.id, text: base + ' (' + (j.posterId ? j.poster + ' 기사님 일' : '러너 노선') + ')', status: '확정', camp: sc, route: rt, who: j.poster || '' });
+    // 내가 맡긴 일감이 배차 확정됨: 달력 칸에 '맡김 → 받은 기사' (칸 노선과 같아 '배차확정 완료'로 이미 보이는 날은 앱이 겹쳐 보이지 않게 뺀다)
+    else if (j.status === PST.DONE && j.posterId === me) (out[j.date] = out[j.date] || []).push({ role: '맡김', id: j.id, text: base + ' → ' + (j.accepted || '') + ' 기사님', status: '확정', camp: sc, route: rt, who: j.accepted || '' });
     // 내가 올린(맡긴) 일감: 모집 중·협의 중일 때만 보이고, 배차가 확정되면 내 스케줄에서 뺀다
     else if (j.posterId === me && (j.status === PST.OPEN || j.status === PST.TALK)) (out[j.date] = out[j.date] || []).push({ role: '맡김', id: j.id, text: base, status: j.status });
   });

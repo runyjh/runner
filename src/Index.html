@@ -452,6 +452,9 @@
   .mc.sun .n { color: var(--danger); } .mc.sat .n { color: var(--brand); }
   .mc .v { font-size: 10.5px; font-weight: 800; line-height: 1.2; border-radius: 4px; padding: 2px 1px; overflow: hidden; white-space: nowrap; text-overflow: clip; background: #eef0f2; text-align: center; letter-spacing: -.3px; }
   .mc .v.long { font-size: 9px; letter-spacing: -.4px; }
+  .mc .v.k-pm { background: #c9efd6; color: #0b6b3a; margin-top: 2px; } .mc .v.k-pm.give { background: #dbe8fd; color: #0a53a8; }
+  .dsel .pmx { font-size: 12.5px; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; cursor: pointer; border: 0; text-align: left; font-family: inherit; display: block; width: 100%; } .dsel .pmx b { margin-right: 6px; }
+  .dsel .pmx.r-수행 { background: #e5f6ec; color: #0b6b3a; } .dsel .pmx.r-맡김 { background: #e8f0fd; color: #0a53a8; } .dsel .pmx.r-지원 { background: #f2f4f6; color: #4e5968; } .dsel .pmx.r-done { background: #e5f6ec; color: #0b6b3a; }
   .mc .v.k-work { background: #bfe1f6; color: #0a53a8; } .mc .v.k-off { background: #f08c8c; color: #fff; } .mc .v.k-sick { background: #d4edbc; color: #11734b; }
   .mc .v.k-mi { background: #d15555; color: #ffcfc9; } .mc .v.k-yong { background: #e6cff2; color: #5a3286; } .mc .v.k-reg { background: #d9f5ef; color: #0b6b57; }
   .mc .bkdot { font-size: 9.5px; color: #5a3286; font-weight: 700; }
@@ -1962,13 +1965,18 @@
     const st = ((r.staff || {})[d] || []);
     const stRow = st.length ? '<div class="bk stf"><b>직원</b>' + st.map((x) => escH(x.name) + ' ' + escH(x.title) + ' · <i class="' + (x.v ? schKind(x.v) : 'none') + '">' + escH(x.v || '미정') + '</i>').join('<br>') + '</div>' : '';
     const bk = stRow + (!r.camp ? '' : l.length ? '<div class="bk"><b>' + escH(r.camp) + ' 백업</b>' + l.map(escH).join(', ') + '</div>' : '<div class="bk none">' + escH(r.camp) + ' 백업 없음</div>');
-    const pm = ((r.pumasi || {})[d] || []).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : '') + '</b>' + escH(x.text) + '</button>').join('');
+    const pm = pmOfDay(r, d).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : x.status === '확정' ? ' 확정' : '') + '</b>' + escH(x.text) + '</button>').join('');
     return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
       '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +
       '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' +
       ((r.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(r.inst[d]) + '</div>' : '') + pmDoneRow(r, d) + pm + bk + '</div></div>';
   }
   /** 내가 올린 품앗이가 배차 확정 + 그날 내 칸과 캠프·라우트가 같을 때 */
+  /** 그날 내 품앗이 목록 · 맡겨서 확정된 일감은 '배차확정 완료' 줄로 이미 보이면 뺀다 (겹침 방지) */
+  function pmOfDay(r, d) {
+    const done = ((r.pmDone || {})[d] || []).map((x) => x.id);
+    return ((r.pumasi || {})[d] || []).filter((x) => !(x.role === '맡김' && x.status === '확정' && done.includes(x.id)));
+  }
   function pmDoneRow(r, d) {
     return ((r.pmDone || {})[d] || []).map((x) => '<button type="button" class="pmx r-done" data-pm="' + escH(x.id) + '"><b>✅ 배차확정 완료</b>' +
       escH(String(x.camp || '').replace(/\s*캠프$/, '') + ' ' + x.route) + (x.accepted ? ' → ' + escH(x.accepted) + ' 기사님' : '') + '</button>').join('');
@@ -2004,11 +2012,15 @@
     if (!scSel || !r.dates.includes(scSel)) scSel = r.dates.includes(pdd) ? pdd : r.dates[0];
     const lead = new Date(y, m - 1, 1).getDay();
     let work = 0, off = 0;
-    r.dates.forEach((d) => { const v = String(r.cells[d] || ''); if (!v) return; if (/휴무|휴가|병가|퇴사/.test(v)) off++; else if (!/미입차/.test(v)) work++; });
+    r.dates.forEach((d) => { const v = String(r.cells[d] || ''); const pmW = pmOfDay(r, d).some((x) => x.role === '수행' && x.status === '확정'); if (pmW && (!v || /휴무|휴가/.test(v))) { work++; return; } if (!v) return; if (/휴무|휴가|병가|퇴사/.test(v)) off++; else if (!/미입차/.test(v)) work++; }); // 휴무인 날 품앗이를 뛰면 근무로
     const cells = [];
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((d) => {
-      const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', np = ((r.pumasi || {})[d] || []);
+      const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', np = pmOfDay(r, d);
+      // 확정된 품앗이는 칸에 바로 보이게: 수행 = 🤝 캠프·노선 (내 칸이 휴무·빈칸이면 그 대신) · 맡김 = 🤝 맡김 → 받은 기사
+      const pmOk = np.filter((x) => x.status === '확정');
+      const pmChip = pmOk.map((x) => '<span class="v k-pm' + (x.role === '맡김' ? ' give' : '') + '">' + (x.role === '수행' ? '<i class="cp">🤝 품앗이' + (x.camp ? ' ' + escH(x.camp) : '') + '</i>' + escH(x.route || '수행') : '<i class="cp">🤝 맡김</i>→' + escH(x.who || '')) + '</span>').join('');
+      const pmWork = pmOk.some((x) => x.role === '수행');
       // 칸에는 내 노선(줄임 표기)만. 지시·품앗이·확정완료는 작은 아이콘, 백업/근무 인원 글자는 없음 (아래 요약·상세에)
       const pc = v ? schParse(v, r.baseRoute || '') : null;
       const chip = !pc ? '' : pc.routes
@@ -2017,7 +2029,7 @@
       const icons = ((r.inst || {})[d] ? '<span title="지시사항">📌</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
         '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
-        (d === pdd ? '<em class="pddt">PDD</em>' : '') + chip + '</button>');
+        (d === pdd ? '<em class="pddt">PDD</em>' : '') + (pmWork && (!v || /휴무|휴가/.test(v)) ? '' : chip) + pmChip + '</button>');
     });
     $('#scBody').innerHTML = rcNote(r) + '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
       '<div class="msum">근무 ' + work + '일 · 휴무 ' + off + '일' + (r.camp ? ' · ' + escH(r.camp) : '') + '</div>' +
@@ -2026,7 +2038,7 @@
   }
   function monthDsel(r) {
     const d = scSel, bk = (r.backup || {})[d] || [];
-    const pm = ((r.pumasi || {})[d] || []).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : '') + '</b>' + escH(x.text) + '</button>').join('');
+    const pm = pmOfDay(r, d).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : x.status === '확정' ? ' 확정' : '') + '</b>' + escH(x.text) + '</button>').join('');
     const extra = pmDoneRow(r, d) + pm;
     return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', baseRoute: r.baseRoute || '', camp: r.camp || '', inst: (r.inst || {})[d] || '',
       sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk.length ? ' · 들어오는 백업 <b>' + bk.length + '</b>명' : ' · 이 날 들어오는 백업 없음') : ''), extra });
