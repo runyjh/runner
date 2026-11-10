@@ -226,6 +226,7 @@ function fsSync() {
   const c = cache_(), dirty = +c.get('fs:dirty') || 0, built = +c.get('fs:built') || 0;
   const today = todayText_(), day = c.get('fs:day');
   if (!(dirty > built) && day === today) return;
+  if (typeof fsCopyOn_ === 'function' && !fsCopyOn_()) return; // 읽기 사본 만들기를 꺼 둠 (app_settings fsCopy = off)
   // 겹침 방지는 캐시 표시로만: 전체 잠금(LockService)을 잡으면 사본을 만드는 몇 분 동안 앱의 모든 저장이 "다른 저장 작업이 처리 중"으로 막힌다
   if (c.get('fs:busy')) return;
   c.put('fs:busy', '1', 330);

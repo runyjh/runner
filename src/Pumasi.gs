@@ -44,6 +44,8 @@ function appSetPut_(key, value, memo) {
   } finally { lock.releaseLock(); }
   cache_().remove('appset');
 }
+/** Firestore 읽기 사본 만들기 켜짐? (app_settings 의 fsCopy 가 off 면 끔 · 기본 켬 · 실시간 갱신 신호는 이 설정과 무관하게 계속 나감) */
+function fsCopyOn_() { try { return !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(appSet_().fsCopy)); } catch (e) { return true; } }
 /** 품앗이 일감 올리기 켜짐? (관리자 품앗이 관리에서 ON/OFF, 기본 ON) */
 function pmPostOn_() { return !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(appSet_().pmPostOn)); }
 /** 일감 제안(품앗이 주세요 · 일할 기사 찾기에서 특정 기사에게 맡기기) 켜짐 — 자유 등록(pmPostOn)과 따로 */
@@ -1103,13 +1105,14 @@ function pmSchOp_(out, op, driverId, j) {
  * 스케줄 DB 의 품앗이 줄에 쓰기. set = 칸에 그 글자를 넣음(이미 다른 글이 있으면 줄을 바꿔 덧붙임), clear = 그 글자만 지움.
  * 품앗이 줄이 없으면 비고 줄 바로 위에 새로 만든다. 스케줄 DB 가 없거나 실패해도 품앗이 처리는 그대로 (기록만 남김).
  */
-function pmSchApply_(ops) {
+function pmSchApply_(ops, soft) {
   try {
     if (!props_().SCH_DB_ID) return;
     const ds = ops.map(function (o) { return o.date; }).sort();
     const h0 = schEnsureDates_(parseYmd_(ds[0]), parseYmd_(ds[ds.length - 1]));
     const lock = scriptLock_();
-    lock.waitLock(20000);
+    // soft = 스케줄을 읽다가 하는 복구: 잠금이 바로 안 잡히면 그만둔다 (화면 열기가 다른 저장을 기다리며 늦어지지 않게)
+    if (soft) { if (!lock.tryLock(300)) return; } else lock.waitLock(20000);
     try {
       const sh = schSheet_(), h = schHeader_(true) || h0, F = h.fixed;
       const read = function () {

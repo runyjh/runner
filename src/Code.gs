@@ -801,7 +801,10 @@ const FS_READ_FNS = ['adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueLis
   'adm_stlMonth', 'adm_stlPayList', 'adm_stlPnl', 'adm_stlRoundInfo', 'adm_stlSlip', 'adm_stlTable', 'adm_stlTax', 'adm_tiList',
   'api_bdList', 'api_bdPost', 'api_bdRecent', 'api_bdAttach', 'api_campSchedule', 'api_checkLoginId', 'api_checkSession', 'api_fsToken', 'api_login', 'api_logout',
   'api_changePassword', 'api_myInfo', 'api_mySchedule', 'api_mySettle', 'api_mySlip', 'api_notices', 'api_perf', 'api_ping', 'api_pmAlerts', 'api_pmAlertsRead',
-  'api_pmAttach', 'api_pmAvailList', 'api_pmAvailMine', 'api_pmForm', 'api_pmJob', 'api_pmList', 'api_pmMine', 'api_pmPrice', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel'];
+  'api_pmAttach', 'api_pmAvailList', 'api_pmAvailMine', 'api_pmForm', 'api_pmJob', 'api_pmList', 'api_pmMine', 'api_pmPrice', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel',
+  // 읽기만 하는 함수인데 빠져 있던 것 (부를 때마다 '자료가 바뀜' 표시가 찍혔음 · 2026-11-11 점검)
+  'adm_stlAdjSummary', 'adm_campThumbs', 'adm_pmMeta', 'adm_bankList', 'adm_bankPreview', 'adm_accCats', 'adm_stlDriveList', 'adm_stlFbView', 'adm_stlReportExtra', 'adm_stlReportYear', 'adm_stlBank'
+];
 /** Firestore 사본: 데이터가 바뀜 (Firebase.gs · 없으면 아무것도 안 함) */
 function fsMark_(area, extra) { if (typeof fsDirty_ === 'function') fsDirty_(area, extra); }
 function fail_(msg) { const e = new Error(msg); e.userMsg = msg; throw e; }
@@ -2618,7 +2621,7 @@ function api_notices(token) {
       .map(function (n) { return { id: n.id, title: n.title, body: n.body, important: n.important, date: n.start || n.createdAt.slice(0, 10), updatedAt: n.updatedAt }; });
     const out = { ok: true, notices: list, today: today };
     // 기사 앱 홈 사본 (공지 + 게시판 최근 글) → 다음 번엔 Firestore 에서
-    if (typeof fsSaveDrvHome_ === 'function' && !(typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_)) fsSaveDrvHome_(s.d, out, fsT0);
+    if (typeof fsSaveDrvHome_ === 'function' && fsCopyOn_() && !(typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_)) fsSaveDrvHome_(s.d, out, fsT0);
     return out;
   });
 }
@@ -3277,6 +3280,9 @@ function adm_companySave(token, values) {
     const a = requireAdmin_(token);
     values = values || {};
     ensureCompany_();
+    const lock = scriptLock_();
+    lock.waitLock(20000); // 다른 저장과 같은 잠금 (동시에 두 명이 저장해도 덮어쓰지 않게)
+    try {
     const sh = ss_().getSheetByName(COMPANY_SHEET);
     const last = sh.getLastRow();
     const labels = sh.getRange(2, 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); });
@@ -3290,6 +3296,7 @@ function adm_companySave(token, values) {
     });
     if (changed.length) logAdmin_(a, '회사 정보 수정', '', changed.join(', '));
     return { ok: true };
+    } finally { lock.releaseLock(); }
   });
 }
 
@@ -4716,7 +4723,7 @@ function adm_schWeek(token, start) {
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
     const fsT0 = Date.now(), res = schRead_(sun, addDays_(sun, SCH_DAYS - 1));
     // 이번 주면 Firestore 사본도 (다음 번엔 거기서)
-    if (typeof fsSaveAdmSched_ === 'function' && sun.getTime() === sundayOf_(new Date()).getTime()) fsSaveAdmSched_(Utilities.formatDate(sun, CFG.TZ, 'yyyy-MM-dd'), res, fsT0);
+    if (typeof fsSaveAdmSched_ === 'function' && fsCopyOn_() && sun.getTime() === sundayOf_(new Date()).getTime()) fsSaveAdmSched_(Utilities.formatDate(sun, CFG.TZ, 'yyyy-MM-dd'), res, fsT0);
     return res;
   });
 }
@@ -4850,7 +4857,7 @@ function schRead_(sun, end) {
         });
       });
     });
-    if (fix.length) pmSchApply_(fix);
+    if (fix.length) pmSchApply_(fix, true); // 읽는 길이므로 잠금을 기다리지 않는다: 다른 저장이 진행 중이면 이번엔 화면 값만 맞추고 시트는 다음 조회 때
   } catch (e) { console.error('품앗이 칸 잠금·복구 실패: ' + (e && e.message)); }
   const pmRows = Object.keys(cells).filter(function (id) { return id.indexOf(SCH_PM_PREFIX) === 0 && byDrv[id.slice(SCH_PM_PREFIX.length)]; }).map(function (id) {
     const d = byDrv[id.slice(SCH_PM_PREFIX.length)];
