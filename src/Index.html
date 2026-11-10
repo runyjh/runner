@@ -203,6 +203,10 @@
   .bdg.k-주간 { background: #fff4d6; color: #b7791f; } .bdg.k-야간 { background: #e6e9ff; color: #3b4cc0; } .bdg.k-일택 { background: #e5f6ec; color: #11734b; }
   .bdg.pay { background: #fff0f0; color: #d63b3b; } .bdg.pay.m { background: #f2f4f6; color: #4e5968; }
   .bdg.of { background: #ffe8f3; color: #c2185b; }
+  /* 내가 맡은(배차 확정된) 품앗이: 회색으로 덮지 않고 초록 테두리 + '✅ 배차 확정' */
+  .pmc.my-ok { border: 2px solid #12a150; background: #f3fbf6; }
+  .bdg.okk { background: #12a150; color: #fff; font-weight: 800; }
+  .pmc .okline { margin: 0 0 6px; font-size: 14px; font-weight: 800; color: #0b7a3e; }
   .btn.off, button.off { opacity: .45; pointer-events: none; filter: grayscale(1); }
   .bdg.pdd { background: var(--brand); color: #fff; font-size: 11px; padding: 1px 7px; margin-left: 4px; }
   .bdg.gv { background: #e8f7ee; color: #11734b; }
@@ -2220,11 +2224,12 @@
       '<button type="button" class="more" data-gvact="1">' + (g.me ? '수정' : '💌 일감 제안') + '</button></div></div>';
   }
   function pmCardHtml(j, extra) {
-    const sk = PM_ST[j.status] || 'open';
-    const tags = (j.offerToMe ? '<span class="bdg of">💌 나에게 온 제안</span> ' : '') + (j.offerTo ? '<span class="bdg of">💌 ' + escH(j.offerTo) + ' 기사님께 제안</span> ' : '') + (j.mine ? '<span class="bdg me">내 일감</span> ' : '') + (j.office && !j.mine && (j.status === '모집 중' || j.status === '배차 협의중') ? '<span class="bdg of">🏢 사무실 · 지원하면 바로 확정</span> ' : '') + (j.myApp && j.myApp !== '지원 취소' && j.myApp !== '제안' ? '<span class="bdg ap">' + (j.myApp === '지원' ? '지원함' : escH(j.myApp)) + '</span> ' : '') +
+    const myOk = j.accepted && j.status === '배차 확정'; // 내가 맡은 일감 (배차일 전)
+    const sk = myOk ? 'open' : PM_ST[j.status] || 'open';
+    const tags = (j.offerToMe ? '<span class="bdg of">💌 나에게 온 제안</span> ' : '') + (j.offerTo ? '<span class="bdg of">💌 ' + escH(j.offerTo) + ' 기사님께 제안</span> ' : '') + (j.mine ? '<span class="bdg me">내 일감</span> ' : '') + (j.office && !j.mine && (j.status === '모집 중' || j.status === '배차 협의중') ? '<span class="bdg of">🏢 사무실 · 지원하면 바로 확정</span> ' : '') + (myOk ? '<span class="bdg okk">✅ 배차 확정</span> ' : '') + (!myOk && j.myApp && j.myApp !== '지원 취소' && j.myApp !== '제안' ? '<span class="bdg ap">' + (j.myApp === '지원' ? '지원함' : escH(j.myApp)) + '</span> ' : '') +
       (j.newApps ? '<span class="bdg nw">새 지원 ' + j.newApps + '</span> ' : '');
     const over = sk === 'open' ? '' : '<div class="pmst"><span>' + escH(PM_STL[j.status] || j.status) + '</span></div>';
-    return '<div class="pmc s-' + sk + '" data-pj="' + escH(j.id) + '">' +
+    return '<div class="pmc s-' + sk + (myOk ? ' my-ok' : '') + '" data-pj="' + escH(j.id) + '">' + (myOk ? '<div class="okline">✅ 배차 확정 · 내가 맡은 품앗이입니다</div>' : '') +
       '<div class="top"><span>' + pmDay(j.date) + pddTag(j.kind) + ' · 입차 ' + escH(j.time) + '</span><span class="bdg k-' + escH(j.kind) + '">' + escH(PM_KIND[j.kind] || j.kind) + '</span></div>' +
       '<div class="ar">' + escH(j.area) + '</div>' +
       '<div class="ln">' + tags + '<b>' + escH(j.camp) + '</b>' + (j.route ? ' · ' + escH(j.route) : '') + '</div>' +
