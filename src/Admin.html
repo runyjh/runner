@@ -7634,17 +7634,21 @@
   function upCoupang(tab) {
     const w = upWk(tab);
     if (w < 0) return null;
-    const work = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근');
+    // 노선관리에 있는 캠프만 (그 밖의 캠프 줄은 빼고 몇 줄 뺐는지 알려 줌)
+    const campOk = new Set((SD.camps || []).map((c) => String(c.name || '').replace(/\s*캠프\s*$/, '').trim()).filter(Boolean));
+    const okCamp = (c) => !campOk.size || campOk.has(String(c || '').replace(/\s*캠프\s*$/, '').trim());
+    const work0 = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근'), work = work0.filter((r) => okCamp(r[2]));
+    const skipCamps = Array.from(new Set(work0.filter((r) => !okCamp(r[2])).map((r) => r[2])));
     const dates = upRes.dates.slice(w * 7, w * 7 + 7).filter((d) => d >= upRes.target);
     if (!dates.length) return { rows: [], extra: [], dates };
     const sc = (c) => String(c || '').replace(/\s*캠프\s*$/, '').trim();
     const rSeen = {};
-    let roster = (upRes.roster || []).map((x) => ({ camp: sc(x.camp), id: x.id, name: x.name })).filter((x) => { const k = x.camp + '|' + x.id; if (rSeen[k]) return false; rSeen[k] = 1; return true; });
+    let roster = (upRes.roster || []).map((x) => ({ camp: sc(x.camp), id: x.id, name: x.name })).filter((x) => { const k = x.camp + '|' + x.id; if (rSeen[k] || !okCamp(x.camp)) return false; rSeen[k] = 1; return true; });
     const fromCp = roster.length > 0;
     if (!fromCp) { // 쿠팡 목록이 없으면: 재직 기사의 소속 캠프(추가 배정 줄은 그 캠프)
       const seen = {};
       SD.drivers.forEach((d) => {
-        if (!d.loginId || d.status !== '승인' || (d.workStatus === '퇴사' && (!d.leaveDate || d.leaveDate <= dates[0])) || !d.camp) return;
+        if (!d.loginId || d.status !== '승인' || (d.workStatus === '퇴사' && (!d.leaveDate || d.leaveDate <= dates[0])) || !d.camp || !okCamp(d.camp)) return;
         const k = sc(d.camp) + '|' + d.loginId; if (seen[k]) return; seen[k] = 1;
         roster.push({ camp: sc(d.camp), id: d.loginId, name: d.ex ? ((SD.drivers.find((x) => x.id === d.mainId) || {}).name || d.name) : d.name });
       });
@@ -7667,7 +7671,7 @@
         else rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '휴무', '', '']);
       });
     });
-    return { rows, extra, dates, fromCp };
+    return { rows, extra, dates, fromCp, skipCamps };
   }
   $('#upXlsx').addEventListener('click', () => {
     if (!upRes) return;
@@ -7683,7 +7687,7 @@
     const md = (d) => d.slice(5).replace('-', '');
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '쿠팡_기사스케줄_업로드_' + md(c.dates[0]) + '-' + md(c.dates[c.dates.length - 1]) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     const nW = c.rows.filter((r) => r[7] === '출근').length;
-    toast('받았습니다: ' + c.dates.length + '일 · 출근 ' + nW + '줄 · 휴무 ' + (c.rows.length - 1 - nW) + '줄' + (c.fromCp ? '' : ' (쿠팡 등록 목록 없이 기사 정보로)'));
+    toast('받았습니다: ' + c.dates.length + '일 · 출근 ' + nW + '줄 · 휴무 ' + (c.rows.length - 1 - nW) + '줄' + (c.fromCp ? '' : ' (쿠팡 등록 목록 없이 기사 정보로)') + (c.skipCamps.length ? ' · 노선관리에 없는 캠프 뺌: ' + c.skipCamps.join(', ') : ''));
   });
   $('#sUpload').addEventListener('click', upMake);
   $('#upRegen').addEventListener('click', upMake);
