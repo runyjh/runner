@@ -474,6 +474,27 @@
   .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--brand); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .cbk { font-size: 14px; line-height: 1.7; color: #5a3286; }
+  /* 내 캠프 → 노선 정보 (참고 이미지 + 기사들이 쓰는 라우트 정보) */
+  .ri .riaddr { font-size: 12.5px; color: var(--sub); margin: -4px 0 8px; }
+  .ristrip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin: 0 -2px 10px; -webkit-overflow-scrolling: touch; }
+  .rimg { flex: 0 0 132px; border: 1px solid #e5e8eb; border-radius: 10px; background: #fff; padding: 0; overflow: hidden; text-align: left; cursor: pointer; }
+  .rimg .ph { width: 132px; height: 96px; background: #f2f4f6 center/cover no-repeat; display: flex; align-items: center; justify-content: center; color: #b0b8c1; font-size: 22px; }
+  .rimg span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11.5px; line-height: 1.35; padding: 5px 7px; color: var(--ink); min-height: 31px; }
+  .richips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; }
+  .richips button { flex: 0 0 auto; border: 1px solid #d1d6db; background: #fff; border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .richips button.on { background: var(--brand); border-color: var(--brand); color: #fff; } .richips button.my:not(.on) { border-color: var(--brand); color: var(--brand); }
+  .riw { background: #f7f9fc; border: 1px solid #e5e8eb; border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+  .riw .row1 { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; } .riw .row1 label { font-size: 12.5px; color: var(--sub); white-space: nowrap; }
+  .riw select { flex: 1; height: 38px; border: 1px solid #d1d6db; border-radius: 8px; padding: 0 8px; font-size: 14px; background: #fff; }
+  .riw textarea { width: 100%; box-sizing: border-box; min-height: 74px; border: 1px solid #d1d6db; border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 14px; line-height: 1.5; resize: vertical; }
+  .riw .row2 { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; align-items: center; } .riw .row2 small { margin-right: auto; color: var(--sub); font-size: 11.5px; }
+  .rin { border-top: 1px solid #f2f4f6; padding: 10px 0; } .rin:first-child { border-top: 0; }
+  .rin .rb { display: inline-block; font-size: 11.5px; font-weight: 800; border-radius: 6px; padding: 1px 7px; background: #e8f3ff; color: var(--brand); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; } .rin .rb.all { background: #f2f4f6; color: #4e5968; font-family: inherit; }
+  .rin .tx { white-space: pre-wrap; word-break: break-word; font-size: 14.5px; line-height: 1.55; margin: 5px 0 4px; color: var(--ink); }
+  .rin .mt { font-size: 12px; color: var(--sub); display: flex; gap: 8px; align-items: center; } .rin .mt button { border: 0; background: none; color: var(--sub); font-size: 12px; text-decoration: underline; padding: 0 2px; }
+  .rin.mine { background: #fffdf3; margin: 0 -14px; padding: 10px 14px; }
+  #riView .ibox { width: min(760px, 100%); max-height: 92vh; overflow: auto; padding: 12px; } #riView img { width: 100%; height: auto; border-radius: 8px; display: block; background: #f2f4f6; min-height: 120px; }
+  #riView p { white-space: pre-wrap; font-size: 14px; line-height: 1.55; margin: 10px 2px; }
   .cbk div { background: #f5eefb; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-weight: 600; }
   .mdet { margin-top: 12px; }
   .mdet .day { border-top: 0; }
@@ -736,6 +757,7 @@
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
     <div class="links"><a id="changePwBtn">비밀번호 변경</a><i>|</i><a id="logoutBtn">로그아웃</a></div>
   </section>
+  <div class="ihelp center hidden" id="riView" role="dialog" aria-modal="true"><div class="ibox"><div id="riViewImg"></div><p id="riViewDesc"></p><button class="btn ghost" type="button" id="riViewNo" style="width:100%">닫기</button></div></div>
   <div class="ihelp hidden" id="instHelp" role="dialog"><div class="ibox">
     <b>홈 화면에 추가하기</b><ol id="instSteps"></ol>
     <button class="btn" type="button" id="instClose">확인</button></div></div>
@@ -1105,7 +1127,7 @@
   // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
   const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_myFb', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
   const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
-  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
+  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_routeInfo', 'api_campImage']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
   const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
   // 자동 로그인이면 이 기기(localStorage), 아니면 이 창에만(sessionStorage · 창을 닫으면 사라짐) — 로그인 토큰과 같은 곳
@@ -1219,7 +1241,7 @@
     signup: '#v-signup .back', reset: '#v-reset .back', notice: '#ntBack', sched: '#scBack', changepw: '#cpBack', pumasi: '#pmBack', pmdetail: '#pdBack',
     pmform: '#pfBack', pmgive: '#gvBack', board: '#bdBack', bdpost: '#bpBack', bdform: '#bfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack'
   };
-  const OVERLAYS = ['#pmAsk', '#instHelp', '#ntPop', '#slPop', '#pushPop']; // 뒤로가기로 닫히는 팝업 (없으면 홈에서 뒤로가기 = 앱 종료)
+  const OVERLAYS = ['#riView', '#pmAsk', '#instHelp', '#ntPop', '#slPop', '#pushPop']; // 뒤로가기로 닫히는 팝업 (없으면 홈에서 뒤로가기 = 앱 종료)
   let backGuard = false, backSkip = false;
   const overlayOpen = () => OVERLAYS.find((sel) => { const el = document.querySelector(sel); return el && !el.classList.contains('hidden'); }) || (document.getElementById('postLayer') && document.getElementById('postLayer').classList.contains('on') ? '#postLayer' : '');
   function syncBack() {
@@ -1754,8 +1776,98 @@
         '<p class="hint" style="margin:-2px 0 6px">실제 출근일 ' + (prevD.getMonth() + 1) + '/' + prevD.getDate() + ' (' + DOWK[prevD.getDay()] + ') 저녁 입차 · ' + (guest ? escH(D.camp) + ' ' : '') + '기사 ' + list.length + '명 · 근무 ' + work + '명 · 백업 ' + bk.length + '명</p>' +
         (rows || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(D.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
-        (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>';
+        (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>' +
+      '<div id="riBox"></div>';
+    const myCell = me ? me.cells[d] || '' : '', myPc = myCell ? schParse(myCell, me.route || '') : (me && me.route ? schParse(me.route, '') : null);
+    riShow(D.campId || r.campId, D.camp, (myPc && myPc.codes) || []);
   }
+  // ───── 내 캠프 → 노선 정보: 노선관리 참고 이미지 + 기사들이 자유롭게 쓰는 라우트 정보 ─────
+  const RI = { cache: {}, campId: '', camp: '', mine: [], f: '', edit: '', big: {}, seq: 0 };
+  function riShow(campId, camp, mine) {
+    if (!campId) return;
+    const changed = RI.campId !== campId;
+    RI.campId = campId; RI.camp = camp; RI.mine = mine || [];
+    if (changed) { RI.f = ''; RI.edit = ''; }
+    if (RI.cache[campId]) riPaint();
+    else $('#riBox').innerHTML = '<div class="wk ri"><h3>🗺️ ' + escH(camp) + ' 노선 정보</h3><div style="color:var(--sub);padding:8px 0">불러오는 중…</div></div>';
+    if (!RI.cache[campId] || Date.now() - RI.cache[campId].at > 60000) riLoad();
+  }
+  function riLoad() {
+    const campId = RI.campId, seq = ++RI.seq, tok = pmTok(); if (!tok) return Promise.resolve();
+    return api('api_routeInfo', tok, campId).then((r) => {
+      if (seq !== RI.seq) return;
+      if (!r || !r.ok) { if (r && (r.code === 'EXPIRED' || r.code === 'MUST_CHANGE')) return pmOk(r); const b = $('#riBox'); if (b && !RI.cache[campId]) b.innerHTML = '<div class="wk ri"><h3>🗺️ 노선 정보</h3><div style="color:var(--sub)">' + escH((r && r.msg) || '불러오지 못했습니다.') + '</div></div>'; return; }
+      r.at = Date.now(); RI.cache[campId] = r;
+      if (RI.campId === campId) riPaint();
+    }).catch(() => { netErr(); });
+  }
+  function riPaint() {
+    const box = $('#riBox'), r = RI.cache[RI.campId]; if (!box || !r) return;
+    const keep = $('#riTx') ? { v: $('#riTx').value, rt: $('#riRt').value, focus: document.activeElement && document.activeElement.id === 'riTx' } : null;
+    const mine = RI.mine.filter((c) => r.routes.indexOf(c) >= 0), others = r.routes.filter((c) => mine.indexOf(c) < 0);
+    const cnt = (k) => r.notes.filter((n) => (k === '*' ? !n.route : n.route === k)).length;
+    const chip = (k, label, my) => { const n = k === '' ? r.notes.length : cnt(k); return '<button type="button" data-rif="' + escH(k) + '" class="' + (RI.f === k ? 'on' : '') + (my ? ' my' : '') + '">' + escH(label) + (n ? ' ' + n : '') + '</button>'; };
+    const extra = Array.from(new Set(r.notes.map((n) => n.route).filter((x) => x && r.routes.indexOf(x) < 0))); // 지금은 없는 라우트에 남은 글
+    const list = r.notes.filter((n) => RI.f === '' || (RI.f === '*' ? !n.route : n.route === RI.f));
+    const ed = RI.edit ? r.notes.find((n) => n.id === RI.edit) : null;
+    const defRt = ed ? ed.route : (RI.f && RI.f !== '*' ? RI.f : (RI.f === '*' ? '' : (mine[0] || '')));
+    const opts = ['<option value="">캠프 전체</option>'].concat(mine.concat(others).concat(extra).map((c) => '<option value="' + escH(c) + '"' + (c === defRt ? ' selected' : '') + '>' + escH(c) + (mine.indexOf(c) >= 0 ? ' (내 노선)' : '') + '</option>')).join('');
+    box.innerHTML = '<div class="wk ri"><h3>🗺️ ' + escH(r.camp) + ' 노선 정보<small class="fix">' + r.notes.length + '건</small></h3>' +
+      (r.address ? '<div class="riaddr">📍 ' + escH(r.address) + '</div>' : '') +
+      (r.images.length ? '<div class="ristrip">' + r.images.map((im) => '<button type="button" class="rimg" data-riimg="' + escH(im.id) + '"><div class="ph"' + (im.thumb ? ' style="background-image:url(data:image/jpeg;base64,' + im.thumb + ')"' : '') + '>' + (im.thumb ? '' : '🖼️') + '</div><span>' + escH(im.desc || '참고 이미지') + '</span></button>').join('') + '</div>' : '') +
+      '<div class="richips">' + chip('', '전체') + chip('*', '캠프 전체') + mine.map((c) => chip(c, c, true)).join('') + others.concat(extra).map((c) => chip(c, c)).join('') + '</div>' +
+      '<div class="riw"><div class="row1"><label for="riRt">' + (ed ? '✏️ 고치는 중 ·' : '✍️ 남기기 ·') + ' 노선</label><select id="riRt">' + opts + '</select></div>' +
+        '<textarea id="riTx" maxlength="1000" placeholder="아파트 출입 비번, 주차·상차 위치, 엘리베이터, 주의할 집 등 이 노선을 처음 뛰는 기사님께 도움이 될 정보를 자유롭게 남겨 주세요.">' + escH(ed ? ed.text : '') + '</textarea>' +
+        '<div class="row2"><small>러너 기사님 모두가 봅니다</small>' + (ed ? '<button type="button" class="btn ghost sm" id="riCancel">취소</button>' : '') + '<button type="button" class="btn sm" id="riGo">' + (ed ? '저장' : '올리기') + '</button></div></div>' +
+      (list.length ? list.map((n) => '<div class="rin' + (n.mine ? ' mine' : '') + '"><span class="rb' + (n.route ? '' : ' all') + '">' + escH(n.route || '캠프 전체') + '</span><div class="tx">' + escH(n.text) + '</div>' +
+        '<div class="mt"><span>' + escH(n.author) + ' · ' + escH(String(n.at || '').slice(5, 16).replace('-', '/')) + (n.edited ? ' (수정)' : '') + '</span>' + (n.mine ? '<button type="button" data-riedit="' + escH(n.id) + '">수정</button><button type="button" data-ridel="' + escH(n.id) + '">삭제</button>' : '') + '</div></div>').join('')
+        : '<div style="color:#b0b8c1;padding:6px 0 2px">' + (RI.f ? '이 노선에 남긴 정보가 아직 없습니다. 첫 정보를 남겨 주세요.' : '아직 남긴 정보가 없습니다. 첫 정보를 남겨 주세요.') + '</div>') + '</div>';
+    if (keep && !ed) { $('#riTx').value = keep.v; if (keep.v) $('#riRt').value = keep.rt; if (keep.focus) $('#riTx').focus(); }
+  }
+  function riImg(id) {
+    const r = RI.cache[RI.campId], im = r && r.images.find((x) => x.id === id); if (!im) return;
+    $('#riViewDesc').textContent = im.desc || '';
+    const put = (src) => { $('#riViewImg').innerHTML = '<img alt="' + escH(im.desc || '참고 이미지') + '" src="' + src + '">'; };
+    put(im.thumb ? 'data:image/jpeg;base64,' + im.thumb : 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+    $('#riView').classList.remove('hidden'); syncBack();
+    if (RI.big[id]) return put(RI.big[id]);
+    const tok = pmTok(); if (!tok) return;
+    api('api_campImage', tok, id).then((x) => {
+      if (!pmOk(x, '이미지를 열지 못했습니다.')) return;
+      RI.big[id] = 'data:' + x.mime + ';base64,' + x.data;
+      if (!$('#riView').classList.contains('hidden') && $('#riViewDesc').textContent === (im.desc || '')) put(RI.big[id]);
+    }).catch(() => netErr());
+  }
+  $('#riViewNo').addEventListener('click', () => { $('#riView').classList.add('hidden'); syncBack(); });
+  $('#riView').addEventListener('click', (e) => { if (e.target.id === 'riView') { $('#riView').classList.add('hidden'); syncBack(); } });
+  $('#scBody').addEventListener('click', (e) => {
+    const f = e.target.closest('[data-rif]'); if (f) { RI.f = f.dataset.rif; RI.edit = ''; return riPaint(); }
+    const im = e.target.closest('[data-riimg]'); if (im) return riImg(im.dataset.riimg);
+    const ed = e.target.closest('[data-riedit]'); if (ed) { RI.edit = ed.dataset.riedit; riPaint(); const t = $('#riTx'); if (t) { t.focus(); t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return; }
+    if (e.target.id === 'riCancel') { RI.edit = ''; return riPaint(); }
+    const dl = e.target.closest('[data-ridel]');
+    if (dl) {
+      const id = dl.dataset.ridel;
+      return pmAsk('이 정보를 지울까요?', '지우면 되돌릴 수 없습니다.', '지우기').then((ok) => {
+        if (ok === null) return;
+        api('api_routeNoteDel', pmTok(), id).then((x) => { if (!pmOk(x)) return; const r = RI.cache[RI.campId]; if (r) r.notes = r.notes.filter((n) => n.id !== id); riPaint(); toast('지웠습니다.'); }).catch(() => netErr());
+      });
+    }
+    if (e.target.id === 'riGo') {
+      const b = e.target, text = $('#riTx').value.trim(), route = $('#riRt').value;
+      if (!text) { toast('내용을 입력해 주세요.'); return $('#riTx').focus(); }
+      b.disabled = true;
+      const campId = RI.campId, id = RI.edit;
+      api('api_routeNoteSave', pmTok(), { id: id || undefined, campId, route, text }).then((x) => {
+        b.disabled = false;
+        if (!pmOk(x)) return;
+        const r = RI.cache[campId];
+        if (r) { r.notes = r.notes.filter((n) => n.id !== x.note.id); r.notes.unshift(x.note); }
+        RI.edit = ''; if (RI.campId === campId) { $('#riTx').value = ''; riPaint(); }
+        toast(id ? '고쳤습니다.' : '올렸습니다. 고마워요!');
+      }).catch(() => { b.disabled = false; netErr(); });
+    }
+  });
   /** 하루 상세 줄 (2주 보기와 같은 모양) */
   function dayRow(r, d) {
     const p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay(), v = r.cells[d] || '', pdd = pddOf(r.today);

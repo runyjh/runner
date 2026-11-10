@@ -4601,7 +4601,8 @@
           '<button class="img-tile" data-img="' + esc(im.id) + '"><div class="ph" data-ph="' + esc(im.id) + '"><div class="spin" style="width:20px;height:20px"></div></div>' +
           '<span>' + (im.desc ? esc(im.desc) : '<em>설명 없음</em>') + '</span></button>').join('') + '</div>'
           : '<div class="no-memo">참고 이미지가 없습니다. 출입구, 주차 위치, 상차 위치 사진 등을 올려 두세요.</div>') +
-      '</div>') +
+      '<div class="db-note" style="margin-top:6px">참고 이미지와 설명은 기사 앱 → 내 스케줄 → 내 캠프 → 노선 정보에도 보입니다.</div></div>' +
+      '<div class="sec" id="rnSec"></div>') +
       '<div class="sec"><div class="sec-h"><div class="rtabs">' +
           '<button class="tab' + (rtab === 'routes' ? ' on' : '') + '" data-rtab="routes">노선 <b id="rCount"></b></button>' +
           (orphan ? '' : '<button class="tab' + (rtab === 'prices' ? ' on' : '') + '" data-rtab="prices">구분별 단가 <b id="pCount"></b></button>' +
@@ -4614,8 +4615,43 @@
         (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div><div id="tabLn"' + (rtab === 'ln' ? '' : ' class="hidden"') + '></div>') +
       '</div>';
     renderFilters(); renderRoutes(); loadThumbs();
-    if (!orphan) { renderPrices(); renderLnTab(); }
+    if (!orphan) { renderPrices(); renderLnTab(); rnLoad(curCamp); }
   }
+  // ── 기사 노선 정보 (기사 앱 내 캠프에서 기사들이 쓴 글 · 숨기기/되살리기/삭제) ──
+  const RN = { campId: '', notes: [], open: false, seq: 0 };
+  function rnLoad(campId) {
+    const seq = ++RN.seq; RN.campId = campId;
+    const box = $('#rnSec'); if (!box) return;
+    if (!box.innerHTML) box.innerHTML = '<div class="sec-h"><h4>기사 노선 정보</h4></div><div class="spin" style="width:20px;height:20px"></div>';
+    api('adm_routeNotes', campId).then((r) => {
+      if (seq !== RN.seq || curCamp !== campId) return;
+      if (!r.ok) { box.innerHTML = '<div class="sec-h"><h4>기사 노선 정보</h4></div><div class="sub">' + esc(r.msg || '불러오지 못했습니다.') + '</div>'; return; }
+      RN.notes = r.notes || []; rnPaint();
+    }).catch(() => {});
+  }
+  function rnPaint() {
+    const box = $('#rnSec'); if (!box) return;
+    const ns = RN.notes, shown = RN.open ? ns : ns.slice(0, 8), nh = ns.filter((n) => n.hidden).length;
+    box.innerHTML = '<div class="sec-h"><h4>기사 노선 정보<small>' + ns.length + '건' + (nh ? ' · 숨김 ' + nh : '') + '</small></h4><span class="db-note" style="margin:0">기사 앱 → 내 캠프에서 기사님들이 자유롭게 남긴 글 (route_notes 탭)</span></div>' +
+      (ns.length ? '<div class="table-wrap"><table><thead><tr><th style="width:90px">라우트</th><th>내용</th><th style="width:90px">작성자</th><th style="width:120px">시각</th><th style="width:120px"></th></tr></thead><tbody>' +
+        shown.map((n) => '<tr' + (n.hidden ? ' style="opacity:.5"' : '') + '><td><b>' + esc(n.route || '캠프 전체') + '</b></td><td style="white-space:pre-wrap;word-break:break-word">' + esc(n.text) + '</td><td>' + esc(n.author) + '</td><td class="sub">' + esc(String(n.at || '').slice(0, 16)) + (n.edited ? ' (수정)' : '') + '</td>' +
+          '<td><button class="btn sm ghost" data-rnhide="' + esc(n.id) + '" data-h="' + (n.hidden ? '0' : '1') + '">' + (n.hidden ? '되살리기' : '숨기기') + '</button> <button class="btn sm ghost danger-t" data-rndel="' + esc(n.id) + '">삭제</button></td></tr>').join('') +
+        '</tbody></table></div>' + (ns.length > 8 ? '<button class="btn sm ghost" id="rnMore" style="margin-top:6px">' + (RN.open ? '접기' : '모두 보기 (' + ns.length + '건)') + '</button>' : '')
+        : '<div class="no-memo">아직 기사님이 남긴 노선 정보가 없습니다.</div>');
+  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#rnSec')) return;
+    if (e.target.id === 'rnMore') { RN.open = !RN.open; return rnPaint(); }
+    const h = e.target.closest('[data-rnhide]'), d = e.target.closest('[data-rndel]');
+    if (!h && !d) return;
+    const id = (h || d).dataset[h ? 'rnhide' : 'rndel'];
+    if (d && !confirm('이 글을 지울까요? 되돌릴 수 없습니다. (숨기기는 기사 앱에서만 안 보이게 합니다)')) return;
+    api('adm_routeNoteSet', id, d ? { del: true } : { hide: h.dataset.h === '1' }).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      if (d) RN.notes = RN.notes.filter((n) => n.id !== id); else RN.notes.forEach((n) => { if (n.id === id) n.hidden = h.dataset.h === '1'; });
+      rnPaint(); toast(d ? '지웠습니다.' : h.dataset.h === '1' ? '숨겼습니다.' : '되살렸습니다.');
+    }).catch(() => {});
+  });
   // ── 변경이력 탭 (lnRender 공용 · 고른 캠프 관련 줄만, '전체 캠프' 체크로 모두) ──
   let lnAll = false;
   document.addEventListener('click', (e) => { if (e.target.id === 'lnRetry') renderLnTab(); });

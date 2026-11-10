@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -373,7 +373,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'teams_msgs', 'camp_thumbs', 'route_notes']);
 
 /** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
 const HEAD_RENAME = {};
@@ -411,8 +411,11 @@ SCHEMA[SH.RLIN] = RLN;
 SCHEMA[SH.RFB] = RFB;
 SCHEMA[SH.TEAMS] = TMS;
 // camp_thumbs: 참고 이미지 미리보기(작은 JPEG, base64) — 노선관리 목록은 캠프마다 이 탭 한 번 읽기로 끝 (원본은 크게 볼 때만)
+// 기사 노선 정보 (RouteInfo.gs): 기사 앱 '내 캠프'에서 기사들이 자유롭게 쓰는 노선·캠프 정보 (route = 라우트 코드 · 비우면 캠프 전체)
+const RNT = { id: '정보ID', campId: '캠프ID', campName: '캠프명', route: '라우트', text: '내용', authorId: '작성자ID', author: '작성자', status: '상태', createdAt: '등록일시', updatedAt: '수정일시' };
 const CTH = { id: '이미지ID', campId: '캠프ID', fileId: '파일ID', data: '미리보기', updatedAt: '만든일시' };
 SCHEMA[SH.CTHUMB] = CTH;
+SCHEMA[SH.RNOTE] = RNT;
 SCHEMA[SH.TAXINV] = TI;
 SCHEMA[SH.RCHG] = RC;
 // 속도 측정 (Perf.gs): 1분마다 화면·함수별 합계 한 줄
@@ -783,7 +786,7 @@ function run_(fn) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_live', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_live', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
@@ -3959,6 +3962,12 @@ function adm_campThumbSave(token, items) {
 function adm_campImage(token, id, full) {
   return run_(function () {
     requireAdmin_(token);
+    return campImageData_(id, full);
+  });
+}
+/** 캠프 참고 이미지 내용 (관리자 adm_campImage · 기사 앱 api_campImage 공용) */
+function campImageData_(id, full) {
+  {
     const row = findRow_(SH.CIMG, 'id', String(id || ''));
     if (!row) fail_('이미지를 찾을 수 없습니다.');
     const o = readObj_(SH.CIMG, row), fid = fileIdOf_(o.file);
@@ -3983,7 +3992,7 @@ function adm_campImage(token, id, full) {
     const data = Utilities.base64Encode(blob.getBytes());
     if (!full && data.length < 90000) { try { cache_().put(ck, mime + '|' + (thumb ? 't' : 'f') + '|' + data, CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
     return { ok: true, mime: mime, thumb: thumb, data: data, url: o.file };
-  });
+  }
 }
 
 // ── 노선 ──
