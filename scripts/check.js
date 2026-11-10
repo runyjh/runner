@@ -45,6 +45,13 @@ walk(path.join(ROOT, 'site'));
 walk(path.join(ROOT, 'extension'));
 checkJs('scripts/build-pages.js', fs.readFileSync(path.join(ROOT, 'scripts', 'build-pages.js'), 'utf8').replace(/^#!.*\n/, ''));
 
+// 없는 함수 부르기: 선언이 어디에도 없는 이름을 부르면 배포하지 않는다 (scripts/check-names.js)
+try {
+  const miss = require('./check-names.js').run(ROOT);
+  if (miss.length) miss.forEach(function (x) { bad('없는 함수 부르기 · ' + x, new Error('이 이름의 함수·변수가 어디에도 없습니다. 지운 함수를 아직 부르고 있지 않은지 확인하세요.')); });
+  else ok('없는 함수 부르기 없음 (서버 · 관리자앱 · 기사앱)');
+} catch (e) { bad('없는 함수 부르기 검사', e); }
+
 // 정산 계산 시험: 금액이 기대값과 다르면 배포하지 않는다 (scripts/test-settle.js)
 if (!failed) {
   try {

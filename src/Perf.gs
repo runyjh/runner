@@ -51,7 +51,7 @@ function errLog_(kind, fn, msg, x) {
     const c = cache_(), ck = 'el:' + Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, k + '|' + f + '|' + m, Utilities.Charset.UTF_8)).slice(0, 20);
     if (c.get(ck)) return;
     c.put(ck, '1', 600);
-    const cols = cols_(SH.ERR, true), sh = sheet_(SH.ERR);
+    const cols = cols_(SH.ERR), sh = sheet_(SH.ERR);
     if (sh.getLastRow() > 5000) return;
     const o = { at: nowText_(), app: str_(x.app).slice(0, 10) || '서버', kind: k, view: str_(x.view).slice(0, 40), fn: f, msg: m, upd: str_(x.upd).replace(/[^\d]/g, '').slice(0, 6), who: str_(x.who).slice(0, 40) };
     const a = new Array(cols.__w).fill('');
@@ -193,7 +193,7 @@ function adm_perfStats(token, days) {
     try { rows = readAll_(SH.PERF); } catch (e) { rows = []; }
     const by = {}, dayset = {};
     rows.forEach(function (r) {
-      const at = str_(r.at); if (!at || at < from) return;
+      const at = str_(r.at); if (!at || at < from || /^(st_|idb_)/.test(r.fn)) return; // st_ = 단계별 시간 · idb_ = 사진 보관함 진단 (분석용 줄이라 화면 목록에서는 뺌)
       dayset[at.slice(0, 10)] = 1;
       const k = r.app + '|' + r.view + '|' + r.fn, o = by[k] || (by[k] = { app: r.app, view: r.view, fn: r.fn, n: 0, rt: 0, mx: 0, srv: 0, last: '' });
       o.n += +r.n || 0; o.rt += +r.rt || 0; o.srv += +r.srv || 0; o.mx = Math.max(o.mx, +r.rtMax || 0); if (at > o.last) o.last = at;

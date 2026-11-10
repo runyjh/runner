@@ -10033,7 +10033,6 @@
   STX.last = STX.last || {}; // 묶음마다 마지막으로 연 하위 탭
   function stGo(code) {
     const i = code.indexOf(':'), kind = code.slice(0, i), v = code.slice(i + 1);
-    if (kind === 'modal') { if (v === 'imp') impOpen(); return; }
     if (kind === 'btn') { const b = $('#' + v); if (b) b.click(); return; }
     if (kind === 'tab') { if (v === 'ids') { STX.idt = 'ids'; } if (v === 'reportY') { STX.rpT = 'year'; return stShowTab('report'); } if (v === 'report') STX.rpT = 'month'; return stShowTab(v); }
     if (kind === 'idt') { STX.idt = v; STX.tab = ''; return stShowTab('ids'); }
@@ -10086,9 +10085,6 @@
     $('#stSubRight').classList.toggle('hidden', !step4);
     $('#stAdjCards').classList.toggle('hidden', !(!w.fin && w.step && w.step.k === 'adjust'));
     if (!w.fin && w.step && w.step.k === 'adjust') loadAdjCards();
-    const condOn = !w.fin && g && g.k === 'drv' && STX.tab === 'cfg';
-    $('#stCondBox').classList.toggle('hidden', !condOn);
-    if (condOn) loadCond();
   }
   // 매입·매출 단계 상태 · 통장 잔액 줄
   function finStatus(k) {
@@ -12037,11 +12033,11 @@
     sheets.push({ name: '쿠팡 정산서 원본', rows: F, widths: [12, 6, 40, 60, 18] });
     // ⑩-2 통장 내역 (분류 완료)
     if (r.bankRows && r.bankRows.length) {
-      const T = [H(['통장', '계좌 끝4', '날짜', '시각', '입/출', '입금', '출금', '잔액', '거래내용', '거래구분', '분류', '연결 · 이름', '메모'])];
-      r.bankRows.sort((a, b) => (a.bank + a.date + a.time).localeCompare(b.bank + b.date + b.time)).forEach((x) => T.push([x.bank, x.acct4 ? '···' + x.acct4 : '', x.date, x.time, x.io, x.io === '입금' ? n(x.amt) : '', x.io === '출금' ? n(x.amt) : '', n(x.bal), x.memo, x.kind, x.cat, x.refName, x.note]));
-      T.push(T(['합계', '', '', '', '', r.bankRows.reduce((a, x) => a + (x.io === '입금' ? n(x.amt) : 0), 0), r.bankRows.reduce((a, x) => a + (x.io === '출금' ? n(x.amt) : 0), 0)]));
-      T.push([]); T.push(['※ 올인원 [통장 내역 올리기]에서 분류한 결과 · 내부 이체 = 러너 통장끼리 옮긴 돈 · 사업 무관 = 개인 지출']);
-      sheets.push({ name: '통장 내역', rows: T, widths: [14, 9, 11, 9, 6, 14, 14, 14, 30, 12, 14, 18, 16] });
+      const BK = [H(['통장', '계좌 끝4', '날짜', '시각', '입/출', '입금', '출금', '잔액', '거래내용', '거래구분', '분류', '연결 · 이름', '메모'])]; // (이름이 T 면 합계 줄 꾸미는 T() 를 가려 '합계' 줄에서 오류가 났음)
+      r.bankRows.sort((a, b) => (a.bank + a.date + a.time).localeCompare(b.bank + b.date + b.time)).forEach((x) => BK.push([x.bank, x.acct4 ? '···' + x.acct4 : '', x.date, x.time, x.io, x.io === '입금' ? n(x.amt) : '', x.io === '출금' ? n(x.amt) : '', n(x.bal), x.memo, x.kind, x.cat, x.refName, x.note]));
+      BK.push(T(['합계', '', '', '', '', r.bankRows.reduce((a, x) => a + (x.io === '입금' ? n(x.amt) : 0), 0), r.bankRows.reduce((a, x) => a + (x.io === '출금' ? n(x.amt) : 0), 0)]));
+      BK.push([]); BK.push(['※ 올인원 [통장 내역 올리기]에서 분류한 결과 · 내부 이체 = 러너 통장끼리 옮긴 돈 · 사업 무관 = 개인 지출']);
+      sheets.push({ name: '통장 내역', rows: BK, widths: [14, 9, 11, 9, 6, 14, 14, 14, 30, 12, 14, 18, 16] });
     }
     // ⑪ 사업자번호 미입력
     if (r.noBiz.length) {
