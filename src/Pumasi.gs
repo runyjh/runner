@@ -1140,7 +1140,7 @@ function pmSchApply_(ops) {
  * 어드민 기사스케줄: 품앗이로 맡겨 배차 확정된 칸 { 기사ID: { 날짜: '품앗이 → 이지원' } }
  * 그날 그 기사 칸의 캠프·라우트가 일감과 같을 때만 (기사 앱 '배차확정 완료' 와 같은 규칙)
  */
-function pmAdminMarks_(cells, dates, byDrv) {
+function pmAdminMarks_(cells, dates, byDrv, tips) {
   // 품앗이 배차 확정: 일을 준 기사 칸 = '▶ 받은 기사', 받은 기사(본인 줄) 칸 = '◀ 준 기사' (화면에는 품▶ / 품◀ 로 짧게)
   const out = {}, set = {};
   dates.forEach(function (d) { set[d] = 1; });
@@ -1150,6 +1150,11 @@ function pmAdminMarks_(cells, dates, byDrv) {
     // 일을 준 기사: 그날 칸 글자(출근·휴무·라우트 등)와 상관없이 늘 표시
     if (j.posterId) add(j.posterId, j.date, '▶ ' + (j.accepted || ''));
     if (j.acceptedId) add(j.acceptedId, j.date, '◀ ' + (j.poster || ''));
+    // 마우스를 올리면 보이는 일감 정보 (배차일 · 구분 · 입차시간 · 캠프·라우트 · 준 기사 → 받은 기사)
+    if (tips) {
+      const t = { id: j.id, date: j.date, kind: j.kind || '', time: str_(j.time), camp: str_(j.camp), route: str_(j.route), area: str_(j.area), from: j.poster || '', to: j.accepted || '' };
+      [j.posterId, j.acceptedId].forEach(function (id) { if (!id) return; const m = tips[id] || (tips[id] = {}); (m[j.date] = m[j.date] || []).push(t); });
+    }
   });
   return out;
 }

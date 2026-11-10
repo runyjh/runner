@@ -4830,12 +4830,12 @@ function schRead_(sun, end) {
     const d = byDrv[id.slice(SCH_PM_PREFIX.length)];
     return { id: id, driverId: d.id, name: d.name, loginId: d.loginId || '', campId: d.campId || '' };
   }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
-  let pmMarks = {};
-  try { pmMarks = pmAdminMarks_(cells, dates, byDrv); } catch (e) { pmMarks = {}; }
+  let pmMarks = {}, pmTips = {};
+  try { pmMarks = pmAdminMarks_(cells, dates, byDrv, pmTips); } catch (e) { pmMarks = {}; pmTips = {}; }
   return {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
-    routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, rcMoves: rcMoves,
+    routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
     issues: issues, issueKinds: SCH_ISSUE.KINDS
   };
 }
