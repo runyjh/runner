@@ -1297,7 +1297,7 @@
         <input class="inp search" id="paQ" placeholder="기사·배송지·센터·라우트 검색" style="width:220px">
         <button class="btn ghost" id="paReload">새로고침</button>
         <button class="btn pmsw" id="paPostSw" type="button" title="기사 앱의 '품앗이 일감 올리기'(자유 등록)를 켜고 끕니다. 끄면 기사 앱에서 메뉴가 숨겨집니다">일감 올리기 <b>…</b></button>
-        <button class="btn pmsw" id="paOfferSw" type="button" title="기사 앱의 '💌 일감 제안'(품앗이 주세요 · 일할 기사 찾기)을 켜고 끕니다">일감 제안 <b>…</b></button>
+        <button class="btn pmsw" id="paOfferSw" type="button" title="기사 앱의 '💌 일감 제안'(품앗이 · 일할 기사 찾기)을 켜고 끕니다">일감 제안 <b>…</b></button>
         <button class="btn ghost danger-t" type="button" data-reset="pumasi">데이터 초기화</button>
       </div>
     </div>
@@ -3591,7 +3591,7 @@
   });
   $('#paOfferSw').addEventListener('click', () => {
     const on = !$('#paOfferSw').dataset.on;
-    if (!on && !confirm('기사 앱의 "💌 일감 제안"(품앗이 주세요 · 일할 기사 찾기)을 끌까요?')) return;
+    if (!on && !confirm('기사 앱의 "💌 일감 제안"(품앗이 · 일할 기사 찾기)을 끌까요?')) return;
     api('adm_pmPostSet', on, 'offer').then((r) => { if (!r.ok) return toast(r.msg); paintPostSw(r.postOn, r.offerOn); toast('일감 제안을 ' + (r.offerOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {});
   });
   $('#paFrom').addEventListener('change', loadPumasi); $('#paTo').addEventListener('change', loadPumasi);

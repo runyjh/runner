@@ -79,11 +79,26 @@ function pmMoney_(v) { const m = normMoney_(v); return m === null ? null : m; }
 function pmActiveApp_(a) { return a.status === PAST.APPLY || a.status === PAST.TALK || a.status === PAST.OK || a.status === PAST.OFFER; }
 /** 제안 일감: 등록 기사·제안받은 기사 말고는 안 보임 */
 function pmHidden_(j, me) { return !!j.offerToId && j.offerToId !== me && j.posterId !== me; }
-/** 화면 상태: 배차 확정이고 배차일이 지났으면 '완료' */
+/**
+ * 일이 끝났나: 야간은 배차일 그 날짜 아침 7시에 무조건 끝난다 (전날 밤 입차 → 그날 7시 끝).
+ * 주간·일택·무관은 배차일이 지나면(다음 날 0시) 끝. x = 일감 · 근무 가능일 { date, kind }
+ */
+const PM_NIGHT_END_H = 7;
+function pmPast_(x, today) {
+  const dt = pmDate_(x && x.date) || str_(x && x.date);
+  today = today || todayText_();
+  if (dt < today) return true;
+  if (dt > today || str_(x && x.kind) !== '야간') return false;
+  return Number(Utilities.formatDate(new Date(), CFG.TZ, 'H')) >= PM_NIGHT_END_H;
+}
+/** 지원 줄이 끝난 일인지 (그 일감의 구분으로) */
+function pmAppPast_(a, byId, today) { return pmPast_(byId[a.jobId] || a, today); }
+function pmJobMap_(d) { if (!d._byId) { d._byId = {}; d.jobs.forEach(function (j) { d._byId[j.id] = j; }); } return d._byId; }
+/** 화면 상태: 배차 확정이고 배차일이 지났으면(야간은 그날 7시) '완료' */
 function pmView_(j, today) {
   const known = Object.keys(PST).some(function (k) { return PST[k] === j.status; });
   const st = known ? j.status : PST.OPEN;
-  return st === PST.DONE && j.date < today ? '완료' : st;
+  return st === PST.DONE && pmPast_(j, today) ? '완료' : st;
 }
 /** 목록 카드 (공개 항목만) */
 function pmCard_(j, me, apps, today) {
@@ -103,7 +118,7 @@ function pmCanApply_(j, me, apps, today) {
   if (j.offerToId && j.offerToId !== me) return '다른 기사님에게 제안한 일감입니다.';
   if (j.offerToId === me && apps.some(function (a) { return a.jobId === j.id && a.driverId === me && a.status === PAST.OFFER; })) return '나에게 온 제안입니다. 아래에서 수락 또는 거절해 주세요.';
   if (j.status !== PST.OPEN && j.status !== PST.TALK) return '모집이 끝난 일감입니다.';
-  if (j.date < today) return '배차일이 지났습니다.';
+  if (pmPast_(j, today)) return j.date < today ? '배차일이 지났습니다.' : '야간 품앗이는 그날 아침 7시에 끝났습니다.';
   if (apps.some(function (a) { return a.jobId === j.id && a.driverId === me && pmActiveApp_(a); })) return '이미 지원했습니다.';
   const n = apps.filter(function (a) { return a.driverId === me && a.date === j.date && pmActiveApp_(a); }).length;
   if (n >= PM_MAX_APPLY) return '같은 배차일에는 ' + PM_MAX_APPLY + '번까지만 지원할 수 있습니다.';
@@ -130,15 +145,15 @@ function api_pmList(token, f) {
     const list = d.jobs.filter(function (j) {
       if (j.status === PST.CANCEL) return false;
       if (pmHidden_(j, u.id)) return false;
-      if (j.date < today && !(j.date >= from && (j.posterId === u.id || j.acceptedId === u.id))) return false;
+      if (pmPast_(j, today) && !(j.date >= from && (j.posterId === u.id || j.acceptedId === u.id))) return false;
       if (q && (str_(j.area) + str_(j.camp) + str_(j.route)).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return false;
       if (f.onlyAvail && pmCanApply_(j, u.id, d.apps, today)) return false;
       return true;
     }).sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time) || a.createdAt.localeCompare(b.createdAt); })
       .map(function (j) { return pmCard_(j, u.id, d.apps, today); });
-    const waiting = d.jobs.filter(function (j) { return j.posterId === u.id && (j.status === PST.OPEN || j.status === PST.TALK) && j.date >= today; })
+    const waiting = d.jobs.filter(function (j) { return j.posterId === u.id && (j.status === PST.OPEN || j.status === PST.TALK) && !pmPast_(j, today); })
       .reduce(function (n, j) { return n + d.apps.filter(function (a) { return a.jobId === j.id && a.status === PAST.APPLY; }).length; }, 0);
-    const confirmed = d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OK && a.date >= today; }).length;
+    const confirmed = d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OK && !pmAppPast_(a, pmJobMap_(d), today); }).length;
     // 품앗이 주세요: 근무 가능일 카드 (기사 · 날짜마다 1장)
     let gives = [];
     try {
@@ -257,7 +272,7 @@ function api_pmSave(token, job) {
     if (PM_KINDS.indexOf(f.kind) < 0) fail_('구분은 ' + PM_KINDS.join(' / ') + ' 중에서 골라 주세요.');
     f.date = pmDate_(job.date);
     if (!f.date) fail_('배차일자를 입력해 주세요.');
-    if (!job.id && f.date < todayText_()) fail_('지난 날짜로는 올릴 수 없습니다.');
+    if (!job.id && pmPast_(f)) fail_(f.date < todayText_() ? '지난 날짜로는 올릴 수 없습니다.' : '야간 품앗이는 그날 아침 7시에 끝나 오늘 날짜로는 올릴 수 없습니다.');
     f.time = t(job.time, 20, '입차시간', true);
     f.area = t(job.area, 40, '배송지', true);
     const camp = master_().camps.filter(function (c) { return c.id === str_(job.campId); })[0];
@@ -420,7 +435,7 @@ function pmDecide_(posterId, jobId, appId, action) {
         writeFields_(SH.PJOB, jr, { status: PST.TALK, updatedAt: now });
         out.push(pmA_(a.driverId, a.name, j, 'talk'));
       } else if (action === 'accept') {
-        if (j.date < todayText_()) fail_('배차일이 지난 일감입니다.');
+        if (pmPast_(j)) fail_('배차일이 지난 일감입니다. (야간은 그날 아침 7시에 끝남)');
         apps.forEach(function (x) {
           if (x.id === a.id) { writeFields_(SH.PAPP, x._row, { status: PAST.OK, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'accept')); }
           else if (pmActiveApp_(x)) { writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'lost')); }
@@ -469,7 +484,7 @@ function pmClose_(posterId, id, action) {
         writeFields_(SH.PJOB, jr, { status: PST.CLOSED, updatedAt: now });
         readAll_(SH.PAPP).forEach(function (x) { if (x.jobId === j.id && (x.status === PAST.APPLY || x.status === PAST.TALK)) out.push(pmA_(x.driverId, x.name, j, 'closed')); });
       } else if (action === 'reopen') {
-        if (j.date < todayText_()) fail_('배차일이 지난 일감은 다시 열 수 없습니다.');
+        if (pmPast_(j)) fail_('배차일이 지난 일감은 다시 열 수 없습니다. (야간은 그날 아침 7시에 끝남)');
         // 제안이 거절된 일감을 다시 열면 모든 기사에게 공개
         writeFields_(SH.PJOB, jr, j.offerToId ? { status: PST.OPEN, offerToId: '', offerTo: '', updatedAt: now } : { status: PST.OPEN, updatedAt: now });
         if (j.offerToId) readAll_(SH.PAPP).forEach(function (x) { if (x.jobId === j.id && x.status === PAST.OFFER) { writeFields_(SH.PAPP, x._row, { status: PAST.NO, updatedAt: now }); out.push(pmA_(x.driverId, x.name, j, 'canceled')); } });
@@ -499,7 +514,7 @@ function api_pmMine(token, kind) {
     d.jobs.forEach(function (j) { byId[j.id] = j; });
     let list = [];
     if (kind === 'posted') {
-      list = d.jobs.filter(function (j) { return j.posterId === u.id && !(j.status === PST.DONE && j.date < today); })
+      list = d.jobs.filter(function (j) { return j.posterId === u.id && !(j.status === PST.DONE && pmPast_(j, today)); })
         .map(function (j) {
           const c = pmCard_(j, u.id, d.apps, today);
           c.newApps = d.apps.filter(function (a) { return a.jobId === j.id && a.status === PAST.APPLY; }).length;
@@ -507,10 +522,10 @@ function api_pmMine(token, kind) {
           return c;
         });
     } else if (kind === 'applied') {
-      list = d.apps.filter(function (a) { return a.driverId === u.id && byId[a.jobId] && !(a.status === PAST.OK && a.date < today); })
+      list = d.apps.filter(function (a) { return a.driverId === u.id && byId[a.jobId] && !(a.status === PAST.OK && pmAppPast_(a, byId, today)); })
         .map(function (a) { const c = pmCard_(byId[a.jobId], u.id, d.apps, today); c.myApp = a.status; c.appliedAt = a.createdAt; return c; });
     } else if (kind === 'done') {
-      list = d.jobs.filter(function (j) { return j.status === PST.DONE && j.date < today && (j.posterId === u.id || j.acceptedId === u.id); })
+      list = d.jobs.filter(function (j) { return j.status === PST.DONE && pmPast_(j, today) && (j.posterId === u.id || j.acceptedId === u.id); })
         .map(function (j) { const c = pmCard_(j, u.id, d.apps, today); c.role = j.posterId === u.id ? '맡김' : '수행'; c.partner = j.posterId === u.id ? j.accepted : j.poster; return c; });
     } else fail_('알 수 없는 목록입니다.');
     list.sort(function (a, b) { return kind === 'done' ? (b.date + b.time).localeCompare(a.date + a.time) : (a.date + a.time).localeCompare(b.date + b.time); });
@@ -531,11 +546,11 @@ function api_myInfo(token) {
       },
       stats: {
         posted: d.jobs.filter(function (j) { return j.posterId === u.id && j.status !== PST.CANCEL; }).length,
-        helped: d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date < today; }).length,
-        giveDays: (d.avail || []).filter(function (a) { return a.driverId === u.id && a.date >= today; }).length,
-        offers: d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OFFER && a.date >= today; }).length,
+        helped: d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && pmPast_(j, today); }).length,
+        giveDays: (d.avail || []).filter(function (a) { return a.driverId === u.id && !pmPast_(a, today); }).length,
+        offers: d.apps.filter(function (a) { return a.driverId === u.id && a.status === PAST.OFFER && !pmAppPast_(a, pmJobMap_(d), today); }).length,
         // 내 일감에 온 지원 중 아직 답하지 않은 수 (api_pmList 의 waiting 과 같은 셈 · 마이페이지가 목록을 따로 부르지 않게)
-        waiting: d.jobs.filter(function (j) { return j.posterId === u.id && (j.status === PST.OPEN || j.status === PST.TALK) && j.date >= today; })
+        waiting: d.jobs.filter(function (j) { return j.posterId === u.id && (j.status === PST.OPEN || j.status === PST.TALK) && !pmPast_(j, today); })
           .reduce(function (n, j) { return n + d.apps.filter(function (a) { return a.jobId === j.id && a.status === PAST.APPLY; }).length; }, 0)
       }, postOn: pmPostOn_(), offerOn: pmOfferOn_()
     };
@@ -578,12 +593,12 @@ function api_pmAvailMine(token) {
   return run_(function () {
     const u = pmUser_(token);
     const d = pmData_(), today = todayText_(), me = driverById_(u.id) || {};
-    const list = d.avail.filter(function (a) { return a.driverId === u.id && a.date >= today; })
+    const list = d.avail.filter(function (a) { return a.driverId === u.id && !pmPast_(a, today); })
       .map(function (a) { return { date: a.date, kind: PM_AVAIL_KINDS.indexOf(a.kind) >= 0 ? a.kind : '무관' }; })
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
     const mine = d.avail.filter(function (a) { return a.driverId === u.id; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
     const memo = (mine.filter(function (a) { return a.date >= today && a.memo; })[0] || {}).memo || '';
-    const booked = d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && j.date >= today; }).map(function (j) { return j.date; });
+    const booked = d.jobs.filter(function (j) { return j.acceptedId === u.id && j.status === PST.DONE && !pmPast_(j, today); }).map(function (j) { return j.date; });
     // 기본 정보: 마지막으로 저장한 값 → 없으면 내 소속 캠프 · 희망 단가 1,100원 · 당일지급
     const info = pmInfoOf_(mine[0]);
     const myCamp = master_().camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
@@ -621,7 +636,7 @@ function api_pmAvailSave(token, list, memo, info) {
     const busyHit = [];
     list.forEach(function (x) {
       const dt = pmDate_(x && x.date);
-      if (!dt || dt < today || dt > until || seen[dt]) return;
+      if (!dt || dt > until || seen[dt] || pmPast_({ date: dt, kind: x.kind }, today)) return;
       if (busy[dt]) { busyHit.push(dt); return; }
       seen[dt] = 1;
       rows.push(Object.assign({ id: uniqId_('V'), driverId: u.id, name: u.info.name, date: dt, kind: PM_AVAIL_KINDS.indexOf(x.kind) >= 0 ? x.kind : '무관', memo: m, createdAt: now }, inf));
@@ -656,7 +671,7 @@ function pmAvailDrivers_(me, d, today, withMe) {
     d.apps.forEach(function (a) { if (a.status === PAST.OFFER) offered[a.driverId + '|' + a.date] = (offered[a.driverId + '|' + a.date] || 0) + 1; });
     const by = {};
     d.avail.forEach(function (a) {
-      if ((!withMe && a.driverId === me) || a.date < today || booked[a.driverId + '|' + a.date]) return;
+      if ((!withMe && a.driverId === me) || pmPast_(a, today) || booked[a.driverId + '|' + a.date]) return;
       const x = by[a.driverId] || (by[a.driverId] = { id: a.driverId, name: a.name, memo: '', dates: [], info: pmInfoOf_(a) });
       if (a.memo) x.memo = a.memo;
       x.dates.push({ date: a.date, kind: PM_AVAIL_KINDS.indexOf(a.kind) >= 0 ? a.kind : '무관', offered: offered[a.driverId + '|' + a.date] || 0 });
@@ -688,7 +703,7 @@ function api_pmOfferReply(token, jobId, yes) {
       if (j.status === PST.CANCEL || j.status === PST.CLOSED) fail_('취소되었거나 마감된 일감입니다.');
       const now = nowText_();
       if (yes) {
-        if (j.date < todayText_()) fail_('배차일이 지난 일감입니다.');
+        if (pmPast_(j)) fail_('배차일이 지난 일감입니다. (야간은 그날 아침 7시에 끝남)');
         writeFields_(SH.PAPP, a._row, { status: PAST.APPLY, updatedAt: now });
         appId = a.id;
       } else {
@@ -1210,7 +1225,7 @@ function adm_pmDelete(token, ids) {
       const jobs = readAll_(SH.PJOB).filter(function (j) { return want[j.id]; });
       const apps = readAll_(SH.PAPP).filter(function (x) { return want[x.jobId]; });
       jobs.forEach(function (j) {
-        const live = (j.status === PST.OPEN || j.status === PST.TALK || j.status === PST.DONE) && j.date >= today;
+        const live = (j.status === PST.OPEN || j.status === PST.TALK || j.status === PST.DONE) && !pmPast_(j, today);
         if (!live) return;
         apps.forEach(function (x) { if (x.jobId === j.id && pmActiveApp_(x)) out.push(pmA_(x.driverId, x.name, j, 'canceled')); });
         out.push(pmA_(j.posterId, j.poster, j, 'admin', 'cancel'));
@@ -1241,7 +1256,7 @@ function adm_pmPostSet(token, on, which) {
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
-      if (offer) appSetPut_('pmOfferOn', on ? 'ON' : 'OFF', '품앗이 일감 제안 (ON/OFF) — 품앗이 주세요·일할 기사 찾기에서 맡기기');
+      if (offer) appSetPut_('pmOfferOn', on ? 'ON' : 'OFF', '품앗이 일감 제안 (ON/OFF) — 품앗이·일할 기사 찾기에서 맡기기');
       else appSetPut_('pmPostOn', on ? 'ON' : 'OFF', '품앗이 일감 올리기 · 자유 등록 (ON/OFF) — 관리자 품앗이 관리에서 바꿈');
     } finally { lock.releaseLock(); }
     logAdmin_(a, '품앗이 ' + (offer ? '일감 제안 ' : '일감 올리기 ') + (on ? '켜기' : '끄기'), '', '');
