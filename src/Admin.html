@@ -4126,7 +4126,7 @@
   function irEnrTag(x) {
     const v = irEnrolled(x);
     if (v === null) return '<span class="sm" title="⚙ 신고 설정에서 토탈서비스 양식을 올리면 표시">—</span>';
-    return v ? '<span class="dc-tag y">신고됨</span>' : '<span class="dc-tag w" style="background:#fde8e8;color:#c81e1e;font-weight:800" title="토탈서비스 양식에 성명이 없음 — 먼저 노무제공자 입직신고(피보험자격 취득신고)가 필요">입직신고 대상</span>';
+    return v ? '<span class="dc-tag y">완료</span>' : '<span class="dc-tag w" style="background:#fde8e8;color:#c81e1e;font-weight:800" title="토탈서비스 양식에 성명이 없음 — 먼저 노무제공자 입직신고(피보험자격 취득신고)가 필요">입직신고 대상</span>';
   }
   /** 공단 양식 머리글 → 채울 값 종류 */
   function irKey(h) {
