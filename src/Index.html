@@ -273,6 +273,10 @@
   .segk { display: flex; gap: 6px; }
   .segk button { flex: 1; height: 44px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font: inherit; font-weight: 700; font-size: 14px; color: var(--sub); cursor: pointer; }
   .segk button.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand); }
+  .myposted { padding: 14px 14px 6px; }
+  .myposted .mph { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .myposted .mph b { font-size: 15px; } .myposted .mph button { border: 0; background: none; color: var(--brand); font-weight: 700; font-size: 13px; padding: 4px 0; }
+  .myposted .pmc { margin: 0 0 8px; box-shadow: none; border: 1px solid #e5e8eb; }
   .mylist { background: #fff; border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; }
   .mylist button { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; border-top: 1px solid var(--line); background: none; padding: 16px; font: inherit; font-size: 15.5px; font-weight: 600; color: var(--ink); cursor: pointer; text-align: left; }
   .mylist button:first-child { border-top: 0; }
@@ -877,11 +881,13 @@
     <div class="mylist">
       <button type="button" data-my="alerts">🔔 알림<em id="myAlertCnt"></em></button>
     </div>
+    <!-- 내가 올린 일감 (배차일이 안 지난 것 · 최근 3개) -->
+    <div class="card myposted" id="myPosted"><div class="mph"><b>📤 내가 올린 일감</b></div><div class="pmempty" style="padding:10px 0">불러오는 중…</div></div>
     <div class="mylist">
       <button type="button" data-my="give">🙋 품앗이 (내 근무 가능일)<em id="myGive"></em></button>
       <button type="button" data-my="find">🔎 일할 기사 찾기 (품앗이)</button>
       <button type="button" data-my="new">품앗이 일감 올리기</button>
-      <button type="button" data-my="posted"><span class="mylab">품앗이 관리 (지원자 보기)</span><em id="myNew"></em></button>
+      <button type="button" data-my="posted"><span class="mylab">내가 올린 일감 (지원자 보기)</span><em id="myNew"></em></button>
       <button type="button" data-my="applied"><span class="mylab">지원한 품앗이</span></button>
       <button type="button" data-my="done">완료한 품앗이</button>
       <button type="button" data-my="board" class="hidden">💬 내가 쓴 게시글</button>
@@ -2268,7 +2274,7 @@
     // 일감 올리기가 꺼져 있으면 전체/맡길 일감/품앗이 선택 칸을 숨기고 전체(= 품앗이 + 남아 있는 일감)로
     $('#pmShow').classList.toggle('hidden', !pmPostOn);
     const lab = (k, on, off) => { const el = document.querySelector('[data-my="' + k + '"] .mylab'); if (el) el.textContent = pmPostOn ? on : off; };
-    lab('posted', '품앗이 관리 (지원자 보기)', '📤 보낸 제안'); lab('applied', '지원한 품앗이', '📥 받은 제안');
+    lab('posted', '내가 올린 일감 (지원자 보기)', '📤 내가 올린 일감 (보낸 제안)'); lab('applied', '지원한 품앗이', '📥 받은 제안');
     if (!pmPostOn && pmShowMode !== 'all') { pmShowMode = 'all'; $$('#pmShow button').forEach((x) => x.classList.toggle('on', x.dataset.s === 'all')); loadPmList(); }
     const nb = $('#pmOffNote'); if (nb) nb.classList.add('hidden');
     $$('[data-my="new"]').forEach((b) => { b.classList.toggle('hidden', !pmPostOn); });
@@ -2290,6 +2296,7 @@
   function pmBackFromDetail() {
     if (pmDetFrom === 'sched') { show('sched'); loadSched(); }
     else if (pmDetFrom === 'mine') { show('pmmine'); loadPmMine(); }
+    else if (pmDetFrom === 'mypage') openMyPage();
     else if (pmDetFrom === 'alerts') openPmAlerts();
     else { show('pumasi'); loadPmList(); }
   }
@@ -2651,8 +2658,27 @@
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';
       $('#myNew').innerHTML = r.stats.waiting ? '<span class="bdg nw">새 지원 ' + r.stats.waiting + '</span>' : ''; // (예전엔 품앗이 목록을 한 번 더 불렀음)
     }).catch(() => { myCardFail(); netErr(); });
-    loadMyPerf(token); loadMyFb(token);
+    loadMyPerf(token); loadMyFb(token); loadMyPosted(token);
   }
+  /** 마이페이지: 내가 올린 일감 (품앗이 관리 목록 앞 3개 · 배차일 가까운 순) */
+  let myPostedSeq = 0;
+  function loadMyPosted(token) {
+    const box = $('#myPosted'); if (!box) return;
+    const seq = ++myPostedSeq;
+    api('api_pmMine', token, 'posted').then((r) => {
+      if (seq !== myPostedSeq) return;
+      if (!r || !r.ok) { box.classList.add('hidden'); return; }
+      const jobs = pmShown(r.jobs || []), top = jobs.slice(0, 3);
+      box.classList.remove('hidden');
+      box.innerHTML = '<div class="mph"><b>📤 내가 올린 일감' + (jobs.length ? ' <small style="color:var(--sub);font-weight:600">' + jobs.length + '건</small>' : '') + '</b>' + (jobs.length > top.length ? '<button type="button" data-my="posted">모두 보기 →</button>' : '') + '</div>' +
+        (top.length ? top.map((j) => pmCardHtml(j, '<div class="ln">지원자 <b>' + (j.applicants || 0) + '명</b>' + (j.acceptedName ? ' · 확정 <b>' + escH(j.acceptedName) + '</b>' : '') + '</div>')).join('')
+          : '<div class="pmempty" style="padding:8px 0 12px">올린 일감이 없습니다.</div>');
+    }).catch(() => { if (seq === myPostedSeq) box.classList.add('hidden'); });
+  }
+  $('#myPosted').addEventListener('click', (e) => {
+    if (e.target.closest('[data-my]')) return; // '모두 보기' 는 마이페이지 메뉴와 같이 처리
+    const c = e.target.closest('[data-pj]'); if (c) openPmDetail(c.dataset.pj, 'mypage');
+  });
   /** 프레시백 가중요인(추가 인센티브) — 사무실에서 켜 두었을 때만. 내 라우트의 이달 누적 해당 여부 · 예상 단가·금액 · 최근 7일 · 전월 확정 */
   function loadMyFb(token) {
     const box = $('#myFb'); if (!box) return;
@@ -2745,13 +2771,13 @@
     pmMineKind = k; ssSet('runner.pmKind', k); show('pmmine'); loadPmMine();
   });
   const PM_MINE = {
-    posted: ['품앗이 관리', '내가 올린 일감입니다. 눌러서 지원자를 보고 전화·협의·확정하세요.', '올린 일감이 없습니다.'],
+    posted: ['내가 올린 일감', '내가 올린 일감입니다. 눌러서 지원자를 보고 전화·협의·확정하세요.', '올린 일감이 없습니다.'],
     applied: ['지원한 품앗이', '지원한 일감입니다. 올린 기사님이 전화로 연락합니다.', '지원한 일감이 없습니다.'],
     done: ['완료한 품앗이', '배차 확정되고 배차일이 지난 품앗이입니다 (맡긴 것·뛴 것 모두).', '완료한 품앗이가 없습니다.']
   };
   // 일감 올리기가 꺼져 있으면 품앗이는 '제안'으로만 오가므로 이름을 맞춘다
   const PM_MINE_OFFER = {
-    posted: ['📤 보낸 제안', '내가 보낸 일감 제안입니다. 상대 기사님의 수락·거절을 확인하고 완료·취소를 처리하세요.', '보낸 제안이 없습니다.'],
+    posted: ['📤 내가 올린 일감', '내가 보낸 일감 제안입니다. 상대 기사님의 수락·거절을 확인하고 완료·취소를 처리하세요.', '보낸 제안이 없습니다.'],
     applied: ['📥 받은 제안', '나에게 온 일감 제안과 수락한 품앗이입니다.', '받은 제안이 없습니다.']
   };
   function loadPmMine() {
