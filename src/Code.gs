@@ -412,7 +412,7 @@ SCHEMA[SH.RFB] = RFB;
 SCHEMA[SH.TEAMS] = TMS;
 // camp_thumbs: 참고 이미지 미리보기(작은 JPEG, base64) — 노선관리 목록은 캠프마다 이 탭 한 번 읽기로 끝 (원본은 크게 볼 때만)
 // 기사 노선 정보 (RouteInfo.gs): 기사 앱 '내 캠프'에서 기사들이 자유롭게 쓰는 노선·캠프 정보 (route = 라우트 코드 · 비우면 캠프 전체)
-const RNT = { id: '정보ID', campId: '캠프ID', campName: '캠프명', route: '라우트', text: '내용', authorId: '작성자ID', author: '작성자', status: '상태', createdAt: '등록일시', updatedAt: '수정일시' };
+const RNT = { id: '정보ID', campId: '캠프ID', campName: '캠프명', route: '라우트', text: '내용', photos: '사진', authorId: '작성자ID', author: '작성자', status: '상태', createdAt: '등록일시', updatedAt: '수정일시' };
 const CTH = { id: '이미지ID', campId: '캠프ID', fileId: '파일ID', data: '미리보기', updatedAt: '만든일시' };
 SCHEMA[SH.CTHUMB] = CTH;
 SCHEMA[SH.RNOTE] = RNT;
@@ -786,7 +786,7 @@ function run_(fn) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_live', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_live', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
