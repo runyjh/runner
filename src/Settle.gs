@@ -2521,7 +2521,7 @@ function stlFund_(month) {
   const base = deposit.amt || deposit.plan, rr = rows['유보금 (나머지)'] || {}, ra = alloc['유보금 (나머지)'] || {};
   const restPlan = base - used;
   items.push({ key: 'rest', label: '유보금 (나머지)', bank: ra.bank || roleBank('유보금'), plan: restPlan, amt: str_(rr.amt) !== '' ? stlNum_(rr.amt) : restPlan, adj: str_(rr.amt) !== '', done: stlYes_(rr.done), date: rr.date || '', memo: rr.memo || '', desc: STL_FUND_ITEMS[STL_FUND_ITEMS.length - 1][3], rule: '' });
-  return { month: month, closed: !!sum.closed, source: source, deposit: deposit, items: items, used: used, base: base, pnlNet: pnl.net, dates: sum.dates || {}, earlyPay: stlCfg_().earlyPay, early: Object.keys(early).map(function (k) { return { id: k, name: early[k].name, net: early[k].net }; }) };
+  return { month: month, closed: !!sum.closed, source: source, deposit: deposit, items: items, used: used, base: base, pnlNet: pnl.net, dates: sum.dates || {}, earlyPay: stlCfg_().earlyPay, early: Object.keys(early).map(function (k) { return { id: k, name: early[k].name, net: early[k].net, checked: !!early[k].checked, payDate: early[k].payDate || '' }; }) };
 }
 /** 통장별 움직임: 기초잔액 · 직접 입출금 · 자금배분 완료 · 입금확인(기사 지급) */
 function stlBankMoves_() {

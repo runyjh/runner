@@ -8852,9 +8852,10 @@
     const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + (x.key === 'early' ? esc((F.early || []).map((e) => e.name + ' ' + wn(e.net)).join(' · ')) + ' · 쿠팡 입금일에 쿠팡정산 통장에서 바로 · 대상은 ⚙ 세부정산 설정 "15일 선지급 기사"' : esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '')) + '</div>' + (x.key === 'driver' ? payProg : '') + '</td>' +
       '<td>' + (x.bank ? esc(x.bank) + (x.bank === F.source && ['staff', 'owner'].includes(x.key) ? '<div class="smemo" style="color:var(--brand)">쿠팡정산 통장에서 바로 ' + (x.key === 'owner' ? '인출' : '지급') + '</div>' : bal[x.bank] != null ? '<div class="smemo">잔액 ' + wn(bal[x.bank]) + '</div>' : '') : '<span style="color:var(--danger)">통장 없음</span>') + '</td>' +
       '<td class="n">' + wn(x.plan) + '</td><td class="n">' + amtIn(x.key, x.adj ? x.amt : '', x.plan, x.done) + '</td>' +
-      (x.key === 'early' ? '<td class="sub" style="text-align:center;font-size:12px">입금확인에서<br>체크</td>' : '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? (['staff', 'owner'].includes(x.key) ? ' title="쿠팡정산 통장에서 바로 지급·인출 — 보냈으면 체크 (잔액에서 빠짐)"' : ' title="받는 통장과 같아 이체할 필요 없음 (돈이 그대로 남음)"') : '') + '></td>') +
+      (x.key === 'early' ? '<td style="text-align:center"><input type="checkbox" data-fk="early" data-ff="done"' + ((F.early || []).length && (F.early || []).every((e) => e.checked) ? ' checked' : '') + ' title="체크하면 입금확인에도 같이 체크됨 (쿠팡정산 통장에서 출금)"></td>' : '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? (['staff', 'owner'].includes(x.key) ? ' title="쿠팡정산 통장에서 바로 지급·인출 — 보냈으면 체크 (잔액에서 빠짐)"' : ' title="받는 통장과 같아 이체할 필요 없음 (돈이 그대로 남음)"') : '') + '></td>') +
+      (x.key === 'early' ? '<td><input class="inp" type="date" data-fk="early" data-ff="date" value="' + esc(((F.early || [])[0] || {}).payDate || '') + '" style="width:140px" title="지급일 (비우면 쿠팡 입금일)"></td><td class="sub" style="font-size:12px">' + esc((F.early || []).map((e) => e.name + (e.checked ? ' ✓' : '')).join(' · ')) + ' · 입금확인과 같은 체크</td></tr>' :
       '<td><input class="inp" type="date" data-fk="' + x.key + '" data-ff="date" value="' + esc(x.date || '') + '" style="width:140px"></td>' +
-      '<td><input class="inp" data-fk="' + x.key + '" data-ff="memo" value="' + esc(x.memo || '') + '" style="min-width:140px"></td></tr>';
+      '<td><input class="inp" data-fk="' + x.key + '" data-ff="memo" value="' + esc(x.memo || '') + '" style="min-width:140px"></td></tr>');
     const sent = F.items.filter((x) => x.done).reduce((a, x) => a + x.amt, 0), total = F.items.reduce((a, x) => a + x.amt, 0);
     const rest = F.items.find((x) => x.key === 'rest') || {};
     $('#stPnl').innerHTML = reserveBox() + earlyBar(F.earlyPay, (F.early || []).map((e) => e.name)) + dep +
@@ -8865,6 +8866,19 @@
   $('#stPnl').addEventListener('change', (e) => {
     const el = e.target.closest('[data-fk]'); if (!el || !STX.fund) return;
     const key = el.dataset.fk, ff = el.dataset.ff, f = {};
+    if (key === 'early') { // 운영자 선지급: 입금확인의 체크와 같은 기록 (쿠팡 입금일 기준 · 쿠팡정산 통장에서 출금)
+      const F = STX.fund, box = el.closest('tr'), dt = box.querySelector('[data-ff="date"]'), ck = box.querySelector('[data-ff="done"]');
+      const checked = ff === 'done' ? el.checked : ck.checked, date = (dt && dt.value) || ((F.dates || {}).coupang || '').slice(0, 10) || ymdLocal(new Date());
+      if (ff === 'date' && !checked) return; // 날짜만 바꾸고 체크 전이면 저장 안 함
+      el.disabled = true;
+      api('adm_stlPaySet', STX.month, (F.early || []).map((x) => ({ id: x.id, checked: checked, date: checked ? date : '' }))).then((r) => {
+        if (!r.ok) { el.disabled = false; return toast(r.msg); }
+        toast(checked ? '운영자 선지급을 입금 완료로 기록했습니다 (입금확인에도 체크 · 쿠팡정산 통장에서 출금).' : '선지급 체크를 풀었습니다.');
+        if (STX.sum) (F.early || []).forEach((x) => { const d = STX.sum.drivers.find((y) => y.id === x.id); if (d) { d.checked = checked; d.payDate = checked ? date : ''; } });
+        STX.pay = null; loadFund();
+      }).catch(() => { el.disabled = false; });
+      return;
+    }
     if (ff === 'done') f.done = el.checked;
     else if (ff === 'amt') f.amt = el.value.replace(/[^\d-]/g, '');
     else f[ff] = el.value;
