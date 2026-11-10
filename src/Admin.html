@@ -7893,11 +7893,12 @@
     const s = STX.sum; if (!s) return;
     const t = s.total, c = s.company;
     const k = (lab, v, sub) => '<div class="kpi"><small>' + lab + '</small><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
-    $('#stKpi').innerHTML = k('쿠팡 매출 (VAT포함)', wn(c.sales), '공급가 ' + wn(c.supplyCp) + (c.lossCp ? ' · 분실차감 ' + wn(c.lossCp) : '')) +
+    const inv = c.invTotal != null ? c : { invSupply: (c.supplyCp || 0) - (c.lossCp || 0), invVat: Math.floor(((c.supplyCp || 0) - (c.lossCp || 0)) * 0.1), invTotal: 0 }; if (!inv.invTotal) inv.invTotal = inv.invSupply + inv.invVat;
+    $('#stKpi').innerHTML = k('쿠팡 세금계산서 (매출 · 입금액)', wn(inv.invTotal), '공급가 ' + wn(inv.invSupply) + ' · 세액 ' + wn(inv.invVat) + ' — 총합계 ' + wn(c.supplyCp) + (c.lossCp ? ' − 분실 ' + wn(c.lossCp) : '') + ' (쿠팡 계산서 방식)') +
       k('기사 지급 (계산서 합계)', wn(t.invoice), '공급가 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax) + (t.taxDed ? ' · 계산서 차감 ' + wn(t.taxDed) : ' · 지급 합계 전액으로 발행 (분실·용차는 발행 후 공제)')) +
-      (c.lossCp || t.loss ? k('분실파손 (쿠팡 정산서 · 소비자가)', wn(c.lossCp), '공급가 환산 ' + wn(c.lossSup || 0) + ' · 기사 변상 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossVat === false ? ' (부가세 환산 안 함)' : ' (×1.1)') + ' → 기타수익') : '') +
+      (c.lossCp || t.loss ? k('분실파손 (쿠팡 차감)', wn(c.lossCp), '쿠팡이 공급가에서 뺌 (부가세 ' + wn(Math.floor((c.lossCp || 0) * 0.1)) + '도 같이 줄어듦) · 기사 변상 ' + wn(t.loss) + (STX.pnl && STX.pnl.lossVat === false ? ' (차감금액만 · 부가세분 러너 부담)' : ' (×1.1 · 정확히 상쇄)')) : '') +
       k('기사 실입금 합계', wn(t.net), '산재 ' + wn(t.san) + ' · 고용 ' + wn(t.goy) + ' · 공제금액 ' + wn(t.depDed)) +
-      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0) + (c.promoBase || 0) + (c.promoRunner || 0)), '쿠팡 공급가 − 분실(공급가 환산 ' + wn(c.lossSup || 0) + ') − 기사 공급가' + (t.otherInc ? ' + 기타수익(분실·용차) ' + wn(t.otherInc) : '') + ((c.promoBase || 0) + (c.promoRunner || 0) ? ' + 러너 몫 프로모션 ' + wn((c.promoBase || 0) + (c.promoRunner || 0)) : '') + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
+      k('회사이익금 (공급가)', wn(t.profit + (c.vendorCut || 0) + (c.promoBase || 0) + (c.promoRunner || 0)), '쿠팡 계산서 공급가 ' + wn(inv.invSupply) + ' − 기사 공급가 ' + wn(t.supply) + (t.otherInc ? ' + 기타수익(분실·용차) ' + wn(t.otherInc) : '') + ((c.promoBase || 0) + (c.promoRunner || 0) ? ' + 러너 몫 프로모션 ' + wn((c.promoBase || 0) + (c.promoRunner || 0)) : '') + (c.vendorCut ? ' − 쿠팡 프로그램 사용료(영업점 수수료) ' + wn(-c.vendorCut) : '') + (c.unregSales ? ' · 미등록 ID 매출 ' + wn(c.unregSales) + ' 제외' : '')) +
       (STX.pnl && STX.pnl.ins ? k('기타수익 (세무사 전달용 · 부가세 없음)', wn((STX.pnl.otherInc || {}).total || 0), '분실 변상금 ' + wn((STX.pnl.otherInc || {}).loss || 0) + ' · 용차 차액 ' + wn((STX.pnl.otherInc || {}).yong || 0) + ' · 보험 차액 ' + wn(STX.pnl.insGap || 0)) +
         k('지급률 마진 (참고 · 이익에 이미 포함)', wn((STX.pnl.margin || {}).total || 0), '프백 ' + wn((t.fbKeep || 0) + t.fbCut) + ((t.fbKeep || 0) && t.fbCut ? ' (지급률 밖 ' + wn(t.fbKeep) + ' + 차감 ' + wn(t.fbCut) + ')' : '') + ' · 용차·품앗이 러너 몫 ' + wn(c.yongGain || 0)) +
         k('산재·고용 신고액 (빼둘 돈)', wn(STX.pnl.ins.total), '기사분 ' + wn(STX.pnl.ins.sanD + STX.pnl.ins.goyD) + ' + 러너 ' + Math.round(STX.pnl.ins.runner * 100) + '% ' + wn(STX.pnl.ins.runnerAmt)) : '') +
@@ -8021,7 +8022,7 @@
         '<td' + cls(x.net) + '><span class="rp-barcell">' + bar(Math.abs(x.net), maxN, x.net < 0 ? 'var(--danger)' : 'var(--ok, #15803d)') + '<span><b>' + sgn(x.net) + '</b></span></span></td><td class="n">' + pct(x.rate) + '</td><td class="n">' + n(x.qty) + '</td><td class="n">' + n(x.drivers) + '</td></tr>'; };
     const t1 = '<div class="rp-card wide"><h4>① ' + esc(R.year) + '년 월별 추이 <small>공급가 · 세전</small></h4><div class="table-wrap"><table class="sttbl rp-year" data-tk-off><thead><tr><th>월</th><th class="n">쿠팡 매출</th><th class="n">기사 매입</th><th class="n">회사이익</th><th class="n">운영경비</th><th class="n">당기순이익</th><th class="n">이익률</th><th class="n">배송건수</th><th class="n">기사</th></tr></thead><tbody>' +
       months.map(mrow).join('') + '</tbody><tfoot><tr><td>합계 (' + has.length + '개월)</td><td class="n">' + n(sum('salesSupply')) + '</td><td class="n">' + n(sum('drvSupply')) + '</td><td' + cls(sum('profit')) + '>' + sgn(sum('profit')) + '</td><td class="n">' + n(sum('opex')) + '</td><td' + cls(sum('net')) + '><b>' + sgn(sum('net')) + '</b></td><td class="n">' + pct(sum('salesSupply') ? sum('net') / sum('salesSupply') : 0) + '</td><td class="n">' + n(sum('qty')) + '</td><td></td></tr></tfoot></table></div>' +
-      '<p class="sub" style="margin:8px 0 0;font-size:12px">운영경비 = 러너 산재·고용 부담 + 직원 인건비 + 고정 운영비·지출. 당기순이익 = 회사이익 − 운영경비 + 보험 차액. 기사 매입 = 세금계산서 공급가 합계.</p></div>';
+      '<p class="sub" style="margin:8px 0 0;font-size:12px">운영경비 = 러너 산재·고용 부담 + 직원 인건비 + 고정 운영비·지출. 당기순이익 = 회사이익 − 운영경비 + 보험 차액. 기사 매입 = 세금계산서 공급가 합계. 쿠팡 매출 = 쿠팡 세금계산서 공급가(총합계 − 분실).</p></div>';
     // ② 캠프별 (조회월)
     const C = R.camps || [], maxCS = Math.max(1, ...C.map((c) => c.sales)), tq = C.reduce((a, c) => a + c.qty, 0), ts = C.reduce((a, c) => a + c.sales, 0), tp = C.reduce((a, c) => a + c.pay, 0);
     const t2 = '<div class="rp-card"><h4>② 캠프별 <small>' + esc(ymTitle(R.month)) + ' · VAT포함</small></h4><table class="sttbl rp-camp" data-tk-off><thead><tr><th>캠프</th><th class="n">배송건수</th><th class="n">매출</th><th class="n">기사 지급</th><th class="n">회사 몫</th><th class="n">비율</th></tr></thead><tbody>' +
@@ -8083,9 +8084,10 @@
       ' · ' + (closed ? '<b class="rp-closed">마감</b> ' + esc(closed.at || '') + (closed.admin ? ' · ' + esc(closed.admin) : '') : '<b class="rp-open">열림 (마감 전)</b>') + (legacy ? ' · ' + legacy : '') +
       (S.round ? ' · 쿠팡 정산서 ' + S.round + '차' + (S.roundAt ? ' (' + esc(String(S.roundAt).slice(0, 10)) + ')' : '') : ' · 쿠팡 정산서 없음') + ' · 만든 시각 ' + esc(ymdLocal(new Date()) + ' ' + String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')) + '</div></div>' +
       '<div class="noprint"><button type="button" class="btn ghost sm" id="rpPrint">인쇄 · PDF 저장</button> <button type="button" class="btn ghost sm" id="rpXlsx">엑셀</button></div></div>';
-    const k1 = box('① 쿠팡 매출', row('쿠팡 매출 (VAT포함)', n(c.sales), '배송 ' + n(t.qty) + '건 · 기사 ' + D.length + '명') + row('공급가', n(c.supplyCp)) + row('매출 부가세', n(P.salesVat != null ? P.salesVat : Math.round((c.supplyCp || 0) * 0.1))) +
-      row('분실파손 (쿠팡 · 소비자가)', '− ' + n(c.lossCp), '공급가 환산 ' + n(c.lossSup)) + (c.vendorCut ? row('쿠팡 프로그램 사용료', '− ' + n(c.vendorCut)) : '') +
-      row('쿠팡 입금 예상', n(Math.round((c.supplyCp || 0) * 1.1) - (c.lossCp || 0) - (c.vendorCut || 0)), '공급가×1.1 − 분실 − 사용료', 'sum'));
+    const invS = c.invSupply != null ? c.invSupply : (c.supplyCp || 0) - (c.lossCp || 0), invV = c.invVat != null ? c.invVat : Math.floor(invS * 0.1), invT = c.invTotal || invS + invV;
+    const k1 = box('① 쿠팡 매출 (세금계산서 방식)', row('정산서 총합계 (공급가)', n(c.supplyCp), '배송 ' + n(t.qty) + '건 · 기사 ' + D.length + '명' + (c.vendorCut ? ' · 영업점 수수료 ' + n(-c.vendorCut) + ' 포함' : '')) +
+      row('분실파손 차감', '− ' + n(c.lossCp), '쿠팡이 공급가에서 그대로 뺌') + row('계산서 공급가', n(invS)) + row('계산서 세액 (10% · 끝자리 버림)', n(invV)) +
+      row('쿠팡 세금계산서 합계 = 입금액', n(invT), '', 'sum'));
     const k2 = box('② 기사 지급', row('세금계산서 합계 (매입)', n(t.invoice), '공급가 ' + n(t.supply) + ' · 세액 ' + n(t.tax) + ' · ' + paid.length + '명') +
       row('산재보험 (기사분)', '− ' + n(t.san)) + row('고용보험 (기사분)', '− ' + n(t.goy)) + row('공제 (분실 변상·용차·가불·기타)', '− ' + n(ded), '분실 변상 ' + n(t.loss)) + (t.depAdd ? row('계산서 외 지급', '+ ' + n(t.depAdd)) : '') +
       row('기사 실입금 합계', n(t.net), '', 'sum'));
@@ -8287,7 +8289,7 @@
     const step = (lab, v, sign, cls, note) => '<div class="pnl-step' + (cls ? ' ' + cls : '') + '"><span>' + lab + (note ? '<small>' + note + '</small>' : '') + '</span><b>' + (sign || '') + wn(v) + '</b></div>';
     const c = cur || {};
     const box = '<div class="pnl-box"><h4>' + esc(ymTitle(c.month || STX.month)) + ' 정산 손익 <small>공급가 · 세전' + (c.closed ? ' · 마감' : '') + '</small></h4>' +
-      step('회사이익금', c.profit, '', 'base', '쿠팡 공급가 ' + wn(c.salesSupply) + ' − 분실 ' + wn(c.lossSup != null ? c.lossSup : c.loss) + ' (소비자가 ' + wn(c.loss) + ' ÷ 1.1) − 기사 공급가 ' + wn(c.drvSupply) + (c.otherInc && (c.otherInc.loss || c.otherInc.yong) ? ' + 기타수익(분실 변상금 ' + wn(c.otherInc.loss) + ' · 용차 차액 ' + wn(c.otherInc.yong) + ')' : '') + (c.progFee ? ' − 영업점 수수료 ' + wn(c.progFee) : '') + ' (프백 마진 포함)') +
+      step('회사이익금', c.profit, '', 'base', '쿠팡 계산서 공급가 ' + wn(c.salesSupply) + ' (총합계 ' + wn(c.salesGross != null ? c.salesGross : c.salesSupply + c.loss) + ' − 분실 ' + wn(c.loss) + ') − 기사 공급가 ' + wn(c.drvSupply) + (c.otherInc && (c.otherInc.loss || c.otherInc.yong) ? ' + 기타수익(분실 변상금 ' + wn(c.otherInc.loss) + ' · 용차 차액 ' + wn(c.otherInc.yong) + ')' : '') + (c.progFee ? ' − 영업점 수수료 ' + wn(c.progFee) : '') + ' (프백 마진 포함)') +
       step('러너 산재·고용 ' + (c.ins ? Math.round(c.ins.runner * 100) + '%' : ''), c.runnerIns, '− ', '', '산재·고용 신고 표의 러너 몫') +
       step('보험 차액 (기타수익)', c.insGap || 0, (c.insGap || 0) < 0 ? '' : '+ ', '', '기사 정산서 실제 공제 ' + wn(c.insDrv) + ' − 신고 기준 기사분 ' + wn(c.ins ? c.ins.sanD + c.ins.goyD : 0)) +
       step('직원 인건비', c.staff, '− ', '', c.staffN ? c.staffN + '명 세전 · 원천세 ' + wn(c.staffWht) + ' (다음 달 10일 납부) · 실지급 ' + wn(c.staffNet) : '직원 탭에 입력') +
@@ -9538,8 +9540,9 @@
     S.push(['※ 기사 세금계산서는 지급 합계 전액으로 발행 · 분실파손 변상금·용차 차액·산재고용·가불은 발행 후 실 입금에서 공제 · 공제한 분실 변상금·용차 차액·보험 차액은 러너 기타수입(부가세 없음)']);
     S.push([]);
     S.push(SEC(['[매출 — 쿠팡]']));
-    line('배송 건수', (x) => x.qty); line('쿠팡 매출 (부가세 포함)', (x) => x.sales); line('쿠팡 공급가', (x) => x.supplyCp); line('매출세액 (분실 부가세분 차감)', (x) => x.salesVat);
-    line('분실파손 차감 (소비자가)', (x) => x.lossCp); line('분실파손 공급가 환산 (÷1.1)', (x) => x.lossSup); line('영업점 수수료 (프로그램 사용료)', (x) => x.progFee);
+    line('배송 건수', (x) => x.qty); line('정산서 총합계 (공급가 · 분실 차감 전)', (x) => x.supplyCp); line('분실파손 차감 (공급가에서 그대로 차감)', (x) => x.lossCp);
+    line('쿠팡 세금계산서 공급가 (= 총합계 − 분실)', (x) => x.invSupply != null ? x.invSupply : x.supplyCp - x.lossCp); line('쿠팡 세금계산서 세액 (10% · 끝자리 버림)', (x) => x.salesVat); line('쿠팡 세금계산서 합계 = 입금액', (x) => x.invTotal);
+    line('영업점 수수료 (프로그램 사용료 · 총합계에 포함)', (x) => x.progFee);
     S.push([]); S.push(SEC(['[매입 — 기사 세금계산서]']));
     line('기사 수 (계산서)', (x) => x.drvN, true); line('계산서 합계 (부가세 포함)', (x) => x.drvInvoice); line('공급가액', (x) => x.drvSupply); line('매입세액', (x) => x.drvVat); line('기사 실 입금 합계', (x) => x.drvNet);
     S.push([]); S.push(SEC(['[기타수익 — 기타수입으로 신고 · 부가세 없음]']));
@@ -9584,7 +9587,7 @@
     C.push([]); C.push(['※ 증빙이 세금계산서·카드·현금영수증이면 ÷1.1 로 공급가·부가세(매입세액) 구분 · "세금·보험 납부"는 손익 제외 · 종이 세금계산서는 실물 스캔 첨부']);
     sheets.push({ name: '운영비지출', rows: C, widths: [12, 12, 14, 12, 24, 14, 14, 13, 11, 12, 12, 9, 20] });
     // ⑦ 쿠팡 입금
-    const D = [H(['정산월', '계산 금액 (공급가×1.1 − 분실)', '실제 입금액', '입금 예정일', '입금일', '확인', '받는 통장'])];
+    const D = [H(['정산월', '쿠팡 세금계산서 합계 (계산값)', '실제 입금액', '입금 예정일', '입금일', '확인', '받는 통장'])];
     r.deposits.forEach((x) => D.push([mt(x.month), n(x.plan), n(x.amt), x.due, x.date, x.done ? '✓' : '', x.bank]));
     sheets.push({ name: '쿠팡 입금', rows: D, widths: [12, 26, 16, 12, 12, 6, 14] });
     // ⑧ 가불

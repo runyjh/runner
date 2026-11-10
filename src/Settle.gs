@@ -139,7 +139,7 @@ const STL_CFG = [
   ['uncFee', '미계약 라우트 업체 수수료율', '10%', '기사 지급 = 미계약 금액 × (1 − 수수료율), 10원 단위 반올림', '금액 환산 · 기사 지급률'],
   ['etcRate', '기타(프로모션·소급) 기사 지급률', '0%', '', '금액 환산 · 기사 지급률'],
   ['lossRate', '분실파손 기사 부담률', '100%', '', '분실파손'],
-  ['lossVat', '분실파손 부가세 포함 환산 (Y/N)', 'Y', 'Y = 쿠팡 차감금액(소비자가) × 1.1 을 기사 부담 · 차이는 러너 잉여', '분실파손'],
+  ['lossVat', '분실파손 부가세 포함 환산 (Y/N)', 'Y', 'Y = 쿠팡 차감금액 × 1.1 을 기사 부담 (쿠팡은 차감금액을 공급가에서 빼 부가세 10%도 같이 줄어듦 → ×1.1 이면 정확히 상쇄) · N = 차감금액만 (부가세분은 러너 부담)', '분실파손'],
   ['expense', '필요경비 공제율 (경비율, 공단 기준)', '34.6%', '보수액 = 기준금액 × (1 − 경비율)', '산재 · 고용보험'],
   ['san', '산재보험료율 (전체 요율 · 기사+러너)', '1.76%', '기사 공제 = 보수액 × 요율 × (1 − 러너 부담률) · 10원 미만 버림', '산재 · 고용보험'],
   ['commute', '출퇴근재해 요율 (전체 요율)', '0%', '', '산재 · 고용보험'],
@@ -172,7 +172,7 @@ const STL_TYPE_KEY = { '고정': 'p2', '백업': 'p3', '품앗이': 'p4', '외�
 let _stlSS = null, _stlTv = null, _stlFresh = false;
 const _stlSh = {}, _stlCols = {}, _stlTab = {}, _stlMon = {};
 // 계산 방식·표시가 바뀌면 올린다 → 배포하자마자 예전 계산 결과(10분 캐시) 대신 새로 계산
-const STL_CALC_VER = '20261110a'; // 회사 합계에 러너 몫 프로모션(promoBase·promoRunner) 추가
+const STL_CALC_VER = '20261110b'; // 쿠팡 분실 차감 = 공급가에서 그대로 (계산서 방식) · 매출세액 끝자리 버림
 const STL_BIG = ['stl_raw', 'stl_loss', 'stl_closed', 'stl_bankrows']; // 정산월 묶음으로만 읽는 큰 탭
 const STL_SMALL = ['stl_ids', 'stl_vendors', 'stl_usage', 'stl_tmp', 'stl_config', 'stl_items', 'stl_kinds', 'stl_camps', 'stl_adjust', 'stl_advance', 'stl_yongcha', 'stl_regular', 'stl_fbcut', 'stl_target', 'stl_split', 'stl_leave', 'stl_pay', 'stl_rounds', 'stl_close', 'stl_ack', 'stl_cost', 'stl_staff', 'stl_expense', 'stl_bank', 'stl_alloc', 'stl_fund', 'stl_banktx', 'stl_taxpay', 'stl_bankrules'];
 // 손익·운영비 탭: 고쳐도 기사 정산(계산 결과)은 다시 계산하지 않는다 (손익만 바로 다시 셈)
@@ -1744,7 +1744,7 @@ function stlCompute_(month) {
       base: s.base, inc: s.inc, fresh: s.fresh, freshRaw: s.freshRaw, fbCutTxt: s.fbCutTxt || '', fbCut: s.fbCut, fbKeep: s.fbKeep, unc: s.unc, etc: s.etc, loss: s.loss, lossCp: s.lossCp, yongPay: s.yongPay, yongCut: s.yongCut,
       pay: f.pay, taxDed: f.taxDed, invoice: f.invoice, supply: f.supply, tax: f.tax, san: f.san, goy: f.goy, depDed: f.depDed, depAdd: f.depAdd, net: f.net,
       lossInc: f.lossInc, yongInc: f.yongInc, otherInc: f.otherInc, // 계산서 발행 후 공제한 분실 변상금·용차 차액 = 러너 기타수익 (부가세 없음)
-      profit: Math.round(s.supplyCp - s.lossSup - f.supply + f.otherInc), runnerIns: f.runnerIns, insGain: f.insGain,
+      profit: Math.round(s.supplyCp - s.lossSup - f.supply + f.otherInc), runnerIns: f.runnerIns, insGain: f.insGain, supplyCp: s.supplyCp, // 회사이익 = 쿠팡 공급가 − 분실(공급가에서 그대로) − 기사 공급가 + 기타수익
       bank: o.bankName || '', holder: o.accountHolder || '', account: o.account || '', hasAccount: !!(o.accountEnc || (o.vendor && o.accountRaw)), bizNo: o.bizNo || '', bizName: o.vendor ? '' : o.bizName || '',
       checked: stlYes_(p.checked), payDate: p.date || '', payMemo: p.memo || '',
       advLeft: adv[id] ? adv[id].left : 0, noPriceQty: s.noPriceQty,
@@ -1862,7 +1862,8 @@ function stlCompute_(month) {
     company: {
       sales: company.sales, supplyCp: company.supplyCp, lossCp: company.lossCp, lossSup: company.lossSup, unregSales: company.unregSales, vendorCut: company.vendorCut, progFee: company.progFee, yongGain: company.yongGain,
       promoBase: company.promoBase, promoRunner: company.promoRunner, // 러너 몫 프로모션 (기사 줄에 없음 → 회사이익에 따로 더함)
-      coupangNet: company.supplyCp - company.lossSup - company.vendorCut
+      coupangNet: company.supplyCp - company.lossSup - company.vendorCut,
+      invSupply: stlInvoiceOf_(company.supplyCp, company.lossCp, cfg).supply, invVat: stlInvoiceOf_(company.supplyCp, company.lossCp, cfg).vat, invTotal: stlInvoiceOf_(company.supplyCp, company.lossCp, cfg).total // 쿠팡 세금계산서 = 실제 입금
     },
     dates: stlDates_(month, cfg), warnings: warnings, yong: yongOut, advAuto: advAuto, vendors: X.vendors.list.map(function (v) { return v.name; })
   };
@@ -2189,7 +2190,7 @@ function stlLegacySales_(month) {
   };
   sum.drivers.forEach(function (row) {
     const c = pick(row);
-    row.sales = c ? c.sales || 0 : 0; row.lossCp = c ? c.lossCp || 0 : 0;
+    row.sales = c ? c.sales || 0 : 0; row.lossCp = c ? c.lossCp || 0 : 0; row.supplyCp = c ? c.supplyCp || 0 : 0;
     if (c) used[c.id] = 1;
   });
   let extra = 0;
@@ -2202,7 +2203,7 @@ function stlLegacySales_(month) {
     slips[row.id] = { row: row, lines: [{ name: '(기존 정산서 없음 · 쿠팡 매출만)', side: '지급', method: '직접입력', taxCut: false, amt: 0, memo: '', unknown: false }], ins: {}, routes: [], daily: {}, sched: {}, idUse: {}, loss: [], yong: [], members: row.cids.slice(), workers: [], movedIn: [], movedOut: [] };
   });
   sum.drivers.forEach(function (row) {
-    row.profit = Math.round(Math.round((row.sales || 0) / 1.1) - (row.lossCp ? Math.round(row.lossCp / 1.1) : 0) - (row.supply || 0) + (row.otherInc || 0));
+    row.profit = Math.round((row.supplyCp != null ? row.supplyCp : Math.round((row.sales || 0) / 1.1)) - (row.lossCp || 0) - (row.supply || 0) + (row.otherInc || 0));
     if (slips[row.id]) slips[row.id].row = row;
   });
   ['sales', 'lossCp', 'profit', 'qty'].forEach(function (k) { sum.total[k] = sum.drivers.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0); });
@@ -2298,12 +2299,19 @@ function stlWht_(pay, rate) {
   return Math.floor(pay * r / 10) * 10;
 }
 /** 쿠팡 분실파손 차감금액은 소비자가(부가세 포함) → 공급가 환산 (손익·매출세액·역발행 계산서에 쓰는 값) */
-function stlLossSup_(amt, cfg) { const v = cfg && typeof cfg.vat === 'number' ? cfg.vat : 0.1; return Math.round(stlNum_(amt) / (1 + v)); }
+/** 쿠팡 분실파손 차감은 세금계산서 공급가(부가세 제외)에서 그 금액 그대로 빠진다 (쿠팡 정산 총괄: 금액+프레시백+인센 − 분실 = 공급가 · 2026-11-10 확인) → 공급가 환산 없음 */
+function stlLossSup_(amt, cfg) { return stlNum_(amt); }
+/** 쿠팡 세금계산서(매출) 금액: 공급가 = 총합계(공급가) − 분실 차감 · 세액 = 공급가×10% 끝자리 버림 · 합계 = 입금액 */
+function stlInvoiceOf_(supplyCp, lossCp, cfg) {
+  const v = cfg && typeof cfg.vat === 'number' ? cfg.vat : 0.1;
+  const sup = Math.round((supplyCp || 0) - (lossCp || 0)), vat = Math.floor(sup * v);
+  return { supply: sup, vat: vat, total: sup + vat };
+}
 function stlPnl_(month, sum) {
   const t = (sum && sum.total) || {}, c = (sum && sum.company) || {};
   const o = {
     month: month, closed: !!(sum && sum.closed), hasData: !!(sum && (sum.drivers || []).length),
-    qty: t.qty || 0, salesSupply: c.supplyCp || 0, salesVat: Math.round((c.supplyCp || 0) * 0.1 - ((c.lossCp || 0) - (c.lossSup || 0))), loss: c.lossCp || 0, lossSup: c.lossSup || 0, progFee: -(c.vendorCut || 0),
+    qty: t.qty || 0, salesGross: c.supplyCp || 0, salesSupply: c.invSupply != null ? c.invSupply : (c.supplyCp || 0) - (c.lossCp || 0), salesVat: c.invVat != null ? c.invVat : Math.floor(((c.supplyCp || 0) - (c.lossCp || 0)) * 0.1), salesTotal: c.invTotal || 0, loss: c.lossCp || 0, lossSup: c.lossSup || 0, progFee: -(c.vendorCut || 0),
     drvSupply: t.supply || 0, drvVat: t.tax || 0, profit: (t.profit || 0) + (c.vendorCut || 0) + (c.promoBase || 0) + (c.promoRunner || 0),
     insDrv: (t.san || 0) + (t.goy || 0),
     staff: 0, staffWht: 0, staffNet: 0, staffN: 0, fixed: 0, fixedVat: 0, fixedN: 0, varCost: 0, varVat: 0, varN: 0, byCat: {}
@@ -2475,7 +2483,7 @@ function stlFund_(month) {
   const rows = {};
   stlRead_('stl_fund').forEach(function (r) { if (r.month === month) rows[r.item] = r; });
   const dep = rows['쿠팡 입금'] || {};
-  const depPlan = Math.round((c.supplyCp || 0) * 1.1 - (c.lossCp || 0)); // 분실파손 차감은 소비자가(부가세 포함)라 부가세 붙인 뒤 뺀다
+  const depPlan = c.invTotal != null ? c.invTotal : stlInvoiceOf_(c.supplyCp, c.lossCp, stlCfg_()).total; // 쿠팡 세금계산서 합계 = 입금액 (공급가 − 분실, 세액 끝자리 버림)
   const deposit = { plan: depPlan, amt: stlNum_(dep.amt) || 0, done: stlYes_(dep.done), date: dep.date || '', memo: dep.memo || '', due: (sum.dates || {}).coupang || '', bank: source };
   const auto = {
     driver: t.net || 0, vat: Math.max(0, pnl.vatDue), ins: pnl.ins.total, staff: pnl.staff,
@@ -3972,7 +3980,7 @@ function adm_stlTaxPack(token, months, extraTo) {
       const res = stlResult_(m, false), sum = res.summary, t = sum.total || {}, c = sum.company || {};
       const pnl = stlPnl_(m, sum), fund = stlFund_(m), rd = stlRounds_(m), dates = sum.dates || {};
       out.summary.push({
-        month: m, closed: !!sum.closed, qty: t.qty || 0, sales: c.sales || 0, supplyCp: c.supplyCp || 0, salesVat: pnl.salesVat, lossCp: c.lossCp || 0, lossSup: c.lossSup || 0, progFee: c.vendorCut || 0,
+        month: m, closed: !!sum.closed, qty: t.qty || 0, sales: c.sales || 0, supplyCp: c.supplyCp || 0, invSupply: pnl.salesSupply, salesVat: pnl.salesVat, invTotal: pnl.salesTotal || (pnl.salesSupply + pnl.salesVat), lossCp: c.lossCp || 0, lossSup: c.lossSup || 0, progFee: c.vendorCut || 0,
         drvInvoice: t.invoice || 0, drvSupply: t.supply || 0, drvVat: t.tax || 0, drvNet: t.net || 0, drvN: (sum.drivers || []).length,
         otherInc: pnl.otherInc, margin: pnl.margin, profit: pnl.profit, runnerIns: pnl.runnerIns, insGap: pnl.insGap, staff: pnl.staff, staffWht: pnl.staffWht, fixed: pnl.fixed, fixedVat: pnl.fixedVat, varCost: pnl.varCost, varVat: pnl.varVat, net: pnl.net, vatDue: pnl.vatDue,
         insTotal: pnl.ins ? pnl.ins.total : 0, insDrv: pnl.ins ? pnl.ins.sanD + pnl.ins.goyD : 0, insRunner: pnl.ins ? pnl.ins.runnerAmt : 0,
@@ -4126,8 +4134,8 @@ function stlLegacyMerge_(month, leg) {
   // 회사이익금 (기사별) · 합계 다시
   sum.drivers.forEach(function (row) {
     const s = slips[row.id];
-    const cpSup = Math.round((row.sales || 0) / 1.1);
-    row.profit = Math.round(cpSup - (row.lossCp ? Math.round(row.lossCp / 1.1) : 0) - (row.supply || 0) + (row.otherInc || 0));
+    const cpSup = row.supplyCp != null ? row.supplyCp : Math.round((row.sales || 0) / 1.1);
+    row.profit = Math.round(cpSup - (row.lossCp || 0) - (row.supply || 0) + (row.otherInc || 0));
     if (s) s.row = row;
   });
   const keys = ['qty', 'pay', 'invoice', 'supply', 'tax', 'san', 'goy', 'depDed', 'depAdd', 'net', 'loss', 'lossCp', 'lossInc', 'yongInc', 'otherInc', 'profit', 'runnerIns', 'fbCut', 'fbKeep', 'insGain', 'sales', 'taxDed'];
