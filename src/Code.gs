@@ -5856,8 +5856,9 @@ function schBuildUpload_(data, opt) {
   const rotSort = function (arr) { return ALL.filter(function (x) { return arr.indexOf(x) >= 0; }); };
 
   // 아이디 → 이름 (운영시트 nameMap: 스케쥴 시트 D·E열)
-  const nameMap = {}, campById = {};
-  data.camps.forEach(function (c) { campById[c.id] = short(c.name); });
+  const nameMap = {}, campById = {}, campReal = {}, routeCamps = {};
+  data.camps.forEach(function (c) { campById[c.id] = short(c.name); if (!isStaffCamp_(c.name)) campReal[short(c.name)] = 1; });
+  Object.keys(data.routes || {}).forEach(function (cid) { const cn = campById[cid]; if (!cn) return; (data.routes[cid] || []).forEach(function (code) { routeExpand(code).forEach(function (x) { const a = routeCamps[x] || (routeCamps[x] = []); if (a.indexOf(cn) < 0) a.push(cn); }); }); });
   data.drivers.forEach(function (d) { if (d.loginId) nameMap[d.loginId.toLowerCase()] = d.name; });
   const nm = function (id) { return nameMap[String(id || '').toLowerCase()] || ''; };
 
@@ -5865,7 +5866,9 @@ function schBuildUpload_(data, opt) {
   const info = data.drivers.filter(function (d) {
     return d.status === ST.ACTIVE || Object.keys(data.cells[d.id] || {}).some(function (k) { return data.dates.indexOf(k) >= 0; });
   }).map(function (d) {
-    const campOf = function (id) { return campById[id] || ((d.type === '백업' || d.type === '외부용차') ? '백업' : ''); };
+    // 소속 캠프가 없거나 직원(관리자·운영자·대표) 캠프인 사람은 '백업'으로 두고, 그날 칸에 적힌 캠프·노선·회전으로 출력한다
+    const staff = TITLES.indexOf(str_(d.type)) >= 0 || TITLES.indexOf(str_(d.title)) >= 0 || isStaffCamp_(campById[d.campId] || d.camp || '');
+    const campOf = function (id) { return staff ? '백업' : campById[id] || ((d.type === '백업' || d.type === '외부용차') ? '백업' : ''); };
     const base = { key: d.id, camp: campOf(d.campId), name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: data.cells[d.id] || {}, leaveFrom: d.leaveDate || '' };
     // 노선 변경 예약이 걸린 기사: 날짜마다 그날의 캠프·기본노선으로
     if (d.segs) base.at = function (date) {
@@ -5999,11 +6002,14 @@ function schBuildUpload_(data, opt) {
           if (!rotation && base.rot) rotation = base.rot;
         } else code = cell;
         const parts = String(code).split(/\s+/);
-        if ((campStr === '백업' || campStr === '운영자') && parts.length >= 2) { finalCamp = parts[0].substr(0, 3); code = parts[1]; }
+        if ((campStr === '백업' || campStr === '운영자') && parts.length >= 2 && !dynCamp) { finalCamp = parts[0].substr(0, 3); code = parts[1]; }
         else if (parts.length >= 2 && /^\d+[A-Za-z]+$/.test(parts[1])) code = parts[1];
         let rl = routeExpand(code);
         const fromText = cell.match(/\d+[A-Za-z]+/g) || [];
         if (!rl.length && fromText.length) fromText.forEach(function (rc) { rl = rl.concat(routeExpand(rc)); });
+        // 캠프를 안 적은 백업·직원 칸: 노선관리에서 그 노선이 한 캠프에만 있으면 그 캠프로
+        if (!campReal[finalCamp] && rl.length) { const cs = {}; rl.forEach(function (x) { (routeCamps[x] || []).forEach(function (c) { cs[c] = 1; }); }); const k = Object.keys(cs); if (k.length === 1) finalCamp = k[0]; }
+        if (!campReal[finalCamp]) return; // 캠프를 알 수 없는 칸은 업로드 줄로 만들지 않음
         const routeHasKey = hasKeyword(rl.join(','));
         let rots = normRot(rotation);
         if (!rots.length) rots = defRotArr(finalCamp);
