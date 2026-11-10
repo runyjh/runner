@@ -3073,7 +3073,7 @@ function stlTaxCheck_(token, month, rows, dry) {
     const norm = function (v) { return str_(v).replace(/[^0-9]/g, ''); };
     const nm = function (v) { return str_(v).replace(/\s*\(.*\)\s*$/, '').replace(/\s+/g, ''); };
     const byBiz = {}, byName = {};
-    const targets = (r.summary.drivers || []).filter(function (d) { return d.invoice; }).map(function (d) {
+    const targets = (r.summary.drivers || []).filter(function (d) { return !d.ceo && d.invoice > 0; }).map(function (d) {
       const vv = d.vendor ? V.by[stlVendorKey_(d.vendor)] : null, o = vv ? {} : (D.byId[d.ownerId] || {});
       const biz = norm(vv ? vv.bizNo : (o.bizNo || d.bizNo));
       const t = { id: d.id, name: d.name, invoice: d.invoice, biz: biz, names: [nm(d.name), nm(vv ? vv.name : o.name), nm(vv ? vv.ceo : o.bizCeo), nm(o.bizName)].filter(Boolean), hits: [] };
@@ -3087,6 +3087,7 @@ function stlTaxCheck_(token, month, rows, dry) {
       let c = biz && byBiz[biz] ? byBiz[biz] : [];
       if (!c.length) { const n1 = nm(x.ceo), n2 = nm(x.co); c = (byName[n1] || []).concat(byName[n2] || []).filter(function (t, i, arr) { return arr.indexOf(t) === i; }); }
       if (c.length > 1) { const exact = c.filter(function (t) { return Math.abs(t.invoice - tot) <= 1; }); if (exact.length) c = exact; }
+      if (!c.length) { const amt = targets.filter(function (t) { return t.invoice === tot && !t.hits.length; }); if (amt.length === 1) c = amt; }
       if (!c.length) { unmatched.push({ bizNo: x.bizNo, co: x.co, ceo: x.ceo, date: x.date, total: tot }); return; }
       c[0].hits.push({ total: tot, date: str_(x.date), no: str_(x.approval) });
     });

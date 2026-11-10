@@ -10813,14 +10813,14 @@
     const d = (v) => v ? '<span style="color:' + (v > 0 ? 'var(--brand)' : 'var(--danger)') + '">' + (v > 0 ? '+' : '') + wn(v) + '</span>' : '<span class="sub">0</span>';
     $('#htTitle').textContent = ymTitle(HT.month || r.month) + ' 홈택스 계산서 대조' + (saved ? ' — 저장됨' : ' — 미리보기');
     $('#htBody').innerHTML = '<div class="kpis" style="margin-bottom:10px">' +
-      '<div class="kpi"><small>발행 완료</small><b style="color:var(--ok)">' + (n.done + n.round) + ' / ' + n.total + '명</b><em>' + (n.round ? '1원차 ' + n.round + ' 포함 · ' : '') + '정산서 계산서 있는 기사 기준</em></div>' +
-      '<div class="kpi"><small>금액 다름</small><b' + (n.diff ? ' style="color:var(--danger)"' : '') + '>' + n.diff + '명</b><em>홈택스 합계 ≠ 정산서 계산서</em></div>' +
+      '<div class="kpi"><small>발행 완료</small><b style="color:var(--ok)">' + (n.done + n.round) + ' / ' + n.total + '명</b><em>' + (n.round ? '1원차 ' + n.round + ' 포함 · ' : '') + '합계금액이 같은 기사</em></div>' +
+      '<div class="kpi"><small>금액 다름</small><b' + (n.diff ? ' style="color:var(--danger)"' : '') + '>' + n.diff + '명</b><em>홈택스 합계금액 ≠ 발행 메뉴 합계금액</em></div>' +
       '<div class="kpi"><small>미발행</small><b' + (n.none ? ' style="color:var(--warn)"' : '') + '>' + n.none + '명</b><em>홈택스에 계산서 없음</em></div>' +
       '<div class="kpi"><small>홈택스 엑셀</small><b>' + n.hometax + '장</b><em>합계 ' + wn(n.hometaxSum) + (r.unmatched.length ? ' · <b style="color:var(--danger)">기사와 짝 없는 ' + r.unmatched.length + '장</b>' : '') + '</em></div></div>' +
-      '<div class="table-wrap"><table class="sttbl"><thead><tr><th>기사</th><th>사업자번호</th><th class="n">정산서 계산서</th><th class="n">홈택스 합계</th><th class="n">차이</th><th>장수</th><th>작성일자</th><th>판정</th></tr></thead><tbody>' +
-      r.rows.map((x) => '<tr><td><b>' + esc(x.name) + '</b></td><td class="sub">' + esc(x.biz ? x.biz.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : '사업자번호 없음') + '</td><td class="n">' + wn(x.invoice) + '</td><td class="n">' + wn(x.hometax) + '</td><td class="n">' + d(x.diff) + '</td><td>' + (x.n || '-') + '</td><td class="sub">' + esc(x.date) + '</td><td>' + st(x) + '</td></tr>').join('') + '</tbody></table></div>' +
+      '<div class="table-wrap"><table class="sttbl"><thead><tr><th>기사</th><th class="n">합계금액 (발행 메뉴)</th><th class="n">홈택스 합계금액</th><th class="n">차이</th><th>작성일자</th><th>판정</th></tr></thead><tbody>' +
+      r.rows.map((x) => '<tr><td><b>' + esc(x.name) + '</b></td><td class="n">' + wn(x.invoice) + '</td><td class="n">' + (x.n ? wn(x.hometax) : '<span class="sub">—</span>') + '</td><td class="n">' + (x.n ? d(x.diff) : '') + '</td><td class="sub">' + esc(x.date) + '</td><td>' + st(x) + '</td></tr>').join('') + '</tbody></table></div>' +
       (r.unmatched.length ? '<h4 style="margin:14px 0 6px;font-size:14px">기사와 짝이 없는 홈택스 계산서 ' + r.unmatched.length + '장 <small class="sub">— 사업자번호가 기사 정보에 없거나 이름이 다름 · 기사 정보관리에서 사업자번호를 채우면 다음 대조부터 짝이 맞음</small></h4><div class="table-wrap"><table class="sttbl"><thead><tr><th>작성일자</th><th>사업자번호</th><th>상호</th><th>대표자</th><th class="n">합계</th></tr></thead><tbody>' + r.unmatched.map((u) => '<tr><td>' + esc(u.date) + '</td><td>' + esc(u.bizNo) + '</td><td>' + esc(u.co) + '</td><td>' + esc(u.ceo) + '</td><td class="n">' + wn(u.total) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
-      '<p class="sub" style="font-size:12px;margin:10px 0 0">짝 맞추기: ① 공급자 사업자번호 = 명의자(용차업체) 사업자번호 ② 없으면 대표자명·상호 = 명의자 이름 · 같은 사람 여러 장은 합산 · 작성일자가 다른 달이어도 금액이 맞으면 완료</p>';
+      '<p class="sub" style="font-size:12px;margin:10px 0 0">홈택스 엑셀의 <b>합계금액</b>과 이 메뉴의 <b>합계금액</b>만 비교합니다 · 누구 계산서인지는 사업자번호 → 대표자명·상호 → 합계금액이 똑같은 기사 순으로 찾음 · 같은 기사 여러 장은 금액이 맞는 한 장, 없으면 합산</p>';
     $('#htSave').classList.toggle('hidden', saved);
     $('#htModal').classList.remove('hidden');
   }
