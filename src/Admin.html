@@ -1381,6 +1381,7 @@
       <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
       <label class="check" id="sStaffAllWrap" title="관리자·운영자·대표 줄은 고른 캠프 기사들 다음에 이어서 나옵니다. 캠프를 고르면 그 기간에 그 캠프 노선을 뛴 사람만 — 체크하면 전원"><input type="checkbox" id="sStaffAll"> 관리자·운영자·대표 전원</label>
       <div class="grow">
+        <button class="btn ghost" id="sPmNew" title="칸을 고르고 누르면 그 기사·날짜로 사무실에서 품앗이 일감을 등록합니다 (모집 · 제안 · 바로 배차 확정)">🤝 품앗이 등록</button>
         <button class="btn ghost" id="sNoteAdd">+ 비고 줄</button>
         <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
         <button class="btn ghost" id="sFill" title="오늘 이후 빈칸: 고정·품앗이 기사는 출근/고정휴무, 백업 기사는 고정휴무 요일만">빈칸 자동 채우기</button>
@@ -1654,6 +1655,35 @@
 </div>
 
 <!-- ───────────── 공지 작성·수정 ───────────── -->
+<!-- ───────────── 기사스케줄 → 사무실 품앗이 등록 ───────────── -->
+<div class="modal hidden" id="pmcModal">
+  <div class="m-box" style="width:min(640px,100%);max-height:92vh;overflow:auto">
+    <h3 style="margin:0 0 4px">🤝 품앗이 일감 등록 <small class="sub" style="font-weight:600;font-size:12.5px">사무실 등록</small></h3>
+    <div class="db-note" style="margin:0 0 12px">맡기는 기사 이름으로 일감을 올립니다. 기사 앱의 일감 올리기·제안 스위치와 상관없이 등록됩니다.</div>
+    <div class="grid2">
+      <div class="field"><label class="lb" for="pmcPoster">맡기는 기사 (일을 주는 기사)</label><select class="inp" id="pmcPoster"></select></div>
+      <div class="field"><label class="lb" for="pmcDate">배차일자 (PDD)</label><input class="inp" type="date" id="pmcDate"></div>
+      <div class="field"><span class="lb">구분</span><div class="seg" id="pmcKind"></div></div>
+      <div class="field"><label class="lb" for="pmcTime">입차시간</label><input class="inp" id="pmcTime" placeholder="예: 20:30 / 8시반"></div>
+      <div class="field"><label class="lb" for="pmcCamp">캠프</label><select class="inp" id="pmcCamp"></select></div>
+      <div class="field"><label class="lb" for="pmcRoute">라우트</label><input class="inp" id="pmcRoute" placeholder="예: 527B"></div>
+      <div class="field"><label class="lb" for="pmcArea">배송지 (비우면 캠프 이름)</label><input class="inp" id="pmcArea" placeholder="예: 강서구 화곡동"></div>
+      <div class="field"><label class="lb" for="pmcQty">평균 물량</label><input class="inp" id="pmcQty" placeholder="예: 350~400"></div>
+      <div class="field"><label class="lb" for="pmcPrice">건당 단가 (VAT포함)</label><input class="inp" id="pmcPrice" inputmode="numeric" placeholder="비워도 됨"></div>
+      <div class="field"><label class="lb" for="pmcPay">지급방법</label><select class="inp" id="pmcPay"></select></div>
+      <div class="field"><label class="lb" for="pmcUse">배송 아이디</label><select class="inp" id="pmcUse"></select></div>
+      <div class="field"><label class="lb" for="pmcTop">탑 종류</label><select class="inp" id="pmcTop"></select></div>
+    </div>
+    <div class="field"><label class="lb" for="pmcDesc">상세 설명 (선택)</label><textarea class="inp" id="pmcDesc" style="height:70px"></textarea></div>
+    <div class="field"><span class="lb">받는 기사</span>
+      <div class="seg" id="pmcMode"><button type="button" data-m="confirm" class="on">바로 배차 확정</button><button type="button" data-m="offer">제안 (기사 앱에서 수락)</button><button type="button" data-m="open">모든 기사에게 모집</button></div>
+    </div>
+    <div class="field" id="pmcToWrap"><label class="lb" for="pmcTo">받는 기사 (대신 뛰는 기사)</label><select class="inp" id="pmcTo"></select></div>
+    <div class="db-note" id="pmcNote"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="pmcCancel">취소</button><button type="button" class="btn" id="pmcGo">등록</button></div>
+  </div>
+</div>
+
 <!-- ───────────── 팀즈 소식 (전체 · 설정) ───────────── -->
 <div class="modal hidden" id="tmModal">
   <div class="m-box" style="width:min(860px,100%);height:min(92vh,900px);display:flex;flex-direction:column;padding:0;overflow:hidden">
@@ -7332,6 +7362,68 @@
   $('#sAll').addEventListener('change', (e) => { sf.all = e.target.checked; renderSched(); });
   $('#sStaffAll').addEventListener('change', (e) => { sf.staffAll = e.target.checked; renderSched(); });
   $('#sReload').addEventListener('click', () => schedGo(SD.start));
+  // ───── 기사스케줄 → 사무실 품앗이 등록 (고른 칸의 기사·날짜로) ─────
+  const PMC = { meta: null, mode: 'confirm' };
+  const pmcNote = () => {
+    const m = PMC.mode, to = $('#pmcTo'), toName = to.value ? to.options[to.selectedIndex].text.replace(/\s*\(.*$/, '') : '받는 기사';
+    $('#pmcToWrap').classList.toggle('hidden', m === 'open');
+    $('#pmcNote').textContent = m === 'confirm' ? '등록하면 바로 배차 확정됩니다 → ' + toName + ' 기사님 품앗이 줄에 적히고, 두 기사님께 알림이 갑니다.'
+      : m === 'offer' ? toName + ' 기사님께 제안 알림이 가고, 기사 앱에서 수락하면 배차 확정됩니다.' : '모든 기사님이 품앗이 목록에서 보고 지원합니다. 지원자 확정은 품앗이 관리에서.';
+  };
+  function pmcOpen() {
+    const go = () => {
+      const M = PMC.meta, r = sAct && srows[sAct.r], dt = sAct ? SD.dates[sAct.c] : '';
+      const d0 = r && r.kind === 'd' ? r.d : r && r.kind === 'p' ? null : null;
+      const did = d0 ? d0.mainId || d0.id : '';
+      const drvs = SD.drivers.filter((d) => !d.ex && d.status === '승인').sort((a, b) => koSort(a.name, b.name));
+      const opt = (sel) => '<option value="">— 고르기 —</option>' + drvs.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + (d.camp ? ' (' + esc(shortCamp(d.camp)) + ')' : '') + '</option>').join('');
+      $('#pmcPoster').innerHTML = opt(did); $('#pmcTo').innerHTML = opt('');
+      $('#pmcDate').value = dt || pddDate();
+      let kind = ''; try { kind = localStorage.getItem('runner.pmcKind') || ''; } catch (e) {}
+      if (M.kinds.indexOf(kind) < 0) kind = M.kinds[0];
+      $('#pmcKind').innerHTML = M.kinds.map((k) => '<button type="button" data-k="' + esc(k) + '"' + (k === kind ? ' class="on"' : '') + '>' + esc(k) + '</button>').join('');
+      const campId = d0 ? d0.campId : '';
+      $('#pmcCamp').innerHTML = '<option value="">— 캠프 —</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => '<option value="' + esc(c.id) + '"' + (c.id === campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+      const v = r && dt ? sget(r.row, dt) : '', m = /\b(\d{3,4}[A-Z]{1,4})\b/.exec(String(v).toUpperCase());
+      $('#pmcRoute').value = m ? m[1] : d0 ? d0.baseRoute || '' : '';
+      ['#pmcTime', '#pmcArea', '#pmcQty', '#pmcDesc'].forEach((x) => { $(x).value = ''; });
+      $('#pmcPrice').value = '';
+      $('#pmcPay').innerHTML = M.pays.map((x) => '<option' + (x === '협의' ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
+      $('#pmcUse').innerHTML = M.useIds.map((x) => '<option>' + esc(x) + '</option>').join('');
+      $('#pmcTop').innerHTML = M.tops.map((x) => '<option>' + esc(x) + '</option>').join('');
+      PMC.mode = 'confirm'; $$('#pmcMode [data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === PMC.mode));
+      pmcNote();
+      $('#pmcModal').classList.remove('hidden');
+      (did ? $('#pmcTo') : $('#pmcPoster')).focus();
+    };
+    if (PMC.meta) return go();
+    api('adm_pmMeta').then((r) => { if (!r.ok) return toast(r.msg); PMC.meta = r; go(); }).catch(() => {});
+  }
+  $('#sPmNew').addEventListener('click', pmcOpen);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#pmcModal').classList.contains('hidden')) $('#pmcModal').classList.add('hidden'); });
+  $('#pmcCancel').addEventListener('click', () => $('#pmcModal').classList.add('hidden'));
+  $('#pmcModal').addEventListener('click', (e) => { if (e.target.id === 'pmcModal') $('#pmcModal').classList.add('hidden'); });
+  $('#pmcKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; $$('#pmcKind [data-k]').forEach((x) => x.classList.toggle('on', x === b)); });
+  $('#pmcMode').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (!b) return; PMC.mode = b.dataset.m; $$('#pmcMode [data-m]').forEach((x) => x.classList.toggle('on', x === b)); pmcNote(); });
+  $('#pmcTo').addEventListener('change', pmcNote);
+  $('#pmcPoster').addEventListener('change', () => { const d = SD.drivers.find((x) => x.id === $('#pmcPoster').value); if (d) { if (d.campId) $('#pmcCamp').value = d.campId; if (!$('#pmcRoute').value) $('#pmcRoute').value = d.baseRoute || ''; } });
+  $('#pmcGo').addEventListener('click', () => {
+    const kb = $('#pmcKind .on'), kind = kb ? kb.dataset.k : '';
+    const job = { posterId: $('#pmcPoster').value, date: $('#pmcDate').value, kind, time: $('#pmcTime').value, campId: $('#pmcCamp').value, route: $('#pmcRoute').value, area: $('#pmcArea').value,
+      qty: $('#pmcQty').value, price: $('#pmcPrice').value, pay: $('#pmcPay').value, useId: $('#pmcUse').value, top: $('#pmcTop').value, desc: $('#pmcDesc').value, mode: PMC.mode, toId: $('#pmcTo').value };
+    if (!job.posterId) return toast('맡기는 기사를 골라 주세요.');
+    if (PMC.mode !== 'open' && !job.toId) return toast('받는 기사를 골라 주세요.');
+    if (!job.campId) return toast('캠프를 골라 주세요.');
+    try { localStorage.setItem('runner.pmcKind', kind); } catch (e) {}
+    const b = $('#pmcGo'); b.disabled = true;
+    api('adm_pmCreate', job).then((r) => {
+      b.disabled = false;
+      if (!r.ok) return toast(r.msg);
+      $('#pmcModal').classList.add('hidden');
+      toast(PMC.mode === 'confirm' ? '등록하고 배차 확정했습니다.' : PMC.mode === 'offer' ? '등록하고 제안을 보냈습니다.' : '등록했습니다. 기사님들이 지원할 수 있습니다.');
+      schedGo(SD.start);
+    }).catch(() => { b.disabled = false; });
+  });
   $('#sNoteAdd').addEventListener('click', () => {
     ask('비고 줄 추가', '날짜별로 메모를 적는 줄을 하나 더 만듭니다. 줄 이름을 입력하세요.', '예: 유정근 비고').then((v) => {
       if (!v) return;

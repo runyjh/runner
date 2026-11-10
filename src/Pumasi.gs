@@ -749,6 +749,7 @@ const PM_ALERT_TEXT = {
   closed: function (j) { return ['모집 마감', pmJobLabel_(j) + ' 일감의 모집이 마감되었습니다.']; },
   canceled: function (j) { return ['⚠️ 일감 취소', pmJobLabel_(j) + ' 일감이 취소되었습니다.']; },
   edit: function (j) { return ['✏️ 일감 내용 변경', pmJobLabel_(j) + ' 일감 내용이 바뀌었습니다. 확인해 주세요.']; },
+  office: function (j, how) { return ['🛠 사무실 등록', '사무실에서 기사님 이름으로 ' + pmJobLabel_(j) + ' 품앗이 일감을 ' + (how || '올렸습니다.')]; },
   admin: function (j, act) { return ['🛠 사무실 처리', pmJobLabel_(j) + ' 일감을 사무실에서 ' + ({ talk: '협의 중으로', accept: '배차 확정으로', reject: '지원자 거절로', back: '지원 상태로 되돌림으로', close: '모집 마감으로', reopen: '다시 모집으로', cancel: '취소로' }[act] || '변경') + ' 처리했습니다.']; }
 };
 /** 알림 1건 만들기 (아직 저장 전) */
@@ -1157,6 +1158,84 @@ function pmAdminMarks_(cells, dates, byDrv, tips) {
     }
   });
   return out;
+}
+
+// ───────────────────────── 관리자: 사무실에서 품앗이 일감 등록 (기사스케줄에서) ─────────────────────────
+/** 등록 창에 필요한 목록 */
+function adm_pmMeta(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    return { ok: true, kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE };
+  });
+}
+/**
+ * 사무실 등록: 맡기는 기사(posterId) 이름으로 일감을 만든다. 일감 올리기·제안 스위치와 상관없이 된다.
+ * job = { posterId, date, kind, time, campId, route, area, qty, top, price, pay, useId, desc, secret, mode, toId, memo }
+ *  mode = 'open'(모든 기사에게 모집) / 'offer'(toId 기사에게 제안 → 기사 앱에서 수락) / 'confirm'(toId 기사로 바로 배차 확정 → 기사스케줄 품앗이 칸까지)
+ * 입차시간·배송지·물량·단가는 비워도 된다 (배송지 비우면 캠프 이름).
+ */
+function adm_pmCreate(token, job) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    job = job || {};
+    const t = function (v, n, label) { const s = String(v == null ? '' : v).trim(); if (s.length > n) fail_(label + '이(가) 너무 깁니다.'); return s; };
+    const poster = driverById_(str_(job.posterId));
+    if (!poster) fail_('맡기는 기사를 골라 주세요.');
+    const mode = ['open', 'offer', 'confirm'].indexOf(job.mode) >= 0 ? job.mode : 'open';
+    const f = {};
+    f.kind = PM_KINDS.indexOf(str_(job.kind)) >= 0 ? str_(job.kind) : fail_('구분(' + PM_KINDS.join('/') + ')을 골라 주세요.');
+    f.date = pmDate_(job.date) || fail_('배차일자를 입력해 주세요.');
+    if (pmPast_(f)) fail_(f.date < todayText_() ? '지난 날짜입니다.' : '야간 품앗이는 그날 아침 7시에 끝나 오늘 날짜로는 등록할 수 없습니다.');
+    const camp = master_().camps.filter(function (c) { return c.id === str_(job.campId); })[0];
+    if (!camp) fail_('캠프를 골라 주세요.');
+    f.campId = camp.id; f.camp = camp.name;
+    f.route = normCode_(t(job.route, 20, '라우트'));
+    f.time = t(job.time, 20, '입차시간');
+    f.area = t(job.area, 40, '배송지') || String(camp.name);
+    f.qty = t(job.qty, 20, '평균 물량');
+    f.top = PM_TOPS.indexOf(str_(job.top)) >= 0 ? str_(job.top) : '';
+    const pr = str_(job.price) === '' ? null : pmMoney_(job.price);
+    if (str_(job.price) !== '' && (pr === null || pr < 0)) fail_('건당 단가는 숫자로 입력해 주세요.');
+    f.price = pr || '';
+    f.pay = PM_PAYS.indexOf(str_(job.pay)) >= 0 ? str_(job.pay) : '협의';
+    f.useId = PM_USE_IDS.indexOf(str_(job.useId)) >= 0 ? str_(job.useId) : '';
+    f.desc = t(job.desc, 3000, '상세 설명');
+    f.secret = t(job.secret, 1500, '비공개 정보');
+    f.byOffice = a.name + ' · ' + nowText_().slice(0, 16);
+    let tgt = null;
+    if (mode !== 'open') {
+      tgt = driverById_(str_(job.toId));
+      if (!tgt || tgt.status !== ST.ACTIVE) fail_('받는 기사를 골라 주세요.');
+      if (tgt.id === poster.id) fail_('맡기는 기사와 받는 기사가 같습니다.');
+    }
+    const lock = scriptLock_(), out = [];
+    let id = '', appId = '';
+    lock.waitLock(20000);
+    try {
+      if (tgt && readAll_(SH.PJOB).some(function (x) { return x.acceptedId === tgt.id && x.status === PST.DONE && x.date === f.date; }))
+        fail_(tgt.name + ' 기사님은 ' + f.date + ' 에 이미 확정된 품앗이가 있습니다.');
+      const now = nowText_();
+      id = uniqId_('J');
+      if (mode === 'offer') { f.offerToId = tgt.id; f.offerTo = tgt.name; }
+      const row = Object.assign({ id: id, status: PST.OPEN, posterId: poster.id, poster: poster.name, attach: '', createdAt: now, updatedAt: now }, f);
+      appendObj_(SH.PJOB, row);
+      if (tgt) {
+        appId = uniqId_('A');
+        appendObj_(SH.PAPP, { id: appId, jobId: id, driverId: tgt.id, name: tgt.name, date: f.date, status: mode === 'offer' ? PAST.OFFER : PAST.APPLY, memo: str_(job.memo).slice(0, 200) || '사무실 등록', createdAt: now, updatedAt: now });
+        if (mode === 'offer') out.push(pmA_(tgt.id, tgt.name, row, 'offer', poster.name));
+      }
+      if (mode !== 'confirm') out.push(pmA_(poster.id, poster.name, row, 'office', mode === 'open' ? '올렸습니다. 지원자는 품앗이 관리에서 볼 수 있습니다.' : '올려 ' + tgt.name + ' 기사님께 제안했습니다.'));
+      pmAlertAdd_(out);
+      pmTouch_();
+    } finally {
+      lock.releaseLock();
+      pmAfter_(out);
+    }
+    // 바로 배차 확정: 기사 앱의 확정과 같은 길(알림 · 기사스케줄 품앗이 칸)
+    if (mode === 'confirm') pmDecide_('', id, appId, 'accept');
+    logAdmin_(a, '품앗이 사무실 등록', poster.name, f.date + ' ' + f.kind + ' ' + f.camp + ' ' + (f.route || '') + (tgt ? ' → ' + tgt.name + ' (' + (mode === 'offer' ? '제안' : '확정') + ')' : ' (모집)'));
+    return { ok: true, id: id, mode: mode };
+  });
 }
 
 // ───────────────────────── 관리자: 품앗이 관리 ─────────────────────────

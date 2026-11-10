@@ -317,7 +317,7 @@ const PJ = {
   id: '일감ID', status: '상태', posterId: '등록 기사ID', poster: '등록 기사', kind: '구분', date: '배차일자', time: '입차시간',
   area: '배송지', campId: '센터ID', camp: '센터', route: '라우트', qty: '평균 물량', top: '탑 종류', price: '건당 단가(VAT포함)', pay: '지급방법',
   desc: '상세 설명', secret: '배차 확정 기사에게만 (배송지코드·연락처 등)', attach: '첨부파일', acceptedId: '확정 기사ID', accepted: '확정 기사',
-  createdAt: '등록일시', updatedAt: '수정일시', offerToId: '제안 기사ID', offerTo: '제안 기사', useId: '배송 아이디'
+  createdAt: '등록일시', updatedAt: '수정일시', offerToId: '제안 기사ID', offerTo: '제안 기사', useId: '배송 아이디', byOffice: '사무실 등록'
 };
 const PJ_NOTES = {
   status: '모집 중 / 배차 협의중 / 배차 확정 / 모집 마감 / 취소',
