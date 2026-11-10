@@ -10677,7 +10677,7 @@
       const col = (re, from) => h.findIndex((c, i) => i >= (from || 0) && re.test(c));
       const cBiz = col(/공급자사업자등록번호/), cDate = col(/^작성일자/), cNo = col(/승인번호/), cCo = col(/^상호/, cBiz + 1), cCeo = col(/^대표자명?/, cBiz + 1), cTot = col(/^합계금액/), cSup = col(/^공급가액/), cTax = col(/^세액/);
       const num = (v) => Number(String(v == null ? '' : v).replace(/[^\d.-]/g, '')) || 0;
-      const dstr = (v) => { if (v instanceof Date) return ymdLocal(v); const t = String(v || ''); if (/^\d{5}$/.test(t)) { const d = new Date(Date.UTC(1899, 11, 30) + Number(t) * 86400000); return d.toISOString().slice(0, 10); } return t.slice(0, 10); };
+      const dstr = (v) => { if (v instanceof Date) return ymdLocal(v); const t = String(v == null ? '' : v).trim(); if (/^\d{5}(\.\d+)?$/.test(t)) { const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(t)) * 86400000); return d.toISOString().slice(0, 10); } const m = t.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m ? m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0') : t.slice(0, 10); };
       for (let i = hi + 1; i < A.length; i++) {
         const r = A[i]; if (!r || !r.length) continue;
         const tot = num(r[cTot]), biz = String(r[cBiz] || '').trim();

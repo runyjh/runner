@@ -3086,6 +3086,8 @@ function adm_stlTaxCheck(token, month, rows, dry) {
     });
     const out = [];
     targets.forEach(function (t) {
+      // 여러 장이면: 한 장이 정산서 금액과 맞으면 그 장만 (다른 달 계산서가 섞인 경우) · 아니면 전부 합산 (수정·취소 계산서 포함)
+      if (t.hits.length > 1) { const one = t.hits.filter(function (h) { return Math.abs(h.total - t.invoice) <= 1; }); if (one.length) t.hits = one.slice(0, 1); }
       const sum = t.hits.reduce(function (s0, h) { return s0 + h.total; }, 0), diff = sum - t.invoice;
       const st = !t.hits.length ? '미발행' : Math.abs(diff) === 0 ? '완료' : Math.abs(diff) <= 1 ? '완료(1원차)' : '금액다름';
       out.push({ id: t.id, name: t.name, invoice: t.invoice, hometax: sum, diff: diff, n: t.hits.length, status: st, date: t.hits.map(function (h) { return h.date; }).sort().slice(-1)[0] || '', no: t.hits.map(function (h) { return h.no; }).join(' / '), biz: t.biz });
