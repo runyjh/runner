@@ -789,7 +789,7 @@ function run_(fn) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_live', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_live', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
@@ -5553,8 +5553,21 @@ function adm_cpRosterSave(token, p) {
 
 // ───────────────────────── 스케줄 이슈 (칸별 사유: 부상·병가·차량 등) ─────────────────────────
 // 스케줄 DB 파일의 'issues' 탭. 시트에서 직접 고쳐도 된다 (이슈ID 는 비워 두면 다음에 자동으로 채워짐).
-const SCH_ISSUE = { SHEET: 'issues', HEAD: ['이슈ID', '날짜', '기사ID', '이름', '구분', '사유', '조치', '작성자', '작성일시'],
-  KINDS: ['부상', '병가', '개인사유', '차량', '사고', '경조사', '기타', '지시'] }; // 지시 = 칸 편집기의 '지시사항' (기사스케줄 칸에 표시)
+const SCH_ISSUE = { SHEET: 'issues', HEAD: ['이슈ID', '날짜', '기사ID', '이름', '구분', '사유', '조치', '작성자', '작성일시', '미입차'],
+  // 이슈 관리의 이슈 항목 코드 (+ 지시 = 칸 편집기의 '지시사항', 기사스케줄 칸에 표시). 예전 구분(병가·차량 등)도 그대로 읽어 보여 준다
+  CODES: ['질병', '부상', '사고', '고장', '물량조율', '노쇼'],
+  KINDS: ['질병', '부상', '사고', '고장', '물량조율', '노쇼', '지시'],
+  // 코드를 고르면 미입차 칸의 처음 값 (사무실에서 바꿀 수 있음)
+  MI_DEFAULT: { '질병': true, '부상': true, '사고': true, '고장': true, '물량조율': false, '노쇼': true } };
+/** 예전에 만든 issues 탭에 '미입차' 머리글이 없으면 맨 끝에 붙인다 */
+function schIssueHeadFix_(sh) {
+  const n = Math.max(sh.getLastColumn(), 1);
+  const head = sh.getRange(1, 1, 1, n).getValues()[0].map(str_);
+  SCH_ISSUE.HEAD.forEach(function (h, i) {
+    if (head.indexOf(h) >= 0) return;
+    if (!head[i]) { sh.getRange(1, i + 1).setValue(h).setFontWeight('bold').setBackground('#f1f3f4'); head[i] = h; }
+  });
+}
 function schIssueSheet_() {
   const book = schSS_();
   let sh = book.getSheetByName(SCH_ISSUE.SHEET);
@@ -5582,10 +5595,10 @@ function schIssues_(from, to) {
   const ix = {}; SCH_ISSUE.HEAD.forEach(function (h) { ix[h] = head.indexOf(h); });
   const g = function (r, h) { const v = ix[h] >= 0 ? r[ix[h]] : ''; return v instanceof Date ? ymd_(v) : str_(v); };
   return vals.slice(1).map(function (r, i) {
-    return { row: i + 2, id: g(r, '이슈ID'), date: g(r, '날짜'), driverId: g(r, '기사ID'), name: g(r, '이름'), kind: g(r, '구분'), reason: g(r, '사유'), action: g(r, '조치'), by: g(r, '작성자'), at: g(r, '작성일시') };
+    return { row: i + 2, id: g(r, '이슈ID'), date: g(r, '날짜'), driverId: g(r, '기사ID'), name: g(r, '이름'), kind: g(r, '구분'), reason: g(r, '사유'), action: g(r, '조치'), by: g(r, '작성자'), at: g(r, '작성일시'), mi: /^(Y|O|TRUE|1|미입차)$/i.test(g(r, '미입차')) };
   }).filter(function (x) { return x.date && (x.driverId || x.name) && (!from || x.date >= from) && (!to || x.date <= to); });
 }
-/** 이슈 저장. o = { id(있으면 고침), date, driverId, kind, reason, action } */
+/** 이슈 저장. o = { id(있으면 고침), date, driverId, kind, reason, action, mi(미입차 여부 · 없으면 예전 값 유지) } */
 function adm_schIssueSave(token, o) {
   return run_(function () {
     const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
@@ -5600,15 +5613,90 @@ function adm_schIssueSave(token, o) {
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
+      schIssueHeadFix_(sh);
       const list = schIssues_();
       const hit = o.id ? list.filter(function (x) { return x.id === str_(o.id); })[0] : null;
-      const row = [hit ? hit.id : 'I' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10), date, drv.id, drv.name, kind, reason, action,
-        hit ? hit.by : a.name, hit ? hit.at : nowText_()].map(safeText_);
-      if (hit) sh.getRange(hit.row, 1, 1, row.length).setNumberFormat('@').setValues([row]);
-      else sh.getRange(sh.getLastRow() + 1, 1, 1, row.length).setNumberFormat('@').setValues([row]);
-      logAdmin_(a, hit ? '스케줄 이슈 수정' : '스케줄 이슈 기록', drv.name + ' ' + date, kind + ' · ' + reason);
-      return { ok: true, issue: { id: row[0], date: date, driverId: drv.id, name: drv.name, kind: kind, reason: reason, action: action, by: row[7], at: row[8] } };
+      if (o.id && !hit) fail_('이미 지워진 이슈입니다. 새로고침해 주세요.');
+      const mi = o.mi === undefined || o.mi === null ? !!(hit && hit.mi) : !!o.mi;
+      const vals = {
+        '이슈ID': hit ? hit.id : 'I' + Utilities.formatDate(new Date(), CFG.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10),
+        '날짜': date, '기사ID': drv.id, '이름': drv.name, '구분': kind, '사유': reason, '조치': action,
+        '작성자': hit ? hit.by : a.name, '작성일시': hit ? hit.at : nowText_(), '미입차': mi ? 'Y' : ''
+      };
+      // 머리글 순서대로 (사람이 탭의 열 순서를 바꿨어도 맞는 칸에)
+      const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(str_);
+      const row = head.map(function (h) { return vals.hasOwnProperty(h) ? safeText_(vals[h]) : null; });
+      const at = hit ? hit.row : sh.getLastRow() + 1;
+      if (hit) {
+        const cur = sh.getRange(at, 1, 1, head.length).getValues()[0];
+        row.forEach(function (v, i) { if (v === null) row[i] = cur[i]; });
+      } else row.forEach(function (v, i) { if (v === null) row[i] = ''; });
+      sh.getRange(at, 1, 1, row.length).setNumberFormat('@').setValues([row]);
+      logAdmin_(a, hit ? '스케줄 이슈 수정' : '스케줄 이슈 기록', drv.name + ' ' + date, kind + ' · ' + reason + (mi ? ' · 미입차' : ''));
+      return { ok: true, issue: { id: vals['이슈ID'], date: date, driverId: drv.id, name: drv.name, kind: kind, reason: reason, action: action, by: vals['작성자'], at: vals['작성일시'], mi: mi } };
     } finally { lock.releaseLock(); }
+  });
+}
+/**
+ * 이슈 관리 목록. f = { from, to } (없으면 이번 달)
+ * 기사별 캠프·그날 스케줄 칸 글자를 같이 준다 (미입차 체크와 스케줄이 맞는지 보려고)
+ */
+function adm_issueList(token, f) {
+  return run_(function () {
+    requireAdmin_(token);
+    f = f || {};
+    const now = new Date();
+    const from = parseYmd_(f.from) ? ymd_(parseYmd_(f.from)) : ymd_(new Date(now.getFullYear(), now.getMonth(), 1));
+    const to = parseYmd_(f.to) ? ymd_(parseYmd_(f.to)) : ymd_(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    if (from > to) fail_('기간을 확인해 주세요.');
+    const list = schIssues_(from, to).filter(function (x) { return x.kind !== '지시'; }).map(function (x) { delete x.row; return x; });
+    // 그날 스케줄 칸
+    const cell = {};
+    try {
+      const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+      const ds = Object.keys(h.dates).filter(function (d) { return d >= from && d <= to; });
+      if (last >= 2 && ds.length && list.length) {
+        const cols = ds.map(function (d) { return h.dates[d]; });
+        const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+        const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); });
+        const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+        const rowOf = {}; ids.forEach(function (id, i) { if (rowOf[id] === undefined) rowOf[id] = i; });
+        list.forEach(function (x) {
+          const i = rowOf[x.driverId], c = h.dates[x.date];
+          if (i !== undefined && c !== undefined) cell[x.id] = str_(block[i][c - c0]);
+        });
+      }
+    } catch (e) { /* 스케줄 DB 가 없으면 칸 글자 없이 */ }
+    const drv = {};
+    readAll_(SH.DRIVERS).forEach(function (d) { if (d.id) drv[d.id] = d; });
+    list.forEach(function (x) {
+      const d = drv[x.driverId] || {};
+      x.cell = cell[x.id] || '';
+      x.camp = d.schCamp || '';
+      x.type = d.driverType || '';
+      if (d.name) x.name = d.name;
+    });
+    list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.at < b.at ? 1 : -1); });
+    const drivers = readAll_(SH.DRIVERS).filter(function (d) { return d.id && d.name && d.status === ST.ACTIVE; })
+      .map(function (d) { return { id: d.id, name: d.name, camp: d.schCamp || '', type: d.driverType || '' }; });
+    return { ok: true, from: from, to: to, issues: list, codes: SCH_ISSUE.CODES, miDefault: SCH_ISSUE.MI_DEFAULT, drivers: drivers };
+  });
+}
+/** 이슈 등록 창: 그 기사·날짜의 스케줄 칸 글자 (미입차 처음 값 정할 때) */
+function adm_issueCell(token, driverId, date) {
+  return run_(function () {
+    requireAdmin_(token);
+    const d = parseYmd_(date);
+    if (!d) return { ok: true, cell: '' };
+    try {
+      const h = schHeader_(), c = h.dates[ymd_(d)];
+      if (c === undefined) return { ok: true, cell: '' };
+      const sh = schSheet_(), last = sh.getLastRow();
+      if (last < 2) return { ok: true, cell: '' };
+      const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); });
+      const i = ids.indexOf(str_(driverId));
+      return { ok: true, cell: i < 0 ? '' : str_(sh.getRange(i + 2, c + 1).getValue()) };
+    } catch (e) { return { ok: true, cell: '' }; }
   });
 }
 function adm_schIssueDel(token, id) {

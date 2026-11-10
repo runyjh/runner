@@ -1055,6 +1055,29 @@
   .sed .sinst textarea:focus { border-color: var(--brand); }
   /* 지시사항 있는 칸: 오른쪽 위 주황 삼각 */
   .sg td.c.inst { position: relative; }
+  .sg td.c.iss { background-image: linear-gradient(135deg, #e5484d 0 6px, transparent 6px); } /* 이슈(이슈 관리) 있는 칸: 왼쪽 위 빨간 삼각 */
+  /* 이슈 관리 */
+  .is-mionly, .is-mi { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .is-mi input, .is-mionly input { width: 16px; height: 16px; accent-color: #e5484d; }
+  .is-codes { flex-wrap: wrap; }
+  #isQuick button { white-space: nowrap; padding: 0 10px; }
+  .is-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .is-sum .isd { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 8px 12px; min-width: 150px; cursor: pointer; text-align: left; font: inherit; }
+  .is-sum .isd:hover { border-color: var(--brand); }
+  .is-sum .isd.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-weak, rgba(49,130,246,.18)); }
+  .is-sum .isd b { font-size: 14px; } .is-sum .isd small { color: var(--sub); margin-left: 4px; }
+  .is-sum .isd .k { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .ikc { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: #eef1f4; color: #4e5968; white-space: nowrap; }
+  .ikc.k-질병 { background: #fdeaf3; color: #b4236c; } .ikc.k-부상 { background: #fff0e6; color: #c2410c; } .ikc.k-사고 { background: #fde8e8; color: #c81e1e; }
+  .ikc.k-고장 { background: #eef2ff; color: #4338ca; } .ikc.k-물량조율 { background: #e7f6ee; color: #0b6b3a; } .ikc.k-노쇼 { background: #2b2f36; color: #fff; }
+  .ikc.mi { background: #e5484d; color: #fff; }
+  .is-tb td { vertical-align: middle; }
+  .is-tb td.rs { max-width: 260px; white-space: pre-wrap; word-break: break-all; font-size: 13px; }
+  .is-tb td.cl { font-size: 12.5px; color: var(--sub); white-space: nowrap; }
+  .is-tb td.cl.warn { color: #c2410c; font-weight: 700; }
+  .is-tb .mick { display: inline-flex; align-items: center; justify-content: center; min-width: 54px; height: 26px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12px; font-weight: 800; color: var(--sub); cursor: pointer; }
+  .is-tb .mick.on { background: #e5484d; border-color: #e5484d; color: #fff; }
+  .is-tb tr.mi td:first-child { box-shadow: inset 3px 0 0 #e5484d; }
   .sg td.c.inst::after { content: ''; position: absolute; top: 0; right: 0; border-top: 9px solid #f59e0b; border-left: 9px solid transparent; }
   .offbtns { display: flex; gap: 4px; margin-bottom: 6px; }
   .offbtns button { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 700; color: var(--sub); }
@@ -1159,6 +1182,7 @@
         <a data-view="drivers">기사 정보관리</a>
         <a data-view="sched">기사스케줄</a>
         <a data-view="pumasi">품앗이 관리</a>
+        <a data-view="issue">이슈 관리</a>
         <a data-view="bib">배번호 관리</a>
       </div>
       <div class="ng g-ops"><p class="ngt">운영</p>
@@ -1364,6 +1388,29 @@
         <tbody id="paRows"></tbody>
       </table>
       <div class="empty hidden" id="paEmpty"></div>
+    </div>
+   </section>
+   <section id="view-issue" class="hidden">
+    <div class="head">
+      <h2>이슈 관리 <small id="isCount" style="font-size:13px;color:var(--sub);font-weight:600"></small><i class="live-dot" title="실시간 갱신"></i></h2>
+      <div class="tools">
+        <input class="inp" type="date" id="isFrom" title="기간 시작"><input class="inp" type="date" id="isTo" title="기간 끝">
+        <div class="seg" id="isQuick"><button type="button" data-q="this">이번 달</button><button type="button" data-q="prev">지난달</button><button type="button" data-q="3m">최근 3개월</button></div>
+        <input class="inp search" id="isQ" placeholder="기사·캠프·사유 검색" style="width:200px">
+        <label class="is-mionly"><input type="checkbox" id="isMiOnly"> 미입차만</label>
+        <button class="btn ghost" id="isReload">새로고침</button>
+        <button class="btn" id="isAdd">+ 이슈 등록</button>
+      </div>
+    </div>
+    <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사별 이슈를 <b>이슈 항목 코드</b>로 기록하고, 그 이슈 때문에 <b>미입차</b>했는지 체크합니다. 표의 미입차 칸을 누르면 바로 바뀝니다. 기사스케줄에서는 이슈가 있는 칸 왼쪽 위에 빨간 표시가 붙습니다. 데이터는 스케줄 DB 의 <b>issues</b> 탭.</p>
+    <div class="tabs" id="isCodes"></div>
+    <div class="is-sum" id="isSum"></div>
+    <div class="table-wrap">
+      <table class="is-tb">
+        <thead><tr><th>날짜</th><th>기사</th><th>캠프</th><th>이슈 코드</th><th title="이 이슈 때문에 미입차했는지">미입차</th><th>그날 스케줄</th><th>사유</th><th>조치</th><th>작성</th><th></th></tr></thead>
+        <tbody id="isRows"></tbody>
+      </table>
+      <div class="empty hidden" id="isEmpty"></div>
     </div>
    </section>
    <section id="view-memo" class="hidden">
@@ -1723,6 +1770,22 @@
 
 <!-- ───────────── 공지 작성·수정 ───────────── -->
 <!-- ───────────── 기사스케줄 → 사무실 품앗이 등록 ───────────── -->
+<div class="modal hidden" id="isModal">
+  <div class="m-box" style="width:min(560px,100%);max-height:92vh;overflow:auto">
+    <h3 style="margin:0 0 12px" id="isMTitle">이슈 등록</h3>
+    <div class="grid2">
+      <div class="field"><label class="lb" for="isMDrv">기사</label><select class="inp" id="isMDrv"></select></div>
+      <div class="field"><label class="lb" for="isMDate">날짜</label><input class="inp" type="date" id="isMDate"></div>
+    </div>
+    <div class="field"><span class="lb">이슈 항목 코드</span><div class="seg is-codes" id="isMKind"></div></div>
+    <div class="field"><label class="is-mi"><input type="checkbox" id="isMMi"> <b>미입차</b> <span class="sub">이 이슈 때문에 그날 입차하지 못함</span></label>
+      <div class="db-note" id="isMCell" style="margin-top:6px"></div></div>
+    <div class="field"><label class="lb" for="isMReason">사유</label><textarea class="inp" id="isMReason" style="height:64px" maxlength="200" placeholder="예: 허리 부상으로 병원 진료"></textarea></div>
+    <div class="field"><label class="lb" for="isMAction">조치</label><textarea class="inp" id="isMAction" style="height:52px" maxlength="200" placeholder="예: 백업 기사 투입 · 품앗이 요청"></textarea></div>
+    <div class="m-actions"><button type="button" class="btn ghost danger-t hidden" id="isMDel" style="margin-right:auto">삭제</button><button type="button" class="btn ghost" id="isMCancel">취소</button><button type="button" class="btn" id="isMGo">저장</button></div>
+  </div>
+</div>
+
 <div class="modal hidden" id="pmcModal">
   <div class="m-box" style="width:min(640px,100%);max-height:92vh;overflow:auto">
     <h3 style="margin:0 0 4px">🤝 품앗이 일감 등록 <small class="sub" style="font-weight:600;font-size:12.5px">사무실 등록</small></h3>
@@ -2246,6 +2309,7 @@
       LIVE.schAt = schAt;
       const mine = m.schBy && me && m.schBy === me.loginId && Date.now() - schAt < 20000; // 내가 방금 저장한 것은 다시 받지 않음
       if (!mine) liveLater('sched', liveSched, 1500);
+      if (!mine) liveLater('issue', liveIssue, 1500);
     }
     if (pmAt > LIVE.pmAt) { LIVE.pmAt = pmAt; liveLater('pumasi', livePumasi, 1500); }
     if (dirtyAt > LIVE.dirtyAt) { LIVE.dirtyAt = dirtyAt; liveLater('dash', liveDash, 3000); }
@@ -2270,6 +2334,11 @@
       window.scrollTo(0, y); if (wrap) wrap.scrollLeft = x;
       if (n) toast('기사스케줄이 바뀌었습니다 (' + n + '칸 · 노란 칸)');
     }).catch(() => {});
+  }
+  function liveIssue() {
+    if (currentView !== 'issue') return;
+    if (document.hidden || $$('.modal').some((m) => !m.classList.contains('hidden'))) return liveLater('issue', liveIssue, 3000);
+    loadIssue();
   }
   function livePumasi() {
     if (currentView !== 'pumasi') return;
@@ -3292,6 +3361,8 @@
     $('#view-sched').classList.toggle('hidden', v !== 'sched');
     $('#view-pumasi').classList.toggle('hidden', v !== 'pumasi');
     if (v === 'pumasi') loadPumasi();
+    $('#view-issue').classList.toggle('hidden', v !== 'issue');
+    if (v === 'issue') loadIssue();
     $('#view-settle').classList.toggle('hidden', v !== 'settle');
     if (v === 'settle') loadSettle();
     if (v === 'sched') loadSched();
@@ -3629,6 +3700,175 @@
   const paKind = { '주간': '주간 ☀️', '야간': '야간 🌙', '일택': '일택 📦' };
   const paBadge = (st) => '<span class="badge p-' + esc(String(st).replace(/\s/g, '')) + '">' + esc(st) + '</span>';
   const paDay = (d) => { const p = String(d || '').split('-'); if (p.length !== 3) return esc(d || ''); return +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
+  // ───── 이슈 관리: 기사별 이슈(이슈 항목 코드) · 미입차 체크 (스케줄 DB issues 탭) ─────
+  const IS = { list: [], codes: ['질병', '부상', '사고', '고장', '물량조율', '노쇼'], miDef: {}, drivers: [], code: '전체', drv: '', seq: 0, cur: null, miTouched: false, cellSeq: 0 };
+  const isYmd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const isMd = (s) => s ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8)) + ' (' + '일월화수목금토'[new Date(s + 'T00:00:00').getDay()] + ')' : '';
+  const isKc = (k) => '<span class="ikc k-' + esc(k) + '">' + esc(k) + '</span>';
+  /** 그날 스케줄이 '출근'인데 미입차로 체크했으면 경고 (휴무·미입차 칸이면 정상) */
+  const isCellWarn = (x) => x.mi && x.cell && !/미입차|휴무|휴가|병가|결근/.test(x.cell);
+  function isQuick(q) {
+    const t = new Date();
+    let a, b;
+    if (q === 'prev') { a = new Date(t.getFullYear(), t.getMonth() - 1, 1); b = new Date(t.getFullYear(), t.getMonth(), 0); }
+    else if (q === '3m') { a = new Date(t.getFullYear(), t.getMonth() - 2, 1); b = new Date(t.getFullYear(), t.getMonth() + 1, 0); }
+    else { a = new Date(t.getFullYear(), t.getMonth(), 1); b = new Date(t.getFullYear(), t.getMonth() + 1, 0); }
+    $('#isFrom').value = isYmd(a); $('#isTo').value = isYmd(b);
+    $$('#isQuick button').forEach((x) => x.classList.toggle('on', x.dataset.q === q));
+  }
+  function loadIssue() {
+    if (!$('#isFrom').value || !$('#isTo').value) isQuick('this');
+    if (!IS.list.length) $('#isRows').innerHTML = '<tr><td colspan="10" class="sub">불러오는 중…</td></tr>';
+    const seq = ++IS.seq;
+    api('adm_issueList', { from: $('#isFrom').value, to: $('#isTo').value }).then((r) => {
+      if (seq !== IS.seq) return;
+      if (!r.ok) return toast(r.msg);
+      IS.list = r.issues || []; IS.codes = r.codes || IS.codes; IS.miDef = r.miDefault || {};
+      IS.drivers = (r.drivers || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko'));
+      renderIssue();
+    }).catch(() => {});
+  }
+  function isFiltered(skipCode) {
+    const q = $('#isQ').value.trim().toLowerCase(), mo = $('#isMiOnly').checked;
+    return IS.list.filter((x) => (skipCode || IS.code === '전체' || x.kind === IS.code) && (!mo || x.mi) && (!IS.drv || x.driverId === IS.drv) &&
+      (!q || [x.name, x.camp, x.reason, x.action, x.kind, x.cell].join(' ').toLowerCase().includes(q)));
+  }
+  function renderIssue() {
+    // 코드 탭 (그 밖의 예전 구분도 있으면 뒤에)
+    const base = isFiltered(true);
+    const extra = Array.from(new Set(base.map((x) => x.kind).filter((k) => k && !IS.codes.includes(k))));
+    const tabs = ['전체'].concat(IS.codes, extra);
+    $('#isCodes').innerHTML = tabs.map((k) => {
+      const n = k === '전체' ? base.length : base.filter((x) => x.kind === k).length;
+      const m = (k === '전체' ? base : base.filter((x) => x.kind === k)).filter((x) => x.mi).length;
+      return '<button class="tab' + (IS.code === k ? ' on' : '') + '" data-ik="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b>' + (m ? ' <span class="ikc mi" title="미입차">' + m + '</span>' : '') + '</button>';
+    }).join('');
+    // 기사별 요약 (기사 필터는 빼고 계산 · 누르면 그 기사만)
+    const drvBase = IS.list.filter((x) => (IS.code === '전체' || x.kind === IS.code) && (!$('#isMiOnly').checked || x.mi));
+    const by = new Map();
+    drvBase.forEach((x) => { const g = by.get(x.driverId) || { id: x.driverId, name: x.name, camp: x.camp, n: 0, mi: 0, k: {} }; g.n++; if (x.mi) g.mi++; g.k[x.kind] = (g.k[x.kind] || 0) + 1; by.set(x.driverId, g); });
+    const sums = Array.from(by.values()).sort((a, b) => b.n - a.n || b.mi - a.mi || String(a.name).localeCompare(String(b.name), 'ko'));
+    $('#isSum').innerHTML = sums.map((g) => '<button type="button" class="isd' + (IS.drv === g.id ? ' on' : '') + '" data-idrv="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><small>' + esc(g.camp ? shortCampSafe(g.camp) : '') + ' · ' + g.n + '건' + (g.mi ? ' · 미입차 ' + g.mi : '') + '</small><div class="k">' +
+      Object.keys(g.k).sort((a, b) => g.k[b] - g.k[a]).map((k) => '<span class="ikc k-' + esc(k) + '">' + esc(k) + ' ' + g.k[k] + '</span>').join('') + '</div></button>').join('') +
+      (IS.drv ? '<button type="button" class="btn sm ghost" data-idrv="" style="align-self:center">기사 선택 풀기</button>' : '');
+    const list = isFiltered(false);
+    const miN = list.filter((x) => x.mi).length;
+    $('#isCount').textContent = list.length + '건' + (miN ? ' · 미입차 ' + miN : '');
+    $('#isRows').innerHTML = list.map((x) => '<tr data-iid="' + esc(x.id) + '"' + (x.mi ? ' class="mi"' : '') + '>' +
+      '<td style="white-space:nowrap">' + esc(isMd(x.date)) + '</td>' +
+      '<td style="white-space:nowrap"><b>' + esc(x.name) + '</b></td>' +
+      '<td class="cl">' + esc(x.camp ? shortCampSafe(x.camp) : '') + '</td>' +
+      '<td>' + isKc(x.kind) + '</td>' +
+      '<td><button type="button" class="mick' + (x.mi ? ' on' : '') + '" data-mi="' + esc(x.id) + '" title="눌러서 미입차 체크/해제">' + (x.mi ? '미입차' : '입차') + '</button></td>' +
+      '<td class="cl' + (isCellWarn(x) ? ' warn' : '') + '"' + (isCellWarn(x) ? ' title="미입차로 체크했지만 기사스케줄 칸은 출근으로 되어 있습니다"' : '') + '>' + (isCellWarn(x) ? '⚠ ' : '') + esc(x.cell || '—') + '</td>' +
+      '<td class="rs">' + esc(x.reason) + '</td><td class="rs">' + esc(x.action) + '</td>' +
+      '<td class="cl" title="' + esc(x.at) + '">' + esc(x.by) + '</td>' +
+      '<td><button type="button" class="btn sm ghost" data-iedit="' + esc(x.id) + '">수정</button></td></tr>').join('');
+    $('#isEmpty').textContent = IS.list.length ? '조건에 맞는 이슈가 없습니다.' : '이 기간에 기록된 이슈가 없습니다. 오른쪽 위 + 이슈 등록으로 기록하세요.';
+    $('#isEmpty').classList.toggle('hidden', list.length > 0);
+  }
+  function shortCampSafe(c) { try { return shortCamp(c); } catch (e) { return String(c || '').replace(/\s*캠프\s*$/, ''); } }
+  $('#isCodes').addEventListener('click', (e) => { const b = e.target.closest('[data-ik]'); if (!b) return; IS.code = b.dataset.ik; renderIssue(); });
+  $('#isSum').addEventListener('click', (e) => { const b = e.target.closest('[data-idrv]'); if (!b) return; IS.drv = IS.drv === b.dataset.idrv ? '' : b.dataset.idrv; renderIssue(); });
+  $('#isQuick').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; isQuick(b.dataset.q); loadIssue(); });
+  $('#isFrom').addEventListener('change', () => { $$('#isQuick button').forEach((x) => x.classList.remove('on')); loadIssue(); });
+  $('#isTo').addEventListener('change', () => { $$('#isQuick button').forEach((x) => x.classList.remove('on')); loadIssue(); });
+  $('#isQ').addEventListener('input', (e) => { if (!e.isComposing) renderIssue(); });
+  $('#isQ').addEventListener('compositionend', renderIssue);
+  $('#isMiOnly').addEventListener('change', renderIssue);
+  $('#isReload').addEventListener('click', loadIssue);
+  $('#isRows').addEventListener('click', (e) => {
+    const m = e.target.closest('[data-mi]');
+    if (m) {
+      const x = IS.list.find((i) => i.id === m.dataset.mi); if (!x) return;
+      const want = !x.mi; x.mi = want; renderIssue();
+      api('adm_schIssueSave', { id: x.id, date: x.date, driverId: x.driverId, kind: x.kind, reason: x.reason, action: x.action, mi: want }).then((r) => {
+        if (!r.ok) { x.mi = !want; renderIssue(); return toast(r.msg); }
+        isSyncSched(r.issue); toast(x.name + ' ' + isMd(x.date) + (want ? ' 미입차로 체크했습니다.' : ' 미입차 체크를 풀었습니다.'));
+      }).catch(() => { x.mi = !want; renderIssue(); });
+      return;
+    }
+    const ed = e.target.closest('[data-iedit]');
+    if (ed) isOpen(IS.list.find((i) => i.id === ed.dataset.iedit));
+  });
+  /** 기사스케줄 화면의 이슈 목록도 같이 고친다 (칸의 빨간 표시) */
+  function isSyncSched(iss, delId) {
+    if (typeof SD === 'undefined' || !SD || !SD.issues) return;
+    SD.issues = SD.issues.filter((x) => x.id !== (delId || (iss && iss.id)));
+    if (iss) SD.issues.push(iss);
+  }
+  // ── 등록 · 수정 창 ──
+  function isKindsFor(cur) { const l = IS.codes.slice(); if (cur && !l.includes(cur)) l.push(cur); return l; }
+  function isPaintKind(k) { $$('#isMKind button').forEach((b) => b.classList.toggle('on', b.dataset.k === k)); }
+  function isOpen(x) {
+    IS.cur = x || null; IS.miTouched = !!x;
+    const done = () => {
+      $('#isMTitle').textContent = x ? '이슈 수정' : '이슈 등록';
+      $('#isMDrv').innerHTML = '<option value="">기사 선택</option>' + IS.drivers.map((d) => '<option value="' + esc(d.id) + '">' + esc(d.name) + (d.camp ? ' · ' + esc(shortCampSafe(d.camp)) : '') + '</option>').join('') +
+        (x && !IS.drivers.some((d) => d.id === x.driverId) ? '<option value="' + esc(x.driverId) + '">' + esc(x.name) + '</option>' : '');
+      $('#isMDrv').value = x ? x.driverId : (IS.drv || '');
+      $('#isMDate').value = x ? x.date : isYmd(new Date());
+      const k0 = x ? x.kind : '';
+      $('#isMKind').innerHTML = isKindsFor(k0).map((k) => '<button type="button" data-k="' + esc(k) + '">' + esc(k) + '</button>').join('');
+      isPaintKind(k0);
+      $('#isMMi').checked = x ? !!x.mi : false;
+      $('#isMReason').value = x ? x.reason : ''; $('#isMAction').value = x ? x.action : '';
+      $('#isMDel').classList.toggle('hidden', !x);
+      $('#isMCell').textContent = '';
+      $('#isModal').classList.remove('hidden');
+      isLoadCell();
+      setTimeout(() => (x ? $('#isMReason') : $('#isMDrv')).focus(), 30);
+    };
+    if (!IS.drivers.length) api('adm_issueList', { from: isYmd(new Date()), to: isYmd(new Date()) }).then((r) => { if (r.ok) { IS.codes = r.codes || IS.codes; IS.miDef = r.miDefault || {}; IS.drivers = (r.drivers || []).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko')); } done(); }).catch(done);
+    else done();
+  }
+  /** 고른 기사·날짜의 스케줄 칸을 보여 주고, 칸이 '미입차'면 미입차를 켠다 */
+  function isLoadCell() {
+    const id = $('#isMDrv').value, dt = $('#isMDate').value;
+    if (!id || !dt) { $('#isMCell').textContent = ''; return; }
+    const seq = ++IS.cellSeq;
+    $('#isMCell').textContent = '그날 기사스케줄 확인 중…';
+    api('adm_issueCell', id, dt).then((r) => {
+      if (seq !== IS.cellSeq) return;
+      const c = (r && r.cell) || '';
+      $('#isMCell').textContent = '그날 기사스케줄: ' + (c || '(빈 칸)') + (/미입차/.test(c) ? ' → 미입차로 체크했습니다' : '');
+      if (/미입차/.test(c) && !IS.miTouched) $('#isMMi').checked = true;
+    }).catch(() => { if (seq === IS.cellSeq) $('#isMCell').textContent = ''; });
+  }
+  $('#isAdd').addEventListener('click', () => isOpen(null));
+  $('#isMDrv').addEventListener('change', isLoadCell);
+  $('#isMDate').addEventListener('change', isLoadCell);
+  $('#isMMi').addEventListener('change', () => { IS.miTouched = true; });
+  $('#isMKind').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-k]'); if (!b) return;
+    isPaintKind(b.dataset.k);
+    if (!IS.miTouched && IS.miDef[b.dataset.k] !== undefined) $('#isMMi').checked = !!IS.miDef[b.dataset.k] || /미입차/.test($('#isMCell').textContent);
+  });
+  const isClose = () => $('#isModal').classList.add('hidden');
+  $('#isMCancel').addEventListener('click', isClose);
+  $('#isModal').addEventListener('click', (e) => { if (e.target.id === 'isModal') isClose(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#isModal').classList.contains('hidden')) isClose(); });
+  $('#isMGo').addEventListener('click', () => {
+    const on = $('#isMKind button.on');
+    const o = { id: IS.cur ? IS.cur.id : '', driverId: $('#isMDrv').value, date: $('#isMDate').value, kind: on ? on.dataset.k : '', mi: $('#isMMi').checked,
+      reason: $('#isMReason').value.trim(), action: $('#isMAction').value.trim() };
+    if (!o.driverId) return toast('기사를 고르세요.');
+    if (!o.date) return toast('날짜를 고르세요.');
+    if (!o.kind) return toast('이슈 항목 코드를 고르세요.');
+    const b = $('#isMGo'); b.disabled = true; b.textContent = '저장 중…';
+    api('adm_schIssueSave', o).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      isSyncSched(r.issue); isClose(); toast('이슈를 ' + (o.id ? '고쳤습니다.' : '기록했습니다.')); loadIssue();
+    }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
+  });
+  $('#isMDel').addEventListener('click', () => {
+    const x = IS.cur; if (!x) return;
+    if (!confirm(x.name + ' ' + isMd(x.date) + ' ' + x.kind + ' 이슈를 지울까요?')) return;
+    api('adm_schIssueDel', x.id).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      isSyncSched(null, x.id); isClose(); toast('이슈를 지웠습니다.'); IS.list = IS.list.filter((i) => i.id !== x.id); renderIssue();
+    }).catch(() => {});
+  });
   function paDefaultRange() {
     const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 14), b = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30);
     const f = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -7002,12 +7242,14 @@
     if (sepCol(ci)) cls.push('wk2');
     const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
     if (ins) cls.push('inst');
+    const iss = r.kind === 'd' ? issOf(r.row, dt) : [];
+    if (iss.length) cls.push('iss');
     const pm = r.kind === 'd' ? pmMark(r.row, dt) : '';
     if (pm) cls.push('pmk');
     const nov = noAssign(r, dt, v);
     const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
     if (mis) cls.push('mis'); else if (nov) cls.push('nov');
-    const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
+    const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
     return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="품' + esc(pm) + '"' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(v) + '</td>';
   }
   /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
@@ -7080,6 +7322,9 @@
     document.addEventListener('scroll', hide, true);
   })();
   /** 칸의 지시사항 (스케줄 이슈 중 구분 '지시') */
+  /** 이슈 관리의 이슈 (지시 제외) */
+  function issOf(row, dt) { return (SD.issues || []).filter((x) => x.driverId === row && x.date === dt && x.kind !== '지시'); }
+  function issTip(list) { return list.map((x) => '🚩 ' + x.kind + (x.mi ? ' · 미입차' : '') + (x.reason ? ' · ' + x.reason : '')).join('\n'); }
   function instOf(row, dt) { return (SD.issues || []).find((x) => x.driverId === row && x.date === dt && x.kind === '지시') || null; }
   function renderCalc() {
     const dates = SD.dates, campOk = (short) => !sf.camp || shortCamp((SD.camps.find((c) => c.id === sf.camp) || {}).name) === short;
@@ -7106,13 +7351,13 @@
       const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
       if (!r || (r.seg && !segIn(r.seg, dt))) return;
       const v = sget(r.row, dt), k = r.row + '|' + dt;
-      const ins = r.kind === 'd' ? instOf(r.row, dt) : null, pm = r.kind === 'd' ? pmMark(r.row, dt) : '';
+      const ins = r.kind === 'd' ? instOf(r.row, dt) : null, pm = r.kind === 'd' ? pmMark(r.row, dt) : '', iss = r.kind === 'd' ? issOf(r.row, dt) : [];
       const nov = noAssign(r, dt, v), mis = scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
-      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', pm ? 'pmk' : '', mis ? 'mis' : nov ? 'nov' : '']
+      const want = ['c', cellKind(v), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', mis ? 'mis' : nov ? 'nov' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
       if (td.textContent !== v) td.textContent = v;
-      const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
+      const tip = [v.length > 14 ? v : '', ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
       if (tip) td.title = tip; else td.removeAttribute('title');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
