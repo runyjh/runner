@@ -2389,6 +2389,16 @@
     set(v, persist) { memToken = v; try { (persist ? localStorage : sessionStorage).setItem(TOKEN, v); } catch (e) {} },
     del() { memToken = null; try { localStorage.removeItem(TOKEN); sessionStorage.removeItem(TOKEN); } catch (e) {} }
   };
+  // ───── 빠른 첫 화면: 마지막에 받은 내용을 이 창(sessionStorage)에만 보관 → 새로고침·배포 뒤에도 바로 보여 주고 뒤에서 새로 받는다 ─────
+  //  · 로그인 토큰과 같은 수준으로 다룬다: 창을 닫거나 로그아웃·로그인 만료 때 지운다 · 저장 공간이 모자라면 그냥 안 쓴다
+  const ADM_KEEP = 'runner.adm.keep.';
+  const admKeep = {
+    get(k) { try { return JSON.parse(sessionStorage.getItem(ADM_KEEP + k) || 'null'); } catch (e) { return null; } },
+    set(k, v) { try { sessionStorage.setItem(ADM_KEEP + k, JSON.stringify(v)); } catch (e) { try { sessionStorage.removeItem(ADM_KEEP + k); } catch (x) {} } },
+    clear() { try { Object.keys(sessionStorage).forEach((k) => { if (k.indexOf(ADM_KEEP) === 0) sessionStorage.removeItem(k); }); localStorage.removeItem(ADM_KEEP + 'me'); } catch (e) {} },
+    // 로그인한 관리자 이름·아이디 (화면을 먼저 띄울 때 씀 · 자동 로그인이면 이 PC 에, 아니면 이 창에만 — 토큰과 같은 곳)
+    me(v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(ADM_KEEP + 'me') || sessionStorage.getItem(ADM_KEEP + 'me') || 'null'); (localStorage.getItem(TOKEN) ? localStorage : sessionStorage).setItem(ADM_KEEP + 'me', JSON.stringify(v)); } catch (e) { return null; } }
+  };
   let toastTimer;
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3000); }
   // ───── 서버 호출 ─────
@@ -2649,6 +2659,7 @@
     $('#app').classList.add('hidden'); closeDrawer(true); try { liveStop(); } catch (e) {}
     try { closeBib(true); } catch (e) {}
     $$('.modal').forEach((m) => m.classList.add('hidden')); // 로그인 만료 때 열려 있던 창이 로그인 화면 위에 남지 않게
+    admKeep.clear();
     $('#login').classList.remove('hidden'); $('#lgId').focus();
   }
   let me = null;
@@ -2671,6 +2682,7 @@
     call('adm_login', id, pw, auto).then((r) => {
       if (!r.ok) return toast(r.msg);
       store.set(r.token, auto); $('#lgPw').value = '';
+      admKeep.me(r.admin);
       showApp(r.admin);
     }).catch(() => toast('연결이 원활하지 않습니다.')).finally(() => { b.disabled = false; });
   });
@@ -2707,10 +2719,14 @@
   // ───── 목록 ─────
   let all = [], counts = {}, filter = '전체', tfilter = '', wfilter = '', selectedId = '';
   function loadList(keepSel) {
-    $('#rows').innerHTML = '<tr><td colspan="12"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
+    // 이미 받은 목록이 있으면 그대로 두고 뒤에서 새로 받는다 (메뉴를 누를 때마다 빈 화면으로 기다리지 않게) · 처음이면 이 창에 보관해 둔 것부터
+    if (!all.length) { const c = admKeep.get('drv') || (typeof DSB !== 'undefined' && DSB.drv && DSB.drv.length ? { rows: DSB.drv, counts: null } : null); if (c && c.rows && c.rows.length && c.counts) { all = c.rows; counts = c.counts; renderTabs(); renderRows(); } }
+    if (!all.length) $('#rows').innerHTML = '<tr><td colspan="12"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
     return api('adm_listDrivers').then((r) => {
       if (!r.ok) return toast(r.msg);
       all = r.rows; counts = r.counts;
+      admKeep.set('drv', { rows: all, counts: counts });
+      try { if (typeof DSB !== 'undefined') DSB.drv = all; } catch (e) { /* 대시보드 검색용 목록도 같은 것으로 */ }
       if (r.repaired && r.repaired.length) toast('겹친 기사ID를 고쳤습니다: ' + r.repaired.map((m) => m.name + '(' + m.keptName + '와 겹침)').join(', ') + ' · 새 ID를 받았습니다.');
       if (!keepSel && filter === '전체' && counts['승인대기'] > 0) filter = '승인대기';
       renderTabs(); renderRows();
@@ -3633,7 +3649,10 @@
   function dsNeed(k) {
     if (DSB.busy[k]) return DSB.busy[k];
     const done = (p) => (DSB.busy[k] = p.catch(() => {}).finally(() => { DSB.busy[k] = null; if (currentView === 'dash') dsRender(); }));
-    if (k === 'drv' && !DSB.drv) return done(api('adm_listDrivers').then((r) => { if (r.ok) DSB.drv = r.rows || []; }));
+    if (k === 'drv' && !DSB.drv) {
+      if (all.length) { DSB.drv = all; return null; } // 기사 정보관리에서 이미 받은 목록을 같이 쓴다 (같은 목록을 두 번 받지 않음)
+      return done(api('adm_listDrivers').then((r) => { if (r.ok) { DSB.drv = r.rows || []; if (!all.length && r.counts) { all = DSB.drv; counts = r.counts; admKeep.set('drv', { rows: all, counts: counts }); } } }));
+    }
     if (k === 'route' && !RT.camps.length) return done(loadRoutes());
     if (k === 'perf' && !RP.loaded) return done(loadPerf().then(() => loadSla()));
     if (k === 'sched' && !DSB.sched) return done(api('adm_schWeek', ymdLocal(new Date())).then((r) => { if (r.ok) DSB.sched = r; }));
@@ -4647,6 +4666,12 @@
     el.textContent = ''; IS.cellNow = '';
     if (!id || !dt) return isPaintModal();
     const seq = ++IS.cellSeq;
+    // 기사스케줄을 이미 받아 둔 날짜면 화면에 있는 값을 그대로 쓴다 (서버에 묻지 않음 · 저장 안 된 수정도 반영된 값)
+    if (typeof SD !== 'undefined' && SD.dates && SD.dates.includes(dt) && SD.cells) {
+      IS.cellNow = String((SD.cells[id] || {})[dt] || '');
+      el.textContent = '지금 ' + isMd0(dt) + ' 칸: ' + (IS.cellNow || '(빈 칸)');
+      return isPaintModal();
+    }
     api('adm_issueCell', id, dt).then((r) => {
       if (seq !== IS.cellSeq) return;
       IS.cellNow = (r && r.cell) || '';
@@ -4763,7 +4788,7 @@
   }
   function loadPumasi() {
     paDefaultRange();
-    $('#paRows').innerHTML = '<tr><td colspan="14" class="sub">불러오는 중…</td></tr>';
+    if (!PA.jobs.length) $('#paRows').innerHTML = '<tr><td colspan="14" class="sub">불러오는 중…</td></tr>'; // 받은 목록이 있으면 그대로 두고 뒤에서 갱신
     const seq = PA.seq = (PA.seq || 0) + 1; // 늦게 온 예전 응답이 새 결과를 덮지 않게
     api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
       if (seq !== PA.seq) return;
@@ -5487,7 +5512,7 @@
   let bapps = [], bcounts = {}, bdrivers = [], bfilter = '전체', bcur = null, bdirty = {};
 
   function loadBib() {
-    $('#brows').innerHTML = '<tr><td colspan="8"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
+    if (!bapps.length) $('#brows').innerHTML = '<tr><td colspan="8"><div style="padding:24px"><div class="spin"></div></div></td></tr>'; // 받은 목록이 있으면 그대로 두고 뒤에서 갱신
     return api('adm_bibList').then((r) => {
       if (!r.ok) return toast(r.msg);
       bapps = r.apps; bcounts = r.counts; bdrivers = r.drivers;
@@ -7974,9 +7999,7 @@
     if (!SD.dates.length) $('#sWrap').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     paintModeUi();
     const seq = ++sLoadSeq; // ◀▶ 를 빠르게 누르거나 2주↔한 달을 바꾼 뒤 늦게 온 이전 응답은 버린다
-    return fetchSched(start).then((r) => {
-      if (seq !== sLoadSeq) return;
-      if (!r.ok) return toast(r.msg);
+    const apply = (r) => {
       Object.assign(SD, r);
       Object.keys(sBase).forEach((k) => delete sBase[k]);
       Object.keys(SD.cells).forEach((row) => Object.keys(SD.cells[row]).forEach((d) => { sBase[row + '|' + d] = SD.cells[row][d]; }));
@@ -7986,6 +8009,18 @@
       $('#sDate').value = sMode === 'month' ? SD.dates[0] : SD.start;
       if (sMode === 'month' && !sMonth) sMonth = monthOf(SD.dates[0]);
       paintModeUi(); renderSchedCamps(); renderSched();
+    };
+    // 처음 여는 것이면(새로고침·배포 뒤) 이 창에 보관해 둔 같은 기간 자료를 먼저 그린다 → 서버 응답(평균 7초)을 기다리지 않고 바로 보임.
+    //  곧 새 자료로 다시 그리고, 그 사이 고친 칸은 저장 때 서버가 이전 값과 대조한다 (다른 곳에서 바뀌었으면 저장하지 않고 알림)
+    if (!SD.dates.length && !start) {
+      const c = admKeep.get('sched'), tdy = ymdLocal(new Date());
+      if (c && c.r && c.mode === sMode && Array.isArray(c.r.dates) && (sMode === 'month' ? c.month === (sMonth || monthOf(tdy)) : c.r.dates.includes(tdy))) { try { if (sMode === 'month' && !sMonth) sMonth = c.month; apply(c.r); } catch (e) { SD.dates = []; } }
+    }
+    return fetchSched(start).then((r) => {
+      if (seq !== sLoadSeq) return;
+      if (!r.ok) return toast(r.msg);
+      apply(r);
+      admKeep.set('sched', { mode: sMode, month: sMode === 'month' ? sMonth : '', r: r });
     }).catch(() => {});
   }
   function renderSchedCamps() {
@@ -12315,7 +12350,7 @@
   const tiFmtNo = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.length === 10 ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : String(v || ''); };
   function loadTax() {
     if (!$('#tiMonth').value) { const t = new Date(); t.setDate(1); t.setMonth(t.getMonth() - 1); $('#tiMonth').value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2); }
-    $('#tiRows').innerHTML = '<tr><td colspan="12" class="sub">불러오는 중…</td></tr>';
+    if (!TX.list.length) $('#tiRows').innerHTML = '<tr><td colspan="12" class="sub">불러오는 중…</td></tr>'; // 받은 목록이 있으면 그대로 두고 뒤에서 갱신
     return api('adm_tiList').then((r) => {
       if (!r.ok) return toast(r.msg);
       TX.list = r.list; TX.sups = r.suppliers; TX.buyer = r.buyer;
@@ -12615,8 +12650,14 @@
   (function boot() {
     const t = store.get();
     if (!t) return showLogin();
-    call('adm_check', t).then((r) => { if (r.ok) showApp(r.admin); else { store.del(); showLogin(); } })
-      .catch(() => { showLogin(); toast('연결이 원활하지 않습니다.'); });
+    // 지난번 로그인한 관리자 정보가 있으면 화면을 먼저 띄우고, 로그인 확인은 동시에 한다 (확인이 끝나길 3~4초 기다리지 않음).
+    // 로그인이 만료됐으면 화면 자료를 부르는 쪽(api)과 아래 확인이 로그인 화면으로 돌려보낸다.
+    const kept = admKeep.me();
+    if (kept && kept.name) showApp(kept);
+    call('adm_check', t).then((r) => {
+      if (r.ok) { admKeep.me(r.admin); if (!kept || !kept.name) showApp(r.admin); else if (me && (me.name !== r.admin.name || me.loginId !== r.admin.loginId)) { me = r.admin; $('#meName').textContent = r.admin.name + ' (' + r.admin.loginId + ')'; } }
+      else { store.del(); showLogin(); }
+    }).catch(() => { if (!kept || !kept.name) showLogin(); toast('연결이 원활하지 않습니다.'); });
   })();
 
   // ───────────── 속도 측정 ─────────────
