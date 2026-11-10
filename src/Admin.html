@@ -10667,7 +10667,7 @@
   }
   async function htParse(file) {
     const X = await loadSheetJs();
-    const wb = X.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
+    const wb = X.read(await file.arrayBuffer(), { type: 'array', cellDates: false, codepage: 65001 });
     const rows = [];
     wb.SheetNames.forEach((n) => {
       const A = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' });
