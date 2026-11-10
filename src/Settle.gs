@@ -2524,6 +2524,8 @@ function stlBankMoves_() {
   fundRows.forEach(function (r) {
     const a = stlNum_(r.amt), mt = Number(String(r.month).slice(5)) + '월 ';
     if (r.item === '쿠팡 입금') { add(r.date, r.bank || src, a, mt + '쿠팡 입금', '자금배분', r.month); return; }
+    // 인건비 · 대표 인출은 쿠팡 입금 통장에서 바로 나가는 돈 → 이체가 아니라 출금
+    if ((r.item === '인건비' || r.item === '대표 인출') && (!r.bank || r.bank === src)) { add(r.date, src, -a, mt + r.item + ' (바로 ' + (r.item === '대표 인출' ? '인출' : '지급') + ')', '자금배분', r.month); return; }
     if (!r.bank || r.bank === src) return;
     add(r.date, src, -a, mt + r.item + ' → ' + r.bank, '자금배분', r.month);
     add(r.date, r.bank, a, mt + r.item + ' ← ' + src, '자금배분', r.month);

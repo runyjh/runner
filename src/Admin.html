@@ -495,8 +495,7 @@
   .bank-card em { font-style: normal; font-weight: 800; font-size: 17px; } .bank-card em.neg { color: var(--danger); } .bank-card span { font-size: 11.5px; color: var(--sub); }
   .kpi.clk { cursor: pointer; } .kpi.clk:hover { box-shadow: 0 0 0 2px var(--brand-weak); }
   .pnl-box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; max-width: 860px; }
-  .pnl-reserve { cursor: pointer; max-width: none; margin-bottom: 12px; }
-  .pnl-reserve:hover { border-color: var(--brand); }
+  .pnl-reserve { max-width: none; margin-bottom: 12px; }
   .pnl-reserve table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .pnl-reserve td { padding: 7px 6px; border-bottom: 1px dashed var(--line); } .pnl-reserve td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; } .pnl-reserve td.sub { color: var(--sub); font-size: 12px; }
   .pnl-reserve tr.todo td:first-child { font-weight: 700; } .pnl-reserve tr.ok td { color: var(--sub); } .pnl-reserve tr.ok td.n { text-decoration: line-through; text-decoration-color: #b8c4d8; }
@@ -7958,7 +7957,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#rzModal').classList.contains('hidden') && !$('#rzOk').textContent.includes('지우는')) $('#rzModal').classList.add('hidden'); });
 
   // ───── 정산관리 ─────
-  const STX = { month: '', months: [], sum: null, pnl: null, pnlT: 'pnl', items: [], tab: 'list', cfg: 'config', table: null, edRows: [], edDirty: false, slipIds: [], slipAt: -1, drv: null, drvDirty: {}, pay: null, up: null };
+  const STX = { month: '', months: [], sum: null, pnl: null, pnlT: 'fund', items: [], tab: 'list', cfg: 'config', table: null, edRows: [], edDirty: false, slipIds: [], slipAt: -1, drv: null, drvDirty: {}, pay: null, up: null };
   const wn = (v) => (Math.round(Number(v) || 0)).toLocaleString('ko-KR');
   const wnz = (v) => (Number(v) ? wn(v) : '-');
   const ymTitle = (m) => (m ? +m.slice(0, 4) + '년 ' + +m.slice(5, 7) + '월' : '');
@@ -8066,7 +8065,7 @@
     ],
     fund: [
       ['하는 일', '쿠팡 입금(= 쿠팡 세금계산서 합계)을 <b>통장별로 나눠 보내기</b> — 항목마다 보낼 통장과 계산 금액이 자동'],
-      ['순서', '① 쿠팡 입금이 들어오면 실제 금액 확인 후 <b>받음</b> ② 항목별로 보내고 <b>이체</b> 체크 → 통장 잔액에 바로 반영'],
+      ['순서', '① 15일 쿠팡 입금이 들어오면 실제 금액 확인 후 <b>받음</b> ② 빼둘 돈을 통장별로 보내고 <b>이체</b> 체크 → 통장 잔액에 바로 반영 ③ 기사 급여(20일)는 <b>입금확인</b> 탭에서 · 대표 인출·직원 급여는 쿠팡정산 통장에서 바로 나가므로 보냈을 때 체크만'],
       ['금액', '보낼 금액을 비우면 <b>계산 금액</b> 그대로 · 다르게 보냈으면 그 금액을 넣기 · 유보금 = 쿠팡 입금 − 나머지 합계'],
       ['바꾸는 곳', '보낼 통장·금액 규칙(종소세 적립률 · 대표 인출) → <b>[배분 설정]</b> · 통장 → <b>[통장 목록]</b>']
     ],
@@ -8168,8 +8167,8 @@
     ],
     'page:pnl': [
       ['하는 일', '정산월마다 <b>빼둘 돈</b>(기사정산 · 부가세 · 산재고용 · 급여 · 운영비 · 종소세 적립) · 러너가 <b>실제로 남긴 돈(순이익)</b> · 세금 일정 · 통장 잔액'],
-      ['순서', '① 맨 위 <b>빼둘 돈</b> 카드 확인 ② 쿠팡 입금 들어오면 [자금배분] 받음 → 항목별 이체 체크(카드에 ✓) ③ [통장 내역 올리기]로 은행 거래내역 자동 분류 ④ 세금은 [세금 일정]에 낸 금액 입력'],
-      ['묶음', '<b>이번 달 돈</b>(월별 손익·빼둘 돈 · 자금배분 · 입금확인) · <b>통장</b>(잔액 · 내역 올리기 · 입출금 기록) · <b>손익·세금</b>(세금 일정 · 지출) · <b>⚙ 설정</b>(통장 목록 · 배분 설정 · 고정 운영비 · 직원)']
+      ['순서', '① 15일 쿠팡 입금 → <b>자금배분</b>에서 받음 · 빼둘 돈 통장별 이체 체크 (대표 인출·직원 급여는 쿠팡정산 통장에서 바로) ② 20일 기사 급여 → <b>입금확인</b>에서 체크 ③ <b>월별 손익</b> 확인 ④ [통장 내역 올리기]로 은행 거래내역 자동 분류 ⑤ 세금은 [세금 일정]에 낸 금액 입력'],
+      ['묶음', '<b>이번 달 돈</b>(자금배분·빼둘 돈 → 입금확인 → 월별 손익) · <b>통장</b>(잔액 · 내역 올리기 · 입출금 기록) · <b>손익·세금</b>(세금 일정 · 지출) · <b>⚙ 설정</b>(통장 목록 · 배분 설정 · 고정 운영비 · 직원)']
     ],
     'page:uiset': [
       ['하는 일', '관리자 화면의 <b>메뉴 · 탭 · 제목 · 입력칸 이름 · 설명서 · 경고 문구 · 기사 앱 문구</b>를 코드 수정 없이 바꾸기'],
@@ -8362,7 +8361,7 @@
     ] }
   ];
   const ST_FIN = [
-    { k: 'now', t: '이번 달 돈', d: '빼둘 돈 · 자금배분 · 기사 입금확인', sub: [['pnl:pnl', '월별 손익 · 빼둘 돈', '정산월마다 빼둘 돈(기사정산·부가세·산재고용·급여·운영비·종소세 적립)과 러너 순이익'], ['pnl:fund', '자금배분', '쿠팡 입금을 통장별로 나눠 보내기 · 받음·이체 체크'], ['pnl:pay', '입금확인', '기사 지급 입금체크 · 대량이체용 복사']] },
+    { k: 'now', t: '이번 달 돈', d: '① 자금배분(15일 쿠팡 입금 → 빼둘 돈) ② 입금확인(20일 기사 지급) ③ 손익', sub: [['pnl:fund', '① 자금배분 · 빼둘 돈', '쿠팡 입금(15일)이 쿠팡정산 통장에 들어오면 [받음] → 빼둘 돈을 통장별로 이체하고 체크 · 대표 인출·직원 급여는 쿠팡정산 통장에서 바로 나감'], ['pnl:pay', '② 입금확인 (기사 지급 20일)', '20일 기사 급여를 보내면서 입금체크 · 대량이체용 복사 · 체크하면 기사정산 통장에서 빠짐'], ['pnl:pnl', '③ 월별 손익', '이 달 러너 순이익 · 산재고용 신고 · 그 해 월별 추이']] },
     { k: 'bank', t: '통장', d: '잔액 · 거래내역 올리기 · 직접 입력', sub: [['pnl:bal', '통장 잔액', '통장별 지금 잔액 = 기초잔액 + 들어온 돈 − 나간 돈'], ['pnl:bank', '통장 내역 올리기', '은행 거래내역(PDF·엑셀) 한 줄씩 자동 분류'], ['pnl:banktx', '입·출금 기록', '자금배분·기사 지급 말고 직접 넣는 입·출금']] },
     { k: 'tax', t: '손익 · 세금', d: '세금 일정 · 이 달 지출', sub: [['pnl:tax', '세금 일정', '부가세 · 원천세 · 산재고용 · 종합소득세 납부기한 순 · 낸 금액 기록'], ['pnl:expense', '지출 기록', '이 정산월에 넣을 그 달 실제 지출']] },
     { k: 'cfg', gear: true, t: '⚙ 설정', d: '통장 · 배분 규칙 · 고정비 · 직원', sub: [['pnl:banks', '통장 목록'], ['pnl:alloc', '배분 설정'], ['pnl:cost', '고정 운영비'], ['pnl:staff', '직원 (원천세)']] }
@@ -8746,14 +8745,14 @@
     const dl = ((STX.sum && STX.sum.drivers) || []).filter((v) => v.net), dDone = dl.filter((v) => v.checked);
     const payProg = '<div class="pay-prog">입금확인 <b>' + dDone.length + ' / ' + dl.length + '명</b> · 남은 <b>' + wn(dl.reduce((a, v) => a + v.net, 0) - dDone.reduce((a, v) => a + v.net, 0)) + '원</b> <a data-go-pay>입금확인 열기 →</a></div>';
     const row = (x) => '<tr class="' + (x.done ? 'done' : '') + (x.key === 'rest' ? ' rest' : '') + '"><td><b>' + esc(x.label) + '</b><div class="smemo">' + esc(x.desc) + (x.rule ? ' · 규칙 ' + esc(x.rule) : '') + '</div>' + (x.key === 'driver' ? payProg : '') + '</td>' +
-      '<td>' + (x.bank ? esc(x.bank) + (bal[x.bank] != null ? '<div class="smemo">잔액 ' + wn(bal[x.bank]) + '</div>' : '') : '<span style="color:var(--danger)">통장 없음</span>') + '</td>' +
+      '<td>' + (x.bank ? esc(x.bank) + (x.bank === F.source && ['staff', 'owner'].includes(x.key) ? '<div class="smemo" style="color:var(--brand)">쿠팡정산 통장에서 바로 ' + (x.key === 'owner' ? '인출' : '지급') + '</div>' : bal[x.bank] != null ? '<div class="smemo">잔액 ' + wn(bal[x.bank]) + '</div>' : '') : '<span style="color:var(--danger)">통장 없음</span>') + '</td>' +
       '<td class="n">' + wn(x.plan) + '</td><td class="n">' + amtIn(x.key, x.adj ? x.amt : '', x.plan, x.done) + '</td>' +
-      '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? ' title="받는 통장과 같아 이체할 필요 없음"' : '') + '></td>' +
+      '<td style="text-align:center"><input type="checkbox" data-fk="' + x.key + '" data-ff="done"' + (x.done ? ' checked' : '') + (x.bank === F.source ? (['staff', 'owner'].includes(x.key) ? ' title="쿠팡정산 통장에서 바로 지급·인출 — 보냈으면 체크 (잔액에서 빠짐)"' : ' title="받는 통장과 같아 이체할 필요 없음 (돈이 그대로 남음)"') : '') + '></td>' +
       '<td><input class="inp" type="date" data-fk="' + x.key + '" data-ff="date" value="' + esc(x.date || '') + '" style="width:140px"></td>' +
       '<td><input class="inp" data-fk="' + x.key + '" data-ff="memo" value="' + esc(x.memo || '') + '" style="min-width:140px"></td></tr>';
     const sent = F.items.filter((x) => x.done).reduce((a, x) => a + x.amt, 0), total = F.items.reduce((a, x) => a + x.amt, 0);
     const rest = F.items.find((x) => x.key === 'rest') || {};
-    $('#stPnl').innerHTML = dep +
+    $('#stPnl').innerHTML = reserveBox() + dep +
       (rest.amt < 0 ? '<div class="stw bad" style="margin-bottom:10px">쿠팡 입금보다 배분할 돈이 ' + wn(-rest.amt) + '원 많습니다. 금액을 조정하거나 유보금에서 채워 주세요.</div>' : '') +
       '<div class="table-wrap"><table class="sttbl fund-tbl"><thead><tr><th>항목</th><th>보낼 통장</th><th class="n">계산 금액</th><th class="n">보낼 금액 <small>(비우면 계산 금액)</small></th><th>이체</th><th>이체일</th><th>메모</th></tr></thead><tbody>' +
       F.items.map(row).join('') + '</tbody><tfoot><tr><td colspan="3">배분 합계 <small>(이체 완료 ' + wn(sent) + ')</small></td><td class="n"><b>' + wn(total) + '</b></td><td colspan="3" class="sub">쿠팡 입금 ' + wn(F.base) + (d.done ? ' (받음)' : ' (예정)') + '</td></tr></tfoot></table></div>';
@@ -8846,12 +8845,12 @@
       R2.map(([lab, k, t]) => !lab ? '<tr class="gap"><td colspan="' + (rows.length + 2) + '"></td></tr>' :
         '<tr class="' + (t || '') + '"><td>' + lab + '</td>' + rows.map((x) => '<td class="n' + (x.month === STX.month ? ' cur' : '') + (t === 'net' && x.net < 0 ? ' neg' : '') + '">' + cell(x, k, t) + '</td>').join('') +
         '<td class="n' + (t === 'net' && sum('net') < 0 ? ' neg' : '') + '">' + (t === 'pct' ? pct(sum('salesSupply') ? sum('net') / sum('salesSupply') : 0) : wn(sum(k))) + '</td></tr>').join('') + '</tbody></table></div>';
-    $('#stPnl').innerHTML = reserveBox(c, rows) + '<div class="pnl-top">' + box + insBox + '</div>' + tb;
-    const rb = $('#pnlReserve'); if (rb) rb.addEventListener('click', (e) => { if (!e.target.closest('a')) stPnlTab('fund'); });
+    $('#stPnl').innerHTML = '<div class="pnl-top">' + box + insBox + '</div>' + tb;
   }
   // 이번 달 빼둘 돈: 자금배분과 같은 계산(adm_stlFund) · 이체 체크한 항목은 ✓ · 부가세는 반기 누계도
   function reserveBox(c, rows) {
     const F = STX.fund; if (!F || F.month !== STX.month) return '';
+    rows = rows || ((STX.pnlYear && STX.pnlYear.rows) || []);
     const by = {}; (F.items || []).forEach((x) => { by[x.key] = x; });
     const pick = (keys) => keys.map((k) => by[k]).filter(Boolean);
     const when = { driver: '기사 지급일 ' + (mdTxt((F.dates || {}).pay) || ''), vat: '1/25 · 7/25', ins: '다음 달 10일', staff: '급여일 · 원천세 10일', fixed: '결제일', var: '결제일', tax: '다음 해 5월' };
@@ -8864,12 +8863,12 @@
     const groups = [['기사정산금', pick(['driver'])], ['부가세', pick(['vat']), '1/25 · 7/25 · ' + half[0] + '~' + mon + '월 누계 ' + wn(vatAcc)], ['산재·고용 (공단 신고액)', pick(['ins'])], ['급여 (세전 · 원천세 포함)', pick(['staff'])], ['운영비 (고정 + 지출)', pick(['fixed', 'var'])], ['종합소득세 적립', pick(['tax'])]].filter((g) => g[1].length);
     const total = groups.reduce((a, g) => a + g[1].reduce((x, y) => x + (y.amt || 0), 0), 0), dep = F.deposit || {}, base = dep.amt || dep.plan || 0, left = base - total;
     const owner = by.owner ? by.owner.amt || 0 : 0, rest = left - owner;
-    return '<div class="pnl-box pnl-reserve" id="pnlReserve" title="자금배분 탭으로"><h4>' + esc(ymTitle(STX.month)) + ' 빼둘 돈 <small>쿠팡 입금 ' + wn(base) + (dep.done ? ' (받음)' : ' (' + (mdTxt(dep.due) || '예정') + ')') + ' 에서 미리 떼어 둘 돈 · 자금배분과 같은 숫자</small></h4><table>' +
+    return '<div class="pnl-box pnl-reserve" id="pnlReserve"><h4>' + esc(ymTitle(STX.month)) + ' 빼둘 돈 요약 <small>쿠팡 입금 ' + wn(base) + (dep.done ? ' (받음)' : ' (' + (mdTxt(dep.due) || '예정') + ')') + ' 에서 미리 떼어 둘 돈 · 아래 표에서 이체 체크하면 ✓</small></h4><table>' +
       groups.map((g) => line(g[0], g[1], g[2])).join('') +
       '<tr class="tot"><td>빼둘 돈 합계</td><td class="sub">' + (F.items || []).filter((x) => x.done && x.key !== 'rest' && x.key !== 'owner').length + '/' + groups.reduce((a, g) => a + g[1].length, 0) + ' 항목 이체 완료</td><td class="n">' + wn(total) + '</td></tr>' +
       '<tr class="left' + (left < 0 ? ' neg' : '') + '"><td>남는 돈</td><td class="sub">쿠팡 입금 − 빼둘 돈' + (owner ? ' = 대표 인출 ' + wn(owner) + ' + 유보금 ' + wn(rest) : ' → 유보금') + '</td><td class="n">' + wn(left) + '</td></tr></table>' +
       (left < 0 ? '<div class="stw bad" style="margin-top:8px">빼둘 돈이 쿠팡 입금보다 ' + wn(-left) + '원 많습니다 — 유보금에서 채우거나 운영비·인출을 줄여야 합니다.</div>' : '') +
-      '<div class="pnl-ref">누르면 <b>자금배분</b> 탭 — 실제 이체 후 체크하면 ✓ 로 바뀌고 통장 잔액에 반영됩니다</div></div>';
+      '<div class="pnl-ref">순서: ① 15일 쿠팡 입금 확인 → <b>받음</b> ② 빼둘 돈을 통장별로 이체 → 아래 표 <b>이체</b> 체크 ③ 20일 기사 급여는 <b>입금확인</b> 탭에서 체크 · 대표 인출 · 직원 급여는 쿠팡정산 통장에서 바로 나감(이체 없이 체크만)</div></div>';
   }
   $$('#stPnlTabs .tab').forEach((b) => b.addEventListener('click', () => stPnlTab(b.dataset.pnl)));
   function stCfgTab(name) {
