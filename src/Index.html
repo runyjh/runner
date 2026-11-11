@@ -254,6 +254,7 @@
   .pmc.s-talk { background: #ecf8f0; } .pmc.s-talk .pmst span { color: var(--ok); }
   .pmc.s-done, .pmc.s-closed, .pmc.s-end, .pmc.s-cancel { background: #eceef1; } .pmc.s-done > :not(.pmst), .pmc.s-closed > :not(.pmst), .pmc.s-end > :not(.pmst), .pmc.s-cancel > :not(.pmst) { opacity: .45; }
   .pmc.s-done .pmst span, .pmc.s-closed .pmst span, .pmc.s-end .pmst span, .pmc.s-cancel .pmst span { color: #4e5968; }
+  .pmc.s-done .pmst span { background: var(--brand); color: #fff; } .pmc.s-end .pmst span { background: var(--ok); color: #fff; } /* 배차 확정 = 메인 색 · 완료 = 초록 (흰 글자) */
   .pmc .more, .pmc { pointer-events: auto; }
   .pmc.s-done .more, .pmc.s-closed .more, .pmc.s-end .more, .pmc.s-cancel .more { opacity: 1; position: relative; z-index: 1; }
   .pmempty { background: #fff; border-radius: var(--radius); padding: 36px 16px; text-align: center; color: var(--sub); }
