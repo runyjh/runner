@@ -392,6 +392,9 @@ function api_pmSave(token, job) {
         appendObj_(SH.PAPP, { id: uniqId_('A'), jobId: id, driverId: tgt.id, name: tgt.name, date: f.date, status: PAST.OFFER, memo: str_(job.offerMemo).slice(0, 200), createdAt: now, updatedAt: now });
         out.push(pmA_(tgt.id, tgt.name, row, 'offer', u.info.name));
         pmAlertAdd_(out);
+      } else {
+        // 공개 일감: 러너 기사 모두에게 '새 품앗이 일감' 알림 (휴대폰 알림 포함 · 올린 기사 제외)
+        try { pmNewJobAlerts_(row, u.info.name, [u.id]).forEach(function (a) { out.push(a); }); pmAlertAdd_(out); } catch (e) { errLog_('서버 오류', 'pmNewJobAlerts_', '새 일감 알림 실패: ' + String(e && e.message || e)); }
       }
       pmTouch_();
       return { ok: true, id: id, offered: tgt ? tgt.name : '' };
@@ -810,10 +813,17 @@ const PM_ALERT_TEXT = {
   unaccept: function (j) { return ['⚠️ 배차 확정 취소', pmJobLabel_(j) + ' 일감의 배차 확정이 풀렸습니다.']; },
   closed: function (j) { return ['모집 마감', pmJobLabel_(j) + ' 일감의 모집이 마감되었습니다.']; },
   canceled: function (j) { return ['⚠️ 일감 취소', pmJobLabel_(j) + ' 일감이 취소되었습니다.']; },
+  newjob: function (j, who) { return ['📢 새 품앗이 일감', (who ? who + ' 기사님이 ' : '') + pmJobLabel_(j) + ' (' + (j.kind || '') + (j.time ? ' · ' + j.time : '') + ') 일감을 올렸습니다.' + (j.price ? ' 건당 ' + String(Number(j.price)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원' : '')]; },
   edit: function (j) { return ['✏️ 일감 내용 변경', pmJobLabel_(j) + ' 일감 내용이 바뀌었습니다. 확인해 주세요.']; },
   office: function (j, how) { return ['🛠 사무실 등록', '사무실에서 기사님 이름으로 ' + pmJobLabel_(j) + ' 품앗이 일감을 ' + (how || '올렸습니다.')]; },
   admin: function (j, act) { return ['🛠 사무실 처리', pmJobLabel_(j) + ' 일감을 사무실에서 ' + ({ talk: '협의 중으로', accept: '배차 확정으로', reject: '지원자 거절로', back: '지원 상태로 되돌림으로', close: '모집 마감으로', reopen: '다시 모집으로', cancel: '취소로' }[act] || '변경') + ' 처리했습니다.']; }
 };
+/** 새 공개 일감 → 재직 중인 러너 기사 모두에게 알림 (올린 기사·빼 줄 기사 제외) */
+function pmNewJobAlerts_(j, who, skip) {
+  const no = {}; (skip || []).forEach(function (x) { if (x) no[String(x)] = 1; });
+  return readAll_(SH.DRIVERS).filter(function (o) { return o.id && !no[String(o.id)] && o.status === ST.ACTIVE && str_(o.workStatus) !== '퇴사'; })
+    .map(function (o) { return pmA_(o.id, o.name, j, 'newjob', who); });
+}
 /** 알림 1건 만들기 (아직 저장 전) */
 function pmA_(driverId, name, j, kind, who) {
   const t = PM_ALERT_TEXT[kind](j, who || '');
