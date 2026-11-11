@@ -170,7 +170,7 @@ const M_NOTES = {
 const NST = { ON: '게시', OFF: '숨김' };
 const N = {
   id: '공지ID', title: '제목', body: '내용', important: '중요', target: '대상 캠프', start: '게시 시작일', end: '게시 종료일',
-  status: '상태', author: '작성자', createdAt: '작성일시', updatedAt: '수정일시'
+  status: '상태', author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', attach: '사진'
 };
 const N_NOTES = {
   title: '새 줄에 제목·내용을 입력하면 공지ID·작성일시가 자동으로 채워지고 기사 앱에 바로 보입니다.',
@@ -806,7 +806,7 @@ function run_(fn) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_ntPhoto', 'api_ntPhoto', 'adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
@@ -2591,7 +2591,7 @@ function noticeView_(o) {
   return {
     id: o.id, title: o.title, body: o.body, important: String(o.important).toUpperCase() === 'Y', target: o.target,
     start: normDate_(o.start) || '', end: normDate_(o.end) || '', status: o.status === NST.OFF ? NST.OFF : NST.ON,
-    author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt
+    author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt, photos: ntPhotos_(o.attach).length
   };
 }
 function noticeSort_(a, b) {
@@ -2632,7 +2632,7 @@ function api_notices(token) {
     let camp = info.camp || '';
     if (info.campId) { const c = master_().camps.filter(function (x) { return x.id === info.campId; })[0]; if (c) camp = c.name; }
     const list = noticeAll_().filter(function (n) { return noticeLive_(n, today) && noticeFor_(n, camp); }).sort(noticeSort_).slice(0, 50)
-      .map(function (n) { return { id: n.id, title: n.title, body: n.body, important: n.important, date: n.start || n.createdAt.slice(0, 10), updatedAt: n.updatedAt }; });
+      .map(function (n) { return { id: n.id, title: n.title, body: n.body, important: n.important, date: n.start || n.createdAt.slice(0, 10), updatedAt: n.updatedAt, photos: n.photos || 0 }; });
     const out = { ok: true, notices: list, today: today };
     // 기사 앱 홈 사본 (공지 + 게시판 최근 글) → 다음 번엔 Firestore 에서
     if (typeof fsSaveDrvHome_ === 'function' && fsCopyOn_() && !(typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_)) fsSaveDrvHome_(s.d, out, fsT0);
@@ -2653,6 +2653,53 @@ function adm_noticeList(token) {
   });
 }
 
+// ───── 공지 사진 (드라이브 '공지사항 사진' 폴더 · 사진 칸에 주소를 줄바꿈으로) ─────
+const NT_MAX_PHOTOS = 5;
+function ntPhotos_(v) { return str_(v).split(/\s*\n\s*/).filter(function (x) { return !!fileIdOf_(x); }); }
+function ntFolder_() {
+  const p = props_();
+  if (p.NT_FOLDER) { try { return DriveApp.getFolderById(p.NT_FOLDER); } catch (e) { /* 새로 */ } }
+  const root = DriveApp.getFolderById(p.ROOT_FOLDER_ID), it = root.getFoldersByName('공지사항 사진');
+  const f = it.hasNext() ? it.next() : root.createFolder('공지사항 사진');
+  PropertiesService.getScriptProperties().setProperty('NT_FOLDER', f.getId());
+  _props = null;
+  return f;
+}
+/** 사진 한 장 → {mime, data} (600KB 넘으면 작은 그림) */
+function ntPhotoBlob_(url) {
+  let file;
+  try { file = DriveApp.getFileById(fileIdOf_(url)); } catch (e) { fail_('사진을 열 수 없습니다.'); }
+  let blob = null;
+  if (file.getSize() > 600 * 1024) { try { blob = file.getThumbnail(); } catch (e) { blob = null; } }
+  if (!blob) blob = file.getBlob();
+  return { ok: true, mime: blob.getContentType() || 'image/jpeg', data: Utilities.base64Encode(blob.getBytes()) };
+}
+/** 기사 앱: 나에게 보이는 공지의 사진 i번째 */
+function api_ntPhoto(token, id, i) {
+  return run_(function () {
+    const s = getSession_(token);
+    const info = s ? driverInfo_(s.d) : null;
+    if (!s || !info || info.status !== ST.ACTIVE) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
+    let camp = info.camp || '';
+    if (info.campId) { const c = master_().camps.filter(function (x) { return x.id === info.campId; })[0]; if (c) camp = c.name; }
+    const row = findRow_(SH.NOTICE, 'id', String(id || ''));
+    const o = row ? readObj_(SH.NOTICE, row) : null;
+    if (!o || !noticeLive_(noticeView_(o), todayText_()) || !noticeFor_(noticeView_(o), camp)) fail_('공지를 찾을 수 없습니다.');
+    const u = ntPhotos_(o.attach)[Number(i) || 0];
+    if (!u) fail_('사진이 없습니다.');
+    return ntPhotoBlob_(u);
+  });
+}
+/** 관리자: 공지 사진 i번째 (수정 화면 미리보기) */
+function adm_ntPhoto(token, id, i) {
+  return run_(function () {
+    requireAdmin_(token);
+    const row = findRow_(SH.NOTICE, 'id', String(id || ''));
+    const u = row ? ntPhotos_(readObj_(SH.NOTICE, row).attach)[Number(i) || 0] : '';
+    if (!u) fail_('사진이 없습니다.');
+    return ntPhotoBlob_(u);
+  });
+}
 /** 공지 추가(id 없음)·수정 */
 function adm_noticeSave(token, n) {
   return run_(function () {
@@ -2669,17 +2716,30 @@ function adm_noticeSave(token, n) {
     if (n.start && !f.start) fail_('게시 시작일을 확인해 주세요.');
     if (n.end && !f.end) fail_('게시 종료일을 확인해 주세요.');
     if (f.start && f.end && f.end < f.start) fail_('게시 종료일이 시작일보다 빠릅니다.');
+    // 사진: keep = 남길 기존 사진 번호들 · add = 새 사진 [{data, mime}] (최대 5장 · 잠금 밖에서 드라이브에 올림)
+    const add = Array.isArray(n.add) ? n.add : [];
+    if (add.length > NT_MAX_PHOTOS) fail_('사진은 ' + NT_MAX_PHOTOS + '장까지 올릴 수 있습니다.');
+    const newUrls = add.map(function (x, i) {
+      if (!x || !/^image\//.test(String(x.mime))) fail_('사진(이미지)만 올릴 수 있습니다.');
+      if (String(x.data || '').length > CFG.MAX_FILE_B64) fail_('사진이 너무 큽니다.');
+      return ntFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(x.data), x.mime, (todayText_() + '_' + f.title + '_' + (i + 1)).replace(/[\\\/:*?"<>|]/g, '_').slice(0, 80) + (/png/.test(x.mime) ? '.png' : '.jpg'))).getUrl();
+    });
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
       const now = nowText_();
       let row;
       if (!n.id) {
+        f.attach = newUrls.slice(0, NT_MAX_PHOTOS).join('\n');
         row = appendObj_(SH.NOTICE, Object.assign({ id: newNoticeId_(), author: a.name, createdAt: now, updatedAt: now }, f));
         logAdmin_(a, '공지 등록', f.title, f.target || '전체');
       } else {
         row = findRow_(SH.NOTICE, 'id', String(n.id));
         if (!row) fail_('공지를 찾을 수 없습니다. 시트에서 지워졌을 수 있습니다. 새로고침해 주세요.');
+        const old = ntPhotos_(readObj_(SH.NOTICE, row).attach), keep = Array.isArray(n.keep) ? n.keep.map(Number) : old.map(function (_, i) { return i; });
+        const urls = old.filter(function (_, i) { return keep.indexOf(i) >= 0; }).concat(newUrls);
+        if (urls.length > NT_MAX_PHOTOS) fail_('사진은 ' + NT_MAX_PHOTOS + '장까지 올릴 수 있습니다.');
+        f.attach = urls.join('\n');
         f.updatedAt = now;
         writeFields_(SH.NOTICE, row, f);
       }

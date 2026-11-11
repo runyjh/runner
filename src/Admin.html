@@ -90,6 +90,10 @@
   .db-list li.done .t { color: var(--faint); text-decoration: line-through; }
   .db-tbl { width: 100%; min-width: 0; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .db-card { overflow: hidden; }
+  .ntph { display: flex; flex-wrap: wrap; gap: 8px; } .ntph-i { position: relative; width: 96px; height: 96px; border-radius: 10px; overflow: hidden; background: #f2f4f6; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .ntph-i img { width: 100%; height: 100%; object-fit: cover; } .ntph-i button { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; cursor: pointer; }
+  .ntph-i em { position: absolute; left: 4px; bottom: 4px; font-style: normal; font-size: 11px; background: var(--brand, #1b64da); color: #fff; border-radius: 6px; padding: 1px 5px; }
+  .ntph-add { width: 96px; height: 96px; border-radius: 10px; border: 1.5px dashed #c5ccd3; background: #fff; color: var(--sub); font-weight: 700; cursor: pointer; }
   .dc-it { border-top: 1px solid #f0f1f3; padding: 6px 0 2px; font-size: 12.5px; } .dc-it:first-of-type { border-top: 0; }
   .dc-it summary { cursor: pointer; display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; } .dc-it summary span { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; } .dc-it summary b { color: #c81e1e; flex: none; }
   .dc-l { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; } .dc-l span { background: #f5f6f8; border-radius: 6px; padding: 2px 7px; white-space: normal; overflow-wrap: anywhere; } .dc-it p { margin: 2px 0 6px; font-size: 11.5px; white-space: normal; }
@@ -2081,6 +2085,8 @@
     <h3 id="ntTitleH">새 공지</h3>
     <div class="field"><label class="lb" for="ntTitle">제목</label><input class="inp" id="ntTitle" maxlength="100" placeholder="예: 11월 추석 연휴 배송 일정 안내"></div>
     <div class="field"><label class="lb" for="ntBody">내용</label><textarea class="inp" id="ntBody" maxlength="5000" style="height:200px;line-height:1.6" placeholder="기사님께 보일 내용을 입력하세요. 줄바꿈은 그대로 보입니다."></textarea></div>
+    <div class="field"><span class="lb">사진 <small class="sub">(최대 5장 · 기사 앱 공지 아래에 보임)</small></span>
+      <div class="ntph" id="ntPhotos"></div><input type="file" id="ntFile" accept="image/*" multiple class="hidden"></div>
     <label class="check"><input type="checkbox" id="ntImp"> <b style="color:var(--danger)">중요</b>&nbsp;— 맨 위 고정, 처음 볼 때 팝업으로 한 번 보여 줌</label>
     <div class="field"><span class="lb">보낼 대상</span>
       <div class="seg" id="ntTgtMode"><button type="button" data-tm="all" class="on">전체 기사</button><button type="button" data-tm="camp">캠프 선택</button></div>
@@ -5146,7 +5152,7 @@
     $('#ntRows').innerHTML = list.map((n) => {
       const st = ntState(n), per = (n.start || '등록일부터') + ' ~ ' + (n.end || '계속');
       return '<tr data-nt="' + esc(n.id) + '"><td><span class="badge b-' + st + '">' + (st === '게시' ? '게시 중' : st) + '</span></td>' +
-        '<td class="t"><b>' + (n.important ? '<span class="nt-imp">[중요]</span>' : '') + esc(n.title) + '</b><small>' + esc(String(n.body || '').replace(/\s+/g, ' ').slice(0, 80)) + '</small></td>' +
+        '<td class="t"><b>' + (n.important ? '<span class="nt-imp">[중요]</span>' : '') + esc(n.title) + (n.photos ? ' <span class="sub" style="font-weight:600">📷' + n.photos + '</span>' : '') + '</b><small>' + esc(String(n.body || '').replace(/\s+/g, ' ').slice(0, 80)) + '</small></td>' +
         '<td>' + (n.target ? esc(n.target) : '<span class="sub">전체</span>') + '</td><td class="sub">' + esc(per) + '</td>' +
         '<td class="sub">' + esc(n.author || '') + '</td><td class="sub">' + esc(String(n.updatedAt || n.createdAt || '').slice(0, 16)) + '</td></tr>';
     }).join('');
@@ -5167,8 +5173,31 @@
     setTgtMode(tg.length ? 'camp' : 'all');
     setNtStatus(n ? n.status : '게시');
     $('#ntDel').classList.toggle('hidden', !n);
+    // 사진: 기존 사진은 번호(i)로, 새 사진은 압축한 data 로 들고 있다가 저장할 때 보냄
+    ntPh = []; const seq = ++ntPhSeq;
+    for (let i = 0; i < (n && n.photos || 0); i++) ntPh.push({ i: i, preview: '' });
+    ntPhPaint();
+    ntPh.forEach((p) => api('adm_ntPhoto', n.id, p.i).then((r) => { if (seq !== ntPhSeq || !r || !r.ok) return; p.preview = 'data:' + r.mime + ';base64,' + r.data; ntPhPaint(); }).catch(() => {}));
     $('#ntModal').classList.remove('hidden'); $('#ntTitle').focus();
   }
+  let ntPh = [], ntPhSeq = 0;
+  function ntPhPaint() {
+    $('#ntPhotos').innerHTML = ntPh.map((p, k) => '<div class="ntph-i">' + (p.preview ? '<img alt="" src="' + p.preview + '">' : '<span class="sub">불러오는 중…</span>') +
+      '<button type="button" data-phx="' + k + '" title="이 사진 빼기">✕</button>' + (p.data ? '<em>새 사진</em>' : '') + '</div>').join('') +
+      (ntPh.length < 5 ? '<button type="button" class="ntph-add" id="ntAddPh">＋ 사진 추가</button>' : '');
+  }
+  $('#ntPhotos').addEventListener('click', (e) => {
+    const x = e.target.closest('[data-phx]'); if (x) { ntPh.splice(+x.dataset.phx, 1); return ntPhPaint(); }
+    if (e.target.closest('#ntAddPh')) $('#ntFile').click();
+  });
+  $('#ntFile').addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []).filter((f) => /^image\//.test(f.type)); e.target.value = '';
+    const room = 5 - ntPh.length; if (files.length > room) toast('사진은 5장까지입니다. 앞의 ' + room + '장만 넣었습니다.');
+    for (const f of files.slice(0, Math.max(0, room))) {
+      try { const c = await compressImage(f, 1600, 0.82); ntPh.push({ data: c.data, mime: c.mime, preview: c.preview }); ntPhPaint(); }
+      catch (err) { toast(err.message || '사진을 읽지 못했습니다.'); }
+    }
+  });
   function setTgtMode(m) { $$('#ntTgtMode [data-tm]').forEach((b) => b.classList.toggle('on', b.dataset.tm === m)); $('#ntCamps').classList.toggle('hidden', m !== 'camp'); }
   function setNtStatus(v) { $$('#ntStatus [data-st]').forEach((b) => b.classList.toggle('on', b.dataset.st === v)); }
   $('#ntTgtMode').addEventListener('click', (e) => { const b = e.target.closest('[data-tm]'); if (b) setTgtMode(b.dataset.tm); });
@@ -5186,15 +5215,17 @@
     if (campMode && !target) return toast('공지를 보낼 캠프를 하나 이상 골라 주세요.');
     const n = {
       id: ntEdit ? ntEdit.id : '', title: $('#ntTitle').value.trim(), body: $('#ntBody').value, important: $('#ntImp').checked, target: target,
-      start: $('#ntStart').value, end: $('#ntEnd').value, status: $('#ntStatus [data-st].on').dataset.st
+      start: $('#ntStart').value, end: $('#ntEnd').value, status: $('#ntStatus [data-st].on').dataset.st,
+      keep: ntPh.filter((p) => p.i !== undefined).map((p) => p.i), add: ntPh.filter((p) => p.data).map((p) => ({ data: p.data, mime: p.mime }))
     };
     if (!n.title) return toast('제목을 입력해 주세요.');
     const btn = $('#ntSave'); btn.disabled = true;
+    if (n.add.length) btn.textContent = '사진 올리는 중…';
     api('adm_noticeSave', n).then((r) => {
       if (!r.ok) return toast(r.msg);
       ntClose(); toast(ntEdit ? '공지를 고쳤습니다.' : (n.status === '게시' ? '공지를 올렸습니다. 기사 앱에 바로 보입니다.' : '공지를 저장했습니다 (숨김).'));
       loadNotices();
-    }).catch(() => {}).finally(() => { btn.disabled = false; });
+    }).catch(() => {}).finally(() => { btn.disabled = false; btn.textContent = '저장'; });
   });
   $('#ntDel').addEventListener('click', () => {
     if (!ntEdit || !confirm('"' + ntEdit.title + '" 공지를 삭제할까요?\n\n기사 앱에서도 바로 사라집니다. 잠시 내리려면 삭제 대신 상태를 "숨김"으로 바꾸세요.')) return;

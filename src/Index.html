@@ -444,6 +444,7 @@
   .nitem { background: #fff; border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
   .nitem > button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 16px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
   .nitem > button .tt { flex: 1; font-weight: 700; font-size: 16px; }
+  .ntph { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; } .ntph img { width: 100%; height: auto; border-radius: 10px; display: block; } .ntph-w { height: 120px; border-radius: 10px; background: #f2f4f6; display: flex; align-items: center; justify-content: center; color: var(--sub); font-size: 13px; }
   .nitem .nb { display: none; padding: 0 16px 16px; white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: 15px; color: #333d4b; }
   .nitem.open .nb { display: block; }
   .nitem .meta { font-size: 12px; color: var(--sub); padding: 0 16px 12px; margin-top: -10px; }
@@ -1172,7 +1173,7 @@
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_ntPhoto', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -1192,7 +1193,7 @@
   // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
   const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_myFb', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
   const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
-  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
+  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_ntPhoto', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
   const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
   // 자동 로그인이면 이 기기(localStorage), 아니면 이 창에만(sessionStorage · 창을 닫으면 사라짐) — 로그인 토큰과 같은 곳
@@ -2203,14 +2204,29 @@
     const seen = ntGet(NT_SEEN);
     $('#ntList').innerHTML = ntList.length ? ntList.map((n) => '<div class="nitem' + (ntOpen.has(n.id) ? ' open' : '') + '" data-ni="' + escH(n.id) + '"><button type="button">' +
       (n.important ? '<span class="nimp">중요</span>' : '') + '<span class="tt">' + escH(n.title) + '</span>' + (seen.includes(ntKey(n)) ? '' : '<span class="nnew">N</span>') + '</button>' +
-      '<div class="meta">' + escH(n.date || '') + '</div><div class="nb">' + escH(n.body || '') + '</div></div>').join('')
+      '<div class="meta">' + escH(n.date || '') + (n.photos ? ' · 📷 사진 ' + n.photos + '장' : '') + '</div><div class="nb">' + escH(n.body || '') + ntPhHtml(n) + '</div></div>').join('')
       : '<div class="card" style="text-align:center;color:var(--sub)">지금 올라온 공지가 없습니다.</div>';
+  }
+  // 공지 사진: 펼칠 때 받아 오고 이 화면이 켜져 있는 동안 메모리에 보관 (기기에는 저장 안 함)
+  const NTPH = {};
+  const ntPhHtml = (n) => !n.photos ? '' : '<div class="ntph" data-np="' + escH(n.id) + '">' + Array.from({ length: n.photos }, (_, i) => { const k = n.id + '|' + i + '|' + (n.updatedAt || ''); return NTPH[k] ? '<img alt="공지 사진 ' + (i + 1) + '" src="' + NTPH[k] + '">' : '<div class="ntph-w">사진 불러오는 중…</div>'; }).join('') + '</div>';
+  function ntPhLoad(n, box) {
+    if (!n || !n.photos) return;
+    for (let i = 0; i < n.photos; i++) {
+      const k = n.id + '|' + i + '|' + (n.updatedAt || '');
+      if (NTPH[k]) continue;
+      api('api_ntPhoto', store.get(TOKEN), n.id, i).then((r) => {
+        if (!r || !r.ok) return;
+        NTPH[k] = 'data:' + r.mime + ';base64,' + r.data;
+        document.querySelectorAll('[data-np="' + CSS.escape(n.id) + '"]').forEach((b) => { b.outerHTML = ntPhHtml(n); });
+      }).catch(() => {});
+    }
   }
   function markSeen(n) { const seen = ntGet(NT_SEEN); if (!seen.includes(ntKey(n))) { seen.push(ntKey(n)); ntPut(NT_SEEN, seen); } }
   function openNotices(id) {
     ntOpen.clear(); if (id) ntOpen.add(id);
     const n = ntList.find((x) => x.id === id); if (n) markSeen(n);
-    show('notice'); renderNtList();
+    show('notice'); renderNtList(); if (n) ntPhLoad(n);
     loadNotices(true);
   }
   // 관리자가 정산서를 마감하면 앱을 열 때 한 번 안내 (달·마감 시각마다 한 번 · 이 기기에 기억)
@@ -2233,6 +2249,7 @@
   $('#slPopGo').addEventListener('click', () => { slipPopDone(); openSettle(); });
   function showNtPop(n) {
     $('#ntPopTitle').textContent = n.title; $('#ntPopBody').textContent = n.body || '';
+    if (n.photos) { $('#ntPopBody').insertAdjacentHTML('beforeend', ntPhHtml(n)); ntPhLoad(n); }
     $('#ntPop').dataset.k = ntKey(n); $('#ntPop').classList.add('center'); $('#ntPop').classList.remove('hidden');
   }
   $('#ntPopOk').addEventListener('click', () => {
@@ -2250,7 +2267,7 @@
     it.classList.toggle('open');
     if (it.classList.contains('open')) ntOpen.add(it.dataset.ni); else ntOpen.delete(it.dataset.ni);
     const n = ntList.find((x) => x.id === it.dataset.ni);
-    if (n && it.classList.contains('open')) { markSeen(n); const nn = it.querySelector('.nnew'); if (nn) nn.remove(); }
+    if (n && it.classList.contains('open')) { markSeen(n); const nn = it.querySelector('.nnew'); if (nn) nn.remove(); ntPhLoad(n); }
   });
   $('#ntBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
   $('#mSched').addEventListener('click', openSched);
