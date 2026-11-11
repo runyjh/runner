@@ -8061,6 +8061,7 @@
     const ids = [];
     let t = s.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, (m0, id) => (/^[DF]\d$/i.test(id) ? m0 : (ids.push(id), ' ')));
     t = t.replace(/업무등록/g, ' ').replace(/\s*\[\s*[A-Z]?\d+\s*\]/g, '').replace(/\s+/g, ' ').trim();
+    if ((t === '' || t === '출근') && ids.length) return d.baseRoute && /^\d/.test(d.baseRoute) ? { text: '출근', ids: ids, kind: 'k-work', mine: true, whole: true } : null; // 노선 생략 = 담당 노선
     const m = t.match(/^(?:([가-힣]+\s?\d+)\s+)?(\d{3,4}[A-Za-z][0-9A-Za-z,()\s]*)$/);
     if (!m) return null;
     const p = parseBR(m[2]); if (!p.units.length || !p.units.every((u) => unitRe.test(u))) return null;
@@ -9106,16 +9107,15 @@
     if (jobs.length) { CE = { mode: 'pm', r: r, dt: dt, d: d, jobs: jobs, ins: ins0, ins0: ins0 }; return ceShow(); }
     const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null;
     const subs = [...new Set((d.subIds || []).concat((main && main.subIds) || []).map(String).filter(Boolean))];
-    const myCamp = d.campId || '', sc = subCell(v, r.row);
+    const myCamp = d.campId || '', n = cellNorm(v, r.row);
     let st = CE_ST.includes(v) ? v : /^(노선|라우트)\s*변경$/.test(v) ? v.replace(/\s/g, '') : '', sub = '', rv = '';
-    if (sc) { st = '출근'; sub = subs.find((x) => x.toLowerCase() === sc.id.toLowerCase()) || sc.id; rv = (sc.camp ? sc.camp + ' ' : '') + sc.route; }
-    else if (!st && v && !/업무등록|변경|\n/.test(v) && (/^\d/.test(v) || /^[가-힣]+\d\s+\d/.test(v))) { st = '출근'; rv = v; }
+    if (n) { st = '출근'; if (n.ids.length) sub = subs.find((x) => x.toLowerCase() === n.ids[0].toLowerCase()) || n.ids[0]; rv = n.whole ? '' : n.text; }
     const src = rv || d.baseRoute || '', mc = String(src).match(/^([가-힣]+\d)\s+(.+)$/);
     const c0 = mc ? SD.camps.find((c) => shortCamp(c.name).replace(/\s/g, '') === mc[1]) : null;
     const body = c0 ? mc[2] : src, p0 = /^\d/.test(body) ? parseBR(body) : { units: [], rots: [], per: {} };
     const pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: '', rots: p0.rots, per: p0.per || {} };
     if (!pk.rots.length) pk.rots = sdCampRots(pk.campId);
-    CE = { mode: 'cell', r: r, dt: dt, d: d, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv && !sc, touched: false, alt: '', pm: false, ins: ins0, ins0: ins0 };
+    CE = { mode: 'cell', r: r, dt: dt, d: d, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv, touched: false, alt: '', pm: false, ins: ins0, ins0: ins0 };
     ceShow();
   }
   function ceShow() { cePaint(); $('#ceModal').classList.remove('hidden'); try { const t = $('#cellTip'); if (t) t.style.display = 'none'; } catch (e) { /* 무시 */ } }
@@ -9148,7 +9148,7 @@
   /** 그날 휴무인 기사 (같은 캠프 → 백업 → 다른 캠프 · 고정휴무는 뒤) */
   function ceAlts() {
     const c = CE, me = String(c.r.row).split('~')[0], mine = [me, c.d.mainId || ''];
-    return SD.drivers.filter((x) => x.status === '승인' && !x.ex && !x.title && !mine.includes(x.id) && x.workStatus !== '퇴사' && x.workStatus !== '휴직' && CE_OFF.test(String(sget(x.id, c.dt)).trim()) && !pmMark(x.id, c.dt))
+    return SD.drivers.filter((x) => x.status === '승인' && !x.ex && !mine.includes(x.id) && x.workStatus !== '퇴사' && x.workStatus !== '휴직' && CE_OFF.test(String(sget(x.id, c.dt)).trim()) && !pmMark(x.id, c.dt))
       .map((x) => { const v = String(sget(x.id, c.dt)).trim(), bk = /백업/.test(x.baseRoute || '') || x.type === '백업'; return { d: x, v: v, rank: (x.campId === c.pk.campId ? 0 : bk ? 2 : 4) + (v === '고정휴무' ? 1 : 0) }; })
       .sort((a, b) => a.rank - b.rank || koSort(a.d.name, b.d.name));
   }
