@@ -427,3 +427,87 @@ function issView_(x) {
   o.miDays = o.mi ? issDates_(o.date, o.end || o.date).length : 0;
   return o;
 }
+
+// ───────────────────────── 기사 칸 편집 창: 한 번에 저장 ─────────────────────────
+/**
+ * 편집 창의 [저장] 한 번 = 서버 호출 한 번. 칸 · 대체 인원 칸 · 이슈(사유·대체·조치) · 지시사항을 차례로 처리하고 바뀐 것을 모아 돌려준다.
+ * (화면이 칸 저장 → 이슈 고치기를 따로따로 부르다가 중간에 끊겨 절반만 저장되는 일을 없앰)
+ * o = { row: 기사 줄 ID, date, end(기간 끝 · 없으면 하루), old: 화면에 보이던 칸 값, value: 새 칸 값,
+ *       issue: null | { result: 병가/미입차/노쇼/물량조율, kind: 사유, reason: 사유 메모, sub: 대체 방법, subWho: 대체 인원 이름, qty, action },
+ *       alt: null | { id: 대체 인원 기사ID, value: 그 칸에 넣을 노선 },
+ *       inst: undefined(안 건드림) | 지시사항 글자('' = 지움) }
+ * 반환 { ok, cells: [{row,date,value}], issues: [고쳐진 이슈], removed: [지워진 이슈ID], inst: 지시 이슈 | null, warn }
+ *       처음 칸이 그 사이 다른 곳에서 바뀌었으면 { ok: false, code: 'CONFLICT', current }
+ */
+function adm_schCellApply(token, o) {
+  o = o || {};
+  const row = str_(o.row), date = parseYmd_(o.date) ? ymd_(parseYmd_(o.date)) : '';
+  if (!row || !date) return { ok: false, msg: '기사와 날짜를 확인해 주세요.' };
+  let end = parseYmd_(o.end) ? ymd_(parseYmd_(o.end)) : date;
+  if (end < date) end = date;
+  const dates = issDates_(date, end);
+  if (dates.length > 62) return { ok: false, msg: '기간은 두 달까지 한 번에 넣을 수 있습니다.' };
+  const value = String(o.value == null ? '' : o.value).replace(/\r\n?/g, '\n').trim();
+  const iss = o.issue && ISS.RESULTS.indexOf(str_(o.issue.result)) >= 0 ? o.issue : null;
+  const alt = o.alt && str_(o.alt.id) && str_(o.alt.value) ? { id: str_(o.alt.id), value: str_(o.alt.value) } : null;
+  const out = { ok: true, cells: [], issues: [], removed: [], inst: undefined, warn: '' };
+  const drvId = row.split('~')[0]; // 이슈 · 지시사항은 기사 단위 (구간 줄 'id~n' 도 같은 기사)
+  const pdd = schAddDays_(todayText_(), 1);
+  // 이슈가 대체 인원 칸을 대신 넣어 주는 날 = 이슈 결과가 있고 · 올인원 규칙 기간(11/1~)이고 · 내일 이후 · 대체가 우리 인원(업체백업·품앗이)
+  const viaIssue = function (d) { return !!iss && issOurs_(str_(iss.sub)) && d >= ISS.RULE_FROM && d >= pdd && !schExParse_(row); };
+  // 1) 칸 (기간 전체) + 이슈가 넣어 주지 않는 날의 대체 인원 칸
+  let cur = {}, curAlt = {};
+  try { cur = schCellsOf_(row, dates); if (alt) curAlt = schCellsOf_(alt.id, dates); } catch (e) { return { ok: false, msg: '스케줄을 읽지 못했습니다: ' + (e && e.message) }; }
+  if (o.old !== undefined && String(o.old == null ? '' : o.old).trim() !== str_(cur[date])) return { ok: false, code: 'CONFLICT', current: str_(cur[date]), msg: '그 사이 다른 곳에서 이 칸이 바뀌었습니다. 최신 값으로 다시 열어 주세요.' };
+  const changes = [];
+  dates.forEach(function (d) {
+    if (str_(cur[d]) !== value) changes.push({ row: row, date: d, value: value, old: str_(cur[d]) });
+    if (alt && !viaIssue(d) && str_(curAlt[d]) !== alt.value) changes.push({ row: alt.id, date: d, value: alt.value, old: str_(curAlt[d]) });
+  });
+  let sync = null;
+  if (changes.length) {
+    const r1 = adm_schSave(token, changes);
+    if (!r1.ok) return r1;
+    const conf = {}; (r1.conflicts || []).forEach(function (c) { conf[c.row + '|' + c.date] = 1; });
+    changes.forEach(function (c) { if (!conf[c.row + '|' + c.date]) out.cells.push({ row: c.row, date: c.date, value: c.value }); });
+    if ((r1.conflicts || []).length) out.warn = '그 사이 바뀐 칸 ' + r1.conflicts.length + '개는 건너뛰었습니다.';
+    if ((r1.pmLocked || []).length) out.warn = (out.warn ? out.warn + ' ' : '') + '배차 확정된 품앗이 칸은 바꾸지 않았습니다.';
+    sync = r1.issueSync && !r1.issueSync.error ? r1.issueSync : null;
+    if (sync) { out.removed = (sync.removed || []).slice(); out.issues = (sync.created || []).concat(sync.changed || []); out.cells = out.cells.concat(sync.cells || []); }
+  }
+  // 2) 이슈: 칸 저장으로 생긴(또는 원래 있던) 그날 이슈에 사유 · 대체 · 조치를 채운다 → 대체가 우리 인원이면 서버가 그 칸을 넣고 원래 값을 기억 (되돌릴 때 같이 돌아감)
+  if (iss) {
+    let hit = null;
+    try { hit = schIssues_().filter(function (x) { return x.driverId === drvId && x.kind !== '지시' && x.result === str_(iss.result) && x.date <= date && date <= (x.end || x.date); })[0] || null; } catch (e) { hit = null; }
+    // 이슈에 맡기려던 대체 인원 칸을 직접 넣는다 (이슈가 없거나 · 앞 날짜와 이어져 여기서 못 고칠 때 — 대체 인원이 빠지지 않게)
+    const altDirect = function () {
+      if (!alt) return;
+      const ch = dates.filter(viaIssue).filter(function (d) { return str_(curAlt[d]) !== alt.value; }).map(function (d) { return { row: alt.id, date: d, value: alt.value, old: str_(curAlt[d]) }; });
+      if (!ch.length) return;
+      const rA = adm_schSave(token, ch);
+      if (rA.ok) { const cf = {}; (rA.conflicts || []).forEach(function (c) { cf[c.row + '|' + c.date] = 1; }); ch.forEach(function (c) { if (!cf[c.row + '|' + c.date]) out.cells.push({ row: c.row, date: c.date, value: c.value }); }); }
+      else out.warn = (out.warn ? out.warn + ' ' : '') + '대체 인원 칸 저장 실패: ' + rA.msg;
+    };
+    if (!hit) altDirect();
+    else if (hit.date < date) { altDirect(); out.warn = (out.warn ? out.warn + ' ' : '') + '앞 날짜와 이어진 이슈라 사유 · 대체는 이슈 관리에서 고쳐 주세요.'; }
+    else {
+      const r2 = adm_schIssueSave(token, { id: hit.id, driverId: drvId, date: hit.date, end: hit.end || hit.date, result: hit.result, cut: hit.cut || '',
+        kind: str_(iss.kind) || hit.kind || ISS.UNSET, reason: iss.reason === undefined ? (hit.reason || '') : str_(iss.reason), sub: str_(iss.sub), subWho: issOurs_(str_(iss.sub)) ? str_(iss.subWho) : '',
+        qty: iss.qty === undefined ? (hit.qty || '') : str_(iss.qty), action: iss.action === undefined ? (hit.action || '') : str_(iss.action), force: true });
+      if (!r2.ok) { altDirect(); out.warn = (out.warn ? out.warn + ' ' : '') + '이슈 저장 실패: ' + r2.msg; }
+      else { out.issues = out.issues.filter(function (x) { return x.id !== r2.issue.id; }).concat([r2.issue]); out.cells = out.cells.concat(r2.cells || []); }
+    }
+  }
+  // 3) 지시사항 (이슈 '지시')
+  if (o.inst !== undefined) {
+    const text = str_(o.inst).slice(0, 200);
+    let curI = null;
+    try { curI = schIssues_().filter(function (x) { return x.driverId === drvId && x.date === date && x.kind === '지시'; })[0] || null; } catch (e) { curI = null; }
+    if (!text && curI) { const r3 = adm_schIssueDel(token, curI.id); if (r3.ok) { out.removed.push(curI.id); out.inst = null; } else out.warn = (out.warn ? out.warn + ' ' : '') + '지시사항 지우기 실패: ' + r3.msg; }
+    else if (text && (!curI || curI.reason !== text)) { const r3 = adm_schIssueSave(token, { id: curI ? curI.id : '', date: date, driverId: drvId, kind: '지시', reason: text }); if (r3.ok) out.inst = r3.issue; else out.warn = (out.warn ? out.warn + ' ' : '') + '지시사항 저장 실패: ' + r3.msg; }
+  }
+  // 같은 칸이 여러 번 나오면 마지막 값만
+  const last = {}; out.cells.forEach(function (c) { last[c.row + '|' + c.date] = c; });
+  out.cells = Object.keys(last).map(function (k) { return last[k]; });
+  return out;
+}
