@@ -204,12 +204,14 @@ function adm_schLegacyPull(token, apply) {
     const underIssue = function (id, d) { return issues.some(function (x) { return x.driverId === id && x.date <= d && d <= (x.end || x.date); }); };
     const ctxOf = issCtxMaker_();
     const out = { from: L.from, to: L.to, drivers: 0, total: 0, same: 0, write: [], conv: 0, need: [], kept: [], noDriver: [] };
+    // 1) 기존 시트 칸 → 올인원 값 (기사 · 날짜별)
+    const ent = [], has = {}; // has[기사ID|날짜] = 기존 시트에 그 기사 본인 줄의 값이 있음
     L.rows.forEach(function (r) {
       const o = byLogin[stlLogin_(r.login)] || ((byName[r.name] || []).length === 1 ? byName[r.name][0] : null);
       if (!o) { if (Object.keys(r.cells).length) out.noDriver.push(r.name + ' (' + r.login + ')'); return; }
       out.drivers++;
       Object.keys(r.cells).forEach(function (d) {
-        const c = h.dates[d]; if (c === undefined) return;
+        if (h.dates[d] === undefined) return;
         const cx = ctxOf(o, d);
         // 기존 시트의 소속 캠프가 올인원과 다른 기사(백업 등): 캠프 이름 없이 적힌 노선·출근은 기존 시트 캠프의 노선이므로 캠프 이름을 붙여 넣는다
         const lc = str_(r.camp).replace(/\s*캠프\s*$/, '').replace(/\s/g, ''), diff = /^[가-힣]+\d+$/.test(lc) && lc !== String(cx.camp || '').replace(/\s/g, '');
@@ -219,14 +221,58 @@ function adm_schLegacyPull(token, apply) {
           else if (/^\d/.test(cv.v)) cv = { v: lc + ' ' + cv.v, kind: 'conv' };
         }
         if (cv.kind === 'skip') return;
-        out.total++;
-        if (cv.kind === 'need') { out.need.push({ name: o.name, date: d, raw: r.cells[d], why: cv.why }); return; }
-        const cur = rowOf[o.id] === undefined ? '' : str_(blk[rowOf[o.id]][c - cMin]); // 줄이 아직 없는 기사는 저장할 때 줄을 만든다
-        if (cur === cv.v || (cur && schLegacyMean_(cur, cx) === schLegacyMean_(cv.v, cx))) { out.same++; return; } // 글자가 달라도 뜻이 같으면 그대로 둠 (출근 = 담당 노선)
-        if (underIssue(o.id, d)) { out.kept.push({ name: o.name, date: d, raw: r.cells[d], cur: cur }); return; }
-        if (cv.kind === 'conv') out.conv++;
-        out.write.push({ row: o.id, name: o.name, date: d, raw: r.cells[d], value: cv.v, old: cur, conv: cv.kind === 'conv' });
+        ent.push({ o: o, d: d, raw: r.cells[d], cv: cv, cx: cx });
+        has[o.id + '|' + d] = 1;
       });
+    });
+    // 2) '노선 (아이디) 업무등록' 인데 그 아이디의 주인이 올인원에서 자기 줄·담당 노선이 있는 기사면 (예: 정유정 줄의 dasom1125 = 이윤형)
+    //    → 그 기사 줄에 적고(담당 노선이면 출근), 줄 주인은 휴무 — 같은 일을 두 줄에 적어 '중복'이 되지 않게 (올인원 규칙: 칸 = 그 사람이 한 일)
+    ent.slice().forEach(function (e) {
+      if (e.cv.kind === 'need') return;
+      const m = e.cv.v.match(/^(.*?)\s*\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)\s*업무등록$/);
+      if (!m || !m[1]) return;
+      const alt = byLogin[stlLogin_(m[2])];
+      if (!alt || alt.id === e.o.id || alt.status !== ST.ACTIVE || !alt.schCampId || rowOf[alt.id] === undefined || has[alt.id + '|' + e.d]) return;
+      const ax = ctxOf(alt, e.d);
+      if (!/^\d/.test(str_(ax.base))) return; // 담당 노선이 없는 사람(백업·서브 전용 아이디)은 지금처럼 줄 주인 칸에 아이디로 남김
+      const u = issUnits_(m[1], e.cx.rots); if (!u) return;
+      const camp = u.camp || e.cx.camp, text = issCompose_(u.units, ax.rots, camp !== ax.camp ? camp : '');
+      const v = schLegacyMean_(text, ax) === schLegacyMean_('출근', ax) ? '출근' : text;
+      ent.push({ o: alt, d: e.d, raw: e.raw + ' (' + e.o.name + ' 줄)', cv: { v: v, kind: 'conv' }, cx: ax });
+      has[alt.id + '|' + e.d] = 1;
+      e.cv = { v: '휴무', kind: 'conv' };
+    });
+    // 3) 회전을 나눠 뛰는 날: 다른 기사가 내 담당 노선의 일부 회전만 맡았으면 (예: 민경진 205C (D2,F3)) 내 '출근'에서 그 회전을 뺀다 (205C(D1),205D) — 통째로 겹치는 건 그대로 두어 중복으로 보이게 함
+    const part = {}; // 날짜|캠프|노선 → [{ id, rots }]
+    ent.forEach(function (e) {
+      if (e.cv.kind === 'need' || !/\d{3}/.test(e.cv.v)) return;
+      const u = issUnits_(e.cv.v, e.cx.rots); if (!u) return;
+      const camp = u.camp || e.cx.camp;
+      Object.keys(u.units).forEach(function (rt) { if (u.units[rt].length < e.cx.rots.length) (part[e.d + '|' + camp + '|' + rt] = part[e.d + '|' + camp + '|' + rt] || []).push({ id: e.o.id, rots: u.units[rt] }); });
+    });
+    ent.forEach(function (e) {
+      if (e.cv.kind === 'need' || e.cv.v !== '출근') return;
+      const b = issUnits_(e.cx.base, e.cx.rots); if (!b) return;
+      let cut = false; const left = {};
+      Object.keys(b.units).forEach(function (rt) {
+        const others = (part[e.d + '|' + e.cx.camp + '|' + rt] || []).filter(function (x) { return x.id !== e.o.id; });
+        const gone = {}; others.forEach(function (x) { x.rots.forEach(function (r) { gone[r] = 1; }); });
+        const keep = b.units[rt].filter(function (r) { return !gone[r]; });
+        if (keep.length < b.units[rt].length) cut = true;
+        if (keep.length) left[rt] = keep;
+      });
+      if (cut && Object.keys(left).length) e.cv = { v: issCompose_(left, e.cx.rots, ''), kind: 'conv' };
+    });
+    // 4) 올인원과 견주기
+    ent.forEach(function (e) {
+      const o = e.o, d = e.d, c = h.dates[d], cv = e.cv, cx = e.cx;
+      out.total++;
+      if (cv.kind === 'need') { out.need.push({ name: o.name, date: d, raw: e.raw, why: cv.why }); return; }
+      const cur = rowOf[o.id] === undefined ? '' : str_(blk[rowOf[o.id]][c - cMin]); // 줄이 아직 없는 기사는 저장할 때 줄을 만든다
+      if (cur === cv.v || (cur && schLegacyMean_(cur, cx) === schLegacyMean_(cv.v, cx))) { out.same++; return; } // 글자가 달라도 뜻이 같으면 그대로 둠 (출근 = 담당 노선)
+      if (underIssue(o.id, d)) { out.kept.push({ name: o.name, date: d, raw: e.raw, cur: cur }); return; }
+      if (cv.kind === 'conv') out.conv++;
+      out.write.push({ row: o.id, name: o.name, date: d, raw: e.raw, value: cv.v, old: cur, conv: cv.kind === 'conv' });
     });
     return { ok: true, a: a, out: out };
   });
