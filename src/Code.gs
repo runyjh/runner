@@ -5514,7 +5514,7 @@ function api_campSchedule(token, month, campId) {
       if (forceMe && !inCamp[me.id]) { const all1 = {}; dates.forEach(function (d) { all1[d] = 1; }); inCamp[me.id] = { days: all1, route: me.baseRoute || '', guest: true, home: out.camp }; }
       const byId = {};
       all.filter(function (o) { return inCamp[o.id]; }).forEach(function (o) {
-        byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].home || '', cells: {}, away: {}, order: 1e9 };
+        byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', loginId: str_(o.loginId), subIds: [o.subId1, o.subId2].map(str_).filter(Boolean), phone: o.phone ? fmtPhone_(o.phone) : '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].home || '', cells: {}, away: {}, order: 1e9 };
         // 노선 변경·이관으로 이 캠프에 없는 날 (예: 11/11부터 군포1로 간 기사는 그날부터 안양1 목록에서 빠짐)
         if (!inCamp[o.id].guest) { const off = {}; let n = 0; dates.forEach(function (d) { if (!inCamp[o.id].days[d]) { off[d] = 1; n++; } }); if (n) byId[o.id].off = off; }
       });

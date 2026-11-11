@@ -510,6 +510,12 @@
   .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--brand); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .cbk { font-size: 14px; line-height: 1.7; color: #5a3286; }
+  /* 내 캠프 → 기사 연락처 (쿠팡 아이디 · 전화) */
+  .ct .ctr { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid #f0f2f4; } .ct .ctr:first-of-type { border-top: 0; }
+  .ct .ctr.me { background: #fffbea; margin: 0 -14px; padding: 9px 14px; border-radius: 10px; }
+  .ct .ctr .nm { flex: 1; min-width: 0; } .ct .ctr .nm b { display: block; font-size: 14.5px; } .ct .ctr .nm b small { color: #b7791f; font-weight: 600; }
+  .ct .ctr .nm span { display: block; font-size: 13px; color: var(--sub); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; } .ct .ctr .nm span i { font-style: normal; color: #b0b8c1; font-family: inherit; } .ct .ctr .nm em { display: block; font-style: normal; font-size: 12px; }
+  .ct .tel { flex: 0 0 auto; font-size: 14px; font-weight: 700; color: var(--brand); text-decoration: none; background: var(--brand-weak); border-radius: 999px; padding: 7px 12px; white-space: nowrap; } .ct .tel.none { color: #b0b8c1; background: #f2f4f6; font-weight: 600; }
   /* 내 캠프 → 노선 정보 (참고 이미지 + 기사들이 쓰는 라우트 정보) */
   /* 노선 정보 접기: 제목줄을 누르면 접고 펼침 (이 기기에 기억) */
   .wk.ri h3.rih { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; margin-bottom: 0; }
@@ -1870,12 +1876,22 @@
         ((rows + pmRows) || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(D.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>' +
-      '<div id="riBox"></div>';
+      '<div id="riBox"></div>' + ctHtml(D);
     const myCell = me ? me.cells[d] || '' : '', myPc = myCell ? schParse(myCell, me.route || '') : (me && me.route ? schParse(me.route, '') : null);
     riShow(D.campId || r.campId, D.camp, (myPc && myPc.codes) || []);
   }
+  /** 내 캠프 → 노선 정보 밑: 이 캠프 소속 기사들의 쿠팡 아이디 · 연락처 (전화번호를 누르면 바로 전화) */
+  let CT_FOLD = true; // 기사 연락처도 앱을 열 때마다 접힌 채로 시작
+  function ctHtml(D) {
+    const ds = (D.drivers || []).filter((x) => !x.guest);
+    return '<div class="wk ri ct' + (CT_FOLD ? ' fold' : '') + '"><h3 class="rih" data-ctfold role="button" aria-expanded="' + !CT_FOLD + '"><span>📇 ' + escH(D.camp) + ' 기사 연락처<i class="chev">▾</i></span><small class="fix">' + ds.length + '명' + (CT_FOLD ? ' · 펼치기' : '') + '</small></h3>' +
+      (ds.length ? ds.map((x) => '<div class="ctr' + (x.me ? ' me' : '') + '"><div class="nm"><b>' + escH(x.name) + (x.me ? ' <small>(나)</small>' : '') + '</b>' +
+        '<span>' + (x.loginId ? escH(x.loginId) : '<i>아이디 없음</i>') + ((x.subIds || []).length ? '<em>서브 ' + escH(x.subIds.join(', ')) + '</em>' : '') + '</span></div>' +
+        (x.phone ? '<a class="tel" href="tel:' + escH(String(x.phone).replace(/[^0-9]/g, '')) + '">📞 ' + escH(x.phone) + '</a>' : '<span class="tel none">번호 없음</span>') + '</div>').join('')
+        : '<div style="color:#b0b8c1">이 캠프 기사가 없습니다.</div>') + '</div>';
+  }
   // ───── 내 캠프 → 노선 정보: 노선관리 참고 이미지 + 기사들이 자유롭게 쓰는 라우트 정보 ─────
-  const RI = { cache: {}, campId: '', camp: '', mine: [], f: '', edit: '', big: {}, seq: 0, ph: [], draftFor: null, fold: (() => { try { return localStorage.getItem('runner.riFold') === '1'; } catch (e) { return false; } })() };
+  const RI = { cache: {}, campId: '', camp: '', mine: [], f: '', edit: '', big: {}, seq: 0, ph: [], draftFor: null, fold: true }; // 노선 정보는 앱을 열 때마다 접힌 채로 시작 (제목줄을 누르면 펼침)
   const riHead = (camp, n) => '<h3 class="rih" data-rifold role="button" aria-expanded="' + !RI.fold + '"><span>🗺️ ' + escH(camp) + ' 노선 정보<i class="chev">▾</i></span>' + (n == null ? '' : '<small class="fix">' + n + '건' + (RI.fold ? ' · 펼치기' : '') + '</small>') + '</h3>';
   const RI_PH_MAX = 4;
   function riShow(campId, camp, mine) {
@@ -1976,10 +1992,18 @@
   $('#scBody').addEventListener('click', (e) => {
     const fd = e.target.closest('[data-rifold]');
     if (fd) { // 접기·펼치기: 다시 그리지 않고 class 만 바꿈 (쓰던 글·사진 그대로)
-      RI.fold = !RI.fold; try { localStorage.setItem('runner.riFold', RI.fold ? '1' : '0'); } catch (x) {}
+      RI.fold = !RI.fold;
       const w = fd.closest('.wk.ri'); w.classList.toggle('fold', RI.fold); fd.setAttribute('aria-expanded', String(!RI.fold));
       const sm = fd.querySelector('small'), r = RI.cache[RI.campId]; if (sm && r) sm.textContent = r.notes.length + '건' + (RI.fold ? ' · 펼치기' : '');
       if (!RI.fold) fd.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
+    }
+    const cf = e.target.closest('[data-ctfold]');
+    if (cf) {
+      CT_FOLD = !CT_FOLD;
+      cf.closest('.wk.ct').classList.toggle('fold', CT_FOLD); cf.setAttribute('aria-expanded', String(!CT_FOLD));
+      const sm = cf.querySelector('small'); if (sm) sm.textContent = sm.textContent.replace(/ · 펼치기$/, '') + (CT_FOLD ? ' · 펼치기' : '');
+      if (!CT_FOLD) cf.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       return;
     }
     const f = e.target.closest('[data-rif]'); if (f) { RI.f = f.dataset.rif; RI.edit = ''; return riPaint(); }
