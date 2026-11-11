@@ -836,7 +836,7 @@
     <div class="menu">
       <button class="tile" id="mSched" type="button"><i class="ti">📅</i><b>스케줄</b><span>한 달 일정 · 내 캠프 →</span></button>
       <button class="tile" id="mSettle" type="button"><i class="ti">💰</i><b>정산서 보기</b><span>월별 정산서·계산서 →</span></button>
-      <button class="tile" id="mPm" type="button"><i class="ti">🤝</i><b>품앗이</b><span>일감 찾기·맡기기 →</span></button>
+      <button class="tile" id="mPm" type="button"><i class="ti">🤝</i><b>품앗이</b><span>일감 찾기·맡기기 →</span><em class="tbdg hidden" id="mPmBdg"></em></button>
       <button class="tile" id="mMy" type="button"><i class="ti">👤</i><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
       <button class="tile wide hidden" id="mMemo" type="button"><i class="ti">📝</i><b>러너 업무스케줄</b><span>관리자·운영자·대표 전용 · 날짜별 업무 메모 →</span></button>
       <div class="tile wide bdtile hidden" id="mBoard" role="button" tabindex="0"><b><i class="ti">💬</i>자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
@@ -2434,7 +2434,11 @@
       '<button type="button" class="more" data-pj="' + escH(j.id) + '">내용 보기</button></div>' + over + '</div>';
   }
   // 목록
-  function openPumasi(from) { pmFrom = from || 'home'; show('pumasi'); loadPmList(); }
+  function openPumasi(from) {
+    pmFrom = from || 'home'; show('pumasi'); loadPmList();
+    // 품앗이 화면을 열면 '새 품앗이 일감' 알림은 읽은 것으로 (카드 숫자 지움)
+    const nj = paList.filter((a) => !a.read && a.kind === 'newjob').map((a) => a.id); if (nj.length && window.markAlerts) window.markAlerts(nj);
+  }
   let pmListSeq = 0;
   function loadPmList() {
     const token = pmTok(); if (!token) return;
@@ -3367,7 +3371,10 @@
   const seenGet = () => { try { return JSON.parse(lsGet(PM_SEEN) || '[]'); } catch (e) { return []; } };
   function paintAlertBadges() {
     const n = paUnread;
-    ['#mMyBdg'].forEach((sel) => { const b = $(sel); if (!b) return; b.textContent = n > 99 ? '99+' : String(n); b.classList.toggle('hidden', !n); });
+    // 품앗이 카드 = 안 읽은 '새 품앗이 일감' 알림 수 · 마이페이지 카드 = 그 밖의 안 읽은 알림 수 (둘을 더하면 전체)
+    const nj = Math.min(n, paList.filter((a) => !a.read && a.kind === 'newjob').length);
+    const put = (sel, k) => { const b = $(sel); if (!b) return; b.textContent = k > 99 ? '99+' : String(k); b.classList.toggle('hidden', !k); };
+    put('#mPmBdg', nj); put('#mMyBdg', n - nj);
     const c = $('#myAlertCnt'); if (c) c.innerHTML = n ? '<span class="bdg nw">' + n + '</span>' : '';
     syncIconBadge(n + (slipPending ? 1 : 0)); // + 아직 안 본 '정산서 마감' 안내
   }
@@ -3447,6 +3454,7 @@
     if (t && token) { api('api_pmPushDel', token, t).catch(() => {}); lsSet(PUSH_TOK, null); lsSet(PUSH_AT, null); }
   };
   document.addEventListener('visibilitychange', () => { if (!document.hidden && paTimer) { clearShownNotifications(); pollAlerts(true); } });
+  window.markAlerts = (ids) => markAlerts(ids);
   function markAlerts(ids) {
     const token = store.get(TOKEN); if (!token) return Promise.resolve();
     paList.forEach((a) => { if (ids === 'all' || ids.includes(a.id)) { if (!a.read) paUnread = Math.max(0, paUnread - 1); a.read = true; } });
