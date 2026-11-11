@@ -808,7 +808,7 @@ function run_(fn) {
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
 const FS_READ_FNS = ['adm_ntPhoto', 'api_ntPhoto', 'adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
-  'adm_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
+  'adm_memoMonth', 'api_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
   'adm_stlMonth', 'adm_stlPayList', 'adm_stlPnl', 'adm_stlRoundInfo', 'adm_stlSlip', 'adm_stlTable', 'adm_stlTax', 'adm_tiList',
   'api_bdList', 'api_bdPost', 'api_bdRecent', 'api_bdAttach', 'api_campSchedule', 'api_checkLoginId', 'api_checkSession', 'api_fsToken', 'api_login', 'api_logout',
@@ -2445,8 +2445,11 @@ function memoSort_(a, b) {
 
 /** 한 달치 메모 (시트를 한 번에 읽는다). ym = 'yyyy-MM' */
 function adm_memoMonth(token, ym) {
-  return run_(function () {
-    requireAdmin_(token);
+  return run_(function () { requireAdmin_(token); return memoMonth_(ym); });
+}
+/** 한 달치 메모 (관리자앱 · 기사앱 직함자 공용) */
+function memoMonth_(ym) {
+  {
     if (!/^\d{4}-\d{2}$/.test(String(ym || ''))) fail_('월 형식이 올바르지 않습니다.');
     const sh = sheet_(SH.MEMO), c = cols_(SH.MEMO), last = sh.getLastRow();
     const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
@@ -2466,7 +2469,7 @@ function adm_memoMonth(token, ym) {
     let noteLabels = [];
     try { noteLabels = schNotes_().map(function (n) { return n.label; }); } catch (e) { /* 스케줄 DB 가 없으면 비움 */ }
     return { ok: true, memos: list, pastUndone: pastUndone, today: today, noteLabels: noteLabels };
-  });
+  }
 }
 
 /** 지난 날짜의 완료 안 된 메모 목록 */
@@ -2492,8 +2495,11 @@ function adm_memoPastUndone(token) {
 
 /** 메모 추가(id 없음) 또는 수정(id 있음). 바꿀 항목만 보내도 된다. */
 function adm_memoSave(token, memo) {
-  return run_(function () {
-    const a = requireAdmin_(token);
+  return run_(function () { return memoSave_(requireAdmin_(token), memo); });
+}
+/** 메모 추가·수정 (관리자앱 · 기사앱 직함자 공용). a = { name } 작성자 */
+function memoSave_(a, memo) {
+  {
     memo = memo || {};
     const f = {};
     if (memo.date !== undefined) {
@@ -2534,12 +2540,14 @@ function adm_memoSave(token, memo) {
     } finally {
       lock.releaseLock();
     }
-  });
+  }
 }
 
 function adm_memoDelete(token, id) {
-  return run_(function () {
-    requireAdmin_(token);
+  return run_(function () { requireAdmin_(token); return memoDelete_(id); });
+}
+function memoDelete_(id) {
+  {
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
@@ -2550,6 +2558,35 @@ function adm_memoDelete(token, id) {
     } finally {
       lock.releaseLock();
     }
+  }
+}
+
+// ───── 기사앱: 러너 업무스케줄 (직함자 = 관리자·운영자·대표만 · 보기·쓰기·고치기·지우기) ─────
+/** 기사앱 세션 + 직함 확인. 직함이 없으면 막는다 */
+function memoStaff_(token) {
+  const s = getSession_(token);
+  const info = s ? driverInfo_(s.d) : null;
+  if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { err: { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' } };
+  if (info.mustChange) return { err: { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' } };
+  if (!info.title) fail_('업무스케줄은 관리자·운영자·대표만 볼 수 있습니다.');
+  return { me: info };
+}
+function api_memoMonth(token, ym) {
+  return run_(function () { const x = memoStaff_(token); return x.err || memoMonth_(ym); });
+}
+function api_memoSave(token, memo) {
+  return run_(function () {
+    const x = memoStaff_(token); if (x.err) return x.err;
+    const out = memoSave_({ name: x.me.name }, memo);
+    logAdmin_({ name: x.me.name + ' (기사앱 ' + x.me.title + ')', loginId: x.me.loginId }, memo && memo.id ? '업무스케줄 수정' : '업무스케줄 추가', (out.memo && out.memo.date) || '', String((memo && memo.content) || '').slice(0, 40));
+    return out;
+  });
+}
+function api_memoDelete(token, id) {
+  return run_(function () {
+    const x = memoStaff_(token); if (x.err) return x.err;
+    logAdmin_({ name: x.me.name + ' (기사앱 ' + x.me.title + ')', loginId: x.me.loginId }, '업무스케줄 삭제', String(id || ''), '');
+    return memoDelete_(id);
   });
 }
 

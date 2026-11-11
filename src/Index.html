@@ -510,6 +510,19 @@
   .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--brand); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .cbk { font-size: 14px; line-height: 1.7; color: #5a3286; }
+  /* 러너 업무스케줄 (직함자) */
+  .mmnav { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; } .mmnav > button { flex: 0 0 auto; height: 42px; min-width: 42px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font-size: 14px; font-weight: 700; color: var(--ink); }
+  .mmnav .mmtd { padding: 0 12px; color: var(--brand); }
+  .mmnav .mmd { flex: 1; position: relative; height: 42px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; }
+  .mmnav .mmd input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
+  .mmform { padding: 14px; } .mmform .row1 { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; } .mmform .row1 input { width: 130px; flex: 0 0 auto; } .mmform .row1 small { color: var(--sub); font-weight: 600; }
+  .mmform textarea { min-height: 84px; } .mmform .row2 { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; } .mmform .row2 .btn.sm { height: 42px; }
+  .mmi { background: #fff; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
+  .mmi .ck { flex: 0 0 auto; width: 26px; height: 26px; border: 2px solid #c5ccd3; border-radius: 8px; background: #fff; color: #fff; font-size: 15px; font-weight: 800; line-height: 1; padding: 0; margin-top: 1px; }
+  .mmi.done .ck { background: #12b886; border-color: #12b886; } .mmi.done .tx { color: #9aa4ae; text-decoration: line-through; }
+  .mmi .bd { flex: 1; min-width: 0; } .mmi .tm { font-size: 12.5px; font-weight: 800; color: var(--brand); margin-right: 6px; } .mmi .cat { font-size: 11.5px; font-weight: 700; color: #8a4b00; background: #fff4d6; border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+  .mmi .tx { font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
+  .mmi .mt { display: flex; gap: 10px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--sub); } .mmi .mt span { flex: 1; } .mmi .mt button { border: 0; background: none; color: var(--brand); font-size: 12.5px; font-weight: 700; padding: 2px 0; } .mmi .mt button.del { color: #e03131; }
   /* 내 캠프 → 기사 연락처 (쿠팡 아이디 · 전화) */
   .ct .ctr { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid #f0f2f4; } .ct .ctr:first-of-type { border-top: 0; }
   .ct .ctr.me { background: #fffbea; margin: 0 -14px; padding: 9px 14px; border-radius: 10px; }
@@ -807,6 +820,7 @@
       <button class="tile" id="mSettle" type="button"><i class="ti">💰</i><b>정산서 보기</b><span>월별 정산서·계산서 →</span></button>
       <button class="tile" id="mPm" type="button"><i class="ti">🤝</i><b>품앗이</b><span>일감 찾기·맡기기 →</span></button>
       <button class="tile" id="mMy" type="button"><i class="ti">👤</i><b>마이페이지</b><span>내 품앗이·내 정보 →</span><em class="tbdg hidden" id="mMyBdg"></em></button>
+      <button class="tile wide hidden" id="mMemo" type="button"><i class="ti">📝</i><b>러너 업무스케줄</b><span>관리자·운영자·대표 전용 · 날짜별 업무 메모 →</span></button>
       <div class="tile wide bdtile hidden" id="mBoard" role="button" tabindex="0"><b><i class="ti">💬</i>자유게시판</b><span class="sub2">기사님끼리 정보·질문·나눔 →</span><div id="bdCard" class="bdrecent hidden"></div></div>
     </div>
     <button class="inst hidden" id="instBtn" type="button"><b>📲 홈 화면에 러너 앱 설치</b><span>다음부터 아이콘을 누르면 바로 열립니다</span></button>
@@ -835,6 +849,16 @@
     <button class="btn" type="button" id="pushPopGo" style="width:100%">알림 허용하기</button>
     <button class="btn ghost hidden" type="button" id="pushPopNo" style="width:100%;margin-top:8px">확인</button>
     <button class="btn ghost" type="button" id="pushPopLater" style="width:100%;margin-top:8px">나중에 (오늘은 그만 보기)</button></div></div>
+
+  <!-- ───────────── 러너 업무스케줄 (직함자 전용 · 관리자앱 업무스케줄과 같은 데이터) ───────────── -->
+  <section id="v-memo" class="view">
+    <div class="topbar"><button class="back" id="mmBack" aria-label="뒤로">←</button><h2>러너 업무스케줄</h2></div>
+    <div class="mmnav"><button type="button" data-mmv="-1" aria-label="전날">◀</button><label class="mmd"><b id="mmDay"></b><input type="date" id="mmPick" aria-label="날짜 고르기"></label><button type="button" data-mmv="1" aria-label="다음날">▶</button><button type="button" class="mmtd" id="mmToday">오늘</button></div>
+    <div class="card mmform"><div class="row1"><input type="time" id="mmTime" aria-label="시간 (비워도 됨)"><small id="mmMode">✍️ 새 메모</small></div>
+      <textarea id="mmTx" maxlength="2000" placeholder="이 날 할 일·업무 메모를 적어 주세요. (관리자앱 업무스케줄에 같이 보입니다)"></textarea>
+      <div class="row2"><button type="button" class="btn ghost sm hidden" id="mmCancel">취소</button><button type="button" class="btn sm" id="mmGo">추가</button></div></div>
+    <div id="mmList"></div>
+  </section>
 
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
@@ -1204,7 +1228,7 @@
   // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
   const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_myFb', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
   const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
-  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_ntPhoto', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
+  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_ntPhoto', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto', 'api_memoMonth']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
   const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
   // 자동 로그인이면 이 기기(localStorage), 아니면 이 창에만(sessionStorage · 창을 닫으면 사라짐) — 로그인 토큰과 같은 곳
@@ -1306,7 +1330,7 @@
       notice: () => openNotices(''), sched: () => openSched(), pumasi: () => openPumasi('home'), pmform: () => openPumasi('home'), pmgive: () => openGive(ssGet('runner.gvMode') || 'me'),
       board: () => openBoard(), bdform: () => openBoard(), bdpost: () => { const id = ssGet('runner.bdId'); if (id) openBdPost(id, 'board'); else openBoard(); },
       pmdetail: () => { const id = ssGet('runner.pmId'); if (id) openPmDetail(id, 'pumasi'); else openPumasi('home'); },
-      mypage: () => openMyPage(), myinfo: () => { openMyPage(); show('myinfo'); }, pmalerts: () => openPmAlerts(), settle: () => openSettle(),
+      mypage: () => openMyPage(), myinfo: () => { openMyPage(); show('myinfo'); }, pmalerts: () => openPmAlerts(), settle: () => openSettle(), memo: () => openMemo(),
       pmmine: () => { pmMineKind = ssGet('runner.pmKind') || 'posted'; show('pmmine'); loadPmMine(); }
     }[v];
     if (!open) return false;
@@ -1316,7 +1340,7 @@
   const BASE_VIEWS = ['home', 'login', 'splash', 'pending'];
   const BACK_BTN = {
     signup: '#v-signup .back', reset: '#v-reset .back', notice: '#ntBack', sched: '#scBack', changepw: '#cpBack', pumasi: '#pmBack', pmdetail: '#pdBack',
-    pmform: '#pfBack', pmgive: '#gvBack', board: '#bdBack', bdpost: '#bpBack', bdform: '#bfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack'
+    pmform: '#pfBack', pmgive: '#gvBack', board: '#bdBack', bdpost: '#bpBack', bdform: '#bfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack', memo: '#mmBack'
   };
   const OVERLAYS = ['#riView', '#pmAsk', '#instHelp', '#ntPop', '#slPop', '#pushPop']; // 뒤로가기로 닫히는 팝업 (없으면 홈에서 뒤로가기 = 앱 종료)
   let backGuard = false, backSkip = false;
@@ -1411,6 +1435,7 @@
   const honor = (u) => !u || !u.name ? '기사님' : u.name + ' ' + (u.title ? u.title + '님' : '기사님');
   function goHome(user) {
     $('#homeName').textContent = honor(user) + ', 안녕하세요';
+    $('#mMemo').classList.toggle('hidden', !(user && user.title)); // 러너 업무스케줄: 관리자·운영자·대표만
     const saved = viewRestored ? null : ssGet('runner.view');
     viewRestored = true;
     show('home');
@@ -3559,6 +3584,76 @@
     }).catch(() => { if (!append) $('#bdList').innerHTML = ''; netErr(); });
   }
   $('#mBoard').addEventListener('click', () => openBoard('home'));
+  // ───── 러너 업무스케줄 (직함자 전용): 하루씩 보기 · 추가 · 수정 · 완료 · 삭제 ─────
+  const MM = { day: '', months: {}, edit: '', seq: 0 };
+  const mmYmd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  function openMemo() {
+    if (!MM.day) MM.day = mmYmd(new Date());
+    show('memo'); mmReset(); mmPaint(); mmLoad();
+  }
+  function mmLoad(force) {
+    const ym = MM.day.slice(0, 7), seq = ++MM.seq, tok = store.get(TOKEN); if (!tok) return;
+    if (!force && MM.months[ym] && Date.now() - MM.months[ym].at < 30000) return;
+    return api('api_memoMonth', tok, ym).then((r) => {
+      if (seq !== MM.seq) return;
+      if (!pmOk(r, '업무스케줄을 불러오지 못했습니다.')) { if (!MM.months[ym]) $('#mmList').innerHTML = '<div class="card" style="color:var(--sub)">' + escH((r && r.msg) || '불러오지 못했습니다.') + '</div>'; return; }
+      MM.months[ym] = { at: Date.now(), memos: r.memos || [] }; mmPaint();
+    }).catch(() => netErr());
+  }
+  function mmPaint() {
+    const p = MM.day.split('-'), dt = new Date(+p[0], +p[1] - 1, +p[2]), today = mmYmd(new Date());
+    $('#mmDay').textContent = (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dt.getDay()] + ')' + (MM.day === today ? ' · 오늘' : '');
+    $('#mmPick').value = MM.day;
+    const m = MM.months[MM.day.slice(0, 7)];
+    if (!m) { $('#mmList').innerHTML = '<div class="card" style="color:var(--sub)">불러오는 중…</div>'; return; }
+    const list = m.memos.filter((x) => x.date === MM.day);
+    $('#mmList').innerHTML = list.length ? list.map((x) => '<div class="mmi' + (x.done ? ' done' : '') + '">' +
+      (x.note ? '' : '<button type="button" class="ck" data-mmdone="' + escH(x.id) + '" aria-label="완료 표시">' + (x.done ? '✓' : '') + '</button>') +
+      '<div class="bd">' + (x.time ? '<span class="tm">' + escH(x.time) + '</span>' : '') + (x.cat ? '<span class="cat">' + escH(x.cat) + '</span>' : '') +
+      '<div class="tx">' + escH(x.content) + '</div>' +
+      '<div class="mt"><span>' + escH(x.author || '') + '</span><button type="button" data-mmedit="' + escH(x.id) + '">수정</button><button type="button" class="del" data-mmdel="' + escH(x.id) + '">삭제</button></div></div></div>').join('')
+      : '<div class="card" style="color:#b0b8c1;text-align:center">이 날은 업무 메모가 없습니다.</div>';
+  }
+  function mmFind(id) { const m = MM.months[MM.day.slice(0, 7)]; return m ? m.memos.find((x) => x.id === id) : null; }
+  function mmPut(memo) {
+    Object.keys(MM.months).forEach((k) => { MM.months[k].memos = MM.months[k].memos.filter((x) => x.id !== memo.id); });
+    const ym = memo.date.slice(0, 7); if (MM.months[ym]) { MM.months[ym].memos.push(memo); MM.months[ym].memos.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.time !== b.time ? (!a.time ? 1 : !b.time ? -1 : a.time < b.time ? -1 : 1) : (a.createdAt < b.createdAt ? -1 : 1))); }
+  }
+  function mmReset() { MM.edit = ''; $('#mmTx').value = ''; $('#mmTime').value = ''; $('#mmMode').textContent = '✍️ 새 메모'; $('#mmGo').textContent = '추가'; $('#mmCancel').classList.add('hidden'); }
+  function mmGoDay(d) { MM.day = d; mmReset(); mmPaint(); mmLoad(); }
+  $('#mMemo').addEventListener('click', openMemo);
+  $('#mmBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
+  $('#mmToday').addEventListener('click', () => mmGoDay(mmYmd(new Date())));
+  $('#mmPick').addEventListener('change', (e) => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) mmGoDay(e.target.value); });
+  $('#v-memo').addEventListener('click', (e) => {
+    const mv = e.target.closest('[data-mmv]');
+    if (mv) { const p = MM.day.split('-'); return mmGoDay(mmYmd(new Date(+p[0], +p[1] - 1, +p[2] + (+mv.dataset.mmv)))); }
+    const ed = e.target.closest('[data-mmedit]');
+    if (ed) { const x = mmFind(ed.dataset.mmedit); if (!x) return; MM.edit = x.id; $('#mmTx').value = x.content; $('#mmTime').value = x.time || ''; $('#mmMode').textContent = '✏️ 고치는 중'; $('#mmGo').textContent = '저장'; $('#mmCancel').classList.remove('hidden'); $('#mmTx').focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    const dn = e.target.closest('[data-mmdone]');
+    if (dn) {
+      const x = mmFind(dn.dataset.mmdone); if (!x || dn.disabled) return; dn.disabled = true;
+      return api('api_memoSave', store.get(TOKEN), { id: x.id, done: !x.done }).then((r) => { if (pmOk(r, '저장하지 못했습니다.')) { mmPut(r.memo); mmPaint(); } else dn.disabled = false; }).catch(() => { dn.disabled = false; netErr(); });
+    }
+    const dl = e.target.closest('[data-mmdel]');
+    if (dl) {
+      const x = mmFind(dl.dataset.mmdel); if (!x) return;
+      return pmAsk('메모 삭제', '이 메모를 지울까요? 관리자앱 업무스케줄에서도 지워집니다.\n\n' + x.content.slice(0, 60), '삭제').then((ok) => {
+        if (ok === null) return;
+        return api('api_memoDelete', store.get(TOKEN), x.id).then((r) => { if (!pmOk(r, '지우지 못했습니다.')) return; Object.keys(MM.months).forEach((k) => { MM.months[k].memos = MM.months[k].memos.filter((y) => y.id !== x.id); }); if (MM.edit === x.id) mmReset(); mmPaint(); toast('지웠습니다.'); });
+      }).catch(() => netErr());
+    }
+  });
+  $('#mmCancel').addEventListener('click', mmReset);
+  $('#mmGo').addEventListener('click', () => {
+    const tx = $('#mmTx').value.trim(), go = $('#mmGo'); if (!tx) { toast('내용을 입력해 주세요.'); return $('#mmTx').focus(); }
+    if (go.disabled) return; go.disabled = true;
+    const memo = MM.edit ? { id: MM.edit, content: tx, time: $('#mmTime').value } : { date: MM.day, content: tx, time: $('#mmTime').value };
+    api('api_memoSave', store.get(TOKEN), memo).then((r) => {
+      go.disabled = false; if (!pmOk(r, '저장하지 못했습니다.')) return;
+      mmPut(r.memo); toast(MM.edit ? '고쳤습니다.' : '추가했습니다.'); mmReset(); mmPaint();
+    }).catch(() => { go.disabled = false; netErr(); });
+  });
   // 홈: 게시판 최근 글 3개
   window.bdPaint = function (posts) {
       const box = $('#bdCard');
