@@ -220,10 +220,16 @@
   .pmc.give .ar small { font-size: 13px; color: var(--sub); font-weight: 600; margin-left: 6px; }
   /* 품앗이: 근무 가능일 달력 */
   /* 내 근무 가능일 / 일할 기사 찾기: 높이 2배 · 고른 쪽은 메인 색 바탕 흰 글자 */
-  .pfltr { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
-  .pfltr button { min-width: 64px; height: 42px; padding: 0 10px; border-radius: 10px; border: 1.5px solid #d1d6db; background: #fff; color: var(--sub); font-size: 15px; font-weight: 700; text-decoration: line-through; }
-  .pfltr button.on { border-color: var(--brand); background: var(--brand); color: #fff; text-decoration: none; }
-  .pfltr small { flex-basis: 100%; color: var(--sub); font-size: 12px; }
+  .rpk { border: 1px solid var(--line, #e5e8eb); border-radius: 12px; padding: 10px 8px; background: #fafbfc; }
+  .rpk-g { display: flex; flex-direction: column; gap: 6px; }
+  .rpk-r { display: flex; align-items: center; gap: 6px; } .rpk-r > b { width: 38px; flex: none; font-size: 15px; font-family: ui-monospace, monospace; }
+  .rpk-l { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+  .rpk-l button, .rpk-all, .rpk-d { height: 40px; min-width: 38px; padding: 0 8px; border-radius: 10px; border: 1.5px solid #d1d6db; background: #fff; color: var(--ink); font-size: 15px; font-weight: 700; }
+  .rpk-l button.on { border-color: var(--brand); background: var(--brand); color: #fff; }
+  .rpk-all { flex: none; font-size: 13px; color: var(--sub); background: #f2f4f6; border-color: #e5e8eb; } .rpk-all.on { background: var(--brand-weak); color: var(--brand); border-color: var(--brand); }
+  .rpk-f { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--sub); } .rpk-f b { color: var(--ink); word-break: break-all; } .rpk-f i { font-style: normal; color: #b0b8c1; font-weight: 500; }
+  @media (max-width: 340px) { .rpk-l button { min-width: 32px; padding: 0 5px; } .rpk-r > b { width: 32px; font-size: 14px; } .rpk-all { padding: 0 6px; } .rpk-l { gap: 4px; } }
+  .rpk-d { height: 34px; font-size: 13px; flex: none; } .rpk-d.on { background: var(--ink); color: #fff; border-color: var(--ink); }
   .segm.gvseg { margin: 0 0 14px; padding: 5px; border-radius: 14px; background: var(--brand-weak); }
   .segm.gvseg button { flex: 1; padding: 0 6px; height: 70px; font-size: 17px; font-weight: 800; border-radius: 11px; color: var(--brand); white-space: nowrap; transition: background .15s, color .15s; }
   .segm.gvseg button.on { background: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(27,100,218,.28); }
@@ -864,10 +870,8 @@
           <div class="field"><label class="lb" for="pfDate">배차일자<span class="req">*</span></label><input type="date" id="pfDate"></div>
           <div class="field"><label class="lb" for="pfTime">입차시간<span class="req">*</span></label><input type="time" id="pfTime"></div>
         </div>
-        <div class="row">
-          <div class="field"><label class="lb" for="pfCamp">센터(캠프)<span class="req">*</span></label><select id="pfCamp"></select></div>
-          <div class="field"><label class="lb" for="pfRouteSel">라우트</label><select id="pfRouteSel"></select><div class="pfltr hidden" id="pfLetters" role="group" aria-label="맡길 구역"></div><input type="text" id="pfRoute" class="hidden" placeholder="라우트 직접 입력 (예: 527B)" autocomplete="off" style="margin-top:6px"></div>
-        </div>
+        <div class="field"><label class="lb" for="pfCamp">센터(캠프)<span class="req">*</span></label><select id="pfCamp"></select></div>
+        <div class="field"><label class="lb">라우트</label><div class="rpk" id="pfRoutePick"></div><input type="text" id="pfRoute" class="hidden" placeholder="라우트 직접 입력 (예: 527B)" autocomplete="off" style="margin-top:6px"></div>
         <div class="field"><label class="lb" for="pfArea">배송지<span class="req">*</span></label><input type="text" id="pfArea" placeholder="예: 강서구 화곡동" maxlength="40"></div>
         <div class="row">
           <div class="field"><label class="lb" for="pfQty">평균 물량<span class="req">*</span></label><input type="text" id="pfQty" placeholder="예: 250개" maxlength="20"></div>
@@ -2495,39 +2499,52 @@
     if (!raw) pmSuggestPrice();
   }
   function pmSetKind(k) { $$('#pfKind button').forEach((b) => b.classList.toggle('on', b.dataset.k === k)); }
+  // ───── 라우트 조합창 (관리자 기사스케줄 칸 고르기와 같은 모양): 숫자 줄마다 A·B·C·D 단추 + 전체 → '404AB' · '404A,405CD' ─────
+  //  RPK.units = ['404A','404B', …] · RPK.direct = 직접 입력 중
+  const RPK = { units: [], direct: false, codes: [] };
+  const rpkSplit = (v) => { const m = String(v || '').toUpperCase().match(/^(\d+)([A-Z]+)$/); return m ? [m[1], m[2].split('')] : null; };
+  function rpkGroups() { // { nums: [[num, [letters]]…], whole: [code…] }
+    const by = new Map(), whole = [];
+    RPK.codes.forEach((c) => { const sp = rpkSplit(c); if (!sp) { whole.push(c); return; } const g = by.get(sp[0]) || []; sp[1].forEach((L) => { if (!g.includes(L)) g.push(L); }); by.set(sp[0], g); });
+    return { nums: [...by.entries()].sort((a, b) => Number(a[0]) - Number(b[0])).map(([n, g]) => [n, g.sort()]), whole: whole.sort() };
+  }
+  function rpkCompose() {
+    const by = new Map(), whole = [];
+    const W = new Set(rpkGroups().whole);
+    RPK.units.forEach((u) => { const m = !W.has(u) && String(u).match(/^(\d+)([A-Z])$/); if (m) by.set(m[1], (by.get(m[1]) || []).concat([m[2]])); else whole.push(u); });
+    return [...by.entries()].sort((a, b) => Number(a[0]) - Number(b[0])).map(([n, g]) => n + [...new Set(g)].sort().join('')).concat(whole.sort()).join(',');
+  }
+  function rpkPaint() {
+    const box = $('#pfRoutePick');
+    if (!$('#pfCamp').value) { box.innerHTML = '<div class="rpk-f">센터를 먼저 고르세요</div>'; return; }
+    const G = rpkGroups(), on = (u) => RPK.units.includes(u), v = RPK.direct ? $('#pfRoute').value.trim().toUpperCase() : rpkCompose();
+    box.innerHTML = (G.nums.length || G.whole.length ? '<div class="rpk-g">' + G.nums.map(([n, ls]) => '<div class="rpk-r"><b>' + escH(n) + '</b><div class="rpk-l">' +
+        ls.map((L) => '<button type="button" data-u="' + escH(n + L) + '" class="' + (on(n + L) ? 'on' : '') + '">' + escH(L) + '</button>').join('') + '</div>' +
+        '<button type="button" class="rpk-all' + (ls.every((L) => on(n + L)) ? ' on' : '') + '" data-all="' + escH(n) + '">전체</button></div>').join('') +
+        (G.whole.length ? '<div class="rpk-r"><b class="sub">기타</b><div class="rpk-l">' + G.whole.map((c) => '<button type="button" data-u="' + escH(c) + '" class="w' + (on(c) ? ' on' : '') + '">' + escH(c) + '</button>').join('') + '</div></div>' : '') + '</div>'
+      : '<div class="rpk-f">이 센터에 등록된 노선이 없습니다. 직접 입력해 주세요.</div>') +
+      '<div class="rpk-f"><span>입력될 값: <b>' + (v ? escH(v) : '<i>없음</i>') + '</b></span><button type="button" class="rpk-d' + (RPK.direct ? ' on' : '') + '" data-direct="1">' + (RPK.direct ? '고르기로' : '직접 입력') + '</button></div>';
+    $('#pfRoute').classList.toggle('hidden', !RPK.direct);
+  }
   function pmRoutes() {
     const c = (pmFormData ? pmFormData.camps : []).find((x) => x.id === $('#pfCamp').value);
-    const cur = $('#pfRoute').value.trim();
-    $('#pfRouteSel').innerHTML = !c ? '<option value="">센터를 먼저 고르세요</option>'
-      : '<option value="">선택 안 함</option>' + c.routes.map((r) => '<option value="' + escH(r) + '">' + escH(r) + '</option>').join('') + '<option value="__other">직접 입력…</option>';
-    pmSetRoute(cur);
+    RPK.codes = c ? c.routes.slice() : [];
+    pmSetRoute($('#pfRoute').value.trim());
   }
-  // 노선 코드 → [숫자, 글자들] (404ABCD → ['404', ['A','B','C','D']]) · 모양이 다르면 null
-  const pmSplitRt = (v) => { const m = String(v || '').toUpperCase().match(/^(\d+)([A-Z]+)$/); return m ? [m[1], m[2].split('')] : null; };
-  /** 고른 노선의 구역(A·B·C·D)을 하나씩 켜고 끄는 단추 · 하나뿐인 노선은 숨김. on = 켜 둘 글자들 (없으면 전부) */
-  function pmLetters(code, on) {
-    const box = $('#pfLetters'), sp = pmSplitRt(code);
-    if (!sp || sp[1].length < 2) { box.classList.add('hidden'); box.innerHTML = ''; return; }
-    const keep = on && on.length ? on : sp[1];
-    box.dataset.num = sp[0];
-    box.innerHTML = sp[1].map((L) => '<button type="button" data-l="' + L + '" class="' + (keep.includes(L) ? 'on' : '') + '" aria-pressed="' + keep.includes(L) + '">' + sp[0] + L + '</button>').join('') + '<small>맡길 구역만 남겨 두세요</small>';
-    box.classList.remove('hidden');
-  }
-  function pmLettersVal() {
-    const box = $('#pfLetters'), ls = Array.from(box.querySelectorAll('button.on')).map((b) => b.dataset.l);
-    return box.dataset.num + ls.join('');
-  }
-  /** 라우트 값 → 러너 노선 목록에 있으면 그 줄 선택(일부 구역이면 그 구역만 켬), 없으면 '직접 입력' 칸에 */
+  /** 라우트 값 → 조합창에 켜기 (노선관리에 있는 구역이면) · 아니면 직접 입력 칸에 */
   function pmSetRoute(val) {
     val = String(val || '').trim().toUpperCase();
-    const sel = $('#pfRouteSel'), opts = Array.from(sel.options).filter((o) => o.value && o.value !== '__other'), sv = pmSplitRt(val);
-    let hit = opts.find((o) => o.value === val);
-    if (!hit && sv) hit = opts.find((o) => { const so = pmSplitRt(o.value); return so && so[0] === sv[0] && sv[1].every((L) => so[1].includes(L)); });
-    const other = !!val && !hit && Array.from(sel.options).some((o) => o.value === '__other');
-    sel.value = hit ? hit.value : other ? '__other' : '';
-    $('#pfRoute').value = hit || other ? val : '';
-    $('#pfRoute').classList.toggle('hidden', !other);
-    pmLetters(hit ? hit.value : '', hit && sv ? sv[1] : null);
+    const known = new Set(), G = rpkGroups();
+    G.nums.forEach(([n, ls]) => ls.forEach((L) => known.add(n + L))); G.whole.forEach((c) => known.add(c));
+    const units = [];
+    const ok = !val || val.split(/[,\s]+/).filter(Boolean).every((part) => {
+      if (known.has(part)) { units.push(part); return true; }
+      const sp = rpkSplit(part); if (!sp) return false;
+      return sp[1].every((L) => { if (!known.has(sp[0] + L)) return false; units.push(sp[0] + L); return true; });
+    });
+    RPK.direct = !ok; RPK.units = ok ? units : [];
+    $('#pfRoute').value = val;
+    rpkPaint();
   }
   let pmPriceSeq = 0;
   function pmSuggestPrice() {
@@ -2581,20 +2598,18 @@
   $('#pfKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) pmSetKind(b.dataset.k); });
   $('#pfCamp').addEventListener('change', () => { $('#pfRoute').value = ''; $('#pfPrice').value = ''; $('#pfPriceHint').textContent = ''; pmRoutes(); });
   $('#pfRoute').addEventListener('change', pmSuggestPrice);
-  $('#pfLetters').addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    if (b.classList.contains('on') && $$('#pfLetters button.on').length === 1) return toast('구역을 하나 이상 남겨 두세요.');
-    b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on'));
-    $('#pfRoute').value = pmLettersVal();
+  $('#pfRoutePick').addEventListener('click', (e) => {
+    const u = e.target.closest('[data-u]'), al = e.target.closest('[data-all]'), d = e.target.closest('[data-direct]');
+    if (d) { RPK.direct = !RPK.direct; if (RPK.direct) { RPK.units = []; rpkPaint(); $('#pfRoute').focus(); } else { $('#pfRoute').value = ''; rpkPaint(); } return; }
+    if (!u && !al) return;
+    RPK.direct = false;
+    if (u) { const v = u.dataset.u; RPK.units = RPK.units.includes(v) ? RPK.units.filter((x) => x !== v) : RPK.units.concat([v]); }
+    else { const n = al.dataset.all, ls = (rpkGroups().nums.find((x) => x[0] === n) || [n, []])[1].map((L) => n + L), all = ls.every((x) => RPK.units.includes(x));
+      RPK.units = all ? RPK.units.filter((x) => !ls.includes(x)) : [...new Set(RPK.units.concat(ls))]; }
+    $('#pfRoute').value = rpkCompose(); rpkPaint();
     $('#pfPrice').value = ''; $('#pfPriceHint').textContent = ''; pmSuggestPrice();
   });
-  $('#pfRouteSel').addEventListener('change', () => {
-    const v = $('#pfRouteSel').value, other = v === '__other';
-    $('#pfRoute').classList.toggle('hidden', !other);
-    $('#pfRoute').value = other ? '' : v;
-    pmLetters(other ? '' : v, null);
-    if (other) $('#pfRoute').focus(); else pmSuggestPrice();
-  });
+  $('#pfRoute').addEventListener('input', () => { if (RPK.direct) rpkPaint(); });
   $('#pfFile').addEventListener('change', () => {
     const file = $('#pfFile').files && $('#pfFile').files[0]; if (!file) return;
     if (!/^image\//.test(file.type)) { toast('이미지 파일만 올릴 수 있습니다.'); $('#pfFile').value = ''; return; }
