@@ -106,3 +106,118 @@ function adm_schLegacyImport(token, data, apply) {
     } finally { lock.releaseLock(); }
   });
 }
+
+// ───────────────────────── 기존 운영시트 스케줄 가져오기 (병행 기간용 · 누를 때마다) ─────────────────────────
+// 기존 운영시트(뉴버전_운영시트 '스케쥴' 탭 · 지금 보이는 2주)를 직접 읽어 올인원 규칙으로 바꾼 뒤, 올인원과 다른 칸만 반영한다.
+//  · 기존 시트가 빈 칸(또는 '-', '퇴사')이면 올인원 칸을 건드리지 않음 · 품앗이 줄·지시사항·이슈가 걸린 칸은 건드리지 않음
+//  · 저장은 adm_schSave 로 (이슈 자동 연동·품앗이 잠금·실시간 알림이 그대로 동작)
+//  · 올인원이 완성되면 이 기능과 기존 시트는 쓰지 않는다
+const SCH_LEGACY_SHEET_ID = '1UwnMcMaS5iNwLO_n1BDkDgEnK-ru1N-HZFXhzUhAZQc', SCH_LEGACY_TAB = '스케쥴';
+
+/** 기존 표기 한 칸 → { v: 올인원 값, kind: same(그대로) / conv(바꿈) / need(확인 필요) / skip(빈 칸 취급), why } */
+function schLegacyConv_(raw, base, ownCamp) {
+  const r0 = str_(raw).replace(/\r?\n/g, ' ').trim();
+  let s = r0.replace(/\s+/g, ' ');
+  // 소속 캠프 이름이 앞에 붙은 것은 뗀다 (올인원 저장 규칙: 소속 캠프 노선은 캠프 이름 없이)
+  if (ownCamp) { const mc = s.match(/^([가-힣]+)\s?(\d+)\s+(?=\d)/); if (mc && mc[1] + mc[2] === String(ownCamp).replace(/\s/g, '')) s = s.slice(mc[0].length); }
+  if (!s || s === '-' || s === '퇴사') return { v: '', kind: 'skip' };
+  if (/^계획된\s*휴무$/.test(s)) return { v: '추가휴무', kind: 'conv' };
+  if (['출근', '휴무', '고정휴무', '추가휴무', '병가', '휴가', '미입차', '노쇼', '용차'].indexOf(s) >= 0) return { v: s, kind: 'same' };
+  if (/^품앗이/.test(s)) return { v: '', kind: 'need', why: '품앗이는 올인원에서 품앗이 등록으로 넣어 주세요' };
+  if (/용차/.test(s)) return { v: '', kind: 'need', why: '용차 표기가 섞여 있어 누가 뛰었는지 알 수 없습니다 (용차면 상태를 용차로)' };
+  // (아이디) 업무등록 · 출근 (아이디) 업무등록 = 담당 노선을 그 아이디로
+  let m = s.match(/^(?:출근\s*)?\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)\s*업무등록$/);
+  if (m) {
+    const b = /^\d/.test(str_(base)) ? str_(base).replace(/\s*\([^)]*\)/g, '').replace(/\s*\[[^\]]*\]/g, '').trim() : '';
+    return b ? { v: b + ' (' + m[1] + ') 업무등록', kind: 'conv' } : { v: '', kind: 'need', why: '담당 노선이 없어 어느 노선인지 알 수 없습니다' };
+  }
+  // 408AB (408A D1) = 408A 는 D1 만, 나머지는 전체
+  m = s.match(/^(\d{3,4})([A-Za-z]+)\s*\(\s*(\d{3,4})([A-Za-z])\s+([DF]\d(?:\s*,\s*[DF]\d)*)\s*\)$/);
+  if (m && m[1] === m[3] && m[2].toUpperCase().indexOf(m[4].toUpperCase()) >= 0) {
+    const rest = m[2].toUpperCase().split('').filter(function (ch) { return ch !== m[4].toUpperCase(); }).join('');
+    return { v: m[1] + m[4].toUpperCase() + '(' + m[5].replace(/\s+/g, '').toUpperCase() + ')' + (rest ? ',' + m[1] + rest : ''), kind: 'conv' };
+  }
+  if (s.indexOf('추가업무등록') >= 0) return { v: s, kind: s === r0 ? 'same' : 'conv' };
+  // 읽을 수 있는 노선 값인지: [표] · (회전) · (아이디) · 업무등록 · 노선/라우트 변경 · 앞의 캠프 이름을 걷어 내고 남는 글자가 노선뿐이어야 함
+  const rest = s.replace(/\[[^\]]*\]/g, ' ').replace(/\(\s*[DF]\d(?:\s*,\s*[DF]\d)*\s*\)/gi, ' ').replace(/\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)/g, ' ')
+    .replace(/추가업무등록|업무등록/g, ' ').replace(/(노선|라우트)\s*변경(됨)?/g, ' ').replace(/^\s*[가-힣]+\s?\d+\s+/, ' ').replace(/\s+/g, '');
+  if (rest && /^\d{3,4}[A-Za-z][0-9A-Za-z,]*$/.test(rest) && issUnits_(s.replace(/(노선|라우트)\s*변경(됨)?/g, ' '), ROTS.slice())) return { v: s, kind: s === r0 ? 'same' : 'conv' };
+  return { v: '', kind: 'need', why: '올인원 규칙으로 읽을 수 없는 글자입니다 (메모는 지시사항에 적어 주세요)' };
+}
+
+/** 기존 시트 '스케쥴' 탭 → { from, to, dates[], rows: [{ camp, name, login, base, cells: { 날짜: 글자 } }] } */
+function schLegacyRead_() {
+  let book;
+  try { book = SpreadsheetApp.openById(props_().SCH_LEGACY_ID || SCH_LEGACY_SHEET_ID); } catch (e) { fail_('기존 운영시트를 열 수 없습니다. 올인원을 배포한 구글 계정에 그 시트 보기 권한이 있는지 확인해 주세요.'); }
+  const sh = book.getSheetByName(SCH_LEGACY_TAB);
+  if (!sh) fail_("기존 운영시트에 '" + SCH_LEGACY_TAB + "' 탭이 없습니다.");
+  const last = Math.min(sh.getLastRow(), 400), w = Math.min(sh.getLastColumn(), 60);
+  if (last < 2) fail_('기존 스케줄이 비어 있습니다.');
+  const vals = sh.getRange(1, 1, last, w).getDisplayValues();
+  let hr = -1, c0 = -1;
+  for (let i = 0; i < Math.min(vals.length, 40) && hr < 0; i++) { const j = vals[i].indexOf('캠프명'); if (j >= 0) { hr = i; c0 = j; } }
+  if (hr < 0) fail_("기존 스케줄에서 머리글('캠프명')을 찾지 못했습니다.");
+  const dcols = [];
+  vals[hr].forEach(function (t, j) { const m = str_(t).match(/^(\d{4}-\d{2}-\d{2})/); if (m && j > c0 + 3) dcols.push({ j: j, d: m[1] }); });
+  if (!dcols.length) fail_('기존 스케줄에서 날짜 머리글을 찾지 못했습니다.');
+  const rows = [];
+  for (let i = hr + 1; i < vals.length; i++) {
+    const r = vals[i], camp = str_(r[c0]), name = str_(r[c0 + 1]), login = str_(r[c0 + 2]);
+    if (/^비고/.test(camp)) break; // 비고 줄부터는 기사 줄이 아님
+    if (!camp || !name || !login || name === '담당없음' || camp === '용차') continue;
+    const cells = {};
+    dcols.forEach(function (c) { const v = str_(r[c.j]); if (v) cells[c.d] = v; });
+    rows.push({ camp: camp, name: name, login: login, base: str_(r[c0 + 3]), cells: cells });
+  }
+  const ds = dcols.map(function (c) { return c.d; }).sort();
+  return { from: ds[0], to: ds[ds.length - 1], dates: ds, rows: rows };
+}
+
+/** apply = false: 미리 보기만 (무엇이 어떻게 바뀌는지) · true: 반영 */
+function adm_schLegacyPull(token, apply) {
+  const pre = run_(function () {
+    const a = requireAdmin_(token);
+    const L = schLegacyRead_();
+    const h = schEnsureDates_(parseYmd_(L.from), parseYmd_(L.to));
+    const sh = schSheet_(), last = sh.getLastRow();
+    const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
+    const cols = L.dates.map(function (d) { return h.dates[d]; }), cMin = Math.min.apply(null, cols), cMax = Math.max.apply(null, cols);
+    const blk = last >= 2 ? sh.getRange(2, cMin + 1, last - 1, cMax - cMin + 1).getValues() : [];
+    const rowOf = {}; ids.forEach(function (id, i) { if (id && rowOf[id] === undefined) rowOf[id] = i; });
+    const byLogin = {}, byName = {};
+    readAll_(SH.DRIVERS).forEach(function (o) { if (!o.id) return; if (o.loginId) byLogin[stlLogin_(o.loginId)] = o; (byName[str_(o.name)] = byName[str_(o.name)] || []).push(o); });
+    const issues = schIssues_().filter(function (x) { return x.link === 'Y' && x.result && x.kind !== '지시'; });
+    const underIssue = function (id, d) { return issues.some(function (x) { return x.driverId === id && x.date <= d && d <= (x.end || x.date); }); };
+    const ctxOf = issCtxMaker_();
+    const out = { from: L.from, to: L.to, drivers: 0, total: 0, same: 0, write: [], conv: 0, need: [], kept: [], noDriver: [] };
+    L.rows.forEach(function (r) {
+      const o = byLogin[stlLogin_(r.login)] || ((byName[r.name] || []).length === 1 ? byName[r.name][0] : null);
+      if (!o) { if (Object.keys(r.cells).length) out.noDriver.push(r.name + ' (' + r.login + ')'); return; }
+      out.drivers++;
+      Object.keys(r.cells).forEach(function (d) {
+        const c = h.dates[d]; if (c === undefined) return;
+        const cx = ctxOf(o, d), cv = schLegacyConv_(r.cells[d], cx.base || r.base, cx.camp);
+        if (cv.kind === 'skip') return;
+        out.total++;
+        if (cv.kind === 'need') { out.need.push({ name: o.name, date: d, raw: r.cells[d], why: cv.why }); return; }
+        const cur = rowOf[o.id] === undefined ? '' : str_(blk[rowOf[o.id]][c - cMin]); // 줄이 아직 없는 기사는 저장할 때 줄을 만든다
+        if (cur === cv.v) { out.same++; return; }
+        if (underIssue(o.id, d)) { out.kept.push({ name: o.name, date: d, raw: r.cells[d], cur: cur }); return; }
+        if (cv.kind === 'conv') out.conv++;
+        out.write.push({ row: o.id, name: o.name, date: d, raw: r.cells[d], value: cv.v, old: cur, conv: cv.kind === 'conv' });
+      });
+    });
+    return { ok: true, a: a, out: out };
+  });
+  if (!pre.ok) return pre;
+  const out = pre.out, a = pre.a;
+  const view = { from: out.from, to: out.to, drivers: out.drivers, total: out.total, same: out.same, write: out.write.length, conv: out.conv,
+    writeList: out.write.slice(0, 80).map(function (x) { return { name: x.name, date: x.date, raw: x.raw, value: x.value, old: x.old, conv: x.conv }; }),
+    need: out.need.slice(0, 80), needN: out.need.length, kept: out.kept.slice(0, 40), keptN: out.kept.length, noDriver: out.noDriver };
+  if (!apply) return { ok: true, preview: view };
+  if (!out.write.length) return { ok: true, preview: view, saved: 0, conflicts: [] };
+  const r = adm_schSave(token, out.write.map(function (x) { return { row: x.row, date: x.date, value: x.value, old: x.old }; }));
+  if (!r.ok) return r;
+  try { logAdmin_(a, '기존 스케줄 가져오기', out.from + ' ~ ' + out.to, '반영 ' + r.saved + '칸 (표기 바꿈 ' + out.conv + ') · 확인 필요 ' + out.need.length + ' · 이슈 칸 유지 ' + out.kept.length); } catch (e) { /* 기록 실패는 무시 */ }
+  return { ok: true, preview: view, saved: r.saved, conflicts: r.conflicts || [], issueSync: r.issueSync, pmLocked: r.pmLocked || [] };
+}

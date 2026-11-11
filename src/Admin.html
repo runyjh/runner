@@ -1070,9 +1070,6 @@
   .sg td.c.pmk::after { content: attr(data-pm); display: block; font-size: 11px; font-weight: 800; color: #0b6b3a; line-height: 1.25; white-space: pre-line; word-break: keep-all; margin-top: 1px; background: #e6f6ec; border-radius: 4px; padding: 1px 3px; }
   .sg td.c.pmk.pmgive { background: #f1fbf4; }
   /* 품앗이 칸은 품앗이만 표시 (출근·휴무 글자 숨김) */
-  .sg td.c .cv.cv-w { max-width: none; margin: 0 -5px; overflow: visible; }
-  .sg td.c .cv-sub { display: block; font-size: 10px; font-weight: 700; line-height: 1.3; white-space: nowrap; letter-spacing: -.3px; }
-  table.sg { --cw: 98px; } table.sg.month { --cw: 74px; } /* 서브아이디 업무등록: 둘째 줄 */
   .sg td.c.pmk.pmonly { background: #f1fbf4; }
   .sg td.c.pmk.pmonly .cv { display: none; }
   .sg td.c.pmk.pmonly::after { margin-top: 0; background: transparent; padding: 0; font-size: 11.5px; }
@@ -1705,14 +1702,14 @@
         <button class="btn" id="sUpload" title="내일(PDD)부터 2주 끝까지 어드민 업로드용 표를 만듭니다">어드민 업로드 테이블</button>
         <button class="btn ghost" id="sFill" title="오늘 이후 빈칸: 고정·품앗이 기사는 출근/고정휴무, 백업 기사는 고정휴무 요일만">빈칸 자동 채우기</button>
         <button class="btn ghost" id="sReload">새로고침</button>
-        <button class="btn ghost" id="sLegacy" type="button" title="기존 운영시트 스케줄 이식 파일(JSON)을 올려 기사스케줄 칸·비고·이슈를 한 번에 넣습니다">⬆ 기존 스케줄 이식</button><input type="file" id="sLegacyFile" accept=".json" class="hidden">
+        <button class="btn ghost" id="sLegPull" type="button" title="기존 운영시트의 스케쥴 탭(지금 보이는 2주)을 읽어 올인원 규칙으로 바꿔 가져옵니다 · 다른 칸만 반영 · 병행 기간용">⬇ 기존 스케줄 가져오기</button><button class="btn ghost" id="sLegacy" type="button" title="기존 운영시트 스케줄 이식 파일(JSON)을 올려 기사스케줄 칸·비고·이슈를 한 번에 넣습니다">⬆ 기존 스케줄 이식</button><input type="file" id="sLegacyFile" accept=".json" class="hidden">
         <button class="btn ghost danger-t" type="button" data-reset="sched">데이터 초기화</button>
       </div>
     </div>
     <div class="swrap" id="sWrap" tabindex="0"></div>
     <div class="slegend">
       <span class="k-work">출근</span><span class="k-off">휴무</span><span class="k-sick">병가</span><span class="k-mi">미입차</span><span class="k-yong">용차</span>
-      <span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other">다른 캠프</span><span style="box-shadow:inset 0 0 0 2px #8b5cf6">중복</span><span style="box-shadow:inset 0 0 0 2px #12a150">품앗이</span><span>⚠ 미배정 노선</span><span><b style="color:#f59e0b">⚠</b> 배정 안 된 칸</span><span><b style="color:#e5484d">⚠</b> 내 노선 미배정</span>
+      <span class="k-chg">노선변경</span><span class="k-reg">업무등록</span><span class="k-other" title="담당 노선이 아닌 노선 (같은 캠프·다른 캠프 모두) — 캠프 + 노선으로 표시">담당 아닌 노선</span><span style="box-shadow:inset 0 0 0 2px #8b5cf6">중복</span><span style="box-shadow:inset 0 0 0 2px #12a150">품앗이</span><span>⚠ 미배정 노선</span><span><b style="color:#f59e0b">⚠</b> 배정 안 된 칸</span><span><b style="color:#e5484d">⚠</b> 내 노선 미배정</span>
       <em style="font-style:normal">· 칸을 누르고 입력 (Enter 저장, Alt+Enter 줄바꿈) · 드래그로 여러 칸 선택 · Ctrl+C / Ctrl+V 로 엑셀·구글시트와 복사 · Delete 지우기 · Ctrl+Z 되돌리기 · 마우스 오른쪽 = 이슈 창 · 고치면 자동 저장</em>
     </div>
    </section>
@@ -2017,6 +2014,11 @@
   </div>
 </div>
 
+<!-- 기존 운영시트 스케줄 가져오기 (병행 기간용): 기간·바뀌는 칸 미리 보기 → 가져오기 -->
+<div class="modal hidden" id="lpModal">
+  <div class="m-box" style="width:min(680px,100%)"><div id="lpBody"></div></div>
+</div>
+
 <!-- 기사스케줄 기사 칸 입력 창: 상태 · 아이디(서브) · 지시사항 · 대신 뛸 기사 / 품앗이 칸이면 품앗이 창 -->
 <div class="modal hidden" id="ceModal">
   <div class="m-box" style="width:min(600px,100%)"><div id="ceBody"></div></div>
@@ -2024,14 +2026,7 @@
 
 <!-- 기사스케줄 '담당 없음' 노선 칸: 그날 뛸 기사 배정 -->
 <div class="modal hidden" id="uaModal">
-  <div class="m-box" style="width:min(480px,100%)">
-    <h3 style="margin:0 0 4px" id="uaTitle">담당 없음 노선</h3>
-    <div class="db-note" style="margin:0 0 10px">담당 기사가 없는 노선입니다. 고른 기사 줄 칸에 이 노선을 적습니다 (올인원 규칙: 칸 = 그 사람이 한 일).</div>
-    <div class="field"><span class="lb">지금 뛰는 기사</span><div id="uaNow"></div></div>
-    <div class="field"><label class="lb" for="uaDrv">배정할 기사 <span class="sub">(그날 비었거나 휴무인 백업 기사가 위)</span></label><select class="inp" id="uaDrv"></select></div>
-    <div class="field"><span class="lb">회전</span><div id="uaRots"></div><div id="uaPrev"></div></div>
-    <div class="m-actions"><button type="button" class="btn ghost" id="uaPm" title="이 노선을 러너(회사)가 맡기는 품앗이로 등록합니다 · 단가를 적으면 정산에 자동 반영">🤝 품앗이로 등록</button><button type="button" class="btn ghost" id="uaCancel">닫기</button><button type="button" class="btn" id="uaGo">배정</button></div>
-  </div>
+  <div class="m-box" style="width:min(600px,100%)"><div id="uaBody"></div></div>
 </div>
 
 <!-- 기사스케줄 칸에서 이슈가 자동으로 만들어졌을 때: 사유 묻기 -->
@@ -2529,7 +2524,7 @@
     if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     // 오래 걸리는 작업(이관·정산서 올리기·초기화·마감·사본 다시 만들기)은 60초에 끊지 않는다 — 끊으면 서버는 계속 도는데 화면은 "다시 시도"라 해서 두 번 처리될 수 있음
-    const LONG_MS = { adm_stlTaxCheck: 180000, adm_stlLegacyCompare: 300000, adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
+    const LONG_MS = { adm_stlTaxCheck: 180000, adm_schLegacyPull: 240000, adm_stlLegacyCompare: 300000, adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
     const timer = setTimeout(() => { if (ctl) ctl.abort(); }, LONG_MS[fn] || 60000);
     return fetch(RUNNER_API, {
       method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',
@@ -4021,6 +4016,48 @@
   const paBadge = (st) => '<span class="badge p-' + esc(String(st).replace(/\s/g, '')) + '">' + esc(st) + '</span>';
   const paDay = (d) => { const p = String(d || '').split('-'); if (p.length !== 3) return esc(d || ''); return +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
   // ───── 기존 운영시트 스케줄 이식 (SchLegacy.gs) ─────
+  // ── 기존 스케줄 가져오기 (병행 기간용): 누를 때마다 기간과 바뀌는 칸을 보여 주고, 확인하면 다른 칸만 반영 ──
+  const LP = { busy: false };
+  const lpMd = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8)) + ' (' + '일월화수목금토'[new Date(d + 'T00:00:00').getDay()] + ')';
+  function lpPaint(p, done) {
+    const li = (x, right) => '<tr><td style="white-space:nowrap"><b>' + esc(x.name) + '</b></td><td style="white-space:nowrap">' + esc(lpMd(x.date)) + '</td><td>' + esc(x.raw) + '</td><td>' + right + '</td></tr>';
+    const tbl = (rows, h3) => '<div style="max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px"><table class="tbl" style="font-size:12.5px;width:100%"><thead><tr><th>기사</th><th>날짜</th><th>기존 스케줄</th><th>' + h3 + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    $('#lpBody').innerHTML = '<h3 class="ce-h">⬇ 기존 스케줄 가져오기</h3>' +
+      '<div class="ce-s"><span>기존 운영시트 스케쥴 탭의 <b>' + esc(lpMd(p.from)) + ' ~ ' + esc(lpMd(p.to)) + '</b> (' + esc(p.from) + ' ~ ' + esc(p.to) + ') 을 올인원 규칙으로 변환해 가져옵니다.</span></div>' +
+      '<div class="dc-sum" style="margin:0 0 10px"><div class="dcs"><small>기사</small><b>' + p.drivers + '명</b><em>' + p.total + '칸</em></div>' +
+        '<div class="dcs ok"><small>이미 같음</small><b>' + p.same + '칸</b></div>' +
+        '<div class="dcs' + (p.write ? ' bad' : '') + '"><small>' + (done ? '반영함' : '바뀔 칸') + '</small><b>' + p.write + '칸</b><em>표기 바꿈 ' + p.conv + '</em></div>' +
+        '<div class="dcs' + (p.needN ? ' bad' : '') + '"><small>확인 필요</small><b>' + p.needN + '칸</b><em>가져오지 않음</em></div></div>' +
+      (p.write ? '<div class="ce-hint" style="color:#475569">' + (done ? '반영한 칸' : '바뀔 칸') + ' (기존 스케줄 → 올인원' + (p.write > p.writeList.length ? ' · 앞 ' + p.writeList.length + '칸만 표시' : '') + ')</div>' +
+        tbl(p.writeList.map((x) => li(x, '<b>' + esc(x.value) + '</b>' + (x.conv ? ' <span class="dc-tag w">표기 바꿈</span>' : '') + '<div class="sub">지금: ' + esc(x.old || '빈 칸') + '</div>')).join(''), '올인원에 넣을 값') : '<div class="ce-pv">올인원과 다른 칸이 없습니다.</div>') +
+      (p.needN ? '<div class="ce-hint" style="color:#c2410c;margin-top:10px">확인 필요 — 올인원에서 직접 넣어 주세요' + (p.needN > p.need.length ? ' (앞 ' + p.need.length + '칸만 표시)' : '') + '</div>' + tbl(p.need.map((x) => li(x, esc(x.why || ''))).join(''), '이유') : '') +
+      (p.keptN ? '<div class="ce-hint" style="margin-top:10px">이슈가 걸려 있어 건드리지 않는 칸 ' + p.keptN + '개: ' + esc(p.kept.map((x) => x.name + ' ' + lpMd(x.date)).join(', ')) + '</div>' : '') +
+      (p.noDriver.length ? '<div class="ce-hint" style="margin-top:6px">올인원에서 못 찾은 줄 ' + p.noDriver.length + '개 (건너뜀): ' + esc(p.noDriver.join(', ')) + '</div>' : '') +
+      '<div class="ce-hint" style="margin-top:10px">기존 스케줄이 빈 칸이면 올인원 칸은 그대로 둡니다 · 품앗이 줄 · 지시사항은 건드리지 않습니다.</div>' +
+      '<div class="m-actions"><button type="button" class="btn ghost" data-lpclose>닫기</button>' + (done || !p.write ? '' : '<button type="button" class="btn" data-lpgo>' + p.write + '칸 가져오기</button>') + '</div>';
+  }
+  const lpClose = () => $('#lpModal').classList.add('hidden');
+  $('#sLegPull').addEventListener('click', () => {
+    if (LP.busy) return; LP.busy = true;
+    const b = $('#sLegPull'); b.disabled = true; b.textContent = '기존 스케줄 읽는 중…';
+    if (sTimer || Object.keys(sPending).length) flushSave();
+    api('adm_schLegacyPull', false).then((r) => { if (!r.ok) return toast(r.msg); lpPaint(r.preview, false); $('#lpModal').classList.remove('hidden'); })
+      .catch(() => {}).finally(() => { LP.busy = false; b.disabled = false; b.textContent = '⬇ 기존 스케줄 가져오기'; });
+  });
+  $('#lpModal').addEventListener('mousedown', (e) => { if (e.target.id === 'lpModal') lpClose(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#lpModal').classList.contains('hidden')) lpClose(); });
+  $('#lpBody').addEventListener('click', (e) => {
+    if (e.target.closest('[data-lpclose]')) return lpClose();
+    const g = e.target.closest('[data-lpgo]'); if (!g || LP.busy) return;
+    LP.busy = true; g.disabled = true; g.textContent = '가져오는 중…';
+    api('adm_schLegacyPull', true).then((r) => {
+      if (!r.ok) { toast(r.msg); g.disabled = false; g.textContent = '다시 시도'; return; }
+      lpPaint(r.preview, true);
+      toast('기존 스케줄 ' + r.saved + '칸을 가져왔습니다.' + (r.conflicts && r.conflicts.length ? ' (그 사이 바뀐 ' + r.conflicts.length + '칸은 건너뜀)' : ''));
+      loadSched(SD.start);
+      if (r.issueSync) { try { isFromSchedSave(r.issueSync); } catch (er) { console.warn(er); } }
+    }).catch(() => {}).finally(() => { LP.busy = false; });
+  });
   $('#sLegacy').addEventListener('click', () => $('#sLegacyFile').click());
   $('#sLegacyFile').addEventListener('change', async (e) => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
@@ -4812,6 +4849,7 @@
   const IQ = { queue: [], cur: null, kind: '', sub: '' };
   /** adm_schSave 결과의 issueSync 를 반영 */
   function isFromSchedSave(sync) {
+    try { ceSubLink(sync && !sync.error ? sync : null); } catch (e) { console.warn(e); } // 이슈 연동이 실패해도 대신 뛸 기사 칸은 넣는다
     if (!sync || sync.error) { if (sync && sync.error) console.warn('issueSync', sync.error); return; }
     (sync.removed || []).forEach((id) => isSyncSched(null, id));
     (sync.changed || []).concat(sync.created || []).forEach((x) => isSyncSched(x));
@@ -4828,13 +4866,14 @@
   function iqNext() {
     IQ.cur = IQ.queue.shift() || null;
     if (!IQ.cur) { $('#iqModal').classList.add('hidden'); return; }
-    const x = IQ.cur; IQ.kind = ''; IQ.sub = '';
+    const x = IQ.cur; IQ.kind = ''; IQ.sub = x.sub || '';
     const go = () => {
       const what = x.result === '물량조율' ? (x.cut || '') + '를 뺐어요' : x.result + '예요';
       $('#iqTitle').textContent = x.name + ' · ' + what;
       $('#iqSub').textContent = (x.end && x.end !== x.date ? isMd0(x.date) + ' ~ ' + isMd0(x.end) : isMd(x.date)) + ' · 사유를 골라 주세요' + (IQ.queue.length ? ' (남은 ' + IQ.queue.length + '건)' : '');
       $('#iqReason').value = '';
-      iqPaint(); $('#iqModal').classList.remove('hidden');
+      $('#iqSubWho').innerHTML = ''; iqPaint(); if (x.subWho && IS_OURS(IQ.sub)) $('#iqSubWho').value = x.subWho;
+      $('#iqModal').classList.remove('hidden');
     };
     if (!IS.drivers.length) api('adm_issueList', { from: isYmd(new Date()), to: isYmd(new Date()) }).then((r) => { if (r.ok) isTakeMeta(r); go(); }).catch(go); else go();
   }
@@ -8043,10 +8082,13 @@
   }
   /** '212AB (dmsdud3810) 업무등록' → { route, id } (서브아이디로 업무등록한 칸) */
   function subRegOf(v) {
-    const m = String(v || '').trim().match(/^([0-9A-Za-z,\s]+?)\s*\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)\s*업무등록$/);
-    return m && !/^[DF]\d$/i.test(m[2]) ? { route: m[1].replace(/\s+/g, ''), id: m[2] } : null;
+    // 앞에 캠프 이름이 붙은 것도 같은 형식 ('인천7 919CD (kbk2623) 업무등록')
+    const m = String(v || '').trim().match(/^(?:([가-힣]+\s?\d+)\s+)?(\d[0-9A-Za-z,\s]*?)\s*\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)\s*업무등록$/);
+    return m && !/^[DF]\d$/i.test(m[3]) ? { camp: (m[1] || '').replace(/\s+/g, ''), route: m[2].replace(/\s+/g, ''), id: m[3] } : null;
   }
-  const rowDrv = (row) => SD.drivers.find((x) => x.id === String(row || '').split('~')[0]) || null;
+  // 기사 찾기 · 칸 규칙 읽기는 칸마다 여러 번 불리므로 기사 목록이 바뀔 때까지 기억해 둔다 (한 달 보기 1,500칸에서도 가볍게)
+  let _rdSrc = null, _rdMap = null, _cnMemo = new Map();
+  const rowDrv = (row) => { if (_rdSrc !== SD.drivers) { _rdSrc = SD.drivers; _rdMap = new Map(SD.drivers.map((x) => [x.id, x])); _cnMemo = new Map(); } return _rdMap.get(String(row || '').split('~')[0]) || null; };
   const baseCodes = (d) => (d && d.baseRoute && !/백업|용차/.test(d.baseRoute) ? String(d.baseRoute).replace(/\([^)]*\)|\[[^\]]*]/g, '').replace(/\s+/g, '') : '');
   const sameUnits = (a, b) => { const u = (x) => parseBR(x).units.slice().sort().join(','); return !!a && !!b && u(a) === u(b); };
   /** 그 기사의 서브아이디로 업무등록한 칸이면 { route, id, base(담당 노선 그대로인지) } · 아니면 null */
@@ -8054,17 +8096,45 @@
     const s = String(v || '').trim();
     if (!s || s.indexOf('\n') >= 0) return null;
     const sr = subRegOf(s); if (!sr || !cellSubsOf(row).includes(sr.id.toLowerCase())) return null;
-    return { route: sr.route, id: sr.id, base: sameUnits(sr.route, baseCodes(rowDrv(row))) };
+    const d = rowDrv(row), own = d ? shortCamp(d.camp || '').replace(/\s/g, '') : '', other = sr.camp && sr.camp !== own ? sr.camp : '';
+    return { route: sr.route, id: sr.id, camp: other, base: !other && sameUnits(sr.route, baseCodes(d)) };
   }
-  /** 칸 색: 서브아이디로 담당 노선을 뛴 날 = 출근과 같은 색 · 다른 노선 = 노선 색 */
-  function cellKindRow(v, row) { const sc = subCell(v, row); return sc ? (sc.base ? 'k-work' : 'k-route') : cellKind(v); }
+  /**
+   * 칸 표시 규칙 하나 (기사 줄 · 한 줄짜리 노선 값) — 시트 글자는 그대로, 화면만:
+   *  윗줄 = 그날 뛴 노선: 담당 노선 그대로 = '출근'(파랑) · 담당 노선의 일부 = 노선 글자(파랑) · 담당이 아닌 노선 = '캠프 노선'(노랑, 같은 캠프여도 캠프 이름)
+   *  아랫줄 = 아이디 표 (다른 아이디로 업무등록한 날만)
+   * → { text, ids, kind } · 규칙으로 읽을 수 없는 값이면 null (예전 표시 그대로)
+   */
+  function cellNorm(v, row) {
+    const s = String(v || '').trim();
+    if (!s || /\n/.test(s) || /추가업무등록|변경/.test(s)) return null;
+    const d = rowDrv(row); if (!d) return null;
+    const mk = row + '\u0001' + s;
+    if (_cnMemo.has(mk)) return _cnMemo.get(mk);
+    const out = cellNorm0(s, d); _cnMemo.set(mk, out); return out;
+  }
+  function cellNorm0(s, d) {
+    const ids = [];
+    let t = s.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, (m0, id) => (/^[DF]\d$/i.test(id) ? m0 : (ids.push(id), ' ')));
+    t = t.replace(/업무등록/g, ' ').replace(/\s*\[\s*[A-Z]?\d+\s*\]/g, '').replace(/\s+/g, ' ').trim();
+    if ((t === '' || t === '출근') && ids.length) return d.baseRoute && /^\d/.test(d.baseRoute) ? { text: '출근', ids: ids, kind: 'k-work', mine: true, whole: true } : null; // 노선 생략 = 담당 노선
+    const m = t.match(/^(?:([가-힣]+\s?\d+)\s+)?(\d{3,4}[A-Za-z][0-9A-Za-z,()\s]*)$/);
+    if (!m) return null;
+    const p = parseBR(m[2]); if (!p.units.length || !p.units.every((u) => unitRe.test(u))) return null;
+    const own = shortCamp(d.camp || '').replace(/\s/g, ''), camp = (m[1] || '').replace(/\s/g, ''), other = !!camp && camp !== own;
+    const b = d.baseRoute && /^\d/.test(d.baseRoute) ? parseBR(d.baseRoute) : null;
+    const mine = !other && !!b && p.units.every((u) => b.units.includes(u));
+    const all = sdCampRots(d.campId || ''), comp = (x) => composeUnits(x.units, '', x.rots.length ? x.rots : all, all, x.per || {});
+    const whole = mine && comp(p) === comp(b), cn = camp || own;
+    return { text: whole ? '출근' : (mine || !cn ? '' : cn + ' ') + m[2].trim(), ids: ids, kind: mine ? 'k-work' : 'k-other', mine: mine, whole: whole };
+  }
+  function cellKindRow(v, row) { const n = cellNorm(v, row); return n ? n.kind : cellKind(v); }
   function cellHtml(v, row) {
     const s = String(v || '').trim();
     if (!s) return '';
-    // 서브아이디 업무등록: 담당 노선이면 '출근(아이디)', 다른 노선이면 '노선(아이디)' (시트 글자는 그대로)
-    const sc = subCell(s, row);
-    if (sc) return '<span class="cv cv-w">' + (sc.base ? '출근' : esc(groupRoutes(sc.route.toUpperCase())).replace(/,/g, ',<wbr>')) + '<span class="cv-sub" style="font-size:min(11px,calc(var(--cw,100px)/' + (sc.id.length * 0.62 + 4.7).toFixed(1) + '))">(' + esc(sc.id) + ')업무등록</span></span>';
     const subs = cellSubsOf(row);
+    const n = cellNorm(s, row);
+    if (n) return '<span class="cv">' + cellLineHtml(n.text + n.ids.map((id) => ' (' + id + ')').join(''), subs) + '</span>';
     return '<span class="cv">' + s.split(/\r?\n/).map((ln) => cellLineHtml(ln, subs)).join('<br>') + '</span>';
   }
   const cellTipRaw = (v) => (v && (v.length > 10 || /[(\[\n]/.test(v)) ? v : '');
@@ -8445,56 +8515,83 @@
       td.classList.remove('uc-ok', 'uc-part', 'uc-mi', 'uc-vd'); td.classList.add(c.cls);
     });
   }
-  // 배정 창
-  const UA = { cid: '', code: '', dt: '', rots: [] };
+  // 담당 없음 노선 창 (기사 칸 입력 창과 같은 틀): 회전 · 뛸 기사 + 품앗이로 · 아이디 · 지시사항 → [저장]
+  const UA = { cid: '', code: '', dt: '', rots: [], drv: '', sub: '', pm: false, ins: '', ins0: '' };
+  const uaFree = (v) => !v || /^(휴무|고정휴무|추가휴무)$/.test(v);
   function uaOpen(cid, code, dt) {
-    Object.assign(UA, { cid, code, dt });
     const c = unCover(cid, code, dt);
+    Object.assign(UA, { cid: cid, code: code, dt: dt, drv: '', sub: '', pm: false, ins: '', ins0: '' });
     UA.rots = c.rots.filter((r) => c.miss.some((x) => x.endsWith('|' + r)));
     if (!UA.rots.length) UA.rots = c.rots.slice();
-    const md = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8)) + ' (' + '일월화수목금토'[new Date(d + 'T00:00:00').getDay()] + ')';
-    $('#uaTitle').textContent = c.camp + ' ' + code + ' · ' + md(dt);
-    $('#uaNow').innerHTML = (c.who.length ? c.who.map((w) => '<div class="ua-w"><b>' + esc(w.name) + '</b> <span class="sub">' + esc(sget(w.key, dt)) + '</span> <button type="button" class="btn sm ghost" data-uadel="' + esc(w.key) + '">배정 빼기</button></div>').join('') : '<div class="sub">아직 뛰는 기사가 없습니다.</div>') +
-      (c.miss.length ? '<div class="ua-miss">⚠ 비어 있는 물량: ' + esc(Array.from(new Set(c.miss.map((x) => x.split('|')[0]))).join(',')) + ' · ' + esc(Array.from(new Set(c.miss.map((x) => x.split('|')[1]))).join('·')) + '</div>' : '<div class="ua-ok">✓ 모든 회전이 채워졌습니다</div>') +
-      (c.miss.length && unVendor(c.camp, Array.from(new Set(c.miss.map((x) => x.split('|')[0]))), dt) ? '<div class="sub" style="margin-top:6px;color:#5f3dc4;font-weight:700">🚚 ' + esc(unVendor(c.camp, Array.from(new Set(c.miss.map((x) => x.split('|')[0]))), dt)) + ' 용차가 맡은 노선 · 우리 인원이 안 들어가면 업체가 뜀 (쿠팡 업로드는 미입차 · 수행률 제외)</div>' : '');
-    // 후보: 승인 기사 (그날 칸이 비었거나 휴무인 백업 기사 먼저)
-    const free = (v) => !v || /^(휴무|고정휴무|추가휴무)$/.test(v);
-    const cands = SD.drivers.filter((d) => d.status === '승인' && !d.ex && !(d.workStatus === '퇴사')).map((d) => {
-      const v = sget(d.id, dt), bk = /백업|용차/.test(d.baseRoute || '') || d.type === '백업';
-      return { d, v, rank: (bk ? 0 : 2) + (free(v) ? 0 : 1) };
-    }).sort((a, b) => a.rank - b.rank || koSort(a.d.name, b.d.name));
-    $('#uaDrv').innerHTML = '<option value="">기사 고르기</option>' + cands.map((x) => '<option value="' + esc(x.d.id) + '">' + esc(x.d.name) + ' · ' + esc(shortCamp(x.d.camp || '') || '-') + (x.rank % 2 === 0 ? ' · ' + (x.v ? x.v : '빈 칸') : ' · 지금: ' + x.v) + (x.rank < 2 ? '  [백업]' : '') + '</option>').join('');
-    uaPaintRots(); $('#uaModal').classList.remove('hidden');
+    uaPaint(); $('#uaModal').classList.remove('hidden');
   }
-  function uaPaintRots() {
-    const all = unRotsOf(UA.cid);
-    $('#uaRots').innerHTML = all.map((r) => '<button type="button" data-uar="' + r + '" class="' + (UA.rots.includes(r) ? 'on' : '') + '">' + r + '</button>').join('');
-    const id = $('#uaDrv').value, d = id && SD.drivers.find((x) => x.id === id);
-    $('#uaPrev').textContent = d ? d.name + ' ' + Number(UA.dt.slice(5, 7)) + '/' + Number(UA.dt.slice(8)) + ' 칸 → ' + uaValue(d) + (sget(d.id, UA.dt) ? '  (지금: ' + sget(d.id, UA.dt) + ')' : '') : '';
+  const uaDrv = () => (UA.drv ? SD.drivers.find((x) => x.id === UA.drv) || null : null);
+  const uaFull = () => { const all = unRotsOf(UA.cid); return all.every((r) => UA.rots.includes(r)); };
+  /** 기사 목록: 그날 휴무·빈 칸 → 같은 캠프 → 백업 → 다른 캠프 (기사 칸 창의 '대신 뛸 기사'와 같은 순서) */
+  function uaCands() {
+    return SD.drivers.filter((d) => d.status === '승인' && !d.ex && d.workStatus !== '퇴사' && d.workStatus !== '휴직').map((d) => {
+      const v = String(sget(d.id, UA.dt) || '').trim(), bk = /백업|용차/.test(d.baseRoute || '') || d.type === '백업';
+      return { d: d, v: v, free: uaFree(v), rank: (uaFree(v) ? 0 : 10) + (d.campId === UA.cid ? 0 : bk ? 2 : 4) + (v === '고정휴무' ? 1 : 0) };
+    }).sort((a, b) => a.rank - b.rank || koSort(a.d.name, b.d.name));
   }
   function uaValue(d) {
     const all = unRotsOf(UA.cid), camp = shortCamp((SD.camps.find((c) => c.id === UA.cid) || {}).name || '');
-    const rs = all.filter((r) => UA.rots.includes(r));
-    return (shortCamp(d.camp || '') !== camp ? camp + ' ' : '') + UA.code + (rs.length && rs.length < all.length ? ' (' + rs.join(',') + ')' : '');
+    const rs = all.filter((r) => UA.rots.includes(r)), pre = shortCamp(d.camp || '') !== camp ? camp + ' ' : '';
+    if (UA.sub && uaFull()) return pre + UA.code + ' (' + UA.sub + ') 업무등록';
+    return pre + UA.code + (rs.length && rs.length < all.length ? ' (' + rs.join(',') + ')' : '');
   }
-  $('#uaRots').addEventListener('click', (e) => { const b = e.target.closest('[data-uar]'); if (!b) return; const r = b.dataset.uar; UA.rots = UA.rots.includes(r) ? UA.rots.filter((x) => x !== r) : UA.rots.concat(r); uaPaintRots(); });
-  $('#uaDrv').addEventListener('change', uaPaintRots);
+  function uaPaint() {
+    const c = unCover(UA.cid, UA.code, UA.dt), all = unRotsOf(UA.cid), d = uaDrv(), full = uaFull();
+    const missU = Array.from(new Set(c.miss.map((x) => x.split('|')[0]))), missR = Array.from(new Set(c.miss.map((x) => x.split('|')[1])));
+    const vd = c.miss.length ? unVendor(c.camp, missU, UA.dt) : '';
+    const subs = d ? (d.subIds || []).map(String).filter(Boolean) : [];
+    if (UA.sub && (!subs.includes(UA.sub) || !full)) UA.sub = '';
+    const cands = uaCands();
+    $('#uaBody').innerHTML = '<h3 class="ce-h">' + esc(c.camp + ' ' + UA.code) + ' · ' + esc(ceMd(UA.dt)) + '</h3>' +
+      '<div class="ce-s"><span>담당 기사 없음 · ' + (c.miss.length ? '<b style="color:#c2410c">비어 있는 물량 ' + esc(groupRoutes(missU.join(','))) + ' · ' + esc(missR.join(' ')) + '</b>' : '<b style="color:#0b6b3a">✓ 모든 회전이 채워졌습니다</b>') + '</span></div>' +
+      (vd ? '<div class="ce-hint" style="margin:-6px 0 10px;color:#5f3dc4;font-weight:700">🚚 ' + esc(vd) + ' 용차가 맡은 노선 · 우리 인원이 안 들어가도 됩니다</div>' : '') +
+      (c.who.length ? '<div class="ce-ln"><span>지금 뛰는 기사</span><div>' + c.who.map((w) => '<div class="ua-w"><b>' + esc(w.name) + '</b> <span class="sub">' + esc(ceDisp(sget(w.key, UA.dt), w.key)) + '</span> <button type="button" class="btn sm ghost" data-uadel="' + esc(w.key) + '">배정 빼기</button></div>').join('') + '</div></div>' : '') +
+      '<div class="ce-ln"><span>회전</span><div class="ce-g">' + all.map((r) => '<button type="button" class="ce-c' + (UA.rots.includes(r) ? ' on' : '') + '" data-uar="' + r + '">' + r + '</button>').join('') + '</div></div>' +
+      '<div class="ce-ln"><span>뛸 기사</span><div><div class="ce-alt"><select class="inp" data-uadrv><option value="">' + (UA.pm ? '정하지 않음 (품앗이 창에서 고르기)' : '기사 고르기') + '</option>' +
+        cands.map((x) => '<option value="' + esc(x.d.id) + '"' + (x.d.id === UA.drv ? ' selected' : '') + '>' + esc(x.d.name) + ' · ' + esc(shortCamp(x.d.camp || '') || '-') + ' · ' + (x.free ? (x.v || '빈 칸') : '지금: ' + esc(ceDisp(x.v, x.d.id))) + '</option>').join('') + '</select>' +
+        '<label><input type="checkbox" data-uapm' + (UA.pm ? ' checked' : '') + '> 🤝 품앗이로</label></div></div></div>' +
+      (subs.length && !UA.pm ? '<div class="ce-ln"><span>아이디</span><div><div class="ce-g"><button type="button" class="ce-c' + (!UA.sub ? ' on' : '') + '" data-uasub="">본인 · ' + esc(d.name) + (d.loginId ? '<small>' + esc(ceLid(d.loginId)) + '</small>' : '') + '</button>' +
+        subs.map((x, i) => '<button type="button" class="ce-c' + (UA.sub === x ? ' on' : '') + '" data-uasub="' + esc(x) + '"' + (full ? '' : ' disabled title="서브아이디 업무등록은 회전을 나누지 않습니다. 회전을 모두 켜 주세요."') + '>서브' + (subs.length > 1 ? ' ' + (i + 1) : '') + (ceSubName(x) ? ' · ' + esc(ceSubName(x)) : '') + '<small>' + esc(x) + '</small></button>').join('') + '</div></div></div>' : '') +
+      (d && !UA.pm ? '<div class="ce-ln"><span>📌 지시사항</span><div><textarea id="uaIns" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량">' + esc(UA.ins) + '</textarea></div></div>' : '') +
+      '<div class="ce-pv">저장하면 → ' + (UA.pm ? '🤝 러너(회사)가 맡기는 품앗이 등록 창이 열립니다' + (d ? ' (받는 기사 ' + esc(d.name) + ')' : '') + ' — 단가를 확인하고 등록하세요.'
+        : d ? esc(d.name) + ' 칸 <b>' + esc(ceDisp(uaValue(d), d.id)) + '</b>' + (sget(d.id, UA.dt) ? ' (지금: ' + esc(ceDisp(sget(d.id, UA.dt), d.id)) + ')' : '') : '뛸 기사를 고르세요.') + '</div>' +
+      '<div class="m-actions"><button type="button" class="btn ghost" data-uaclose>닫기</button><button type="button" class="btn" data-uasave>저장</button></div>';
+  }
   const uaClose = () => $('#uaModal').classList.add('hidden');
-  $('#uaCancel').addEventListener('click', uaClose);
-  $('#uaModal').addEventListener('click', (e) => { if (e.target.id === 'uaModal') uaClose(); });
-  $('#uaGo').addEventListener('click', () => {
-    const id = $('#uaDrv').value; if (!id) return toast('기사를 고르세요.');
+  function uaSave() {
+    if (UA.pm) { PMC.pre = { runner: true, campId: UA.cid, route: UA.code, date: UA.dt, to: UA.drv }; uaClose(); return pmcOpen(); }
+    const d = uaDrv(); if (!d) return toast('뛸 기사를 고르세요.');
     if (!UA.rots.length) return toast('회전을 고르세요.');
-    const d = SD.drivers.find((x) => x.id === id), now = sget(id, UA.dt), v = uaValue(d);
+    const now = sget(d.id, UA.dt), v = uaValue(d);
     if (now && !/^(휴무|고정휴무|추가휴무|출근)$/.test(now) && !confirm(d.name + ' 칸에 이미 "' + now + '" 이(가) 있습니다. "' + v + '" 로 바꿀까요?')) return;
-    setCells([{ row: id, date: UA.dt, value: v }]); uaClose(); toast(d.name + ' ' + Number(UA.dt.slice(5, 7)) + '/' + Number(UA.dt.slice(8)) + ' 칸에 ' + v + ' 배정');
+    setCells([{ row: d.id, date: UA.dt, value: v }]); saveInst(d.id, UA.dt, String(UA.ins || '').trim(), UA.ins0);
+    uaClose(); toast(d.name + ' ' + ceMd(UA.dt) + ' 칸에 ' + ceDisp(v, d.id) + ' 배정 (Ctrl+Z 로 되돌리기)');
+  }
+  $('#uaModal').addEventListener('mousedown', (e) => { if (e.target.id === 'uaModal') uaClose(); });
+  $('#uaBody').addEventListener('input', (e) => { if (e.target.id === 'uaIns') UA.ins = e.target.value; });
+  $('#uaBody').addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.dataset.uadrv !== undefined) { UA.drv = t.value; UA.sub = ''; const cur = UA.drv ? instOf(UA.drv, UA.dt) : null; UA.ins = UA.ins0 = cur ? cur.reason : ''; return uaPaint(); }
+    if (t.dataset.uapm !== undefined) { UA.pm = t.checked; return uaPaint(); }
   });
-  $('#uaNow').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-uadel]'); if (!b) return;
+  $('#uaBody').addEventListener('click', (e) => {
+    const t = e.target;
+    if (t.closest('[data-uaclose]')) return uaClose();
+    if (t.closest('[data-uasave]')) return uaSave();
+    const rb = t.closest('[data-uar]');
+    if (rb) { const r = rb.dataset.uar; UA.rots = UA.rots.includes(r) ? UA.rots.filter((x) => x !== r) : UA.rots.concat(r); return uaPaint(); }
+    const sb = t.closest('[data-uasub]'); if (sb && !sb.disabled) { UA.sub = sb.dataset.uasub; return uaPaint(); }
+    const b = t.closest('[data-uadel]'); if (!b) return;
     const key = b.dataset.uadel, o = unDrvOfKey(key), now = sget(key, UA.dt);
-    if (!confirm((o ? o.d.name : '') + ' ' + Number(UA.dt.slice(5, 7)) + '/' + Number(UA.dt.slice(8)) + ' 칸 "' + now + '" 을 비울까요?')) return;
+    if (!confirm((o ? o.d.name : '') + ' ' + ceMd(UA.dt) + ' 칸 "' + now + '" 을 비울까요?')) return;
     setCells([{ row: key, date: UA.dt, value: '' }]); uaOpen(UA.cid, UA.code, UA.dt);
   });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#uaModal').classList.contains('hidden')) uaClose(); });
   $('#sWrap').addEventListener('click', (e) => { const td = e.target.closest('#sGrid td.uc[data-ucid]'); if (!td) return; uaOpen(td.dataset.ucid, td.dataset.ucode, SD.dates[+td.dataset.c]); });
   /** 배정 안 된 칸: 소속 캠프가 있는 재직 기사(추가 배정 줄·휴직·퇴사일 이후 제외)의 빈 칸 */
   function noAssign(r, dt, v) {
@@ -8529,11 +8626,11 @@
     return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pmLabel(r, dt, pm)) + '"' : '') + '>' + cellHtml(v, r.row) + '</td>';
   }
   /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
-  /** 품앗이 칸에 보일 글자: 맡긴 기사 = '🤝 품앗이 맡김 ▶ 강준길' · 받은 기사 = '🤝 품앗이 군포1 212CD ◀ 이현모' (일감이 여러 개면 줄마다) */
+  /** 품앗이 칸에 보일 글자: 맡긴 기사 칸 = '🤝 받은기사 / 품앗이 맡김' · 받은 기사 칸 = '🤝 맡긴기사 / 품앗이 받음' (일감이 여러 개면 줄마다 · 노선은 마우스를 올리면 보임) */
   function pmLabel(r, dt, pm) {
     const list = pmTipList(r, dt), me = r.d ? r.d.name : '';
     if (!list.length) return '🤝 품앗이 ' + pm;
-    return list.map((t) => (t.from === me && t.to !== me ? '🤝 ' + (t.to || '') + '\n품앗이 맡김' : '🤝 ' + ((shortCamp(t.camp || '') + ' ' + (t.route || t.area || '')).trim() || '품앗이') + '\n◀ ' + (t.from || '') + ' (받음)')).join('\n');
+    return list.map((t) => (t.from === me && t.to !== me ? '🤝 ' + (t.to || '') + '\n품앗이 맡김' : '🤝 ' + (t.from || '러너') + '\n품앗이 받음')).join('\n');
   }
   /** 품앗이 칸에서 숨길 칸 글자 (품앗이만 보이게) — 노선 글자 등 다른 값은 그대로 둠 */
   const PM_ONLY = /^(출근|휴무|고정휴무|추가휴무|휴가)?$/;
@@ -8607,7 +8704,7 @@
     const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
     if (ins) secs.push('<div class="cc-sec"><div class="cc-t">📌 지시사항</div><div>' + esc(ins.reason) + '</div></div>');
     const scc = r.kind === 'd' ? subCell(v, r.row) : null;
-    if (scc) secs.push('<div class="cc-sec"><div class="cc-t">🪪 서브아이디 업무등록</div><div>' + esc((ceSubName(scc.id) ? ceSubName(scc.id) + ' 아이디' : '서브아이디') + '(' + scc.id + ')로 ' + groupRoutes(scc.route.toUpperCase()) + ' 업무등록') + '</div></div>');
+    if (scc) secs.push('<div class="cc-sec"><div class="cc-t">🪪 서브아이디 업무등록</div><div>' + esc((ceSubName(scc.id) ? ceSubName(scc.id) + ' 아이디' : '서브아이디') + '(' + scc.id + ')로 ' + (scc.camp ? scc.camp + ' ' : '') + groupRoutes(scc.route.toUpperCase()) + ' 업무등록') + '</div></div>');
     const pl = pmTipList(r, dt);
     if (pl.length) secs.push('<div class="cc-sec cc-pm">' + pmTipHtml(pl) + '</div>');
     else { const pm = r.kind === 'd' ? pmMark(r.row, dt) : ''; if (pm) secs.push('<div class="cc-sec"><div class="cc-t">🤝 품앗이</div><div>' + esc(pm) + '</div></div>'); }
@@ -8773,6 +8870,7 @@
       }
       refreshAfterChange();
       if (r.issueSync) { try { isFromSchedSave(r.issueSync); refreshAfterChange(); } catch (e) { console.warn(e); } }
+      else { try { ceSubLink(null); } catch (e) { console.warn(e); } }
       sStatus(Object.keys(sPending).length ? 'wait' : 'ok');
       if (Object.keys(sPending).length) scheduleSave();
     }).catch(() => { sStatus('err'); }).finally(() => { sBusy = false; });
@@ -8851,6 +8949,7 @@
   });
   $('#sWrap').addEventListener('keydown', (e) => {
     if (sEdit || !sAct) return;
+    if (e.target.closest && e.target.closest('.sed')) return; // 빠른 입력 칸에서 누른 Enter·Tab 은 거기서 끝 (저장하고 옮긴 뒤 다음 칸 입력 창이 또 열리지 않게)
     const k = e.key, ctrl = e.ctrlKey || e.metaKey;
     if (k === 'ArrowUp') { moveAct(-1, 0, e.shiftKey); e.preventDefault(); }
     else if (k === 'ArrowDown') { moveAct(1, 0, e.shiftKey); e.preventDefault(); }
@@ -9055,6 +9154,21 @@
   const CE_VACANT = /^(휴무|고정휴무|추가휴무|병가|휴가|미입차)$/;
   const CE_OFF = /^(휴무|고정휴무|추가휴무)$/;
   let CE = null;
+  const CE_SUBQ = []; // 병가·미입차 + 대신 뛸 기사: 저장 뒤 자동으로 생긴 이슈에 대체를 채우려고 잠시 보관
+  const ceRouteTextOf = (c, alt) => { const keep = CE; CE = c; try { return ceRouteText(alt.campId || ''); } finally { CE = keep; } };
+  /** 칸 저장으로 생긴 병가·미입차 이슈에 대신 뛸 기사를 '대체: 업체백업'으로 채움 (하루짜리 이슈만 · 여러 날 이슈는 그 기사 칸에 직접 적음) */
+  function ceSubLink(sync) {
+    if (!CE_SUBQ.length) return;
+    const q = CE_SUBQ.splice(0), got = ((sync && sync.created) || []).concat((sync && sync.changed) || []);
+    q.forEach((w) => {
+      const x = got.find((i) => i.driverId === w.driverId && /^(병가|미입차)$/.test(i.result || '') && i.date <= w.date && w.date <= (i.end || i.date));
+      const oneDay = x && x.date === (x.end || x.date);
+      if (!x || !oneDay || x.sub) { if (!w.direct) setCells([{ row: w.altId, date: w.date, value: w.value }]); return; }
+      x.sub = '업체백업'; x.subWho = w.who; // 사유를 묻는 창에도 미리 채워짐
+      isSave({ id: x.id, driverId: x.driverId, date: x.date, end: x.end || x.date, result: x.result, cut: x.cut || '', kind: x.kind, reason: x.reason || '', sub: '업체백업', subWho: w.who, qty: x.qty || '', action: x.action || '' }, true)
+        .then((r) => { if (!r && !w.direct) setCells([{ row: w.altId, date: w.date, value: w.value }]); else refreshAfterChange(); }).catch(() => {});
+    });
+  }
   const ceLid = (x) => String(x || '').replace(/@.*/, '').toLowerCase();
   function ceSubName(id) { const d = SD.drivers.find((x) => !x.ex && ceLid(x.loginId) === ceLid(id)); return d ? d.name : ''; }
   const ceMd = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8)) + ' (' + '일월화수목금토'[new Date(d + 'T00:00:00').getDay()] + ')';
@@ -9066,16 +9180,15 @@
     if (jobs.length) { CE = { mode: 'pm', r: r, dt: dt, d: d, jobs: jobs, ins: ins0, ins0: ins0 }; return ceShow(); }
     const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null;
     const subs = [...new Set((d.subIds || []).concat((main && main.subIds) || []).map(String).filter(Boolean))];
-    const myCamp = d.campId || '', sc = subCell(v, r.row);
+    const myCamp = d.campId || '', n = cellNorm(v, r.row);
     let st = CE_ST.includes(v) ? v : /^(노선|라우트)\s*변경$/.test(v) ? v.replace(/\s/g, '') : '', sub = '', rv = '';
-    if (sc) { st = '출근'; sub = subs.find((x) => x.toLowerCase() === sc.id.toLowerCase()) || sc.id; rv = sc.route; }
-    else if (!st && v && !/업무등록|변경|\n/.test(v) && (/^\d/.test(v) || /^[가-힣]+\d\s+\d/.test(v))) { st = '출근'; rv = v; }
+    if (n) { st = '출근'; if (n.ids.length) sub = subs.find((x) => x.toLowerCase() === n.ids[0].toLowerCase()) || n.ids[0]; rv = n.whole ? '' : n.text; }
     const src = rv || d.baseRoute || '', mc = String(src).match(/^([가-힣]+\d)\s+(.+)$/);
     const c0 = mc ? SD.camps.find((c) => shortCamp(c.name).replace(/\s/g, '') === mc[1]) : null;
     const body = c0 ? mc[2] : src, p0 = /^\d/.test(body) ? parseBR(body) : { units: [], rots: [], per: {} };
     const pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: '', rots: p0.rots, per: p0.per || {} };
     if (!pk.rots.length) pk.rots = sdCampRots(pk.campId);
-    CE = { mode: 'cell', r: r, dt: dt, d: d, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv && !sc, touched: false, alt: '', pm: false, ins: ins0, ins0: ins0 };
+    CE = { mode: 'cell', r: r, dt: dt, d: d, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv, touched: false, alt: '', pm: false, ins: ins0, ins0: ins0 };
     ceShow();
   }
   function ceShow() { cePaint(); $('#ceModal').classList.remove('hidden'); try { const t = $('#cellTip'); if (t) t.style.display = 'none'; } catch (e) { /* 무시 */ } }
@@ -9099,7 +9212,7 @@
     const c = CE; if (!c.touched) return c.v0;
     if (c.st && c.st !== '출근') return c.st;
     if (c.st === '출근') {
-      if (c.sub && c.pk.campId === (c.d.campId || '') && ceCodes()) return ceCodes() + ' (' + c.sub + ') 업무등록';
+      if (c.sub && ceCodes()) return (c.pk.campId && c.pk.campId !== (c.d.campId || '') && ceCampName(c.pk.campId) ? ceCampName(c.pk.campId) + ' ' : '') + ceCodes() + ' (' + c.sub + ') 업무등록';
       const rt = ceRouteText(c.d.campId || '');
       return !rt || ceIsBase() ? '출근' : rt;
     }
@@ -9108,13 +9221,13 @@
   /** 그날 휴무인 기사 (같은 캠프 → 백업 → 다른 캠프 · 고정휴무는 뒤) */
   function ceAlts() {
     const c = CE, me = String(c.r.row).split('~')[0], mine = [me, c.d.mainId || ''];
-    return SD.drivers.filter((x) => x.status === '승인' && !x.ex && !x.title && !mine.includes(x.id) && x.workStatus !== '퇴사' && x.workStatus !== '휴직' && CE_OFF.test(String(sget(x.id, c.dt)).trim()) && !pmMark(x.id, c.dt))
+    return SD.drivers.filter((x) => x.status === '승인' && !x.ex && !mine.includes(x.id) && x.workStatus !== '퇴사' && x.workStatus !== '휴직' && CE_OFF.test(String(sget(x.id, c.dt)).trim()) && !pmMark(x.id, c.dt))
       .map((x) => { const v = String(sget(x.id, c.dt)).trim(), bk = /백업/.test(x.baseRoute || '') || x.type === '백업'; return { d: x, v: v, rank: (x.campId === c.pk.campId ? 0 : bk ? 2 : 4) + (v === '고정휴무' ? 1 : 0) }; })
       .sort((a, b) => a.rank - b.rank || koSort(a.d.name, b.d.name));
   }
   const ceAltOn = () => CE.st !== '용차' && (CE.pm || CE_VACANT.test(CE.st)) && !!CE.pk.units.length;
   const ceAltDrv = () => (ceAltOn() && CE.alt ? SD.drivers.find((x) => x.id === CE.alt) || null : null);
-  const ceDisp = (v, row) => { const sc = subCell(v, row); return sc ? (sc.base ? '출근' : groupRoutes(sc.route.toUpperCase())) + ' (' + sc.id + ')업무등록' + (ceSubName(sc.id) ? ' · ' + ceSubName(sc.id) + ' 아이디' : '') : v || '빈 칸'; };
+  const ceDisp = (v, row) => { const n = cellNorm(v, row); return n ? groupRoutes(n.text) + (n.ids.length ? ' · 아이디 ' + n.ids.map((id) => (ceSubName(id) ? ceSubName(id) + ' ' : '') + id).join(', ') : '') : v || '빈 칸'; };
   function cePaint() {
     const c = CE; if (!c) return;
     const insRow = '<div class="ce-ln"><span>📌 지시사항</span><div><textarea id="ceIns" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량">' + esc(c.ins) + '</textarea></div></div>';
@@ -9128,7 +9241,7 @@
       return;
     }
     const d = c.d, pk = c.pk, rots = sdCampRots(pk.campId), myCamp = d.campId || '';
-    const rt = ceRouteText(''), val = ceValue(), subOk = pk.campId === myCamp && !!ceCodes();
+    const rt = ceRouteText(''), val = ceValue(), subOk = !!ceCodes();
     const head = '<h3 class="ce-h">' + esc(d.name) + ' · ' + esc(ceMd(c.dt)) + '</h3>' +
       '<div class="ce-s"><span>' + (rt ? esc(ceCampName(pk.campId)) + ' <b>' + esc(groupRoutes(ceCodes())) + '</b> · ' + esc((pk.rots.length && !Object.keys(pk.per || {}).length ? rots.filter((x) => pk.rots.includes(x)) : rots).join(' ')) + (Object.keys(pk.per || {}).length ? ' (글자마다 다름)' : '') : '담당 노선 없음') + '</span>' +
       '<button type="button" class="ce-lk" data-cetog>노선 바꾸기 ' + (c.open ? '▾' : '▸') + '</button></div>';
@@ -9137,8 +9250,8 @@
       '<div class="ce-x">그 밖에 <button type="button" class="ce-c' + (c.st === '노선변경' ? ' on' : '') + '" data-cest="노선변경">노선변경</button><button type="button" class="ce-c' + (c.st === '라우트변경' ? ' on' : '') + '" data-cest="라우트변경">라우트변경</button></div></div>' : '';
     const stRow = '<div class="ce-ln"><span>상태</span><div class="ce-g">' + CE_ST.map((x) => '<button type="button" class="ce-c' + (x === '용차' ? ' yc' : '') + (c.st === x ? ' on' : '') + '" data-cest="' + x + '">' + x + '</button>').join('') + '</div></div>';
     const idRow = c.subs.length ? '<div class="ce-ln"><span>아이디</span><div><div class="ce-g"><button type="button" class="ce-c' + (c.st === '출근' && !c.sub ? ' on' : '') + '" data-cesub="">본인 · ' + esc((d.mainId && (SD.drivers.find((x) => x.id === d.mainId) || {}).name) || d.name) + (d.loginId ? '<small>' + esc(ceLid(d.loginId)) + '</small>' : '') + '</button>' +
-      c.subs.map((x, i) => '<button type="button" class="ce-c' + (c.st === '출근' && c.sub === x ? ' on' : '') + '" data-cesub="' + esc(x) + '"' + (subOk ? '' : ' disabled title="서브아이디는 소속 캠프 노선에서만 고를 수 있습니다"') + '>서브' + (c.subs.length > 1 ? ' ' + (i + 1) : '') + (ceSubName(x) ? ' · ' + esc(ceSubName(x)) : '') + '<small>' + esc(x) + '</small></button>').join('') + '</div>' +
-      (c.sub && c.st === '출근' && rt !== ceCodes() ? '<div class="ce-hint">서브아이디 업무등록은 회전을 나누지 않고 노선 전체로 기록합니다.</div>' : '') + '</div></div>' : '';
+      c.subs.map((x, i) => '<button type="button" class="ce-c' + (c.st === '출근' && c.sub === x ? ' on' : '') + '" data-cesub="' + esc(x) + '"' + (subOk ? '' : ' disabled title="노선을 먼저 고르세요"') + '>서브' + (c.subs.length > 1 ? ' ' + (i + 1) : '') + (ceSubName(x) ? ' · ' + esc(ceSubName(x)) : '') + '<small>' + esc(x) + '</small></button>').join('') + '</div>' +
+      (c.sub && c.st === '출근' && ceRouteText(pk.campId) !== ceCodes() ? '<div class="ce-hint">서브아이디 업무등록은 회전을 나누지 않고 노선 전체로 기록합니다.</div>' : '') + '</div></div>' : '';
     let altRow = '';
     if (c.st !== '용차') {
       const on = ceAltOn(), alts = on ? ceAlts() : [];
@@ -9162,13 +9275,17 @@
     const val = ceValue(), alt = ceAltDrv(), list = [];
     if (c.pm && !c.pk.units.length) return toast('품앗이로 넘길 노선을 고르세요.');
     if (val !== c.v0) list.push({ row: c.r.row, date: c.dt, value: val });
-    if (alt && !c.pm) list.push({ row: alt.id, date: c.dt, value: ceRouteText(alt.campId || '') });
+    // 병가·미입차는 이슈가 자동으로 생김 → 대신 뛸 기사를 그 이슈의 '대체: 업체백업'으로 남겨 이슈 관리와 맞춤
+    //  (내일 이후 날짜는 서버가 대신 뛸 기사 칸을 넣고 원래 값을 기억 → 병가를 취소하면 그 칸도 되돌아감 · 오늘까지는 실제 기록이라 칸에 직접 적음)
+    const viaIss = !!alt && !c.pm && /^(병가|미입차)$/.test(val) && val !== c.v0 && !c.d.ex && c.dt >= '2026-11-01';
+    if (viaIss) CE_SUBQ.push({ driverId: c.r.row, date: c.dt, who: alt.name, altId: alt.id, value: ceRouteText(alt.campId || ''), direct: c.dt < pddDate() });
+    if (alt && !c.pm && (!viaIss || c.dt < pddDate())) list.push({ row: alt.id, date: c.dt, value: ceRouteText(alt.campId || '') });
     const pre = c.pm ? { poster: c.d.mainId || c.d.id, to: alt ? alt.id : '', campId: c.pk.campId, route: ceCodes(), date: c.dt } : null;
     ceClose();
     if (list.length) setCells(list);
     saveInst(c.r.row, c.dt, ins, c.ins0);
     if (pre) { PMC.pre = pre; pmcOpen(); }
-    else if (alt) toast(alt.name + ' ' + ceMd(c.dt) + ' 칸에 ' + list[list.length - 1].value + ' 배정 (Ctrl+Z 로 되돌리기)');
+    else if (alt) toast(alt.name + ' ' + ceMd(c.dt) + ' 칸에 ' + ceRouteTextOf(c, alt) + ' 배정' + (viaIss ? ' · 이슈에 대체(업체백업)로 기록' : ' (Ctrl+Z 로 되돌리기)'));
   }
   $('#ceBody').addEventListener('input', (e) => { if (CE && e.target.id === 'ceIns') CE.ins = e.target.value; });
   $('#ceBody').addEventListener('keydown', (e) => { if (e.target.id === 'ceIns' && e.key === 'Enter' && !e.altKey && !e.shiftKey && !e.isComposing) { e.preventDefault(); ceSave(); } });
@@ -9185,14 +9302,14 @@
     if (sb) { c.st = sb.dataset.cest; c.touched = true; if (c.st !== '출근') c.sub = ''; if (c.st === '용차') { c.alt = ''; c.pm = false; } return cePaint(); }
     const ub = t.closest('[data-cesub]');
     if (ub && !ub.disabled) { c.sub = ub.dataset.cesub; c.st = '출근'; c.touched = true; return cePaint(); }
-    if (c.open && unitClick(e, 'ce', c.pk, ceRoutes())) { c.touched = true; if (!c.st || /변경$/.test(c.st)) c.st = '출근'; if (c.pk.campId !== (c.d.campId || '')) c.sub = ''; return cePaint(); }
+    if (c.open && unitClick(e, 'ce', c.pk, ceRoutes())) { c.touched = true; if (!c.st || /변경$/.test(c.st)) c.st = '출근'; return cePaint(); }
   });
   $('#ceBody').addEventListener('change', (e) => {
     const c = CE; if (!c || c.mode !== 'cell') return;
     const t = e.target;
     if (t.dataset.cealt !== undefined) { c.alt = t.value; return cePaint(); }
     if (t.dataset.cepm !== undefined) { c.pm = t.checked; return cePaint(); }
-    if (t.dataset.cecamp !== undefined) { c.pk.campId = t.value; c.pk.units = []; c.pk.rots = sdCampRots(c.pk.campId); c.pk.per = {}; c.sub = ''; c.touched = true; if (!c.st || /변경$/.test(c.st)) c.st = '출근'; return cePaint(); }
+    if (t.dataset.cecamp !== undefined) { c.pk.campId = t.value; c.pk.units = []; c.pk.rots = sdCampRots(c.pk.campId); c.pk.per = {}; c.touched = true; if (!c.st || /변경$/.test(c.st)) c.st = '출근'; return cePaint(); }
     if (rotChange(e, 'ce', c.pk)) { c.touched = true; if (!c.st || /변경$/.test(c.st)) c.st = '출근'; return cePaint(); }
   });
   $('#ceModal').addEventListener('mousedown', (e) => { if (e.target.id === 'ceModal') ceClose(); });
@@ -9201,6 +9318,20 @@
     if (!sEdit) return;
     const e = sEdit; sEdit = null;
     e.box.remove();
+    // '품앗이' / '품앗이 212CD' / '품앗이_김창호': 품앗이는 받는 기사·단가가 있는 등록이라 글자로 저장하지 않고 입력 창을 '품앗이로'에 체크한 채 연다
+    const pmTxt = e.r.kind === 'd' && e.r.d && /^품앗이/.test(String(e.ta.value || '').trim()) ? String(e.ta.value).trim() : '';
+    if (pmTxt) {
+      ceOpen(e.r, e.dt, true);
+      if (CE && CE.mode === 'cell') {
+        const rest = pmTxt.replace(/^품앗이[\s_·:-]*/, ''), pr = /\d{3,4}[A-Za-z]/.test(rest) ? parseBR(rest.replace(/^[가-힣]+\d\s+/, '')) : null;
+        if (pr && pr.units.length) { CE.pk.units = pr.units; CE.pk.per = {}; CE.pk.rots = sdCampRots(CE.pk.campId); }
+        CE.pm = true;
+        const who = rest && !pr ? SD.drivers.find((x) => !x.ex && x.name === rest) : null;
+        if (who && ceAlts().some((x) => x.d.id === who.id)) CE.alt = who.id;
+        cePaint(); toast('품앗이는 등록이 필요해서 입력 창을 열었습니다. 받는 기사를 고르고 저장하세요.');
+      }
+      return;
+    }
     setCells([{ row: e.r.row, date: e.dt, value: e.ta.value }]);
     if (e.insTa) saveInst(e.r.row, e.dt, e.insTa.value.trim(), e.ins0);
   }
@@ -9294,7 +9425,6 @@
     api('adm_pmMeta').then((r) => { if (!r.ok) return toast(r.msg); PMC.meta = r; go(); }).catch(() => {});
   }
   $('#sPmNew').addEventListener('click', () => { PMC.pre = null; pmcOpen(); });
-  $('#uaPm').addEventListener('click', () => { PMC.pre = { runner: true, campId: UA.cid, route: UA.code, date: UA.dt }; $('#uaModal').classList.add('hidden'); pmcOpen(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#pmcModal').classList.contains('hidden')) $('#pmcModal').classList.add('hidden'); });
   $('#pmcCancel').addEventListener('click', () => $('#pmcModal').classList.add('hidden'));
   $('#pmcModal').addEventListener('click', (e) => { if (e.target.id === 'pmcModal') $('#pmcModal').classList.add('hidden'); });
