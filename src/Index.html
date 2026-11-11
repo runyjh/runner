@@ -220,6 +220,10 @@
   .pmc.give .ar small { font-size: 13px; color: var(--sub); font-weight: 600; margin-left: 6px; }
   /* 품앗이: 근무 가능일 달력 */
   /* 내 근무 가능일 / 일할 기사 찾기: 높이 2배 · 고른 쪽은 메인 색 바탕 흰 글자 */
+  .pfltr { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+  .pfltr button { min-width: 64px; height: 42px; padding: 0 10px; border-radius: 10px; border: 1.5px solid #d1d6db; background: #fff; color: var(--sub); font-size: 15px; font-weight: 700; text-decoration: line-through; }
+  .pfltr button.on { border-color: var(--brand); background: var(--brand); color: #fff; text-decoration: none; }
+  .pfltr small { flex-basis: 100%; color: var(--sub); font-size: 12px; }
   .segm.gvseg { margin: 0 0 14px; padding: 5px; border-radius: 14px; background: var(--brand-weak); }
   .segm.gvseg button { flex: 1; padding: 0 6px; height: 70px; font-size: 17px; font-weight: 800; border-radius: 11px; color: var(--brand); white-space: nowrap; transition: background .15s, color .15s; }
   .segm.gvseg button.on { background: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(27,100,218,.28); }
@@ -862,7 +866,7 @@
         </div>
         <div class="row">
           <div class="field"><label class="lb" for="pfCamp">센터(캠프)<span class="req">*</span></label><select id="pfCamp"></select></div>
-          <div class="field"><label class="lb" for="pfRouteSel">라우트</label><select id="pfRouteSel"></select><input type="text" id="pfRoute" class="hidden" placeholder="라우트 직접 입력 (예: 527B)" autocomplete="off" style="margin-top:6px"></div>
+          <div class="field"><label class="lb" for="pfRouteSel">라우트</label><select id="pfRouteSel"></select><div class="pfltr hidden" id="pfLetters" role="group" aria-label="맡길 구역"></div><input type="text" id="pfRoute" class="hidden" placeholder="라우트 직접 입력 (예: 527B)" autocomplete="off" style="margin-top:6px"></div>
         </div>
         <div class="field"><label class="lb" for="pfArea">배송지<span class="req">*</span></label><input type="text" id="pfArea" placeholder="예: 강서구 화곡동" maxlength="40"></div>
         <div class="row">
@@ -2498,14 +2502,32 @@
       : '<option value="">선택 안 함</option>' + c.routes.map((r) => '<option value="' + escH(r) + '">' + escH(r) + '</option>').join('') + '<option value="__other">직접 입력…</option>';
     pmSetRoute(cur);
   }
-  /** 라우트 값 → 러너 노선 목록에 있으면 그 줄 선택, 없으면 '직접 입력' 칸에 */
+  // 노선 코드 → [숫자, 글자들] (404ABCD → ['404', ['A','B','C','D']]) · 모양이 다르면 null
+  const pmSplitRt = (v) => { const m = String(v || '').toUpperCase().match(/^(\d+)([A-Z]+)$/); return m ? [m[1], m[2].split('')] : null; };
+  /** 고른 노선의 구역(A·B·C·D)을 하나씩 켜고 끄는 단추 · 하나뿐인 노선은 숨김. on = 켜 둘 글자들 (없으면 전부) */
+  function pmLetters(code, on) {
+    const box = $('#pfLetters'), sp = pmSplitRt(code);
+    if (!sp || sp[1].length < 2) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    const keep = on && on.length ? on : sp[1];
+    box.dataset.num = sp[0];
+    box.innerHTML = sp[1].map((L) => '<button type="button" data-l="' + L + '" class="' + (keep.includes(L) ? 'on' : '') + '" aria-pressed="' + keep.includes(L) + '">' + sp[0] + L + '</button>').join('') + '<small>맡길 구역만 남겨 두세요</small>';
+    box.classList.remove('hidden');
+  }
+  function pmLettersVal() {
+    const box = $('#pfLetters'), ls = Array.from(box.querySelectorAll('button.on')).map((b) => b.dataset.l);
+    return box.dataset.num + ls.join('');
+  }
+  /** 라우트 값 → 러너 노선 목록에 있으면 그 줄 선택(일부 구역이면 그 구역만 켬), 없으면 '직접 입력' 칸에 */
   function pmSetRoute(val) {
     val = String(val || '').trim().toUpperCase();
-    const sel = $('#pfRouteSel'), has = val && Array.from(sel.options).some((o) => o.value === val && o.value !== '__other');
-    const other = !!val && !has && Array.from(sel.options).some((o) => o.value === '__other');
-    sel.value = has ? val : other ? '__other' : '';
-    $('#pfRoute').value = has || other ? val : '';
+    const sel = $('#pfRouteSel'), opts = Array.from(sel.options).filter((o) => o.value && o.value !== '__other'), sv = pmSplitRt(val);
+    let hit = opts.find((o) => o.value === val);
+    if (!hit && sv) hit = opts.find((o) => { const so = pmSplitRt(o.value); return so && so[0] === sv[0] && sv[1].every((L) => so[1].includes(L)); });
+    const other = !!val && !hit && Array.from(sel.options).some((o) => o.value === '__other');
+    sel.value = hit ? hit.value : other ? '__other' : '';
+    $('#pfRoute').value = hit || other ? val : '';
     $('#pfRoute').classList.toggle('hidden', !other);
+    pmLetters(hit ? hit.value : '', hit && sv ? sv[1] : null);
   }
   let pmPriceSeq = 0;
   function pmSuggestPrice() {
@@ -2559,10 +2581,18 @@
   $('#pfKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) pmSetKind(b.dataset.k); });
   $('#pfCamp').addEventListener('change', () => { $('#pfRoute').value = ''; $('#pfPrice').value = ''; $('#pfPriceHint').textContent = ''; pmRoutes(); });
   $('#pfRoute').addEventListener('change', pmSuggestPrice);
+  $('#pfLetters').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.classList.contains('on') && $$('#pfLetters button.on').length === 1) return toast('구역을 하나 이상 남겨 두세요.');
+    b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on'));
+    $('#pfRoute').value = pmLettersVal();
+    $('#pfPrice').value = ''; $('#pfPriceHint').textContent = ''; pmSuggestPrice();
+  });
   $('#pfRouteSel').addEventListener('change', () => {
     const v = $('#pfRouteSel').value, other = v === '__other';
     $('#pfRoute').classList.toggle('hidden', !other);
     $('#pfRoute').value = other ? '' : v;
+    pmLetters(other ? '' : v, null);
     if (other) $('#pfRoute').focus(); else pmSuggestPrice();
   });
   $('#pfFile').addEventListener('change', () => {
