@@ -1109,8 +1109,9 @@ function pmDoneOf_(me, cells, myCamp) {
 // ───────────────────────── 어드민 기사스케줄 연동 ─────────────────────────
 /** 처리 뒤 (잠금을 푼 다음): 휴대폰 푸시 + 기사스케줄 품앗이 줄 반영 */
 function pmAfter_(out) {
-  pmPushSend_(out);
+  // 기사스케줄 칸·정산 기록을 먼저 쓰고 휴대폰 알림은 그 뒤에 (알림 발송이 느려도 스케줄 반영이 늦어지지 않게)
   if (out && out.sch && out.sch.length) { pmSchApply_(out.sch); pmStlUsageApply_(out.sch); try { if (typeof stlBump_ === 'function') stlBump_(); } catch (e) { /* 무시 */ } } // 정산 품앗이 자동 줄도 다시 계산되게
+  pmPushSend_(out);
 }
 /**
  * 정산 연동 (모두 러너 소속 기사): 배송 아이디가 '주는 기사 아이디'인 품앗이가 배차 확정되면
@@ -1138,7 +1139,7 @@ function pmStlUsageApply_(ops) {
       });
       if (changed) { stlWriteAll_('stl_usage', rows.map(function (r) { const x = Object.assign({}, r); delete x._row; return x; })); stlBump_(); }
     } finally { lock.releaseLock(); }
-  } catch (e) { console.error('정산 아이디 사용 기록 연동 실패: ' + (e && e.message)); }
+  } catch (e) { console.error('정산 아이디 사용 기록 연동 실패: ' + (e && e.message)); errLog_('서버 오류', 'pmStlUsageApply_', '정산 아이디 사용 기록 연동 실패: ' + String(e && e.message || e)); }
 }
 /** 기사스케줄 품앗이 줄 칸에 적을 글자: '강서1 527B' (라우트가 없으면 배송지) */
 function pmSchText_(j) {
@@ -1198,6 +1199,8 @@ function pmSchApply_(ops, soft) {
     }
   } catch (e) {
     console.error('기사스케줄 품앗이 반영 실패: ' + (e && e.message));
+    // 오류 기록 탭에도 남긴다 (관리자가 기사스케줄을 열면 자동으로 다시 채워지지만, 실패한 사실은 알아야 함)
+    errLog_('서버 오류', 'pmSchApply_', '기사스케줄 품앗이 칸 쓰기 실패 (' + (ops || []).map(function (o) { return o.op + ' ' + o.date + ' ' + o.value; }).slice(0, 3).join(' / ') + '): ' + String(e && e.message || e));
   }
 }
 /**

@@ -303,6 +303,12 @@ scenario('이식 달 그날 노선 되살리기', null, function (r) {
   eq('두 번째는 아무것도 안 함 (저장 1번뿐)', [out.again, out.writes], [-1, 1]);
 });
 
+// 15) 품앗이 확정 뒤 순서: 스케줄 칸 → 알림 · 칸 쓰기 실패는 오류 기록에
+ops('확정 뒤 처리 순서·실패 기록', function (run) {
+  eq('스케줄 칸을 알림보다 먼저 씀', run("var seq = []; var ps = pmSchApply_; pmSchApply_ = function (o, s) { seq.push('sch'); return ps(o, s); }; pmPushSend_ = function () { seq.push('push'); }; pmDecide_('d1', 'J3', 'A1', 'accept'); pmSchApply_ = ps; return seq;"), ['sch', 'push']);
+  eq('칸 쓰기 실패 → 오류 기록 · 확정은 그대로', run("var logs = []; errLog_ = function (k, f, m) { logs.push(k + '|' + f); }; var sh = schSheet_; schSheet_ = function () { throw new Error('boom'); }; pmDecide_('d1', 'J3', 'A1', 'back'); pmDecide_('d1', 'J3', 'A2', 'accept'); schSheet_ = sh; return [__M.jobs[2].status, logs];"), ['배차 확정', ['서버 오류|pmSchApply_', '서버 오류|pmSchApply_']]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
