@@ -1036,6 +1036,35 @@
   #sGrid > tbody > tr.cgrp:hover > td.fx { background-color: #eef4ff !important; box-shadow: none; }
   .sg .rlab { font-style: normal; font-size: 10px; font-weight: 800; color: #8b95a1; background: rgba(0,0,0,.06); border-radius: 4px; padding: 0 4px; margin-right: 4px; }
   .sg.noauto #sCalc { display: none; }
+  /* 휴대폰 기사스케줄: 기사앱 '내 스케줄'과 같은 틀 ([한 달 / 캠프] 달력 + 날짜별 줄) */
+  #view-sched.mob .stools, #view-sched.mob #sWrap, #view-sched.mob #sChk, #view-sched.mob #sChkBox, #view-sched.mob #sLegend, #view-sched.mob > .head .tools { display: none !important; }
+  .smb-top { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; } .smb-top .seg { margin-left: auto; }
+  .smb-pick { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; } .smb-pick select { flex: 1; min-width: 0; height: 42px; font-size: 15px; font-weight: 700; }
+  .smb-cal { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px 8px 8px; }
+  .smb-nav { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 6px; font-weight: 800; font-size: 15px; }
+  .smb-nav button { border: 0; background: #f1f3f6; border-radius: 9px; width: 40px; height: 36px; font-size: 14px; color: var(--sub); }
+  .smb-sum { font-size: 12px; color: var(--sub); padding: 0 4px 6px; }
+  .smb-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .smb-grid .wd { text-align: center; font-size: 11px; font-weight: 700; color: #94a3b8; padding: 2px 0; } .smb-grid .wd.sun { color: var(--danger); }
+  .smb-c { border: 0; border-radius: 8px; background: #f7f8fa; min-height: 54px; padding: 3px 1px; text-align: center; font-size: 10px; line-height: 1.25; display: flex; flex-direction: column; align-items: stretch; gap: 1px; color: var(--sub); }
+  .smb-c.blank { background: none; } .smb-c .n { font-weight: 800; font-size: 12.5px; color: var(--ink); } .smb-c.sun .n { color: var(--danger); }
+  .smb-c.pdd { background: #eef4ff; } .smb-c.sel { box-shadow: inset 0 0 0 2px #1b64da; background: #e6efff; } .smb-c.past { opacity: .6; }
+  .smb-c .v { border-radius: 5px; font-weight: 800; font-size: 10px; padding: 1px 0; margin: 0 1px; overflow-wrap: anywhere; } .smb-c .v.none { background: #fff; color: #cbd5e1; }
+  .smb-c .mi { background: #dc2626; color: #fff; border-radius: 5px; font-weight: 800; margin: 0 1px; } .smb-c .bk { color: #0f766e; font-weight: 700; } .smb-c .sb { color: #15803d; font-weight: 800; font-size: 9px; }
+  .smb-dh { margin: 12px 4px 2px; font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .smb-dh em { font-style: normal; font-size: 11px; font-weight: 800; color: #fff; background: var(--brand); border-radius: 6px; padding: 2px 7px; }
+  .smb-dh small { margin-left: auto; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; } .smb-dh small.fix { background: #dcfce7; color: #15803d; } .smb-dh small.est { background: #fff1d6; color: #a15c00; }
+  .smb-hint { margin: 0 4px 6px; font-size: 12px; color: var(--sub); }
+  .smb-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; margin-bottom: 6px; color: var(--ink); }
+  .smb-row.warn { border-color: #fecaca; } .smb-row .l { min-width: 0; flex: 1; } .smb-row .rt { display: block; font-size: 16px; font-weight: 800; overflow-wrap: anywhere; } .smb-row .rt.none { color: #cbd5e1; }
+  .smb-row .nm { font-size: 13px; font-weight: 700; color: #475569; } .smb-row .nm small { color: #94a3b8; font-weight: 600; margin-left: 4px; }
+  .smb-row .r { flex: none; max-width: 52%; text-align: right; } .smb-row .r small { display: block; font-size: 11px; color: #94a3b8; margin-top: 2px; overflow-wrap: anywhere; }
+  .smb-pill { display: inline-block; border-radius: 7px; padding: 4px 9px; font-weight: 800; font-size: 13px; overflow-wrap: anywhere; text-align: center; } .smb-pill.none { background: #f1f3f6; color: #94a3b8; }
+  .smb-card { background: #fff; border: 1px solid #bfdbfe; border-radius: 14px; margin-top: 10px; padding: 12px 14px; }
+  .smb-card .big { font-size: 17px; font-weight: 800; margin: 6px 0; overflow-wrap: anywhere; } .smb-card .big b { color: #1b4fc4; }
+  .smb-card .btn { width: 100%; height: 44px; margin-top: 10px; justify-content: center; }
+  #sMobBack { display: none; } html.m #sMobBack { display: flex; }
+  .smb-more { position: relative; } .smb-more .smore-box { right: 0; }
   .schk { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; min-height: 30px; }
   .schk > small { font-weight: 800; color: var(--sub); font-size: 12px; }
   .schk .chip { display: inline-flex; gap: 6px; align-items: center; border-radius: 999px; padding: 5px 11px; font-weight: 800; font-size: 12.5px; background: #fff; border: 1px solid var(--line); cursor: pointer; white-space: nowrap; color: var(--ink); }
@@ -1732,6 +1761,7 @@
         <button class="btn ghost" id="sReload">새로고침</button>
         <div class="smore" id="sMoreWrap"><button class="btn ghost" id="sMore" type="button" aria-haspopup="true" aria-expanded="false" title="보기 설정 · 비고 줄 · 자동 채우기 · 기존 스케줄">⋯ 더 보기</button>
           <div class="smore-box hidden" id="sMoreBox">
+            <button class="btn ghost" id="sMobBack" type="button">📅 달력으로 보기 (한 달 / 캠프)</button>
             <div class="smore-h">보기</div>
             <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
             <label class="check" id="sStaffAllWrap" title="관리자·운영자·대표 줄은 고른 캠프 기사들 다음에 이어서 나옵니다. 캠프를 고르면 그 기간에 그 캠프 노선을 뛴 사람만 — 체크하면 전원"><input type="checkbox" id="sStaffAll"> 관리자·운영자·대표 전원</label>
@@ -1747,6 +1777,7 @@
           </div></div>
       </div>
     </div>
+    <div id="sMobBox" class="hidden"></div>
     <div class="schk" id="sChk"></div>
     <div class="schk-box hidden" id="sChkBox"></div>
     <div class="swrap" id="sWrap" tabindex="0"></div>
@@ -3674,6 +3705,7 @@
     document.documentElement.classList.toggle('m', m);
     try { localStorage.setItem('runner.ui', m ? 'm' : 'pc'); } catch (e) {}
     $('.side').classList.remove('open'); uiSwLabel(); if (window.__tkRe) window.__tkRe();
+    try { if (window.__schMob) window.__schMob(); } catch (e) { /* 기사스케줄을 아직 안 열었음 */ }
   });
   uiSwLabel();
   function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; }
@@ -8471,7 +8503,7 @@
     if (!flushed) body += unRows(lastCamp) + restUn();
     $('#sWrap').innerHTML = '<table class="sg' + (sMode === 'month' ? ' month' : '') + (sAutoOn() ? '' : ' noauto') + '" id="sGrid">' + head + '<tbody>' + body + '</tbody><tbody id="sCalc"></tbody></table>' +
       (srows.length ? '' : '<div class="empty">표시할 기사가 없습니다. 기사 정보관리에서 기사를 승인하거나, 캠프 필터를 바꿔 보세요.</div>');
-    renderCalc(); paintSel();
+    renderCalc(); paintSel(); paintMob();
     $('#sCount').textContent = new Set(srows.filter((r) => r.kind === 'd' && !r.d.ex).map((r) => r.row)).size + '명' + (srows.some((r) => r.kind === 'd' && r.d.ex) ? ' (+추가 배정 ' + srows.filter((r) => r.kind === 'd' && r.d.ex).length + '줄)' : '');
   }
   /** 캠프별 '담당 없는' 노선: 노선관리 노선(사용 중) 중 재직 기사의 기본노선(날짜별 구간·추가 배정 포함)에 없는 글자 → 번호별로 묶음 (예: 110CD) */
@@ -8878,7 +8910,113 @@
     el.scrollIntoView({ block: ri >= 0 ? 'center' : 'nearest', inline: 'center' });
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
   });
+  // ───── 휴대폰 기사스케줄: [한 달 / 캠프] 달력 (기사앱 '내 스케줄'과 같은 틀 · 관리자는 캠프·기사를 골라 보고, 누르면 칸 입력 창) ─────
+  let sMob = 'camp', sMobDay = '', sMobDrv = '';
+  try { const v = localStorage.getItem('runner.sch.mob'); if (v === 'drv' || v === 'table' || v === 'camp') sMob = v; } catch (e) { /* 기본값 */ }
+  const mobOn = () => document.documentElement.classList.contains('m') && sMob !== 'table';
+  const mobSet = (v) => { sMob = v; try { localStorage.setItem('runner.sch.mob', v); } catch (e) { /* 무시 */ } };
+  /** 달력 화면은 달력 달(1일~말일) 자료가 필요 → 2주·정산 기준으로 열려 있으면 한 달로 바꿔 다시 읽는다 (true = 다시 읽는 중) */
+  function mobNeedMonth() {
+    if (sMode === 'month' && sBasis === 'cal') return false;
+    const ref = pddDate() || SD.today || ymdLocal(new Date());
+    sMode = 'month'; sBasis = 'cal'; sMonth = monthOf(ref); schedGo(ref); return true;
+  }
+  const mobRowFor = (id, dt) => srows.find((r) => r.kind === 'd' && !r.d.ex && r.d.id === id && (!r.seg || segIn(r.seg, dt))) || null;
+  const mobMd = (dt) => { const p = dt.split('-'); return +p[1] + '/' + +p[2] + ' (' + DOW[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
+  /** 칸 값 → 달력·줄에 쓸 { top(짧은 글자), kind, sub(아이디), full } */
+  function mobCell(r, dt) {
+    const v = sget(r.row, dt), pm = pmMark(r.row, dt), yg = yongParse(v), n = cellNorm(v, r.row);
+    if (pm && PM_ONLY.test(v)) return { top: '품앗이', kind: 'pmk', sub: '', full: pmLabel(r, dt, pm).replace(/\n/g, ' ') };
+    if (!v) return { top: '', kind: 'none', sub: '', full: '' };
+    if (yg) return { top: '용차', kind: 'k-yong', sub: yg.vendor, full: '용차' + (yg.vendor ? ' ' + yg.vendor : '') };
+    if (n) return { top: groupRoutes(n.text), kind: n.kind, sub: n.ids.join(', '), full: groupRoutes(n.text) };
+    return { top: v.split(/\n/)[0], kind: cellKindRow(v, r.row), sub: '', full: v.replace(/\n/g, ' ') };
+  }
+  function paintMob() {
+    const box = $('#sMobBox'), view = $('#view-sched'); if (!box) return;
+    const on = mobOn();
+    view.classList.toggle('mob', on); box.classList.toggle('hidden', !on);
+    if (!on || !SD.dates.length) { if (!on) box.innerHTML = ''; return; }
+    if (mobNeedMonth()) { box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; return; }
+    const dates = SD.dates, pdd = pddDate();
+    if (!sMobDay || !dates.includes(sMobDay)) sMobDay = dates.includes(pdd) ? pdd : dates[0];
+    const [yy, mo] = dates[0].split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
+    const camps = SD.camps.slice().sort((a, b) => koSort(a.name, b.name));
+    const top = '<div class="smb-top"><div class="seg" id="smbMode"><button type="button" data-smb="drv"' + (sMob === 'drv' ? ' class="on"' : '') + '>한 달</button><button type="button" data-smb="camp"' + (sMob === 'camp' ? ' class="on"' : '') + '>캠프</button></div>' +
+      '<div class="smb-more"><button type="button" class="btn ghost" id="smbMore">⋯</button><div class="smore-box hidden" id="smbMoreBox"><button type="button" class="btn ghost" data-smbgo="table">표로 보기</button><button type="button" class="btn ghost" data-smbgo="reload">새로고침</button></div></div></div>';
+    const nav = (ttl) => '<div class="smb-nav"><button type="button" data-smbmv="-1" aria-label="이전 달">◀</button><span>' + yy + '년 ' + mo + '월 · ' + esc(ttl) + '</span><button type="button" data-smbmv="1" aria-label="다음 달">▶</button></div>';
+    const grid = (cellFn) => '<div class="smb-grid">' + DOW.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : '') + '">' + w + '</div>').join('') + new Array(lead).fill('<div class="smb-c blank"></div>').join('') +
+      dates.map((dt, i) => { const dow = (lead + i) % 7; return '<button type="button" class="smb-c' + (dow === 0 || SD.holidays[dt] ? ' sun' : '') + (dt === pdd ? ' pdd' : '') + (dt === sMobDay ? ' sel' : '') + (dt < pdd ? ' past' : '') + '" data-smbd="' + dt + '"><span class="n">' + +dt.slice(8) + '</span>' + cellFn(dt, i) + '</button>'; }).join('') + '</div>';
+    const d = sMobDay, di = dates.indexOf(d), prev = (() => { const p = d.split('-'); const t = new Date(+p[0], +p[1] - 1, +p[2] - 1); return (t.getMonth() + 1) + '/' + t.getDate() + ' (' + DOW[t.getDay()] + ')'; })();
+    const sat = (() => { const t = new Date(SD.today + 'T00:00:00'); t.setDate(t.getDate() - t.getDay() + 6); return ymdLocal(t); })();
+    const dh = (ttl) => '<div class="smb-dh">' + esc(ttl) + (d === pdd ? '<em>PDD</em>' : '') + (SD.holidays[d] ? ' <span style="color:var(--danger);font-size:12px">' + esc(SD.holidays[d]) + '</span>' : '') + '<small class="' + (d > sat ? 'est">예상 · 변동 있음' : 'fix">확정') + '</small></div>';
+    let html = top;
+    if (sMob === 'camp') {
+      if (!sf.camp || !camps.some((c) => c.id === sf.camp)) { sf.camp = camps.length ? camps[0].id : ''; $('#sCamp').value = sf.camp; return renderSched(); }
+      const C = camps.find((c) => c.id === sf.camp), cs = shortCamp(C.name);
+      const rows = srows.filter((r) => r.kind === 'd' && !r.staff && shortCamp(r.camp) === cs);
+      const miOf = (i) => (SCHK ? SCHK.mi.filter((x) => x.i === i && String(x.t).split(' ')[0] === cs) : []);
+      const bkOf = (i) => (scalc && scalc.roster[cs] ? scalc.roster[cs][i] || [] : []);
+      const wkOf = (dt) => rows.filter((r) => (!r.seg || segIn(r.seg, dt)) && (isWorkDayCell(sget(r.row, dt)) || !!cellNorm(sget(r.row, dt), r.row) || (pmMark(r.row, dt) && /받음|◀/.test(pmLabel(r, dt, pmMark(r.row, dt)))))).length;
+      html += '<div class="smb-pick"><select class="inp" id="smbCamp" aria-label="캠프">' + camps.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === sf.camp ? ' selected' : '') + '>' + esc(shortCamp(c.name)) + '</option>').join('') + '</select></div>' +
+        '<div class="smb-cal">' + nav(cs) + '<div class="smb-sum">기사 ' + new Set(rows.filter((r) => !r.d.ex).map((r) => r.d.id)).size + '명 · 칸: 미입차 / 근무 인원 / 백업 인원</div>' +
+        grid((dt, i) => { const mi = miOf(i).length, w = wkOf(dt), b = bkOf(i).length; return (mi ? '<span class="mi">미입차 ' + mi + '</span>' : '') + '<span>근무 ' + w + '</span>' + (b ? '<span class="bk">백업 ' + b + '</span>' : ''); }) + '</div>';
+      const list = rows.filter((r) => !r.seg || segIn(r.seg, d));
+      const UN = unassignedRoutes()[sf.camp] || [];
+      html += dh(cs + ' · ' + mobMd(d)) + '<p class="smb-hint">실제 출근일 ' + prev + ' 저녁 입차 · 기사 ' + list.length + '명 · 근무 ' + wkOf(d) + '명 · 백업 ' + bkOf(di).length + '명</p>' +
+        list.map((r) => { const c = mobCell(r, d), base = r.d.baseRoute && /^\d/.test(r.d.baseRoute) ? groupRoutes(baseCodes(r.d)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
+          const own = shortCamp(r.camp || '');
+          const rt = c.kind === 'k-work' || c.kind === 'k-other' ? (c.top === '출근' ? base : c.top.indexOf(own + ' ') === 0 ? c.top.slice(own.length + 1) : c.top) : base;
+          return '<button type="button" class="smb-row' + (/미입차|노쇼/.test(c.top) ? ' warn' : '') + '" data-smbrow="' + esc(r.key || r.row) + '"><span class="l"><b class="rt' + (rt ? '' : ' none') + '">' + esc(rt || '—') + '</b><span class="nm">' + esc(r.d.name) + (r.d.type ? '<small>' + esc(r.d.type) + '</small>' : '') + (r.d.ex ? '<small>추가</small>' : '') + '</span></span>' +
+            '<span class="r"><span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-other' || c.kind === 'k-work' ? '출근' : c.top) + '</span>' + (c.kind === 'k-other' ? '<small>담당 아닌 노선</small>' : '') +
+            (c.sub ? '<small style="color:#15803d;font-weight:700">' + esc(c.sub) + '</small>' : '') + (iss ? '<small>' + esc(iss.kind + (iss.sub ? ' · ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</small>' : '') + (ins ? '<small>📌 ' + esc(ins.reason) + '</small>' : '') + '</span></button>'; }).join('') +
+        UN.map((code) => { const c = unCover(sf.camp, code, d); return '<button type="button" class="smb-row' + (c.miss.length ? ' warn' : '') + '" data-smbun="' + esc(code) + '"><span class="l"><b class="rt">' + esc(code) + '</b><span class="nm">담당 없음</span></span><span class="r"><span class="smb-pill ' + (c.miss.length ? 'k-mi' : 'k-work') + '">' + (c.miss.length ? '미입차' : esc(c.who.map((w) => w.name).join(', '))) + '</span><small>눌러서 기사 배정</small></span></button>'; }).join('') +
+        (list.length || UN.length ? '' : '<p class="smb-hint">이 캠프 기사가 없습니다.</p>') +
+        (bkOf(di).length ? '<div class="smb-dh" style="font-size:13.5px">' + esc(cs) + ' 백업 명단</div><p class="smb-hint">' + bkOf(di).map(esc).join(' · ') + '</p>' : '');
+    } else {
+      if (sf.camp) { sf.camp = ''; $('#sCamp').value = ''; return renderSched(); }
+      const drvs = Array.from(new Map(srows.filter((r) => r.kind === 'd' && !r.d.ex).map((r) => [r.d.id, r.d])).values());
+      if (!sMobDrv || !drvs.some((x) => x.id === sMobDrv)) sMobDrv = drvs.length ? drvs[0].id : '';
+      const D = drvs.find((x) => x.id === sMobDrv);
+      html += '<div class="smb-pick"><select class="inp" id="smbDrv" aria-label="기사">' + drvs.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === sMobDrv ? ' selected' : '') + '>' + esc(x.name + ' · ' + (shortCamp(x.camp || '') || '-') + (x.baseRoute ? ' · ' + x.baseRoute : '')) + '</option>').join('') + '</select></div>';
+      if (!D) html += '<p class="smb-hint">표시할 기사가 없습니다.</p>';
+      else {
+        const cnt = { w: 0, o: 0, s: 0, m: 0, y: 0 };
+        dates.forEach((dt) => { const r = mobRowFor(D.id, dt); if (!r) return; const v = sget(r.row, dt); if (!v) return; if (/^용차/.test(v)) cnt.y++; else if (/병가/.test(v)) cnt.s++; else if (/미입차|노쇼/.test(v)) cnt.m++; else if (/휴무|휴가/.test(v)) cnt.o++; else if (isWorkDayCell(v) || cellNorm(v, r.row)) cnt.w++; });
+        html += '<div class="smb-cal">' + nav(D.name) + '<div class="smb-sum">근무 ' + cnt.w + '일 · 쉬는 날 ' + cnt.o + '일' + (cnt.s ? ' · 병가 ' + cnt.s + '일' : '') + (cnt.m ? ' · 미입차 ' + cnt.m + '일' : '') + (cnt.y ? ' · 용차 ' + cnt.y + '일' : '') + '</div>' +
+          grid((dt) => { const r = mobRowFor(D.id, dt); if (!r) return ''; const c = mobCell(r, dt); return '<span class="v ' + c.kind + '">' + esc(c.kind === 'none' ? '·' : c.top) + '</span>' + (c.sub && c.kind !== 'k-yong' ? '<span class="sb">서브</span>' : ''); }) + '</div>';
+        const r = mobRowFor(D.id, d);
+        if (r) {
+          const c = mobCell(r, d), base = D.baseRoute && /^\d/.test(D.baseRoute) ? groupRoutes(baseCodes(D)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
+          const rt = c.kind === 'k-work' || c.kind === 'k-other' ? (c.top === '출근' ? base : c.top) : '';
+          html += '<div class="smb-card">' + dh(mobMd(d)) + '<p class="smb-hint" style="margin:2px 0 0">실제 출근일 ' + prev + ' 저녁 입차</p>' +
+            '<div class="big">' + (rt ? esc(shortCamp(r.camp || D.camp || '')) + ' <b>' + esc(rt) + '</b>' : c.kind === 'none' ? '<span style="color:#94a3b8">아직 정해지지 않음</span>' : '담당 <b>' + esc(base || '없음') + '</b>') + '</div>' +
+            '<span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-work' ? '출근' : c.full) + '</span>' + (c.sub && c.kind !== 'k-yong' ? ' <span class="smb-pill" style="background:#dcfce7;color:#15803d">' + esc(c.sub) + ' 업무등록</span>' : '') +
+            (iss ? '<p class="smb-hint" style="margin:8px 0 0">이슈: ' + esc(iss.result + ' · ' + iss.kind + (iss.sub ? ' · 대체 ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</p>' : '') + (ins ? '<p class="smb-hint" style="margin:6px 0 0">📌 ' + esc(ins.reason) + '</p>' : '') +
+            '<button type="button" class="btn" data-smbrow="' + esc(r.key || r.row) + '">이 날 고치기</button></div>';
+        }
+      }
+    }
+    box.innerHTML = html;
+  }
+  window.__schMob = () => { if (SD.dates.length && !$('#view-sched').classList.contains('hidden')) paintMob(); };
+  const isWorkDayCell = (v) => { const s = String(v || '').trim(); return !!s && s !== '휴가' && !['휴무', '용차', '병가', '퇴사', '미입차', '노쇼', '업무'].some((w) => s.includes(w)); };
+  $('#sMobBox').addEventListener('click', (e) => {
+    const t = e.target;
+    const mb = t.closest('[data-smb]'); if (mb) { if (mb.dataset.smb !== sMob) { mobSet(mb.dataset.smb); paintMob(); } return; }
+    if (t.closest('#smbMore')) { $('#smbMoreBox').classList.toggle('hidden'); return; }
+    const go = t.closest('[data-smbgo]'); if (go) { if (go.dataset.smbgo === 'table') { mobSet('table'); paintMob(); } else schedGo(SD.dates[0]); return; }
+    const mv = t.closest('[data-smbmv]'); if (mv) { sMonth = addMonth(sMonth || monthOf(SD.dates[0]), +mv.dataset.smbmv); sMobDay = ''; schedGo(); return; }
+    const dc = t.closest('[data-smbd]'); if (dc) { sMobDay = dc.dataset.smbd; paintMob(); return; }
+    const rw = t.closest('[data-smbrow]'); if (rw) { const r = srows.find((x) => (x.key || x.row) === rw.dataset.smbrow); if (r) ceOpen(r, sMobDay); return; }
+    const un = t.closest('[data-smbun]'); if (un) return uaOpen(sf.camp, un.dataset.smbun, sMobDay);
+  });
+  $('#sMobBox').addEventListener('change', (e) => {
+    if (e.target.id === 'smbCamp') { sf.camp = e.target.value; $('#sCamp').value = sf.camp; renderSched(); }
+    if (e.target.id === 'smbDrv') { sMobDrv = e.target.value; paintMob(); }
+  });
   $('#sAuto').checked = sAutoOn();
+  $('#sMobBack').addEventListener('click', () => { mobSet('camp'); paintMob(); });
   $('#sAuto').addEventListener('change', (e) => { try { localStorage.setItem('runner.sAuto', e.target.checked ? '1' : '0'); } catch (er) { /* 무시 */ } const g = $('#sGrid'); if (g) g.classList.toggle('noauto', !e.target.checked); });
   function refreshAfterChange(changedRows) {
     UNC = null;
@@ -8904,6 +9042,7 @@
     $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });
     try { paintUnassigned(); } catch (e) { /* 무시 */ }
     renderCalc();
+    try { paintMob(); } catch (e) { /* 무시 */ }
   }
 
   // ── 값 바꾸기 · 자동 저장 ──
