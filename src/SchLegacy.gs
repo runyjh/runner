@@ -123,7 +123,15 @@ function schLegacyConv_(raw, base, ownCamp) {
   if (!s || s === '-' || s === '퇴사') return { v: '', kind: 'skip' };
   if (/^계획된\s*휴무$/.test(s)) return { v: '추가휴무', kind: 'conv' };
   if (['출근', '휴무', '고정휴무', '추가휴무', '병가', '휴가', '미입차', '노쇼', '용차'].indexOf(s) >= 0) return { v: s, kind: 'same' };
-  if (/^품앗이/.test(s)) return { v: '', kind: 'need', why: '품앗이는 올인원에서 품앗이 등록으로 넣어 주세요' };
+  // 품앗이 표기: 받은 쪽 '품앗이_103AB' = 그 노선을 뜀 → 노선으로 · 맡긴 쪽 '품앗이_김창호' = 그날 내 노선은 그 기사가 뜀 → 휴무 · 상대가 안 적힌 '품앗이' 는 알 수 없어 확인 필요
+  //  (품앗이 정산·단가는 옮기지 않는다 — 필요하면 올인원에서 품앗이로 등록)
+  if (/^품앗이/.test(s)) {
+    const rest = s.replace(/^품앗이[\s_·:\-]*/, '').trim();
+    if (!rest) return { v: '', kind: 'need', why: '품앗이 상대가 적혀 있지 않습니다 — 올인원에서 품앗이로 등록해 주세요' };
+    if (/^(?:[가-힣]+\s?\d+\s+)?\d{3,4}[A-Za-z]/.test(rest)) { const r2 = schLegacyConv_(rest, base, ownCamp); return r2.kind === 'need' || r2.kind === 'skip' ? { v: '', kind: 'need', why: '품앗이 노선을 읽을 수 없습니다' } : { v: r2.v, kind: 'conv' }; }
+    if (/^[가-힣A-Za-z() ]{2,20}$/.test(rest)) return { v: '휴무', kind: 'conv' };
+    return { v: '', kind: 'need', why: '품앗이 표기를 읽을 수 없습니다' };
+  }
   if (/용차/.test(s)) return { v: '', kind: 'need', why: '용차 표기가 섞여 있어 누가 뛰었는지 알 수 없습니다 (용차면 상태를 용차로)' };
   // (아이디) 업무등록 · 출근 (아이디) 업무등록 = 담당 노선을 그 아이디로
   let m = s.match(/^(?:출근\s*)?\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)\s*업무등록$/);
