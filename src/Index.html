@@ -191,6 +191,10 @@
   .pmban { background: linear-gradient(135deg, #1b64da, #4f8ef7); color: #fff; border-radius: var(--radius); padding: 14px 16px; margin: 0 0 12px; font-weight: 700; font-size: 15px; }
   .pmban small { display: block; font-weight: 500; font-size: 12.5px; opacity: .85; margin-top: 2px; }
   .pmfil { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .pmdate { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; } /* 좁은 폰에서는 둘째 줄로 (글자 잘림 없음) */
+  .pmdate button, .pmdate-pick { flex: none; height: 38px; padding: 0 12px; border-radius: 19px; border: 1.5px solid #d1d6db; background: #fff; color: var(--ink); font-size: 14px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; position: relative; }
+  .pmdate button.on, .pmdate-pick.on { border-color: var(--brand); background: var(--brand); color: #fff; }
+  .pmdate-pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
   .pmfil input[type=search] { flex: 1; min-width: 0; height: 44px; }
   .pmchk { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; margin: 0 0 12px; cursor: pointer; user-select: none; }
   .pmchk input { width: 20px; height: 20px; accent-color: var(--brand); margin: 0; }
@@ -843,6 +847,7 @@
     <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.<small>기사님끼리 품앗이 일감을 맡기고 대신 뛰어 주세요.</small></div>
     <div class="pmofr hidden" id="pmOffNote">지금은 사무실에서 <b>품앗이 일감 올리기</b>를 잠시 멈춰 두었습니다. 올라온 일감 보기·지원은 그대로 할 수 있습니다.</div>
     <div class="pmfil"><input type="search" id="pmQ" placeholder="배송지·센터 검색 (예: 화곡동, 강서1)" enterkeyhint="search" autocomplete="off"><button class="btn sm" id="pmGo" type="button" style="height:44px">검색</button></div>
+    <div class="pmdate" id="pmDateBar"><button type="button" data-pd="" class="on">전체 날짜</button><button type="button" data-pd="0">오늘</button><button type="button" data-pd="1">내일</button><button type="button" data-pd="2">모레</button><label class="pmdate-pick"><input type="date" id="pmDate" aria-label="날짜 고르기"><span id="pmDateTxt">📅 날짜 고르기</span></label></div>
     <div class="segm pmseg" id="pmShow"><button type="button" data-s="all" class="on">전체</button><button type="button" data-s="jobs">품앗이 일감</button><button type="button" data-s="gives">일할 기사</button></div>
     <label class="pmchk"><input type="checkbox" id="pmAvail"> 지원 가능 오더만 보기</label>
     <div class="pmsum" id="pmSum"></div>
@@ -2344,11 +2349,11 @@
     api('api_pmList', token, { onlyAvail: $('#pmAvail').checked, q: $('#pmQ').value.trim() }).then((r) => {
       if (seq !== pmListSeq) return;
       if (!pmOk(r, '품앗이 목록을 불러오지 못했습니다.')) { $('#pmList').innerHTML = ''; return; }
-      r.jobs = pmShown(r.jobs);
+      r.jobs = pmShown(r.jobs).filter((j) => !pmDateSel || j.date === pmDateSel); // 날짜 검색 (화면에서 거름)
       pmPostOn = r.postOn !== false; pmOfferOn = r.offerOn !== false; paintPostOn();
-      const gives = $('#pmAvail').checked ? [] : (r.gives || []);
+      const gives = $('#pmAvail').checked ? [] : (r.gives || []).filter((g) => !pmDateSel || g.date === pmDateSel);
       pmGives = gives;
-      const bits = ['일감 ' + r.jobs.length + '건'];
+      const bits = (pmDateSel ? [pmDay(pmDateSel)] : []).concat(['일감 ' + r.jobs.length + '건']);
       if (gives.length) bits.push('품앗이 ' + gives.length + '건');
       if (r.waiting) bits.push('내 일감에 새 지원 ' + r.waiting + '명');
       if (r.confirmed) bits.push('확정된 내 품앗이 ' + r.confirmed + '건');
@@ -2358,12 +2363,26 @@
         .sort((a, b) => a.d.localeCompare(b.d));
       setTimeout(paintPostOn, 0);
       $('#pmList').innerHTML = items.length ? items.map((x) => x.h).join('')
-        : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : (pmPostOn ? '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 품앗이 일감</b>로 첫 일감을 올려 보세요.' : '아직 올라온 일감이 없습니다.')) + '</div>';
+        : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() || pmDateSel ? '조건에 맞는 일감이 없습니다.' : (pmPostOn ? '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 품앗이 일감</b>로 첫 일감을 올려 보세요.' : '아직 올라온 일감이 없습니다.')) + '</div>';
     }).catch(() => { if (seq !== pmListSeq) return; $('#pmList').innerHTML = ''; netErr(); });
   }
   $('#mPm').addEventListener('click', () => openPumasi('home'));
   $('#pmBack').addEventListener('click', () => { if (pmFrom === 'mypage') return openMyPage(); let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
   $('#pmAvail').addEventListener('change', loadPmList);
+  // 날짜 검색: 전체 · 오늘 · 내일 · 모레 · 달력에서 고르기 (목록은 그대로 받고 화면에서 거름)
+  let pmDateSel = '';
+  const pmYmd = (k) => { const d = new Date(); d.setDate(d.getDate() + k); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  function pmDateSet(v, btn) {
+    pmDateSel = v || '';
+    $$('#pmDateBar [data-pd]').forEach((b) => b.classList.toggle('on', b === btn));
+    const picked = !!pmDateSel && !btn;
+    $('#pmDateBar .pmdate-pick').classList.toggle('on', picked);
+    $('#pmDateTxt').textContent = picked ? '📅 ' + pmDay(pmDateSel) : '📅 날짜 고르기';
+    if (btn) $('#pmDate').value = '';
+    loadPmList();
+  }
+  $('#pmDateBar').addEventListener('click', (e) => { const b = e.target.closest('[data-pd]'); if (b) pmDateSet(b.dataset.pd === '' ? '' : pmYmd(+b.dataset.pd), b); });
+  $('#pmDate').addEventListener('change', () => { if ($('#pmDate').value) pmDateSet($('#pmDate').value, null); else pmDateSet('', $('#pmDateBar [data-pd=""]')); });
   $('#pmGo').addEventListener('click', loadPmList);
   $('#pmQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loadPmList(); } });
   $('#pmQ').addEventListener('search', loadPmList);
