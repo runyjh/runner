@@ -806,7 +806,7 @@ function run_(fn) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_ntPhoto', 'api_ntPhoto', 'adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_ntPhoto', 'api_ntPhoto', 'api_ntAdmPhoto', 'api_ntAdmList', 'adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_teamsList', 'api_teamsConfig', 'api_teamsPush', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'api_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
@@ -2569,7 +2569,7 @@ function memoStaff_(token) {
   const info = s ? driverInfo_(s.d) : null;
   if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { err: { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' } };
   if (info.mustChange) return { err: { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' } };
-  if (!info.title) fail_('업무스케줄은 관리자·운영자·대표만 볼 수 있습니다.');
+  if (!info.title) fail_('관리자·운영자·대표만 쓸 수 있는 기능입니다.');
   return { me: info };
 }
 function api_memoMonth(token, ym) {
@@ -2680,15 +2680,18 @@ function api_notices(token) {
 
 /** 관리자: 공지 전체 + 캠프 목록(대상 고르기용) */
 function adm_noticeList(token) {
-  return run_(function () {
-    requireAdmin_(token);
+  return run_(function () { requireAdmin_(token); return noticeList_(); });
+}
+/** 공지 전체 + 캠프 목록 (관리자앱 · 기사앱 직함자 공용) */
+function noticeList_() {
+  {
     const today = todayText_();
     const list = noticeAll_().map(function (n) { n.live = noticeLive_(n, today); return n; }).sort(function (a, b) {
       if (a.live !== b.live) return a.live ? -1 : 1;
       return noticeSort_(a, b);
     });
-    return { ok: true, notices: list, today: today, camps: master_().camps.map(function (c) { return c.name; }) };
-  });
+    return { ok: true, notices: list, today: today, camps: master_().camps.filter(function (c) { return c.name && !isStaffCamp_(c.name); }).map(function (c) { return c.name; }) };
+  }
 }
 
 // ───── 공지 사진 (드라이브 '공지사항 사진' 폴더 · 사진 칸에 주소를 줄바꿈으로) ─────
@@ -2730,18 +2733,25 @@ function api_ntPhoto(token, id, i) {
 }
 /** 관리자: 공지 사진 i번째 (수정 화면 미리보기) */
 function adm_ntPhoto(token, id, i) {
-  return run_(function () {
-    requireAdmin_(token);
+  return run_(function () { requireAdmin_(token); return ntPhotoAny_(id, i); });
+}
+/** 공지 사진 (게시 여부와 상관없이 · 관리자 · 직함자용) */
+function ntPhotoAny_(id, i) {
+  {
     const row = findRow_(SH.NOTICE, 'id', String(id || ''));
     const u = row ? ntPhotos_(readObj_(SH.NOTICE, row).attach)[Number(i) || 0] : '';
     if (!u) fail_('사진이 없습니다.');
     return ntPhotoBlob_(u);
-  });
+  }
 }
 /** 공지 추가(id 없음)·수정 */
 function adm_noticeSave(token, n) {
-  return run_(function () {
-    const a = requireAdmin_(token); fsMark_('nb');
+  return run_(function () { return noticeSave_(requireAdmin_(token), n); });
+}
+/** 공지 추가·수정 (관리자앱 · 기사앱 직함자 공용). a = { name, loginId } */
+function noticeSave_(a, n) {
+  {
+    fsMark_('nb');
     n = n || {};
     const f = {
       title: str_(n.title), body: String(n.body == null ? '' : n.body).replace(/\r\n?/g, '\n').trim(),
@@ -2780,18 +2790,22 @@ function adm_noticeSave(token, n) {
         f.attach = urls.join('\n');
         f.updatedAt = now;
         writeFields_(SH.NOTICE, row, f);
+        logAdmin_(a, '공지 수정', f.title, n.id);
       }
       cache_().remove('nt:all');
       return { ok: true, notice: noticeView_(readObj_(SH.NOTICE, row)) };
     } finally {
       lock.releaseLock();
     }
-  });
+  }
 }
 
 function adm_noticeDelete(token, id) {
-  return run_(function () {
-    const a = requireAdmin_(token); fsMark_('nb');
+  return run_(function () { return noticeDelete_(requireAdmin_(token), id); });
+}
+function noticeDelete_(a, id) {
+  {
+    fsMark_('nb');
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
@@ -2805,8 +2819,19 @@ function adm_noticeDelete(token, id) {
     } finally {
       lock.releaseLock();
     }
-  });
+  }
 }
+
+// ───── 기사앱: 공지사항 편집 (직함자 = 관리자·운영자·대표만 · 관리자앱 공지사항과 같은 데이터) ─────
+/** 기사앱 직함자 → 작업 기록용 { name, loginId } */
+function ntStaff_(token) {
+  const x = memoStaff_(token); if (x.err) return x;
+  return { a: { name: x.me.name, loginId: x.me.loginId + ' · 기사앱 ' + x.me.title } };
+}
+function api_ntAdmList(token) { return run_(function () { const x = ntStaff_(token); return x.err || noticeList_(); }); }
+function api_ntAdmSave(token, n) { return run_(function () { const x = ntStaff_(token); return x.err || noticeSave_(x.a, n); }); }
+function api_ntAdmDelete(token, id) { return run_(function () { const x = ntStaff_(token); return x.err || noticeDelete_(x.a, id); }); }
+function api_ntAdmPhoto(token, id, i) { return run_(function () { const x = ntStaff_(token); return x.err || ntPhotoAny_(id, i); }); }
 
 /** notices 시트를 직접 고쳤을 때: 공지ID·작성일시 자동, 날짜·중요·상태 정리, 캐시 삭제 */
 function fixNoticeRow_(sh, c, o) {

@@ -513,6 +513,12 @@
   .cmate .dt .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--brand); margin-top: 3px; } .cmate .dt small { display: block; font-size: 11.5px; color: var(--sub); }
   .cmate.me { background: #fffbea; margin: 0 -14px; padding: 10px 14px; border-radius: 10px; }
   .cbk { font-size: 14px; line-height: 1.7; color: #5a3286; }
+  /* 공지 관리 (직함자) */
+  .mylist button.naw { display: block; } .mylist button.naw::after { content: none; }
+  .naw .t { display: flex; gap: 6px; align-items: center; font-size: 15px; font-weight: 700; } .naw .t span { flex: 1; min-width: 0; word-break: break-word; }
+  .naw .m { display: block; font-size: 12.5px; color: var(--sub); font-weight: 500; margin-top: 4px; }
+  .naw .bg { flex: none; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 2px 6px; } .naw .bg.on { background: #e6f4ea; color: #2b8a3e; } .naw .bg.off { background: #f1f3f5; color: #868e96; } .naw .bg.imp { background: #ffe3e3; color: #e03131; }
+  .necamps { display: flex; flex-wrap: wrap; gap: 6px; } .necamps button { border: 1px solid #d1d6db; background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13.5px; font-weight: 600; color: var(--ink); } .necamps button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
   /* 러너 업무스케줄 (직함자) */
   .mmnav { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; } .mmnav > button { flex: 0 0 auto; height: 42px; min-width: 42px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font-size: 14px; font-weight: 700; color: var(--ink); }
   .mmnav .mmtd { padding: 0 12px; color: var(--brand); }
@@ -844,8 +850,30 @@
 
   <!-- ───────────── 공지사항 ───────────── -->
   <section id="v-notice" class="view">
-    <div class="topbar"><button class="back" id="ntBack" aria-label="뒤로">←</button><h2>공지사항</h2></div>
+    <div class="topbar"><button class="back" id="ntBack" aria-label="뒤로">←</button><h2>공지사항</h2>
+      <button class="btn sm ghost hidden" id="ntAdmGo" type="button" style="margin-left:auto;height:38px;padding:0 12px">✏️ 공지 관리</button></div>
     <div id="ntList"></div>
+  </section>
+  <!-- 공지 관리 (직함자 전용 · 관리자앱 공지사항과 같은 데이터) -->
+  <section id="v-ntadm" class="view">
+    <div class="topbar"><button class="back" id="naBack" aria-label="뒤로">←</button><h2>공지 관리</h2>
+      <button class="btn sm" id="naNew" type="button" style="margin-left:auto;height:38px;padding:0 12px">＋ 새 공지</button></div>
+    <div class="mylist" id="naList"></div>
+    <p class="hint" style="text-align:center">관리자·운영자·대표만 보입니다. 숨김·기간 지난 공지도 여기서 고칠 수 있습니다.</p>
+  </section>
+  <section id="v-ntedit" class="view">
+    <div class="topbar"><button class="back" id="neBack" aria-label="뒤로">←</button><h2 id="neH">새 공지</h2></div>
+    <div class="card">
+      <div class="field"><label class="lb" for="neTitle">제목<span class="req">*</span></label><input type="text" id="neTitle" maxlength="100"></div>
+      <div class="field"><label class="lb" for="neBody">내용</label><textarea id="neBody" maxlength="5000" style="min-height:160px"></textarea></div>
+      <div class="field"><label class="lb">사진 <small style="font-weight:500;color:var(--sub)">5장까지</small></label><div class="riph" id="nePh"></div></div>
+      <label class="check" style="color:var(--ink)"><input type="checkbox" id="neImp"> 중요 공지 (맨 위 고정 · 처음 열 때 팝업)</label>
+      <div class="field"><label class="lb">대상 캠프 <small style="font-weight:500;color:var(--sub)">아무것도 안 고르면 전체 기사</small></label><div class="necamps" id="neCamps"></div></div>
+      <div class="field" style="display:flex;gap:8px"><div style="flex:1;min-width:0"><label class="lb" for="neStart">게시 시작일</label><input type="date" id="neStart"></div><div style="flex:1;min-width:0"><label class="lb" for="neEnd">게시 종료일</label><input type="date" id="neEnd"></div></div>
+      <div class="field"><label class="lb">상태</label><div class="segm" id="neSt"><button type="button" data-st="게시" class="on">게시</button><button type="button" data-st="숨김">숨김</button></div></div>
+      <button class="btn" id="neSave" type="button">저장</button>
+      <button class="btn ghost hidden" id="neDel" type="button" style="margin-top:8px;color:#e03131;background:#fff0f0">이 공지 삭제</button>
+    </div>
   </section>
   <div class="ihelp hidden" id="ntPop" role="dialog" aria-modal="true"><div class="ibox ntpop">
     <span class="nimp">중요 공지</span><b id="ntPopTitle"></b><div class="ntpop-body" id="ntPopBody"></div>
@@ -1241,7 +1269,7 @@
   // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
   const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_myFb', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
   const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
-  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_ntPhoto', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto', 'api_memoMonth']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
+  const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_ntPhoto', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto', 'api_memoMonth', 'api_ntAdmList', 'api_ntAdmPhoto']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
   const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
   // 자동 로그인이면 이 기기(localStorage), 아니면 이 창에만(sessionStorage · 창을 닫으면 사라짐) — 로그인 토큰과 같은 곳
@@ -1343,7 +1371,7 @@
       notice: () => openNotices(''), sched: () => openSched(), pumasi: () => openPumasi('home'), pmform: () => openPumasi('home'), pmgive: () => openGive(ssGet('runner.gvMode') || 'me'),
       board: () => openBoard(), bdform: () => openBoard(), bdpost: () => { const id = ssGet('runner.bdId'); if (id) openBdPost(id, 'board'); else openBoard(); },
       pmdetail: () => { const id = ssGet('runner.pmId'); if (id) openPmDetail(id, 'pumasi'); else openPumasi('home'); },
-      mypage: () => openMyPage(), myinfo: () => { openMyPage(); show('myinfo'); }, pmalerts: () => openPmAlerts(), settle: () => openSettle(), memo: () => openMemo(),
+      mypage: () => openMyPage(), myinfo: () => { openMyPage(); show('myinfo'); }, pmalerts: () => openPmAlerts(), settle: () => openSettle(), memo: () => openMemo(), ntadm: () => openNtAdm(), ntedit: () => openNtAdm(),
       pmmine: () => { pmMineKind = ssGet('runner.pmKind') || 'posted'; show('pmmine'); loadPmMine(); }
     }[v];
     if (!open) return false;
@@ -1353,7 +1381,7 @@
   const BASE_VIEWS = ['home', 'login', 'splash', 'pending'];
   const BACK_BTN = {
     signup: '#v-signup .back', reset: '#v-reset .back', notice: '#ntBack', sched: '#scBack', changepw: '#cpBack', pumasi: '#pmBack', pmdetail: '#pdBack',
-    pmform: '#pfBack', pmgive: '#gvBack', board: '#bdBack', bdpost: '#bpBack', bdform: '#bfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack', memo: '#mmBack'
+    pmform: '#pfBack', pmgive: '#gvBack', board: '#bdBack', bdpost: '#bpBack', bdform: '#bfBack', mypage: '#myBack', pmmine: '#pmmBack', myinfo: '#miBack', pmalerts: '#paBack', settle: '#slBack', memo: '#mmBack', ntadm: '#naBack', ntedit: '#neBack'
   };
   const OVERLAYS = ['#riView', '#pmAsk', '#instHelp', '#ntPop', '#slPop', '#pushPop']; // 뒤로가기로 닫히는 팝업 (없으면 홈에서 뒤로가기 = 앱 종료)
   let backGuard = false, backSkip = false;
@@ -1446,6 +1474,8 @@
   }
   /** 호칭: 직함(관리자·운영자·대표)이 있으면 '유정훈 대표님', 없으면 '홍길동 기사님' */
   const honor = (u) => !u || !u.name ? '기사님' : u.name + ' ' + (u.title ? u.title + '님' : '기사님');
+  /** 직함자(관리자·운영자·대표)인지: 로그인 때 받은 user.title */
+  function isStaffUser() { try { return !!(JSON.parse(store.get(USER) || 'null') || {}).title; } catch (e) { return false; } }
   function goHome(user) {
     $('#homeName').textContent = honor(user) + ', 안녕하세요';
     $('#mMemo').classList.toggle('hidden', !(user && user.title)); // 러너 업무스케줄: 관리자·운영자·대표만
@@ -2292,6 +2322,7 @@
   function markSeen(n) { const seen = ntGet(NT_SEEN); if (!seen.includes(ntKey(n))) { seen.push(ntKey(n)); ntPut(NT_SEEN, seen); } }
   function openNotices(id) {
     ntOpen.clear(); if (id) ntOpen.add(id);
+    $('#ntAdmGo').classList.toggle('hidden', !isStaffUser());
     const n = ntList.find((x) => x.id === id); if (n) markSeen(n);
     show('notice'); renderNtList(); if (n) ntPhLoad(n);
     loadNotices(true);
@@ -3664,6 +3695,76 @@
   function mmReset() { MM.edit = ''; $('#mmTx').value = ''; $('#mmTime').value = ''; $('#mmMode').textContent = '✍️ 새 메모'; $('#mmGo').textContent = '추가'; $('#mmCancel').classList.add('hidden'); }
   function mmGoDay(d) { MM.day = d; mmReset(); mmPaint(); mmLoad(); }
   $('#mMemo').addEventListener('click', openMemo);
+  // ───── 공지 관리 (직함자 전용): 목록(숨김·기간 지난 것 포함) · 새 공지 · 수정 · 사진 · 삭제 ─────
+  const NA = { list: [], camps: [], edit: null, ph: [], camp: new Set(), st: '게시', big: {} };
+  function openNtAdm() { show('ntadm'); naPaint(); naLoad(); }
+  function naLoad() {
+    const tok = store.get(TOKEN); if (!tok) return Promise.resolve();
+    if (!NA.list.length) $('#naList').innerHTML = '<div class="pmempty">불러오는 중…</div>';
+    return api('api_ntAdmList', tok).then((r) => { if (!pmOk(r, '공지를 불러오지 못했습니다.')) return; NA.list = r.notices || []; NA.camps = (r.camps || []).map((c) => String(c).replace(/\s*캠프\s*$/, '')); NA.today = r.today; naPaint(); }).catch(() => netErr());
+  }
+  function naPaint() {
+    if (!NA.list.length) { if (NA.today) $('#naList').innerHTML = '<div class="pmempty">공지가 없습니다. ＋ 새 공지로 올려 주세요.</div>'; return; }
+    $('#naList').innerHTML = NA.list.map((n) => {
+      const per = (n.start || n.end) ? ' · ' + (n.start ? n.start.slice(5).replace('-', '/') : '') + '~' + (n.end ? n.end.slice(5).replace('-', '/') : '') : '';
+      return '<button type="button" class="naw" data-na="' + escH(n.id) + '"><div class="t">' + (n.important ? '<i class="bg imp" style="font-style:normal">중요</i>' : '') + '<span>' + escH(n.title) + (n.photos ? ' 📷' + n.photos : '') + '</span>' +
+        '<i class="bg ' + (n.live ? 'on' : 'off') + '" style="font-style:normal">' + (n.live ? '게시 중' : n.status === '숨김' ? '숨김' : '기간 외') + '</i></div>' +
+        '<span class="m">' + escH(n.target || '전체') + per + ' · ' + escH(n.author || '') + ' ' + escH(String(n.updatedAt || n.createdAt || '').slice(5, 10).replace('-', '/')) + '</span></button>';
+    }).join('');
+  }
+  function naEdit(n) {
+    NA.edit = n || null; NA.ph = []; NA.camp = new Set(n ? String(n.target || '').split(/\s*,\s*/).filter(Boolean) : []); NA.st = n && n.status === '숨김' ? '숨김' : '게시';
+    $('#neH').textContent = n ? '공지 수정' : '새 공지';
+    $('#neTitle').value = n ? n.title : ''; $('#neBody').value = n ? n.body || '' : ''; $('#neImp').checked = !!(n && n.important);
+    $('#neStart').value = n ? n.start || '' : ''; $('#neEnd').value = n ? n.end || '' : '';
+    $('#neDel').classList.toggle('hidden', !n);
+    if (n) for (let i = 0; i < (n.photos || 0); i++) NA.ph.push({ keep: i, t: '' });
+    neCampPaint(); neStPaint(); nePhPaint(); show('ntedit');
+    if (n) NA.ph.forEach((x) => {
+      const k = n.id + '|' + x.keep + '|' + (n.updatedAt || '');
+      if (NA.big[k]) { x.src = NA.big[k]; return; }
+      api('api_ntAdmPhoto', store.get(TOKEN), n.id, x.keep).then((r) => { if (r && r.ok) { NA.big[k] = x.src = 'data:' + r.mime + ';base64,' + r.data; nePhPaint(); } }).catch(() => {});
+    });
+  }
+  function neCampPaint() { $('#neCamps').innerHTML = NA.camps.concat([...NA.camp].filter((c) => !NA.camps.includes(c))).map((c) => '<button type="button" data-nc="' + escH(c) + '" class="' + (NA.camp.has(c) ? 'on' : '') + '">' + escH(c) + '</button>').join(''); }
+  function neStPaint() { $$('#neSt button').forEach((b) => b.classList.toggle('on', b.dataset.st === NA.st)); }
+  function nePhPaint() {
+    $('#nePh').innerHTML = NA.ph.map((x, i) => '<div class="pt" style="background-image:url(' + (x.src || x.preview || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=') + ')"><button type="button" data-neph="' + i + '" aria-label="사진 빼기">✕</button></div>').join('') +
+      (NA.ph.length < 5 ? '<label class="add"><b>📷</b>사진 ' + NA.ph.length + '/5<input type="file" accept="image/*" multiple id="nePhIn" hidden></label>' : '');
+  }
+  $('#ntAdmGo').addEventListener('click', openNtAdm);
+  $('#naBack').addEventListener('click', () => openNotices(''));
+  $('#neBack').addEventListener('click', openNtAdm);
+  $('#naNew').addEventListener('click', () => naEdit(null));
+  $('#naList').addEventListener('click', (e) => { const b = e.target.closest('[data-na]'); if (b) naEdit(NA.list.find((n) => n.id === b.dataset.na)); });
+  $('#neCamps').addEventListener('click', (e) => { const b = e.target.closest('[data-nc]'); if (!b) return; const c = b.dataset.nc; if (NA.camp.has(c)) NA.camp.delete(c); else NA.camp.add(c); neCampPaint(); });
+  $('#neSt').addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) { NA.st = b.dataset.st; neStPaint(); } });
+  $('#nePh').addEventListener('click', (e) => { const b = e.target.closest('[data-neph]'); if (b) { NA.ph.splice(+b.dataset.neph, 1); nePhPaint(); } });
+  $('#nePh').addEventListener('change', (e) => {
+    if (e.target.id !== 'nePhIn') return;
+    const files = Array.from(e.target.files || []).filter((f) => /^image\//.test(f.type)), room = 5 - NA.ph.length;
+    if (files.length > room) toast('사진은 5장까지 붙일 수 있습니다.');
+    Promise.all(files.slice(0, room).map((f) => compressImage(f).catch(() => null))).then((list) => { list.filter(Boolean).forEach((x) => { if (NA.ph.length < 5) NA.ph.push({ data: x.data, mime: x.mime, preview: x.preview }); }); nePhPaint(); });
+  });
+  $('#neSave').addEventListener('click', () => {
+    const t = $('#neTitle').value.trim(), btn = $('#neSave'); if (!t) { toast('제목을 입력해 주세요.'); return $('#neTitle').focus(); }
+    if (btn.disabled) return;
+    const n = { id: NA.edit ? NA.edit.id : '', title: t, body: $('#neBody').value, important: $('#neImp').checked, target: [...NA.camp].join(', '), start: $('#neStart').value, end: $('#neEnd').value, status: NA.st,
+      keep: NA.ph.filter((x) => x.keep != null).map((x) => x.keep), add: NA.ph.filter((x) => x.data).map((x) => ({ data: x.data, mime: x.mime })) };
+    btn.disabled = true; btn.textContent = '저장 중…';
+    api('api_ntAdmSave', store.get(TOKEN), n).then((r) => {
+      btn.disabled = false; btn.textContent = '저장';
+      if (!pmOk(r, '저장하지 못했습니다.')) return;
+      toast(NA.edit ? '공지를 고쳤습니다.' : '공지를 올렸습니다.'); swrClear(); loadNotices(true); openNtAdm();
+    }).catch(() => { btn.disabled = false; btn.textContent = '저장'; netErr(); });
+  });
+  $('#neDel').addEventListener('click', () => {
+    const n = NA.edit; if (!n) return;
+    pmAsk('공지 삭제', '"' + n.title + '" 공지를 지울까요? 기사앱·관리자앱 모두에서 사라지고 되돌릴 수 없습니다.', '삭제').then((ok) => {
+      if (ok === null) return;
+      return api('api_ntAdmDelete', store.get(TOKEN), n.id).then((r) => { if (!pmOk(r, '지우지 못했습니다.')) return; toast('공지를 지웠습니다.'); NA.list = NA.list.filter((x) => x.id !== n.id); swrClear(); loadNotices(true); openNtAdm(); });
+    }).catch(() => netErr());
+  });
   $('#mmBack').addEventListener('click', () => { let user = null; try { user = JSON.parse(store.get(USER) || 'null'); } catch (e) {} goHome(user); });
   $('#mmToday').addEventListener('click', () => mmGoDay(mmYmd(new Date())));
   $('#mmPick').addEventListener('change', (e) => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) mmGoDay(e.target.value); });
