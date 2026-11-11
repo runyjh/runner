@@ -62,6 +62,7 @@
   .btn:disabled { opacity: .55; cursor: default; }
   .btn.ghost { background: var(--brand-weak); color: var(--brand); }
   .btn.sm { width: auto; height: 48px; padding: 0 14px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .pmtop { flex-wrap: wrap; row-gap: 8px; } .pmtop .btn.sm { padding: 0 9px !important; font-size: 13.5px; } .pmtopb { margin-left: auto; display: flex; white-space: nowrap; } /* 품앗이 화면 위 버튼: 좁은 폰에서는 둘째 줄로 내려가 잘리지 않게 */
   .links { display: flex; justify-content: center; gap: 14px; margin-top: 18px; font-size: 14px; }
   .links a { color: var(--sub); text-decoration: none; cursor: pointer; }
   .links i { color: var(--line); font-style: normal; }
@@ -821,13 +822,13 @@
 
   <!-- ───────────── 품앗이 (기사끼리 품앗이 일감 주고받기) ───────────── -->
   <section id="v-pumasi" class="view">
-    <div class="topbar"><button class="back" id="pmBack" aria-label="뒤로">←</button><h2>품앗이</h2>
-      <button class="btn sm" id="pmGive" type="button" style="margin-left:auto;height:38px;padding:0 10px">🙋 품앗이</button>
-      <button class="btn sm" id="pmNew" type="button" style="margin-left:6px;height:38px;padding:0 10px">+ 일감 올리기</button></div>
+    <div class="topbar pmtop"><button class="back" id="pmBack" aria-label="뒤로">←</button><h2>품앗이</h2>
+      <span class="pmtopb"><button class="btn sm" id="pmGive" type="button" style="height:38px;padding:0 10px">🙋 일할 수 있어요</button>
+      <button class="btn sm" id="pmNew" type="button" style="margin-left:6px;height:38px;padding:0 10px">+ 품앗이 일감</button></span></div>
     <div class="pmban">수수료 무료! 안전 운전만 부탁드려요.<small>기사님끼리 품앗이 일감을 맡기고 대신 뛰어 주세요.</small></div>
     <div class="pmofr hidden" id="pmOffNote">지금은 사무실에서 <b>품앗이 일감 올리기</b>를 잠시 멈춰 두었습니다. 올라온 일감 보기·지원은 그대로 할 수 있습니다.</div>
     <div class="pmfil"><input type="search" id="pmQ" placeholder="배송지·센터 검색 (예: 화곡동, 강서1)" enterkeyhint="search" autocomplete="off"><button class="btn sm" id="pmGo" type="button" style="height:44px">검색</button></div>
-    <div class="segm pmseg" id="pmShow"><button type="button" data-s="all" class="on">전체</button><button type="button" data-s="jobs">맡길 일감</button><button type="button" data-s="gives">품앗이</button></div>
+    <div class="segm pmseg" id="pmShow"><button type="button" data-s="all" class="on">전체</button><button type="button" data-s="jobs">품앗이 일감</button><button type="button" data-s="gives">일할 기사</button></div>
     <label class="pmchk"><input type="checkbox" id="pmAvail"> 지원 가능 오더만 보기</label>
     <div class="pmsum" id="pmSum"></div>
     <div id="pmList"></div>
@@ -2328,7 +2329,7 @@
         .sort((a, b) => a.d.localeCompare(b.d));
       setTimeout(paintPostOn, 0);
       $('#pmList').innerHTML = items.length ? items.map((x) => x.h).join('')
-        : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : (pmPostOn ? '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 일감 올리기</b>로 첫 일감을 올려 보세요.' : '아직 올라온 일감이 없습니다.')) + '</div>';
+        : '<div class="pmempty">' + ($('#pmAvail').checked || $('#pmQ').value.trim() ? '조건에 맞는 일감이 없습니다.' : (pmPostOn ? '아직 올라온 일감이 없습니다.<br>오른쪽 위 <b>+ 품앗이 일감</b>로 첫 일감을 올려 보세요.' : '아직 올라온 일감이 없습니다.')) + '</div>';
     }).catch(() => { if (seq !== pmListSeq) return; $('#pmList').innerHTML = ''; netErr(); });
   }
   $('#mPm').addEventListener('click', () => openPumasi('home'));
