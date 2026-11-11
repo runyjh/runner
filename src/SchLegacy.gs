@@ -210,7 +210,14 @@ function adm_schLegacyPull(token, apply) {
       out.drivers++;
       Object.keys(r.cells).forEach(function (d) {
         const c = h.dates[d]; if (c === undefined) return;
-        const cx = ctxOf(o, d), cv = schLegacyConv_(r.cells[d], cx.base || r.base, cx.camp);
+        const cx = ctxOf(o, d);
+        // 기존 시트의 소속 캠프가 올인원과 다른 기사(백업 등): 캠프 이름 없이 적힌 노선·출근은 기존 시트 캠프의 노선이므로 캠프 이름을 붙여 넣는다
+        const lc = str_(r.camp).replace(/\s*캠프\s*$/, '').replace(/\s/g, ''), diff = /^[가-힣]+\d+$/.test(lc) && lc !== String(cx.camp || '').replace(/\s/g, '');
+        let cv = schLegacyConv_(r.cells[d], diff ? r.base : (cx.base || r.base), diff ? lc : cx.camp);
+        if (diff && (cv.kind === 'same' || cv.kind === 'conv')) {
+          if (cv.v === '출근') cv = /^\d/.test(r.base) ? { v: lc + ' ' + r.base, kind: 'conv' } : { v: '', kind: 'need', why: '소속 캠프가 올인원과 달라 어느 노선인지 알 수 없습니다' };
+          else if (/^\d/.test(cv.v)) cv = { v: lc + ' ' + cv.v, kind: 'conv' };
+        }
         if (cv.kind === 'skip') return;
         out.total++;
         if (cv.kind === 'need') { out.need.push({ name: o.name, date: d, raw: r.cells[d], why: cv.why }); return; }
