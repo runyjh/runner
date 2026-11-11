@@ -1114,6 +1114,7 @@
   .ce-alt { display: flex; gap: 10px; align-items: center; } .ce-alt select { flex: 1; min-width: 0; height: 40px; }
   .ce-alt label { font-size: 13px; font-weight: 700; color: #14532d; white-space: nowrap; display: flex; align-items: center; gap: 5px; cursor: pointer; }
   .ce-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .sg td.c .cv-yv { display: block; font-style: normal; font-size: 10px; font-weight: 700; line-height: 1.25; opacity: .85; } .sg td.c .cv-yv.id { font-weight: 600; opacity: .7; }
   .ce-g5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; } .ce-g5 .ce-c { padding: 11px 2px; font-size: 14px; white-space: nowrap; }
   .ce-g2 { margin-top: 6px; } .ce-c.sm { padding: 6px 9px; font-size: 12.5px; }
   .ce-per { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13.5px; color: #475569; } .ce-per input { width: 150px; height: 38px; } .ce-per em { font-style: normal; font-weight: 800; color: #2563eb; }
@@ -8149,7 +8150,7 @@
    */
   function cellNorm(v, row) {
     const s = String(v || '').trim();
-    if (!s || /\n/.test(s) || /추가업무등록|변경/.test(s)) return null;
+    if (!s || /\n/.test(s) || /추가업무등록|변경/.test(s) || /^용차/.test(s)) return null;
     const d = rowDrv(row); if (!d) return null;
     const mk = row + '\u0001' + s;
     if (_cnMemo.has(mk)) return _cnMemo.get(mk);
@@ -8171,9 +8172,21 @@
     return { text: whole ? '출근' : (mine || !cn ? '' : cn + ' ') + m[2].trim(), ids: ids, kind: mine ? 'k-work' : 'k-other', mine: mine, whole: whole };
   }
   function cellKindRow(v, row) { const n = cellNorm(v, row); return n ? n.kind : cellKind(v); }
+  /** '용차 히어로 (runyjg) (청구없음)' → { vendor, id, charge } · 용차 칸이 아니면 null (서버 schYongParse_ 와 같은 규칙) */
+  function yongParse(v) {
+    const s = String(v || '').trim(), m = s.match(/^용차(?:\s+([\s\S]*))?$/);
+    if (!m || /\n/.test(s)) return null;
+    let rest = String(m[1] || ''), charge = true, id = '';
+    if (/\(\s*청구\s*없음\s*\)/.test(rest)) { charge = false; rest = rest.replace(/\(\s*청구\s*없음\s*\)/, ' '); }
+    rest = rest.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/, (m0, x) => { id = x; return ' '; });
+    return { vendor: rest.replace(/\s+/g, ' ').trim(), id: id, charge: charge };
+  }
+  const yongText = (y) => '용차' + (y.vendor ? ' ' + y.vendor : '') + (y.vendor && y.id ? ' (' + y.id + ')' : '') + (y.vendor && !y.charge ? ' (청구없음)' : '');
   function cellHtml(v, row) {
     const s = String(v || '').trim();
     if (!s) return '';
+    const yg = yongParse(s);
+    if (yg && yg.vendor) return '<span class="cv">용차<i class="cv-yv">' + esc(yg.vendor) + (yg.charge ? '' : ' · 청구없음') + '</i>' + (yg.id ? '<i class="cv-yv id">' + esc(yg.id) + '</i>' : '') + '</span>';
     const subs = cellSubsOf(row);
     const n = cellNorm(s, row);
     if (n) return '<span class="cv">' + cellLineHtml(n.text + n.ids.map((id) => ' (' + id + ')').join(''), subs) + '</span>';
@@ -9266,7 +9279,8 @@
     const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null;
     const subs = [...new Set((d.subIds || []).concat((main && main.subIds) || []).map(String).filter(Boolean))];
     const myCamp = d.campId || '', n = cellNorm(v, r.row);
-    let st = CE_ST.includes(v) ? v : /^(노선|라우트)\s*변경$/.test(v) ? v.replace(/\s/g, '') : '', sub = '', rv = '';
+    const yg0 = yongParse(v);
+    let st = yg0 ? '용차' : CE_ST.includes(v) ? v : /^(노선|라우트)\s*변경$/.test(v) ? v.replace(/\s/g, '') : '', sub = '', rv = '';
     if (n) { st = '출근'; if (n.ids.length) sub = subs.find((x) => x.toLowerCase() === n.ids[0].toLowerCase()) || n.ids[0]; rv = n.whole ? '' : n.text; }
     const src = rv || d.baseRoute || '', mc = String(src).match(/^([가-힣]+\d)\s+(.+)$/);
     const c0 = mc ? SD.camps.find((c) => shortCamp(c.name).replace(/\s/g, '') === mc[1]) : null;
@@ -9276,7 +9290,7 @@
     const did = String(r.row).split('~')[0];
     const x0 = CE_ISS.test(v) ? issOf(did, dt).find((x) => x.result === v) || null : null; // 이 칸에 붙어 있는 이슈
     const ik = x0 && x0.kind !== IS.unset ? x0.kind : '';
-    CE = { mode: 'cell', r: r, dt: dt, d: d, did: did, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv, touched: false, alt: '', ins: ins0, ins0: ins0, busy: false,
+    CE = { mode: 'cell', r: r, dt: dt, d: d, did: did, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv, touched: false, alt: '', ins: ins0, ins0: ins0, busy: false, yv: yg0 ? yg0.vendor : '', yid: yg0 ? yg0.id : '', ych: yg0 ? yg0.charge : true, yrun: !!(yg0 && yg0.id),
       end: x0 && x0.date === dt ? (x0.end || dt) : dt, x0: x0, ik: ik, ir: x0 ? x0.reason || '' : '', isub: x0 ? x0.sub || '' : '', ik0: ik, ir0: x0 ? x0.reason || '' : '', isub0: x0 ? x0.sub || '' : '' };
     ceShow();
   }
@@ -9299,6 +9313,7 @@
   }
   function ceValue() {
     const c = CE; if (!c.touched) return c.v0;
+    if (c.st === '용차') return yongText({ vendor: c.yv, id: c.yrun ? String(c.yid || '').trim() : '', charge: c.ych });
     if (c.st && c.st !== '출근') return c.st;
     if (c.st === '출근') {
       if (c.sub && ceCodes()) return (c.pk.campId && c.pk.campId !== (c.d.campId || '') && ceCampName(c.pk.campId) ? ceCampName(c.pk.campId) + ' ' : '') + ceCodes() + ' (' + c.sub + ') 업무등록';
@@ -9318,7 +9333,7 @@
   const ceOurs = (s) => s === '업체백업' || s === '품앗이';
   const ceAltOn = () => CE_VACANT.test(CE.st) && !!CE.pk.units.length && CE.end === CE.dt && (!ceIssOn() || !CE.isub || ceOurs(CE.isub));
   const ceAltDrv = () => (ceAltOn() && CE.alt ? SD.drivers.find((x) => x.id === CE.alt) || null : null);
-  const ceDisp = (v, row) => { const n = cellNorm(v, row); return n ? groupRoutes(n.text) + (n.ids.length ? ' · 아이디 ' + n.ids.map((id) => (ceSubName(id) ? ceSubName(id) + ' ' : '') + id).join(', ') : '') : v || '빈 칸'; };
+  const ceDisp = (v, row) => { const yg = yongParse(v); if (yg && yg.vendor) return '용차 · ' + yg.vendor + (yg.id ? ' · 아이디 ' + yg.id : '') + (yg.charge ? '' : ' · 청구없음'); const n = cellNorm(v, row); return n ? groupRoutes(n.text) + (n.ids.length ? ' · 아이디 ' + n.ids.map((id) => (ceSubName(id) ? ceSubName(id) + ' ' : '') + id).join(', ') : '') : v || '빈 칸'; };
   function cePaint() {
     const c = CE; if (!c) return;
     const insRow = '<div class="ce-ln"><span>📌 지시사항</span><div><textarea id="ceIns" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량">' + esc(c.ins) + '</textarea></div></div>';
@@ -9353,6 +9368,21 @@
     const idRow = c.subs.length ? '<div class="ce-ln"><span>아이디</span><div><div class="ce-g"><button type="button" class="ce-c' + (c.st === '출근' && !c.sub ? ' on' : '') + '" data-cesub="">본인 · ' + esc((d.mainId && (SD.drivers.find((x) => x.id === d.mainId) || {}).name) || d.name) + (d.loginId ? '<small>' + esc(ceLid(d.loginId)) + '</small>' : '') + '</button>' +
       c.subs.map((x, i) => '<button type="button" class="ce-c' + (c.st === '출근' && c.sub === x ? ' on' : '') + '" data-cesub="' + esc(x) + '"' + (subOk ? '' : ' disabled title="노선을 먼저 고르세요"') + '>서브' + (c.subs.length > 1 ? ' ' + (i + 1) : '') + (ceSubName(x) ? ' · ' + esc(ceSubName(x)) : '') + '<small>' + esc(x) + '</small></button>').join('') + '</div>' +
       (c.sub && c.st === '출근' && ceRouteText(pk.campId) !== ceCodes() ? '<div class="ce-hint">서브아이디 업무등록은 회전을 나누지 않고 노선 전체로 기록합니다.</div>' : '') + '</div></div>' : '';
+    let yongRow = '';
+    if (c.st === '용차' && !d.ex) {
+      const VS = SD.vendors || [], vOn = VS.find((x) => x.name === c.yv);
+      yongRow = '<div class="ce-ln"><span>용차 업체</span><div><div class="ce-g">' + VS.map((x) => '<button type="button" class="ce-c sm' + (c.yv === x.name ? ' on' : '') + '" data-ceyv="' + esc(x.name) + '">' + esc(x.name) + '</button>').join('') +
+        '<button type="button" class="ce-c sm' + (c.yv ? '' : ' on') + '" data-ceyv="">미정</button></div>' +
+        (VS.length ? '' : '<div class="ce-hint">등록된 용차업체가 없습니다. 정산관리 › 용차업체에서 먼저 등록해 주세요.</div>') +
+        (c.yv && !vOn ? '<div class="ce-hint" style="color:#b45309">「' + esc(c.yv) + '」 는 용차업체 목록에 없습니다.</div>' : '') + '</div></div>';
+      if (c.yv) yongRow += '<div class="ce-ln"><span>아이디</span><div><div class="ce-g"><button type="button" class="ce-c sm' + (c.yrun ? '' : ' on') + '" data-ceyrun="0">업체 아이디</button><button type="button" class="ce-c sm' + (c.yrun ? ' on' : '') + '" data-ceyrun="1">러너 아이디</button></div>' +
+        (c.yrun ? '<input class="inp" id="ceYid" list="ceYidList" maxlength="40" placeholder="업체에 준 러너 아이디 (예: runyjg)" value="' + esc(c.yid) + '" style="margin-top:6px" autocomplete="off"><datalist id="ceYidList">' +
+          Array.from(new Set(SD.drivers.reduce((a, x) => a.concat([x.loginId || ''], x.subIds || []), []).filter(Boolean))).sort().map((x) => '<option value="' + esc(x) + '">').join('') + '</datalist>' +
+          (String(c.yid || '').trim() && vOn && !(vOn.ids || []).some((x) => String(x).toLowerCase() === String(c.yid).trim().toLowerCase()) ? '<div class="ce-hint" style="color:#b45309">이 아이디는 ' + esc(c.yv) + ' 아이디로 등록되어 있지 않습니다. 정산관리 › 아이디 관리에서 용차업체를 지정해야 업체 정산에 잡힙니다.</div>' : '')
+          : '<div class="ce-hint">' + (vOn && (vOn.ids || []).length ? esc(c.yv) + ' 등록 아이디 ' + vOn.ids.length + '개로 배송' : '업체가 자기 아이디로 배송') + '</div>') + '</div></div>' +
+        '<div class="ce-ln"><span>차액 청구</span><div><label class="check"><input type="checkbox" id="ceYch"' + (c.ych ? ' checked' : '') + '> 기사에게 차액 청구</label>' +
+        '<div class="ce-hint">' + (c.ych ? '외부용차단가와 기사 본인 단가의 차이 × 건수를 ' + esc(d.name) + ' 정산서에서 뺍니다. 건수는 쿠팡 정산서에서 자동으로 셉니다.' : '청구하지 않습니다 (러너 부담).') + '</div></div></div>';
+    }
     let altRow = '';
     if (CE_VACANT.test(c.st)) {
       const on = ceAltOn(), alts = on ? ceAlts() : [];
@@ -9366,6 +9396,7 @@
     const pvL = [];
     pvL.push(val === c.v0 && nDays === 1 ? esc(d.name) + ' 칸 그대로 (' + esc(ceDisp(c.v0, c.r.row)) + ')' : esc(d.name) + ' 칸 <b>' + esc(ceDisp(val, c.r.row)) + '</b>' + (nDays > 1 ? ' · ' + esc(ceMd(c.dt)) + ' ~ ' + esc(ceMd(c.end)) + ' (' + nDays + '일)' : ''));
     if (alt) pvL.push(esc(alt.name) + ' 칸 <b>' + esc(ceRouteText(alt.campId || '')) + '</b>');
+    if (c.st === '용차' && c.yv && val !== c.v0) pvL.push('정산 <b>' + esc(c.yv) + '</b> 용차' + (c.ych ? ' · ' + esc(d.name) + ' 에게 차액 청구' : ' · 청구 없음'));
     if (ceIssOn() && (val !== c.v0 || issChg)) pvL.push('이슈 <b>' + esc(c.st) + '</b>' + (c.ik ? ' · 사유 ' + esc(c.ik) : ' · 사유 미정') + (c.isub || alt ? ' · 대체 ' + esc(c.isub || '업체백업') + (alt ? ' ' + esc(alt.name) : '') : ''));
     if (String(c.ins || '').trim() !== String(c.ins0 || '').trim()) pvL.push(String(c.ins || '').trim() ? '지시사항 저장' : '지시사항 지움');
     const pv = '<div class="ce-pv">저장하면 → ' + pvL.join('<br>＋ ') + '</div>';
@@ -9373,7 +9404,7 @@
       (d.ex ? '' : '<button type="button" class="ce-lb" data-cercgo>🔀 이 날부터 노선 이관</button>') +
       (issOf(c.did, c.dt).length ? '<button type="button" class="ce-lb" data-ceissgo>⚠ 이슈 상세</button>' : d.ex ? '' : '<button type="button" class="ce-lb" data-ceissnew>＋ 이슈 등록</button>') +
       (d.ex ? '' : '<button type="button" class="ce-lb" data-cedrvgo>👤 기사 설정</button>') + '</div>';
-    $('#ceBody').innerHTML = head + pkBox + stRow + idRow + perRow + issRow + altRow + insRow + pv + links +
+    $('#ceBody').innerHTML = head + pkBox + stRow + idRow + yongRow + perRow + issRow + altRow + insRow + pv + links +
       '<div class="m-actions"><button type="button" class="btn ghost" data-ceclose>닫기</button><button type="button" class="btn" data-cesave' + (c.busy ? ' disabled' : '') + '>' + (c.busy ? '저장 중…' : '저장') + '</button></div>';
   }
   /** [저장] 한 번 = 서버 한 번 (칸 · 대체 인원 칸 · 이슈 · 지시사항) → 끝나면 한꺼번에 화면에 반영, Ctrl+Z 한 번으로 되돌림 */
@@ -9412,7 +9443,7 @@
       try { if (!$('#view-issue').classList.contains('hidden')) loadIssue(); } catch (e) { /* 무시 */ }
     }).catch(() => { if (CE === c) { c.busy = false; cePaint(); } toast('저장하지 못했습니다. 다시 눌러 주세요.'); });
   }
-  $('#ceBody').addEventListener('input', (e) => { if (!CE) return; if (e.target.id === 'ceIns') CE.ins = e.target.value; if (e.target.id === 'ceIr') CE.ir = e.target.value; });
+  $('#ceBody').addEventListener('input', (e) => { if (!CE) return; if (e.target.id === 'ceIns') CE.ins = e.target.value; if (e.target.id === 'ceIr') CE.ir = e.target.value; if (e.target.id === 'ceYid') { CE.yid = e.target.value; CE.touched = true; } });
   $('#ceBody').addEventListener('keydown', (e) => { if ((e.target.id === 'ceIns' || e.target.id === 'ceIr') && e.key === 'Enter' && !e.altKey && !e.shiftKey && !e.isComposing) { e.preventDefault(); ceSave(); } });
   $('#ceBody').addEventListener('click', (e) => {
     const c = CE; if (!c) return;
@@ -9428,6 +9459,8 @@
     if (sb) { c.st = sb.dataset.cest; c.touched = true; if (c.st !== '출근') c.sub = ''; if (!CE_VACANT.test(c.st)) { c.alt = ''; c.end = c.dt; } return cePaint(); }
     const gb = t.closest('[data-cegrp]');
     if (gb) { const g = CE_GRP.find((x) => x[0] === gb.dataset.cegrp); if (!g[1].includes(c.st)) c.st = g[1][0]; c.touched = true; if (c.st !== '출근') c.sub = ''; if (!CE_VACANT.test(c.st)) { c.alt = ''; c.end = c.dt; } return cePaint(); }
+    const yb = t.closest('[data-ceyv]'); if (yb) { c.yv = yb.dataset.ceyv; c.touched = true; return cePaint(); }
+    const yr = t.closest('[data-ceyrun]'); if (yr) { c.yrun = yr.dataset.ceyrun === '1'; c.touched = true; cePaint(); if (c.yrun) { const i = $('#ceYid'); if (i) i.focus(); } return; }
     const kb = t.closest('[data-ceik]'); if (kb) { c.ik = c.ik === kb.dataset.ceik ? '' : kb.dataset.ceik; return cePaint(); }
     const ib = t.closest('[data-ceisub]'); if (ib) { c.isub = c.isub === ib.dataset.ceisub ? '' : ib.dataset.ceisub; if (c.isub && !ceOurs(c.isub)) c.alt = ''; return cePaint(); }
     if (t.closest('[data-cepmgo]')) { const pre = { poster: c.d.mainId || c.d.id, to: '', campId: c.pk.campId, route: ceCodes(), date: c.dt }, ins = String(c.ins || '').trim(); ceClose(); saveInst(c.did, c.dt, ins, c.ins0); PMC.pre = pre; return pmcOpen(); }
@@ -9443,6 +9476,8 @@
     const c = CE; if (!c || c.mode !== 'cell') return;
     const t = e.target;
     if (t.dataset.cealt !== undefined) { c.alt = t.value; if (c.alt && ceIssOn() && !c.isub) c.isub = '업체백업'; return cePaint(); }
+    if (t.id === 'ceYch') { c.ych = t.checked; c.touched = true; return cePaint(); }
+    if (t.id === 'ceYid') { c.yid = t.value; c.touched = true; return cePaint(); }
     if (t.id === 'ceEnd') { c.end = t.value && t.value >= c.dt ? t.value : c.dt; if (c.end > c.dt) c.alt = ''; c.touched = true; return cePaint(); }
     if (t.dataset.cecamp !== undefined) { c.pk.campId = t.value; c.pk.units = []; c.pk.rots = sdCampRots(c.pk.campId); c.pk.per = {}; c.touched = true; if (!c.st || /변경$/.test(c.st)) c.st = '출근'; return cePaint(); }
     if (rotChange(e, 'ce', c.pk)) { c.touched = true; if (!c.st || /변경$/.test(c.st)) c.st = '출근'; return cePaint(); }
