@@ -145,6 +145,20 @@ function schLegacyConv_(raw, base, ownCamp) {
   return { v: '', kind: 'need', why: '올인원 규칙으로 읽을 수 없는 글자입니다 (메모는 지시사항에 적어 주세요)' };
 }
 
+/** 칸 글자의 뜻 (비교용): 상태는 그 글자, 노선은 캠프 · 노선별 회전 · 아이디 — '출근' 과 담당 노선을 적은 칸, 캠프 이름을 붙인 칸은 같은 뜻 */
+function schLegacyMean_(v, cx) {
+  const s = str_(v).replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  if (/^(휴무|고정휴무|추가휴무|병가|휴가|미입차|노쇼|용차)$/.test(s)) return 'S:' + s;
+  if (/추가업무등록/.test(s)) return 'X:' + s;
+  const ids = []; s.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, function (m0, id) { if (!/^[DF]\d$/i.test(id)) ids.push(id.toLowerCase()); return m0; });
+  const body = s.replace(/\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)/g, function (m0) { return /^\(\s*[DF]\d\s*\)$/i.test(m0) ? m0 : ' '; }).replace(/업무등록/g, ' ').replace(/\[[^\]]*\]/g, ' ').replace(/(노선|라우트)\s*변경(됨)?/g, ' ').replace(/\s+/g, ' ').trim();
+  const u = !body || body === '출근' ? issUnits_(cx.base, cx.rots) : issUnits_(body, cx.rots);
+  if (!u) return 'R:' + s;
+  const camp = u.camp || cx.camp;
+  return 'W:' + camp + '|' + Object.keys(u.units).sort().map(function (k) { return k + ':' + u.units[k].slice().sort().join(''); }).join(',') + '|' + ids.sort().join(',');
+}
+
 /** 기존 시트 '스케쥴' 탭 → { from, to, dates[], rows: [{ camp, name, login, base, cells: { 날짜: 글자 } }] } */
 function schLegacyRead_() {
   let book;
@@ -201,7 +215,7 @@ function adm_schLegacyPull(token, apply) {
         out.total++;
         if (cv.kind === 'need') { out.need.push({ name: o.name, date: d, raw: r.cells[d], why: cv.why }); return; }
         const cur = rowOf[o.id] === undefined ? '' : str_(blk[rowOf[o.id]][c - cMin]); // 줄이 아직 없는 기사는 저장할 때 줄을 만든다
-        if (cur === cv.v) { out.same++; return; }
+        if (cur === cv.v || (cur && schLegacyMean_(cur, cx) === schLegacyMean_(cv.v, cx))) { out.same++; return; } // 글자가 달라도 뜻이 같으면 그대로 둠 (출근 = 담당 노선)
         if (underIssue(o.id, d)) { out.kept.push({ name: o.name, date: d, raw: r.cells[d], cur: cur }); return; }
         if (cv.kind === 'conv') out.conv++;
         out.write.push({ row: o.id, name: o.name, date: d, raw: r.cells[d], value: cv.v, old: cur, conv: cv.kind === 'conv' });
