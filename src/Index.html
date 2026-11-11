@@ -822,7 +822,8 @@
   <div class="ihelp hidden" id="pushPop" role="dialog" aria-modal="true"><div class="ibox ntpop">
     <span class="nimp" style="background:#e8f3ff;color:#1b64da">휴대폰 알림</span><b id="pushPopT"></b><div class="ntpop-body" id="pushPopB"></div>
     <button class="btn" type="button" id="pushPopGo" style="width:100%">알림 허용하기</button>
-    <button class="btn ghost hidden" type="button" id="pushPopNo" style="width:100%;margin-top:8px">확인</button></div></div>
+    <button class="btn ghost hidden" type="button" id="pushPopNo" style="width:100%;margin-top:8px">확인</button>
+    <button class="btn ghost" type="button" id="pushPopLater" style="width:100%;margin-top:8px">나중에 (오늘은 그만 보기)</button></div></div>
 
   <!-- ───────────── 내 스케줄 ───────────── -->
   <section id="v-sched" class="view">
@@ -3383,9 +3384,23 @@
   }
   function pushPop(title, body, canAllow) {
     $('#pushPopT').textContent = title; $('#pushPopB').textContent = body;
-    $('#pushPopGo').classList.toggle('hidden', !canAllow); $('#pushPopNo').classList.toggle('hidden', canAllow);
+    $('#pushPopGo').classList.toggle('hidden', !canAllow); $('#pushPopNo').classList.toggle('hidden', canAllow); $('#pushPopLater').classList.toggle('hidden', !canAllow);
     $('#pushPop').classList.add('center'); $('#pushPop').classList.remove('hidden');
   }
+  // 알림 상태를 여러 길로 확인: 설치한 안드로이드 앱(WebAPK)에서는 폰 설정이 '허용됨'인데도 Notification.permission 이 'default' 로 나오는 일이 있음
+  //  → 알림 수신 기능(pushManager)·권한 조회(permissions)에도 물어서 하나라도 허용이면 허용으로 본다
+  async function pushPerm() {
+    const p = window.Notification ? Notification.permission : 'default', d = { n: p, pm: '-', q: '-' };
+    if (p !== 'granted') {
+      try { const reg = await navigator.serviceWorker.getRegistration(); if (reg && reg.pushManager && reg.pushManager.permissionState) d.pm = await reg.pushManager.permissionState({ userVisibleOnly: true }); } catch (e) { d.pm = 'err'; }
+      try { if (navigator.permissions && navigator.permissions.query) d.q = (await navigator.permissions.query({ name: 'notifications' })).state; } catch (e) { d.q = 'err'; }
+    }
+    d.eff = p === 'granted' || d.pm === 'granted' || d.q === 'granted' ? 'granted' : p === 'denied' || d.pm === 'denied' || d.q === 'denied' ? 'denied' : 'default';
+    return d;
+  }
+  const pushLaterKey = 'runner.pushLater', pushToday = () => { const n = new Date(); return n.getFullYear() + '-' + (n.getMonth() + 1) + '-' + n.getDate(); };
+  // 이 기기에서 최근(3일) 알림 등록에 성공했는지 (같은 기사)
+  const pushRecent = () => { try { const seen = lsGet(PUSH_AT) || '', me = (JSON.parse(store.get(USER) || '{}') || {}).loginId || ''; return !!me && seen.split('|')[1] === me && Date.now() - (+seen.split('|')[0] || 0) < 3 * 864e5; } catch (e) { return false; } };
   function pushAuto() {
     if (pushBusy || pushDone || pushOff || !store.get(TOKEN)) return;
     if (!pushCapable()) { if (!pushShown) { pushShown = true; pushFail(new Error('이 브라우저는 휴대폰 알림 미지원')); } return; }
@@ -3395,18 +3410,25 @@
     }
     getPushCfg().then((cfg) => {
       if (!cfg.on) { if (cfg.err) pushFail(new Error('알림 설정을 서버에서 못 받음')); else pushOff = true; return; }
-      const perm = Notification.permission;
+      return pushPerm().then((st) => {
+      const perm = st.eff, recent = pushRecent();
+      // 상태가 엇갈리면(폰은 허용인데 'default' 등) 원인 확인용으로 오류 기록 탭에 남김 (같은 내용 10분에 1번)
+      if (st.n !== st.eff || (st.n !== 'granted' && recent)) errAdd('pushdiag', 'pushAuto', 'Notification=' + st.n + ' push=' + st.pm + ' perm=' + st.q + ' 판정=' + perm + ' 설치앱=' + (standalone() ? 'Y' : 'N') + ' 최근등록=' + (recent ? 'Y' : 'N') + ' ' + deviceName());
       if (perm === 'granted') { pushBusy = true; return pushRegister(cfg).then(() => { pushDone = true; }).catch(pushFail).finally(() => { pushBusy = false; }); }
       if (pushShown) return;
+      if (recent) return; // 최근에 이 기기에서 등록이 됐으면 알림은 받는 중 → 창을 띄우지 않음
+      if (perm !== 'denied') { try { if (localStorage.getItem(pushLaterKey) === pushToday()) return; } catch (e) { /* 무시 */ } } // '나중에' 누른 날
       pushShown = true;
       if (perm === 'denied') return pushPop('휴대폰 알림이 꺼져 있습니다', '품앗이 · 정산 마감 소식을 받으려면 알림을 켜야 합니다.\n\n휴대폰 설정 → 앱(또는 크롬·사파리) → 알림에서 러너 알림을 허용한 뒤 앱을 다시 열어 주세요.', false);
       setTimeout(() => {
         if (!$('#ntPop').classList.contains('hidden') || !$('#slPop').classList.contains('hidden')) { pushShown = false; return setTimeout(pushAuto, 1500); } // 다른 안내 창 먼저
         pushPop('휴대폰 알림을 켜 주세요', '품앗이 배차 · 정산서 마감 소식을 휴대폰 알림과 러너 아이콘 숫자로 알려 드립니다.\n\n아래 버튼을 누른 뒤 나오는 창에서 "허용"을 눌러 주세요.', true);
       }, 1200);
+      });
     }).catch(() => {});
   }
   $('#pushPopNo').addEventListener('click', () => $('#pushPop').classList.add('hidden'));
+  $('#pushPopLater').addEventListener('click', () => { try { localStorage.setItem(pushLaterKey, pushToday()); } catch (e) { /* 무시 */ } $('#pushPop').classList.add('hidden'); });
   $('#pushPopGo').addEventListener('click', async () => {
     // '허용' 창은 누른 직후 바로 띄워야 한다 (아이폰·일부 크롬)
     const permP = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();

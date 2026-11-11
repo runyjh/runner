@@ -118,7 +118,7 @@ function dataCheckLive_(drivers, today) {
 /** 화면이 보낸 오류 목록 [{ k: 종류, v: 화면, f: 함수, m: 내용, u: 업데이트 }] (한 번에 10건까지) */
 function errRows_(errs, app, who) {
   if (!Array.isArray(errs)) return;
-  const KIND = { client: '화면 오류', timeout: '시간 초과', badresp: '응답 오류' };
+  const KIND = { client: '화면 오류', timeout: '시간 초과', badresp: '응답 오류', pushdiag: '알림 상태' };
   errs.slice(0, 10).forEach(function (e) { if (e && KIND[e.k]) errLog_(KIND[e.k], e.f, e.m, { app: app, view: e.v, upd: e.u, who: who }); });
 }
 /**
