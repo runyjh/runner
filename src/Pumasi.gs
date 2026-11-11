@@ -241,13 +241,14 @@ function api_pmForm(token) {
   });
 }
 /** 노선 줄(527ABCD) → 고를 수 있는 라우트 [527A, 527B, …] */
+/** 품앗이 일감 라우트 고르기: 노선관리의 노선 코드 그대로 (404ABCD · 410AB …). 한 글자만 맡길 때는 '직접 입력' */
 function pmRouteCodes_(routes) {
   const seen = {}, out = [];
   routes.forEach(function (r) {
-    const ls = [r.g2, r.g3, r.g4, r.g5].filter(Boolean);
-    (ls.length ? ls.map(function (L) { return r.g1 + L; }) : [r.code]).forEach(function (c) { if (!seen[c]) { seen[c] = 1; out.push(c); } });
+    const c = normCode_(r.code) || (r.g1 + [r.g2, r.g3, r.g4, r.g5].filter(Boolean).join(''));
+    if (c && !seen[c]) { seen[c] = 1; out.push(c); }
   });
-  return out.sort();
+  return out.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || a.localeCompare(b); });
 }
 /** 센터 + 라우트 → 노선관리의 품앗이단가(없으면 고정단가) 제안 */
 function api_pmPrice(token, campId, route) {
