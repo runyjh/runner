@@ -2468,7 +2468,8 @@ function memoMonth_(ym) {
     list.sort(memoSort_);
     let noteLabels = [];
     try { noteLabels = schNotes_().map(function (n) { return n.label; }); } catch (e) { /* 스케줄 DB 가 없으면 비움 */ }
-    return { ok: true, memos: list, pastUndone: pastUndone, today: today, noteLabels: noteLabels };
+    const holidays = {}; Object.keys(HOLIDAYS).forEach(function (d) { if (d.indexOf(ym) === 0) holidays[d] = HOLIDAYS[d]; });
+    return { ok: true, memos: list, pastUndone: pastUndone, today: today, noteLabels: noteLabels, holidays: holidays };
   }
 }
 

@@ -515,6 +515,14 @@
   .mmnav .mmtd { padding: 0 12px; color: var(--brand); }
   .mmnav .mmd { flex: 1; position: relative; height: 42px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; }
   .mmnav .mmd input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
+  .mmcal { padding: 12px 10px 10px; } .mmcal .mmnav { margin-bottom: 8px; } .mmcal .mmym { flex: 1; text-align: center; font-size: 16px; }
+  .mmgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .mmgrid .wd { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--sub); padding: 2px 0 4px; } .mmgrid .wd.sun { color: #e03131; } .mmgrid .wd.sat { color: #1c7ed6; }
+  .mmgrid .c { height: 50px; border: 1px solid transparent; border-radius: 9px; background: #f7f8fa; padding: 4px 0 0; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+  .mmgrid .c.out { visibility: hidden; } .mmgrid .c.sun { color: #e03131; } .mmgrid .c.sat { color: #1c7ed6; }
+  .mmgrid .c.today { border-color: var(--brand); } .mmgrid .c.sel { background: var(--brand); color: #fff; }
+  .mmgrid .c i { font-style: normal; font-size: 11px; font-weight: 800; min-width: 20px; line-height: 17px; border-radius: 999px; padding: 0 5px; background: #ffe8cc; color: #d9480f; }
+  .mmgrid .c i.ok { background: #e6f4ea; color: #2b8a3e; } .mmgrid .c.sel i { background: #fff; color: var(--brand); }
   .mmform { padding: 14px; } .mmform .row1 { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; } .mmform .row1 input { width: 130px; flex: 0 0 auto; } .mmform .row1 small { color: var(--sub); font-weight: 600; }
   .mmform textarea { min-height: 84px; } .mmform .row2 { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; } .mmform .row2 .btn.sm { height: 42px; }
   .mmi { background: #fff; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
@@ -853,7 +861,9 @@
   <!-- ───────────── 러너 업무스케줄 (직함자 전용 · 관리자앱 업무스케줄과 같은 데이터) ───────────── -->
   <section id="v-memo" class="view">
     <div class="topbar"><button class="back" id="mmBack" aria-label="뒤로">←</button><h2>러너 업무스케줄</h2></div>
-    <div class="mmnav"><button type="button" data-mmv="-1" aria-label="전날">◀</button><label class="mmd"><b id="mmDay"></b><input type="date" id="mmPick" aria-label="날짜 고르기"></label><button type="button" data-mmv="1" aria-label="다음날">▶</button><button type="button" class="mmtd" id="mmToday">오늘</button></div>
+    <div class="card mmcal"><div class="mmnav"><button type="button" data-mmm="-1" aria-label="이전 달">◀</button><b class="mmym" id="mmYm"></b><button type="button" data-mmm="1" aria-label="다음 달">▶</button><button type="button" class="mmtd" id="mmToday">오늘</button></div>
+      <div class="mmgrid" id="mmGrid"></div></div>
+    <div class="mmnav"><button type="button" data-mmv="-1" aria-label="전날">◀</button><label class="mmd"><b id="mmDay"></b><input type="date" id="mmPick" aria-label="날짜 고르기"></label><button type="button" data-mmv="1" aria-label="다음날">▶</button></div>
     <div class="card mmform"><div class="row1"><input type="time" id="mmTime" aria-label="시간 (비워도 됨)"><small id="mmMode">✍️ 새 메모</small></div>
       <textarea id="mmTx" maxlength="2000" placeholder="이 날 할 일·업무 메모를 적어 주세요. (관리자앱 업무스케줄에 같이 보입니다)"></textarea>
       <div class="row2"><button type="button" class="btn ghost sm hidden" id="mmCancel">취소</button><button type="button" class="btn sm" id="mmGo">추가</button></div></div>
@@ -3597,13 +3607,30 @@
     return api('api_memoMonth', tok, ym).then((r) => {
       if (seq !== MM.seq) return;
       if (!pmOk(r, '업무스케줄을 불러오지 못했습니다.')) { if (!MM.months[ym]) $('#mmList').innerHTML = '<div class="card" style="color:var(--sub)">' + escH((r && r.msg) || '불러오지 못했습니다.') + '</div>'; return; }
-      MM.months[ym] = { at: Date.now(), memos: r.memos || [] }; mmPaint();
+      MM.months[ym] = { at: Date.now(), memos: r.memos || [], hol: r.holidays || {} }; mmPaint();
     }).catch(() => netErr());
+  }
+  /** 한 달 달력: 날짜마다 메모 수 (안 끝난 게 있으면 주황 · 다 끝났으면 초록) · 누르면 그날 */
+  function mmCal() {
+    const p = MM.day.split('-'), y = +p[0], mo = +p[1], today = mmYmd(new Date()), m = MM.months[MM.day.slice(0, 7)];
+    $('#mmYm').textContent = y + '년 ' + mo + '월';
+    const cnt = {}; if (m) m.memos.forEach((x) => { const c = cnt[x.date] = cnt[x.date] || { n: 0, open: 0 }; c.n++; if (!x.done && !x.note) c.open++; });
+    const first = new Date(y, mo - 1, 1).getDay(), last = new Date(y, mo, 0).getDate(), cells = [];
+    DOWK.forEach((w, i) => cells.push('<div class="wd' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + w + '</div>'));
+    for (let i = 0; i < first; i++) cells.push('<div class="c out"></div>');
+    for (let d = 1; d <= last; d++) {
+      const dd = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0'), dow = (first + d - 1) % 7, c = cnt[dd];
+      cells.push('<button type="button" class="c' + (dow === 0 || (m && m.hol && m.hol[dd]) ? ' sun' : dow === 6 ? ' sat' : '') + (dd === today ? ' today' : '') + (dd === MM.day ? ' sel' : '') + '" data-mmday="' + dd + '"><span>' + d + '</span>' +
+        (c ? '<i class="' + (c.open ? '' : 'ok') + '">' + c.n + '</i>' : '') + '</button>');
+    }
+    $('#mmGrid').innerHTML = cells.join('');
   }
   function mmPaint() {
     const p = MM.day.split('-'), dt = new Date(+p[0], +p[1] - 1, +p[2]), today = mmYmd(new Date());
-    $('#mmDay').textContent = (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dt.getDay()] + ')' + (MM.day === today ? ' · 오늘' : '');
+    const hm = MM.months[MM.day.slice(0, 7)], hn = hm && hm.hol && hm.hol[MM.day];
+    $('#mmDay').textContent = (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dt.getDay()] + ')' + (hn ? ' ' + hn : '') + (MM.day === today ? ' · 오늘' : '');
     $('#mmPick').value = MM.day;
+    mmCal();
     const m = MM.months[MM.day.slice(0, 7)];
     if (!m) { $('#mmList').innerHTML = '<div class="card" style="color:var(--sub)">불러오는 중…</div>'; return; }
     const list = m.memos.filter((x) => x.date === MM.day);
@@ -3626,6 +3653,9 @@
   $('#mmToday').addEventListener('click', () => mmGoDay(mmYmd(new Date())));
   $('#mmPick').addEventListener('change', (e) => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) mmGoDay(e.target.value); });
   $('#v-memo').addEventListener('click', (e) => {
+    const md = e.target.closest('[data-mmday]'); if (md) return mmGoDay(md.dataset.mmday);
+    const mm = e.target.closest('[data-mmm]');
+    if (mm) { const p = MM.day.split('-'), t = new Date(+p[0], +p[1] - 1 + (+mm.dataset.mmm), 1), now = new Date(); return mmGoDay(t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth() ? mmYmd(now) : mmYmd(t)); }
     const mv = e.target.closest('[data-mmv]');
     if (mv) { const p = MM.day.split('-'); return mmGoDay(mmYmd(new Date(+p[0], +p[1] - 1, +p[2] + (+mv.dataset.mmv)))); }
     const ed = e.target.closest('[data-mmedit]');
