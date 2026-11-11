@@ -219,7 +219,10 @@
   .pmc.give { border: 1.5px dashed #8fd3ad; }
   .pmc.give .ar small { font-size: 13px; color: var(--sub); font-weight: 600; margin-left: 6px; }
   /* 품앗이: 근무 가능일 달력 */
-  .gvseg { margin: 0 0 12px; } .gvseg button { flex: 1; padding: 10px 6px; }
+  /* 내 근무 가능일 / 일할 기사 찾기: 높이 2배 · 고른 쪽은 메인 색 바탕 흰 글자 */
+  .segm.gvseg { margin: 0 0 14px; padding: 5px; border-radius: 14px; background: var(--brand-weak); }
+  .segm.gvseg button { flex: 1; padding: 0 6px; height: 70px; font-size: 17px; font-weight: 800; border-radius: 11px; color: var(--brand); white-space: nowrap; transition: background .15s, color .15s; }
+  .segm.gvseg button.on { background: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(27,100,218,.28); }
   .gvcal { background: #fff; border-radius: var(--radius); padding: 12px 10px 10px; margin-bottom: 10px; }
   .gvcal h4 { margin: 0 4px 8px; font-size: 15px; }
   .gvgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
