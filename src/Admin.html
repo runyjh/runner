@@ -9038,7 +9038,7 @@
       $('#pmcRoute').value = pre && pre.route ? pre.route : m ? m[1] : d0 ? d0.baseRoute || '' : '';
       ['#pmcTime', '#pmcArea', '#pmcQty', '#pmcDesc'].forEach((x) => { $(x).value = ''; });
       $('#pmcPrice').value = '';
-      $('#pmcPay').innerHTML = M.pays.map((x) => '<option' + (x === '협의' ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
+      $('#pmcPay').innerHTML = M.pays.map((x) => '<option' + (x === (M.payDef || '러너 정산서') ? ' selected' : '') + ((M.paysOff || []).includes(x) ? ' disabled' : '') + '>' + esc(x) + ((M.paysOff || []).includes(x) ? ' (지금은 못 고름)' : '') + '</option>').join('');
       $('#pmcUse').innerHTML = M.useIds.map((x) => '<option>' + esc(x) + '</option>').join('');
       $('#pmcTop').innerHTML = M.tops.map((x) => '<option>' + esc(x) + '</option>').join('');
       PMC.mode = 'confirm'; $$('#pmcMode [data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === PMC.mode));

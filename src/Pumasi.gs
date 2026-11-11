@@ -14,7 +14,12 @@
  */
 const PM_KINDS = ['주간', '야간', '일택'];
 const PM_TOPS = ['탑무관', '하이탑', '로우탑', '냉탑'];
-const PM_PAYS = ['당일지급', '주급', '월급', '협의'];
+const PM_PAYS = ['러너 정산서', '당일지급', '주급', '월급', '협의'];
+// 지금은 고를 수 없게 잠근 지급방법 (화면에서 회색 · 새로 고르면 서버가 막음 · 예전에 이미 저장된 일감은 그대로 둠)
+const PM_PAYS_OFF = ['당일지급', '주급', '월급', '협의'];
+const PM_PAY_DEF = '러너 정산서';
+/** 지급방법 확인: 잠긴 값은 '예전 값 그대로'일 때만 허용 */
+function pmPayOk_(pay, old) { if (PM_PAYS.indexOf(pay) < 0) fail_('지급방법을 골라 주세요.'); if (PM_PAYS_OFF.indexOf(pay) >= 0 && pay !== old) fail_('지급방법 \'' + pay + '\' 은(는) 지금 고를 수 없습니다. 러너 정산서를 골라 주세요.'); return pay; }
 const PM_RUNNER_ID = 'RUNNER', PM_RUNNER = '러너'; // 맡기는 쪽이 회사(러너)인 일감: 등록 기사ID 빈칸 · 등록 기사 '러너'
 const PM_MAX_APPLY = 2; // 한 기사가 같은 배차일에 지원할 수 있는 횟수
 const PM_DESC_TEMPLATE = [
@@ -236,7 +241,7 @@ function api_pmForm(token) {
     const myCamp = m.camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
     return {
       ok: true, camps: camps, myCampId: myCamp ? myCamp.id : '', myRoute: String(me.baseRoute || '').replace(/\(.*?\)|\[.*?\]/g, '').trim().split(/[\s,]+/)[0] || '',
-      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_(), offerOn: pmOfferOn_()
+      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, payDef: PM_PAY_DEF, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_(), offerOn: pmOfferOn_()
     };
   });
 }
@@ -292,6 +297,7 @@ function api_pmSave(token, job) {
     f.price = price;
     f.pay = t(job.pay, 10, '지급방법', true);
     if (PM_PAYS.indexOf(f.pay) < 0) fail_('지급방법을 골라 주세요.');
+    if (!job.id) pmPayOk_(f.pay, ''); // 고칠 때는 아래에서 예전 값과 견줌
     f.useId = PM_USE_IDS.indexOf(str_(job.useId)) >= 0 ? str_(job.useId) : '';
     if (!job.id && !job.offerToId && !pmPostOn_()) fail_('지금은 사무실에서 품앗이 일감 올리기를 잠시 막아 두었습니다. 사무실에 문의해 주세요.');
     if (!job.id && job.offerToId && !pmOfferOn_()) fail_('지금은 사무실에서 품앗이 일감 제안을 잠시 막아 두었습니다. 사무실에 문의해 주세요.');
@@ -318,6 +324,7 @@ function api_pmSave(token, job) {
         const o = readObj_(SH.PJOB, row);
         if (o.posterId !== u.id) fail_('내가 올린 일감만 고칠 수 있습니다.');
         if (o.status !== PST.OPEN && o.status !== PST.TALK) fail_('배차가 확정되었거나 마감된 일감은 고칠 수 없습니다. 확정을 풀거나 다시 열어 주세요.');
+        pmPayOk_(f.pay, str_(o.pay));
         if (attachUrl) f.attach = attachUrl; else if (job.removeAttach) f.attach = '';
         f.updatedAt = now;
         writeFields_(SH.PJOB, row, f);
@@ -618,13 +625,13 @@ function api_pmAvailMine(token) {
     // 기본 정보: 마지막으로 저장한 값 → 없으면 내 소속 캠프 · 희망 단가 1,100원 · 당일지급
     const info = pmInfoOf_(mine[0]);
     const myCamp = master_().camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
-    if (!mine.length) { info.campId = myCamp ? myCamp.id : ''; info.camp = myCamp ? myCamp.name : ''; info.crew = '1인'; info.price = String(PM_GIVE_PRICE); info.pay = '당일지급'; info.useId = '받는 기사 아이디'; }
+    if (!mine.length) { info.campId = myCamp ? myCamp.id : ''; info.camp = myCamp ? myCamp.name : ''; info.crew = '1인'; info.price = String(PM_GIVE_PRICE); info.pay = PM_PAY_DEF; info.useId = '받는 기사 아이디'; }
     const camps = master_().camps.map(function (c) { return { id: c.id, name: c.name }; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
     const until0 = ymd_(addDays_(parseYmd_(today), PM_AVAIL_DAYS));
     let busy = [];
     try { busy = schWorkDates_(u.id, today, until0); } catch (e) { busy = []; }
     return { ok: true, today: today, until: until0, list: list, memo: memo, info: info, booked: booked, busy: busy, kinds: PM_AVAIL_KINDS, qual: !!me.docQual,
-      camps: camps, crews: PM_CREWS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE, myLogin: me.loginId || '' };
+      camps: camps, crews: PM_CREWS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE, myLogin: me.loginId || '' };
   });
 }
 /** 내 근무 가능일 저장: list = [{ date, kind }] (오늘 이후 것을 통째로 바꾼다), memo = 한마디 */
@@ -639,7 +646,7 @@ function api_pmAvailSave(token, list, memo, info) {
     // 기본 정보 (원하는 지역 · 캠프 · 배송 인원 · 원하는 수량 · 탑 종류 · 희망 단가 · 지급방법)
     info = info || {};
     const inf = { area: str_(info.area).slice(0, 40), crew: PM_CREWS.indexOf(str_(info.crew)) >= 0 ? str_(info.crew) : '', qty: str_(info.qty).slice(0, 20),
-      top: PM_TOPS.indexOf(str_(info.top)) >= 0 ? str_(info.top) : '', pay: PM_PAYS.indexOf(str_(info.pay)) >= 0 ? str_(info.pay) : '',
+      top: PM_TOPS.indexOf(str_(info.top)) >= 0 ? str_(info.top) : '', pay: PM_PAYS.indexOf(str_(info.pay)) >= 0 && PM_PAYS_OFF.indexOf(str_(info.pay)) < 0 ? str_(info.pay) : '',
       useId: PM_USE_IDS.indexOf(str_(info.useId)) >= 0 ? str_(info.useId) : '' };
     const camp = master_().camps.filter(function (c) { return c.id === str_(info.campId); })[0];
     inf.campId = camp ? camp.id : ''; inf.camp = camp ? camp.name : '';
@@ -1235,7 +1242,7 @@ function pmOfficeAuto_() {
 function adm_pmMeta(token) {
   return run_(function () {
     requireAdmin_(token);
-    return { ok: true, kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE };
+    return { ok: true, kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, payDef: PM_PAY_DEF, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE };
   });
 }
 /**
@@ -1269,7 +1276,7 @@ function adm_pmCreate(token, job) {
     const pr = str_(job.price) === '' ? null : pmMoney_(job.price);
     if (str_(job.price) !== '' && (pr === null || pr < 0)) fail_('건당 단가는 숫자로 입력해 주세요.');
     f.price = pr || '';
-    f.pay = PM_PAYS.indexOf(str_(job.pay)) >= 0 ? str_(job.pay) : '협의';
+    f.pay = PM_PAYS.indexOf(str_(job.pay)) >= 0 && PM_PAYS_OFF.indexOf(str_(job.pay)) < 0 ? str_(job.pay) : PM_PAY_DEF;
     f.useId = PM_USE_IDS.indexOf(str_(job.useId)) >= 0 ? str_(job.useId) : '';
     if (byRunner && f.useId === '주는 기사 아이디') f.useId = '받는 기사 아이디'; // 러너는 쿠팡 아이디가 없음
     f.desc = t(job.desc, 3000, '상세 설명');

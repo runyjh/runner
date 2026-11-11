@@ -2483,7 +2483,8 @@
   function pmFillForm(f, raw) {
     $('#pfKind').innerHTML = f.kinds.filter((k) => !PM_HIDE_KINDS.includes(k)).map((k) => '<button type="button" data-k="' + escH(k) + '">' + escH(PM_KIND[k] || k) + '</button>').join('');
     $('#pfTop').innerHTML = '<option value="">선택 안 함</option>' + f.tops.map((k) => '<option>' + escH(k) + '</option>').join('');
-    $('#pfPay').innerHTML = f.pays.map((k) => '<option>' + escH(k) + '</option>').join('');
+    const payOff = f.paysOff || [], oldPay = (raw || {}).pay || ''; // 잠긴 지급방법은 회색 (예전 일감에 이미 적힌 값만 그대로 보임)
+    $('#pfPay').innerHTML = f.pays.map((k) => '<option' + (payOff.includes(k) && k !== oldPay ? ' disabled' : '') + '>' + escH(k) + (payOff.includes(k) ? ' (지금은 못 고름)' : '') + '</option>').join('');
     $('#pfUse').innerHTML = (f.useIds || ['받는 기사 아이디', '주는 기사 아이디', '협의']).map((k) => '<option value="' + escH(k) + '">' + escH(PM_USE_LABEL[k] || k) + '</option>').join('');
     $('#pfCamp').innerHTML = '<option value="">선택</option>' + f.camps.map((c) => '<option value="' + escH(c.id) + '">' + escH(c.name) + '</option>').join('');
     const v = raw || {};
@@ -2492,7 +2493,7 @@
     $('#pfTime').value = v.time || ''; $('#pfArea').value = v.area || ''; $('#pfQty').value = v.qty || '';
     $('#pfCamp').value = v.campId || f.myCampId || ''; pmRoutes();
     pmSetRoute(raw ? (v.route || '') : (f.myRoute || ''));
-    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || '당일지급'; $('#pfPrice').value = v.price || ''; $('#pfUse').value = v.useId || '협의';
+    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || f.payDef || '러너 정산서'; $('#pfPrice').value = v.price || ''; $('#pfUse').value = v.useId || '협의';
     $('#pfDesc').value = raw ? (v.desc || '') : f.descTemplate; $('#pfSecret').value = raw ? (v.secret || '') : f.secretTemplate;
     pmAttach = null; pmRemoveAttach = false; $('#pfFile').value = ''; $('#pfPrev').classList.add('hidden'); $('#pfFileHint').textContent = raw ? '바꾸지 않음' : '없음';
     $('#pfPriceHint').textContent = '';
@@ -2576,7 +2577,7 @@
         if (oi.area && !$('#pfArea').value) $('#pfArea').value = oi.area;
         if (oi.qty && !$('#pfQty').value) $('#pfQty').value = oi.qty;
         if (oi.top) $('#pfTop').value = oi.top;
-        if (oi.pay) $('#pfPay').value = oi.pay;
+        if (oi.pay && !(f.paysOff || []).includes(oi.pay)) $('#pfPay').value = oi.pay;
         if (oi.useId) $('#pfUse').value = oi.useId;
         if (oi.price) { $('#pfPrice').value = oi.price; $('#pfPriceHint').textContent = '희망 단가 ' + won(oi.price) + (oi.crew ? ' · ' + oi.crew : ''); }
         ob.innerHTML = '💌 <b>' + escH(pmOffer.name) + '</b> 기사님에게 ' + pmDay(pmOffer.date) + ' 일감을 제안합니다. 이 기사님에게만 보이고, 수락하면 바로 배차 확정됩니다.';
@@ -2710,7 +2711,7 @@
       '<div class="row"><div class="field"><label class="lb" for="gvQty">원하는 수량</label><input type="text" id="gvQty" data-gi="qty" maxlength="20" placeholder="예: 250개" value="' + escH(i.qty || '') + '"></div>' +
       '<div class="field"><label class="lb" for="gvTop">탑 종류</label><select id="gvTop" data-gi="top">' + opt(r.tops || [], i.top, '선택 안 함') + '</select></div></div>' +
       '<div class="row"><div class="field"><label class="lb" for="gvPrice">희망 단가 (VAT포함)</label><div class="suffix"><input type="number" id="gvPrice" data-gi="price" inputmode="numeric" min="0" placeholder="' + (r.defPrice || 1100) + '" value="' + escH(i.price || '') + '"><span>원</span></div></div>' +
-      '<div class="field"><label class="lb" for="gvPay">지급방법</label><select id="gvPay" data-gi="pay">' + opt(r.pays || [], i.pay, '선택 안 함') + '</select></div></div>' +
+      '<div class="field"><label class="lb" for="gvPay">지급방법</label><select id="gvPay" data-gi="pay">' + opt((r.pays || []).filter((x) => !(r.paysOff || []).includes(x)), i.pay, '선택 안 함') + '</select></div></div>' +
       '<div class="field" style="margin-bottom:0"><label class="lb" for="gvUse">배송 아이디 <small style="font-weight:500;color:var(--sub)">누구 쿠팡 아이디로 배송할지</small></label><select id="gvUse" data-gi="useId">' +
         (r.useIds || []).map((k) => '<option value="' + escH(k) + '"' + (i.useId === k ? ' selected' : '') + '>' + escH(PM_USE_GV[k] || k) + (k === '받는 기사 아이디' && r.myLogin ? ' (' + escH(r.myLogin) + ')' : '') + '</option>').join('') + '</select>' +
         '<p class="hint" style="margin:6px 0 0">러너 기사님끼리라 정산은 자동으로 맞춥니다. 일감 주는 기사님 아이디로 배송하면 그날 매출이 기사님 정산으로 옮겨집니다.</p></div></div>';
