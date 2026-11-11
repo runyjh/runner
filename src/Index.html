@@ -367,6 +367,9 @@
   .pmbanner i { font-style: normal; margin-left: auto; opacity: .6; font-size: 18px; line-height: 1; padding: 2px 0 0 6px; }
   .pmal { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: #fff; padding: 14px 16px; font: inherit; color: var(--ink); cursor: pointer; }
   .pmal:first-child { border-top: 0; }
+  .pmw { position: relative; } .pmw + .pmw { border-top: 1px solid var(--line); } .mylist .pmw button.pmal { border-top: 0; padding-right: 46px; }
+  .mylist button.padel { position: absolute; top: 8px; right: 6px; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: none; color: #adb5bd; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .mylist button.padel::after { content: none; } .mylist button.padel:active { background: #f1f3f5; color: #e03131; }
   /* 알림 카드: 머릿글(위) · 내용(아래) — 마이페이지 목록 버튼의 가로 배치를 덮어씀 */
   .mylist button.pmal { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0; font-weight: 400; }
   .mylist button.pmal::after { content: none; }
@@ -985,9 +988,9 @@
 
   <section id="v-pmalerts" class="view">
     <div class="topbar"><button class="back" id="paBack" aria-label="뒤로">←</button><h2>알림</h2>
-      <button class="btn sm ghost" id="paAll" type="button" style="margin-left:auto;height:38px">모두 읽음</button></div>
+      <button class="btn sm ghost" id="paAll" type="button" style="margin-left:auto;height:38px;padding:0 11px">모두 읽음</button><button class="btn sm ghost" id="paDelAll" type="button" style="height:38px;padding:0 11px;margin-left:6px;color:#e03131;background:#fff0f0">모두 지우기</button></div>
     <div class="mylist" id="paList"></div>
-    <p class="hint" style="text-align:center">최근 30일 알림입니다. 누르면 그 일감으로 갑니다.</p>
+    <p class="hint" style="text-align:center">최근 30일 알림입니다. 누르면 그 일감으로 갑니다. ✕ 를 누르면 지워집니다.</p>
   </section>
   <div class="pmbanner" id="pmBanner" role="status" aria-live="polite"><div><b id="pbT"></b><span id="pbB"></span></div><i id="pbX" aria-label="닫기">×</i></div>
 
@@ -1218,7 +1221,7 @@
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_ntPhoto', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead'];
+  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_ntPhoto', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead', 'api_pmAlertsDel'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -3426,14 +3429,26 @@
     return String(at).slice(5, 10).replace('-', '/');
   };
   function renderPmAlerts() {
-    $('#paList').innerHTML = paList.length ? paList.map((a) => '<button type="button" class="pmal' + (a.read ? '' : ' unread') + '" data-al="' + escH(a.id) + '" data-pj="' + escH(a.jobId) + '">' +
-      '<b>' + escH(a.title) + '<small>' + escH(agoText(a.at)) + '</small></b><span>' + escH(a.text) + '</span></button>').join('')
+    $('#paList').innerHTML = paList.length ? paList.map((a) => '<div class="pmw"><button type="button" class="pmal' + (a.read ? '' : ' unread') + '" data-al="' + escH(a.id) + '" data-pj="' + escH(a.jobId) + '">' +
+      '<b>' + escH(a.title) + '<small>' + escH(agoText(a.at)) + '</small></b><span>' + escH(a.text) + '</span></button><button type="button" class="padel" data-padel="' + escH(a.id) + '" aria-label="알림 지우기">✕</button></div>').join('')
       : '<div class="pmempty">아직 알림이 없습니다.</div>';
   }
   function openPmAlerts() { show('pmalerts'); renderPmAlerts(); paVer = ''; pollAlerts(true); }
   $('#paBack').addEventListener('click', openMyPage);
   $('#paAll').addEventListener('click', () => { markAlerts('all'); renderPmAlerts(); });
+  /** 알림 지우기 (ids 배열 또는 'all'): 화면에서 바로 빼고 서버에서 지움 */
+  function delAlerts(ids) {
+    const token = store.get(TOKEN); if (!token) return Promise.resolve();
+    paList = paList.filter((a) => { const del = ids === 'all' || ids.includes(a.id); if (del && !a.read) paUnread = Math.max(0, paUnread - 1); return !del; });
+    paintAlertBadges(); renderPmAlerts(); clearShownNotifications();
+    return api('api_pmAlertsDel', token, ids).then((r) => { if (r && r.ok) paVer = ''; else { toast((r && r.msg) || '지우지 못했습니다.'); paVer = ''; pollAlerts(true); } }).catch(() => { netErr(); paVer = ''; pollAlerts(true); });
+  }
+  $('#paDelAll').addEventListener('click', () => {
+    if (!paList.length) return toast('지울 알림이 없습니다.');
+    pmAsk('알림 모두 지우기', '알림 ' + paList.length + '건을 모두 지울까요? 지운 알림은 되돌릴 수 없습니다.', '모두 지우기').then((ok) => { if (ok !== null) { delAlerts('all'); toast('알림을 모두 지웠습니다.'); } });
+  });
   $('#paList').addEventListener('click', (e) => {
+    const d = e.target.closest('[data-padel]'); if (d) return delAlerts([d.dataset.padel]);
     const b = e.target.closest('[data-al]'); if (!b) return;
     markAlerts([b.dataset.al]);
     if (b.dataset.pj) openAlertTarget(b.dataset.pj, 'alerts');

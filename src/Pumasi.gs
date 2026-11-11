@@ -886,6 +886,25 @@ function api_pmAlertsRead(token, ids) {
   });
 }
 
+/** 알림 지우기: ids 배열, 또는 'all' (내 알림만 · 시트 줄을 지운다) */
+function api_pmAlertsDel(token, ids) {
+  return run_(function () {
+    const u = pmUser_(token);
+    const want = ids === 'all' ? null : {};
+    if (want) (ids || []).forEach(function (x) { want[String(x)] = 1; });
+    let n = 0;
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const rows = readAll_(SH.PALERT).filter(function (a) { return a.id && a.driverId === u.id && (!want || want[a.id]); }).map(function (a) { return a._row; });
+      n = rows.length;
+      if (n) delRows_(sheet_(SH.PALERT), rows);
+    } finally { lock.releaseLock(); }
+    if (n) pmAlertBump_(u.id);
+    return { ok: true, deleted: n };
+  });
+}
+
 // ───── 휴대폰 푸시 (Firebase Cloud Messaging) ─────
 // 파이어베이스 웹앱 설정(공개값: 앱 화면에 원래 들어가는 값, 비밀 아님) — runner-push 프로젝트.
 // 다른 프로젝트로 바꾸려면 스크립트 속성 FCM_WEB 에 넣으면 그 값이 우선한다.
