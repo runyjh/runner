@@ -2511,7 +2511,7 @@
     $('#pfTime').value = v.time || ''; $('#pfArea').value = v.area || ''; $('#pfQty').value = v.qty || '';
     $('#pfCamp').value = v.campId || f.myCampId || ''; pmRoutes();
     pmSetRoute(raw ? (v.route || '') : (f.myRoute || ''));
-    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || f.payDef || '러너 정산서'; $('#pfPrice').value = v.price || ''; $('#pfUse').value = v.useId || '협의';
+    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || f.payDef || '러너 정산서'; $('#pfPrice').value = v.price || String(f.defPrice || 1100); // 새 일감은 항상 1,100원부터 (고칠 수 있음) $('#pfUse').value = v.useId || '협의';
     $('#pfDesc').value = raw ? (v.desc || '') : f.descTemplate; $('#pfSecret').value = raw ? (v.secret || '') : f.secretTemplate;
     pmAttach = null; pmRemoveAttach = false; $('#pfFile').value = ''; $('#pfPrev').classList.add('hidden'); $('#pfFileHint').textContent = raw ? '바꾸지 않음' : '없음';
     $('#pfPriceHint').textContent = '';
@@ -2572,7 +2572,7 @@
     api('api_pmPrice', pmTok(), camp, route).then((r) => {
       if (seq !== pmPriceSeq || !r || !r.ok || !r.price) return;
       $('#pfPriceHint').textContent = (pmOffer && pmOffer.info && pmOffer.info.price ? '희망 단가 ' + won(pmOffer.info.price) + (pmOffer.info.crew ? ' · ' + pmOffer.info.crew : '') + ' · ' : '') + '노선관리 품앗이단가 ' + won(r.price);
-      if (!$('#pfPrice').value) $('#pfPrice').value = r.price;
+      // 단가 칸은 채우지 않음 (기본 1,100원 · 참고로만 보여 줌)
     }).catch(() => {});
   }
   let pmOffer = null; // { id, name, date, kind } 품앗이 → 이 기사에게 제안
@@ -2597,7 +2597,7 @@
         if (oi.top) $('#pfTop').value = oi.top;
         if (oi.pay && !(f.paysOff || []).includes(oi.pay)) $('#pfPay').value = oi.pay;
         if (oi.useId) $('#pfUse').value = oi.useId;
-        if (oi.price) { $('#pfPrice').value = oi.price; $('#pfPriceHint').textContent = '희망 단가 ' + won(oi.price) + (oi.crew ? ' · ' + oi.crew : ''); }
+        if (oi.price) $('#pfPriceHint').textContent = '희망 단가 ' + won(oi.price) + (oi.crew ? ' · ' + oi.crew : '') + ' (참고 · 단가는 기본 1,100원)';
         ob.innerHTML = '💌 <b>' + escH(pmOffer.name) + '</b> 기사님에게 ' + pmDay(pmOffer.date) + ' 일감을 제안합니다. 이 기사님에게만 보이고, 수락하면 바로 배차 확정됩니다.';
         $('#pfTitle').textContent = '품앗이 제안하기'; $('#pfBtn').textContent = '제안 보내기';
       }
@@ -2615,7 +2615,7 @@
     show('pumasi'); loadPmList();
   });
   $('#pfKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) pmSetKind(b.dataset.k); });
-  $('#pfCamp').addEventListener('change', () => { $('#pfRoute').value = ''; $('#pfPrice').value = ''; $('#pfPriceHint').textContent = ''; pmRoutes(); });
+  $('#pfCamp').addEventListener('change', () => { $('#pfRoute').value = ''; $('#pfPriceHint').textContent = ''; pmRoutes(); });
   $('#pfRoute').addEventListener('change', pmSuggestPrice);
   $('#pfRoutePick').addEventListener('click', (e) => {
     const u = e.target.closest('[data-u]'), al = e.target.closest('[data-all]'), d = e.target.closest('[data-direct]');
@@ -2626,7 +2626,7 @@
     else { const n = al.dataset.all, ls = (rpkGroups().nums.find((x) => x[0] === n) || [n, []])[1].map((L) => n + L), all = ls.every((x) => RPK.units.includes(x));
       RPK.units = all ? RPK.units.filter((x) => !ls.includes(x)) : [...new Set(RPK.units.concat(ls))]; }
     $('#pfRoute').value = rpkCompose(); rpkPaint();
-    $('#pfPrice').value = ''; $('#pfPriceHint').textContent = ''; pmSuggestPrice();
+    $('#pfPriceHint').textContent = ''; pmSuggestPrice();
   });
   $('#pfRoute').addEventListener('input', () => { if (RPK.direct) rpkPaint(); });
   $('#pfFile').addEventListener('change', () => {

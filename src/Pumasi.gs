@@ -18,6 +18,7 @@ const PM_PAYS = ['러너 정산서', '당일지급', '주급', '월급', '협의
 // 지금은 고를 수 없게 잠근 지급방법 (화면에서 회색 · 새로 고르면 서버가 막음 · 예전에 이미 저장된 일감은 그대로 둠)
 const PM_PAYS_OFF = ['당일지급', '주급', '월급', '협의'];
 const PM_PAY_DEF = '러너 정산서';
+const PM_JOB_PRICE = 1100; // 품앗이 일감 건당 단가 기본값 (VAT 포함 · 고칠 수 있음)
 /** 지급방법 확인: 잠긴 값은 '예전 값 그대로'일 때만 허용 */
 function pmPayOk_(pay, old) { if (PM_PAYS.indexOf(pay) < 0) fail_('지급방법을 골라 주세요.'); if (PM_PAYS_OFF.indexOf(pay) >= 0 && pay !== old) fail_('지급방법 \'' + pay + '\' 은(는) 지금 고를 수 없습니다. 러너 정산서를 골라 주세요.'); return pay; }
 const PM_RUNNER_ID = 'RUNNER', PM_RUNNER = '러너'; // 맡기는 쪽이 회사(러너)인 일감: 등록 기사ID 빈칸 · 등록 기사 '러너'
@@ -241,7 +242,7 @@ function api_pmForm(token) {
     const myCamp = m.camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
     return {
       ok: true, camps: camps, myCampId: myCamp ? myCamp.id : '', myRoute: String(me.baseRoute || '').replace(/\(.*?\)|\[.*?\]/g, '').trim().split(/[\s,]+/)[0] || '',
-      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, payDef: PM_PAY_DEF, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_(), offerOn: pmOfferOn_()
+      kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, payDef: PM_PAY_DEF, defPrice: PM_JOB_PRICE, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_(), offerOn: pmOfferOn_()
     };
   });
 }
@@ -1242,7 +1243,7 @@ function pmOfficeAuto_() {
 function adm_pmMeta(token) {
   return run_(function () {
     requireAdmin_(token);
-    return { ok: true, kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, payDef: PM_PAY_DEF, useIds: PM_USE_IDS, defPrice: PM_GIVE_PRICE };
+    return { ok: true, kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, payDef: PM_PAY_DEF, useIds: PM_USE_IDS, defPrice: PM_JOB_PRICE };
   });
 }
 /**

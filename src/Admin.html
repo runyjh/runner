@@ -9068,7 +9068,7 @@
       const v = r && dt ? sget(r.row, dt) : '', m = /\b(\d{3,4}[A-Z]{1,4})\b/.exec(String(v).toUpperCase());
       $('#pmcRoute').value = pre && pre.route ? pre.route : m ? m[1] : d0 ? d0.baseRoute || '' : '';
       ['#pmcTime', '#pmcArea', '#pmcQty', '#pmcDesc'].forEach((x) => { $(x).value = ''; });
-      $('#pmcPrice').value = '';
+      $('#pmcPrice').value = String((M && M.defPrice) || 1100); // 기본 1,100원 (고칠 수 있음)
       $('#pmcPay').innerHTML = M.pays.map((x) => '<option' + (x === (M.payDef || '러너 정산서') ? ' selected' : '') + ((M.paysOff || []).includes(x) ? ' disabled' : '') + '>' + esc(x) + ((M.paysOff || []).includes(x) ? ' (지금은 못 고름)' : '') + '</option>').join('');
       $('#pmcUse').innerHTML = M.useIds.map((x) => '<option>' + esc(x) + '</option>').join('');
       $('#pmcTop').innerHTML = M.tops.map((x) => '<option>' + esc(x) + '</option>').join('');
