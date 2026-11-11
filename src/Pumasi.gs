@@ -232,6 +232,43 @@ function api_pmAttach(token, id) {
 
 // ───────────────────────── 등록 · 수정 ─────────────────────────
 /** 등록 화면용: 센터(캠프)·라우트 목록, 내 캠프·기본노선, 고를 값 */
+/**
+ * 품앗이 일감 올리기 '내 캠프': 오늘부터 60일, 기사스케줄 내 칸으로 그날 출근하는 캠프와 라우트를 찾는다.
+ *  칸에 캠프가 적혀 있으면 그 캠프('군포1 212CD') · 휴무·휴가·병가·미입차·퇴사면 출근 아님 · 그 밖(출근·라우트만·빈칸)은 소속 캠프
+ *  반환 { 'yyyy-MM-dd': { campId, route } }
+ */
+function pmWorkDays_(me) {
+  const out = {};
+  if (!me || !me.id || !props_().SCH_DB_ID) return out;
+  const today = todayText_(), dates = issDates_(today, schAddDays_(today, 60));
+  const camps = master_().camps.filter(function (c) { return !isStaffCamp_(c.name); });
+  const shortOf = {}; camps.forEach(function (c) { shortOf[String(c.name).replace(/\s*캠프\s*$/, '').replace(/\s+/g, '')] = c.id; });
+  const shorts = Object.keys(shortOf).sort(function (a, b) { return b.length - a.length; });
+  const home = camps.some(function (c) { return c.id === me.schCampId; }) ? me.schCampId : '';
+  let row = [], c0 = 0, h = null;
+  try {
+    h = schHeader_();
+    const sh = schSheet_(), last = sh.getLastRow(), cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
+    if (last >= 2 && cols.length) {
+      const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues();
+      let ri = -1; for (let i = 0; i < ids.length; i++) if (str_(ids[i][0]) === String(me.id)) { ri = i; break; }
+      c0 = Math.min.apply(null, cols);
+      if (ri >= 0) row = sh.getRange(ri + 2, c0 + 1, 1, Math.max.apply(null, cols) - c0 + 1).getValues()[0];
+    }
+  } catch (e) { row = []; }
+  const base = String(me.baseRoute || '').replace(/\(.*?\)|\[.*?\]/g, '').trim().split(/[\s,]+/)[0] || '';
+  dates.forEach(function (d) {
+    const c = h ? h.dates[d] : undefined, v = c === undefined ? '' : str_(row[c - c0]), t = v.replace(/\s+/g, '');
+    if (/휴무|휴가|병가|미입차|퇴사/.test(t)) return;
+    let cid = '', rest = v;
+    for (let i = 0; i < shorts.length; i++) { const k = rest.replace(/\s+/g, '').indexOf(shorts[i]); if (k >= 0) { cid = shortOf[shorts[i]]; rest = v.replace(new RegExp(shorts[i].split('').join('\\s*')), ' '); break; } }
+    if (!cid) cid = home;
+    if (!cid) return;
+    const codes = rest.replace(/\(.*?\)|\[.*?\]/g, ' ').toUpperCase().split(/[\s,]+/).filter(function (x) { return /^\d+[A-Z]*$/.test(x); });
+    out[d] = { campId: cid, route: codes.join(',') || (cid === home ? base : '') };
+  });
+  return out;
+}
 function api_pmForm(token) {
   return run_(function () {
     const u = pmUser_(token);
@@ -241,7 +278,8 @@ function api_pmForm(token) {
     }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
     const myCamp = m.camps.filter(function (c) { return (me.schCampId && c.id === me.schCampId) || (!me.schCampId && me.schCamp && c.name === me.schCamp); })[0];
     return {
-      ok: true, camps: camps, myCampId: myCamp ? myCamp.id : '', myRoute: String(me.baseRoute || '').replace(/\(.*?\)|\[.*?\]/g, '').trim().split(/[\s,]+/)[0] || '',
+      ok: true, camps: camps, myCampId: myCamp ? myCamp.id : '',
+      work: isStaff_(me) ? null : pmWorkDays_(me), // 내 캠프: 배차일자에 출근하는 캠프만 (직함자는 전체) myRoute: String(me.baseRoute || '').replace(/\(.*?\)|\[.*?\]/g, '').trim().split(/[\s,]+/)[0] || '',
       kinds: PM_KINDS, tops: PM_TOPS, pays: PM_PAYS, paysOff: PM_PAYS_OFF, payDef: PM_PAY_DEF, defPrice: PM_JOB_PRICE, useIds: PM_USE_IDS, descTemplate: PM_DESC_TEMPLATE, secretTemplate: PM_SECRET_TEMPLATE, today: todayText_(), postOn: pmPostOn_(), offerOn: pmOfferOn_()
     };
   });

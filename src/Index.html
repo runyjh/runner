@@ -877,7 +877,7 @@
           <div class="field"><label class="lb" for="pfDate">배차일자<span class="req">*</span></label><input type="date" id="pfDate"></div>
           <div class="field"><label class="lb" for="pfTime">입차시간<span class="req">*</span></label><input type="time" id="pfTime"></div>
         </div>
-        <div class="field"><label class="lb" for="pfCamp">센터(캠프)<span class="req">*</span></label><select id="pfCamp"></select></div>
+        <div class="field"><label class="lb" for="pfCamp">내 캠프<span class="req">*</span></label><select id="pfCamp"></select><small class="sub" id="pfCampHint" style="display:block;margin-top:6px"></small></div>
         <div class="field"><label class="lb">라우트</label><div class="rpk" id="pfRoutePick"></div><input type="text" id="pfRoute" class="hidden" placeholder="라우트 직접 입력 (예: 527B)" autocomplete="off" style="margin-top:6px"></div>
         <div class="field"><label class="lb" for="pfArea">배송지<span class="req">*</span></label><input type="text" id="pfArea" placeholder="예: 강서구 화곡동" maxlength="40"></div>
         <div class="row">
@@ -2523,19 +2523,36 @@
     const payOff = f.paysOff || [], oldPay = (raw || {}).pay || ''; // 잠긴 지급방법은 회색 (예전 일감에 이미 적힌 값만 그대로 보임)
     $('#pfPay').innerHTML = f.pays.map((k) => '<option' + (payOff.includes(k) && k !== oldPay ? ' disabled' : '') + '>' + escH(k) + (payOff.includes(k) ? ' (지금은 못 고름)' : '') + '</option>').join('');
     $('#pfUse').innerHTML = (f.useIds || ['받는 기사 아이디', '주는 기사 아이디', '협의']).map((k) => '<option value="' + escH(k) + '">' + escH(PM_USE_LABEL[k] || k) + '</option>').join('');
-    $('#pfCamp').innerHTML = '<option value="">선택</option>' + f.camps.map((c) => '<option value="' + escH(c.id) + '">' + escH(c.name) + '</option>').join('');
     const v = raw || {};
     pmSetKind(v.kind || '주간');
     $('#pfDate').value = v.date || ''; $('#pfDate').min = raw ? '' : f.today;
     $('#pfTime').value = v.time || ''; $('#pfArea').value = v.area || ''; $('#pfQty').value = v.qty || '';
-    $('#pfCamp').value = v.campId || f.myCampId || ''; pmRoutes();
-    pmSetRoute(raw ? (v.route || '') : (f.myRoute || ''));
-    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || f.payDef || '러너 정산서'; $('#pfPrice').value = v.price || String(f.defPrice || 1100); // 새 일감은 항상 1,100원부터 (고칠 수 있음) $('#pfUse').value = v.useId || '협의';
+    pmCampFill(v.campId || '');
+    if (raw) pmSetRoute(v.route || '');
+    $('#pfTop').value = v.top || ''; $('#pfPay').value = v.pay || f.payDef || '러너 정산서'; $('#pfPrice').value = v.price || String(f.defPrice || 1100); $('#pfUse').value = v.useId || '협의'; // 새 일감 단가는 항상 1,100원부터 (고칠 수 있음)
     $('#pfDesc').value = raw ? (v.desc || '') : f.descTemplate; $('#pfSecret').value = raw ? (v.secret || '') : f.secretTemplate;
     pmAttach = null; pmRemoveAttach = false; $('#pfFile').value = ''; $('#pfPrev').classList.add('hidden'); $('#pfFileHint').textContent = raw ? '바꾸지 않음' : '없음';
     $('#pfPriceHint').textContent = '';
     if (!raw) pmSuggestPrice();
   }
+  // 내 캠프: 배차일자에 내가 출근하는 캠프만 (기사스케줄 내 칸 기준 · 직함자는 전체 · 고칠 때는 원래 캠프도)
+  function pmCampFill(keep) {
+    const f = pmFormData || {}, d = $('#pfDate').value, w = f.work, all = f.camps || [];
+    let list = all, hint = '';
+    if (w) {
+      const day = d ? w[d] : null;
+      list = all.filter((c) => (day && c.id === day.campId) || (keep && c.id === keep));
+      hint = !d ? '배차일자를 고르면 그날 출근하는 캠프가 나옵니다.' : day ? '' : '이 날은 기사스케줄에 출근하는 캠프가 없습니다 (휴무 등).';
+    }
+    $('#pfCamp').innerHTML = (list.length === 1 ? '' : '<option value="">' + (w && !list.length ? '출근하는 캠프 없음' : '선택') + '</option>') + list.map((c) => '<option value="' + escH(c.id) + '">' + escH(c.name) + '</option>').join('');
+    $('#pfCamp').disabled = !list.length;
+    $('#pfCampHint').textContent = hint;
+    const cur = keep || (w && d && w[d] ? w[d].campId : '') || (!w ? f.myCampId || '' : '');
+    $('#pfCamp').value = list.some((c) => c.id === cur) ? cur : (list.length === 1 ? list[0].id : '');
+    $('#pfRoute').value = ''; pmRoutes();
+    if (!keep) pmSetRoute(w && d && w[d] && $('#pfCamp').value === w[d].campId ? w[d].route : (!w && $('#pfCamp').value === f.myCampId ? f.myRoute || '' : ''));
+  }
+  $('#pfDate').addEventListener('change', () => { if (pmFormData) { pmCampFill(pmEditId ? $('#pfCamp').value : ''); pmSuggestPrice(); } });
   function pmSetKind(k) { $$('#pfKind button').forEach((b) => b.classList.toggle('on', b.dataset.k === k)); }
   // ───── 라우트 조합창 (관리자 기사스케줄 칸 고르기와 같은 모양): 숫자 줄마다 A·B·C·D 단추 + 전체 → '404AB' · '404A,405CD' ─────
   //  RPK.units = ['404A','404B', …] · RPK.direct = 직접 입력 중
@@ -2608,7 +2625,7 @@
       pmFormData = f; pmFillForm(f, id ? raw : null);
       const ob = $('#pfOffer');
       if (pmOffer) {
-        $('#pfDate').value = pmOffer.date; if (pmOffer.kind === '주간' || pmOffer.kind === '야간') pmSetKind(pmOffer.kind);
+        $('#pfDate').value = pmOffer.date; pmCampFill(''); if (pmOffer.kind === '주간' || pmOffer.kind === '야간') pmSetKind(pmOffer.kind);
         const oi = pmOffer.info || {};
         if (oi.campId && Array.from($('#pfCamp').options).some((o) => o.value === oi.campId)) { $('#pfCamp').value = oi.campId; pmRoutes(); }
         if (oi.area && !$('#pfArea').value) $('#pfArea').value = oi.area;
