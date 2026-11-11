@@ -473,6 +473,8 @@ function adm_schCellApply(token, o) {
     if ((r1.conflicts || []).length) out.warn = '그 사이 바뀐 칸 ' + r1.conflicts.length + '개는 건너뛰었습니다.';
     if ((r1.pmLocked || []).length) out.warn = (out.warn ? out.warn + ' ' : '') + '배차 확정된 품앗이 칸은 바꾸지 않았습니다.';
     sync = r1.issueSync && !r1.issueSync.error ? r1.issueSync : null;
+    if (r1.yong && (r1.yong.warn || []).length) out.warn = (out.warn ? out.warn + ' ' : '') + r1.yong.warn.join(' ');
+    if (r1.yong) out.yong = { added: r1.yong.added, removed: r1.yong.removed };
     if (sync) { out.removed = (sync.removed || []).slice(); out.issues = (sync.created || []).concat(sync.changed || []); out.cells = out.cells.concat(sync.cells || []); }
   }
   // 2) 이슈: 칸 저장으로 생긴(또는 원래 있던) 그날 이슈에 사유 · 대체 · 조치를 채운다 → 대체가 우리 인원이면 서버가 그 칸을 넣고 원래 값을 기억 (되돌릴 때 같이 돌아감)

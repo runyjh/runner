@@ -1756,6 +1756,7 @@
   let CAMP_ROTS = {}; // 기본 회전이 D1,D2,F3 가 아닌 캠프 { '시흥2': 'D1,D2' } (서버 api_mySchedule·api_campSchedule)
   const fullRot = (camp) => CAMP_ROTS[String(camp || '').replace(/\s+/g, '')] || ROT_FULL;
   function schParse(v, baseRoute, homeCamp) {
+    if (/^용차\s/.test(String(v || ''))) v = '용차'; // 사무실용 표기(업체 · 아이디 · 청구 여부)는 기사 앱에 보이지 않게
     const per = {};
     const pull = (x) => String(x || '').replace(/(\d+[A-Za-z]+)\(([^)]*)\)/g, (m0, rt, ro) => {
       const r = ro.replace(/\s/g, '').toUpperCase(); const mm = rt.toUpperCase().match(/^(\d+)([A-Z]+)$/);

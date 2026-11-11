@@ -5005,12 +5005,13 @@ function schRead_(sun, end) {
   }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
   let pmMarks = {}, pmTips = {};
   try { pmMarks = pmAdminMarks_(cells, dates, byDrv, pmTips); } catch (e) { pmMarks = {}; pmTips = {}; }
+  const VP = typeof schVendorPack_ === 'function' ? schVendorPack_() : { vendors: [], routes: [] };
   return {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
     issues: issues, issueKinds: SCH_ISSUE.KINDS, pmLocks: pmLocks,
-    vendorRoutes: (typeof vendorRoutes_ === 'function' ? vendorRoutes_() : []).map(function (v) { return { name: v.name, camp: v.camp, code: v.code, units: v.units, from: v.from, to: v.to }; })
+    vendorRoutes: VP.routes, vendors: VP.vendors
   };
 }
 
@@ -5166,7 +5167,10 @@ function adm_schSave(token, changes) {
         } catch (e) { issueSync = { error: String(e && e.message || e) }; }
       }
       stg_('iss');
-      return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts), issueSync: issueSync, pmLocked: pmLocked }, rcExtra);
+      // 용차 칸 → 정산 [품앗이/용차 지정] (업체가 적힌 용차 칸만 · 실패해도 칸 저장은 그대로)
+      let yong = null;
+      try { if (typeof schYongSync_ === 'function') yong = schYongSync_(savedList); } catch (e) { yong = { added: 0, removed: 0, warn: ['용차 청구 기록 연동 실패: ' + String(e && e.message || e)] }; try { errLog_('서버 오류', 'schYongSync_', String(e && e.message || e)); } catch (e2) { /* 무시 */ } }
+      return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts), issueSync: issueSync, pmLocked: pmLocked, yong: yong }, rcExtra);
     } finally {
       lock.releaseLock();
     }
