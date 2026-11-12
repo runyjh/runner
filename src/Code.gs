@@ -4850,7 +4850,8 @@ function schDriver_(o) {
     workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
     workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o),
     subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean), // 칸 편집기 '서브아이디 업무등록' 추천용
-    workerId: str_(o.workerId), alias: []
+    workerId: str_(o.workerId), alias: [],
+    phone: str_(o.phone), carName: str_(o.carName), joinDate: str_(o.createdAt).slice(0, 10) // 기사스케줄 오른쪽 확인용 칸 (관리자 화면에만 내려감)
   };
 }
 
