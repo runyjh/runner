@@ -856,6 +856,12 @@
   .rp-table td.rc { cursor: pointer; } .rp-table td.rc:hover b { text-decoration: underline; }
   .rp-sum { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; } .rp-sum span { padding: 4px 10px; border-radius: 8px; background: var(--gray-weak); font-size: 13px; } .rp-sum span b { margin-left: 4px; }
   .rp-sum span.bad { background: #fde8e8; color: #c62828; }
+  .fc-ws { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; } .fc-w { flex: 1 1 220px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; background: #fff; } .fc-w small { display: block; color: var(--sub); font-size: 12px; } .fc-w b { font-size: 26px; font-weight: 800; color: #15803d; margin-right: 8px; } .fc-w span { font-size: 12.5px; color: var(--sub); }
+  .fc-w.warn b { color: #b45309; } .fc-w.bad { border-color: #f5b5b5; background: #fff7f7; } .fc-w.bad b { color: #c62828; }
+  .fc-l { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .fc-l small { color: var(--sub); font-size: 12px; } .fc-rs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .fc-r { padding: 4px 9px; border-radius: 8px; background: #fff7e6; font-size: 12.5px; white-space: nowrap; } .fc-r.bad { background: #fde8e8; color: #c62828; } .fc-r small { opacity: .8; }
+  .fc-note { margin: 10px 0 0; color: var(--sub); font-size: 12px; } html.m .fc-l { grid-template-columns: 1fr; }
+  .rp-table td.fcc { white-space: nowrap; } .fc { font-weight: 700; font-size: 13px; } .fc.ok { color: #9ca3af; font-weight: 500; } .fc.warn { color: #b45309; } .fc.bad { color: #c62828; } .fcn { margin-left: 4px; color: var(--sub); font-size: 11px; }
   .rp-on { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
   .rp-on b.on { color: var(--ok); } .rp-on b.off { color: var(--sub); }
   .rp-top { padding-bottom: 8px; } .rp-top .xp-head { flex-wrap: wrap; gap: 8px; } .rp-tabs { margin: 0; } .rp-tabs .tab { padding: 6px 12px; }
@@ -6634,11 +6640,24 @@
       if (r.lineage) lnSet(r.lineage);
       rpIndex();
       if ($('#rRows')) { renderRoutes(); renderLnTab(); }
-      if (rpViewOn()) rpRender();
+      if (rpViewOn()) { rpRender(); loadForecast(force); }
       return RP;
     }).catch(() => RP).finally(() => { RP.loading = null; });
     return RP.loading;
   }
+  // 스케줄 기준 예상 (이번 주 · 다음 주): 쿠팡 수행률은 쿠팡 자료, 여기는 지금 스케줄대로면 비는 회전만 미리 본다
+  function loadForecast(force) {
+    if (RP.fcLoading || (RP.fc && !force && Date.now() - RP.fcAt < 120000)) return;
+    RP.fcLoading = true;
+    api('adm_perfForecast').then((r) => { if (!r.ok) return; RP.fc = r; RP.fcAt = Date.now(); RP.fcMap = new Map((r.rows || []).map((x) => [rpKey(x.camp, x.code), x])); if (rpViewOn() && rpTabNow() !== 'sla' && rpTabNow() !== 'fb') rpRender(); }).catch(() => {}).finally(() => { RP.fcLoading = false; });
+  }
+  const fcOf = (camp, code, i) => { const x = RP.fcMap && (RP.fcMap.get(rpKey(camp, code)) || RP.fcMap.get(lnHead(rpKey(camp, code)))); return x ? x.w[i] : null; };
+  const fcCell = (camp, code, i) => {
+    if (!RP.fc) return '<span class="sub">…</span>';
+    const w = fcOf(camp, code, i);
+    if (!w || !w.lost) return '<span class="fc ok">100%</span>';
+    return '<span class="fc ' + (w.pct < 95 ? 'bad' : 'warn') + '" title="' + esc(w.days.join('\n')) + '">' + w.pct + '%</span><small class="fcn">−' + w.lost + '회전</small>';
+  };
   /** 라우트(정산코드)의 가장 최근 기록 (최신 주차에 없으면 그 전 주차 · stale 표시) */
   function rpLatestOf(camp, code) {
     const e = RP.map.get(lnHead(rpKey(camp, code))); if (!e) return null;
@@ -6676,7 +6695,7 @@
       return Object.assign({ e, latest, prev }, e);
     }).filter((x) => (f.ended || !LN.ended.has(rpKey(x.camp, x.code))) && (!f.camp || x.camp === f.camp) && (!q || (x.camp + x.code).toUpperCase().includes(q)) &&
       (!f.mode || (f.mode === 'bad' && x.latest && x.latest.grade >= 3) || (f.mode === 'imp' && x.latest && x.latest.improve) ||
-        (f.mode === 'chg' && x.latest && x.prev && x.latest.grade !== x.prev.grade)))
+        (f.mode === 'chg' && x.latest && x.prev && x.latest.grade !== x.prev.grade) || (f.mode === 'fc' && [0, 1].some((i) => { const w = fcOf(x.camp, x.code, i); return w && w.lost; }))))
       .sort((a, b) => koSort(a.camp, b.camp) || koSort(a.code, b.code));
   }
   function rpRender() {
@@ -6694,18 +6713,32 @@
     const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
     const cnt = (g) => lrows.filter((r) => r.grade === g).length;
     const bad = lrows.filter((r) => r.grade >= 3).length, imp = lrows.filter((r) => r.improve).length;
+    box.insertAdjacentHTML('beforeend', fcCardHtml());
     box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">주간 수행률</h4><span class="xp-sum">' + (lw ? esc(rpWkLabel(lw)) + ' (' + rpMd(lrows[0].from) + '~' + rpMd(lrows[0].to) + ') · 이력 ' + RP.totalWeeks + '주' : '아직 올린 자료가 없습니다') + '</span></div>' +
       (lw ? '<div class="rp-sum"><span>라우트<b>' + lrows.length + '</b></span><span>1등급<b>' + cnt(1) + '</b></span><span>2등급<b>' + cnt(2) + '</b></span><span class="' + (bad ? 'bad' : '') + '">3~4등급<b>' + bad + '</b></span><span class="' + (imp ? 'bad' : '') + '">개선 요청<b>' + imp + '</b></span>' +
         '<span>업로드<b>' + esc(String(lrows[0].uploadedAt || '').slice(0, 16)) + '</b></span></div>' : '') +
       '<div class="ptools">' +
         '<select class="inp" id="rpCamp" aria-label="캠프">' + opt('', '캠프 전체', RP.f.camp) + camps.map((c) => opt(c, c, RP.f.camp)).join('') + '</select>' +
-        '<select class="inp" id="rpMode" aria-label="보기">' + opt('', '전체', RP.f.mode) + opt('bad', '3~4등급만', RP.f.mode) + opt('imp', '개선 요청만', RP.f.mode) + opt('chg', '등급 바뀐 라우트', RP.f.mode) + '</select>' +
+        '<select class="inp" id="rpMode" aria-label="보기">' + opt('', '전체', RP.f.mode) + opt('bad', '3~4등급만', RP.f.mode) + opt('imp', '개선 요청만', RP.f.mode) + opt('chg', '등급 바뀐 라우트', RP.f.mode) + opt('fc', '예상에서 빠지는 라우트', RP.f.mode) + '</select>' +
         '<input class="inp" id="rpQ" placeholder="캠프·라우트 검색" value="' + esc(RP.f.q) + '" autocomplete="off" style="width:150px">' + '<label class="check" style="align-self:center"><input type="checkbox" id="rpEnded"' + (RP.f.ended ? ' checked' : '') + '> 종료 포함</label>' +
         '</div>' +
-      '<div class="table-wrap rt-table rp-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>최신 등급</th><th>추세 (8주)</th><th>개선 요청</th>' +
+      '<div class="table-wrap rt-table rp-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>최신 등급</th><th class="fch" title="지금 스케줄 기준 · 회전 수로 계산">이번 주 예상</th><th class="fch" title="지금 스케줄 기준 · 회전 수로 계산">다음 주 예상</th><th>추세 (8주)</th><th>개선 요청</th>' +
         wks.map((w) => '<th title="' + esc(w) + '">' + esc(rpWkLabel(w)) + '</th>').join('') + '</tr></thead><tbody id="rpRows"></tbody></table><div class="empty hidden" id="rpEmpty"></div></div>' +
       '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">등급: <span class="gr g1">1</span> <span class="gr g2">2</span> 95% 초과 · <span class="gr g3">3</span> <span class="gr g4">4</span> 95% 미만(위탁 조정 대상). 칸의 작은 숫자는 배송 수행률(%). 라우트를 누르면 전체 이력. 매주 쿠팡 파일을 [수행률 업로드]로 올리면 이력이 쌓입니다 (같은 주차는 덮어씀 · 한 주 시작은 일요일).</p></div>');
     rpRenderRows();
+  }
+  function fcCardHtml() {
+    const F = RP.fc;
+    if (!F) return '<div class="sec fc-card"><div class="xp-head"><h4 style="margin:0">스케줄 기준 예상</h4><span class="xp-sum">계산 중…</span></div></div>';
+    const md = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8));
+    const wk = (i, lab) => { const w = F.weeks[i]; return '<div class="fc-w' + (w.pct < 95 ? ' bad' : w.lost ? ' warn' : '') + '"><small>' + lab + ' · ' + md(w.from) + '~' + md(w.to) + '</small><b>' + w.pct + '%</b><span>' + (w.lost ? '빠지는 회전 ' + w.lost + ' / 계획 ' + w.plan.toLocaleString() + (w.pct < 50 ? ' · 스케줄이 아직 덜 채워진 주입니다' : '') : '빠지는 회전 없음 · 계획 ' + w.plan.toLocaleString()) + '</span></div>'; };
+    const list = (i) => { const l = (F.rows || []).filter((r) => r.w[i].lost).sort((a, b) => a.w[i].pct - b.w[i].pct || koSort(a.camp, b.camp) || koSort(a.code, b.code));
+      return l.length ? l.slice(0, 40).map((r) => '<span class="fc-r' + (r.w[i].pct < 95 ? ' bad' : '') + '" title="' + esc(r.w[i].days.join('\n')) + '"><b>' + esc(r.camp + ' ' + r.code) + '</b> ' + r.w[i].pct + '% <small>−' + r.w[i].lost + '회전</small></span>').join('') + (l.length > 40 ? '<span class="sub">외 ' + (l.length - 40) + '개 — 아래 표에서 [예상에서 빠지는 라우트]로 보기</span>' : '') : '<span class="sub">빠지는 라우트 없음</span>'; };
+    return '<div class="sec fc-card"><div class="xp-head"><h4 style="margin:0">스케줄 기준 예상</h4><span class="xp-sum">지금 기사스케줄대로 갔을 때 · 일~토 주차</span>' +
+      '<span class="grow" style="text-align:right"><a class="btn sm ghost" href="#" data-view="sched">기사스케줄에서 채우기</a></span></div>' +
+      '<div class="fc-ws">' + wk(0, '이번 주') + wk(1, '다음 주') + '</div>' +
+      '<div class="fc-l"><div><small>이번 주 빠지는 라우트</small><div class="fc-rs">' + list(0) + '</div></div><div><small>다음 주 빠지는 라우트</small><div class="fc-rs">' + list(1) + '</div></div></div>' +
+      '<p class="fc-note">쿠팡 수행률은 쿠팡이 주는 자료(아래 표)이고, 이 예상은 스케줄에서 아무도 안 들어가는 회전 수만 센 것입니다. 실제 수행률은 물량 기준이라 다를 수 있습니다. 수행률 보존 용차업체가 맡은 노선과 [물량 없음]으로 확정한 노선은 빠지는 것으로 세지 않습니다.</p></div>';
   }
   function rpRenderRows() {
     const tb = $('#rpRows'); if (!tb) return;
@@ -6715,6 +6748,7 @@
       const hk = rpKey(x.camp, x.code);
       return '<tr class="' + (l && l.improve ? 'imp' : l && l.grade >= 3 ? 'bad' : '') + '"><td>' + esc(x.camp) + '</td><td class="rc" data-rpc="' + esc(hk) + '"><b class="code">' + esc(x.code) + '</b>' + lnTail(hk) + lnEndTag(hk) + '</td>' +
         '<td>' + (l ? grBadge(l.grade) + (l.perf != null ? ' <small>' + l.perf + '%</small>' : '') + (l.stale ? ' <small class="sub" title="최신 주차 파일에 없는 라우트">(' + esc(l.wk) + ')</small>' : '') : '-') + '</td>' +
+        '<td class="fcc">' + fcCell(x.camp, x.code, 0) + '</td><td class="fcc">' + fcCell(x.camp, x.code, 1) + '</td>' +
         '<td>' + rpTrend(x.camp, x.code, 8) + '</td><td>' + (l && l.improve ? '<span class="gr-imp">개선 요청</span>' : '') + '</td>' +
         wks.map((w) => { const r = x.byWeek[w]; return '<td class="wkc">' + (r ? lnMark(r, hk) + grBadge(r.grade) + (r.perf != null ? '<small>' + r.perf + '%</small>' : '') : '<span class="sub">-</span>') + '</td>'; }).join('') + '</tr>';
     }).join('');
