@@ -66,6 +66,17 @@ function softFail_(label, e) {
   try { console.error(label + ': ' + msg); } catch (x) { /* 무시 */ }
   try { errLog_('연동 실패', (typeof _curFn !== 'undefined' && _curFn) || '', label + ': ' + msg); } catch (x) { /* 무시 */ }
 }
+/** 사본 만들기(1분 자동 작업)에 쓴 시간을 날짜별로 더한다 (스크립트 속성 FS_STAT · 최근 14일) — 자동 작업 하루 시간 한도에 가까운지 보기 위함. 절대 예외를 내지 않는다 */
+function fsStat_(ms) {
+  try {
+    const sp = PropertiesService.getScriptProperties(), day = todayText_();
+    let o = {}; try { o = JSON.parse(sp.getProperty('FS_STAT') || '{}') || {}; } catch (e) { o = {}; }
+    const d = o[day] || (o[day] = { n: 0, ms: 0, mx: 0 });
+    d.n++; d.ms += ms; d.mx = Math.max(d.mx, ms);
+    Object.keys(o).sort().slice(0, -14).forEach(function (k) { delete o[k]; });
+    sp.setProperty('FS_STAT', JSON.stringify(o));
+  } catch (e) { /* 무시 */ }
+}
 /** 푸시 전송 결과를 날짜별로 더한다 (스크립트 속성 PUSH_STAT · 최근 14일만) — 보냄 · 성공 · 없어진 기기 · 그 밖 실패. 절대 예외를 내지 않는다 */
 function pushStat_(tried, sent, dead) {
   try {
@@ -191,7 +202,14 @@ function maintMirror_() {
         o.n += n; o.rt += +r.rt || 0; o.srv += +r.srv || 0; o.mx = Math.max(o.mx, +r.rtMax || 0); if (str_(r.at) > o.last) o.last = str_(r.at);
       });
       const sl = Object.keys(sp).map(function (k) { const o = sp[k]; return [o.app, o.fn, o.n, Math.round(o.rt / o.n), o.mx, Math.round(o.srv / o.n), o.last]; }).filter(function (r) { return r[2] >= 3; }).sort(function (p, q) { return q[3] - p[3]; }).slice(0, 80);
-      put('maint_speed', ['앱', '기능', '횟수(7일)', '평균 왕복(ms)', '가장 느린 것(ms)', '평균 서버(ms)', '마지막'], sl);
+      // 단계별 시간 (st_기능_단계): 한 기능 안에서 어디가 오래 걸리는지
+      const stg = {};
+      readAll_(SH.PERF).forEach(function (r) {
+        const fn = str_(r.fn), n = +r.n || 0; if (!n || !/^st_/.test(fn)) return;
+        const o = stg[fn] || (stg[fn] = { n: 0, rt: 0, mx: 0 }); o.n += n; o.rt += +r.rt || 0; o.mx = Math.max(o.mx, +r.rtMax || 0);
+      });
+      const st = Object.keys(stg).sort().map(function (k) { const o = stg[k]; return ['단계', k.replace(/^st_/, ''), o.n, Math.round(o.rt / o.n), o.mx, '', '']; });
+      put('maint_speed', ['앱', '기능', '횟수(7일)', '평균 왕복(ms)', '가장 느린 것(ms)', '평균 서버(ms)', '마지막'], sl.concat(st.length ? [['', '', '', '', '', '', '']].concat(st) : []));
     } catch (e) { /* 속도 사본은 실패해도 됨 */ }
     // 자료 크기 · 한도 / 접속 버전 / 푸시 전송 결과
     try {
@@ -208,7 +226,9 @@ function maintMirror_() {
       const vr = Object.keys(ver).map(function (k) { const o = ver[k]; return [o.app, o.upd, o.n, o.last]; }).sort(function (p, q) { return p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : Number(q[1]) - Number(p[1]); });
       let ps = {}; try { ps = JSON.parse(PropertiesService.getScriptProperties().getProperty('PUSH_STAT') || '{}') || {}; } catch (e) { ps = {}; }
       const pr = Object.keys(ps).sort().reverse().map(function (d) { const x = ps[d]; return ['푸시 ' + d, '보냄 ' + x.t, '성공 ' + x.s, '없어진 기기 ' + x.d + ' · 실패 ' + x.f]; });
-      put('maint_versions', ['앱 (최근 24시간 접속 버전)', '업데이트 번호', '보고 줄 수', '마지막'], vr.concat([['', '', '', '']], pr));
+      let fst = {}; try { fst = JSON.parse(PropertiesService.getScriptProperties().getProperty('FS_STAT') || '{}') || {}; } catch (e) { fst = {}; }
+      const fr = Object.keys(fst).sort().reverse().map(function (d) { const x = fst[d]; return ['사본 만들기 ' + d, x.n + '번', '합계 ' + Math.round(x.ms / 1000) + '초', '가장 긴 것 ' + Math.round(x.mx / 1000) + '초']; });
+      put('maint_versions', ['앱 (최근 24시간 접속 버전)', '업데이트 번호', '보고 줄 수', '마지막'], vr.concat([['', '', '', '']], pr, [['', '', '', '']], fr));
     } catch (e) { /* 실패해도 됨 */ }
     return list.length;
   } catch (e) { try { console.error('유지보수 사본 실패: '  + (e && e.message)); } catch (x) { /* 무시 */ } return -1; }

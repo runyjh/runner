@@ -5430,10 +5430,12 @@ function adm_schOrder(token, list) {
  */
 function api_mySchedule(token, month) {
   return run_(function () {
+    stg_(); // 단계별 시간 (유지보수용 · 속도 기록에 st_mySchedule_단계 로 남음)
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
     if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    stg_('auth');
     let dates, ym = '';
     const mm = str_(month).match(/^(\d{4})-(\d{2})$/);
     if (mm) {
@@ -5461,6 +5463,7 @@ function api_mySchedule(token, month) {
         if (wk !== meO) out.workerName = wk.name;
       } else out.baseRoute = '';
     } catch (e) { try { const me0 = driverById_(String(s.d)); out.baseRoute = me0 ? str_(me0.baseRoute) : ''; } catch (e2) { out.baseRoute = ''; } }
+    stg_('drv');
     out.campRots = campRotMap_(); // '출근' 칸을 기본노선 코드로 보여 주기 위해
     // 노선 변경 예약 안내: '11/11부터 군포1캠프 212AB'
     try {
@@ -5469,8 +5472,10 @@ function api_mySchedule(token, month) {
       out.routeChanges = (rcByDriver_()[String(s.d)] || []).filter(function (c) { return c.status === RCS.WAIT || (c.date >= addDaysText_(t0, -7) && c.memo !== '바로 변경'); })
         .map(function (c) { return { date: c.date, camp: cn[c.toCampId] || c.toCamp, route: c.toRoute, fromCamp: cn[c.fromCampId] || c.fromCamp, fromRoute: c.fromRoute, done: c.status === RCS.DONE }; });
     } catch (e) { out.routeChanges = []; }
+    stg_('rc');
     // 품앗이: 내가 뛰는 일감(수행)·맡긴 일감(맡김)·지원 중인 일감
     try { out.pumasi = pmScheduleOf_(String(s.d), dates); } catch (e) { out.pumasi = {}; }
+    stg_('pm');
     const fsW = function (o) { return o; };
     if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return fsW(out);
     const h = schHeader_();
@@ -5487,6 +5492,7 @@ function api_mySchedule(token, month) {
       const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
       dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
     }
+    stg_('cell');
     // 추가 배정 캠프 줄: 그 캠프 칸에 적힌 것을 '캠프 노선' 으로 붙여 보여 줌 (예: 출근 → 강서1 527B)
     try {
       const me = driverById_(rowId), ex = me ? extraAssignOf_(me) : [];
@@ -5506,6 +5512,7 @@ function api_mySchedule(token, month) {
         });
       }
     } catch (e) { softFail_('추가 배정 줄 읽기 실패', e); }
+    stg_('ex');
     // 내 캠프에 들어오는 백업 (기사스케줄 '백업 명단' 과 같은 규칙) · 직함자(소속 = 운영자 가짜 캠프)는 백업 줄 대신 다른 직원 스케줄
     if (info.title && isStaffCamp_(info.camp)) {
       out.camp = ''; out.backup = {};
@@ -5516,8 +5523,10 @@ function api_mySchedule(token, month) {
         out.camp = bk.camp; out.backup = bk.list;
       } catch (e) { out.backup = {}; }
     }
+    stg_('bk');
     // 내가 올린 품앗이가 배차 확정되고, 그날 내 스케줄 칸의 캠프·라우트와 같으면 '배차확정 완료' 표시
     try { out.pmDone = pmDoneOf_(String(s.d), out.cells, info.camp || out.camp || ''); } catch (e) { out.pmDone = {}; }
+    stg_('pmDone');
     // 관리자가 기사스케줄 칸에 적은 지시사항 (스케줄 이슈 '지시')
     out.inst = {};
     try { schIssues_(dates[0], dates[dates.length - 1]).forEach(function (x) { if (x.kind === '지시' && x.driverId === rowId && x.reason) out.inst[x.date] = x.reason; }); } catch (e) { out.inst = {}; }
@@ -5551,6 +5560,7 @@ function schStaffOf_(myId, dates, h, c0, c1) {
  */
 function api_campSchedule(token, month, campId) {
   return run_(function () {
+    stg_();
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
@@ -5594,6 +5604,7 @@ function api_campSchedule(token, month, campId) {
     out.campId = myCampId;
     const campNameOf = function (cid) { const c = master_().camps.filter(function (x) { return x.id === cid; })[0]; return c ? String(c.name).replace(/\s*캠프\s*$/, '').trim() : ''; };
     out.camp = noHome ? '' : campNameOf(myCampId) || (me.schCamp || '');
+    stg_('drv');
     // 스케줄 시트는 한 번만 읽는다 (캠프가 여러 개여도)
     let h = null, sh = null, ids = [], block = [], c0 = 0, c1 = 0, hasSheet = false;
     if (props_().SCH_DB_ID && schSS_().getSheetByName(SCH.SHEET)) {
@@ -5608,10 +5619,12 @@ function api_campSchedule(token, month, campId) {
     }
     let issues = [];
     try { issues = schIssues_(dates[0], dates[dates.length - 1]); } catch (e) { issues = []; }
+    stg_('sheet');
     // 캠프 짧은 이름 → ID (칸 글자 '강서1 527B' 에서 캠프 찾기 · 긴 이름부터)
     const shortOf = {}; realCamps.forEach(function (c) { shortOf[String(c.name).replace(/\s*캠프\s*$/, '').replace(/\s+/g, '')] = c.id; });
     const shorts = Object.keys(shortOf).sort(function (a, b) { return b.length - a.length; });
     const campInCell = function (v) { const t = str_(v).replace(/\s+/g, ''); if (!t || /휴무|휴가|병가|미입차/.test(t)) return ''; for (var i = 0; i < shorts.length; i++) if (t.indexOf(shorts[i]) >= 0) return shortOf[shorts[i]]; return ''; };
+    stg_('camp');
     // 배차 확정 품앗이 (이 기간) → 캠프별 날짜 목록 · 내 달력 칸
     let pmJobs = [];
     try { const dset = {}; dates.forEach(function (d) { dset[d] = 1; }); pmJobs = pmData_().jobs.filter(function (j) { return j.status === PST.DONE && j.acceptedId && dset[j.date]; }); } catch (e) { pmJobs = []; }
@@ -5677,6 +5690,7 @@ function api_campSchedule(token, month, campId) {
     })() : buildCamp(myCampId, false);
     out.drivers = home.drivers; out.backup = home.backup; out.pm = home.pm;
     try { out.pumasi = pmScheduleOf_(String(me.id), dates); } catch (e) { out.pumasi = {}; }
+    stg_('build');
     // 백업 기사(기본노선 없음 · 직함자 캠프 선택 아님): 내 칸에 적힌 캠프가 소속과 다른 날은 그 캠프의 기사·백업을 같이 내려준다 → 앱에서 날짜마다 '그날 입차 캠프' 기준으로 보여 줌
     //  + 다른 캠프 품앗이를 받은 날(내 칸이 비었거나 휴무)은 그 캠프가 그날 입차 캠프 (고정 기사도)
     if (!pickCamp && hasSheet) {
