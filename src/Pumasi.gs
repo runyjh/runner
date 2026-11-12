@@ -1062,6 +1062,7 @@ function pmPushSend_(list) {
       }
       dead.forEach(function (d) { cache_().remove('pmt:' + d.driverId); });
     }
+    try { if (typeof pushStat_ === 'function') pushStat_(res.length, sent, dead.length); } catch (e) { /* 무시 */ } // 하루 단위 전송 결과 (유지보수용)
     return sent;
   } catch (e) {
     softFail_('푸시 전송 실패', e);

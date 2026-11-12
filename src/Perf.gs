@@ -52,7 +52,7 @@ function errLog_(kind, fn, msg, x) {
     if (c.get(ck)) return;
     c.put(ck, '1', 600);
     const cols = cols_(SH.ERR), sh = sheet_(SH.ERR);
-    if (sh.getLastRow() > (['안내', '연결 실패', '알림 상태'].indexOf(k) >= 0 ? 3000 : 5000)) return; // 참고 기록(안내·연결 실패·알림 상태)이 몰려도 진짜 오류 자리는 남긴다
+    if (sh.getLastRow() > (['안내', '연결 실패', '알림 상태', '동시 수정'].indexOf(k) >= 0 ? 3000 : 5000)) return; // 참고 기록(안내·연결 실패·알림 상태)이 몰려도 진짜 오류 자리는 남긴다
     const o = { at: nowText_(), app: str_(x.app).slice(0, 10) || '서버', kind: k, view: str_(x.view).slice(0, 40), fn: f, msg: m, upd: str_(x.upd).replace(/[^\d]/g, '').slice(0, 6), who: str_(x.who).slice(0, 40) };
     const a = new Array(cols.__w).fill('');
     Object.keys(o).forEach(function (key) { if (cols[key] !== undefined) a[cols[key]] = safeText_(o[key]); });
@@ -65,6 +65,49 @@ function softFail_(label, e) {
   const msg = String(e && e.message || e || '');
   try { console.error(label + ': ' + msg); } catch (x) { /* 무시 */ }
   try { errLog_('연동 실패', (typeof _curFn !== 'undefined' && _curFn) || '', label + ': ' + msg); } catch (x) { /* 무시 */ }
+}
+/** 푸시 전송 결과를 날짜별로 더한다 (스크립트 속성 PUSH_STAT · 최근 14일만) — 보냄 · 성공 · 없어진 기기 · 그 밖 실패. 절대 예외를 내지 않는다 */
+function pushStat_(tried, sent, dead) {
+  try {
+    const sp = PropertiesService.getScriptProperties(), day = todayText_();
+    let o = {}; try { o = JSON.parse(sp.getProperty('PUSH_STAT') || '{}') || {}; } catch (e) { o = {}; }
+    const d = o[day] || (o[day] = { t: 0, s: 0, d: 0, f: 0 });
+    d.t += tried; d.s += sent; d.d += dead; d.f += Math.max(0, tried - sent - dead);
+    Object.keys(o).sort().slice(0, -14).forEach(function (k) { delete o[k]; });
+    sp.setProperty('PUSH_STAT', JSON.stringify(o));
+  } catch (e) { /* 무시 */ }
+}
+/**
+ * 자료 크기 · 한도 (읽기만): 파일별 탭 크기 · 전체 칸 수(구글 시트 한도 1천만 칸) · 기록 탭 줄 수 · 스크립트 속성 크기(값 하나 9KB · 전체 500KB)
+ * → { rows: [[파일, 탭, 줄, 열, 칸]], warn: [글자], props: [[이름, 바이트]] }
+ */
+function sizeInfo_() {
+  const rows = [], warn = [], props = [];
+  const book = function (label, getter) {
+    try {
+      const b = getter(); if (!b) return;
+      let total = 0;
+      b.getSheets().forEach(function (sh) { const r = sh.getMaxRows(), c = sh.getMaxColumns(), used = sh.getLastRow(); total += r * c; rows.push([label, sh.getName(), used, c, r * c]); });
+      rows.push([label, '(합계)', '', '', total]);
+      if (total > 7000000) warn.push(label + ' 파일이 ' + Math.round(total / 100000) / 100 + '백만 칸입니다 (한도 1천만 칸의 ' + Math.round(total / 100000) + '%)');
+    } catch (e) { rows.push([label, '(읽지 못함)', '', '', String(e && e.message || e).slice(0, 80)]); }
+  };
+  book('메인 DB', function () { return ss_(); });
+  book('스케줄 DB', function () { return props_().SCH_DB_ID ? schSS_() : null; });
+  book('정산 DB', function () { return props_().STL_DB_ID && typeof stlSS_ === 'function' ? stlSS_() : null; });
+  try {
+    const el = sheet_(SH.ERR).getLastRow(), pl = sheet_(SH.PERF).getLastRow();
+    if (el > 4000) warn.push('오류 기록이 ' + el + '줄입니다 (5천 줄을 넘으면 더 적지 않음)');
+    if (pl > 25000) warn.push('속도 기록이 ' + pl + '줄입니다 (3만 줄을 넘으면 더 적지 않음)');
+  } catch (e) { /* 무시 */ }
+  try {
+    const all = PropertiesService.getScriptProperties().getProperties(); let sum = 0;
+    Object.keys(all).forEach(function (k) { const n = Utilities.newBlob(k + String(all[k])).getBytes().length; sum += n; props.push([k, n]); if (n > 8000) warn.push('설정 저장값 ' + k + ' 이(가) ' + n + '바이트입니다 (한 값 한도 9KB)'); });
+    props.sort(function (p, q) { return q[1] - p[1]; });
+    props.unshift(['(전체)', sum]);
+    if (sum > 400000) warn.push('설정 저장 공간을 ' + Math.round(sum / 1000) + 'KB 쓰고 있습니다 (한도 500KB)');
+  } catch (e) { /* 무시 */ }
+  return { rows: rows, warn: warn, props: props.slice(0, 15) };
 }
 /**
  * 자동 작업이 살아 있는지 (심장 박동): 새벽 작업(night) · 1분 사본 동기화(fs)의 마지막 실행 시각을 스크립트 속성 HB 에 적는다.
@@ -150,8 +193,25 @@ function maintMirror_() {
       const sl = Object.keys(sp).map(function (k) { const o = sp[k]; return [o.app, o.fn, o.n, Math.round(o.rt / o.n), o.mx, Math.round(o.srv / o.n), o.last]; }).filter(function (r) { return r[2] >= 3; }).sort(function (p, q) { return q[3] - p[3]; }).slice(0, 80);
       put('maint_speed', ['앱', '기능', '횟수(7일)', '평균 왕복(ms)', '가장 느린 것(ms)', '평균 서버(ms)', '마지막'], sl);
     } catch (e) { /* 속도 사본은 실패해도 됨 */ }
+    // 자료 크기 · 한도 / 접속 버전 / 푸시 전송 결과
+    try {
+      const sz = sizeInfo_();
+      put('maint_size', ['파일', '탭', '쓴 줄', '열', '칸 수'], sz.rows.concat([['', '', '', '', '']], sz.props.map(function (p) { return ['설정 저장값', p[0], '', '', p[1] + ' 바이트']; })));
+    } catch (e) { /* 실패해도 됨 */ }
+    try {
+      const d1 = Utilities.formatDate(new Date(Date.now() - 864e5), CFG.TZ, 'yyyy-MM-dd HH:mm:ss'), ver = {};
+      readAll_(SH.PERF).forEach(function (r) {
+        const at = str_(r.at); if (at < d1 || !str_(r.upd)) return;
+        const k = str_(r.app) + '|' + str_(r.upd), o = ver[k] || (ver[k] = { app: str_(r.app), upd: str_(r.upd), n: 0, last: '' });
+        o.n++; if (at > o.last) o.last = at;
+      });
+      const vr = Object.keys(ver).map(function (k) { const o = ver[k]; return [o.app, o.upd, o.n, o.last]; }).sort(function (p, q) { return p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : Number(q[1]) - Number(p[1]); });
+      let ps = {}; try { ps = JSON.parse(PropertiesService.getScriptProperties().getProperty('PUSH_STAT') || '{}') || {}; } catch (e) { ps = {}; }
+      const pr = Object.keys(ps).sort().reverse().map(function (d) { const x = ps[d]; return ['푸시 ' + d, '보냄 ' + x.t, '성공 ' + x.s, '없어진 기기 ' + x.d + ' · 실패 ' + x.f]; });
+      put('maint_versions', ['앱 (최근 24시간 접속 버전)', '업데이트 번호', '보고 줄 수', '마지막'], vr.concat([['', '', '', '']], pr));
+    } catch (e) { /* 실패해도 됨 */ }
     return list.length;
-  } catch (e) { try { console.error('유지보수 사본 실패: ' + (e && e.message)); } catch (x) { /* 무시 */ } return -1; }
+  } catch (e) { try { console.error('유지보수 사본 실패: '  + (e && e.message)); } catch (x) { /* 무시 */ } return -1; }
 }
 /** 관리자: 자료 점검을 지금 다시 하고 유지보수 사본도 새로 만든다 → { ok, check } */
 function adm_maintSync(token) {
@@ -334,12 +394,14 @@ function dataCheck_() {
   // ⑤ 어제 0시부터 지금까지 오류 기록 (종류별 건수)
   try {
     const y = Utilities.formatDate(new Date(Date.now() - 864e5), CFG.TZ, 'yyyy-MM-dd'), cnt = {};
-    readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y && ['알림 상태', '안내', '연결 실패'].indexOf(str_(r.kind)) < 0) { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
+    readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y && ['알림 상태', '안내', '연결 실패', '동시 수정'].indexOf(str_(r.kind)) < 0) { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
     add('err', '어제부터 기록된 오류', Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).map(function (k) { return k + ' ' + cnt[k] + '건'; }), '자세한 내용은 error_log 탭에 있습니다.');
   } catch (e) { /* 탭 없음 */ }
   // ⑥⑦⑧ 실제 자료로 하는 자체 검사 (운영 자료를 읽기만 함): 확정 품앗이 ↔ 칸 · 이슈 ↔ 칸 · 정산 계산이 끝까지 도는지
   try { dataCheckLive_(drivers, today).forEach(function (x) { add(x.k, x.label, x.list, x.hint); }); }
   catch (e) { add('live', '자체 검사를 끝내지 못함', [String(e && e.message || e).slice(0, 200)], '프로그램 쪽 문제입니다. 개발 쪽에 알려 주세요.'); }
+  // ⑫ 자료 크기 · 한도에 가까움
+  try { const sz = sizeInfo_(); add('size', '자료 크기가 한도에 가까움', sz.warn, '프로그램 쪽에서 정리가 필요합니다. 개발 쪽에 알려 주세요.'); } catch (e) { /* 무시 */ }
   const res = { at: nowText_(), items: items };
   appSetPut_('dataCheck', JSON.stringify(res), '매일 새벽 자료 점검 결과 (자동 · 지워도 다음 날 다시 만들어짐)');
   return res;
