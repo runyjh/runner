@@ -1066,6 +1066,9 @@
   .smb-card .btn { width: 100%; height: 44px; margin-top: 10px; justify-content: center; }
   #sMobBack { display: none; } html.m #sMobBack { display: flex; }
   .smb-more { position: relative; } .smb-more .smore-box { right: 0; }
+  .rz-all { margin-top: 28px; border: 1px solid #fecaca; border-radius: 12px; background: #fff; padding: 10px 14px; }
+  .rz-all summary { cursor: pointer; font-weight: 800; color: #b91c1c; } .rz-all summary small { font-weight: 600; color: var(--sub); margin-left: 8px; }
+  .rz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
   .schk { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; min-height: 30px; }
   .schk > small { font-weight: 800; color: var(--sub); font-size: 12px; }
   .schk .chip { display: inline-flex; gap: 6px; align-items: center; border-radius: 999px; padding: 5px 11px; font-weight: 800; font-size: 12.5px; background: #fff; border: 1px solid var(--line); cursor: pointer; white-space: nowrap; color: var(--ink); }
@@ -1436,7 +1439,6 @@
       <div class="tools">
         <input class="inp search" id="q" placeholder="이름, 아이디, 연락처, 차량 (여러 명은 콤마로: 전광성,이현모)">
         <button class="btn ghost" id="reloadBtn" title="시트의 최신 내용 불러오기">새로고침</button>
-        <button class="btn ghost danger-t" type="button" data-reset="drivers">데이터 초기화</button>
         <button class="btn" id="drvNew">+ 새 기사 등록</button>
       </div>
     </div>
@@ -1459,7 +1461,6 @@
       <div class="tools">
         <input class="inp search" id="acQ" placeholder="서비스명, 아이디, 담당자, 메모 검색" autocomplete="off">
         <select class="inp" id="acCamp" aria-label="캠프"></select>
-        <button class="btn ghost danger-t" type="button" data-reset="accounts">데이터 초기화</button>
         <button class="btn ghost" id="acCatEdit" title="분류 추가·이름 바꾸기·순서·삭제">분류 편집</button>
         <button class="btn ghost" id="acReload" title="시트의 최신 내용 불러오기">새로고침</button>
         <button class="btn" id="acNew">+ 새 계정</button>
@@ -1516,6 +1517,19 @@
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">메뉴 · 탭 · 화면 제목 · 설명서 글자를 직접 바꿉니다. <b>기능과 계산은 그대로</b>이고, 바꾼 문구를 비우면 기본 문구가 나옵니다. 화면에서 바로 고치려면 <b>✏️ 문구 편집 모드</b>를 켜세요.</p>
     <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="form">창 · 입력칸</button><button class="tab" data-uit="warn">경고 문구</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
     <div id="uiBody"></div>
+    <details class="rz-all" id="rzAll">
+      <summary>데이터 초기화 <small>화면별 자료를 모두 지웁니다 · 지우기 전에 복사본을 만들고, 확인 문구를 입력해야 실행됩니다</small></summary>
+      <div class="rz-grid">
+        <button class="btn ghost danger-t" type="button" data-reset="drivers">기사 정보관리</button>
+        <button class="btn ghost danger-t" type="button" data-reset="sched">기사스케줄</button>
+        <button class="btn ghost danger-t" type="button" data-reset="pumasi">품앗이</button>
+        <button class="btn ghost danger-t" type="button" data-reset="bib">배번호 관리</button>
+        <button class="btn ghost danger-t" type="button" data-reset="route">노선관리</button>
+        <button class="btn ghost danger-t" type="button" data-reset="memo">업무스케줄</button>
+        <button class="btn ghost danger-t" type="button" data-reset="notice">공지사항</button>
+        <button class="btn ghost danger-t" type="button" data-reset="accounts">계정관리</button>
+      </div>
+    </details>
    </section>
    <section id="view-einv" class="hidden">
     <div class="head">
@@ -1632,7 +1646,6 @@
     <div class="head">
       <h2>공지사항 <small id="ntCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
       <div class="tools">
-        <button class="btn ghost danger-t" type="button" data-reset="notice">데이터 초기화</button>
         <button class="btn ghost" id="ntReload" title="시트의 최신 내용 불러오기">새로고침</button>
         <button class="btn" id="ntNew">+ 새 공지</button>
       </div>
@@ -1656,7 +1669,6 @@
         <button class="btn ghost" id="paReload">새로고침</button>
         <button class="btn pmsw" id="paPostSw" type="button" title="기사 앱의 '품앗이 일감 올리기'(자유 등록)를 켜고 끕니다. 끄면 기사 앱에서 메뉴가 숨겨집니다">일감 올리기 <b>…</b></button>
         <button class="btn pmsw" id="paOfferSw" type="button" title="기사 앱의 '💌 일감 제안'(품앗이 · 일할 기사 찾기)을 켜고 끕니다">일감 제안 <b>…</b></button>
-        <button class="btn ghost danger-t" type="button" data-reset="pumasi">데이터 초기화</button>
       </div>
     </div>
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사 앱 품앗이에 올라온 일감입니다. 줄을 누르면 지원자·연락처를 보고 사무실에서 <b>배차 확정 · 확정 풀기 · 마감 · 취소</b>를 할 수 있습니다 (처리하면 기사님께 알림이 갑니다). 데이터는 러너 올인원 DB 의 <b>pumasi_jobs · pumasi_apps</b> 탭.</p>
@@ -1697,7 +1709,7 @@
    <section id="view-memo" class="hidden">
     <div class="head">
       <h2>업무스케줄</h2>
-      <div class="tools"><button class="btn ghost danger-t" type="button" data-reset="memo">데이터 초기화</button><button class="btn ghost" id="memoReload" title="시트의 최신 내용 불러오기">새로고침</button></div>
+      <div class="tools"><button class="btn ghost" id="memoReload" title="시트의 최신 내용 불러오기">새로고침</button></div>
     </div>
     <div class="late-bar hidden" id="lateBar"><span id="lateText"></span><button type="button" id="lateShow">보기</button></div>
     <div class="memo-wrap">
@@ -1731,7 +1743,6 @@
         <input class="inp search" id="bq" placeholder="이름, 차량번호 검색">
         <button class="btn ghost" id="coBtn">회사 정보</button>
         <button class="btn ghost" id="bibReload">새로고침</button>
-        <button class="btn ghost danger-t" type="button" data-reset="bib">데이터 초기화</button>
         <button class="btn" id="bibNew">새 신청서</button>
       </div>
     </div>
@@ -1773,8 +1784,6 @@
             <div class="smore-h">기존 스케줄 (병행 기간)</div>
             <button class="btn ghost" id="sLegPull" type="button" title="기존 운영시트의 스케쥴 탭(지금 보이는 2주)을 읽어 올인원 규칙으로 바꿔 가져옵니다 · 다른 칸만 반영 · 병행 기간용">⬇ 기존 스케줄 가져오기</button>
             <button class="btn ghost" id="sLegacy" type="button" title="기존 운영시트 스케줄 이식 파일(JSON)을 올려 기사스케줄 칸·비고·이슈를 한 번에 넣습니다">⬆ 기존 스케줄 이식</button><input type="file" id="sLegacyFile" accept=".json" class="hidden">
-            <div class="smore-h">주의</div>
-            <button class="btn ghost danger-t" type="button" data-reset="sched">데이터 초기화</button>
           </div></div>
       </div>
     </div>
@@ -1796,7 +1805,6 @@
         <button class="btn ghost" id="xpOpen" title="모든 캠프의 정산코드별 단가를 한 표로 봅니다">전체 단가표</button>
         <button class="btn ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button>
         <button class="btn ghost" id="rtReload">새로고침</button>
-        <button class="btn ghost danger-t" type="button" data-reset="route">데이터 초기화</button>
         <button class="btn" id="campNew">+ 캠프 추가</button>
       </div>
     </div>
@@ -7979,6 +7987,9 @@
           const flat = lines.join(' ').trim();
           if (!flat || flat.includes('비고')) return;
           if (/미입차/.test(flat)) { explicitMi.push({ baseCamp, defRt: base.routes }); return; }
+          // 업체가 적힌 용차 칸('용차 히어로'): 그 업체가 이 기사 담당 노선을 뛰므로 미입차 노선이 아님 (업체 미정 '용차'는 그대로 미입차 · 쿠팡 업로드 표는 서버 계산이라 그대로)
+          const mY = flat.match(/^용차\s+([^()\s][^()]*)/);
+          if (mY && defRt && !/백업|예비|용차/.test(defRt)) { addPresent(baseCamp, routeExpand(base.routes), base.rot ? normRot(base.rot) : defRotArr(baseCamp), 'v:' + mY[1].trim(), base.per); return; }
           let m = flat.match(/^([0-9A-Za-z,]+)\s+업무등록$/);
           if (m && routeExpand(m[1]).length) { addPresent(baseCamp, routeExpand(m[1]), defRotArr(baseCamp), r.key); return; }
           if (flat.includes('추가업무등록')) {
@@ -8862,7 +8873,7 @@
       return Array.from(m.entries()).map(([k, v]) => (v ? v.c + ' ' + SchedCalc.routeExpand(v.r.join(',')).sort().join(',') + v.t : k)); };
     let html = line('mi gtop', '미입차', '미입차 노선 (자동)', scalc.missing.map((l, i) => unMerge(l.filter((x) => campOk(x.split(' ')[0])).concat(unMi[i])).map((x) => esc(groupRoutes(x)).replace(/,/g, ',<wbr>')).join('<br>') + unVd[i].map((x) => '<div class="cc-sub" style="color:#5f3dc4">🚚 ' + esc(x) + ' 용차</div>').join('') + subLines(dates[i])));
     // 중복: 같은 캠프·회전·사람이면 노선을 묶어 한 줄로 (529A(D1) 홍·황 + 529B(D1) 홍·황 → 529AB(D1) 홍·황)
-    const nameOf = (k) => (SD.drivers.find((d) => d.id === String(k).split('~')[0]) || {}).name || k;
+    const nameOf = (k) => (/^v:/.test(String(k)) ? String(k).slice(2) + ' 용차' : (SD.drivers.find((d) => d.id === String(k).split('~')[0]) || {}).name || k);
     html += line('du', '중복', '같은 노선·회전 2명 이상', scalc.dups.map((l) => {
       const grp = new Map();
       l.filter((x) => campOk(x.camp)).forEach((x) => {
