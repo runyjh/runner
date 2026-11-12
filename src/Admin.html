@@ -981,12 +981,16 @@
   .sg td.f4 .ct { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 0 3px; margin-left: 2px; background: rgba(0,0,0,.07); vertical-align: 1px; }
   .sg td.f4 .rcb.mv { display: block; width: fit-content; max-width: 100%; white-space: normal; margin-top: 2px; color: #0b5cad; background: #e3efff; }
   .sg td.f2 { white-space: normal; }
+  /* 엑셀처럼 줄 높이 일정하게: 기사 줄은 모두 2줄 자리(윗줄 상태·노선 / 아랫줄 아이디) — 내용이 더 길 때만 그 줄이 늘어남 (글자는 자르지 않음) */
+  .sg tr.drv > td, .sg tr.unas > td { height: 44px; }
+  .sg td.f4 .rcb.mv { white-space: nowrap !important; font-size: 10px; line-height: 15px; padding: 0 4px; margin-top: 1px !important; }
+  .sg td.f2 .rcb { font-size: 10px; line-height: 15px; padding: 0 4px; }
   .sg tr.gtop td { border-top: 2px solid #c9d1da; }
   .sg tr.dim td { opacity: .55; }
   /* 마우스를 올린 칸의 줄: 위·아래 파란 선 + 옅은 파란 덮개 (칸 색·선택·중복 표시는 그대로) · 앞 고정 칸 파란 바탕 · 이름 왼쪽 파란 막대 · 그 날짜 머리글도 강조 */
   #sGrid > tbody:not(#sCalc) > tr:hover > td:not(.rcoff) { background-image: linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da), linear-gradient(rgba(27,100,218,.09), rgba(27,100,218,.09)) !important; background-size: 100% 2px, 100% 2px, 100% 100% !important; background-position: top, bottom, 0 0 !important; background-repeat: no-repeat !important; }
   #sGrid > tbody:not(#sCalc) > tr:hover > td.fx { background-color: #dce9ff !important; color: var(--ink); }
-  #sGrid > tbody:not(#sCalc) > tr:hover > td.fx.f2 { box-shadow: inset 4px 0 0 #1b64da; }
+  #sGrid > tbody:not(#sCalc) > tr:hover > td.fx.f2 { box-shadow: inset 5px 0 0 var(--cs, #1b64da); }
   #sGrid > tbody:not(#sCalc) > tr:hover .dname { color: var(--brand); }
   #sGrid > tbody:not(#sCalc) > tr.dim:hover td { opacity: .85; }
   #sGrid > tbody:not(#sCalc) > tr > td.c:not(.rcoff):hover { outline: 2px solid #1b64da; outline-offset: -2px; }
@@ -1033,10 +1037,11 @@
   .sg tr.calc.mi td.cc:not(:empty)::before { content: '⚠ '; color: #e5484d; font-weight: 800; } /* 미배정(미입차) 노선 칸 */
   .sg .campwarn { color: #e5484d; font-weight: 800; margin-left: 6px; cursor: help; font-size: 11px; font-style: normal; }
   /* 캠프 묶음 머리줄 · 줄 종류 꼬리표 · 점검 칩 (기사스케줄 디자인 규칙) */
-  .sg tr.cgrp td { background: #eef4ff !important; height: 26px; padding: 2px 8px; border-top: 2px solid #c7d7f5; }
+  .sg tr.cgrp td { background: var(--cb, #eef4ff) !important; height: 28px; padding: 2px 8px; border-top: 2px solid rgba(0,0,0,.08); }
   .sg tr.cgrp td.f2 { overflow: visible; white-space: nowrap; z-index: 3; } .sg tr.cgrp td.f4 { box-shadow: none; }
-  .sg tr.cgrp b { color: #1b4fc4; font-size: 12.5px; } .sg tr.cgrp span { color: var(--sub); font-size: 11px; font-weight: 600; margin-left: 6px; }
-  #sGrid > tbody > tr.cgrp:hover > td.fx { background-color: #eef4ff !important; box-shadow: none; }
+  .sg tr.cgrp b { color: var(--cf, #1b4fc4); font-size: 13px; } .sg tr.cgrp span { color: var(--cf, var(--sub)); opacity: .75; font-size: 11px; font-weight: 600; margin-left: 6px; }
+  .sg tr.drv > td.f2, .sg tr.unas > td.f2 { box-shadow: inset 5px 0 0 var(--cs, transparent); padding-left: 11px; } /* 캠프 색 막대 */
+  #sGrid > tbody > tr.cgrp:hover > td.fx { background-color: var(--cb, #eef4ff) !important; box-shadow: none; }
   .sg .albad { display: block; width: fit-content; border: 0; background: #ccfbf1; color: #0f766e; font-size: 10px; font-weight: 800; border-radius: 4px; padding: 0 5px; margin-top: 2px; cursor: pointer; white-space: nowrap; }
   .sg .rlab { font-style: normal; font-size: 10px; font-weight: 800; color: #8b95a1; background: rgba(0,0,0,.06); border-radius: 4px; padding: 0 4px; margin-right: 4px; }
   .sg.noauto #sCalc { display: none; }
@@ -1089,6 +1094,12 @@
   .sg th.dc.flash, .sg td.flash { animation: sflash 1.2s ease-out; } @keyframes sflash { 0% { box-shadow: inset 0 0 0 3px #f59e0b; } 100% { box-shadow: inset 0 0 0 0 transparent; } }
   /* 칸 정보 창 (공용) */
   #cellTip { position: fixed; z-index: 62; display: none; background: #fff; border: 1px solid #d5dbe3; border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 14px 16px; font-size: 13.5px; line-height: 1.6; color: #333d4b; min-width: 270px; max-width: 380px; pointer-events: none; }
+  #cellTip:has(.cc-memo) { max-width: 440px; min-width: 360px; padding: 0 0 12px; overflow: hidden; }
+  #cellTip .cc-memo { margin-bottom: 12px; } #cellTip .cc-memo ~ * { margin-left: 16px; margin-right: 16px; }
+  #cellTip .cc-mh { background: #fffbeb; border-bottom: 1px solid #fde68a; padding: 11px 16px; font-weight: 800; font-size: 14.5px; color: #92400e; display: flex; align-items: baseline; gap: 8px; }
+  #cellTip .cc-mh small { margin-left: auto; color: #64748b; font-weight: 600; font-size: 12.5px; }
+  #cellTip .cc-mb { padding: 14px 16px 6px; font-size: 17px; line-height: 1.6; font-weight: 600; color: #0f172a; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #cellTip .cc-mf { padding: 0 16px; font-size: 12.5px; color: #64748b; }
   #cellTip .cc-h { display: flex; align-items: baseline; gap: 8px; } #cellTip .cc-h b { font-size: 15.5px; color: var(--ink); } #cellTip .cc-h span { color: var(--sub); font-size: 13px; }
   #cellTip .cc-v { margin-top: 6px; font-size: 15px; font-weight: 700; color: var(--ink); white-space: pre-wrap; word-break: break-all; background: #f6f8fb; border-radius: 8px; padding: 6px 10px; }
   #cellTip .cc-sec { border-top: 1px solid #eef1f4; margin-top: 10px; padding-top: 9px; }
@@ -1303,7 +1314,7 @@
   .is-perf th { background: #fafbfd; color: var(--sub); font-weight: 700; font-size: 11.5px; } .is-perf td.l, .is-perf th.l { text-align: left; }
   .is-perf .bar { display: inline-block; width: 90px; height: 6px; border-radius: 3px; background: #eef1f4; vertical-align: middle; margin-right: 6px; position: relative; overflow: hidden; } .is-perf .bar em { position: absolute; left: 0; top: 0; bottom: 0; background: #12a150; }
   .is-perf .bad .bar em { background: #e5484d; } .is-perf .bad b { color: #c81e1e; }
-  .sg td.c.inst::after { content: ''; position: absolute; top: 0; right: 0; border-top: 9px solid #f59e0b; border-left: 9px solid transparent; }
+  .sg td.c.inst::after { content: '📌'; position: absolute; top: 1px; right: 2px; font-size: 11px; line-height: 1; } .sg tr.staff td.c.inst::after { content: '📅'; } /* 지시사항 / 직원 일정 메모 — 내용은 마우스를 올리면 큰 카드 */
   .offbtns { display: flex; gap: 4px; margin-bottom: 6px; }
   .offbtns button { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 700; color: var(--sub); }
   .offbtns button.on { background: #f08c8c; color: #fff; border-color: #f08c8c; }
@@ -8160,6 +8171,19 @@
     const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null;
     return (d.subIds || []).concat((main && main.subIds) || []).map((x) => String(x).toLowerCase());
   }
+  /** 캠프 띠 색상: 같은 캠프는 늘 같은 색 (캠프 ID 로 고름) → { bg(머리줄), fg(글자), bar(줄 왼쪽 막대) } · 직원은 보라 */
+  const CAMP_PAL = [['#dbeafe', '#1e40af', '#3b82f6'], ['#dcfce7', '#166534', '#22c55e'], ['#fef3c7', '#92400e', '#f59e0b'], ['#ffe4e6', '#9f1239', '#f43f5e'], ['#cffafe', '#155e75', '#06b6d4'], ['#fae8ff', '#86198f', '#d946ef'], ['#ecfccb', '#3f6212', '#84cc16'], ['#ffedd5', '#9a3412', '#f97316'], ['#e0e7ff', '#3730a3', '#6366f1'], ['#ccfbf1', '#115e59', '#14b8a6']];
+  const _campCol = {};
+  function campColor(campId, staff) {
+    if (staff) return ['#f3e8ff', '#6b21a8', '#a855f7'];
+    if (!campId) return ['#f1f3f6', '#475569', '#94a3b8'];
+    if (_campCol[campId]) return _campCol[campId];
+    // 캠프 목록(이름순)에서의 순서로 색을 돌려 쓴다 → 이웃한 캠프끼리 색이 겹치지 않음 · 목록에 없으면 ID 글자로
+    const list = SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => c.id), i = list.indexOf(campId);
+    let h = 0; if (i < 0) for (let k = 0; k < campId.length; k++) h = (h * 31 + campId.charCodeAt(k)) % 997;
+    return (_campCol[campId] = CAMP_PAL[(i >= 0 ? i : h) % CAMP_PAL.length]);
+  }
+  const campVars = (c) => ' style="--cb:' + c[0] + ';--cf:' + c[1] + ';--cs:' + c[2] + '"';
   /** 같은 근무자 연결: 다른 명의 아이디 → { name(명의자), worker(근무자 기사ID) } (SD.drivers 가 바뀔 때만 다시 만듦) */
   let _alSrc = null, _alMap = null;
   const aliasMap = () => { if (_alSrc !== SD.drivers) { _alSrc = SD.drivers; _alMap = new Map(); SD.drivers.forEach((d) => (d.alias || []).forEach((a) => _alMap.set(String(a.login).replace(/@.*/, '').toLowerCase(), { name: a.name, worker: d.id, id: a.id }))); } return _alMap; };
@@ -8251,7 +8275,7 @@
   }
   const yongText = (y) => '용차' + (y.vendor ? ' ' + y.vendor : '') + (y.vendor && y.id ? ' (' + y.id + ')' : '') + (y.vendor && !y.charge ? ' (청구없음)' : '');
   /** 칸 아래 메모 (지시사항 · 일정 메모): 본인이 기사 앱에서 확인하는 글 — 칸 상태(출근·휴무 …)는 규칙대로 두고 메모는 따로 보여 준다 */
-  const insHtml = (ins) => (ins && ins.reason ? '<i class="cv-ins">📌 ' + esc(ins.reason) + '</i>' : '');
+  const insHtml = () => ''; // 칸에는 아이콘만(.inst) — 내용은 마우스를 올리면 큰 카드로 (줄 높이를 일정하게)
   function cellHtml(v, row) {
     const s = String(v || '').trim();
     if (!s) return '';
@@ -8502,8 +8526,8 @@
       // 캠프 묶음 머리줄 (캠프 칸 대신): 캠프 이름 · 기사 수 · ⚠ 앞으로 비는 노선 칸 수
       const nDrv = firstOfCamp ? new Set(srows.filter((x) => x.kind === 'd' && !!x.staff === !!r.staff && (r.staff || x.camp === r.camp) && !x.d.ex).map((x) => x.row)).size : 0;
       const grpRow = !(r.staff ? (!ri || !srows[ri - 1].staff) : firstOfCamp) ? '' :
-        '<tr class="cgrp"><td class="fx f2"><b>' + (r.staff ? '직원' : esc(cs || '캠프 없음')) + '</b><span>기사 ' + nDrv + '</span>' + (miN ? '<em class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + miN + '개 · 위쪽 점검의 「미입차 노선」에서 날짜·노선 확인">⚠' + miN + '</em>' : '') + '</td><td class="fx f4"></td><td colspan="' + (dates.length + 5) + '"></td></tr>';
-      return grpRow + '<tr class="drv' + (r.staff ? ' staff' : '') + (d.status !== '승인' ? ' dim' : '') + '">' +
+        '<tr class="cgrp"' + campVars(campColor(d.campId, r.staff)) + '><td class="fx f2"><b>' + (r.staff ? '직원' : esc(cs || '캠프 없음')) + '</b><span>기사 ' + nDrv + '</span>' + (miN ? '<em class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + miN + '개 · 위쪽 점검의 「미입차 노선」에서 날짜·노선 확인">⚠' + miN + '</em>' : '') + '</td><td class="fx f4"></td><td colspan="' + (dates.length + 5) + '"></td></tr>';
+      return grpRow + '<tr class="drv' + (r.staff ? ' staff' : '') + (d.status !== '승인' ? ' dim' : '') + '"' + campVars(campColor(d.campId, r.staff)) + '>' +
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정' + (d.loginId ? ' · 아이디 ' + esc(d.loginId) : '') + '">' + esc(d.name) + '</button>' + (ttl ? '<span class="tbad t-' + esc(ttl) + '" style="width:auto;padding:0 5px">' + esc(ttl) + '</span>' : d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
           (d.ex ? '<span class="exbad" title="추가 배정 줄 (소속: ' + esc(((SD.drivers.find((x) => x.id === d.mainId) || {}).camp) || '-') + ') · 이 캠프 칸은 따로 입력">추가</span>' : '') + rcBadge(r) + (d.alias || []).map((a) => '<button type="button" class="albad" data-alun="' + esc(a.id) + '" title="' + esc(a.name) + ' 명의 아이디 ' + esc(a.login) + ' 도 이 줄에서 관리합니다 (같은 근무자) · 누르면 연결 풀기">＋' + esc(a.name) + ' 명의</button>').join('') + '</td>' +
         '<td class="fx f4" title="' + esc(d.baseRoute || '') + '">' + baseRouteHtml(r) + '</td>' +
@@ -8520,7 +8544,7 @@
     const unRows = (cid) => {
       if (!cid || unDone[cid] || !UN[cid] || !campOf[cid]) return '';
       unDone[cid] = 1;
-      return UN[cid].filter((code) => unShow(cid, code)).map((code) => '<tr class="unas"><td class="fx f2"><span class="unlab" title="' + esc(shortCamp(campOf[cid].name)) + ' — 노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f4">' + esc(code) + '</td>' +
+      return UN[cid].filter((code) => unShow(cid, code)).map((code) => '<tr class="unas"' + campVars(campColor(cid, false)) + '><td class="fx f2"><span class="unlab" title="' + esc(shortCamp(campOf[cid].name)) + ' — 노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f4">' + esc(code) + '</td>' +
         dates.map((dt, ci) => { const c = unCellInfo(cid, code, dt); return '<td class="uc ' + c.cls + (sepCol(ci) ? ' wk2' : '') + (dt === pddDate() ? ' today' : '') + '" data-ucid="' + esc(cid) + '" data-ucode="' + esc(code) + '" data-c="' + ci + '" title="눌러서 이 노선을 뛸 기사 배정">' + c.html + '</td>'; }).join('') + '<td class="ex" colspan="5"></td></tr>').join('');
     };
     const restUn = () => SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => unRows(c.id)).join('');
@@ -8831,7 +8855,7 @@
         (x.action ? '<div class="cc-k">조치 ' + esc(x.action) + '</div>' : '') + '</div>');
     });
     const ins = r.kind === 'd' ? instOf(r.row, dt) : null;
-    if (ins) secs.push('<div class="cc-sec"><div class="cc-t">📌 지시사항</div><div>' + esc(ins.reason) + '</div></div>');
+
     const scc = r.kind === 'd' ? subCell(v, r.row) : null;
     if (scc) secs.push('<div class="cc-sec"><div class="cc-t">🪪 서브아이디 업무등록</div><div>' + esc((ceSubName(scc.id) ? ceSubName(scc.id) + ' 아이디' : '서브아이디') + '(' + scc.id + ')로 ' + (scc.camp ? scc.camp + ' ' : '') + groupRoutes(scc.route.toUpperCase()) + ' 업무등록') + '</div></div>');
     const pl = pmTipList(r, dt);
@@ -8843,9 +8867,11 @@
     if (iss.length || dt < pddDate()) { /* 이슈가 있거나 PDD 이전이면 미배정 안내는 생략 */ } else if (mis) secs.push('<div class="cc-sec cc-warn">⚠ 미배정 노선 <b>' + esc(mis.join(', ')) + '</b> — 그날 아무도 안 뜀</div>');
     else if (noAssign(r, dt, v)) secs.push('<div class="cc-sec cc-warn">⚠ 배정 안 됨 — 출근·휴무 등을 입력해 주세요</div>');
     const longV = !!cellTipRaw(v);
-    if (!secs.length && !longV) return '';
+    if (!secs.length && !longV && !ins) return '';
     const who = r.kind === 'd' ? r.d.name : r.kind === 'p' ? r.p.name + ' · 품앗이 줄' : r.note ? r.note.label : '';
-    return '<div class="cc-h"><b>' + esc(who) + '</b><span>' + esc(md(dt)) + '</span></div>' + (v ? '<div class="cc-v">' + esc(v) + '</div>' : '') + secs.join('');
+    const memo = ins ? '<div class="cc-memo"><div class="cc-mh">' + (r.staff ? '📅 일정 메모' : '📌 지시사항') + '<small>' + esc(who) + ' · ' + esc(md(dt)) + '</small></div><div class="cc-mb">' + esc(ins.reason) + '</div>' +
+      ((ins.admin || ins.updatedAt || ins.createdAt) ? '<div class="cc-mf">' + (ins.admin ? '작성 ' + esc(ins.admin) : '') + (ins.updatedAt || ins.createdAt ? ' · ' + esc(String(ins.updatedAt || ins.createdAt).slice(5, 16)) : '') + '</div>' : '') + '</div>' : '';
+    return memo + '<div class="cc-h"><b>' + esc(who) + '</b><span>' + esc(md(dt)) + '</span></div>' + (v ? '<div class="cc-v">' + esc(v) + '</div>' : '') + secs.join('') + (ins ? '<div class="cc-sec" style="color:#94a3b8">더블클릭하면 고칠 수 있습니다</div>' : '');
   }
   (function () {
     let tip = null, curTd = null;
@@ -9052,7 +9078,7 @@
       const wkOf = (dt) => rows.filter((r) => (!r.seg || segIn(r.seg, dt)) && (isWorkDayCell(sget(r.row, dt)) || !!cellNorm(sget(r.row, dt), r.row) || (pmMark(r.row, dt) && /받음|◀/.test(pmLabel(r, dt, pmMark(r.row, dt)))))).length;
       html += '<div class="smb-pick"><select class="inp" id="smbCamp" aria-label="캠프">' + camps.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === sf.camp ? ' selected' : '') + '>' + esc(shortCamp(c.name)) + '</option>').join('') + '</select></div>' +
         '<div class="smb-cal">' + nav(cs) + '<div class="smb-sum">기사 ' + new Set(rows.filter((r) => !r.d.ex).map((r) => r.d.id)).size + '명 · 칸: 미입차 / 근무 인원 / 백업 인원</div>' +
-        grid((dt, i) => { const mi = miOf(i).length, w = wkOf(dt), b = bkOf(i).length; return (mi ? '<span class="mi">미입차 ' + mi + '</span>' : '') + '<span>근무 ' + w + '</span>' + (b ? '<span class="bk">백업 ' + b + '</span>' : ''); }) + '</div>';
+        grid((dt, i) => { const mi = miOf(i).length, w = wkOf(dt), b = bkOf(i).length; return (mi ? '<span class="mi">미입차 ' + mi + '</span>' : '') + '<span>근무 ' + w + '</span>' + (b ? '<span class="bk">백업 ' + b + '</span>' : '') + (rows.some((r) => instOf(r.row, dt)) ? '<span>📌</span>' : ''); }) + '</div>';
       const list = rows.filter((r) => !r.seg || segIn(r.seg, d));
       const UN = unassignedRoutes()[sf.camp] || [];
       html += dh(cs + ' · ' + mobMd(d)) + '<p class="smb-hint">실제 출근일 ' + prev + ' 저녁 입차 · 기사 ' + list.length + '명 · 근무 ' + wkOf(d) + '명 · 백업 ' + bkOf(di).length + '명</p>' +
@@ -9076,7 +9102,7 @@
         const cnt = { w: 0, o: 0, s: 0, m: 0, y: 0 };
         dates.forEach((dt) => { const r = mobRowFor(D.id, dt); if (!r) return; const v = sget(r.row, dt); if (!v) return; if (/^용차/.test(v)) cnt.y++; else if (/병가/.test(v)) cnt.s++; else if (/미입차|노쇼/.test(v)) cnt.m++; else if (/휴무|휴가/.test(v)) cnt.o++; else if (isWorkDayCell(v) || cellNorm(v, r.row)) cnt.w++; });
         html += '<div class="smb-cal">' + nav(D.name) + '<div class="smb-sum">근무 ' + cnt.w + '일 · 쉬는 날 ' + cnt.o + '일' + (cnt.s ? ' · 병가 ' + cnt.s + '일' : '') + (cnt.m ? ' · 미입차 ' + cnt.m + '일' : '') + (cnt.y ? ' · 용차 ' + cnt.y + '일' : '') + '</div>' +
-          grid((dt) => { const r = mobRowFor(D.id, dt); if (!r) return ''; const c = mobCell(r, dt); return '<span class="v ' + c.kind + '">' + esc(c.kind === 'none' ? '·' : c.top) + '</span>' + (c.sub && c.kind !== 'k-yong' ? '<span class="sb">서브</span>' : ''); }) + '</div>';
+          grid((dt) => { const r = mobRowFor(D.id, dt); if (!r) return ''; const c = mobCell(r, dt); return '<span class="v ' + c.kind + '">' + esc(c.kind === 'none' ? '·' : c.top) + '</span>' + (c.sub && c.kind !== 'k-yong' ? '<span class="sb">서브</span>' : '') + (instOf(r.row, dt) ? '<span>' + (r.staff ? '📅' : '📌') + '</span>' : ''); }) + '</div>';
         const r = mobRowFor(D.id, d);
         if (r) {
           const c = mobCell(r, d), base = D.baseRoute && /^\d/.test(D.baseRoute) ? groupRoutes(baseCodes(D)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
