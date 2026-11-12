@@ -5062,6 +5062,20 @@ function adm_schSave(token, changes) {
         });
       }
     } catch (e) { /* 품앗이 자료를 못 읽으면 그대로 저장 */ }
+    // 품앗이로 맡긴 날(배차 확정)에 맡긴 기사 본인 칸을 '출근'으로 바꾸는 것도 막는다 — 품앗이가 그대로 남아 두 사람이 같은 노선으로 잡히고 정산 연동도 남는다.
+    //  (화면에서는 '품앗이 취소하고 출근으로'를 먼저 거치므로, 여기 걸리는 것은 품앗이를 취소하지 않고 저장한 경우뿐)
+    try {
+      const cand = changes.filter(function (x) { return x.row.indexOf(SCH_PM_PREFIX) !== 0 && !/^NOTE\d+$/.test(x.row) && schWorkDay_(x.value, []) && !schWorkDay_(x.old, []); });
+      if (cand.length) {
+        const given = {};
+        pmData_().jobs.forEach(function (j) { if (j.status === PST.DONE && j.posterId && j.acceptedId) given[j.posterId + '|' + j.date] = 1; });
+        changes = changes.filter(function (x) {
+          if (cand.indexOf(x) < 0 || !given[x.row + '|' + x.date]) return true;
+          pmLocked.push({ row: x.row, date: x.date, current: String(x.old == null ? '' : x.old), given: true });
+          return false;
+        });
+      }
+    } catch (e) { /* 품앗이 자료를 못 읽으면 그대로 저장 */ }
     if (!changes.length) return { ok: true, saved: 0, conflicts: [], pmLocked: pmLocked };
     changes.forEach(function (x) {
       x.value = String(x.value == null ? '' : x.value).replace(/\r\n?/g, '\n').trim();

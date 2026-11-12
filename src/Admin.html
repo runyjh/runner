@@ -9728,7 +9728,7 @@
       }
       if (r.pmLocked && r.pmLocked.length) { // 서버가 막은 확정 품앗이 칸 → 확정 글자로 되돌림
         r.pmLocked.forEach((c) => { const k = c.row + '|' + c.date; sBase[k] = c.current; delete sPending[k]; (SD.cells[c.row] = SD.cells[c.row] || {})[c.date] = c.current; });
-        toast(PM_LOCK_MSG);
+        toast(r.pmLocked.some((c) => c.given) ? '품앗이로 맡긴 날입니다. 칸을 눌러 [품앗이 취소하고 출근으로]로 바꿔 주세요.' : PM_LOCK_MSG);
       }
       refreshAfterChange();
       if (r.issueSync) { try { isFromSchedSave(r.issueSync); refreshAfterChange(); } catch (e) { console.warn(e); } }
@@ -10063,7 +10063,7 @@
   }
   function ceOpen(r, dt, force) {
     const d = drvAt(r.d, dt), v = String(sget(r.row, dt) || '').trim(); // 그 날짜의 기본노선 (노선 변경 적용일 앞뒤가 다름)
-    const jobs = force ? [] : pmTipList(r, dt);
+    const jobs0 = pmTipList(r, dt), jobs = force ? [] : jobs0;
     const cur = instOf(String(r.row).split('~')[0], dt), ins0 = cur ? cur.reason : '';
     if (jobs.length) { CE = { mode: 'pm', r: r, dt: dt, d: d, did: String(r.row).split('~')[0], jobs: jobs, ins: ins0, ins0: ins0 }; return ceShow(); }
     const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null;
@@ -10080,9 +10080,30 @@
     const did = String(r.row).split('~')[0];
     const x0 = (CE_ISS.test(v) ? issOf(did, dt).find((x) => x.result === v) : n && n.mine && !n.whole ? issOf(did, dt).find((x) => x.result === '물량조율') : null) || null; // 이 칸에 붙어 있는 이슈
     const ik = x0 && x0.kind !== IS.unset ? x0.kind : '';
-    CE = { mode: 'cell', r: r, dt: dt, d: d, did: did, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv, touched: false, alt: '', ins: ins0, ins0: ins0, busy: false, yv: yg0 ? yg0.vendor : '', yid: yg0 ? yg0.id : '', ych: yg0 ? yg0.charge : true, yrun: !!(yg0 && yg0.id),
+    CE = { mode: 'cell', pmJobs: jobs0, r: r, dt: dt, d: d, did: did, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv, touched: false, alt: '', ins: ins0, ins0: ins0, busy: false, yv: yg0 ? yg0.vendor : '', yid: yg0 ? yg0.id : '', ych: yg0 ? yg0.charge : true, yrun: !!(yg0 && yg0.id),
       end: x0 && x0.date === dt ? (x0.end || dt) : dt, x0: x0, ik: ik, ir: x0 ? x0.reason || '' : '', isub: x0 ? x0.sub || '' : '', ik0: ik, ir0: x0 ? x0.reason || '' : '', isub0: x0 ? x0.sub || '' : '' };
     ceShow();
+  }
+  /** 이 칸의 기사가 '맡긴 쪽'인 품앗이인가 */
+  const ceGave = (t, c) => (t.fromId ? t.fromId === c.did : t.from === c.d.name) && (t.toId ? t.toId !== c.did : t.to !== c.d.name);
+  /** 품앗이 취소 → 맡긴 기사 칸을 출근으로 (순서대로: 취소가 되어야 칸을 바꾼다) */
+  function ceTakeBack(jobId, val) {
+    const c = CE; if (!c || c.busy) return;
+    const t = (c.jobs || c.pmJobs || []).find((x) => x.id === jobId); if (!t) return;
+    const v = val || '출근';
+    if (!confirm(ceMd(c.dt) + ' ' + (t.to || '받은 기사') + '에게 맡긴 품앗이를 취소하고, ' + c.d.name + ' 칸을 "' + v + '"(으)로 바꿉니다.\n\n· ' + (t.to || '받은 기사') + ' 품앗이 줄에서 이 노선이 빠집니다\n· 정산의 품앗이 지급·공제 연동이 풀립니다\n· 두 기사 앱에 취소 알림이 갑니다\n\n진행할까요?')) return;
+    c.busy = true;
+    const r = c.r, dt = c.dt, did = c.did;
+    api('adm_pmAction', jobId, 'cancel').then((q) => {
+      if (!q.ok) { c.busy = false; return toast(q.msg); }
+      // 화면의 품앗이 표시를 바로 걷어 낸다 (받은 기사 품앗이 줄 · 양쪽 꼬리표) → 그다음 칸 저장
+      [t.fromId || did, t.toId || ''].forEach((id) => { if (!id) return; const m = (SD.pmTips || {})[id]; if (m && m[dt]) { m[dt] = m[dt].filter((x) => x.id !== jobId); if (!m[dt].length) delete m[dt]; } const k = (SD.pmMarks || {})[id]; if (k && k[dt] && !((SD.pmTips || {})[id] || {})[dt]) delete k[dt]; });
+      if (t.toId && SD.cells['PM' + t.toId]) { delete SD.cells['PM' + t.toId][dt]; try { delete sBase['PM' + t.toId + '|' + dt]; } catch (e) {} }
+      ceClose(); setCells([{ row: r.row, date: dt, value: v }]);
+      toast('품앗이를 취소하고 ' + c.d.name + ' 칸을 ' + v + '(으)로 바꿨습니다.');
+      const wait = (n) => setTimeout(() => { if (Object.keys(sPending).length && n < 20) return wait(n + 1); if (currentView === 'sched') schedGo(SD.dates[0]); }, 700);
+      wait(0);
+    }).catch(() => { c.busy = false; });
   }
   function ceShow() { cePaint(); $('#ceModal').classList.remove('hidden'); try { const t = $('#cellTip'); if (t) t.style.display = 'none'; } catch (e) { /* 무시 */ } }
   function ceClose() { CE = null; $('#ceModal').classList.add('hidden'); const w = $('#sWrap'); if (w) w.focus({ preventScroll: true }); }
@@ -10135,8 +10156,10 @@
       $('#ceBody').innerHTML = '<h3 class="ce-h">🤝 품앗이 · ' + esc(c.d.name) + ' · ' + esc(ceMd(c.dt)) + '</h3><div class="ce-s">이 칸은 품앗이가 걸려 있어 품앗이 내용만 보여 줍니다.</div>' +
         c.jobs.map((t) => '<div class="ce-job"><div class="ce-kv"><span>맡긴 기사</span><b>' + esc(t.from || '-') + '</b></div><div class="ce-kv"><span>받은 기사</span><b>' + esc(t.to || '-') + '</b></div>' +
           '<div class="ce-kv"><span>노선</span><b>' + esc(([shortCamp(t.camp || ''), t.route].filter(Boolean).join(' ') || t.area || '-') + (t.kind ? ' · ' + t.kind : '') + (t.time ? ' · 입차 ' + t.time : '')) + '</b></div>' +
-          '<div style="text-align:right;margin-top:4px"><button type="button" class="btn sm ghost" data-cejob="' + esc(t.id) + '">품앗이 상세 열기 (취소·변경)</button></div></div>').join('') +
-        insRow + '<div class="ce-hint">출근·휴무로 바꾸려면 품앗이 상세에서 먼저 취소해 주세요.</div>' +
+          '<div style="text-align:right;margin-top:4px;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">' +
+          (ceGave(t, c) ? '<button type="button" class="btn sm" data-cetake="' + esc(t.id) + '">품앗이 취소하고 ' + esc(c.d.name) + ' 출근으로</button>' : '') +
+          '<button type="button" class="btn sm ghost" data-cejob="' + esc(t.id) + '">품앗이 상세 열기 (취소·변경)</button></div></div>').join('') +
+        insRow + '<div class="ce-hint">' + (c.jobs.some((t) => ceGave(t, c)) ? '맡긴 기사가 직접 뛰게 되면 [품앗이 취소하고 출근으로]를 누르세요 — 품앗이가 취소되고(받은 기사 줄 · 정산 연동 · 기사 앱에서 빠짐) 이 칸이 출근으로 바뀝니다. 칸만 출근으로 바꾸면 품앗이가 남아 두 사람이 겹칩니다.' : '출근·휴무로 바꾸려면 품앗이 상세에서 먼저 취소해 주세요.') + '</div>' +
         '<div class="m-actions"><button type="button" class="btn ghost" data-ceraw style="margin-right:auto">이 칸 값 바꾸기</button><button type="button" class="btn ghost" data-ceclose>닫기</button><button type="button" class="btn" data-cesave>저장</button></div>';
       return;
     }
@@ -10210,6 +10233,9 @@
     const ins = String(c.ins || '').trim(), insChg = ins !== String(c.ins0 || '').trim();
     if (c.mode === 'pm') { ceClose(); saveInst(c.did, c.dt, ins, c.ins0); return; }
     const val = ceValue(), alt = ceAltDrv(), issOn = ceIssOn();
+    // 품앗이로 맡긴 날인데 이 기사 칸을 출근(노선)으로 바꾸는 저장 → 품앗이를 같이 취소할지 먼저 묻는다 (칸만 바꾸면 두 사람이 겹침)
+    const gave = (c.pmJobs || []).find((t) => ceGave(t, c));
+    if (gave && val !== c.v0 && SchedCalc.isWorkDay(val, []) && !SchedCalc.isWorkDay(c.v0, [])) return ceTakeBack(gave.id, val);
     if (issOn && c.ik === '기타' && !c.ir.trim()) return toast('사유가 기타면 내용을 적어 주세요.');
     const issChg = issOn && (c.ik !== c.ik0 || c.ir.trim() !== c.ir0 || c.isub !== c.isub0 || !!alt);
     const multi = c.end > c.dt && c.st && c.st !== '출근';
@@ -10248,6 +10274,7 @@
     if (t.closest('[data-ceclose]')) return ceClose();
     if (t.closest('[data-cesave]')) return ceSave();
     const jb = t.closest('[data-cejob]'); if (jb) { const id = jb.dataset.cejob, ins = String(c.ins || '').trim(); ceClose(); saveInst(c.did, c.dt, ins, c.ins0); return openPumasi(id); }
+    const tk = t.closest('[data-cetake]'); if (tk) return ceTakeBack(tk.dataset.cetake);
     if (t.closest('[data-ceraw]')) { const r = c.r, dt = c.dt; return ceOpen(r, dt, true); }
     if (c.mode === 'multi') { // 여러 칸: 상태 · 용차 업체 · 차액 청구만
       const g = t.closest('[data-cegrp]'), x = t.closest('[data-cest]'), y = t.closest('[data-ceyv]');
