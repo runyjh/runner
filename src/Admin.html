@@ -10546,7 +10546,7 @@
     }
     if (!Object.keys(f).length && !rc && !redate) return $('#sdModal').classList.add('hidden');
     const b = $('#sdSave'); b.disabled = true;
-    const step1 = rc ? api('adm_rcSave', rc) : redate ? api('adm_rcSetDate', redate) : Promise.resolve(null);
+    const step1 = rc ? api('adm_rcSave', rc) : redate ? api('adm_rcSetDate', redate).then((r0) => (r0 && r0.need === 'merge' ? (confirm(r0.msg) ? api('adm_rcSetDate', Object.assign({ force: true }, redate)) : { ok: false, msg: '적용일을 바꾸지 않았습니다.' }) : r0)) : Promise.resolve(null);
     step1.then((rr) => {
       if (rr && !rr.ok) { toast(rr.msg); return; }
       return (Object.keys(f).length ? api('adm_updateDriver', d.id, f, null) : Promise.resolve({ ok: true })).then((r) => {

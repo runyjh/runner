@@ -7131,10 +7131,18 @@ function adm_rcSetDate(token, f) {
       const list = (rcByDriver_()[str_(f.driverId)] || []).filter(function (c) { return c.status === RCS.DONE; });
       const c = list[list.length - 1];
       if (!c) fail_('이 기사는 바뀐 캠프·노선 기록이 없습니다. 캠프·노선을 고르고 날짜를 넣어 주세요.');
-      const prev = list[list.length - 2];
-      if (prev && date <= prev.date) fail_('그 앞 변경(' + prev.date + ' ' + (prev.toCamp || '') + ' ' + (prev.toRoute || '') + ')보다 뒤 날짜여야 합니다.');
-      const old = c.date;
-      writeFields_(SH.RCHG, c._row, { date: date, memo: (c.memo ? c.memo + ' / ' : '') + '적용일 ' + old + ' → ' + date + ' 정정' });
+      // 새 적용일이 그 앞 변경들보다 앞이면: 그 사이 변경은 뜻이 없어지므로(그날부터 이미 지금 캠프·노선) 물어본 뒤 지우고 정정한다
+      const over = list.slice(0, -1).filter(function (x) { return x.date >= date; });
+      if (over.length && !f.force) {
+        return { ok: false, need: 'merge', msg: c.name + ' 기사님은 ' + date + ' 이후에 바뀐 기록이 ' + over.length + '건 더 있습니다.\n' +
+          over.map(function (x) { return ' · ' + x.date + ' → ' + ((x.toCamp || '') + ' ' + (x.toRoute || '')).trim(); }).join('\n') +
+          '\n\n이 기록을 지우고, ' + date + '부터 지금 캠프·노선(' + ((c.toCamp || '') + ' ' + (c.toRoute || '')).trim() + ')인 것으로 고칠까요?\n(기사스케줄 줄 나눔만 바뀝니다 · 칸 내용과 정산은 그대로)' };
+      }
+      const old = c.date, first = over[0];
+      over.forEach(function (x) { writeFields_(SH.RCHG, x._row, { status: RCS.OFF, memo: (x.memo ? x.memo + ' / ' : '') + '적용일 정정(' + date + ')으로 지움' }); });
+      const fix = { date: date, memo: (c.memo ? c.memo + ' / ' : '') + '적용일 ' + old + ' → ' + date + ' 정정' + (over.length ? ' (사이 변경 ' + over.length + '건 지움)' : '') };
+      if (first) ['fromCampId', 'fromCamp', 'fromRoute'].forEach(function (k) { if (first[k] !== undefined) { fix[k] = first[k]; c[k] = first[k]; } }); // 지운 변경의 '이전 캠프·노선'을 이어받는다
+      writeFields_(SH.RCHG, c._row, fix);
       rcTouch_();
       logAdmin_(a, '노선 변경 적용일 정정', c.name + ' (' + c.driverId + ')', old + ' → ' + date + ' · ' + (c.fromCamp || '') + ' ' + (c.fromRoute || '') + ' → ' + (c.toCamp || '') + ' ' + (c.toRoute || ''));
       return { ok: true, change: rcView_(Object.assign({}, c, { date: date }), rcCampNames_()), old: old };
