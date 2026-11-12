@@ -7374,7 +7374,9 @@
       toast('피크 예상 물량을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged + (push ? ' · 알림 ' + (r.pushed || 0) + '건' : '') + (r.memo ? ' · 업무스케줄에 메모' : ''));
       await loadPk(true, ym); loadPkm(true);
       RP.tab = 'pk'; if (currentView !== 'perf') switchView('perf'); else rpRender();
-    } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
+    } catch (e) { // 응답만 끊기고 저장은 됐을 수 있음 → 실제 저장된 내용을 다시 읽어 보여 준다
+      try { await loadPk(true, ym); loadPkm(true); if (PK.periods.some((p) => p.period === ym)) { $('#rpUpModal').classList.add('hidden'); rpUp = null; RP.tab = 'pk'; rpRender(); toast('응답이 끊겼지만 저장은 되어 있습니다. 아래 표를 확인해 주세요.'); } } catch (x) { /* 그대로 둠 */ }
+    } finally { b.disabled = false; b.textContent = '저장'; }
   }
   function pkRender(box) {
     if (!PK.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); loadPk(); return; }

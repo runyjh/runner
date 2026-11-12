@@ -1329,7 +1329,7 @@
       if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest('section.view.on')) return;
       if (overlayOpen()) return;
       const f = {
-        home: () => { loadNotices(true); if (window.bdRecent) window.bdRecent(); },
+        home: () => { loadNotices(true); if (window.bdRecent) window.bdRecent(); try { loadPeakHome(); } catch (e) { /* 무시 */ } },
         notice: () => loadNotices(true), sched: () => loadSched(), pumasi: () => loadPmList(), pmdetail: () => loadPmDetail(), pmmine: () => loadPmMine(),
         mypage: () => openMyPage(), settle: () => { const m = $('#slMonth').value; if (m) loadSlip(m); else openSettle(); },
         board: () => { if (bdPage === 0) loadBoard(false); }, bdpost: () => loadBdPost(true)
@@ -1889,7 +1889,7 @@
           return;
         }
         if (r.campRots) CAMP_ROTS = r.campRots;
-        if (!PEAK) loadPeak().then((P) => { if (P && !stale() && curView === 'sched' && scMode === 'camp' && scCamp && scCamp.dates.some(peakIn)) { const y = window.scrollY; renderCampSched(); window.scrollTo(0, y); } });
+        const sg = peakSig(); loadPeak().then(() => { if (peakSig() !== sg && !stale() && curView === 'sched' && scMode === 'camp' && scCamp) { const y = window.scrollY; renderCampSched(); window.scrollTo(0, y); } });
         scCamp = r; if (!scCampDay || !r.dates.includes(scCampDay)) scCampDay = r.dates.includes(pddOf(r.today)) ? pddOf(r.today) : r.dates[0];
         renderCampSched();
       }).catch(() => { if (stale()) return; $('#scBody').innerHTML = scFailBox('인터넷 연결을 확인해 주세요.'); netErr(); });
@@ -1905,7 +1905,7 @@
         else $('#scBody').innerHTML = scFailBox(r.msg);
         return;
       }
-      if (mode === 'month') { renderMonth(r); if (!PEAK) loadPeak().then((P) => { if (P && !stale() && curView === 'sched' && scMode === 'month' && r.dates.some(peakIn)) { const y = window.scrollY; renderMonth(r); window.scrollTo(0, y); } }); return; }
+      if (mode === 'month') { renderMonth(r); const sg = peakSig(); loadPeak().then(() => { if (peakSig() !== sg && !stale() && curView === 'sched' && scMode === 'month') { const y = window.scrollY; renderMonth(r); window.scrollTo(0, y); } }); return; }
       // PDD(배송 예정일) = 오늘 기준 내일 → 파란색 강조
       const week = (list, title, cls, tag) => '<div class="wk"><h3>' + title + '<small class="' + cls + '">' + tag + '</small></h3>' + list.map((d) => dayRow(r, d)).join('') + '</div>';
       $('#scBody').innerHTML = rcNote(r) + week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
@@ -1990,14 +1990,14 @@
         ((rows + pmRows) || '<div style="color:var(--sub);padding:10px 0">우리 캠프 기사가 없습니다.</div>') + '</div>' +
       '<div class="wk"><h3>' + escH(D.camp) + ' 백업 스케줄<small class="fix">' + bk.length + '명</small></h3><div class="cbk">' +
         (bk.length ? bk.map((x) => '<div>' + escH(x) + '</div>').join('') : '<span style="color:#b0b8c1">이 날 들어오는 백업이 없습니다.</span>') + '</div></div>' +
-      '<div id="riBox"></div>' + ctHtml(D);
+      '<div id="riBox"></div>' + ctHtml(D, scCampDay);
     const myCell = me ? me.cells[d] || '' : '', myPc = myCell ? schParse(myCell, me.route || '') : (me && me.route ? schParse(me.route, '') : null);
     riShow(D.campId || r.campId, D.camp, (myPc && myPc.codes) || []);
   }
   /** 내 캠프 → 노선 정보 밑: 이 캠프 소속 기사들의 쿠팡 아이디 · 연락처 (전화번호를 누르면 바로 전화) */
   let CT_FOLD = true; // 기사 연락처도 앱을 열 때마다 접힌 채로 시작
-  function ctHtml(D) {
-    const ds = (D.drivers || []).filter((x) => !x.guest);
+  function ctHtml(D, day) {
+    const ds = (D.drivers || []).filter((x) => !x.guest && !(day && x.off && x.off[day])); // 고른 날짜에 이 캠프 소속인 기사만 (그날 이미 다른 캠프로 옮긴 기사는 뺌)
     return '<div class="wk ri ct' + (CT_FOLD ? ' fold' : '') + '"><h3 class="rih" data-ctfold role="button" aria-expanded="' + !CT_FOLD + '"><span>📇 ' + escH(D.camp) + ' 기사 연락처<i class="chev">▾</i></span><small class="fix">' + ds.length + '명' + (CT_FOLD ? ' · 펼치기' : '') + '</small></h3>' +
       (ds.length ? ds.map((x) => '<div class="ctr' + (x.me ? ' me' : '') + '"><div class="nm"><b>' + escH(x.name) + (x.me ? ' <small>(나)</small>' : '') + '</b>' +
         '<span>' + (x.loginId ? escH(x.loginId) : '<i>아이디 없음</i>') + ((x.subIds || []).length ? '<em>서브 ' + escH(x.subIds.join(', ')) + '</em>' : '') + '</span></div>' +
@@ -2185,10 +2185,11 @@
     const token = store.get(TOKEN); if (!token) return Promise.resolve(null);
     if (peakP && peakTok === token) return peakP;
     peakTok = token;
-    const p = api('api_myPeak', token).then((r) => { PEAK = r && r.ok && r.on ? r : null; setTimeout(() => { if (peakP === p) peakP = null; }, 60000); return PEAK; }).catch(() => { if (peakP === p) peakP = null; return PEAK; });
+    const p = api('api_myPeak', token).then((r) => { PEAK = r && r.ok && r.on ? r : null; if (peakP === p) peakP = null; return PEAK; }).catch(() => { if (peakP === p) peakP = null; return PEAK; }); // 다시 부르면 새로 확인 (15초 안은 받아 둔 값)
     return (peakP = p);
   }
   window.peakReset = () => { PEAK = null; peakP = null; peakTok = ''; };
+  const peakSig = () => (PEAK ? JSON.stringify(PEAK.periods || []) + '|' + JSON.stringify(PEAK.q || {}).length + '|' + JSON.stringify(PEAK.avg || {}).length : '');
   const peakIn = (d) => !!PEAK && (PEAK.periods || []).some((p) => d >= p.from && d <= p.to);
   /** 그날 내가 타는 노선의 예상 물량 [{ camp, code, qty, avg, pct }] — 스케줄 칸(출근 = 담당 노선) + 품앗이로 받은 노선 − 품앗이로 맡긴 노선 */
   function peakOfDay(r, d) {
