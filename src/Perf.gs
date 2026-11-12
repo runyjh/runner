@@ -52,7 +52,7 @@ function errLog_(kind, fn, msg, x) {
     if (c.get(ck)) return;
     c.put(ck, '1', 600);
     const cols = cols_(SH.ERR), sh = sheet_(SH.ERR);
-    if (sh.getLastRow() > 5000) return;
+    if (sh.getLastRow() > (['안내', '연결 실패', '알림 상태'].indexOf(k) >= 0 ? 3000 : 5000)) return; // 참고 기록(안내·연결 실패·알림 상태)이 몰려도 진짜 오류 자리는 남긴다
     const o = { at: nowText_(), app: str_(x.app).slice(0, 10) || '서버', kind: k, view: str_(x.view).slice(0, 40), fn: f, msg: m, upd: str_(x.upd).replace(/[^\d]/g, '').slice(0, 6), who: str_(x.who).slice(0, 40) };
     const a = new Array(cols.__w).fill('');
     Object.keys(o).forEach(function (key) { if (cols[key] !== undefined) a[cols[key]] = safeText_(o[key]); });
@@ -65,6 +65,47 @@ function softFail_(label, e) {
   const msg = String(e && e.message || e || '');
   try { console.error(label + ': ' + msg); } catch (x) { /* 무시 */ }
   try { errLog_('연동 실패', (typeof _curFn !== 'undefined' && _curFn) || '', label + ': ' + msg); } catch (x) { /* 무시 */ }
+}
+/**
+ * 자동 작업이 살아 있는지 (심장 박동): 새벽 작업(night) · 1분 사본 동기화(fs)의 마지막 실행 시각을 스크립트 속성 HB 에 적는다.
+ *  fs 는 1분마다 도므로 15분에 한 번만 적는다. 절대 예외를 내지 않는다.
+ */
+function hbMark_(key) {
+  try {
+    if (key === 'fs') { const c = cache_(); if (c.get('hb:fs')) return; c.put('hb:fs', '1', 900); }
+    const sp = PropertiesService.getScriptProperties();
+    let o = {}; try { o = JSON.parse(sp.getProperty('HB') || '{}') || {}; } catch (e) { o = {}; }
+    o[key] = Date.now();
+    sp.setProperty('HB', JSON.stringify(o));
+  } catch (e) { /* 무시 */ }
+}
+/** 멈춘 자동 작업 → 자료 점검 항목 모양 [{ k, label, n, list, hint }] (정상이면 빈 목록) · info = true 면 마지막 실행 시각도 돌려줌 */
+function hbItems_(info) {
+  const out = [], rows = [];
+  try {
+    let o = {}; try { o = JSON.parse(PropertiesService.getScriptProperties().getProperty('HB') || '{}') || {}; } catch (e) { o = {}; }
+    const now = Date.now(), ago = function (ms) { const h = (now - ms) / 3600000; return h < 1 ? Math.round(h * 60) + '분 전' : h < 48 ? Math.round(h) + '시간 전' : Math.round(h / 24) + '일 전'; };
+    const fsOn = typeof fsCfg_ === 'function' && !!fsCfg_();
+    const bad = [];
+    if (o.night) { rows.push('새벽 작업(자료 점검 · 예약 적용 · 기록 정리): ' + msText_(o.night) + ' (' + ago(o.night) + ')'); if (now - o.night > 30 * 3600000) bad.push('새벽 작업이 ' + ago(o.night) + ' 이후로 돌지 않았습니다 (매일 새벽 4시)'); }
+    else rows.push('새벽 작업: 아직 기록 없음 (다음 새벽부터 기록)');
+    if (fsOn) {
+      if (o.fs) { rows.push('사본 동기화(1분마다): ' + msText_(o.fs) + ' (' + ago(o.fs) + ')'); if (now - o.fs > 3600000) bad.push('사본 동기화가 ' + ago(o.fs) + ' 이후로 돌지 않았습니다 (실시간 반영 · 빠른 화면이 멈춤)'); }
+      else rows.push('사본 동기화: 아직 기록 없음');
+    }
+    if (bad.length) out.push({ k: 'hb', label: '자동 작업이 멈췄습니다', n: bad.length, list: bad, hint: '프로그램 쪽 문제입니다. 개발 쪽에 알려 주세요. (Apps Script 트리거 확인)' });
+  } catch (e) { /* 무시 */ }
+  return info ? { items: out, rows: rows } : out;
+}
+/** 대시보드에 보일 자료 점검 결과 = 새벽에 적어 둔 결과 + 지금 확인한 '자동 작업 멈춤' */
+function dataCheckView_() {
+  let check = null;
+  try { check = JSON.parse(appSet_().dataCheck || 'null'); } catch (e) { check = null; }
+  try {
+    const hb = hbItems_();
+    if (hb.length) { check = check || { at: nowText_(), items: [] }; check.items = hb.concat((check.items || []).filter(function (x) { return x.k !== 'hb'; })); }
+  } catch (e) { /* 무시 */ }
+  return check;
 }
 /**
  * 유지보수용 사본: 오류 기록(최근 14일 · 같은 오류는 한 줄로 묶음)과 자료 점검 결과를 스케줄 DB 의 maint_errors · maint_check 탭에 적는다.
@@ -96,7 +137,19 @@ function maintMirror_() {
     const rows = [];
     (dc.items || []).forEach(function (x) { (x.list && x.list.length ? x.list : ['']).forEach(function (t, i) { rows.push([i ? '' : str_(dc.at), i ? '' : x.k, i ? '' : x.label, i ? '' : x.n, safeText_(t), i ? '' : x.hint || '']); }); });
     if (!rows.length) rows.push([str_(dc.at), '', '이상 없음', 0, '', '']);
+    try { const hb = hbItems_(true); hb.items.forEach(function (x) { x.list.forEach(function (t, i) { rows.unshift([i ? '' : now, i ? '' : x.k, i ? '' : x.label, i ? '' : x.n, t, i ? '' : x.hint]); }); }); hb.rows.forEach(function (t) { rows.push([now, 'hbinfo', '자동 작업 마지막 실행', '', t, '']); }); } catch (e) { /* 무시 */ }
     put('maint_check', ['확인 시각', '열쇠', '항목', '건수', '내용', '안내'], rows);
+    // 속도: 최근 7일 기능별 (횟수 · 평균 왕복 · 가장 느린 것 · 평균 서버 시간) — 느려지는 기능을 끊기기 전에 본다
+    try {
+      const sp = {};
+      readAll_(SH.PERF).forEach(function (r) {
+        const fn = str_(r.fn), n = +r.n || 0; if (!fn || !n || /^st_/.test(fn)) return;
+        const k = str_(r.app) + '|' + fn, o = sp[k] || (sp[k] = { app: str_(r.app), fn: fn, n: 0, rt: 0, mx: 0, srv: 0, last: '' });
+        o.n += n; o.rt += +r.rt || 0; o.srv += +r.srv || 0; o.mx = Math.max(o.mx, +r.rtMax || 0); if (str_(r.at) > o.last) o.last = str_(r.at);
+      });
+      const sl = Object.keys(sp).map(function (k) { const o = sp[k]; return [o.app, o.fn, o.n, Math.round(o.rt / o.n), o.mx, Math.round(o.srv / o.n), o.last]; }).filter(function (r) { return r[2] >= 3; }).sort(function (p, q) { return q[3] - p[3]; }).slice(0, 80);
+      put('maint_speed', ['앱', '기능', '횟수(7일)', '평균 왕복(ms)', '가장 느린 것(ms)', '평균 서버(ms)', '마지막'], sl);
+    } catch (e) { /* 속도 사본은 실패해도 됨 */ }
     return list.length;
   } catch (e) { try { console.error('유지보수 사본 실패: ' + (e && e.message)); } catch (x) { /* 무시 */ } return -1; }
 }
@@ -104,9 +157,9 @@ function maintMirror_() {
 function adm_maintSync(token) {
   return run_(function () {
     requireAdmin_(token);
-    const res = dataCheck_();
+    dataCheck_();
     const n = maintMirror_();
-    return { ok: true, check: res, mirrored: n };
+    return { ok: true, check: dataCheckView_(), mirrored: n };
   });
 }
 
@@ -211,7 +264,7 @@ function dataCheckLive_(drivers, today) {
 /** 화면이 보낸 오류 목록 [{ k: 종류, v: 화면, f: 함수, m: 내용, u: 업데이트 }] (한 번에 10건까지) */
 function errRows_(errs, app, who) {
   if (!Array.isArray(errs)) return;
-  const KIND = { client: '화면 오류', timeout: '시간 초과', badresp: '응답 오류', pushdiag: '알림 상태' };
+  const KIND = { client: '화면 오류', timeout: '시간 초과', badresp: '응답 오류', pushdiag: '알림 상태', net: '연결 실패' };
   errs.slice(0, 10).forEach(function (e) { if (e && KIND[e.k]) errLog_(KIND[e.k], e.f, e.m, { app: app, view: e.v, upd: e.u, who: who }); });
 }
 /**
@@ -281,7 +334,7 @@ function dataCheck_() {
   // ⑤ 어제 0시부터 지금까지 오류 기록 (종류별 건수)
   try {
     const y = Utilities.formatDate(new Date(Date.now() - 864e5), CFG.TZ, 'yyyy-MM-dd'), cnt = {};
-    readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y && str_(r.kind) !== '알림 상태') { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
+    readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y && ['알림 상태', '안내', '연결 실패'].indexOf(str_(r.kind)) < 0) { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
     add('err', '어제부터 기록된 오류', Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).map(function (k) { return k + ' ' + cnt[k] + '건'; }), '자세한 내용은 error_log 탭에 있습니다.');
   } catch (e) { /* 탭 없음 */ }
   // ⑥⑦⑧ 실제 자료로 하는 자체 검사 (운영 자료를 읽기만 함): 확정 품앗이 ↔ 칸 · 이슈 ↔ 칸 · 정산 계산이 끝까지 도는지
