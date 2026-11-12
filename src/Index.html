@@ -601,6 +601,11 @@
     color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; opacity: 0; transition: .2s; pointer-events: none;
     max-width: calc(100% - 32px); text-align: center; z-index: 50; }
   .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* 스케줄·품앗이가 바뀌었을 때 아래쪽 안내 + [새로 보기] */
+  .rf-note { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translate(-50%, 90px); z-index: 88; display: flex; align-items: center; gap: 8px; background: #191f28; color: #fff; font-size: 14px; font-weight: 600; padding: 8px 8px 8px 16px; border-radius: 999px; box-shadow: 0 8px 22px rgba(0,0,0,.25); opacity: 0; transition: transform .25s ease, opacity .25s ease; white-space: nowrap; pointer-events: none; }
+  .rf-note.on { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .rf-note button { border: 0; border-radius: 999px; font: inherit; font-weight: 700; padding: 7px 13px; cursor: pointer; background: #3182f6; color: #fff; }
+  .rf-note button[data-rf="x"] { background: transparent; color: #b0b8c1; padding: 7px 9px; }
   .busy { position: fixed; inset: 0; z-index: 70; display: none; cursor: progress; background: transparent; align-items: center; justify-content: center; }
   .busy.on { display: flex; }
   .busy .spin { opacity: 0; transition: opacity .15s; }
@@ -3481,14 +3486,63 @@
     clearShownNotifications();
     pollAlerts(true);
     pushAuto();
+    setTimeout(liveStart, 2500); // 실시간 반영 구독 (Firestore 가 준비된 뒤)
   };
   window.pmAlertStop = function (token) {
     clearInterval(paTimer); paTimer = 0; paVer = ''; paList = []; paUnread = 0; paTok = ''; paintAlertBadges();
+    try { liveStop(); } catch (e) { /* 무시 */ }
     pushDone = false; pushShown = false; // 다음 로그인(다른 기사일 수 있음)에서 기기 등록을 다시 한다
     const t = lsGet(PUSH_TOK);
     if (t && token) { api('api_pmPushDel', token, t).catch(() => {}); lsSet(PUSH_TOK, null); lsSet(PUSH_AT, null); }
   };
   document.addEventListener('visibilitychange', () => { if (!document.hidden && paTimer) { clearShownNotifications(); pollAlerts(true); } });
+  // ───── 스케줄·품앗이가 바뀌면 '새로 보기' 안내 (자동으로 다시 그리지 않는다 — 보던 화면이 갑자기 바뀌지 않게) ─────
+  //  사무실이 스케줄·품앗이를 바꾸면(Firestore pub/meta 의 schAt·pmAt) 그 화면을 보고 있을 때만 아래에 안내 + [새로 보기]
+  const RF = { sched: () => loadSched(), pumasi: () => loadPmList(), pmdetail: () => loadPmDetail(), pmmine: () => loadPmMine() };
+  const RF_SCH = ['sched'], RF_PM = ['pumasi', 'pmdetail', 'pmmine'];
+  const LV = { unsub: null, first: true, schAt: 0, pmAt: 0, view: '' };
+  function rfNote(text) {
+    let b = document.getElementById('rfNote');
+    if (!b) {
+      b = document.createElement('div'); b.id = 'rfNote'; b.className = 'rf-note';
+      b.innerHTML = '<span></span><button type="button" data-rf="go">새로 보기</button><button type="button" data-rf="x" aria-label="닫기">✕</button>';
+      document.body.appendChild(b);
+      b.addEventListener('click', (e) => {
+        const k = e.target.closest('[data-rf]'); if (!k) return;
+        b.classList.remove('on');
+        if (k.dataset.rf !== 'go') return;
+        const fn = RF[curView]; if (!fn || curView !== LV.view) return;
+        try { SWR.mem = {}; } catch (x) { /* 무시 */ } // 15초 재사용을 건너뛰고 서버에 다시 묻는다
+        try { fn(); } catch (x) { /* 무시 */ }
+      });
+    }
+    b.firstChild.textContent = text; LV.view = curView; b.classList.add('on');
+  }
+  function rfNoteOff() { const b = document.getElementById('rfNote'); if (b) b.classList.remove('on'); }
+  function liveApply(m) {
+    const schAt = +m.schAt || 0, pmAt = +m.pmAt || 0;
+    if (LV.first) { LV.first = false; LV.schAt = schAt; LV.pmAt = pmAt; return; }
+    const sch = schAt > LV.schAt, pm = pmAt > LV.pmAt;
+    LV.schAt = Math.max(LV.schAt, schAt); LV.pmAt = Math.max(LV.pmAt, pmAt);
+    if (document.hidden || !store.get(TOKEN)) return;
+    if (sch && RF_SCH.includes(curView)) rfNote('스케줄이 바뀌었습니다');
+    else if (pm && RF_PM.includes(curView)) rfNote('품앗이가 바뀌었습니다');
+    else if (pm && RF_SCH.includes(curView)) rfNote('품앗이가 바뀌었습니다');
+  }
+  function liveStart() {
+    if (LV.unsub) return;
+    Promise.resolve().then(() => fsReady()).then((ok) => {
+      if (!ok || !FSR.db || LV.unsub) return;
+      LV.unsub = FSR.db.doc('pub/meta').onSnapshot((d) => {
+        if (!d.exists) return; let j = {}; try { j = JSON.parse(d.data().j || '{}'); } catch (e) { j = {}; }
+        liveApply(j);
+      }, () => { try { if (LV.unsub) LV.unsub(); } catch (e) {} LV.unsub = null; LV.first = true; });
+    }).catch(() => {});
+  }
+  function liveStop() { try { if (LV.unsub) LV.unsub(); } catch (e) {} LV.unsub = null; LV.first = true; rfNoteOff(); }
+  // 다른 화면으로 가면 안내는 접는다 (그 화면을 다시 열면 어차피 새로 받는다)
+  setInterval(() => { if (LV.view && curView !== LV.view) { LV.view = ''; rfNoteOff(); } }, 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && store.get(TOKEN)) liveStart(); }); // 구독이 끊겼으면 다시
   window.markAlerts = (ids) => markAlerts(ids);
   function markAlerts(ids) {
     const token = store.get(TOKEN); if (!token) return Promise.resolve();
