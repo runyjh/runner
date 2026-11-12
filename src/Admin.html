@@ -1249,6 +1249,8 @@
   #sGrid tr.note:not(.open) td.c .cv { max-height: 7em; overflow: hidden; }
   #sGrid tr.note td.c.more::after { content: '⋯ 더 있음'; position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 5px 1px; font-size: 10.5px; font-weight: 800; color: #b45309; background: linear-gradient(transparent, #fffdf5 55%); text-align: right; pointer-events: none; }
   .sg .nfold { display: block; margin-top: 3px; border: 0; background: #fff1d6; color: #a15c00; border-radius: 6px; padding: 1px 7px; font-size: 10.5px; font-weight: 800; cursor: pointer; white-space: normal; text-align: left; } .sg .nfold.hidden { display: none; }
+  #sGrid tr.note td.c .nl { display: block; padding: 1px 0; } #sGrid tr.note td.c .nl + .nl { border-top: 1px dashed #eadfbf; margin-top: 2px; padding-top: 3px; } #sGrid tr.note td.c .nl.dn { color: #9aa3ad; }
+  .sg .nfold:focus { outline: none; }
   .sg tr.note td.f2 { vertical-align: top; padding-top: 6px; padding-bottom: 6px; }
   .sg tr.calc td.cc { white-space: normal; word-break: keep-all; overflow-wrap: break-word; text-align: center; vertical-align: middle; padding: 4px 6px; font-size: 11px; line-height: 1.45; width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; }
   .sg tr.calc.mi td.cc { color: #e00; font-weight: 700; background: #fff6f6; }
@@ -1264,6 +1266,7 @@
   /* 추천 목록: 흰 바탕 둥근 버튼 (배정 캠프·라우트 버튼과 같은 모양) · 왼쪽 점 색 = 칸 색 */
   .sed .sug { max-height: 260px; overflow: auto; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: #fff; }
   .sed .sug:empty { display: none; }
+  .sed.note textarea { text-align: left; font-weight: 500; line-height: 1.5; min-height: 76px; } .sed.note .shint { text-align: left; }
   .sed .sug button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: #fff !important; color: var(--ink) !important; padding: 6px 11px; font-size: 13px; font-weight: 600; cursor: pointer; line-height: 1.2; }
   .sed .sug button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #c9cdd2; flex: none; }
   .sed .sug button.k-work::before { background: #4a90d9; } .sed .sug button.k-off::before { background: #f08c8c; } .sed .sug button.k-sick::before { background: #5cb85c; }
@@ -8371,6 +8374,8 @@
   function cellHtml0(v, row) {
     const s = String(v || '').trim();
     if (!s) return '';
+    // 비고 줄(업무스케줄 일정)은 노선 규칙으로 읽지 않고 적은 글 그대로 (괄호 · 숫자 · 영문이 꼬리표나 노선으로 바뀌지 않게) · 끝난 일정(✓)은 흐리게
+    if (/^NOTE\d+$/.test(String(row))) return '<span class="cv">' + s.split(/\r?\n/).map((ln) => '<span class="nl' + (/ ✓$/.test(ln) ? ' dn' : '') + '">' + esc(ln) + '</span>').join('') + '</span>';
     const yg = yongParse(s);
     if (yg && yg.vendor) return '<span class="cv">용차<i class="cv-yv">' + esc(yg.vendor) + (yg.charge ? '' : ' · 청구없음') + '</i>' + (yg.id ? '<i class="cv-yv id">' + esc(yg.id) + '</i>' : '') + '</span>';
     const subs = cellSubsOf(row);
@@ -9581,6 +9586,7 @@
     const t = String(text || '').trim().toUpperCase();
     const d = r.d, myCamp = d ? d.campId : '', out = [];
     const push = (v, hint) => { if (v && !out.some((x) => x.v === v)) out.push({ v, hint }); };
+    if (r.kind === 'n') return out; // 비고 줄(업무스케줄 일정)은 글을 직접 적는 칸 — 출근·휴무·노선 추천을 띄우지 않음
     if (d && d.baseRoute && !/백업|용차/.test(d.baseRoute)) push('출근', d.baseRoute);
     SOPTS.forEach((o) => push(o));
     // 업무등록 (기본노선으로 업무 등록) · 서브아이디로 뛴 날 = '노선 서브아이디 업무등록' (미입차 계산·정산이 알아보는 모양)
@@ -9614,12 +9620,13 @@
     const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
     const box = document.createElement('div'); box.className = 'sed';
     box.style.left = (rc.left - wc.left + wrap.scrollLeft) + 'px'; box.style.top = (rc.top - wc.top + wrap.scrollTop) + 'px';
-    const isDrv = r.kind === 'd';
-    if (isDrv) box.style.width = '330px'; // 기사 칸 편집기는 크기 고정 (칸 너비와 상관없이)
+    const isDrv = r.kind === 'd', isNote = r.kind === 'n';
+    if (isNote) { box.classList.add('note'); box.style.width = '300px'; }
+    else if (isDrv) box.style.width = '330px'; // 기사 칸 편집기는 크기 고정 (칸 너비와 상관없이)
     else box.style.minWidth = Math.max(rc.width, 170) + 'px';
     box.innerHTML = '<textarea rows="1" spellcheck="false"></textarea>' + (isDrv ? '<div class="spk"></div>' : '') + '<div class="sug"></div>' +
       (isDrv ? '<div class="sinst"><label>📌 지시사항 <small>기사스케줄 칸에 표시 (마우스를 올리면 보임)</small></label><textarea class="instta" rows="2" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량"></textarea></div>' : '') +
-      '<div class="shint">Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
+      '<div class="shint">' + (isNote ? '업무스케줄에 저장됩니다 · ' : '') + 'Enter 저장 · Alt+Enter 줄바꿈 · Esc 취소</div>';
     wrap.appendChild(box);
     // 편집창이 표 테두리(스크롤 영역) 밖으로 나가 잘리지 않게: 오른쪽·아래 끝 칸이면 왼쪽·위로 당겨 열고, 표가 낮으면 표 높이를 잠시 늘림
     const baseL = rc.left - wc.left + wrap.scrollLeft, baseT = rc.top - wc.top + wrap.scrollTop;
@@ -9683,7 +9690,7 @@
       });
       sEdit.paintPk = () => paintPk();
     }
-    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
+    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(r.kind === 'n' ? 300 : 120, ta.scrollHeight) + 'px'; };
     const renderSug = () => {
       const list = suggestions(r, ta.value === sget(r.row, dt) && initial == null ? '' : ta.value);
       sEdit.list = list; sEdit.idx = Math.min(sEdit.idx, list.length - 1);
