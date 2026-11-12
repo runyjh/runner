@@ -1514,10 +1514,22 @@
   .mmore .mm-me { text-align: center; color: var(--sub); font-size: 12px; margin-top: 4px; }
   /* ── 휴대폰 공통 틀: 보기 기본 — 설명 · 표 도구 · PC 전용 버튼은 숨기고, 칩은 한 줄(옆으로 밀기) ── */
   html.m .pg-help, html.m main > section > p.sub, html.m .tkbar, html.m .head .tools [id$="Reload"], html.m #reloadBtn { display: none !important; }
-  html.m #drvNew, html.m #coBtn, html.m #bibNew, html.m #xpOpen, html.m #campNew, html.m #rpUpBtn, html.m #view-perf > .updrop, html.m #paPostSw, html.m #paOfferSw, html.m #acCatEdit, html.m #acNew,
+  html.m #drvNew, html.m #coBtn, html.m #bibNew, html.m #xpOpen, html.m #campNew, html.m #view-perf > .updrop, html.m #paPostSw, html.m #paOfferSw, html.m #acCatEdit, html.m #acNew,
   html.m #paFrom, html.m #paTo, html.m #isFrom, html.m #isTo, html.m .is-mionly, html.m #tiFromStl, html.m #tiNew, html.m #view-einv .updrop, html.m #irCfgBtn, html.m #irXlsx, html.m #stRecalc, html.m #stGearBtn { display: none !important; }
   html.m .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-left: -12px; margin-right: -12px; padding: 0 12px; } html.m .tabs::-webkit-scrollbar { display: none; } html.m .tabs > * { flex: none; }
   html.m .head h2 small.sub { display: none; }
+  .dtel { color: inherit; text-decoration: none; }
+  html.m .dtel { display: inline-flex; align-items: center; gap: 4px; background: #e8f1ff; color: var(--brand); font-weight: 800; border-radius: 999px; padding: 5px 11px; font-size: 13.5px; } html.m .dtel::before { content: '📞'; font-size: 12px; }
+  html.m #rFilters select, html.m #rFilters [data-rf="reset"], html.m #rFilters .btn, html.m #rBulk, html.m #view-route td.ck, html.m [data-ract="img-add"], html.m [data-ract="img-sel"] { display: none !important; }
+  /* 정산 · 매입매출: 휴대폰은 확인용 (요약 숫자 + 기사별 한 줄) */
+  .st-mob { display: none; }
+  html.m #view-settle > *:not(.head):not(#stMob) { display: none !important; } html.m #stMob { display: block; }
+  .st-mob .mk { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; } .st-mob .mk div { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 12px; color: var(--sub); min-width: 0; }
+  .st-mob .mk b { display: block; font-size: 17px; color: var(--ink); margin-top: 2px; overflow-wrap: anywhere; } .st-mob .mk em { display: block; font-style: normal; font-size: 11px; margin-top: 2px; } .st-mob .mk .w { grid-column: 1 / -1; }
+  .st-mob .ml { display: flex; align-items: center; gap: 10px; width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; margin-bottom: 7px; font: inherit; text-align: left; cursor: pointer; color: var(--ink); }
+  .st-mob .ml .t { flex: 1; min-width: 0; } .st-mob .ml .t b { display: block; font-size: 15px; } .st-mob .ml .t small { display: block; color: var(--sub); font-size: 12px; margin-top: 1px; } .st-mob .ml > b { font-size: 15px; white-space: nowrap; } .st-mob .ml i { font-style: normal; color: var(--ok); font-weight: 800; }
+  .st-mob .mn { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 10px 12px; font-size: 12.5px; color: #475569; margin-top: 8px; }
+  .st-mob .mr { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid #f1f2f4; font-size: 14px; } .st-mob .mr:first-child { border-top: 0; } .st-mob .mr span { color: var(--sub); } .st-mob .mr b { white-space: nowrap; }
   html.m #wtabs, html.m #dBulk, html.m #view-drivers table.tk-card td.tk-k, html.m [data-ract="camp-edit"], html.m [data-ract="camp-del"], html.m [data-ract="route-add"], html.m [data-rcopen="move"], html.m #perfBox .rp-top .grow, html.m #perfBox .rp-on { display: none !important; }
   html.m #view-drivers table.tk-card td[data-l="직급"], html.m #view-drivers table.tk-card td[data-l="서브아이디"], html.m #view-drivers table.tk-card td[data-l="쿠팡플렉스 아이디"], html.m #view-drivers table.tk-card td[data-l="가입일"], html.m #view-drivers table.tk-card td[data-l="비고"] { display: none !important; }
   .mseg { display: none; }
@@ -2027,6 +2039,7 @@
       </div>
     </div>
     <!-- 정산관리: 이번 달 할 일 5단계 + ⚙ 설정 (예전 탭 10개는 아래 #stTabs 에 숨겨 두고 그대로 씀) -->
+    <div class="st-mob" id="stMob"></div>
     <div class="st-steps" id="stSteps"></div>
     <!-- 매입·매출: 통장 잔액 줄 + 3단계(15일 · 20일 · 월말) + 통장 · ⚙ -->
     <div class="banks hidden" id="stBanks"></div>
@@ -3205,7 +3218,7 @@
         '<td>' + (r.driverType ? '<span class="badge t-' + esc(r.driverType) + '">' + esc(r.driverType) + '</span>' : '<span class="badge t-none">미지정</span>') + '</td>' +
         '<td class="sub">' + esc([r.subId1, r.subId2].filter(Boolean).join(', ')) + '</td>' +
         '<td>' + (r.schCamp || r.baseRoute ? esc(String(r.schCamp || '').replace(/\s*캠프$/, '')) + (r.baseRoute ? ' · <b class="code">' + esc(r.baseRoute) + '</b>' : '') : '<span class="sub">미배정</span>') + '</td>' +
-        '<td class="sub">' + esc(r.loginId) + '</td><td>' + esc(r.phone) + '</td>' +
+        '<td class="sub">' + esc(r.loginId) + '</td><td>' + (r.phone ? '<a class="dtel" href="tel:' + esc(String(r.phone).replace(/[^0-9+]/g, '')) + '" title="전화 걸기">' + esc(r.phone) + '</a>' : '') + '</td>' +
         '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
         '<td>' + (r.workStatus ? '<span class="badge ws-' + esc(r.workStatus) + '">' + esc(r.workStatus) + '</span>' : '<span class="sub">재직</span>') + '</td>' +
         '<td class="sub">' + esc(r.leaveDate || '') + '</td>' +
@@ -3214,7 +3227,7 @@
     }).join('');
   }
   $('#rows').addEventListener('click', (e) => {
-    if (e.target.closest('td.ck')) return; // 체크박스 칸은 선택만
+    if (e.target.closest('td.ck') || e.target.closest('.dtel')) return; // 체크박스 칸은 선택만 · 전화번호는 전화 걸기
     const tr = e.target.closest('tr[data-id]'); if (tr && tr.dataset.id) openDrawer(tr.dataset.id);
   });
   // ── 선택한 기사 삭제 ──
@@ -11708,7 +11721,32 @@
       if (fresh) toast('다시 계산했습니다.');
     }).catch(() => {});
   }
+  /** 휴대폰 정산 · 매입매출: 확인용 (요약 숫자 + 기사별 한 줄 · 누르면 정산서) — 계산 · 마감 · 통장 배분은 PC */
+  function paintStMob() {
+    const box = $('#stMob'); if (!box || !document.documentElement.classList.contains('m')) return;
+    const s = STX.sum; if (!s) { box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; return; }
+    const t = s.total || {}, c = s.company || {}, P = STX.pnl, k = (l, v, sub, cls) => '<div' + (cls ? ' class="' + cls + '"' : '') + '><span>' + l + '</span><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
+    const inv = c.invTotal != null && c.invTotal ? c.invTotal : Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 1.1);
+    const paid = s.drivers.filter((d) => d.checked).length, head = '<p class="smb-hint" style="margin:0 0 8px">' + esc(s.period.from) + ' ~ ' + esc(s.period.to) + ' · ' + (s.round ? '쿠팡 정산서 ' + s.round + '차' : '쿠팡 정산서 없음') + ' · ' + (s.closed ? '마감 ' + esc(String(s.closed.at).slice(5, 10)) : '마감 전 (금액이 바뀔 수 있음)') + '</p>';
+    if (STX.fin) {
+      const row = (l, v, bold) => '<div class="mr"><span>' + l + '</span><b' + (v < 0 ? ' style="color:var(--danger)"' : '') + '>' + (bold ? wn(v) : wn(v)) + '</b></div>';
+      box.innerHTML = head + (P ? '<div class="mk">' + k('러너 순이익 (운영비 뺀 뒤)', wn(P.net), '종소세 전', 'w') + k('쿠팡 매출 (공급가)', wn(P.salesSupply)) + k('기사 매입 (공급가)', wn(P.drvSupply)) + '</div>' +
+        '<div class="smb-card">' + row('이익금 (매출 − 매입)', P.profit) + row('운영비', -(P.cost || 0)) + row('인건비', -(P.staff || 0)) + (P.runnerIns ? row('러너 부담 산재 · 고용', -(P.runnerIns || 0)) : '') + (P.insGap ? row('보험 차액', P.insGap) : '') + row('순이익', P.net) + '</div>'
+        : '<div class="empty">이 달 손익 자료가 없습니다.</div>') + '<div class="mn">통장 배분 · 운영비 입력 · 통장 내역 올리기는 PC에서 합니다.</div>';
+      return;
+    }
+    const q = nfc(STX.mobQ || '').toLowerCase().replace(/\s/g, ''), list = s.drivers.filter((d) => !q || [d.name].concat(d.cids || [], d.workers || []).some((x) => nfc(String(x || '')).toLowerCase().replace(/\s/g, '').includes(q)));
+    box.innerHTML = head + '<div class="mk">' + k('쿠팡 매출 (입금액)', wn(inv)) + k('기사 실입금 합계', wn(t.net)) + k('기사', s.drivers.length + '명', '배송 ' + wn(t.qty) + '건') + k('입금 확인', paid + ' / ' + s.drivers.length + '명') + (P ? k('러너 순이익 (운영비 뺀 뒤)', wn(P.net), '', 'w') : '') + '</div>' +
+      '<input class="inp" id="stMobQ" type="search" placeholder="기사 이름 · 아이디" value="' + esc(STX.mobQ || '') + '" autocomplete="off" style="width:100%;margin-bottom:8px">' +
+      '<div id="stMobList">' + stMobRows(list) + '</div><div class="mn">정산서 올리기 · 계산 · 조정 · 마감은 PC에서 합니다. 줄을 누르면 그 기사의 정산서가 열립니다.</div>';
+  }
+  function stMobRows(list) {
+    return list.length ? list.slice().sort((a, b) => koSort(a.name, b.name)).map((d) => '<button type="button" class="ml" data-stmslip="' + esc(d.id) + '"><span class="t"><b>' + esc(d.name) + '</b><small>근무 ' + (d.workDays || '-') + '일 · 배송 ' + wn(d.qty) + '건' + (d.checked ? ' · <i>입금 ✓</i>' : '') + '</small></span><b>' + wn(d.net) + '</b></button>').join('') : '<div class="empty">조건에 맞는 기사가 없습니다.</div>';
+  }
+  $('#stMob').addEventListener('input', (e) => { if (e.target.id !== 'stMobQ' || !STX.sum) return; STX.mobQ = e.target.value; const q = nfc(STX.mobQ).toLowerCase().replace(/\s/g, ''); $('#stMobList').innerHTML = stMobRows(STX.sum.drivers.filter((d) => !q || [d.name].concat(d.cids || [], d.workers || []).some((x) => nfc(String(x || '')).toLowerCase().replace(/\s/g, '').includes(q)))); });
+  $('#stMob').addEventListener('click', (e) => { const b = e.target.closest('[data-stmslip]'); if (!b) return; STX.slipIds = [...$$('#stMobList [data-stmslip]')].map((x) => x.dataset.stmslip); openSlip(b.dataset.stmslip); });
   function paintStInfo() {
+    try { paintStMob(); } catch (e) { /* 휴대폰 요약은 없어도 됨 */ }
     const s = STX.sum; if (!s) return;
     const d = s.dates || {};
     $('#stInfo').innerHTML = '<span>정산기간 <b>' + esc(s.period.from) + ' ~ ' + esc(s.period.to) + '</b></span>' +
@@ -12169,7 +12207,7 @@
   }
   /** 러너 손익·통장 = 정산관리와 같은 정산월을 쓰는 별도 화면 (정산관리 탭·버튼은 숨김) */
   function setFin(on) {
-    STX.fin = on;
+    STX.fin = on; try { paintStMob(); } catch (e) { /* 무시 */ }
     const na = $$('.nav a[data-view="settle"]').find((a) => (a.dataset.stGo === 'pnl') === !!on);
     $('#stTitle').textContent = na ? na.textContent.trim() : on ? '매입·매출' : '정산관리';
     $('#stSteps').classList.toggle('hidden', on);
