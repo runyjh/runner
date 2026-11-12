@@ -5213,6 +5213,7 @@ function adm_schSave(token, changes) {
       // 용차 칸 → 정산 [품앗이/용차 지정] (업체가 적힌 용차 칸만 · 실패해도 칸 저장은 그대로)
       let yong = null;
       try { if (typeof schYongSync_ === 'function') yong = schYongSync_(savedList); } catch (e) { yong = { added: 0, removed: 0, warn: ['용차 청구 기록 연동 실패: ' + String(e && e.message || e)] }; try { errLog_('서버 오류', 'schYongSync_', String(e && e.message || e)); } catch (e2) { /* 무시 */ } }
+      if (conflicts.length + noteRes.conflicts.length) { try { errLog_('동시 수정', 'adm_schSave', '저장하려는 칸을 그 사이 다른 사람(다른 창)이 먼저 바꿈'); } catch (e) { /* 무시 */ } } // 유지보수용 참고 기록 (10분에 한 번)
       return Object.assign({ ok: true, saved: saved + noteRes.saved, conflicts: conflicts.concat(noteRes.conflicts), issueSync: issueSync, pmLocked: pmLocked, yong: yong }, rcExtra);
     } finally {
       lock.releaseLock();
