@@ -1521,6 +1521,14 @@
   html.m #paFrom, html.m #paTo, html.m #isFrom, html.m #isTo, html.m .is-mionly, html.m #tiFromStl, html.m #tiNew, html.m #view-einv .updrop, html.m #irCfgBtn, html.m #irXlsx, html.m #stRecalc, html.m #stGearBtn { display: none !important; }
   html.m .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-left: -12px; margin-right: -12px; padding: 0 12px; } html.m .tabs::-webkit-scrollbar { display: none; } html.m .tabs > * { flex: none; }
   html.m .head h2 small.sub { display: none; }
+  /* 휴대폰 기사 상세: 보기 + 기사 앱 사용(가입 승인)만 — 나머지 칸은 눌리지 않게 (서류 보기 · 가려진 정보 보기는 됨) */
+  .m-lock { display: none; }
+  html.m .m-lock { display: block; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 12px; font-size: 12.5px; color: #475569; margin-bottom: 10px; }
+  html.m #dBody .sec:not(.m-ok) { pointer-events: none; }
+  html.m #dBody .sec:not(.m-ok) [data-doc], html.m #dBody .sec:not(.m-ok) [data-reveal], html.m #dBody .sec:not(.m-ok) a { pointer-events: auto; }
+  html.m #dBody .sec:not(.m-ok) input, html.m #dBody .sec:not(.m-ok) select, html.m #dBody .sec:not(.m-ok) textarea { background: #f5f6f8; color: #4b5563; }
+  html.m #dBody .sec:not(.m-ok) button:not([data-doc]):not([data-reveal]):not(.on) { opacity: .45; }
+  html.m #tempPwBtn, html.m #delDrvBtn, html.m #dBody [data-edit], html.m #dReset { display: none !important; }
   .dtel { color: inherit; text-decoration: none; }
   html.m .dtel { display: inline-flex; align-items: center; gap: 4px; background: #e8f1ff; color: var(--brand); font-weight: 800; border-radius: 999px; padding: 5px 11px; font-size: 13.5px; } html.m .dtel::before { content: '📞'; font-size: 12px; }
   html.m #rFilters select, html.m #rFilters [data-rf="reset"], html.m #rFilters .btn, html.m #rBulk, html.m #view-route td.ck, html.m [data-ract="img-add"], html.m [data-ract="img-sel"] { display: none !important; }
@@ -3414,7 +3422,8 @@
     $('#dBody').innerHTML =
       (d.status === '승인대기' ? '<div class="warnbox">가입 승인 대기 중입니다. 서류를 확인한 뒤 승인 또는 반려해 주세요.</div>' : '') +
       (d.mustChange ? '<div class="warnbox">임시 비밀번호 상태입니다. 기사님이 다음 로그인 때 비밀번호를 바꿉니다.</div>' : '') +
-      '<div class="sec"><h4>기사 앱 사용 <small class="sub" style="font-weight:500">— 앱 로그인 허용 여부 (근무와 별개)</small></h4><div class="status-row">' +
+      '<div class="m-lock">휴대폰에서는 보기와 <b>기사 앱 사용(가입 승인)</b>만 됩니다. 다른 정보는 PC에서 고쳐 주세요.</div>' +
+      '<div class="sec m-ok"><h4>기사 앱 사용 <small class="sub" style="font-weight:500">— 앱 로그인 허용 여부 (근무와 별개)</small></h4><div class="status-row">' +
         STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
       '</div></div>' + workSec(d) + rankSec(d) +
       typeSec(d) + assignSec() +
@@ -8888,7 +8897,8 @@
       if (!r.ok) { sStale = false; return toast(r.msg); }
       sStale = false;
       apply(r);
-      admKeep.setP('sched', { mode: sMode, basis: sMode === 'month' ? sBasis : '', month: sMode === 'month' ? sMonth : '', r: r });
+      { const t = new Date(), tdy = ymdLocal(t), tmr = ymdLocal(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1));
+        if (Array.isArray(r.dates) && (r.dates.includes(tdy) || r.dates.includes(tmr))) admKeep.setP('sched', { mode: sMode, basis: sMode === 'month' ? sBasis : '', month: sMode === 'month' ? sMonth : '', r: r }); }
     }).catch(() => {});
   }
   function renderSchedCamps() {
@@ -9964,7 +9974,7 @@
     const had = JSON.stringify((PKM && PKM.periods) || []);
     pkmP = api('adm_peakMap').then((r) => {
       PKM = r && r.ok ? r : PKM;
-      if (PKM && JSON.stringify(PKM.periods || []) !== had && SD.dates.length && !$('#view-sched').classList.contains('hidden') && SD.dates.some(pkmIn)) renderSched();
+      if (PKM && JSON.stringify(PKM.periods || []) !== had && SD.dates.length && !$('#view-sched').classList.contains('hidden') && SD.dates.some(pkmIn) && !sEdit && !Object.keys(sPending).length) renderSched();
       return PKM;
     }).catch(() => PKM);
     setTimeout(() => { pkmP = null; }, 600000);
@@ -11766,7 +11776,7 @@
     const s = STX.sum; if (!s) { box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; return; }
     const t = s.total || {}, c = s.company || {}, P = STX.pnl, k = (l, v, sub, cls) => '<div' + (cls ? ' class="' + cls + '"' : '') + '><span>' + l + '</span><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
     const inv = c.invTotal != null && c.invTotal ? c.invTotal : Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 1.1);
-    const paid = s.drivers.filter((d) => d.checked).length, head = '<p class="smb-hint" style="margin:0 0 8px">' + esc(s.period.from) + ' ~ ' + esc(s.period.to) + ' · ' + (s.round ? '쿠팡 정산서 ' + s.round + '차' : '쿠팡 정산서 없음') + ' · ' + (s.closed ? '마감 ' + esc(String(s.closed.at).slice(5, 10)) : '마감 전 (금액이 바뀔 수 있음)') + '</p>';
+    const pd = s.period || {}, paid = (s.drivers || []).filter((d) => d.checked).length, head = '<p class="smb-hint" style="margin:0 0 8px">' + esc(pd.from || '') + ' ~ ' + esc(pd.to || '') + ' · ' + (s.round ? '쿠팡 정산서 ' + s.round + '차' : '쿠팡 정산서 없음') + ' · ' + (s.closed ? '마감 ' + esc(String(s.closed.at).slice(5, 10)) : '마감 전 (금액이 바뀔 수 있음)') + '</p>';
     if (STX.fin) {
       const row = (l, v, bold) => '<div class="mr"><span>' + l + '</span><b' + (v < 0 ? ' style="color:var(--danger)"' : '') + '>' + (bold ? wn(v) : wn(v)) + '</b></div>';
       box.innerHTML = head + (P ? '<div class="mk">' + k('러너 순이익 (운영비 뺀 뒤)', wn(P.net), '종소세 전', 'w') + k('쿠팡 매출 (공급가)', wn(P.salesSupply)) + k('기사 매입 (공급가)', wn(P.drvSupply)) + '</div>' +
