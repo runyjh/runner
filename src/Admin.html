@@ -8029,7 +8029,7 @@
       const defRotArr = (camp) => (camps[camp] && camps[camp].length ? camps[camp] : ALL_ROTS);
       const campNames = Object.keys(camps).sort((a, b) => b.length - a.length);
       const counts = {};
-      rows.forEach((r) => { counts[r.key] = r.cells.filter((v, i) => (r.recv && r.recv[i]) || isWorkDay(v, r.subs)).length; }); // 품앗이를 받아 뛴 날은 칸이 휴무·빈칸이어도 근무일
+      rows.forEach((r) => { if (r.nocount) return; counts[r.key] = r.cells.filter((v, i) => (r.recv && r.recv[i]) || isWorkDay(v, r.subs)).length; }); // 품앗이를 받아 뛴 날은 칸이 휴무·빈칸이어도 근무일
 
       // 1) 백업 명단: 백업·예비·용차 기사의 칸에서 노선을 뽑아 캠프별로
       const roster = {};
@@ -8608,6 +8608,14 @@
       active: d._seg || SD.dates.some((dt) => drvGone(d, dt)) ? SD.dates.map((dt) => segIn(d._seg, dt) && !drvGone(d, dt)) : null, // 퇴사일 이후 · 휴직: 그 기사의 담당 노선을 '채워야 할 노선'으로 보지 않는다
       subs: cellSubsOf(d.id).concat(aliasOf(d)), recv: SD.dates.map((dt) => (((SD.pmTips || {})[d.id] || {})[dt] || []).some((t) => t.to === d.name && t.from !== d.name))
     }));
+    // 품앗이 줄(배차 확정 때 적히는 '받은 기사가 뛰는 캠프·라우트')도 그 노선을 뛴 것으로 센다 — 받은 기사 본인 칸이 휴무·빈 칸이어도 미입차가 아님
+    //  같은 사람이므로 그 기사와 같은 열쇠(key)를 써서 본인 칸에 같은 노선이 적혀 있어도 중복으로 보지 않는다 · 출근일수에는 넣지 않음(nocount — 본인 줄의 recv 로 이미 셈)
+    (SD.pmRows || []).forEach((pr) => {
+      const d = SD.drivers.find((x) => x.id === (pr.driverId || '') && !x.ex); if (!d) return;
+      const cells = SD.dates.map((dt) => (drvGone(d, dt) ? '' : sget(pr.id, dt)));
+      if (!cells.some(Boolean)) return;
+      rows.push({ key: d.id, nocount: true, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: '백업', type: '백업', baseAt: null, cells: cells, active: null, subs: [], recv: null });
+    });
     const moves = (SD.routeMoves || []).map((m) => ({ a: { camp: shortCamp(m.fromCamp), num: (String(m.from).match(/\d+/) || [''])[0] }, b: { camp: shortCamp(m.toCamp), num: (String(m.to).match(/\d+/) || [''])[0] } })).filter((m) => m.a.camp && m.a.num && m.b.camp && m.b.num);
     scalc = SchedCalc.compute(rows, campRot, SD.dates.length, moves);
   }
