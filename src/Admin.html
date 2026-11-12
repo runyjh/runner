@@ -8440,7 +8440,11 @@
     const p = parseBR(m[2]); if (!p.units.length || !p.units.every((u) => unitRe.test(u))) return null;
     const own = shortCamp(d.camp || '').replace(/\s/g, ''), camp = (m[1] || '').replace(/\s/g, ''), other = !!camp && camp !== own;
     const b = d.baseRoute && /^\d/.test(d.baseRoute) ? parseBR(d.baseRoute) : null;
-    const mine = !other && !!b && p.units.every((u) => b.units.includes(u));
+    const mineAll = !other && !!b && p.units.every((u) => b.units.includes(u));
+    const all0 = sdCampRots(d.campId || ''), comp0 = (x) => composeUnits(x.units, '', x.rots.length ? x.rots : all0, all0, x.per || {});
+    // 백업 기사: 기본노선은 '돌아가며 타는 노선 묶음' — 그대로 다 타는 날만 '출근'(파랑), 일부만 타는 날은 다른 백업 칸과 똑같이 '캠프 노선'(노랑)
+    //  (기본노선을 백업 ↔ 408AB 로 바꾼 이력이 있어도 날짜에 따라 칸 모양 · 입력 창이 달라지지 않게)
+    const mine = mineAll && (d.type !== '백업' || comp0(p) === comp0(b));
     const all = sdCampRots(d.campId || ''), comp = (x) => composeUnits(x.units, '', x.rots.length ? x.rots : all, all, x.per || {});
     const whole = mine && comp(p) === comp(b), cn = camp || own;
     return { text: whole ? '출근' : (mine || !cn ? '' : cn + ' ') + m[2].trim(), ids: ids, kind: mine ? 'k-work' : 'k-other', mine: mine, whole: whole };
