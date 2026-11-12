@@ -281,7 +281,7 @@ function dataCheck_() {
   // ⑤ 어제 0시부터 지금까지 오류 기록 (종류별 건수)
   try {
     const y = Utilities.formatDate(new Date(Date.now() - 864e5), CFG.TZ, 'yyyy-MM-dd'), cnt = {};
-    readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y) { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
+    readAll_(SH.ERR).forEach(function (r) { if (str_(r.at).slice(0, 10) >= y && str_(r.kind) !== '알림 상태') { const k = r.kind + (r.fn ? ' · ' + r.fn : ''); cnt[k] = (cnt[k] || 0) + 1; } });
     add('err', '어제부터 기록된 오류', Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).map(function (k) { return k + ' ' + cnt[k] + '건'; }), '자세한 내용은 error_log 탭에 있습니다.');
   } catch (e) { /* 탭 없음 */ }
   // ⑥⑦⑧ 실제 자료로 하는 자체 검사 (운영 자료를 읽기만 함): 확정 품앗이 ↔ 칸 · 이슈 ↔ 칸 · 정산 계산이 끝까지 도는지
