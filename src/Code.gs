@@ -47,6 +47,7 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
   id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
+  workerId: '실제 근무자 기사ID', // 같은 근무자 연결: 이 기사는 명의(아이디)만 있고 실제로는 그 기사가 뜀 → 스케줄은 근무자 한 줄 · 정산서는 명의별로 따로
   subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
   driverType: '단가코드', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
@@ -71,7 +72,7 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
-  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn'];
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId'];
 // 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -4848,7 +4849,8 @@ function schDriver_(o) {
     campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute, fixedOff: o.fixedOff, extraOff: o.extraOff,
     workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
     workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o),
-    subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean) // 칸 편집기 '서브아이디 업무등록' 추천용
+    subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean), // 칸 편집기 '서브아이디 업무등록' 추천용
+    workerId: str_(o.workerId), alias: []
   };
 }
 
@@ -4946,6 +4948,17 @@ function schRead_(sun, end) {
     d.extra = extraAssignOf_(o).filter(function (x) { return campName[x.c]; });
     return d;
   });
+  // 같은 근무자 연결: 명의 기사(workerId 가 있는 기사)는 줄을 만들지 않고, 근무자 줄에 '다른 명의 아이디'(alias)로 붙인다
+  //  → 기사스케줄 표 · 미입차/중복 계산 · 어드민 업로드 표 모두 근무자 한 줄만 본다 (명의 기사 줄의 예전 칸은 시트에 그대로 남음)
+  (function () {
+    const byId = {}; drivers.forEach(function (d) { byId[d.id] = d; });
+    for (let i = drivers.length - 1; i >= 0; i--) {
+      const d = drivers[i], w = d.workerId && d.workerId !== d.id ? byId[d.workerId] : null;
+      if (!w || w.workerId) continue; // 근무자가 없거나 근무자도 다른 사람에게 연결돼 있으면 연결로 보지 않음
+      if (d.loginId) w.alias.push({ id: d.id, name: d.name, login: d.loginId });
+      drivers.splice(i, 1);
+    }
+  })();
   // 추가 배정 → 그 캠프에 한 줄 더 (같은 기사 · 행ID EX기사ID@캠프ID)
   drivers.slice().forEach(function (d) {
     (d.extra || []).forEach(function (x) {
@@ -6027,7 +6040,28 @@ function schHolidayGroups_(from, to) {
   return { myeong: myeong, other: other };
 }
 /** 출근으로 세는 칸 (화면 출근일수와 같은 규칙) / 쉰 칸 */
-function schIsWork_(v) { const s = str_(v); return !!s && s !== '휴가' && !/휴무|용차|병가|퇴사|미입차|업무/.test(s); }
+/**
+ * 근무일 판정 하나 (정산 근무일수 · 관리자앱 출근일수 · 기사 앱 통계가 같은 규칙) — 그 기사가 그날 직접 일했는가
+ *  근무 O: 출근 · 노선 글자(담당/다른 노선) · 노선·라우트 변경 · '(서브아이디) 업무등록' (그 기사에게 등록된 서브아이디로 뛴 날)
+ *  근무 X: 휴무·휴가·병가·퇴사·미입차·노쇼·용차 · '(본인 아이디) 업무등록' 처럼 등록 서브가 아닌 아이디 (업체 아이디만 쓰인 날) · 추가업무등록
+ *          · 규칙으로 읽을 수 없는 글자 (일정 메모는 칸이 아니라 지시사항·일정 메모 칸에)
+ *  subIds = 그 기사의 서브아이디 목록 (없으면 서브아이디 업무등록을 근무로 보지 않음)
+ */
+function schWorkDay_(v, subIds) {
+  const s = str_(v);
+  if (!s) return false;
+  if (/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(s)) return false;
+  if (/업무/.test(s)) {
+    if (!/업무등록/.test(s) || /추가업무등록/.test(s)) return false;
+    const ids = [];
+    s.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, function (m0, id) { if (!/^[DF]\d$/i.test(id)) ids.push(id.toLowerCase()); return m0; });
+    const subs = (subIds || []).map(function (x) { return str_(x).toLowerCase(); }).filter(Boolean);
+    return ids.length > 0 && ids.some(function (id) { return subs.indexOf(id) >= 0; });
+  }
+  return /^출근/.test(s) || /\d{3,4}[A-Za-z]/.test(s) || /변경/.test(s);
+}
+function schSubIdsOf_(o) { return o ? [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean) : []; }
+function schIsWork_(v, subIds) { return schWorkDay_(v, subIds); }
 function schIsRest_(v) { return /휴무|휴가|병가/.test(str_(v)); }
 /** 기사 한 명의 스케줄 칸 { 날짜: 글자 } (스케줄 DB · 없으면 빈 객체) */
 function schCellsOf_(driverId, dates) {
