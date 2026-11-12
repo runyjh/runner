@@ -7117,6 +7117,36 @@ function adm_rcSave(token, f) {
  *  f = { driverId, date } → 그 기사의 가장 최근 '적용' 변경의 날짜를 date 로. 기사 정보(지금 캠프·노선)는 그대로
  *  date 는 오늘 이전·당일, 그 앞 변경의 날짜보다 뒤여야 한다. 스케줄은 그날부터 새 캠프 줄에 보인다 (정산은 아이디 기준이라 그대로)
  */
+/**
+ * 적용일을 앞당길 때 칸의 뜻 지키기: 그 사이 날짜 칸은 '이전 캠프·노선' 기준으로 적힌 글자라, 새 캠프 줄로 넘어가면 뜻이 바뀐다
+ *  ('110CD' = 안양1 110CD 였는데 캠프 없음 줄에서는 어느 캠프인지 알 수 없음 → 미입차 계산이 틀어짐)
+ *  → '출근' 은 '이전캠프 이전노선', 캠프 없이 적힌 노선은 '이전캠프 노선' 으로 바꿔 적는다. 휴무·미입차·이미 캠프가 적힌 칸은 그대로.
+ * days = [{ date, campId, camp, base }] (그날의 이전 기준) → 바꾼 칸 수
+ */
+function rcKeepCellCamp_(driverId, days, toCampId, toRoute) {
+  if (!days.length || !props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return 0;
+  const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+  if (last < 2) return 0;
+  const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(String(driverId)).matchEntireCell(true).matchCase(true).findNext();
+  if (!cell) return 0;
+  let n = 0;
+  days.forEach(function (x) {
+    const c = h.dates[x.date];
+    if (c === undefined) return;
+    const sameCamp = str_(x.campId) === str_(toCampId), base = str_(x.base);
+    if (sameCamp && base === str_(toRoute)) return;
+    const rng = sh.getRange(cell.getRow(), c + 1), v = str_(rng.getValue());
+    if (!v) return;
+    const short = str_(x.camp).replace(/\s*캠프\s*$/, '').replace(/\s+/g, ''), pre = sameCamp ? '' : (short ? short + ' ' : null), baseOk = /^\d/.test(base);
+    if (pre === null) return;
+    let nv = v;
+    if (v === '출근') { if (baseOk) nv = pre + base; }
+    else if (/^\d{3,4}[A-Za-z]/.test(v)) { if (!sameCamp) nv = pre + v; }
+    else if (/^\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)\s*업무등록$/.test(v)) { if (baseOk) nv = pre + base + ' ' + v; }
+    if (nv !== v) { rng.setValue(nv); n++; }
+  });
+  return n;
+}
 function adm_rcSetDate(token, f) {
   return run_(function () {
     const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
@@ -7139,13 +7169,28 @@ function adm_rcSetDate(token, f) {
           '\n\n이 기록을 지우고, ' + date + '부터 지금 캠프·노선(' + ((c.toCamp || '') + ' ' + (c.toRoute || '')).trim() + ')인 것으로 고칠까요?\n(기사스케줄 줄 나눔만 바뀝니다 · 칸 내용과 정산은 그대로)' };
       }
       const old = c.date, first = over[0];
+      // 앞당겨지는 날짜들의 '이전 기준'(캠프·노선)을 기록을 고치기 전에 구해 둔다 → 칸 글자에 이전 캠프를 붙여 뜻을 지킨다
+      const keep = [];
+      if (date < old) {
+        for (let dd = date; dd < old; dd = addDaysText_(dd, 1)) { const x = rcAt_({}, list, dd, today); keep.push({ date: dd, campId: x.campId, camp: x.camp, base: x.baseRoute }); }
+      } else if (date === old) {
+        // 이미 앞당겨 둔 기록을 같은 날짜로 다시 저장: 예전에 앞당길 때 못 지킨 칸을 지금 고친다 (메모의 '적용일 A → B 정정' 으로 범위를 안다)
+        let m, last0 = null; const re = /적용일 (\d{4}-\d{2}-\d{2}) → (\d{4}-\d{2}-\d{2}) 정정/g;
+        while ((m = re.exec(str_(c.memo)))) last0 = m;
+        if (last0 && last0[2] === date && last0[1] > date) for (let dd = date; dd < last0[1]; dd = addDaysText_(dd, 1)) keep.push({ date: dd, campId: c.fromCampId, camp: c.fromCamp, base: c.fromRoute });
+        let kept0 = 0;
+        try { kept0 = rcKeepCellCamp_(c.driverId, keep, c.toCampId, c.toRoute); } catch (e) { console.error('칸 캠프 붙이기 실패: ' + (e && e.message)); }
+        return { ok: true, change: rcView_(c, rcCampNames_()), old: old, kept: kept0, same: true };
+      }
       over.forEach(function (x) { writeFields_(SH.RCHG, x._row, { status: RCS.OFF, memo: (x.memo ? x.memo + ' / ' : '') + '적용일 정정(' + date + ')으로 지움' }); });
       const fix = { date: date, memo: (c.memo ? c.memo + ' / ' : '') + '적용일 ' + old + ' → ' + date + ' 정정' + (over.length ? ' (사이 변경 ' + over.length + '건 지움)' : '') };
       if (first) ['fromCampId', 'fromCamp', 'fromRoute'].forEach(function (k) { if (first[k] !== undefined) { fix[k] = first[k]; c[k] = first[k]; } }); // 지운 변경의 '이전 캠프·노선'을 이어받는다
       writeFields_(SH.RCHG, c._row, fix);
+      let kept = 0;
+      try { kept = rcKeepCellCamp_(c.driverId, keep, c.toCampId, c.toRoute); } catch (e) { console.error('칸 캠프 붙이기 실패: ' + (e && e.message)); }
       rcTouch_();
       logAdmin_(a, '노선 변경 적용일 정정', c.name + ' (' + c.driverId + ')', old + ' → ' + date + ' · ' + (c.fromCamp || '') + ' ' + (c.fromRoute || '') + ' → ' + (c.toCamp || '') + ' ' + (c.toRoute || ''));
-      return { ok: true, change: rcView_(Object.assign({}, c, { date: date }), rcCampNames_()), old: old };
+      return { ok: true, change: rcView_(Object.assign({}, c, { date: date }), rcCampNames_()), old: old, kept: kept };
     } finally { lock.releaseLock(); }
   });
 }

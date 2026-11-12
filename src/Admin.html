@@ -10554,7 +10554,7 @@
         return fetchSched(SD.start).then((w) => {
           if (w.ok) { SD.drivers = w.drivers; }
           $('#sdModal').classList.add('hidden'); renderSched();
-          if (rr && redate) toast(d.name + ' · 적용일을 ' + mdOf(rr.old) + ' → ' + mdOf(rr.change.date) + '(으)로 고쳤습니다.');
+          if (rr && redate) { if (w.ok) { SD.cells = w.cells; } renderSched(); toast(d.name + (rr.same ? ' · 적용일은 그대로입니다.' : ' · 적용일을 ' + mdOf(rr.old) + ' → ' + mdOf(rr.change.date) + '(으)로 고쳤습니다.') + (rr.kept ? ' 그 사이 칸 ' + rr.kept + '개에 이전 캠프 이름을 붙였습니다 (뜻 그대로).' : '')); }
           else if (rr) rcShowInfo(d.name + ' · ' + mdOf(rr.change.date) + '부터 ' + rr.change.toCamp + ' ' + rr.change.toRoute + (rr.dup ? ' (이미 있던 예약)' : rr.change.date < today ? ' (지난 날짜로 정정 · 바로 적용)' : ' 예약했습니다'), rr.warnings);
           else toast(d.name + ' 기사님 스케줄 설정을 저장했습니다.');
         });
