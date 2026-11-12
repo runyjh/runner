@@ -5998,7 +5998,10 @@ function adm_issueList(token, f) {
     const drivers = readAll_(SH.DRIVERS).filter(function (d) { return d.id && d.name && d.status === ST.ACTIVE; })
       .map(function (d) { return { id: d.id, name: d.name, camp: d.schCamp || '', campId: d.schCampId || '', baseRoute: d.baseRoute || '', type: d.driverType || '' }; });
     const camps = master_().camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; });
-    return { ok: true, from: from, to: to, issues: list, codes: SCH_ISSUE.CODES, miDefault: SCH_ISSUE.MI_DEFAULT, drivers: drivers, camps: camps,
+    // 노선 이슈: 기사스케줄에서 [미입차로 확정]한 노선 (기사 개인 이슈가 아니라 '그날 그 노선이 비었다'는 기록)
+    let routeMiss = [];
+    try { routeMiss = schRmRead_().filter(function (x) { return x.date >= from && x.date <= to; }).map(function (x) { return { date: x.date, camp: x.camp, unit: x.unit, result: x.result, reason: x.reason, memo: x.memo, by: x.by }; }); } catch (e) { routeMiss = []; }
+    return { ok: true, from: from, to: to, issues: list, routeMiss: routeMiss, codes: SCH_ISSUE.CODES, miDefault: SCH_ISSUE.MI_DEFAULT, drivers: drivers, camps: camps,
       results: ISS.RESULTS, reasons: ISS.REASONS, subs: ISS.SUBS, unset: ISS.UNSET, ruleFrom: ISS.RULE_FROM, today: todayText_() };
   });
 }
