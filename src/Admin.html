@@ -1521,6 +1521,14 @@
   html.m #paFrom, html.m #paTo, html.m #isFrom, html.m #isTo, html.m .is-mionly, html.m #tiFromStl, html.m #tiNew, html.m #view-einv .updrop, html.m #irCfgBtn, html.m #irXlsx, html.m #stRecalc, html.m #stGearBtn { display: none !important; }
   html.m .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-left: -12px; margin-right: -12px; padding: 0 12px; } html.m .tabs::-webkit-scrollbar { display: none; } html.m .tabs > * { flex: none; }
   html.m .head h2 small.sub { display: none; }
+  /* 휴대폰 기사 상세: 보기 + 기사 앱 사용(가입 승인)만 — 나머지 칸은 눌리지 않게 (서류 보기 · 가려진 정보 보기는 됨) */
+  .m-lock { display: none; }
+  html.m .m-lock { display: block; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 12px; font-size: 12.5px; color: #475569; margin-bottom: 10px; }
+  html.m #dBody .sec:not(.m-ok) { pointer-events: none; }
+  html.m #dBody .sec:not(.m-ok) [data-doc], html.m #dBody .sec:not(.m-ok) [data-reveal], html.m #dBody .sec:not(.m-ok) a { pointer-events: auto; }
+  html.m #dBody .sec:not(.m-ok) input, html.m #dBody .sec:not(.m-ok) select, html.m #dBody .sec:not(.m-ok) textarea { background: #f5f6f8; color: #4b5563; }
+  html.m #dBody .sec:not(.m-ok) button:not([data-doc]):not([data-reveal]):not(.on) { opacity: .45; }
+  html.m #tempPwBtn, html.m #delDrvBtn, html.m #dBody [data-edit], html.m #dReset { display: none !important; }
   .dtel { color: inherit; text-decoration: none; }
   html.m .dtel { display: inline-flex; align-items: center; gap: 4px; background: #e8f1ff; color: var(--brand); font-weight: 800; border-radius: 999px; padding: 5px 11px; font-size: 13.5px; } html.m .dtel::before { content: '📞'; font-size: 12px; }
   html.m #rFilters select, html.m #rFilters [data-rf="reset"], html.m #rFilters .btn, html.m #rBulk, html.m #view-route td.ck, html.m [data-ract="img-add"], html.m [data-ract="img-sel"] { display: none !important; }
@@ -2456,7 +2464,7 @@
     <div class="field"><label class="lb" for="ntBody">내용</label><textarea class="inp" id="ntBody" maxlength="5000" style="height:200px;line-height:1.6" placeholder="기사님께 보일 내용을 입력하세요. 줄바꿈은 그대로 보입니다."></textarea></div>
     <div class="field"><span class="lb">사진 <small class="sub">(최대 5장 · 기사 앱 공지 아래에 보임)</small></span>
       <div class="ntph" id="ntPhotos"></div><input type="file" id="ntFile" accept="image/*" multiple class="hidden"></div>
-    <label class="check"><input type="checkbox" id="ntImp"> <b style="color:var(--danger)">중요</b>&nbsp;— 맨 위 고정, 처음 볼 때 팝업으로 한 번 보여 줌</label>
+    <label class="check"><input type="checkbox" id="ntImp"> <b style="color:var(--danger);white-space:nowrap">중요</b>&nbsp;— 맨 위 고정, 처음 볼 때 팝업으로 한 번 보여 줌</label>
     <div class="field"><span class="lb">보낼 대상</span>
       <div class="seg" id="ntTgtMode"><button type="button" data-tm="all" class="on">전체 기사</button><button type="button" data-tm="camp">캠프 선택</button></div>
       <div class="rchips hidden" id="ntCamps" style="margin-top:8px"></div></div>
@@ -3030,7 +3038,7 @@
     try { r = await call(fn, store.get(), ...args); }
     catch (e) { toast('연결이 원활하지 않습니다. 잠시 후 다시 시도해 주세요.'); throw e; }
     finally { lbar(false); }
-    if (r && r.code === 'EXPIRED') { store.del(); showLogin(); toast(r.msg); throw new Error('EXPIRED'); }
+    if (r && r.code === 'EXPIRED') { store.del(); try { admKeep.clear(); } catch (e) { /* 무시 */ } showLogin(); toast(r.msg); throw new Error('EXPIRED'); }
     return r;
   }
 
@@ -3414,7 +3422,8 @@
     $('#dBody').innerHTML =
       (d.status === '승인대기' ? '<div class="warnbox">가입 승인 대기 중입니다. 서류를 확인한 뒤 승인 또는 반려해 주세요.</div>' : '') +
       (d.mustChange ? '<div class="warnbox">임시 비밀번호 상태입니다. 기사님이 다음 로그인 때 비밀번호를 바꿉니다.</div>' : '') +
-      '<div class="sec"><h4>기사 앱 사용 <small class="sub" style="font-weight:500">— 앱 로그인 허용 여부 (근무와 별개)</small></h4><div class="status-row">' +
+      '<div class="m-lock">휴대폰에서는 보기와 <b>기사 앱 사용(가입 승인)</b>만 됩니다. 다른 정보는 PC에서 고쳐 주세요.</div>' +
+      '<div class="sec m-ok"><h4>기사 앱 사용 <small class="sub" style="font-weight:500">— 앱 로그인 허용 여부 (근무와 별개)</small></h4><div class="status-row">' +
         STATUSES.map((s) => '<button type="button" class="st' + (s === d.status ? ' on' : '') + '" data-st="' + s + '">' + s + '</button>').join('') +
       '</div></div>' + workSec(d) + rankSec(d) +
       typeSec(d) + assignSec() +
@@ -7371,8 +7380,11 @@
         rows.push({ wave: ci.wave >= 0 ? txt(row[ci.wave]) : '', camp: rpCamp(camp), code: /^total$/i.test(code) ? 'Total' : normCode(code).replace(/[^0-9A-Z]/g, ''), q });
       }
       if (!rows.length) continue;
-      const fm = String(fileName || '').match(/(20\d{2})\D{0,2}(\d{1,2})(?!\d)/), now = new Date();
-      const ym = fm && +fm[2] >= 1 && +fm[2] <= 12 ? fm[1] + '-' + String(+fm[2]).padStart(2, '0') : now.getFullYear() + '-' + String(dc[0].m).padStart(2, '0');
+      const fn = String(fileName || ''), now = new Date();
+      const fm = fn.match(/(?:^|\D)(20\d{2})(0[1-9]|1[0-2])(?:\d{2})?(?!\d)/) || fn.match(/(?:^|\D)(20\d{2})\D{1,2}(0?[1-9]|1[0-2])(?!\d)/);
+      const near = (a, b) => { const d = Math.abs(a - b); return d <= 1 || d === 11; }; // 파일 이름의 월과 머리글 첫 날짜의 월이 같거나 이웃한 달일 때만 믿는다
+      let ym = fm && near(+fm[2], dc[0].m) ? fm[1] + '-' + String(+fm[2]).padStart(2, '0') : '';
+      if (!ym) { const cm = now.getMonth() + 1, y = now.getFullYear() + (dc[0].m < cm - 6 ? 1 : dc[0].m > cm + 6 ? -1 : 0); ym = y + '-' + String(dc[0].m).padStart(2, '0'); }
       return { ym, days: dc.map((c) => ({ m: c.m, d: c.d })), rows, sheet: sh.name };
     }
     return null;
@@ -8885,7 +8897,8 @@
       if (!r.ok) { sStale = false; return toast(r.msg); }
       sStale = false;
       apply(r);
-      admKeep.setP('sched', { mode: sMode, basis: sMode === 'month' ? sBasis : '', month: sMode === 'month' ? sMonth : '', r: r });
+      { const t = new Date(), tdy = ymdLocal(t), tmr = ymdLocal(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1));
+        if (Array.isArray(r.dates) && (r.dates.includes(tdy) || r.dates.includes(tmr))) admKeep.setP('sched', { mode: sMode, basis: sMode === 'month' ? sBasis : '', month: sMode === 'month' ? sMonth : '', r: r }); }
     }).catch(() => {});
   }
   function renderSchedCamps() {
@@ -9961,7 +9974,7 @@
     const had = JSON.stringify((PKM && PKM.periods) || []);
     pkmP = api('adm_peakMap').then((r) => {
       PKM = r && r.ok ? r : PKM;
-      if (PKM && JSON.stringify(PKM.periods || []) !== had && SD.dates.length && !$('#view-sched').classList.contains('hidden') && SD.dates.some(pkmIn)) renderSched();
+      if (PKM && JSON.stringify(PKM.periods || []) !== had && SD.dates.length && !$('#view-sched').classList.contains('hidden') && SD.dates.some(pkmIn) && !sEdit && !Object.keys(sPending).length) renderSched();
       return PKM;
     }).catch(() => PKM);
     setTimeout(() => { pkmP = null; }, 600000);
@@ -9991,7 +10004,7 @@
   }
   let sMy = false, sMobKeep = '';
   /** 내 스케줄 모드: 관리자 본인 줄만 한 달 달력으로 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
-  let sTd = false;
+  let sTd = false, sCampKeep = ''; // sCampKeep = 홈으로 가기 전에 관리에서 보던 캠프 (돌아오면 그 캠프로)
   const HM = { ym: '', memos: null, at: 0, p: null };
   function hmLoad() {
     const ym = ymdLocal(new Date()).slice(0, 7);
@@ -10036,6 +10049,7 @@
     if (!on || !SD.dates.length) { if (!on) box.innerHTML = ''; return; }
     if (mobNeedMonth()) { box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; return; }
     const dates = SD.dates, pdd = pddDate();
+    if (sTd && (sf.camp || sf.q)) { if (sf.camp) sCampKeep = sf.camp; sf.camp = ''; sf.q = ''; $('#sCamp').value = ''; $('#sQ').value = ''; return renderSched(); }
     if (sTd) { // ── 오늘: PDD 하루를 한눈에 (미입차 · 확인 필요 · 출근 · 품앗이 → 지금 처리할 것 → 품앗이 · 용차 → 이슈 · 지시)
       const pi = dates.indexOf(pdd);
       if (pi < 0) { sMonth = monthOf(pdd); box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; schedGo(pdd); return; }
@@ -10087,7 +10101,7 @@
     const myPick = (cur) => '<select class="inp" id="smbMyPick" aria-label="내 줄 고르기" style="width:100%"><option value="">— 내 이름을 골라 주세요 —</option>' + SD.drivers.filter((x) => !x.ex && x.status === '승인').sort((x, y) => (isStaffRow(y) ? 1 : 0) - (isStaffRow(x) ? 1 : 0) || koSort(x.name, y.name)).map((x) => '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + '>' + esc(x.name + (x.title || (TITLES.includes(x.type) ? x.type : '') ? ' ' + (x.title || x.type) : ' · ' + (shortCamp(x.camp || '') || '-'))) + '</option>').join('') + '</select>';
     if (myNone) { box.innerHTML = '<div class="smb-card"><div class="smb-dh">내 스케줄</div><p class="smb-hint" style="margin:6px 0 10px">이 관리자 계정과 아이디 · 이름이 같은 기사 줄을 찾지 못했습니다. 아래에서 본인 이름을 한 번 골라 두면 이 휴대폰에서는 계속 그 줄이 내 스케줄로 보입니다.</p>' + myPick('') + '<button type="button" class="btn ghost" data-smbmng style="width:100%;margin-top:10px">기사 스케줄 관리로 가기</button></div>'; return; }
     if (sMob === 'camp') {
-      if (!sf.camp || !camps.some((c) => c.id === sf.camp)) { sf.camp = camps.length ? camps[0].id : ''; $('#sCamp').value = sf.camp; return renderSched(); }
+      if (!sf.camp || !camps.some((c) => c.id === sf.camp)) { sf.camp = sCampKeep && camps.some((c) => c.id === sCampKeep) ? sCampKeep : camps.length ? camps[0].id : ''; $('#sCamp').value = sf.camp; return renderSched(); }
       const C = camps.find((c) => c.id === sf.camp), cs = shortCamp(C.name);
       const rows = sf.camp === '__staff' ? srows.filter((r) => r.kind === 'd' && r.staff) : srows.filter((r) => r.kind === 'd' && !r.staff && shortCamp(r.camp) === cs);
       const miOf = (i) => (SCHK ? SCHK.mi.filter((x) => x.i === i && String(x.t).split(' ')[0] === cs) : []);
@@ -11762,7 +11776,7 @@
     const s = STX.sum; if (!s) { box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; return; }
     const t = s.total || {}, c = s.company || {}, P = STX.pnl, k = (l, v, sub, cls) => '<div' + (cls ? ' class="' + cls + '"' : '') + '><span>' + l + '</span><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
     const inv = c.invTotal != null && c.invTotal ? c.invTotal : Math.round(((c.supplyCp || 0) - (c.lossCp || 0)) * 1.1);
-    const paid = s.drivers.filter((d) => d.checked).length, head = '<p class="smb-hint" style="margin:0 0 8px">' + esc(s.period.from) + ' ~ ' + esc(s.period.to) + ' · ' + (s.round ? '쿠팡 정산서 ' + s.round + '차' : '쿠팡 정산서 없음') + ' · ' + (s.closed ? '마감 ' + esc(String(s.closed.at).slice(5, 10)) : '마감 전 (금액이 바뀔 수 있음)') + '</p>';
+    const pd = s.period || {}, paid = (s.drivers || []).filter((d) => d.checked).length, head = '<p class="smb-hint" style="margin:0 0 8px">' + esc(pd.from || '') + ' ~ ' + esc(pd.to || '') + ' · ' + (s.round ? '쿠팡 정산서 ' + s.round + '차' : '쿠팡 정산서 없음') + ' · ' + (s.closed ? '마감 ' + esc(String(s.closed.at).slice(5, 10)) : '마감 전 (금액이 바뀔 수 있음)') + '</p>';
     if (STX.fin) {
       const row = (l, v, bold) => '<div class="mr"><span>' + l + '</span><b' + (v < 0 ? ' style="color:var(--danger)"' : '') + '>' + (bold ? wn(v) : wn(v)) + '</b></div>';
       box.innerHTML = head + (P ? '<div class="mk">' + k('러너 순이익 (운영비 뺀 뒤)', wn(P.net), '종소세 전', 'w') + k('쿠팡 매출 (공급가)', wn(P.salesSupply)) + k('기사 매입 (공급가)', wn(P.drvSupply)) + '</div>' +
@@ -15335,7 +15349,7 @@
     if (kept && kept.name) showApp(kept);
     call('adm_check', t).then((r) => {
       if (r.ok) { dcPaint(r.check); admKeep.me(r.admin); if (!kept || !kept.name) showApp(r.admin); else if (me && (me.name !== r.admin.name || me.loginId !== r.admin.loginId)) { me = r.admin; $('#meName').textContent = r.admin.name + ' (' + r.admin.loginId + ')'; } }
-      else { store.del(); showLogin(); }
+      else { store.del(); try { admKeep.clear(); } catch (e) { /* 무시 */ } showLogin(); }
     }).catch(() => { if (!kept || !kept.name) showLogin(); toast('연결이 원활하지 않습니다.'); });
   })();
 })();
