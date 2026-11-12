@@ -10159,7 +10159,7 @@
     const pk = { campId: c0 ? c0.id : myCamp, units: p0.units, special: '', rots: p0.rots, per: p0.per || {} };
     if (!pk.rots.length) pk.rots = sdCampRots(pk.campId);
     const did = String(r.row).split('~')[0];
-    const x0 = (CE_ISS.test(v) ? issOf(did, dt).find((x) => x.result === v) : n && n.mine && !n.whole ? issOf(did, dt).find((x) => x.result === '물량조율') : null) || null; // 이 칸에 붙어 있는 이슈
+    const x0 = (CE_ISS.test(v) ? issOf(did, dt).find((x) => x.result === v) : n && n.mine && !n.whole && d.type !== '백업' ? issOf(did, dt).find((x) => x.result === '물량조율') : null) || null; // 이 칸에 붙어 있는 이슈
     const ik = x0 && x0.kind !== IS.unset ? x0.kind : '';
     CE = { mode: 'cell', pmJobs: jobs0, r: r, dt: dt, d: d, did: did, v0: v, st: st, sub: sub, subs: subs, pk: pk, open: !!rv, touched: false, alt: '', ins: ins0, ins0: ins0, busy: false, yv: yg0 ? yg0.vendor : '', yid: yg0 ? yg0.id : '', ych: yg0 ? yg0.charge : true, yrun: !!(yg0 && yg0.id),
       end: x0 && x0.date === dt ? (x0.end || dt) : dt, x0: x0, ik: ik, ir: x0 ? x0.reason || '' : '', isub: x0 ? x0.sub || '' : '', ik0: ik, ir0: x0 ? x0.reason || '' : '', isub0: x0 ? x0.sub || '' : '' };
@@ -10222,7 +10222,8 @@
       .sort((a, b) => a.rank - b.rank || koSort(a.d.name, b.d.name));
   }
   /** 이 창의 값이 '담당 노선 일부만'(= 물량조율 이슈가 붙는 칸)인가 */
-  const cePartial = () => { const c = CE; if (!c || c.st !== '출근' || c.sub) return false; const n = cellNorm(c.touched ? ceValue() : c.v0, c.r.row, c.dt); return !!n && n.mine && !n.whole; };
+  const cePartial = () => { const c = CE; if (!c || c.st !== '출근' || c.sub || c.d.type === '백업') return false; // 백업 기사는 기본노선의 일부만 타는 날이 정상 → 이슈(물량조율)로 보지 않음
+    const n = cellNorm(c.touched ? ceValue() : c.v0, c.r.row, c.dt); return !!n && n.mine && !n.whole; };
   const ceIssRes = () => (CE_ISS.test(CE.st) ? CE.st : cePartial() ? '물량조율' : '');
   const ceIssOn = () => !!ceIssRes() && !CE.d.ex && CE.dt >= IS.ruleFrom && !(CE.x0 && CE.x0.date < CE.dt && (CE.st === CE.v0 || !CE.touched));
   const ceOurs = (s) => s === '업체백업' || s === '품앗이';

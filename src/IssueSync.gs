@@ -313,7 +313,9 @@ function issFromCells_(a, saved) {
     if (idle(ch)) return; // (앞 칸 처리로 이슈가 바뀌었을 수 있어 그때그때 다시 봄)
     const o = drvOf(ch.row); if (!o) return;
     const ctx = ctxOf(o, ch.date);
-    const cls = issClassify_(ch.value, ctx.base, ctx.rots, ctx.camp);
+    let cls = issClassify_(ch.value, ctx.base, ctx.rots, ctx.camp);
+    // 백업 기사: 기본노선은 '돌아가며 타는 노선 묶음'이라 그중 일부만 타는 날이 정상 (408AB 중 408A) → 물량조율 이슈를 자동으로 만들지 않는다
+    if (cls && cls.result === '물량조율' && str_(o.driverType) === '백업') cls = null;
     // 그날 걸친 연동 이슈
     const hit = hitOf(o.id, ch.date);
     if (hit) {
