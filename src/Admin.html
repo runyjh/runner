@@ -1911,6 +1911,7 @@
             <div class="smore-h">보기</div>
             <label class="check"><input type="checkbox" id="sAll"> 정지·대기 기사도 보기</label>
             <label class="check" id="sStaffAllWrap" title="관리자·운영자·대표 줄은 고른 캠프 기사들 다음에 이어서 나옵니다. 캠프를 고르면 그 기간에 그 캠프 노선을 뛴 사람만 — 체크하면 전원"><input type="checkbox" id="sStaffAll"> 직원 줄 모두 보기 (관리자·운영자·대표)</label>
+            <label class="check" title="품앗이로 받은 기사가 그날 뛰는 캠프·노선이 적히는 줄입니다 (배차 확정 때 자동). 품앗이는 맡긴·받은 기사 칸(🤝)과 위쪽 오늘 카드에 이미 보여서 기본은 숨깁니다. 계산과 쿠팡 업로드에는 숨겨도 그대로 반영됩니다."><input type="checkbox" id="sPmRows"> 품앗이 줄 보기 (표 아래)</label>
             <div class="smore-h">편집</div>
             <button class="btn ghost" id="sFill" title="오늘 이후 빈칸: 고정·품앗이 기사는 출근/고정휴무, 백업 기사는 고정휴무 요일만">빈칸 자동 채우기<small>오늘 이후 빈칸을 출근 · 고정휴무로</small></button>
             <div class="smore-h">기존 스케줄 (병행 기간)</div>
@@ -8665,7 +8666,8 @@
     });
     const rows = list.map((d) => ({ kind: 'd', row: d.id, key: d._key, seg: d._seg || null, d, staff: isStaffRow(d) && !d.ex, camp: isStaffRow(d) && !d.ex ? STAFF_GROUP : (camps[d.campId] ? camps[d.campId].name : '') }));
     // 품앗이 줄 (비고 줄 바로 위): 품앗이로 남의 일을 대신 뛰는 기사 · 날짜 칸 = 그날 뛰는 캠프·라우트 (배차 확정 때 서버가 적음 · 직접 고쳐도 됨)
-    (SD.pmRows || []).filter((pr) => {
+    //  기본은 숨김: 품앗이는 맡긴 기사 · 받은 기사 칸(🤝)과 위쪽 오늘 카드에 이미 보인다 → [⋯ 더 보기] '품앗이 줄 보기'를 켜면 나옴 (계산 · 쿠팡 업로드에는 항상 반영)
+    (sPmRowsOn() ? SD.pmRows || [] : []).filter((pr) => {
       if (q && !qHit([pr.name, pr.loginId].concat(infoOf(pr.driverId || pr.id)))) return false;
       if (campShort && !SD.dates.some((dt) => sget(pr.id, dt).replace(/\s/g, '').includes(campShort))) return false;
       return true;
@@ -9030,10 +9032,12 @@
   function pmLabel(r, dt, pm) {
     const list = pmTipList(r, dt), me = r.d ? r.d.name : '';
     if (!list.length) return '🤝 품앗이 ' + pm;
-    return list.map((t) => (t.from === me && t.to !== me ? '🤝 ' + (t.to || '') + '\n품앗이 맡김' : '🤝 ' + (t.from || '러너') + '\n품앗이 받음')).join('\n');
+    // 둘째 줄에 노선을 같이 (품앗이 줄을 숨겨도 어느 노선인지 보이게): '🤝 배만호 / 맡김 212CD' · '🤝 이현모 / 받음 212CD'
+    return list.map((t) => (t.from === me && t.to !== me ? '🤝 ' + (t.to || '') + '\n맡김' : '🤝 ' + (t.from || '러너') + '\n받음') + (t.route ? ' ' + t.route : '')).join('\n');
   }
   /** 품앗이 칸에서 숨길 칸 글자 (품앗이만 보이게) — 노선 글자 등 다른 값은 그대로 둠 */
   const PM_ONLY = /^(출근|휴무|고정휴무|추가휴무|휴가)?$/;
+  const sPmRowsOn = () => { try { return localStorage.getItem('runner.sch.pmrows') === '1'; } catch (e) { return false; } };
   function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || ''; }
   /** 배차 확정 품앗이가 적힌 품앗이 줄 칸 (잠금) → [{ id, text, from, to }] · 없으면 null */
   function pmLockOf(row, dt) { const l = ((SD.pmLocks || {})[row] || {})[dt]; return l && l.length ? l : null; }
@@ -10473,6 +10477,8 @@
     if (sf.q.trim() && !all.length) loadList(true).then(() => { if (sf.q.trim()) renderSched(); }); // 기사 정보관리 목록이 아직 없으면 불러와서 코드·전화로도 찾게
   });
   $('#sAll').addEventListener('change', (e) => { sf.all = e.target.checked; renderSched(); });
+  try { $('#sPmRows').checked = sPmRowsOn(); } catch (e) { /* 무시 */ }
+  $('#sPmRows').addEventListener('change', (e) => { try { localStorage.setItem('runner.sch.pmrows', e.target.checked ? '1' : '0'); } catch (x) { /* 무시 */ } renderSched(); });
   $('#sStaffAll').addEventListener('change', (e) => { sf.staffAll = e.target.checked; renderSched(); });
   $('#sReload').addEventListener('click', () => schedGo(SD.start));
   // ───── 기사스케줄 → 사무실 품앗이 등록 (고른 칸의 기사·날짜로) ─────
