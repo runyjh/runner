@@ -478,13 +478,13 @@
   .mc .n { font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
   .mc.sun .n { color: var(--danger); } .mc.sat .n { color: var(--brand); }
   .mc .v { font-size: 10.5px; font-weight: 800; line-height: 1.2; border-radius: 4px; padding: 2px 1px; overflow: hidden; white-space: nowrap; text-overflow: clip; background: #eef0f2; text-align: center; letter-spacing: -.3px; }
-  .mc .v.long { font-size: 9px; letter-spacing: -.4px; }
+  .mc .v.long { font-size: 9px; letter-spacing: -.4px; white-space: normal; word-break: keep-all; } /* 노선이 여러 개면 잘리지 않게 줄바꿈 */
   .mc .v.k-pm { background: #c9efd6; color: #0b6b3a; margin-top: 2px; } .mc .v.k-pm.give { background: #dbe8fd; color: #0a53a8; }
   .day.cmate .pmx { display: block; margin-top: 4px; cursor: default; }
   .dsel .pmx { font-size: 12.5px; border-radius: 8px; padding: 6px 10px; line-height: 1.5; word-break: keep-all; cursor: pointer; border: 0; text-align: left; font-family: inherit; display: block; width: 100%; } .dsel .pmx b { margin-right: 6px; }
   .dsel .pmx.r-수행 { background: #e5f6ec; color: #0b6b3a; } .dsel .pmx.r-맡김 { background: #e8f0fd; color: #0a53a8; } .dsel .pmx.r-지원 { background: #f2f4f6; color: #4e5968; } .dsel .pmx.r-done { background: #e5f6ec; color: #0b6b3a; }
   .mc .v.k-work { background: #bfe1f6; color: #0a53a8; } .mc .v.k-off { background: #f08c8c; color: #fff; } .mc .v.k-sick { background: #d4edbc; color: #11734b; }
-  .mc .v.k-mi { background: #d15555; color: #ffcfc9; } .mc .v.k-yong { background: #e6cff2; color: #5a3286; } .mc .v.k-reg { background: #d9f5ef; color: #0b6b57; }
+  .mc .v.k-mi { background: #d15555; color: #ffcfc9; } .mc .v.k-yong { background: #e6cff2; color: #5a3286; } .mc .v.k-reg { background: #d9f5ef; color: #0b6b57; } .mc .v.k-other { background: #fff4d6; color: #99773c; }
   .mc .bkdot { font-size: 9.5px; color: #5a3286; font-weight: 700; }
   .mc .pddt { font-style: normal; font-size: 9.5px; font-weight: 800; color: #fff; background: var(--brand); border-radius: 4px; text-align: center; line-height: 1.5; }
   .mc.td { background: #fff3bf; } /* 오늘 = 노란 바탕 */
@@ -494,7 +494,7 @@
   /* 캠프전체: 날짜 고르기 + 그날 우리 캠프 기사 · 백업 */
   .mc .cwk { font-size: 9.5px; color: #0a53a8; font-weight: 700; white-space: nowrap; margin-top: auto; display: flex; flex-direction: column; line-height: 1.2; } .mc .cwk .bkdot { color: #5a3286; }
   .mc .v .cp { display: block; font-style: normal; font-size: 8.5px; font-weight: 700; opacity: .8; line-height: 1.1; }
-  .mc .n .instdot { position: static; font-size: 10px; margin-left: auto; }
+  .mc .n .instdot { position: static; font-size: 9px; margin-left: auto; white-space: nowrap; letter-spacing: -1px; }
   /* 고른 날 요약 카드 */
   .dsel { background: #fff; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; border: 2px solid transparent; }
   .dsel.pdd { border-color: var(--brand); background: linear-gradient(180deg, #eef4ff, #fff 70%); }
@@ -593,6 +593,9 @@
   .day .val.k-mi { background: #d15555; color: #ffcfc9; }
   .day .val.k-yong { background: #e6cff2; color: #5a3286; }
   .day .val.k-reg { background: #d9f5ef; color: #0b6b57; }
+  .day .val.k-other { background: #fff4d6; color: #99773c; } /* 담당이 아닌 노선 (올인원과 같은 노랑) */
+  .idp { margin-top: 6px; font-size: 13px; font-weight: 700; color: #0b6b57; background: #e6f7f3; border: 1px solid #a9dccf; border-radius: 8px; padding: 5px 10px; line-height: 1.45; word-break: keep-all; } .idp b { font-weight: 800; }
+  .dsel .dmy small.othp { background: #fff4d6; color: #99773c; border-radius: 6px; padding: 1px 7px; }
 
   .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); background: rgba(25,31,40,.92);
     color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; opacity: 0; transition: .2s; pointer-events: none;
@@ -1763,7 +1766,7 @@
       if (r && mm) mm[2].split('').forEach((ch) => { per[mm[1] + ch] = r; });
       return rt;
     });
-    let t = pull(String(v || '').trim());
+    let t = pull(String(v || '').trim()).replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, (m0, id) => (/^[DF]\d$/i.test(id) ? m0 : ' ')); // '(아이디)' 는 회전이 아님
     const rot = ((t.match(/\(([^)]*)\)/) || [])[1] || '').replace(/\s/g, '').toUpperCase();
     t = t.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
     let camp = '';
@@ -1789,14 +1792,40 @@
     const rot = pc.rot;
     return ((pc.camp || camp) ? (pc.camp || camp) + ' ' : '') + pc.routes + (!pc.mixed && rot && rot !== pc.full ? ' (' + rot + ')' : '');
   }
-  function schKind(v) {
+  // ── 올인원(사무실 화면)과 같은 규칙 ──
+  /** 그 기사가 쓰는 다른 아이디 (서브아이디 + 같은 근무자 연결의 다른 명의 아이디) */
+  const schIdsOf = (x) => ((x && x.subIds) || []).concat(((x && x.alias) || []).map((a) => a.login)).map((t) => String(t || '').replace(/@.*/, '').toLowerCase()).filter(Boolean);
+  const schCellIds = (v) => { const o = []; String(v || '').replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, (m0, id) => { if (!/^[DF]\d$/i.test(id)) o.push(id.toLowerCase()); return m0; }); return o; };
+  /** 그날 내 다른 아이디로 업무등록하는 칸이면 그 아이디 ('' = 아님) */
+  const schRegId = (v, ids) => (/업무등록/.test(String(v || '')) && !/추가업무등록/.test(String(v || '')) ? schCellIds(v).find((id) => (ids || []).includes(id)) || '' : '');
+  /** 근무일 판정 (서버 schWorkDay_ · 정산 근무일수와 같은 규칙) */
+  function schWork(v, ids) {
+    const s = String(v || '').trim();
+    if (!s) return false;
+    if (/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(s)) return false;
+    if (/업무/.test(s)) return !!schRegId(s, ids);
+    return /^출근/.test(s) || /\d{3,4}[A-Za-z]/.test(s) || /변경/.test(s);
+  }
+  /** 노선 없이 '(내 다른 아이디) 업무등록' 만 적힌 칸 = 담당 노선 출근 (올인원과 같음) */
+  const schOwn = (v, ids) => (schRegId(v, ids) && !/\d{3,4}[A-Za-z]/.test(String(v)) ? '출근' : v);
+  /** 화면에 보일 칸 글자: 사무실용 용차 표기(업체 · 아이디 · 청구 여부)는 '용차' 로 */
+  const schShow = (v) => (/^용차\s/.test(String(v || '')) ? '용차' : String(v || ''));
+  const instLbl = () => (isStaffUser() ? '📅 일정 메모' : '📌 지시사항'), instIco = () => (isStaffUser() ? '📅' : '📌');
+  /** 칸 색: ids = 내 다른 아이디, base = 담당 노선, home = 소속 캠프 (주면 담당이 아닌 노선은 노랑 k-other) */
+  function schKind(v, ids, base, home) {
     const s = String(v || '').trim();
     if (s === '출근') return 'k-work';
-    if (/미입차/.test(s)) return 'k-mi';
+    if (/미입차|노쇼/.test(s)) return 'k-mi';
     if (/휴무|휴가/.test(s)) return 'k-off';
     if (/병가/.test(s)) return 'k-sick';
     if (/용차/.test(s)) return 'k-yong';
-    if (/업무등록/.test(s)) return 'k-reg';
+    if (/업무등록/.test(s)) { if (!schRegId(s, ids)) return 'k-reg'; if (!/\d{3,4}[A-Za-z]/.test(s)) return 'k-work'; }
+    if (base != null && /\d{3,4}[A-Za-z]/.test(s) && !/변경/.test(s)) {
+      const pc = schParse(s, ''), b = schParse(String(base || ''), '').codes, nz = (t) => String(t || '').replace(/\s|캠프$/g, '');
+      if (!pc.codes.length) return '';
+      const other = !!pc.camp && !!nz(home) && nz(pc.camp) !== nz(home);
+      return !other && b.length && pc.codes.every((c) => b.includes(c)) ? 'k-work' : 'k-other';
+    }
     return '';
   }
   let scMode = 'month', scMonth = '', scSel = '';
@@ -1875,7 +1904,7 @@
     if (r.noCamp) { $('#scBody').innerHTML = picker + '<div class="card" style="text-align:center;color:var(--sub)">' + (r.pick ? '위에서 캠프를 골라 주세요.' : '소속 캠프가 정해지지 않았습니다. 사무실에 문의해 주세요.') + '</div>'; return; }
     // 한 달 달력: 날마다 근무 인원 · 백업 인원 · 내 칸
     const [yy, mo] = (r.month || r.dates[0].slice(0, 7)).split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
-    const isWork = (v) => v && !/휴무|휴가|병가|퇴사/.test(v);
+    const isWork = (v, x) => schWork(v, schIdsOf(x)); // 올인원과 같은 근무일 규칙 (용차 · 미입차 · 노쇼 · 업체 아이디만 쓴 날은 근무 아님)
     const me = r.drivers.find((x) => x.me);
     // 백업 기사: 날짜마다 '그날 입차 캠프'(내 칸의 캠프) 기준. 소속 캠프면 home
     const home = { camp: r.camp, campId: r.campId, drivers: r.drivers, backup: r.backup || {}, pm: r.pm || {} };
@@ -1885,17 +1914,17 @@
     // 그날 이 캠프의 배차 확정 품앗이 · 받은 기사가 목록에 없으면(다른 캠프 소속·휴무 칸) 따로 한 줄
     const pmDay = (C, dd) => (C.pm || {})[dd] || [];
     const pmExtra = (C, dd) => { const on = onDay(C, dd); return pmDay(C, dd).filter((j) => !on.some((x) => x.id === j.toId)); }; // 받은 기사가 그날 목록에 없음 → 따로 한 줄
-    const pmMore = (C, dd) => { const on = onDay(C, dd); return pmDay(C, dd).filter((j) => !on.some((x) => x.id === j.toId && isWork(x.cells[dd]))).length; }; // 근무 인원에 더할 품앗이 수행자 (본인 칸이 휴무·빈칸)
+    const pmMore = (C, dd) => { const on = onDay(C, dd); return pmDay(C, dd).filter((j) => !on.some((x) => x.id === j.toId && isWork(x.cells[dd], x))).length; }; // 근무 인원에 더할 품앗이 수행자 (본인 칸이 휴무·빈칸)
     const cells = [];
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((dd) => {
       const C = campFor(dd);
-      const day = +dd.slice(8), dow = (lead + day - 1) % 7, w = onDay(C, dd).filter((x) => isWork(x.cells[dd])).length + pmMore(C, dd), nb = ((C.backup || {})[dd] || []).length, mv = me ? me.cells[dd] || '' : '';
+      const day = +dd.slice(8), dow = (lead + day - 1) % 7, w = onDay(C, dd).filter((x) => isWork(x.cells[dd], x)).length + pmMore(C, dd), nb = ((C.backup || {})[dd] || []).length, mv = me ? schOwn(me.cells[dd] || '', schIdsOf(me)) : '';
       // 칸 글자가 잘리지 않게: 캠프명(다른 캠프일 때만 작은 꼬리표) · 라우트는 529A,529B → 529AB 로 줄임 · 회전(D1,D2)은 아래 요약에만
       const pc = mv ? schParse(mv, me ? me.route : '') : null;
       const chip = !pc ? '' : pc.routes
-        ? '<span class="v ' + (schKind(mv) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || C.camp) && (r.multi || (pc.camp && pc.camp !== r.camp)) ? '<i class="cp">' + escH(pc.camp || C.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
-        : '<span class="v ' + schKind(mv) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
+        ? '<span class="v ' + (schKind(mv, schIdsOf(me), me ? me.route : '', C.camp) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || C.camp) && (r.multi || (pc.camp && pc.camp !== r.camp)) ? '<i class="cp">' + escH(pc.camp || C.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        : '<span class="v ' + schKind(mv, schIdsOf(me)) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const hasInst = (me && (me.inst || {})[dd]) || r.drivers.some((x) => (x.inst || {})[dd]);
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[dd] ? ' sun' : dow === 6 ? ' sat' : '') + (dd === pdd ? ' pdd' : '') + (dd === r.today ? ' td' : '') + (dd === scCampDay ? ' sel' : '') + '" data-cd="' + dd + '">' +
         '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + (hasInst ? '<span class="instdot" title="지시사항">📌</span>' : '') + '</span>' + (dd === pdd ? '<em class="pddt">PDD</em>' : '') +
@@ -1910,7 +1939,7 @@
     const est = d > sunThis; // 이번 주(토요일)까지는 확정, 그 뒤는 예상
     const D = campFor(d), guest = D !== home, list = onDay(D, d);
     const pmD = pmDay(D, d), pmX = pmExtra(D, d);
-    const work = list.filter((x) => { const v = x.cells[d] || ''; return v && !/휴무|휴가|병가|퇴사/.test(v); }).length + pmMore(D, d);
+    const work = list.filter((x) => isWork(x.cells[d] || '', x)).length + pmMore(D, d);
     const pmRows = pmX.map((j) => '<div class="day cmate"><div class="dt"><b class="rt">' + escH(j.route || j.area || '') + '</b><span class="nm">' + escH(j.to) + '</span><small>품앗이</small></div>' +
       '<div class="vc"><div class="pmx r-수행"><b>🤝 품앗이 수행</b>' + escH(j.fromId ? j.from + ' 기사님 일' : '러너 노선') + '</div></div></div>').join('');
     const rows = list.map((x) => {
@@ -1923,7 +1952,7 @@
       const pc = v ? schParse(v, x.route || '') : null, rtTxt = pmOn ? takes.map((j) => j.route).filter(Boolean).join(',') : pc && pc.routes ? pc.routes : (x.route ? schParse(x.route, '').routes || x.route : '');
       return '<div class="day cmate' + (x.me ? ' me' : '') + '"><div class="dt">' + (rtTxt ? '<b class="rt">' + escH(rtTxt) + '</b>' : '<b class="rt none">—</b>') +
         '<span class="nm">' + escH(x.name) + (x.me ? ' <small style="display:inline;color:#b7791f">(나)</small>' : '') + '</span>' + (x.type || x.guest ? '<small>' + escH(x.type || '') + (x.guest && x.homeCamp ? ' · 소속 ' + escH(x.homeCamp) : '') + '</small>' : '') + '</div>' +
-        '<div class="vc"><div class="val ' + (pmOn ? 'k-work' : v ? (schKind(v) || (pc && pc.routes ? 'k-work' : '')) : 'none') + '">' + (pmOn ? '품앗이 근무' : v ? escH(schNice(v, D.camp, x.route)) : gives.length ? '품앗이로 맡김' : '미정') + '</div>' + pmLine +
+        '<div class="vc"><div class="val ' + (pmOn ? 'k-work' : v ? (schKind(v, schIdsOf(x), x.route || '', x.guest ? x.homeCamp : D.camp) || (pc && pc.routes ? 'k-work' : '')) : 'none') + '">' + (pmOn ? '품앗이 근무' : v ? escH(schRegId(v, schIdsOf(x)) && !(pc && pc.routes) ? '출근' : schNice(v, D.camp, x.route)) : gives.length ? '품앗이로 맡김' : '미정') + '</div>' + (x.me && !pmOn && schRegId(v, schIdsOf(x)) ? '<div class="idp">🆔 <b>' + escH(schRegId(v, schIdsOf(x))) + '</b> 아이디로 등록</div>' : '') + pmLine +
         ((x.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(x.inst[d]) + '</div>' : '') + '</div></div>';
     }).join('');
     const bk = (D.backup || {})[d] || [];
@@ -1935,7 +1964,7 @@
         '<div class="wk"><h3>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + (r.holidays[d] ? ' ' + escH(r.holidays[d]) : '') + '<small class="' + (est ? 'est' : 'fix') + '">' + (est ? '예상 · 변동 있음' : '확정') + '</small></h3>' +
         '<p class="hint" style="margin:-2px 0 6px">이날은 입차 캠프가 없습니다. 칸에 캠프·노선이 적히거나 품앗이가 확정되면 그 캠프 기사님들과 백업 일정이 보입니다.</p>' +
         '<div class="day cmate me"><div class="dt"><b class="rt none">—</b><span class="nm">' + escH(me ? me.name : '') + ' <small style="display:inline;color:#b7791f">(나)</small></span></div>' +
-        '<div class="vc"><div class="val ' + (mv ? schKind(mv) : 'none') + '">' + (mv ? escH(mv) : '미정') + '</div></div></div></div><div id="riBox"></div>';
+        '<div class="vc"><div class="val ' + (mv ? schKind(mv, schIdsOf(me)) : 'none') + '">' + (mv ? escH(schShow(mv)) : '미정') + '</div></div></div></div><div id="riBox"></div>';
       return;
     }
     $('#scBody').innerHTML = picker + chips +
@@ -2129,8 +2158,9 @@
     const pm = pmOfDay(r, d).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : x.status === '확정' ? ' 확정' : '') + '</b>' + escH(x.text) + '</button>').join('');
     return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
       '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +
-      '<div class="vc"><div class="val ' + (v ? schKind(v) : 'none') + '">' + (v ? escH(v) : '미정') + '</div>' +
-      ((r.inst || {})[d] ? '<div class="inst"><b>📌 지시사항</b>' + escH(r.inst[d]) + '</div>' : '') + pmDoneRow(r, d) + pm + bk + '</div></div>';
+      '<div class="vc"><div class="val ' + (v ? schKind(v, schIdsOf(r), r.baseRoute || '', r.camp || '') : 'none') + '">' + (v ? escH(schShow(v)) : '미정') + '</div>' +
+      (schRegId(v, schIdsOf(r)) ? '<div class="idp">🆔 <b>' + escH(schRegId(v, schIdsOf(r))) + '</b> 아이디로 등록</div>' : '') +
+      ((r.inst || {})[d] ? '<div class="inst"><b>' + instLbl() + '</b>' + escH(r.inst[d]) + '</div>' : '') + pmDoneRow(r, d) + pm + bk + '</div></div>';
   }
   /** 내가 올린 품앗이가 배차 확정 + 그날 내 칸과 캠프·라우트가 같을 때 */
   /** 그날 내 품앗이 목록 · 맡겨서 확정된 일감은 '배차확정 완료' 줄로 이미 보이면 뺀다 (겹침 방지) */
@@ -2161,20 +2191,23 @@
   }
   /** 고른 날 요약 카드 (한 달 · 내 캠프 공용): 날짜 + PDD/출근일 안내 · 내 노선 크게 · 인원 · 지시사항 */
   function dselCard(o) {
+    const cell0 = o.cell; o = Object.assign({}, o, { cell: schOwn(o.cell, o.ids) });
     const d = o.d, p = d.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
     const prev = new Date(+p[0], +p[1] - 1, +p[2] - 1), prevTxt = (prev.getMonth() + 1) + '/' + prev.getDate() + ' (' + DOWK[prev.getDay()] + ')';
     const mp = o.cell ? schParse(o.cell, o.baseRoute || '') : null;
     const myLine = o.pmWork ? '<b class="tag" style="background:#c9efd6;color:#0b6b3a">🤝 품앗이 근무</b>' + (o.cell ? ' <small style="color:var(--sub)">내 노선은 ' + escH(o.cell) + '</small>' : '')
       : !o.cell ? '<span class="none">아직 정해지지 않음</span>'
       : mp.routes ? (mp.camp || o.camp ? '<b>' + escH((mp.camp || o.camp) + ' 캠프') + '</b> ' : '') + '<b class="rt">' + escH(mp.codes.join(' · ')) + '</b>' + (mp.rot && !mp.mixed && mp.rot.replace(/\s/g, '').toUpperCase() !== fullRot(mp.camp || o.camp) ? '<small>회전 ' + escH(mp.rot) + '</small>' : '') + (/출근/.test(o.cell) && !/\d/.test(o.cell) ? '<small>출근</small>' : '')
-      : '<b class="' + schKind(o.cell) + ' tag">' + escH(mp.raw) + '</b>';
+      : '<b class="' + schKind(o.cell, o.ids) + ' tag">' + escH(mp.raw) + '</b>';
+    const rid = o.pmWork ? '' : schRegId(cell0, o.ids), oth = !o.pmWork && !rid && o.cell && mp.routes && schKind(o.cell, o.ids, o.baseRoute || '', o.camp || '') === 'k-other';
     return '<div class="dsel' + (d === o.pdd ? ' pdd' : '') + '">' +
       '<div class="dd"><b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b>' + (d === o.pdd ? '<em class="pddt">PDD · 내일 배송</em>' : d === o.today ? '<em class="today">오늘</em>' : '') + (o.holiday ? '<em class="hol">' + escH(o.holiday) + '</em>' : '') +
         (o.est != null ? '<span class="st ' + (o.est ? 'est' : 'fix') + '">' + (o.est ? '예상 · 변동 있음' : '확정') + '</span>' : '') + '</div>' +
       '<div class="dwork">PDD 기준일 <b>' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')</b> · 실제 출근일 <b>' + prevTxt + ' 저녁 입차</b></div>' +
-      '<div class="dmy">' + myLine + '</div>' +
+      '<div class="dmy">' + myLine + (oth ? ' <small class="othp">담당 아닌 노선</small>' : '') + '</div>' +
+      (rid ? '<div class="idp">🆔 이날은 <b>' + escH(rid) + '</b> 아이디로 업무등록</div>' : '') +
       (o.sum ? '<div class="dsum">' + o.sum + '</div>' : '') +
-      (o.inst ? '<div class="inst"><b>📌 지시사항</b>' + escH(o.inst) + '</div>' : '') + (o.extra || '') + '</div>';
+      (o.inst ? '<div class="inst"><b>' + (o.instLbl || '📌 지시사항') + '</b>' + escH(o.inst) + '</div>' : '') + (o.extra || '') + '</div>';
   }
   function renderMonth(r) {
     scLast = r;
@@ -2182,18 +2215,19 @@
     if (!scSel || !r.dates.includes(scSel)) scSel = r.dates.includes(pdd) ? pdd : r.dates[0];
     const lead = new Date(y, m - 1, 1).getDay();
     let work = 0, off = 0;
-    r.dates.forEach((d) => { const v = String(r.cells[d] || ''); const pmW = pmOfDay(r, d).some((x) => x.role === '수행' && x.status === '확정'); if (pmW && (!v || /휴무|휴가/.test(v))) { work++; return; } if (!v) return; if (/휴무|휴가|병가|퇴사/.test(v)) off++; else if (!/미입차/.test(v)) work++; }); // 휴무인 날 품앗이를 뛰면 근무로
+    const myIds = schIdsOf(r); // 올인원과 같은 근무일 규칙: 내 서브·다른 명의 아이디로 뛴 날은 근무, 용차·미입차·노쇼·업체 아이디만 쓴 날은 근무 아님
+    r.dates.forEach((d) => { const v = String(r.cells[d] || ''); const pmW = pmOfDay(r, d).some((x) => x.role === '수행' && x.status === '확정'); if (pmW && (!v || /휴무|휴가/.test(v))) { work++; return; } if (!v) return; if (/휴무|휴가|병가|퇴사/.test(v)) off++; else if (schWork(v, myIds)) work++; }); // 휴무인 날 품앗이를 뛰면 근무로
     const cells = [];
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((d) => {
-      const day = +d.slice(8), dow = (lead + day - 1) % 7, v = r.cells[d] || '', np = pmOfDay(r, d);
+      const day = +d.slice(8), dow = (lead + day - 1) % 7, v0 = r.cells[d] || '', v = schOwn(v0, myIds), np = pmOfDay(r, d);
       const pmC = pmCell(r, d), pmChip = pmC.html, pmWork = pmC.work;
       // 칸에는 내 노선(줄임 표기)만. 지시·품앗이·확정완료는 작은 아이콘, 백업/근무 인원 글자는 없음 (아래 요약·상세에)
       const pc = v ? schParse(v, r.baseRoute || '') : null;
       const chip = !pc ? '' : pc.routes
-        ? '<span class="v ' + (schKind(v) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || r.camp) ? '<i class="cp">' + escH(pc.camp || r.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
-        : '<span class="v ' + schKind(v) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
-      const icons = ((r.inst || {})[d] ? '<span title="지시사항">📌</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
+        ? '<span class="v ' + (schKind(v, myIds, r.baseRoute || '', r.camp || '') || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || r.camp) ? '<i class="cp">' + escH(pc.camp || r.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        : '<span class="v ' + schKind(v, myIds) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
+      const icons = ((r.inst || {})[d] ? '<span title="' + (isStaffUser() ? '일정 메모' : '지시사항') + '">' + instIco() + '</span>' : '') + (schRegId(v0, myIds) ? '<span title="다른 아이디로 업무등록">🆔</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === r.today ? ' td' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
         '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
         (d === pdd ? '<em class="pddt">PDD</em>' : '') + (pmWork && (!v || /휴무|휴가/.test(v)) ? '' : chip) + pmChip + '</button>');
@@ -2207,7 +2241,7 @@
     const d = scSel, bk = (r.backup || {})[d] || [];
     const pm = pmOfDay(r, d).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : x.status === '확정' ? ' 확정' : '') + '</b>' + escH(x.text) + '</button>').join('');
     const extra = pmDoneRow(r, d) + pm;
-    return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', pmWork: pmCell(r, d).work && (!r.cells[d] || /휴무|휴가/.test(r.cells[d])), baseRoute: r.baseRoute || '', camp: r.camp || '', inst: (r.inst || {})[d] || '',
+    return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', pmWork: pmCell(r, d).work && (!r.cells[d] || /휴무|휴가/.test(r.cells[d])), baseRoute: r.baseRoute || '', camp: r.camp || '', ids: schIdsOf(r), instLbl: instLbl(), inst: (r.inst || {})[d] || '',
       sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk.length ? ' · 들어오는 백업 <b>' + bk.length + '</b>명' : ' · 이 날 들어오는 백업 없음') : ''), extra });
   }
   $('#scBody').addEventListener('change', (e) => {

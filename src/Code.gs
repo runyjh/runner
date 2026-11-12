@@ -4850,7 +4850,8 @@ function schDriver_(o) {
     workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
     workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o),
     subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean), // 칸 편집기 '서브아이디 업무등록' 추천용
-    workerId: str_(o.workerId), alias: []
+    workerId: str_(o.workerId), alias: [],
+    phone: str_(o.phone), carName: str_(o.carName), joinDate: str_(o.createdAt).slice(0, 10) // 기사스케줄 오른쪽 확인용 칸 (관리자 화면에만 내려감)
   };
 }
 
@@ -5417,7 +5418,19 @@ function api_mySchedule(token, month) {
     }
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
-    try { const me0 = driverById_(String(s.d)); out.baseRoute = me0 ? str_(me0.baseRoute) : ''; } catch (e) { out.baseRoute = ''; }
+    // 같은 근무자 연결: 명의 계정으로 들어와도 근무자 줄(스케줄 한 줄)을 본다 · 그날 쓸 아이디(서브 · 다른 명의)를 앱이 알 수 있게 내려 준다
+    let rowId = String(s.d);
+    out.subIds = []; out.alias = [];
+    try {
+      const allD = readAll_(SH.DRIVERS), lk = schLinkMap_(allD);
+      const meO = allD.filter(function (o) { return o.id === String(s.d); })[0], wk = lk.workerOf[String(s.d)] || meO;
+      if (wk) {
+        rowId = String(wk.id);
+        out.baseRoute = str_(wk.baseRoute); out.loginId = str_(wk.loginId);
+        out.subIds = schSubIdsOf_(wk); out.alias = lk.aliasOf[wk.id] || [];
+        if (wk !== meO) out.workerName = wk.name;
+      } else out.baseRoute = '';
+    } catch (e) { try { const me0 = driverById_(String(s.d)); out.baseRoute = me0 ? str_(me0.baseRoute) : ''; } catch (e2) { out.baseRoute = ''; } }
     out.campRots = campRotMap_(); // '출근' 칸을 기본노선 코드로 보여 주기 위해
     // 노선 변경 예약 안내: '11/11부터 군포1캠프 212AB'
     try {
@@ -5434,7 +5447,7 @@ function api_mySchedule(token, month) {
     const row = (function () {
       const sh = schSheet_(), last = sh.getLastRow();
       if (last < 2) return 0;
-      const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(String(s.d)).matchEntireCell(true).matchCase(true).findNext();
+      const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(rowId).matchEntireCell(true).matchCase(true).findNext();
       return cell ? cell.getRow() : 0;
     })();
     const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
@@ -5446,13 +5459,13 @@ function api_mySchedule(token, month) {
     }
     // 추가 배정 캠프 줄: 그 캠프 칸에 적힌 것을 '캠프 노선' 으로 붙여 보여 줌 (예: 출근 → 강서1 527B)
     try {
-      const me = driverById_(String(s.d)), ex = me ? extraAssignOf_(me) : [];
+      const me = driverById_(rowId), ex = me ? extraAssignOf_(me) : [];
       if (ex.length) {
         const sh = schSheet_(), last = sh.getLastRow(), cn = {};
         master_().camps.forEach(function (c) { cn[c.id] = String(c.name).replace(/캠프$/, ''); });
         const ids = last >= 2 ? sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); }) : [];
         ex.forEach(function (x) {
-          const i = ids.indexOf(schExId_(String(s.d), x.c)); if (i < 0) return;
+          const i = ids.indexOf(schExId_(rowId, x.c)); if (i < 0) return;
           const vals = sh.getRange(i + 2, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
           dates.forEach(function (d) {
             const c = h.dates[d]; if (c === undefined) return;
@@ -5469,7 +5482,7 @@ function api_mySchedule(token, month) {
       try { out.staff = schStaffOf_(String(s.d), dates, h, c0, c1); } catch (e) { out.staff = {}; }
     } else {
       try {
-        const bk = schMyCampBackup_(s.d, dates, h, c0, c1);
+        const bk = schMyCampBackup_(rowId, dates, h, c0, c1);
         out.camp = bk.camp; out.backup = bk.list;
       } catch (e) { out.backup = {}; }
     }
@@ -5477,7 +5490,7 @@ function api_mySchedule(token, month) {
     try { out.pmDone = pmDoneOf_(String(s.d), out.cells, info.camp || out.camp || ''); } catch (e) { out.pmDone = {}; }
     // 관리자가 기사스케줄 칸에 적은 지시사항 (스케줄 이슈 '지시')
     out.inst = {};
-    try { schIssues_(dates[0], dates[dates.length - 1]).forEach(function (x) { if (x.kind === '지시' && x.driverId === String(s.d) && x.reason) out.inst[x.date] = x.reason; }); } catch (e) { out.inst = {}; }
+    try { schIssues_(dates[0], dates[dates.length - 1]).forEach(function (x) { if (x.kind === '지시' && x.driverId === rowId && x.reason) out.inst[x.date] = x.reason; }); } catch (e) { out.inst = {}; }
     return fsW(out);
   });
 }
@@ -5531,8 +5544,10 @@ function api_campSchedule(token, month, campId) {
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, holidays: {}, camp: '', drivers: [], backup: {} , campRots: campRotMap_() };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
     try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); }
-    const all = readAll_(SH.DRIVERS).filter(function (o) { return o.id; });
-    const me = all.filter(function (o) { return o.id === String(s.d); })[0];
+    const all0 = readAll_(SH.DRIVERS).filter(function (o) { return o.id; }), lk = schLinkMap_(all0);
+    // 같은 근무자 연결: 명의 기사는 목록에서 빼고 (스케줄은 근무자 한 줄), 명의 계정으로 들어오면 근무자로 본다
+    const all = all0.filter(function (o) { return !lk.workerOf[o.id]; });
+    const me = lk.workerOf[String(s.d)] || all.filter(function (o) { return o.id === String(s.d); })[0];
     // 노선 변경 예약: 날짜마다 그날 그 캠프에 있는 기사만 (적용일부터 새 캠프 쪽에 보인다)
     let rcBy = {};
     try { rcBy = rcByDriver_(); } catch (e) { rcBy = {}; }
@@ -5594,7 +5609,7 @@ function api_campSchedule(token, month, campId) {
       if (forceMe && !inCamp[me.id]) { const all1 = {}; dates.forEach(function (d) { all1[d] = 1; }); inCamp[me.id] = { days: all1, route: me.baseRoute || '', guest: true, home: out.camp }; }
       const byId = {};
       all.filter(function (o) { return inCamp[o.id]; }).forEach(function (o) {
-        byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', loginId: str_(o.loginId), subIds: [o.subId1, o.subId2].map(str_).filter(Boolean), phone: o.phone ? fmtPhone_(o.phone) : '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].home || '', cells: {}, away: {}, order: 1e9 };
+        byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', loginId: str_(o.loginId), subIds: [o.subId1, o.subId2].map(str_).filter(Boolean), alias: lk.aliasOf[o.id] || [], phone: o.phone ? fmtPhone_(o.phone) : '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].home || '', cells: {}, away: {}, order: 1e9 };
         // 노선 변경·이관으로 이 캠프에 없는 날 (예: 11/11부터 군포1로 간 기사는 그날부터 안양1 목록에서 빠짐)
         if (!inCamp[o.id].guest) { const off = {}; let n = 0; dates.forEach(function (d) { if (!inCamp[o.id].days[d]) { off[d] = 1; n++; } }); if (n) byId[o.id].off = off; }
       });
@@ -5628,7 +5643,7 @@ function api_campSchedule(token, month, campId) {
       // 소속 없음: 내 줄만 (그날 칸 그대로) · 갈 캠프가 없는 날은 앱이 '입차 캠프 없음'으로 보여 줌
       const cells = {};
       if (hasSheet) dates.forEach(function (d) { const v = cellAt(String(me.id), d); if (v) cells[d] = v; });
-      return { drivers: [{ id: me.id, name: me.name, route: me.baseRoute || '', type: me.driverType || '', me: true, guest: false, homeCamp: '', cells: cells, away: {} }], backup: {}, pm: {} };
+      return { drivers: [{ id: me.id, name: me.name, route: me.baseRoute || '', type: me.driverType || '', subIds: schSubIdsOf_(me), alias: lk.aliasOf[me.id] || [], me: true, guest: false, homeCamp: '', cells: cells, away: {} }], backup: {}, pm: {} };
     })() : buildCamp(myCampId, false);
     out.drivers = home.drivers; out.backup = home.backup; out.pm = home.pm;
     try { out.pumasi = pmScheduleOf_(String(me.id), dates); } catch (e) { out.pumasi = {}; }
@@ -6060,6 +6075,18 @@ function schWorkDay_(v, subIds) {
   }
   return /^출근/.test(s) || /\d{3,4}[A-Za-z]/.test(s) || /변경/.test(s);
 }
+/** 같은 근무자 연결 표 (기사 앱용 · schRead_ 와 같은 규칙): { workerOf: { 명의 기사ID: 근무자 }, aliasOf: { 근무자ID: [{ name, login }] } } */
+function schLinkMap_(all) {
+  const byId = {}, workerOf = {}, aliasOf = {};
+  (all || []).forEach(function (o) { if (o.id) byId[o.id] = o; });
+  (all || []).forEach(function (o) {
+    const wid = str_(o.workerId), w = wid && wid !== o.id ? byId[wid] : null;
+    if (!w || str_(w.workerId)) return;
+    workerOf[o.id] = w;
+    if (str_(o.loginId)) (aliasOf[w.id] = aliasOf[w.id] || []).push({ name: o.name, login: str_(o.loginId) });
+  });
+  return { workerOf: workerOf, aliasOf: aliasOf };
+}
 function schSubIdsOf_(o) { return o ? [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean) : []; }
 function schIsWork_(v, subIds) { return schWorkDay_(v, subIds); }
 function schIsRest_(v) { return /휴무|휴가|병가/.test(str_(v)); }
@@ -6081,7 +6108,9 @@ function schCellsOf_(driverId, dates) {
 /** 그 기사가 이미 근무 스케줄이 있는 날 (휴무·휴가·병가·퇴사·미입차·용차 칸은 근무 아님) */
 function schWorkDates_(driverId, from, to) {
   const cells = schCellsOf_(driverId, schDateRange_(parseYmd_(from), parseYmd_(to)));
-  return Object.keys(cells).filter(function (d) { return schIsWork_(cells[d]); }).sort();
+  let subs = [];
+  try { subs = schSubIdsOf_(driverById_(String(driverId))); } catch (e) { subs = []; }
+  return Object.keys(cells).filter(function (d) { return schIsWork_(cells[d], subs); }).sort();
 }
 /** year = 'yyyy' 또는 'all'(스케줄 DB 전체 기간) */
 function adm_schYear(token, year) {

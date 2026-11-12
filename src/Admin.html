@@ -976,7 +976,9 @@
   .sg .fx { position: sticky; background: #fff; z-index: 2; text-align: left; }
   .sg thead .fx { z-index: 4; background: #fafbfc; }
   .sg .f2 { left: 0; width: 124px; min-width: 124px; max-width: 124px; overflow: hidden; }
-  .sg .f4 { left: 124px; width: 84px; min-width: 84px; max-width: 84px; overflow: hidden; font-weight: 600; box-shadow: 1px 0 0 var(--line); }
+  .sg .f3 { left: 124px; width: 100px; min-width: 100px; max-width: 100px; overflow: hidden; font-size: 11px; color: var(--sub); line-height: 1.3; overflow-wrap: anywhere; }
+  .sg .f3 small { display: block; font-size: 10px; font-weight: 700; } .sg .f3 small.sub { color: #15803d; } .sg .f3 small.al { color: #0f766e; }
+  .sg .f4 { left: 224px; width: 84px; min-width: 84px; max-width: 84px; overflow: hidden; font-weight: 600; box-shadow: 1px 0 0 var(--line); }
   .sg td.f4 { white-space: normal; overflow-wrap: anywhere; word-break: keep-all; line-height: 1.3; padding-top: 3px; padding-bottom: 3px; } /* 기본노선은 자르지 않고 줄바꿈 */
   .sg td.f4 .ct { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 0 3px; margin-left: 2px; background: rgba(0,0,0,.07); vertical-align: 1px; }
   .sg td.f4 .rcb.mv { display: block; width: fit-content; max-width: 100%; white-space: normal; margin-top: 2px; color: #0b5cad; background: #e3efff; }
@@ -1077,6 +1079,21 @@
   .rz-all { margin-top: 28px; border: 1px solid #fecaca; border-radius: 12px; background: #fff; padding: 10px 14px; }
   .rz-all summary { cursor: pointer; font-weight: 800; color: #b91c1c; } .rz-all summary small { font-weight: 600; color: var(--sub); margin-left: 8px; }
   .rz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+  /* 칸 사이 구분선: 같은 색 칸(출근·출근)이 한 덩어리로 붙어 보이지 않게 흰 선 + 아주 옅은 안쪽 선 (과하지 않게) */
+  .sg td.c { border-right: 2px solid #fff; border-bottom: 2px solid #fff; box-shadow: inset -1px -1px 0 rgba(15, 23, 42, .06); }
+  /* 아이콘은 뜻 하나씩: 🚩 이슈(왼쪽 위) · 노랑 ⚠ 확인 필요 · 보라 박스+번호 중복 · 📌/📅 메모(오른쪽 위) */
+  .sg td.c { position: relative; }
+  .sg td.c.iss { background-image: none; }
+  .sg td.c.today.iss { background-image: linear-gradient(#1b64da, #1b64da), linear-gradient(#1b64da, #1b64da) !important; background-size: 2px 100%, 2px 100% !important; background-position: left top, right top !important; background-repeat: no-repeat !important; }
+  .sg td.c .ci-iss { position: absolute; top: 1px; left: 2px; font-size: 11px; line-height: 1; font-style: normal; }
+  .sg td.c .dupn { position: absolute; bottom: 1px; right: 2px; font-style: normal; font-size: 11px; line-height: 1; color: #7c3aed; font-weight: 800; background: #fff; border-radius: 999px; }
+  .sg td.c.mis::before { color: #d97706 !important; } .wy { color: #d97706; font-style: normal; font-weight: 800; }
+  .sg th.dc.today { background-color: #1b64da !important; } .sg th.dc.today b, .sg th.dc.today small, .sg th.dc.today b::after { color: #fff !important; }
+  .sg td.today { box-shadow: inset 0 0 0 9999px rgba(27,100,218,.09); }
+  .schk .pddp { border: 0; background: #1b64da; color: #fff; border-radius: 999px; padding: 6px 12px; font-weight: 800; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+  .schk .chip.is i { background: #dc2626; } .schk .chip.in i { background: #0f766e; } .schk .chip.me i { background: #0f766e; } .schk .chip.nov { border-color: #fcd34d; } .schk .chip.du { border-color: #c4b5fd; }
+  .schk .slg2 { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 12px; color: #475569; } .schk .slg2 b { color: var(--ink); }
+  .schk .slg2 .dbx { font-style: normal; box-shadow: inset 0 0 0 2px #8b5cf6; border-radius: 4px; padding: 0 5px; }
   .schk { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; min-height: 30px; }
   .schk > small { font-weight: 800; color: var(--sub); font-size: 12px; }
   .schk .chip { display: inline-flex; gap: 6px; align-items: center; border-radius: 999px; padding: 5px 11px; font-weight: 800; font-size: 12.5px; background: #fff; border: 1px solid var(--line); cursor: pointer; white-space: nowrap; color: var(--ink); }
@@ -1117,7 +1134,10 @@
   #dupTip .dtip-r b { white-space: nowrap; } #dupTip .dtip-r span { color: #333d4b; } #dupTip .dtip-r em { margin-left: auto; font-style: normal; color: var(--sub); white-space: nowrap; }
   #dupTip .dtip-f { margin-top: 4px; color: var(--sub); font-size: 11px; }
   .sg td.c.pend { font-style: italic; }
-  .sg td.ex { color: var(--sub); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+  .sg td.ex { color: var(--sub); max-width: 150px; white-space: normal; overflow-wrap: anywhere; word-break: keep-all; font-size: 12px; line-height: 1.3; text-align: center; padding: 2px 8px; }
+  .sg td.ex.x-memo { text-align: left; } .sg td.ex b { color: var(--ink); } .sg td.ex small { display: block; font-size: 10.5px; color: #94a3b8; } .sg td.ex .wn { color: #d97706; font-weight: 800; white-space: nowrap; } .sg td.ex .rd { color: #b91c1c; font-weight: 800; }
+  .sg td.ex .wkb { display: inline-flex; gap: 2px; vertical-align: -2px; margin-right: 4px; } .sg td.ex .wkb i { width: 8px; height: 13px; border-radius: 2px; background: #e2e8f0; display: inline-block; } .sg td.ex .wkb i.on { background: #3b82f6; } .sg td.ex .wkb i.off { background: #fca5a5; }
+  .xpick { position: relative; } .xpick .smore-box { right: 0; width: 260px; } .xpick .check small { margin-left: auto; color: #94a3b8; font-size: 11px; }
   .sg td.num { text-align: center; font-weight: 700; color: var(--ink); }
   .sg tr.unas td { background: #fff5f5; } .sg tr.unas td.fx { color: #8b95a1; } .sg tr.unas td.f4 { color: var(--ink); font-weight: 700; }
   .sg tr.unas .unlab { color: #e03131; font-weight: 800; font-size: 12px; }
@@ -1321,7 +1341,7 @@
   .slegend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; margin-top: 8px; color: var(--sub); align-items: center; }
   .slegend span { padding: 1px 6px; border-radius: 4px; font-weight: 600; }
   @media (max-width: 820px) {
-    .sg .f4 { display: none; } .sg .f2 { width: 96px; min-width: 96px; max-width: 96px; }
+    .sg .f3, .sg .f4 { display: none; } .sg .f2 { width: 96px; min-width: 96px; max-width: 96px; }
     .swrap { max-height: calc(100vh - 230px); }
   }
   .rcb.lv { background: #6b7684 !important; color: #fff !important; }
@@ -8171,6 +8191,55 @@
     const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null;
     return (d.subIds || []).concat((main && main.subIds) || []).map((x) => String(x).toLowerCase());
   }
+  // ───── 기사스케줄 왼쪽 아이디 칸 · 오른쪽 확인용 칸 ─────
+  function idCellHtml(d) {
+    const main = d.mainId ? SD.drivers.find((x) => x.id === d.mainId) : null, m = main || d;
+    return esc(ceLid(d.loginId) || '') + (m.subIds || []).map((x) => '<small class="sub" title="서브아이디 (정산서 1장으로 합침)">서브 ' + esc(x) + '</small>').join('') + (m.alias || []).map((a) => '<small class="al" title="' + esc(a.name) + ' 명의 아이디 (정산서 따로)">' + esc(a.name) + ' ' + esc(ceLid(a.login)) + '</small>').join('');
+  }
+  const exRowWork = (r, dt) => { const v = sget(r.row, dt); return (((SD.pmTips || {})[r.d.id] || {})[dt] || []).some((t) => t.to === r.d.name && t.from !== r.d.name) || SchedCalc.isWorkDay(v, cellSubsOf(r.row).concat(aliasOf(r.d))); };
+  /** 이번 주(오늘이 든 일~토) 근무: 요일 막대 + 일수 · 7일이면 경고 */
+  function exWeek(r) {
+    const t = new Date((SD.today || ymdLocal(new Date())) + 'T00:00:00'); t.setDate(t.getDate() - t.getDay());
+    let n = 0, known = 0; const bars = [];
+    for (let i = 0; i < 7; i++) { const dt = ymdLocal(new Date(t.getFullYear(), t.getMonth(), t.getDate() + i)); if (!SD.dates.includes(dt) || (r.seg && !segIn(r.seg, dt))) { bars.push(''); continue; } known++; const v = sget(r.row, dt), w = exRowWork(r, dt); if (w) n++; bars.push(w ? 'on' : v ? 'off' : ''); }
+    if (!known) return '<small>이 화면에 이번 주 없음</small>';
+    return '<span class="wkb">' + bars.map((b) => '<i class="' + b + '"></i>').join('') + '</span><b' + (n >= 7 ? ' class="rd"' : '') + '>' + n + '</b>' + (n >= 7 ? '<small style="color:#b91c1c;font-weight:800">주 7일 ⚠</small>' : '');
+  }
+  /** 고정휴무: 적어 둔 글자 그대로 + 이 화면 기간에 실제로 매번 쉰 요일과 다르면 노랑 ⚠ */
+  function exFixed(r) {
+    const d = r.d, txt = String(d.fixedOff || '');
+    const want = DOW.filter((w) => txt.includes(w));
+    const cnt = DOW.map(() => [0, 0]);
+    SD.dates.forEach((dt) => { if (r.seg && !segIn(r.seg, dt)) return; const v = sget(r.row, dt); if (!v) return; const w = new Date(dt + 'T00:00:00').getDay(); cnt[w][0]++; if (/^(휴무|고정휴무|추가휴무)$/.test(v) && !exRowWork(r, dt)) cnt[w][1]++; });
+    const real = DOW.filter((w, i) => cnt[i][0] >= 2 && cnt[i][1] === cnt[i][0]);
+    const diff = want.length && real.length && (want.join('') !== real.join(''));
+    return exDash(txt) + (diff ? '<small class="wn" title="이 화면 기간의 실제 스케줄에서 매번 쉰 요일">⚠ 실제 ' + real.join('·') + '</small>' : '');
+  }
+  function exIss(r) {
+    const by = {}; SD.dates.forEach((dt) => { if (r.seg && !segIn(r.seg, dt)) return; issOf(r.row, dt).forEach((x) => { if (x.result) by[x.result] = (by[x.result] || 0) + 1; }); });
+    const ks = Object.keys(by); return ks.length ? '<span class="rd">🚩 ' + ks.map((k) => esc(k) + ' ' + by[k]).join(' · ') + '</span>' : '<span style="color:#cbd5e1">—</span>';
+  }
+  function exPm(r) { let g = 0, t = 0; SD.dates.forEach((dt) => ((((SD.pmTips || {})[r.d.id] || {})[dt]) || []).forEach((x) => { if (x.to === r.d.name && x.from !== r.d.name) t++; else if (x.from === r.d.name) g++; })); return g || t ? '맡김 ' + g + ' · 받음 ' + t : '<span style="color:#cbd5e1">—</span>'; }
+  const exDash = (v) => (v ? esc(v) : '<span style="color:#cbd5e1">—</span>');
+  const EX_COLS = [
+    { k: 'cnt', t: '출근일수', def: 1, auto: 1, src: '자동', tip: '이 화면 기간의 근무일 (정산서 근무일수와 같은 규칙)', cell: (r) => '<b>' + (scalc.counts[r.key || r.d.id] || 0) + '</b>' },
+    { k: 'week', t: '이번 주', def: 1, auto: 1, src: '자동 · 주 7일 경고', tip: '오늘이 든 주(일~토)의 근무 — 파랑 = 근무, 분홍 = 쉼', cell: exWeek },
+    { k: 'phone', t: '연락처', def: 1, src: '기사 정보', cell: (r) => (r.d.phone ? '<a href="tel:' + esc(String(r.d.phone).replace(/[^0-9+]/g, '')) + '" style="color:inherit;white-space:nowrap">' + esc(r.d.phone) + '</a>' : exDash('')) },
+    { k: 'car', t: '차량', def: 1, src: '기사 정보', cell: (r) => exDash(r.d.carNo) + (r.d.carName ? '<small>' + esc(r.d.carName) + '</small>' : '') },
+    { k: 'fixed', t: '고정휴무', def: 1, auto: 1, src: '입력 + 실제와 비교', tip: '기사 설정에 적어 둔 고정휴무 · 실제 스케줄과 다르면 ⚠', cell: exFixed },
+    { k: 'pattern', t: '근무형태', def: 1, src: '입력', cell: (r) => exDash(r.d.workPattern) },
+    { k: 'backup', t: '백업 범위', def: 1, src: '기사 정보', cell: (r) => exDash(r.d.backupArea) },
+    { k: 'iss', t: '이슈', def: 1, auto: 1, src: '자동', tip: '이 화면 기간의 병가 · 미입차 · 노쇼 · 물량조율 일수', cell: exIss },
+    { k: 'join', t: '가입일', def: 1, src: '기사 정보', tip: '기사 앱 가입일 (입사일 칸이 따로 없어 가입일을 씁니다)', cell: (r) => exDash(r.d.joinDate) },
+    { k: 'memo', t: '메모', def: 1, src: '입력', cell: (r) => esc(r.d.memo || '') },
+    { k: 'extra', t: '추가휴무', def: 0, src: '입력', cell: (r) => exDash(r.d.extraOff) },
+    { k: 'pm', t: '품앗이', def: 0, auto: 1, src: '자동', tip: '이 화면 기간의 품앗이 맡김 · 받음', cell: exPm }
+  ];
+  const EX_BY = {}; EX_COLS.forEach((c) => { EX_BY[c.k] = c; });
+  let _exOn = null;
+  function exOn() { if (_exOn) return _exOn; try { const v = JSON.parse(localStorage.getItem('runner.sch.cols') || 'null'); if (Array.isArray(v)) return (_exOn = v.filter((k) => EX_BY[k])); } catch (e) { /* 기본값 */ } return (_exOn = EX_COLS.filter((c) => c.def).map((c) => c.k)); }
+  const exCols = () => { const on = exOn(); const l = EX_COLS.filter((c) => on.includes(c.k)); return l.length ? l : [EX_BY.cnt]; };
+  function exSet(k, on) { const cur = exOn().filter((x) => x !== k); if (on) cur.push(k); _exOn = EX_COLS.map((c) => c.k).filter((x) => cur.includes(x)); try { localStorage.setItem('runner.sch.cols', JSON.stringify(_exOn)); } catch (e) { /* 무시 */ } renderSched(); }
   /** 캠프 띠 색상: 같은 캠프는 늘 같은 색 (캠프 ID 로 고름) → { bg(머리줄), fg(글자), bar(줄 왼쪽 막대) } · 직원은 보라 */
   const CAMP_PAL = [['#dbeafe', '#1e40af', '#3b82f6'], ['#dcfce7', '#166534', '#22c55e'], ['#fef3c7', '#92400e', '#f59e0b'], ['#ffe4e6', '#9f1239', '#f43f5e'], ['#cffafe', '#155e75', '#06b6d4'], ['#fae8ff', '#86198f', '#d946ef'], ['#ecfccb', '#3f6212', '#84cc16'], ['#ffedd5', '#9a3412', '#f97316'], ['#e0e7ff', '#3730a3', '#6366f1'], ['#ccfbf1', '#115e59', '#14b8a6']];
   const _campCol = {};
@@ -8498,26 +8567,26 @@
     const hcell = (dt, i) => {
       const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
       const tags = [];
-      if (+p[2] <= 7) tags.push('<i class="tg-peak">Peak물량</i>');
+      if (+p[2] <= 7) tags.push('<i class="tg-peak" title="피크데이 (매달 1~7일 · 물량 많은 날)">🔥 피크</i>');
       if (SD.holidays[dt]) tags.push('<i class="tg-hol">' + esc(SD.holidays[dt]) + '</i>');
       return '<th class="dc' + (dt === today ? ' today' : '') + (dow === 0 || SD.holidays[dt] ? ' sun' : dow === 6 ? ' sat' : '') + (sepCol(i) ? ' wk2' : '') + '" data-col="' + i + '">' +
         '<b>' + +p[1] + '/' + +p[2] + ' (' + DOW[dow] + ')</b><small>' + weekOfMonth(dt) + '주차</small>' + tags.join('') + '</th>';
     };
-    const head = '<thead><tr class="h1"><th class="fx f2" rowspan="2">이름</th><th class="fx f4" rowspan="2">기본노선</th>' +
+    const head = '<thead><tr class="h1"><th class="fx f2" rowspan="2">이름</th><th class="fx f3" rowspan="2">아이디</th><th class="fx f4" rowspan="2">기본노선</th>' +
       (sMode === 'month' ? '<th colspan="' + dates.length + '" class="wk-a">' + esc($('#sTitle').textContent) + ' · ' + dates.length + '일</th>'
         : '<th colspan="7" class="wk-a">확정 스케줄 · 변경 불가</th><th colspan="7" class="wk-b wk2">예상 스케줄 · 변동 있음</th>') +
-      '<th rowspan="2" class="ex">출근일수</th><th rowspan="2" class="ex">고정휴무</th><th rowspan="2" class="ex">추가휴무</th><th rowspan="2" class="ex">근무형태</th><th rowspan="2" class="ex">메모</th></tr>' +
+      exCols().map((c) => '<th rowspan="2" class="ex" title="' + esc(c.tip || '') + '">' + c.t + '</th>').join('') + '</tr>' +
       '<tr class="h2">' + dates.map(hcell).join('') + '</tr></thead>';
     let prevCamp = null;
     const parts = srows.map((r, ri) => {
       if (r.kind === 'p') {
         const first = !ri || srows[ri - 1].kind !== 'p';
-        return '<tr class="pmr' + (first ? ' gtop' : '') + '"><td class="fx f2 lab" title="품앗이 배차 확정 때 자동으로 적힙니다. 확정된 칸(🔒)은 잠겨 있습니다 · 취소·변경은 품앗이에서' + (r.p.loginId ? ' · 아이디 ' + esc(r.p.loginId) : '') + '"><i class="rlab">품앗이</i>' + esc(r.p.name) + '</td><td class="fx f4 lab"></td>' +
-          dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex num">' + dates.filter((dt) => sget(r.row, dt)).length + '</td><td class="ex" colspan="4"></td></tr>';
+        return '<tr class="pmr' + (first ? ' gtop' : '') + '"><td class="fx f2 lab" title="품앗이 배차 확정 때 자동으로 적힙니다. 확정된 칸(🔒)은 잠겨 있습니다 · 취소·변경은 품앗이에서' + (r.p.loginId ? ' · 아이디 ' + esc(r.p.loginId) : '') + '"><i class="rlab">품앗이</i>' + esc(r.p.name) + '</td><td class="fx f3 lab"></td><td class="fx f4 lab"></td>' +
+          dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>';
       }
       if (r.kind === 'n') {
-        return '<tr class="note' + (ri && srows[ri - 1].kind !== 'n' ? ' gtop' : '') + '"><td class="fx f2 lab"><i class="rlab">비고</i><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td><td class="fx f4 lab"></td>' +
-          dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="5"></td></tr>';
+        return '<tr class="note' + (ri && srows[ri - 1].kind !== 'n' ? ' gtop' : '') + '"><td class="fx f2 lab"><i class="rlab">비고</i><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td><td class="fx f3 lab"></td><td class="fx f4 lab"></td>' +
+          dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>';
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp, firstOfCamp = prevCamp !== r.camp;
       prevCamp = r.camp;
@@ -8526,14 +8595,13 @@
       // 캠프 묶음 머리줄 (캠프 칸 대신): 캠프 이름 · 기사 수 · ⚠ 앞으로 비는 노선 칸 수
       const nDrv = firstOfCamp ? new Set(srows.filter((x) => x.kind === 'd' && !!x.staff === !!r.staff && (r.staff || x.camp === r.camp) && !x.d.ex).map((x) => x.row)).size : 0;
       const grpRow = !(r.staff ? (!ri || !srows[ri - 1].staff) : firstOfCamp) ? '' :
-        '<tr class="cgrp"' + campVars(campColor(d.campId, r.staff)) + '><td class="fx f2"><b>' + (r.staff ? '직원' : esc(cs || '캠프 없음')) + '</b><span>기사 ' + nDrv + '</span>' + (miN ? '<em class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + miN + '개 · 위쪽 점검의 「미입차 노선」에서 날짜·노선 확인">⚠' + miN + '</em>' : '') + '</td><td class="fx f4"></td><td colspan="' + (dates.length + 5) + '"></td></tr>';
+        '<tr class="cgrp"' + campVars(campColor(d.campId, r.staff)) + '><td class="fx f2"><b>' + (r.staff ? '직원' : esc(cs || '캠프 없음')) + '</b><span>기사 ' + nDrv + '</span>' + (miN ? '<em class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + miN + '개 · 위쪽 점검의 「미입차 노선」에서 날짜·노선 확인">⚠' + miN + '</em>' : '') + '</td><td class="fx f3"></td><td class="fx f4"></td><td colspan="' + (dates.length + exCols().length) + '"></td></tr>';
       return grpRow + '<tr class="drv' + (r.staff ? ' staff' : '') + (d.status !== '승인' ? ' dim' : '') + '"' + campVars(campColor(d.campId, r.staff)) + '>' +
         '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정' + (d.loginId ? ' · 아이디 ' + esc(d.loginId) : '') + '">' + esc(d.name) + '</button>' + (ttl ? '<span class="tbad t-' + esc(ttl) + '" style="width:auto;padding:0 5px">' + esc(ttl) + '</span>' : d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
           (d.ex ? '<span class="exbad" title="추가 배정 줄 (소속: ' + esc(((SD.drivers.find((x) => x.id === d.mainId) || {}).camp) || '-') + ') · 이 캠프 칸은 따로 입력">추가</span>' : '') + rcBadge(r) + (d.alias || []).map((a) => '<button type="button" class="albad" data-alun="' + esc(a.id) + '" title="' + esc(a.name) + ' 명의 아이디 ' + esc(a.login) + ' 도 이 줄에서 관리합니다 (같은 근무자) · 누르면 연결 풀기">＋' + esc(a.name) + ' 명의</button>').join('') + '</td>' +
-        '<td class="fx f4" title="' + esc(d.baseRoute || '') + '">' + baseRouteHtml(r) + '</td>' +
+        '<td class="fx f3">' + idCellHtml(d) + '</td><td class="fx f4" title="' + esc(d.baseRoute || '') + '">' + baseRouteHtml(r) + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
-        '<td class="ex num" data-cnt="' + esc(r.key || d.id) + '">' + (scalc.counts[r.key || d.id] || 0) + '</td><td class="ex">' + esc(d.fixedOff || '') + '</td><td class="ex">' + esc(d.extraOff || '') + '</td>' +
-        '<td class="ex">' + esc(d.workPattern || '') + '</td><td class="ex memo" title="' + esc(d.memo || '') + '">' + esc(d.memo || '') + '</td></tr>';
+        exCols().map((c) => '<td class="ex x-' + c.k + '" data-exk="' + c.k + '" data-exr="' + ri + '">' + c.cell(r) + '</td>').join('') + '</tr>';
     });
     // 노선관리 노선인데 기본노선으로 맡은 기사가 없는 노선: 그 캠프 기사 줄 바로 아래 '담당 없음' 줄
     //  칸 = 그날 이 노선을 뛰는 기사(다른 기사 줄 칸에서 자동) · 아무도 없으면 미입차 · 칸을 누르면 배정 창 → 고른 기사 줄 칸에 노선을 적음 (올인원 규칙: 칸 = 그 사람이 한 일)
@@ -8544,8 +8612,8 @@
     const unRows = (cid) => {
       if (!cid || unDone[cid] || !UN[cid] || !campOf[cid]) return '';
       unDone[cid] = 1;
-      return UN[cid].filter((code) => unShow(cid, code)).map((code) => '<tr class="unas"' + campVars(campColor(cid, false)) + '><td class="fx f2"><span class="unlab" title="' + esc(shortCamp(campOf[cid].name)) + ' — 노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f4">' + esc(code) + '</td>' +
-        dates.map((dt, ci) => { const c = unCellInfo(cid, code, dt); return '<td class="uc ' + c.cls + (sepCol(ci) ? ' wk2' : '') + (dt === pddDate() ? ' today' : '') + '" data-ucid="' + esc(cid) + '" data-ucode="' + esc(code) + '" data-c="' + ci + '" title="눌러서 이 노선을 뛸 기사 배정">' + c.html + '</td>'; }).join('') + '<td class="ex" colspan="5"></td></tr>').join('');
+      return UN[cid].filter((code) => unShow(cid, code)).map((code) => '<tr class="unas"' + campVars(campColor(cid, false)) + '><td class="fx f2"><span class="unlab" title="' + esc(shortCamp(campOf[cid].name)) + ' — 노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f3"></td><td class="fx f4">' + esc(code) + '</td>' +
+        dates.map((dt, ci) => { const c = unCellInfo(cid, code, dt); return '<td class="uc ' + c.cls + (sepCol(ci) ? ' wk2' : '') + (dt === pddDate() ? ' today' : '') + '" data-ucid="' + esc(cid) + '" data-ucode="' + esc(code) + '" data-c="' + ci + '" title="눌러서 이 노선을 뛸 기사 배정">' + c.html + '</td>'; }).join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>').join('');
     };
     const restUn = () => SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => unRows(c.id)).join('');
     let body = '', lastCamp = null, flushed = false;
@@ -8776,7 +8844,7 @@
     if (cellBad(v, r, dt)) cls.push('bad');
     if (iss.length || dt < pddDate()) { /* 표시 안 함 */ } else if (mis) cls.push('mis'); else if (nov && !pm) cls.push('nov'); // 품앗이로 맡긴 칸은 '배정 안 됨' 아님
     const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pmLabel(r, dt, pm)) + '"' : '') + '>' + cellHtml(v, r.row) + insHtml(ins) + '</td>';
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pmLabel(r, dt, pm)) + '"' : '') + '>' + cellHtml(v, r.row) + (iss.length ? '<i class="ci-iss">🚩</i>' : '') + '</td>';
   }
   /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
   /** 품앗이 칸에 보일 글자: 맡긴 기사 칸 = '🤝 받은기사 / 품앗이 맡김' · 받은 기사 칸 = '🤝 맡긴기사 / 품앗이 받음' (일감이 여러 개면 줄마다 · 노선은 마우스를 올리면 보임) */
@@ -8903,8 +8971,8 @@
     const pdd = pddDate();
     // 미입차 줄: 그날 이슈의 대체(쿠친·품앗이·외부용차 …)를 작게 같이
     const subLines = (dt) => (SD.issues || []).filter((x) => x.result && x.sub && x.date <= dt && dt <= (x.end || x.date) && x.kind !== '지시').map((x) => '<div class="cc-sub">↳ ' + esc(x.name + ' · ' + x.sub + (x.subWho ? ' ' + x.subWho : '')) + '</div>').join('');
-    const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f2 lab" title="' + sub + '"><i class="rlab">' + lab + '</i>' + sub.replace(' (자동)', '') + '</td><td class="fx f4 lab"></td>' +
-      vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + (dates[i] === pdd ? ' today' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="5"></td></tr>';
+    const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f2 lab" title="' + sub + '"><i class="rlab">' + lab + '</i>' + sub.replace(' (자동)', '') + '</td><td class="fx f3 lab"></td><td class="fx f4 lab"></td>' +
+      vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + (dates[i] === pdd ? ' today' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>';
     // 담당 없음 노선(기본노선 주인 없음)도 그날 아무도 안 뛴 물량은 미입차로 · 용차업체가 맡은 노선은 미입차 아님 → 보라색 안내 줄
     const UN = unassignedRoutes(), unMi = dates.map(() => []), unVd = dates.map(() => []);
     Object.keys(UN).forEach((cid) => UN[cid].forEach((code) => dates.forEach((dt, i) => {
@@ -8938,16 +9006,31 @@
     });
     $('#sCalc').innerHTML = html;
     // 점검 칩: 앞으로(PDD~) 챙길 것만 — 미입차 노선 · 중복 · 빈 칸(배정 안 됨) · 백업 명단
-    const K = { mi: [], du: [], nov: [], bk: [] };
+    const K = { mi: [], du: [], nov: [], bk: [], is: [], in: [], me: [] };
+    DUPNO = new Map(); // '행|날짜칸' → 중복 묶음 번호 (같은 번호끼리 겹친 칸)
     dates.forEach((dt, i) => {
       if (dt < pdd) return;
       unMerge(scalc.missing[i].filter((x) => campOk(x.split(' ')[0])).concat(unMi[i])).forEach((x) => K.mi.push({ i: i, t: groupRoutes(x) }));
-      const seen = {};
-      scalc.dups[i].filter((x) => campOk(x.camp)).forEach((x) => { const t = x.camp + ' ' + x.route + '(' + x.rot + ') ' + x.keys.map(nameOf).join('·'); if (!seen[t]) { seen[t] = 1; K.du.push({ i: i, t: t, row: x.keys[0] }); } });
+      // 중복: 같은 사람들끼리 겹친 것을 한 묶음으로 → 번호 ①②… (칸의 보라 박스에도 같은 번호)
+      const grp = new Map();
+      scalc.dups[i].filter((x) => campOk(x.camp)).forEach((x) => { const gk = x.keys.slice().sort().join('|'); if (!grp.has(gk)) grp.set(gk, { keys: x.keys, camp: x.camp, rts: [] }); const g = grp.get(gk); if (!g.rts.includes(x.route)) g.rts.push(x.route); });
+      let no = 0;
+      grp.forEach((g) => { no++; g.keys.forEach((k) => { if (!DUPNO.has(k + '|' + i)) DUPNO.set(k + '|' + i, no); }); K.du.push({ i: i, t: DUP_MARK[(no - 1) % DUP_MARK.length] + ' ' + g.camp + ' ' + groupRoutes(g.rts.sort().join(',')) + ' · ' + g.keys.map(nameOf).join(' · '), row: g.keys.find((k) => !/^v:/.test(k)) }); });
       SD.camps.forEach((c) => { const s = shortCamp(c.name), l = campOk(s) && scalc.roster[s] ? scalc.roster[s][i] || [] : []; if (l.length) K.bk.push({ i: i, t: s + ' ' + l.join(', ') }); });
     });
     srows.forEach((r) => { if (r.kind !== 'd') return; dates.forEach((dt, i) => { if (dt < pdd || (r.seg && !segIn(r.seg, dt))) return; const v = sget(r.row, dt); if (noAssign(r, dt, v) && !pmMark(r.row, dt) && !issOf(r.row, dt).length) K.nov.push({ i: i, t: r.d.name + ' · 빈 칸', row: r.key || r.row }); else if (cellBad(v, r, dt)) K.nov.push({ i: i, t: r.d.name + ' · ' + v.replace(/\n/g, ' ').slice(0, 14), row: r.key || r.row }); }); });
-    SCHK = K; paintChk();
+    // 이슈 · 지시사항 · 일정 메모 (내일부터 · 화면에 보이는 기사 줄만) — 이슈는 시작한 날(지났으면 PDD)에 한 번
+    srows.forEach((r) => {
+      if (r.kind !== 'd' || r.d.ex) return;
+      (SD.issues || []).forEach((x) => {
+        if (x.driverId !== r.row) return;
+        const e = x.end || x.date; if (e < pdd) return;
+        const at = x.date < pdd ? pdd : x.date, i = dates.indexOf(at); if (i < 0 || (r.seg && !segIn(r.seg, at))) return;
+        if (x.kind === '지시') { if (x.reason) (r.staff ? K.me : K.in).push({ i: i, t: r.d.name + ' · ' + x.reason, row: r.key || r.row }); }
+        else if (x.result) K.is.push({ i: i, t: r.d.name + ' · ' + x.result + (x.kind ? ' · ' + x.kind : '') + (x.sub ? ' · 대체 ' + x.sub + (x.subWho ? ' ' + x.subWho : '') : '') + (e !== x.date ? ' (' + Number(x.date.slice(5, 7)) + '/' + Number(x.date.slice(8)) + ' ~ ' + Number(e.slice(5, 7)) + '/' + Number(e.slice(8)) + ')' : ''), row: r.key || r.row });
+      });
+    });
+    SCHK = K; paintChk(); paintDupNo();
   }
   // ───── 같은 근무자 연결 (한 사람이 두 명의 아이디를 날짜를 나눠 씀 · 정산서는 명의별로 따로) ─────
   const wlNo = () => { try { return JSON.parse(localStorage.getItem('runner.wl.no') || '[]'); } catch (e) { return []; } };
@@ -9002,20 +9085,38 @@
   });
   let SCHK = null, sChkOpen = '';
   const sAutoOn = () => { try { return localStorage.getItem('runner.sAuto') === '1'; } catch (e) { return false; } };
-  const CHK_DEF = [['mi', '미입차 노선'], ['du', '중복'], ['nov', '확인 필요'], ['bk', '백업 명단']];
+  const CHK_DEF = [['mi', '미입차 노선'], ['du', '중복'], ['nov', '<span class="wy">⚠</span> 확인 필요'], ['is', '🚩 이슈'], ['in', '📌 지시사항'], ['me', '📅 일정 메모'], ['bk', '백업 명단']];
+  const DUP_MARK = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
+  let DUPNO = new Map();
+  /** 중복 칸에 묶음 번호 붙이기 (보라 박스 오른쪽 아래) */
+  function paintDupNo() {
+    const g = $('#sGrid'); if (!g) return;
+    $$('td.c .dupn', g).forEach((x) => x.remove());
+    $$('td.c.dup', g).forEach((td) => { const r = srows[+td.dataset.r]; if (!r) return; const n = DUPNO.get((r.key || r.row) + '|' + td.dataset.c); if (!n) return; const b = document.createElement('i'); b.className = 'dupn'; b.textContent = DUP_MARK[(n - 1) % DUP_MARK.length]; td.appendChild(b); });
+  }
   function paintChk() {
     const K = SCHK, box = $('#sChk'); if (!K || !box) return;
     const md = (i) => { const p = SD.dates[i].split('-'); return +p[1] + '/' + +p[2] + ' (' + DOW[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
     const bad = K.mi.length + K.du.length + K.nov.length;
-    box.innerHTML = '<small>점검</small>' + CHK_DEF.map((d) => '<button type="button" class="chip ' + d[0] + (K[d[0]].length ? '' : ' zero') + (sChkOpen === d[0] ? ' on' : '') + '" data-chk="' + d[0] + '"' + (K[d[0]].length ? '' : ' disabled') + '>' + d[1] + ' <i>' + K[d[0]].length + '</i></button>').join('') +
-      (bad ? '' : '<span class="ok">✓ 내일부터 비는 노선 · 중복 · 확인할 칸 없음</span>') + wlHints().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.worker.name) + ' 칸에 ' + esc(h.owner.name) + ' 명의 아이디(' + esc(h.owner.loginId) + ')가 있습니다 — 한 사람이 두 아이디를 쓰는 경우 연결">🔗 ' + esc(h.worker.name) + ' ↔ ' + esc(h.owner.name) + ' 연결…</button>').join('') + '<button type="button" class="lg" id="sLgBtn">색 안내 ⓘ</button>';
+    const pddI = SD.dates.indexOf(pddDate());
+    box.innerHTML = (pddI >= 0 ? '<button type="button" class="pddp" id="sPddGo" title="누르면 PDD 날짜 열로 이동">오늘 PDD · ' + md(pddI) + ' ▸</button>' : '<small>점검</small>') + CHK_DEF.map((d) => '<button type="button" class="chip ' + d[0] + (K[d[0]].length ? '' : ' zero') + (sChkOpen === d[0] ? ' on' : '') + '" data-chk="' + d[0] + '"' + (K[d[0]].length ? '' : ' disabled') + '>' + d[1] + ' <i>' + K[d[0]].length + '</i></button>').join('') +
+      (bad ? '' : '<span class="ok">✓ 내일부터 비는 노선 · 중복 · 확인할 칸 없음</span>') + wlHints().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.worker.name) + ' 칸에 ' + esc(h.owner.name) + ' 명의 아이디(' + esc(h.owner.loginId) + ')가 있습니다 — 한 사람이 두 아이디를 쓰는 경우 연결">🔗 ' + esc(h.worker.name) + ' ↔ ' + esc(h.owner.name) + ' 연결…</button>').join('') + '<button type="button" class="lg" id="sLgBtn">색 안내 ⓘ</button>' +
+      '<div class="xpick"><button type="button" class="btn ghost sm" id="sColBtn" title="표 오른쪽에 보일 정보 칸 고르기">⚙ 오른쪽 칸</button><div class="smore-box' + (sColOpen ? '' : ' hidden') + '" id="sColBox"><div class="smore-h">오른쪽에 보일 칸</div>' +
+      EX_COLS.map((c) => '<label class="check"><input type="checkbox" data-excol="' + c.k + '"' + (exOn().includes(c.k) ? ' checked' : '') + '> ' + c.t + '<small>' + c.src + '</small></label>').join('') + '</div></div>' +
+      '<div class="slg2"><b>아이콘</b><span>🚩 이슈</span><span><i class="wy">⚠</i> 확인 필요 (빈 칸 · 규칙 밖 글자 · 내 노선 비어 있음)</span><span><i class="dbx">중복 ①</i> 같은 번호끼리 겹침</span><span>📌 지시사항</span><span>📅 일정 메모</span><span>🤝 품앗이</span></div>';
     const bx = $('#sChkBox');
     if (!sChkOpen || !K[sChkOpen].length) { sChkOpen = ''; bx.classList.add('hidden'); bx.innerHTML = ''; return; }
     const by = {}; K[sChkOpen].forEach((x) => { (by[x.i] = by[x.i] || []).push(x); });
     bx.classList.remove('hidden');
     bx.innerHTML = Object.keys(by).map(Number).sort((a, b) => a - b).map((i) => '<div class="d"><b>' + md(i) + '</b><div>' + by[i].map((x) => '<button type="button" data-chkgo="' + i + '"' + (x.row ? ' data-chkrow="' + esc(x.row) + '"' : '') + ' title="누르면 그 날짜' + (x.row ? ' · 그 기사 칸' : '') + '으로 이동">' + esc(x.t) + '</button>').join('') + '</div></div>').join('');
   }
+  let sColOpen = false;
+  $('#sChk').addEventListener('change', (e) => { const c = e.target.closest('[data-excol]'); if (c) { sColOpen = true; exSet(c.dataset.excol, c.checked); } });
+  document.addEventListener('click', (e) => { if (sColOpen && !e.target.closest('.xpick')) { sColOpen = false; const b = $('#sColBox'); if (b) b.classList.add('hidden'); } });
   $('#sChk').addEventListener('click', (e) => {
+    if (e.target.closest('#sColBtn')) { sColOpen = !sColOpen; $('#sColBox').classList.toggle('hidden', !sColOpen); return; }
+    if (e.target.closest('.xpick')) return;
+    if (e.target.closest('#sPddGo')) { const th = $('#sGrid th.dc.today'); if (th) { th.scrollIntoView({ block: 'nearest', inline: 'center' }); th.classList.remove('flash'); void th.offsetWidth; th.classList.add('flash'); } return; }
     if (e.target.closest('#sLgBtn')) return $('#sLegend').classList.toggle('hidden');
     const wl = e.target.closest('[data-wlo]'); if (wl) return wlOpen(wl.dataset.wlo, wl.dataset.wlw);
     const b = e.target.closest('[data-chk]'); if (!b) return;
@@ -9151,14 +9252,14 @@
       const want = ['c', cellKindRow(v, r.row), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', pm && !v ? 'pmgive' : '', pm && PM_ONLY.test(v) ? 'pmonly' : '', r.kind === 'p' && pmLockOf(r.row, dt) ? 'pmlk' : '', iss.length || dt < pdd ? '' : mis ? 'mis' : nov && !pm ? 'nov' : '', cellBad(v, r, dt) ? 'bad' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
-      const vk = v + '\u0001' + (ins ? ins.reason : '');
-      if (td.__v !== vk || td.__vr !== r.row) { td.innerHTML = cellHtml(v, r.row) + insHtml(ins); td.__v = vk; td.__vr = r.row; }
+      const vk = v + '\u0001' + (iss.length ? 1 : 0);
+      if (td.__v !== vk || td.__vr !== r.row) { td.innerHTML = cellHtml(v, r.row) + (iss.length ? '<i class="ci-iss">🚩</i>' : ''); td.__v = vk; td.__vr = r.row; }
       const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
       td.removeAttribute('title'); void tip;
       if (pm) td.setAttribute('data-pm', pmLabel(r, dt, pm)); else td.removeAttribute('data-pm');
       td.className = want + (selCls.length ? ' ' + selCls.join(' ') : '');
     });
-    $$('[data-cnt]', tb).forEach((td) => { td.textContent = scalc.counts[td.dataset.cnt] || 0; });
+    $$('td[data-exk]', tb).forEach((td) => { const c = EX_BY[td.dataset.exk], r = srows[+td.dataset.exr]; if (c && c.auto && r) { const h = c.cell(r); if (td.__h !== h) { td.innerHTML = h; td.__h = h; } } });
     try { paintUnassigned(); } catch (e) { /* 무시 */ }
     renderCalc();
     try { paintMob(); } catch (e) { /* 무시 */ }
