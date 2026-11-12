@@ -8567,7 +8567,7 @@
     const hcell = (dt, i) => {
       const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
       const tags = [];
-      if (+p[2] <= 7) tags.push('<i class="tg-peak">Peak물량</i>');
+      if (+p[2] <= 7) tags.push('<i class="tg-peak" title="피크데이 (매달 1~7일 · 물량 많은 날)">🔥 피크</i>');
       if (SD.holidays[dt]) tags.push('<i class="tg-hol">' + esc(SD.holidays[dt]) + '</i>');
       return '<th class="dc' + (dt === today ? ' today' : '') + (dow === 0 || SD.holidays[dt] ? ' sun' : dow === 6 ? ' sat' : '') + (sepCol(i) ? ' wk2' : '') + '" data-col="' + i + '">' +
         '<b>' + +p[1] + '/' + +p[2] + ' (' + DOW[dow] + ')</b><small>' + weekOfMonth(dt) + '주차</small>' + tags.join('') + '</th>';
