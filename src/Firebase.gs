@@ -239,6 +239,7 @@ function fsSync() {
     c.put('fs:built', String(t), 21600); c.put('fs:day', today, 21600);
     if (withHome) c.put('fs:nbBuilt', String(Math.max(nb, 1)), 21600);
     c.put('fs:last', JSON.stringify({ at: nowText_(), n: n, ms: Date.now() - t, home: withHome }), 21600);
+    try { if (typeof fsStat_ === 'function') fsStat_(Date.now() - t); } catch (e) { /* 무시 */ } // 하루에 사본 만들기에 쓴 시간 (자동 작업 시간 한도 확인용)
   } finally { c.remove('fs:busy'); }
 }
 /** 1분 트리거 설치 (없으면 · 관리자 로그인 때 확인) */
