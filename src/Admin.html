@@ -9294,7 +9294,9 @@
     const r = srows[sAct.r], dt = SD.dates[sAct.c];
     if (r && r.kind === 'p' && pmLockOf(r.row, dt)) return toast(PM_LOCK_MSG);
     // 기사 칸: 글자를 바로 치는 빠른 입력이 아니면 가운데 큰 창 (품앗이 칸은 품앗이 창)
-    if (r && r.kind === 'd' && r.d) return ceOpenAt(sAct.r, sAct.c); // 기사 칸은 글자를 직접 치지 않고 항상 칸 입력 창 (여러 칸을 골랐으면 한꺼번에)
+    // 기사 칸은 글자를 직접 치지 않고 항상 칸 입력 창 (여러 칸을 골랐으면 한꺼번에)
+    //  단, 직원 줄(관리자·운영자·대표)은 글자를 치면 예전처럼 바로 입력 — '쿠팡이츠 간담회 13:00', '[지원]708' 처럼 본인이 확인할 일정을 적는 줄이라서
+    if (r && r.kind === 'd' && r.d && !(initial != null && r.staff)) return ceOpenAt(sAct.r, sAct.c);
     const td = $('#sGrid').querySelector('td.c[data-r="' + sAct.r + '"][data-c="' + sAct.c + '"]'); if (!td) return;
     const wrap = $('#sWrap'), rc = td.getBoundingClientRect(), wc = wrap.getBoundingClientRect();
     const box = document.createElement('div'); box.className = 'sed';
