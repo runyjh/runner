@@ -999,6 +999,9 @@
   .sg thead th.dc.hov { background: #1b64da !important; } .sg thead th.dc.hov b, .sg thead th.dc.hov small, .sg thead th.dc.hov b::after { color: #fff !important; }
   .dname { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; max-width: 70px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
   .dname:hover { color: var(--brand); text-decoration: underline; }
+  /* 긴 이름(예: LI ANCAI(이안재))은 조금 작게 · 괄호 앞에서 줄바꿈 → 두 줄 안에 들어와 줄 높이가 다른 줄과 같게 */
+  #sGrid .dname { max-width: 84px; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; overflow: visible; text-align: left; line-height: 1.2; }
+  #sGrid .dname.nlong { font-size: 11px; letter-spacing: -.3px; line-height: 1.15; }
   .tbad { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 3px; margin-left: 3px; vertical-align: middle; }
   .sg td.c { width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; cursor: cell; user-select: none; text-align: center; vertical-align: middle; font-weight: 600; white-space: normal; word-break: keep-all; overflow-wrap: break-word; line-height: 1.25; }
   /* 칸 글자: 잘리지 않게 칸 안에서 줄바꿈 (최대 3줄 · 넘으면 마우스를 올리면 전체) · 가운데 정렬 */
@@ -8625,7 +8628,7 @@
       const grpRow = !(r.staff ? (!ri || !srows[ri - 1].staff) : firstOfCamp) ? '' :
         '<tr class="cgrp"' + campVars(campColor(d.campId, r.staff)) + '><td class="fx f2"><b>' + (r.staff ? '직원' : esc(cs || '캠프 없음')) + '</b><span>기사 ' + nDrv + '</span>' + (miN ? '<em class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + miN + '개 · 위쪽 점검의 「미입차 노선」에서 날짜·노선 확인">앞으로 미입차 ' + miN + '</em>' : '') + (r.staff ? '' : '<em class="camppast hidden" data-cp="' + esc(cs) + '" title="PDD 이전에 아무도 안 뛴 노선 칸 수 (이 화면 기간) · 위쪽 「미입차 노선」 › 지난 미입차에서 주차별로 확인"></em>') + '</td><td class="fx f3"></td><td class="fx f4"></td><td colspan="' + (dates.length + exCols().length) + '"></td></tr>';
       return grpRow + '<tr class="drv' + (r.staff ? ' staff' : '') + (d.status !== '승인' ? ' dim' : '') + '"' + campVars(campColor(d.campId, r.staff)) + '>' +
-        '<td class="fx f2"><button class="dname" data-drv="' + esc(d.id) + '" title="스케줄 설정' + (d.loginId ? ' · 아이디 ' + esc(d.loginId) : '') + '">' + esc(d.name) + '</button>' + (ttl ? '<span class="tbad t-' + esc(ttl) + '" style="width:auto;padding:0 5px">' + esc(ttl) + '</span>' : d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
+        '<td class="fx f2"><button class="dname' + (String(d.name || '').length >= 7 ? ' nlong' : '') + '" data-drv="' + esc(d.id) + '" title="' + esc(d.name) + ' · 스케줄 설정' + (d.loginId ? ' · 아이디 ' + esc(d.loginId) : '') + '">' + esc(d.name).replace(/\(/g, '<wbr>(') + '</button>' + (ttl ? '<span class="tbad t-' + esc(ttl) + '" style="width:auto;padding:0 5px">' + esc(ttl) + '</span>' : d.type ? '<span class="tbad t-' + esc(d.type) + '">' + esc(d.type[0]) + '</span>' : '') +
           (d.ex ? '<span class="exbad" title="추가 배정 줄 (소속: ' + esc(((SD.drivers.find((x) => x.id === d.mainId) || {}).camp) || '-') + ') · 이 캠프 칸은 따로 입력">추가</span>' : '') + rcBadge(r) + (d.alias || []).map((a) => '<button type="button" class="albad" data-alun="' + esc(a.id) + '" title="' + esc(a.name) + ' 명의 아이디 ' + esc(a.login) + ' 도 이 줄에서 관리합니다 (같은 근무자) · 누르면 연결 풀기">＋' + esc(a.name) + ' 명의</button>').join('') + '</td>' +
         '<td class="fx f3">' + idCellHtml(d) + '</td><td class="fx f4" title="' + esc(d.baseRoute || '') + '">' + baseRouteHtml(r) + '</td>' +
         dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') +
