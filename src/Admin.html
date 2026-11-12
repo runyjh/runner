@@ -2617,7 +2617,7 @@
 <!-- ───────────── 정산: 명세서 ───────────── -->
 <div class="modal hidden" id="pfModal">
   <div class="m-box wide">
-    <div class="m-top"><b>⏱ 속도 측정 — 화면별 서버 호출 · 걸리는 시간</b><span style="flex:1"></span><button class="btn sm" id="pfRun">지금 측정</button><button class="btn ghost sm" id="pfClose">닫기</button></div>
+    <div class="m-top"><b>⏱ 속도 측정 — 화면별 서버 호출 · 걸리는 시간</b><span style="flex:1"></span><label class="check" style="font-size:12.5px;margin-right:8px" title="관리자앱이 열려 있는 동안 30분마다 기사앱 화면 기능을 한 번씩 불러 시간만 잽니다 (읽기만 · 아무것도 바꾸지 않음). 기사들에게 앱을 배포하기 전에도 속도 자료가 쌓입니다."><input type="checkbox" id="pfAuto"> 자동 측정 (30분마다)</label><button class="btn sm" id="pfRun">지금 측정</button><button class="btn ghost sm" id="pfClose">닫기</button></div>
     <div style="padding:12px 16px;overflow:auto;flex:1">
       <p class="sub" style="margin:0 0 8px">[지금 측정] = 화면을 열 때 부르는 서버 함수를 차례로 2번씩 실제로 불러 잰 시간 (기사 앱 화면은 승인된 기사 1명으로 대신 부름 · 1~3분). 아래 [쓰는 기록] = 관리자 앱·기사 앱을 쓰면서 1분마다 쌓인 실제 기록 (perf_log 탭).</p>
       <div id="fsSt" class="info-ro" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"></div>
@@ -14224,10 +14224,30 @@
     }
     async function one(app, fn, args) {
       const t0 = performance.now();
-      const r = app === '기사앱' ? await call('adm_perfDrv', store.get(), fn, args) : await call(fn, store.get(), ...args);
+      const r = app === '기사앱' ? await call('adm_perfDrv', store.get(), fn, args, AUTO_DRV) : await call(fn, store.get(), ...args);
       const rt = performance.now() - t0;
-      return { rt, sv: app === '기사앱' ? (r && r.ms) || 0 : (r && r._ms) || 0, ok: !!(r && r.ok && (app !== '기사앱' || r.fnOk)), size: app === '기사앱' ? (r && r.size) || 0 : JSON.stringify(r || {}).length };
+      return { st: (r && (r.st || r._st)) || null, rt, sv: app === '기사앱' ? (r && r.ms) || 0 : (r && r._ms) || 0, ok: !!(r && r.ok && (app !== '기사앱' || r.fnOk)), size: app === '기사앱' ? (r && r.size) || 0 : JSON.stringify(r || {}).length };
     }
+    let AUTO_DRV = ''; // 자동 측정 때만 'rand' (승인 기사 중 아무나) · [지금 측정]은 늘 같은 기사
+    const stRows = (rows, v, fn, st) => { if (!st) return; Object.keys(st).forEach((k) => { const ms = +st[k] || 0; rows.push({ v: v, f: 'st_' + fn.replace(/^(adm|api)_/, '') + '_' + k, n: 1, rt: ms, mx: ms, sv: ms }); }); };
+    // ── 자동 측정: 기사들에게 앱을 배포하기 전에도 속도 자료가 쌓이게 — 관리자앱이 열려 있는 동안 30분마다 기사앱 화면 기능을 한 번씩 불러 시간만 잰다 (읽기만 · 아무것도 바꾸지 않음)
+    const autoOn = () => { try { return localStorage.getItem('runner.autobench') !== '0'; } catch (e) { return true; } };
+    let autoBusy = false;
+    async function autoRun() {
+      if (autoBusy || !autoOn() || document.hidden || !store.get()) return;
+      autoBusy = true; AUTO_DRV = 'rand';
+      const now = new Date(), ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'), rows = [];
+      const P = plan().filter((x) => x[0] === '기사앱').concat([['기사앱', '스케줄 (한 달)', [['api_mySchedule', [ym]]]], ['기사앱', '스케줄 (캠프 한 달)', [['api_campSchedule', [ym]]]]]);
+      try {
+        for (const [app, scr, calls] of P) for (const [fn, args] of calls) {
+          if (document.hidden || !store.get()) break;
+          try { const m = await one(app, fn, args); rows.push({ v: '자동:' + scr, f: fn, n: 1, rt: m.rt, mx: m.rt, sv: m.sv }); stRows(rows, '자동:' + scr, fn, m.st); } catch (e) { /* 그 기능만 건너뜀 */ }
+          await new Promise((res) => setTimeout(res, 1500)); // 몰아서 부르지 않는다
+        }
+        if (rows.length) call('adm_perf', store.get(), rows, true).catch(() => {});
+      } finally { autoBusy = false; AUTO_DRV = ''; }
+    }
+    setTimeout(autoRun, 120000); setInterval(autoRun, 1800000);
     const wn2 = (v) => Math.round(v).toLocaleString('ko-KR');
     async function run() {
       const P = plan(), out = [], rows = [];
@@ -14238,7 +14258,7 @@
         let tot = 0, totSv = 0, bad = 0, size = 0; const det = [];
         for (const [fn, args] of calls) {
           let best = null;
-          for (let k = 0; k < 2; k++) { try { const m = await one(app, fn, args); best = best && best.rt <= m.rt ? best : m; if (!m.ok) bad++; rows.push({ v: app + ':' + scr, f: fn, n: 1, rt: m.rt, mx: m.rt, sv: m.sv }); } catch (e) { bad++; } }
+          for (let k = 0; k < 2; k++) { try { const m = await one(app, fn, args); best = best && best.rt <= m.rt ? best : m; if (!m.ok) bad++; rows.push({ v: app + ':' + scr, f: fn, n: 1, rt: m.rt, mx: m.rt, sv: m.sv }); stRows(rows, app + ':' + scr, fn, m.st); } catch (e) { bad++; } }
           if (best) { tot += best.rt; totSv += best.sv; size += best.size; det.push(fn.replace(/^(api|adm)_/, '') + ' ' + wn2(best.rt)); }
         }
         out.push({ app, scr, n: calls.length, tot, totSv, bad, size, det });
@@ -14250,6 +14270,7 @@
       call('adm_perf', store.get(), rows, true).catch(() => {});
       stats();
     }
+    try { $('#pfAuto').checked = autoOn(); $('#pfAuto').addEventListener('change', (e) => { try { localStorage.setItem('runner.autobench', e.target.checked ? '1' : '0'); } catch (x) { /* 무시 */ } toast(e.target.checked ? '자동 측정을 켰습니다 (관리자앱이 열려 있는 동안 30분마다).' : '자동 측정을 껐습니다.'); }); } catch (e) { /* 무시 */ }
     function stats() {
       call('adm_perfStats', store.get(), 7).then((r) => {
         if (!r || !r.ok) return;

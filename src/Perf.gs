@@ -454,8 +454,8 @@ function adm_perfDrv(token, fn, args, driverId) {
   return run_(function () {
     requireAdmin_(token);
     if (PERF_DRV_FNS.indexOf(fn) < 0) fail_('측정할 수 없는 함수입니다.');
-    let d = driverId ? driverById_(driverId) : null;
-    if (!d) d = readAll_(SH.DRIVERS).filter(function (o) { return o.status === ST.ACTIVE && o.loginId && !mustChange_(o) && o.workStatus !== '퇴사'; })[0];
+    let d = driverId && driverId !== 'rand' ? driverById_(driverId) : null;
+    if (!d) { const pool = readAll_(SH.DRIVERS).filter(function (o) { return o.status === ST.ACTIVE && o.loginId && !mustChange_(o) && o.workStatus !== '퇴사'; }); d = driverId === 'rand' && pool.length ? pool[Math.floor(Math.random() * pool.length)] : pool[0]; } // 'rand' = 승인 기사 중 아무나 (자동 측정이 여러 기사 자료로 재도록)
     if (!d) fail_('측정에 쓸 승인된 기사가 없습니다.');
     PERF_BENCH_ = { tok: Utilities.getUuid() + Utilities.getUuid(), s: { d: String(d.id), c: Date.now(), e: Date.now() + 60000, a: 0, th: 'bench' } };
     const t0 = Date.now();
@@ -467,7 +467,7 @@ function adm_perfDrv(token, fn, args, driverId) {
     const ms = Date.now() - t0;
     let size = 0;
     try { size = JSON.stringify(r).length; } catch (e) { size = 0; }
-    return { ok: true, fnOk: !!(r && r.ok), ms: ms, size: size, driver: d.name };
+    return { ok: true, fnOk: !!(r && r.ok), ms: ms, size: size, driver: d.name, st: (r && r._st) || null }; // st = 그 기능의 단계별 시간 (있으면)
   });
 }
 /** 측정 결과 모아 보기: 최근 N일 화면·함수별 (횟수/일 · 평균 왕복 · 평균 서버) */
