@@ -14060,19 +14060,7 @@
     b.disabled = true; b.textContent = '점검 중…';
     api('adm_maintSync').then((r) => { if (!r.ok) { b.disabled = false; b.textContent = '지금 다시 점검'; return toast(r.msg); } dcPaint(r.check); toast('자료 점검을 다시 했습니다' + (r.mirrored >= 0 ? ' · 오류 기록 ' + r.mirrored + '종을 유지보수 탭으로 내보냈습니다.' : '.')); }).catch(() => { b.disabled = false; b.textContent = '지금 다시 점검'; });
   });
-  // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
-  (function boot() {
-    const t = store.get();
-    if (!t) return showLogin();
-    // 지난번 로그인한 관리자 정보가 있으면 화면을 먼저 띄우고, 로그인 확인은 동시에 한다 (확인이 끝나길 3~4초 기다리지 않음).
-    // 로그인이 만료됐으면 화면 자료를 부르는 쪽(api)과 아래 확인이 로그인 화면으로 돌려보낸다.
-    const kept = admKeep.me();
-    if (kept && kept.name) showApp(kept);
-    call('adm_check', t).then((r) => {
-      if (r.ok) { dcPaint(r.check); admKeep.me(r.admin); if (!kept || !kept.name) showApp(r.admin); else if (me && (me.name !== r.admin.name || me.loginId !== r.admin.loginId)) { me = r.admin; $('#meName').textContent = r.admin.name + ' (' + r.admin.loginId + ')'; } }
-      else { store.del(); showLogin(); }
-    }).catch(() => { if (!kept || !kept.name) showLogin(); toast('연결이 원활하지 않습니다.'); });
-  })();
+  // (시작 코드는 맨 아래로 옮김 — 그 아래에 선언된 화면 문구 · 사용법 코드가 준비되기 전에 실행되면, 새로고침으로 '올인원 설정'을 다시 열 때 오류로 멈춘다)
 
   // ───────────── 속도 측정 ─────────────
   (function () {
@@ -14769,6 +14757,19 @@
       if (c.checked) h.delete(c.dataset.tkh); else h.add(c.dataset.tkh);
       p.hide = [...h]; savePref(b._k, p); applyCols(b._tb, b._k);
     });
+  })();
+  // ───── 시작 (스크립트 맨 끝 — 모든 선언 뒤에 실행) ─────
+  (function boot() {
+    const t = store.get();
+    if (!t) return showLogin();
+    // 지난번 로그인한 관리자 정보가 있으면 화면을 먼저 띄우고, 로그인 확인은 동시에 한다 (확인이 끝나길 3~4초 기다리지 않음).
+    // 로그인이 만료됐으면 화면 자료를 부르는 쪽(api)과 아래 확인이 로그인 화면으로 돌려보낸다.
+    const kept = admKeep.me();
+    if (kept && kept.name) showApp(kept);
+    call('adm_check', t).then((r) => {
+      if (r.ok) { dcPaint(r.check); admKeep.me(r.admin); if (!kept || !kept.name) showApp(r.admin); else if (me && (me.name !== r.admin.name || me.loginId !== r.admin.loginId)) { me = r.admin; $('#meName').textContent = r.admin.name + ' (' + r.admin.loginId + ')'; } }
+      else { store.del(); showLogin(); }
+    }).catch(() => { if (!kept || !kept.name) showLogin(); toast('연결이 원활하지 않습니다.'); });
   })();
 })();
 </script>

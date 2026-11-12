@@ -773,9 +773,11 @@ var _lockN = 0, _lockObj = null;
 function scriptLock_() {
   let mine = false;
   const real = function () { return _lockObj || (_lockObj = LockService.getScriptLock()); };
+  // 잠금을 잡은 작업 이름을 잠깐 적어 둔다 → 다른 실행이 '저장 충돌'로 끝나면 누가 잡고 있었는지 오류 기록에 남는다 (유지보수용 · 실패해도 무시)
+  const note = function () { try { cache_().put('lk:who', ((typeof _curFn !== 'undefined' && _curFn) || '(자동 작업)') + '|' + Date.now(), 180); } catch (e) { /* 무시 */ } };
   return {
-    waitLock: function (ms) { if (mine) return; if (_lockN === 0) real().waitLock(ms); _lockN++; mine = true; },
-    tryLock: function (ms) { if (mine) return true; if (_lockN === 0 && !real().tryLock(ms)) return false; _lockN++; mine = true; return true; },
+    waitLock: function (ms) { if (mine) return; if (_lockN === 0) { real().waitLock(ms); note(); } _lockN++; mine = true; },
+    tryLock: function (ms) { if (mine) return true; if (_lockN === 0) { if (!real().tryLock(ms)) return false; note(); } _lockN++; mine = true; return true; },
     hasLock: function () { return mine; },
     // 풀기 전에 시트 쓰기를 먼저 반영(flush)한다: 반영 전에 풀면 다음 실행이 잠금을 잡고도 아직 안 써진 줄을 못 봐 같은 줄에 덮어쓸 수 있다
     releaseLock: function () { if (!mine) return; mine = false; _lockN = Math.max(0, _lockN - 1); if (_lockN === 0) { try { SpreadsheetApp.flush(); } catch (e) { /* 무시 */ } real().releaseLock(); } }
@@ -798,7 +800,9 @@ function run_(fn) {
     if (err && err.userMsg) return err.code ? { ok: false, code: err.code, msg: err.userMsg } : { ok: false, msg: err.userMsg };
     if (/lock timeout|lock.*too long|잠금.*(시간|초과)/i.test(String(err && err.message || err))) {
       console.warn('잠금 대기 시간 초과: ' + (err && err.message));
-      errLog_('저장 충돌', _curFn, '다른 저장이 진행 중이라 20초 안에 잠금을 못 잡음');
+      let who = '';
+      try { const w = String(cache_().get('lk:who') || '').split('|'); if (w[0]) who = ' · 잡고 있던 작업: ' + w[0] + ' (' + Math.round((Date.now() - Number(w[1] || 0)) / 1000) + '초 전부터)'; } catch (e) { /* 무시 */ }
+      errLog_('저장 충돌', _curFn, '다른 저장이 진행 중이라 20초 안에 잠금을 못 잡음' + who);
       return { ok: false, code: 'BUSY', msg: '다른 저장 작업이 처리 중입니다. 잠시 후 다시 시도해 주세요.' };
     }
     console.error(err && err.stack ? err.stack : err);
