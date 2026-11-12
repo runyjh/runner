@@ -797,7 +797,11 @@ function run_(fn) {
     return r;
   }
   catch (err) {
-    if (err && err.userMsg) return err.code ? { ok: false, code: err.code, msg: err.userMsg } : { ok: false, msg: err.userMsg };
+    if (err && err.userMsg) {
+      // 사용자에게 '안 됩니다' 안내가 뜬 것도 남긴다 (오류는 아니지만 같은 안내가 반복되면 화면·규칙이 불편하다는 신호) · 로그인 만료 같은 코드 있는 안내는 제외
+      if (!err.code) { try { errLog_('안내', _curFn, err.userMsg); } catch (x) { /* 무시 */ } }
+      return err.code ? { ok: false, code: err.code, msg: err.userMsg } : { ok: false, msg: err.userMsg };
+    }
     if (/lock timeout|lock.*too long|잠금.*(시간|초과)/i.test(String(err && err.message || err))) {
       console.warn('잠금 대기 시간 초과: ' + (err && err.message));
       let who = '';
@@ -1676,7 +1680,7 @@ function adm_check(token) {
     const a = requireAdmin_(token);
     try { if (typeof fsEnsureTrigger_ === 'function') fsEnsureTrigger_(); } catch (e) { /* 사본 트리거 확인 (6시간에 한 번만 실제 확인) */ }
     let check = null;
-    try { check = JSON.parse(appSet_().dataCheck || 'null'); } catch (e) { check = null; } // 새벽 자료 점검 결과 (대시보드에 표시)
+    try { check = typeof dataCheckView_ === 'function' ? dataCheckView_() : JSON.parse(appSet_().dataCheck || 'null'); } catch (e) { check = null; } // 새벽 자료 점검 결과 + 자동 작업 멈춤 (대시보드에 표시)
     return { ok: true, admin: { name: a.name, loginId: a.loginId }, check: check };
   });
 }
@@ -3679,6 +3683,7 @@ function cleanupSessions() {
     try { dataCheck_(); } catch (e) { console.error('자료 점검 실패: ' + (e && e.message)); errLog_('서버 오류', 'dataCheck_', String(e && e.message || e)); } // 자료 점검 (읽기만)
     try { if (typeof stlLegacyRouteFixAll_ === 'function') stlLegacyRouteFixAll_(); } catch (e) { softFail_('그날 노선 되살리기 실패', e); } // 기존 정산 이식 달 (한 번씩만)
     try { perfRollup_(); } catch (e) { softFail_('속도 기록 요약 실패', e); } // 7일 지난 속도 기록 → 하루 요약으로 · 60일 지난 오류 기록 정리
+    try { hbMark_('night'); } catch (e) { /* 무시 */ } // 새벽 작업이 돌았다는 표시 (안 돌면 대시보드에 경고)
     try { maintMirror_(); } catch (e) { /* 사본은 실패해도 됨 */ } // 오류 기록 · 자료 점검 결과를 스케줄 DB 의 maint_ 탭으로 (유지보수용)
   }
 }

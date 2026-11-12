@@ -222,6 +222,7 @@ function fsCodeCheck_() {
 }
 function fsSync() {
   if (!fsCfg_()) return;
+  try { if (typeof hbMark_ === 'function') hbMark_('fs'); } catch (e) { /* 무시 */ } // 1분 트리거가 살아 있다는 표시 (15분에 한 번만 적음)
   fsCodeCheck_();
   const c = cache_(), dirty = +c.get('fs:dirty') || 0, built = +c.get('fs:built') || 0;
   const today = todayText_(), day = c.get('fs:day');
