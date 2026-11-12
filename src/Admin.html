@@ -1545,6 +1545,12 @@
   .td-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-top: 1px solid #f1f2f4; background: none; font: inherit; text-align: left; padding: 10px 0; cursor: pointer; color: var(--ink); }
   .td-h + .td-row { border-top: 0; } .td-row .tx { flex: 1; min-width: 0; } .td-row .tx b { display: block; font-size: 14.5px; word-break: keep-all; overflow-wrap: anywhere; } .td-row .tx small { display: block; color: var(--sub); font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
   .td-row .go { flex: none; border-radius: 9px; padding: 7px 12px; font-size: 13px; font-weight: 800; background: var(--brand); color: #fff; } .td-row .go.s { background: #eef0f3; color: #374151; }
+  .td-hi { margin: 0 2px 10px; } .td-hi b { display: block; font-size: 19px; } .td-hi small { color: var(--sub); font-size: 13px; }
+  .td-q { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; } .td-q button { border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 12px 4px 10px; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; } .td-q button i { display: block; font-style: normal; font-size: 21px; margin-bottom: 3px; }
+  .td-m { display: flex; gap: 8px; padding: 8px 0; border-top: 1px solid #f1f2f4; font-size: 14px; } .td-h + .td-m { border-top: 0; } .td-m i { font-style: normal; flex: none; } .td-m span { flex: 1; min-width: 0; overflow-wrap: anywhere; } .td-m.done span { color: #9ca3af; text-decoration: line-through; }
+  .td-hd { display: flex; align-items: center; justify-content: space-between; } .td-hd button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--brand); cursor: pointer; padding: 4px 0; }
+  .td-pk { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; background: linear-gradient(135deg, #fff4ea, #ffe6d3); border: 1px solid #fdba74; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; color: #7c2d12; font-size: 13px; } .td-pk b { display: block; color: #9a3412; font-size: 14.5px; margin-bottom: 2px; }
+  #view-sched.td > .head { display: none; }
   .td-ok { color: #15803d; font-size: 13.5px; font-weight: 700; padding: 6px 0 2px; }
   #view-sched.my .pg-help { display: none !important; }
   #view-sched.my .smb-top, #view-sched.my .smb-pick, #view-sched.my #sCount { display: none !important; }
@@ -2146,8 +2152,7 @@
   </main>
   <!-- 휴대폰 화면: 아래 탭 5개 + 더보기 (PC 화면에서는 안 보임) -->
   <nav class="mtab" id="mTab" aria-label="주 메뉴">
-    <button type="button" data-mt="my"><i>🚚</i>내 스케줄</button>
-    <button type="button" data-mt="dash"><i>◉</i>오늘</button>
+    <button type="button" data-mt="dash"><i>🏠</i>홈</button>
     <button type="button" data-mt="mng"><i>▦</i>관리</button>
     <button type="button" data-mt="drivers"><i>👤</i>기사</button>
     <button type="button" data-mt="more"><i>≡</i>더보기</button>
@@ -3068,7 +3073,7 @@
     let sv0 = '';
     try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv0 = sv; } catch (e) {}
     // 휴대폰: 처음 열면 내 스케줄 (내 기사 줄이 없는 계정은 오늘 화면)
-    try { const ph = document.documentElement.classList.contains('m'), sm = sessionStorage.getItem('runner.admMy'); if (ph && (!sv0 || sv0 === 'dash')) { schMode(!sv0 && localStorage.getItem('runner.m.nomy') !== '1' ? 'my' : 'today'); currentView = 'sched'; } else if (ph && sv0 === 'sched' && (sm === '1' || sm === 't')) schMode(sm === '1' ? 'my' : 'today'); } catch (e) { /* 기본 화면으로 */ }
+    try { const ph = document.documentElement.classList.contains('m'), sm = sessionStorage.getItem('runner.admMy'); if (ph && (!sv0 || sv0 === 'dash')) { schMode('today'); currentView = 'sched'; } else if (ph && sv0 === 'sched' && (sm === '1' || sm === 't')) schMode('today'); } catch (e) { /* 기본 화면으로 */ }
     switchView(currentView);
   }
   $('#loginForm').addEventListener('submit', (e) => {
@@ -9977,6 +9982,12 @@
   let sMy = false, sMobKeep = '';
   /** 내 스케줄 모드: 관리자 본인 줄만 한 달 달력으로 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   let sTd = false;
+  const HM = { ym: '', memos: null, at: 0, p: null };
+  function hmLoad() {
+    const ym = ymdLocal(new Date()).slice(0, 7);
+    if (HM.p || (HM.ym === ym && HM.memos && Date.now() - HM.at < 300000)) return;
+    HM.p = api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { HM.ym = ym; HM.memos = r.memos || []; HM.at = Date.now(); if (sTd) { try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } } }).catch(() => {}).finally(() => { HM.p = null; });
+  }
   /** 휴대폰 기사스케줄 화면의 모드: 'my' 내 스케줄 · 'today' 오늘(PDD 한눈에) · '' 관리용 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   function schMode(m) {
     if (!document.documentElement.classList.contains('m')) m = '';
@@ -9985,7 +9996,7 @@
     sMy = m === 'my'; sTd = m === 'today';
     try { sessionStorage.setItem('runner.admMy', m === 'my' ? '1' : m === 'today' ? 't' : '0'); } catch (e) { /* 무시 */ }
     const v = $('#view-sched'); v.classList.toggle('my', !!m); v.classList.toggle('td', sTd);
-    const h = v.querySelector('.head h2'); if (h && h.firstChild && h.firstChild.nodeType === 3) h.firstChild.nodeValue = sMy ? '내 스케줄 ' : sTd ? '오늘 ' : '기사스케줄 ';
+    const h = v.querySelector('.head h2'); if (h && h.firstChild && h.firstChild.nodeType === 3) h.firstChild.nodeValue = sMy ? '내 스케줄 ' : sTd ? '홈 ' : '기사스케줄 ';
   }
   function schMy(on) { if (on) schMode('my'); else schMode(''); }
   const mobOn = () => document.documentElement.classList.contains('m') && sMob !== 'table';
@@ -10022,10 +10033,20 @@
       const chk = T.nov.concat(T.du), todo = T.mi.length + chk.length;
       const row = (x, sub, btn, cls) => '<button type="button" class="td-row"' + (x.row ? ' data-tdrow="' + esc(x.row) + '"' : ' data-tdcamp="' + esc(String(x.t).split(' ')[0]) + '"') + '><span class="tx"><b>' + esc(x.t) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + (btn ? '<span class="go' + (cls || '') + '">' + btn + '</span>' : '') + '</button>';
       const tile = (c, n, l) => '<div class="' + (n ? c : 'z') + '"><b>' + n + '</b>' + l + '</div>';
-      box.innerHTML = '<div class="smb-card"><span class="td-pill">오늘 PDD · ' + esc(mobMd(pdd)) + '</span><p class="smb-hint" style="margin:6px 0 0">실제 출근일 ' + pv + ' 저녁 입차 · 휴무 ' + T.off + ' · 백업 ' + T.bk + (T.yc.length ? ' · 용차 ' + T.yc.length : '') + '</p>' +
+      hmLoad(); try { loadPkm(); } catch (e) { /* 무시 */ }
+      const tdy = ymdLocal(new Date()), who = (typeof me !== 'undefined' && me) || {};
+      const memos = (HM.memos || []).filter((m) => m.date === tdy && !m.note).sort((x, y) => (x.done ? 1 : 0) - (y.done ? 1 : 0)), left = memos.filter((m) => !m.done).length;
+      const pk = PKM && PKM.cur && tdy >= (() => { const p = PKM.cur.from.split('-'); return ymdLocal(new Date(+p[0], +p[1] - 1, +p[2] - 3)); })() && tdy <= PKM.cur.to ? PKM.cur : null;
+      const q = (v, ic, l) => '<button type="button" data-tdgo="' + v + '"><i>' + ic + '</i>' + l + '</button>';
+      box.innerHTML = '<div class="td-hi"><b>' + esc(who.name || '관리자') + ' 님</b><small>' + esc(mobMd(tdy)) + ' · 내일 배송(PDD) ' + esc(mobMd(pdd)) + '</small></div>' +
+        (pk ? '<button type="button" class="td-pk" data-tdgo="peak"><b>🔥 ' + +pk.period.slice(5, 7) + '월 피크데이 · ' + rpMd(pk.from) + ' ~ ' + rpMd(pk.to) + '</b>예상 물량 보기 ›</button>' : '') +
+        '<div class="smb-card"><span class="td-pill">오늘 PDD · ' + esc(mobMd(pdd)) + '</span><p class="smb-hint" style="margin:6px 0 0">실제 출근일 ' + pv + ' 저녁 입차 · 휴무 ' + T.off + ' · 백업 ' + T.bk + (T.yc.length ? ' · 용차 ' + T.yc.length : '') + '</p>' +
         '<div class="td-grid">' + tile('r', T.mi.length, '미입차 노선') + tile('y', chk.length, '확인 필요') + '<div class="g"><b>' + T.work + '</b>출근</div>' + tile('n', T.pm.length, '품앗이') + '</div></div>' +
         '<div class="smb-card"><p class="td-h' + (todo ? ' r' : '') + '">지금 처리할 것' + (todo ? ' ' + todo : '') + '</p>' +
         (todo ? T.mi.map((x) => row(x, '담당 기사가 없는 노선 · 눌러서 그 캠프 보기', '배정')).join('') + T.du.map((x) => row(x, '같은 노선에 두 명', '확인', ' s')).join('') + T.nov.map((x) => row(x, '', '입력', ' s')).join('') : '<div class="td-ok">✓ 처리할 것이 없습니다</div>') + '</div>' +
+        '<div class="td-q">' + q('sched', '📅', '스케줄') + q('issue', '🚩', '이슈') + q('pumasi', '🤝', '품앗이') + q('memo', '🗒', '업무스케줄') + q('notice', '📢', '공지') + q('perf', '📊', '수행률') + '</div>' +
+        '<div class="smb-card"><div class="td-hd"><p class="td-h">오늘 업무' + (left ? ' · 남은 것 ' + left : '') + '</p><button type="button" data-tdgo="memo">모두 보기 ›</button></div>' +
+        (HM.memos == null ? '<p class="smb-hint" style="margin:4px 0">불러오는 중…</p>' : memos.length ? memos.slice(0, 5).map((m) => '<div class="td-m' + (m.done ? ' done' : '') + '"><i>' + (m.done ? '☑' : '☐') + '</i><span>' + esc((m.time ? m.time + ' ' : '') + String(m.content || '').split('\n')[0]) + '</span></div>').join('') + (memos.length > 5 ? '<p class="smb-hint" style="margin:6px 0 0">외 ' + (memos.length - 5) + '건</p>' : '') : '<p class="smb-hint" style="margin:4px 0">오늘 적힌 업무가 없습니다.</p>') + '</div>' +
         (T.pm.length || T.yc.length ? '<div class="smb-card"><p class="td-h">품앗이 · 용차</p>' + T.pm.map((x) => row(x, (x.s ? x.s + ' · ' : '') + '배차 확정')).join('') + T.yc.map((x) => row(x, '용차 · ' + (x.s || ''))).join('') + '</div>' : '') +
         (T.is.length || T.nt.length ? '<div class="smb-card"><p class="td-h">이슈 · 지시</p>' + T.is.map((x) => row(x, x.s || '')).join('') + T.nt.map((x) => row(x, x.s || '')).join('') + '</div>' : '');
       return;
@@ -10107,6 +10128,7 @@
   const isWorkDayCell = (v) => { const s = String(v || '').trim(); return !!s && s !== '휴가' && !['휴무', '용차', '병가', '퇴사', '미입차', '노쇼', '업무'].some((w) => s.includes(w)); };
   $('#sMobBox').addEventListener('click', (e) => {
     const t = e.target;
+    const tg = t.closest('[data-tdgo]'); if (tg) { const v = tg.dataset.tdgo; if (v === 'sched') mSchedGo(''); else { schMode(''); if (v === 'peak') { RP.tab = 'pk'; navGo('perf'); if (currentView === 'perf') rpRender(); } else { if (v === 'perf') RP.tab = 'wk'; navGo(v); } } window.scrollTo(0, 0); return; }
     const tr = t.closest('[data-tdrow]'); if (tr) { const k = tr.dataset.tdrow, r = srows.find((x) => (x.key || x.row) === k || String(x.row) === k); if (r && r.kind === 'd') ceOpen(r, pddDate()); else toast('그 줄을 찾지 못했습니다. 관리 탭에서 확인해 주세요.'); return; }
     const tc = t.closest('[data-tdcamp]'); if (tc) { const c = SD.camps.find((x) => shortCamp(x.name).replace(/\s/g, '') === tc.dataset.tdcamp); schMode(''); mobSet('camp'); sMobDay = pddDate(); if (c) { sf.camp = c.id; $('#sCamp').value = c.id; } renderSched(); try { mTabSync(); } catch (x) { /* 무시 */ } window.scrollTo(0, 0); return; }
     const mg = t.closest('[data-smbmng]'); if (mg) { const c = SD.camps.find((x) => shortCamp(x.name) === mg.dataset.smbmng); schMy(false); mobSet('camp'); if (c) { sf.camp = c.id; $('#sCamp').value = c.id; } renderSched(); try { mTabSync(); } catch (x) { /* 무시 */ } window.scrollTo(0, 0); return; }
