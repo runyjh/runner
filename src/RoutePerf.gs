@@ -930,11 +930,10 @@ function adm_peakSet(token, f) {
  *  { on, cur:{period,from,to}|null(다가오는 · 진행 중인 피크), periods:[{period,from,to}], q:{ 날짜:{ '캠프|코드': 건수 } }, avg:{ '캠프|코드': 평소 하루 평균 } }
  *  앱은 그날 내가 타는 노선(스케줄 칸 · 품앗이)만 골라 보여 준다. 변경이력으로 이어진 옛 · 새 코드로도 찾을 수 있게 같은 값을 함께 넣는다.
  */
-function api_myPeak(token) {
-  return run_(function () {
-    pmUser_(token);
-    const set = pkSettings_();
-    if (!set.drvOn) return { ok: true, on: false, periods: [], q: {}, avg: {} };
+function pkMap_(always) {
+  const set = pkSettings_();
+  if (!set.drvOn && !always) return { ok: true, on: false, periods: [], q: {}, avg: {} };
+  {
     const ck = cache_(), key = 'mypk:' + rpfVer_() + ':' + todayText_(), hit = ck.get(key);
     if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 */ } }
     const today = todayText_(), all = pkAll_();
@@ -958,5 +957,12 @@ function api_myPeak(token) {
     });
     try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
     return out;
-  });
+  }
+}
+function api_myPeak(token) {
+  return run_(function () { pmUser_(token); return pkMap_(false); });
+}
+/** 관리자: 기사 앱과 같은 피크 자료 (기사스케줄 날짜 🔥 표시 · 내 스케줄의 그날 예상 물량) — 기사 앱 공유가 꺼져 있어도 관리자에게는 보인다 */
+function adm_peakMap(token) {
+  return run_(function () { requireAdmin_(token); return pkMap_(true); });
 }

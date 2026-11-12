@@ -1889,6 +1889,7 @@
           return;
         }
         if (r.campRots) CAMP_ROTS = r.campRots;
+        if (!PEAK) loadPeak().then((P) => { if (P && !stale() && curView === 'sched' && scMode === 'camp' && scCamp && scCamp.dates.some(peakIn)) { const y = window.scrollY; renderCampSched(); window.scrollTo(0, y); } });
         scCamp = r; if (!scCampDay || !r.dates.includes(scCampDay)) scCampDay = r.dates.includes(pddOf(r.today)) ? pddOf(r.today) : r.dates[0];
         renderCampSched();
       }).catch(() => { if (stale()) return; $('#scBody').innerHTML = scFailBox('인터넷 연결을 확인해 주세요.'); netErr(); });
@@ -1941,7 +1942,7 @@
         : '<span class="v ' + schKind(mv, schIdsOf(me)) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const hasInst = (me && (me.inst || {})[dd]) || r.drivers.some((x) => (x.inst || {})[dd]);
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[dd] ? ' sun' : dow === 6 ? ' sat' : '') + (dd === pdd ? ' pdd' : '') + (dd === r.today ? ' td' : '') + (dd === scCampDay ? ' sel' : '') + '" data-cd="' + dd + '">' +
-        '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + (hasInst ? '<span class="instdot" title="지시사항">📌</span>' : '') + '</span>' + (dd === pdd ? '<em class="pddt">PDD</em>' : '') +
+        '<span class="n"><span>' + day + '</span>' + (peakIn(dd) ? '<span title="피크데이">🔥</span>' : '') + (hasInst ? '<span class="instdot" title="지시사항">📌</span>' : '') + '</span>' + (dd === pdd ? '<em class="pddt">PDD</em>' : '') +
         (pmCell(r, dd).work && (!mv || /휴무|휴가/.test(mv)) ? '' : chip) + pmCell(r, dd).html +
         ((w || nb) ? '<span class="cwk">' + (w ? '<span>근무 ' + w + '</span>' : '') + (nb ? '<b class="bkdot">백업 ' + nb + '</b>' : '') + '</span>' : '') + '</button>');
     });
@@ -2303,7 +2304,7 @@
         : '<span class="v ' + schKind(v, myIds) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const icons = ((r.inst || {})[d] ? '<span title="' + (isStaffUser() ? '일정 메모' : '지시사항') + '">' + instIco() + '</span>' : '') + (schRegId(v0, myIds) ? '<span title="다른 아이디로 업무등록">🆔</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === r.today ? ' td' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
-        '<span class="n"><span>' + day + '</span>' + (day <= 7 || peakIn(d) ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
+        '<span class="n"><span>' + day + '</span>' + (peakIn(d) ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
         (d === pdd ? '<em class="pddt">PDD</em>' : '') + (pmWork && (!v || /휴무|휴가/.test(v)) ? '' : chip) + pmChip + '</button>');
     });
     $('#scBody').innerHTML = rcNote(r) + '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +

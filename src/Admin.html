@@ -4015,7 +4015,7 @@
     if (v === 'issue') loadIssue();
     $('#view-settle').classList.toggle('hidden', v !== 'settle');
     if (v === 'settle') loadSettle();
-    if (v === 'sched') loadSched();
+    if (v === 'sched') { loadSched(); loadPkm(); }
     if (v === 'bib') loadBib();
     if (v === 'route') loadRoutes();
     // 기사 정보는 스케줄·배번호·정산·초기화 화면에서도 바뀌므로, 다른 메뉴에서 돌아오면 다시 불러온다 (선택 탭은 유지)
@@ -7372,7 +7372,7 @@
       if (!r.ok) { toast(r.msg); return; }
       $('#rpUpModal').classList.add('hidden'); rpUp = null;
       toast('피크 예상 물량을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged + (push ? ' · 알림 ' + (r.pushed || 0) + '건' : '') + (r.memo ? ' · 업무스케줄에 메모' : ''));
-      await loadPk(true, ym);
+      await loadPk(true, ym); loadPkm(true);
       RP.tab = 'pk'; if (currentView !== 'perf') switchView('perf'); else rpRender();
     } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
   }
@@ -8991,7 +8991,7 @@
     const hcell = (dt, i) => {
       const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
       const tags = [];
-      if (+p[2] <= 7) tags.push('<i class="tg-peak" title="피크데이 (매달 1~7일 · 물량 많은 날)">🔥 피크</i>');
+      if (pkmIn(dt)) tags.push('<i class="tg-peak" title="피크데이 (쿠팡 피크 예상 물량 파일의 날짜 · PDD 기준)">🔥 피크</i>');
       if (SD.holidays[dt]) tags.push('<i class="tg-hol">' + esc(SD.holidays[dt]) + '</i>');
       return '<th class="dc' + (dt === today ? ' today' : '') + (dow === 0 || SD.holidays[dt] ? ' sun' : dow === 6 ? ' sat' : '') + (sepCol(i) ? ' wk2' : '') + '" data-col="' + i + '">' +
         '<b>' + +p[1] + '/' + +p[2] + ' (' + DOW[dow] + ')</b><small>' + weekOfMonth(dt) + '주차</small>' + tags.join('') + '</th>';
@@ -9904,6 +9904,42 @@
   // ───── 휴대폰 기사스케줄: [한 달 / 캠프] 달력 (기사앱 '내 스케줄'과 같은 틀 · 관리자는 캠프·기사를 골라 보고, 누르면 칸 입력 창) ─────
   let sMob = 'camp', sMobDay = '', sMobDrv = '';
   try { const v = localStorage.getItem('runner.sch.mob'); if (v === 'drv' || v === 'table' || v === 'camp') sMob = v; } catch (e) { /* 기본값 */ }
+  // ── 피크 예상 물량 (기사 앱과 같은 자료 · 날짜 🔥 표시와 내 스케줄의 그날 예상 물량)
+  let PKM = null, pkmP = null;
+  const pkmIn = (d) => !!PKM && (PKM.periods || []).some((p) => d >= p.from && d <= p.to);
+  function loadPkm(force) {
+    if (pkmP && !force) return pkmP;
+    const had = JSON.stringify((PKM && PKM.periods) || []);
+    pkmP = api('adm_peakMap').then((r) => {
+      PKM = r && r.ok ? r : PKM;
+      if (PKM && JSON.stringify(PKM.periods || []) !== had && SD.dates.length && !$('#view-sched').classList.contains('hidden') && SD.dates.some(pkmIn)) renderSched();
+      return PKM;
+    }).catch(() => PKM);
+    setTimeout(() => { pkmP = null; }, 600000);
+    return pkmP;
+  }
+  /** 그날 그 줄이 타는 노선의 예상 물량 [{ camp, code, qty, pct }] (기사 앱 peakOfDay 와 같은 규칙) */
+  function pkmOfDay(r, dt) {
+    const q = PKM && PKM.q && PKM.q[dt]; if (!q || !r || r.kind !== 'd') return [];
+    const c = mobCell(r, dt); let t = '';
+    if (c.kind === 'k-work' || c.kind === 'k-other') t = c.top === '출근' ? (r.d.baseRoute && /^\d/.test(r.d.baseRoute) ? baseCodes(r.d) : '') : c.top;
+    else if (c.kind === 'pmk' && /받음|◀/.test(c.full)) t = c.full;
+    if (!t) return [];
+    let camp = shortCamp(r.camp || r.d.camp || '').replace(/\s/g, ''); const out = [], seen = {};
+    String(t).toUpperCase().split(/[\s,/·()]+/).forEach((tok) => {
+      if (/^[가-힣]+\d+$/.test(tok)) { camp = tok; return; }
+      const m = tok.match(/^(\d{2,4})([A-Z]+)$/); if (!m) return;
+      m[2].split('').forEach((ch) => { const k = camp + '|' + m[1] + ch; if (seen[k] || q[k] === undefined) return; seen[k] = 1; const avg = (PKM.avg || {})[k] || 0; out.push({ camp, code: m[1] + ch, qty: q[k], pct: avg ? Math.round((q[k] / avg - 1) * 100) : null }); });
+    });
+    return out;
+  }
+  function pkmBox(r, dt) {
+    const L = pkmOfDay(r, dt); if (!L.length) return '';
+    const pc = (p) => (p == null ? '' : Math.abs(p) < 3 ? ' <small style="color:var(--sub)">평소와 비슷</small>' : ' <small style="font-weight:700;color:' + (p > 0 ? '#c2410c">평소보다 +' : '#15803d">평소보다 ') + p + '%</small>');
+    return '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:10px 12px;margin:10px 0 0;text-align:left"><b style="color:#9a3412;font-size:14px">🔥 피크 예상 물량</b>' +
+      L.map((x) => '<div style="margin-top:6px;font-size:14px"><b style="display:inline-block;min-width:52px">' + esc(x.code) + '</b> <b style="font-size:16px">' + x.qty.toLocaleString('ko-KR') + '건</b>' + pc(x.pct) + '</div>').join('') +
+      '<div style="margin-top:7px;font-size:12px;color:#7c2d12">' + (L.length > 1 ? '합계 ' + L.reduce((a, x) => a + x.qty, 0).toLocaleString('ko-KR') + '건 · ' : '') + '쿠팡 예상치라 실제와 다를 수 있습니다.</div></div>';
+  }
   let sMy = false, sMobKeep = '';
   /** 내 스케줄 모드: 관리자 본인 줄만 한 달 달력으로 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   function schMy(on) {
@@ -9952,7 +9988,7 @@
       '<div class="smb-more"><button type="button" class="btn ghost" id="smbMore">⋯</button><div class="smore-box hidden" id="smbMoreBox"><button type="button" class="btn ghost" data-smbgo="table">표로 보기</button><button type="button" class="btn ghost" data-smbgo="reload">새로고침</button></div></div></div>';
     const nav = (ttl) => '<div class="smb-nav"><button type="button" data-smbmv="-1" aria-label="이전 달">◀</button><span>' + yy + '년 ' + mo + '월 · ' + esc(ttl) + '</span><button type="button" data-smbmv="1" aria-label="다음 달">▶</button></div>';
     const grid = (cellFn) => '<div class="smb-grid">' + DOW.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : '') + '">' + w + '</div>').join('') + new Array(lead).fill('<div class="smb-c blank"></div>').join('') +
-      dates.map((dt, i) => { const dow = (lead + i) % 7; return '<button type="button" class="smb-c' + (dow === 0 || SD.holidays[dt] ? ' sun' : '') + (dt === pdd ? ' pdd' : '') + (dt === sMobDay ? ' sel' : '') + (dt < pdd ? ' past' : '') + '" data-smbd="' + dt + '"><span class="n">' + +dt.slice(8) + '</span>' + cellFn(dt, i) + '</button>'; }).join('') + '</div>';
+      dates.map((dt, i) => { const dow = (lead + i) % 7; return '<button type="button" class="smb-c' + (dow === 0 || SD.holidays[dt] ? ' sun' : '') + (dt === pdd ? ' pdd' : '') + (dt === sMobDay ? ' sel' : '') + (dt < pdd ? ' past' : '') + '" data-smbd="' + dt + '"><span class="n">' + +dt.slice(8) + (pkmIn(dt) ? '<span title="피크데이" style="font-size:10px">🔥</span>' : '') + '</span>' + cellFn(dt, i) + '</button>'; }).join('') + '</div>';
     const d = sMobDay, di = dates.indexOf(d), prev = (() => { const p = d.split('-'); const t = new Date(+p[0], +p[1] - 1, +p[2] - 1); return (t.getMonth() + 1) + '/' + t.getDate() + ' (' + DOW[t.getDay()] + ')'; })();
     const sat = (() => { const t = new Date(SD.today + 'T00:00:00'); t.setDate(t.getDate() - t.getDay() + 6); return ymdLocal(t); })();
     const dh = (ttl) => '<div class="smb-dh">' + esc(ttl) + (d === pdd ? '<em>PDD</em>' : '') + (SD.holidays[d] ? ' <span style="color:var(--danger);font-size:12px">' + esc(SD.holidays[d]) + '</span>' : '') + '<small class="' + (d > sat ? 'est">예상 · 변동 있음' : 'fix">확정') + '</small></div>';
@@ -10000,6 +10036,7 @@
             '<div class="big">' + (rt ? esc(shortCamp(r.camp || D.camp || '')) + ' <b>' + esc(rt) + '</b>' : c.kind === 'none' ? '<span style="color:#94a3b8">아직 정해지지 않음</span>' : '담당 <b>' + esc(base || '없음') + '</b>') + '</div>' +
             '<span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-work' ? '출근' : c.full) + '</span>' + (c.sub && c.kind !== 'k-yong' ? ' <span class="smb-pill" style="background:#dcfce7;color:#15803d">' + esc(c.sub) + ' 업무등록</span>' : '') +
             (iss ? '<p class="smb-hint" style="margin:8px 0 0">이슈: ' + esc(iss.result + ' · ' + iss.kind + (iss.sub ? ' · 대체 ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</p>' : '') + (ins ? '<p class="smb-hint" style="margin:6px 0 0">📌 ' + esc(ins.reason) + '</p>' : '') +
+            pkmBox(r, d) +
             '<button type="button" class="btn" data-smbrow="' + esc(r.key || r.row) + '">이 날 고치기</button></div>';
         }
         if (sMy) html += '<button type="button" class="btn ghost" data-smbmng="' + esc(shortCamp(D.camp || '')) + '" style="width:100%;margin-top:10px">' + esc(shortCamp(D.camp || '') || '캠프') + ' 캠프 스케줄 보기</button>';
