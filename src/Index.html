@@ -439,6 +439,12 @@
   .sl-foot { font-size: 13px; } .sl-foot .sl-kv { font-size: 13px; }
   .sl-warn { background: #fdf3e2; color: #8a5a00; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
   .mc .pmdot { font-size: 9.5px; color: #8a5a00; font-weight: 700; }
+  .pkban { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; background: linear-gradient(135deg, #fff4ea, #ffe6d3); border: 1px solid #fdba74; border-radius: var(--radius); padding: 13px 16px; margin: 0 0 12px; }
+  .pkban b { display: block; font-size: 15px; color: #9a3412; } .pkban span { display: block; font-size: 13px; color: #7c2d12; margin-top: 4px; line-height: 1.5; } .pkban span strong { font-weight: 800; }
+  .pkbox { background: #fff7ed; border: 1px solid #fdba74; border-radius: 12px; padding: 11px 13px; margin-top: 10px; }
+  .pkbox > b { color: #9a3412; font-size: 14px; } .pkbox .pkr { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-top: 7px; font-size: 14px; }
+  .pkbox .pkr .rt { font-weight: 800; min-width: 52px; } .pkbox .pkr .q { font-weight: 800; font-size: 16px; } .pkbox .pkr .up { color: #c2410c; font-size: 12.5px; font-weight: 700; } .pkbox .pkr .dn { color: #15803d; font-size: 12.5px; font-weight: 700; } .pkbox .pkr .eq { color: var(--sub); font-size: 12.5px; }
+  .pkbox .pkn { margin-top: 8px; font-size: 12px; color: #7c2d12; line-height: 1.5; }
   .ntcard { background: #fff; border-radius: var(--radius); padding: 14px 16px 6px; margin: 0 0 12px; }
   .ntcard h3 { margin: 0 0 6px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
   .ntcard h3 a { font-size: 13px; font-weight: 600; color: var(--brand); cursor: pointer; }
@@ -841,6 +847,7 @@
   <section id="v-home" class="view">
     <div class="hello"><h2><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><span id="homeName">기사님, 안녕하세요</span></h2><p>오늘도 안전 운행하세요.</p></div>
     <div class="ntcard hidden" id="ntCard"></div>
+    <button type="button" class="pkban hidden" id="pkBan"></button>
     <div class="menu">
       <button class="tile" id="mSched" type="button"><i class="ti">📅</i><b>스케줄</b><span>한 달 일정 · 내 캠프 →</span></button>
       <button class="tile" id="mSettle" type="button"><i class="ti">💰</i><b>정산서 보기</b><span>월별 정산서·계산서 →</span></button>
@@ -1259,7 +1266,7 @@
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_ntPhoto', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead', 'api_pmAlertsDel'];
+  const API_BG = ['api_myPeak', 'api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_ntPhoto', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead', 'api_pmAlertsDel'];
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -1277,7 +1284,7 @@
   //  · 내가 저장·지원·글쓰기 등을 하면 2분 동안은 기다려서라도 서버의 새 값을 받음 (방금 한 일이 바로 보이게)
   //  · 15초 안에 같은 걸 다시 부르면 서버에 다시 묻지 않음
   // ※ 정산서(api_mySettle·api_mySlip)는 계좌번호·금액이 있어 이 기기에 저장하지 않음 (15초 재사용만)
-  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_myFb', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
+  const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_myFb', 'api_myPeak', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
   const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
   const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_ntPhoto', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto', 'api_memoMonth', 'api_ntAdmList', 'api_ntAdmPhoto']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
   const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
@@ -1494,6 +1501,7 @@
     show('home');
     const sp = sessP; // 사본(Firestore)으로 홈을 그렸으면 로그인 확인은 기다리지 않음 (뒤에서 계속 확인 · 만료면 로그인 화면으로)
     homeGate([new Promise((res) => setTimeout(() => res(loadNotices()), 0)).then((v) => (v === 'fs' ? null : sp))]);
+    setTimeout(() => { try { loadPeakHome(); } catch (e) { /* 피크 배너 없음 */ } }, 0);
     setTimeout(() => { if (window.bdRecent) window.bdRecent(); }, 0); // (공지 함수는 뒤에서 선언되므로 한 박자 뒤에)
     setTimeout(() => { try { fsReady(); } catch (e) {} }, 0); // Firestore 준비 (홈 사본)
     setTimeout(() => { if (window.pmAlertStart) window.pmAlertStart(); }, 0); // (알림 함수는 뒤에서 선언되므로 한 박자 뒤에)
@@ -1506,7 +1514,7 @@
     if (last) $('#lgId').value = last;
     show('login');
   }
-  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); if (window.scReset) window.scReset(); try { SLC.tok = ''; SLC.months = null; SLC.slips = {}; SLC.at = 0; } catch (e) { /* 아직 선언 전 */ } try { localStorage.removeItem('runner.slUsed'); localStorage.removeItem('runner.slPreAt'); } catch (e) { /* 무시 */ } } // 다음 로그인(공용 폰의 다른 기사)에 고른 캠프가 남지 않게
+  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); if (window.scReset) window.scReset(); if (window.peakReset) window.peakReset(); try { $('#pkBan').classList.add('hidden'); } catch (e) { /* 무시 */ } try { SLC.tok = ''; SLC.months = null; SLC.slips = {}; SLC.at = 0; } catch (e) { /* 아직 선언 전 */ } try { localStorage.removeItem('runner.slUsed'); localStorage.removeItem('runner.slPreAt'); } catch (e) { /* 무시 */ } } // 다음 로그인(공용 폰의 다른 기사)에 고른 캠프가 남지 않게
 
   // ───── 화면 문구 (관리자앱 → 올인원 설정 → 기사앱 에서 바꿈) ─────
   // 키 = "d:화면id:기본 문구". 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. ※ 관리자앱 uiDrvScan 과 같은 규칙
@@ -1896,7 +1904,7 @@
         else $('#scBody').innerHTML = scFailBox(r.msg);
         return;
       }
-      if (mode === 'month') return renderMonth(r);
+      if (mode === 'month') { renderMonth(r); if (!PEAK) loadPeak().then((P) => { if (P && !stale() && curView === 'sched' && scMode === 'month' && r.dates.some(peakIn)) { const y = window.scrollY; renderMonth(r); window.scrollTo(0, y); } }); return; }
       // PDD(배송 예정일) = 오늘 기준 내일 → 파란색 강조
       const week = (list, title, cls, tag) => '<div class="wk"><h3>' + title + '<small class="' + cls + '">' + tag + '</small></h3>' + list.map((d) => dayRow(r, d)).join('') + '</div>';
       $('#scBody').innerHTML = rcNote(r) + week(r.dates.slice(0, 7), '이번 주', 'fix', '확정') + week(r.dates.slice(7, 14), '다음 주', 'est', '예상 · 변동 있음');
@@ -2170,6 +2178,66 @@
   }
   /** 내가 올린 품앗이가 배차 확정 + 그날 내 칸과 캠프·라우트가 같을 때 */
   /** 그날 내 품앗이 목록 · 맡겨서 확정된 일감은 '배차확정 완료' 줄로 이미 보이면 뺀다 (겹침 방지) */
+  // ───── 피크 예상 물량 (쿠팡 Peak Demand · 사무실에서 올리고 켜 두었을 때만) — 그날 내가 타는 노선만 보여 준다 ─────
+  let PEAK = null, peakP = null, peakTok = '';
+  function loadPeak() {
+    const token = store.get(TOKEN); if (!token) return Promise.resolve(null);
+    if (peakP && peakTok === token) return peakP;
+    peakTok = token;
+    const p = api('api_myPeak', token).then((r) => { PEAK = r && r.ok && r.on ? r : null; setTimeout(() => { if (peakP === p) peakP = null; }, 60000); return PEAK; }).catch(() => { if (peakP === p) peakP = null; return PEAK; });
+    return (peakP = p);
+  }
+  window.peakReset = () => { PEAK = null; peakP = null; peakTok = ''; };
+  const peakIn = (d) => !!PEAK && (PEAK.periods || []).some((p) => d >= p.from && d <= p.to);
+  /** 그날 내가 타는 노선의 예상 물량 [{ camp, code, qty, avg, pct }] — 스케줄 칸(출근 = 담당 노선) + 품앗이로 받은 노선 − 품앗이로 맡긴 노선 */
+  function peakOfDay(r, d) {
+    const q = PEAK && PEAK.q && PEAK.q[d]; if (!q || !r) return [];
+    const nz = (t) => String(t || '').replace(/\s|캠프$/g, ''), list = [], seen = {};
+    const add = (camp, code) => { const k = nz(camp) + '|' + code; if (!seen[k]) { seen[k] = 1; list.push({ camp: nz(camp), code }); } };
+    const v = schOwn(String(r.cells[d] || ''), schIdsOf(r));
+    if (v && !/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(v)) v.split(/,\s*(?=[가-힣]+\d*\s+\d)/).forEach((part, i) => { const pc = schParse(part, i === 0 ? r.baseRoute || '' : ''); pc.codes.forEach((c) => add(pc.camp || r.camp, c)); });
+    const pm = ((r.pumasi || {})[d] || []).filter((x) => x.status === '확정' && x.route);
+    pm.filter((x) => x.role === '수행').forEach((x) => schParse(x.route, '').codes.forEach((c) => add(x.camp || r.camp, c)));
+    const gave = {}; pm.filter((x) => x.role === '맡김').forEach((x) => schParse(x.route, '').codes.forEach((c) => { gave[nz(x.camp || r.camp) + '|' + c] = 1; }));
+    const out = [];
+    list.forEach((x) => {
+      let k = x.camp + '|' + x.code; if (gave[k]) return;
+      if (q[k] === undefined) { const m = Object.keys(q).filter((y) => y.split('|')[1] === x.code); if (!x.camp && m.length === 1) k = m[0]; else return; }
+      const avg = (PEAK.avg || {})[k] || 0;
+      out.push({ camp: k.split('|')[0], code: x.code, qty: q[k], avg, pct: avg ? Math.round((q[k] / avg - 1) * 100) : null });
+    });
+    return out;
+  }
+  const peakPct = (p) => (p == null ? '' : Math.abs(p) < 3 ? '<span class="eq">평소와 비슷</span>' : p > 0 ? '<span class="up">평소보다 +' + p + '%</span>' : '<span class="dn">평소보다 ' + p + '%</span>');
+  function peakBox(r, d) {
+    const L = peakOfDay(r, d); if (!L.length) return '';
+    const sum = L.reduce((a, x) => a + x.qty, 0), many = new Set(L.map((x) => x.camp)).size > 1;
+    return '<div class="pkbox"><b>🔥 피크 예상 물량</b>' + L.map((x) => '<div class="pkr"><span class="rt">' + escH((many ? x.camp + ' ' : '') + x.code) + '</span><span class="q">' + x.qty.toLocaleString('ko-KR') + '건</span>' + peakPct(x.pct) + '</div>').join('') +
+      '<div class="pkn">' + (L.length > 1 ? '합계 ' + sum.toLocaleString('ko-KR') + '건 · ' : '') + '쿠팡 예상치라 실제와 다를 수 있습니다.' + (L.some((x) => x.pct != null) ? ' 평소 = 최근 정산 두 달의 하루 평균.' : '') + '</div></div>';
+  }
+  /** 홈 배너: 피크 3일 전부터 끝나는 날까지 · 누르면 내 스케줄의 그 달로 */
+  function loadPeakHome() {
+    const box = $('#pkBan'); if (!box) return;
+    loadPeak().then((P) => {
+      const c = P && P.cur, today = (P && P.today) || ymdOf(new Date());
+      const t0 = c ? (() => { const p = c.from.split('-'); return ymdOf(new Date(+p[0], +p[1] - 1, +p[2] - 3)); })() : '';
+      if (!c || today < t0 || today > c.to) { box.classList.add('hidden'); return; }
+      const md = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10), dw = (d) => { const p = d.split('-'); return DOWK[new Date(+p[0], +p[1] - 1, +p[2]).getDay()]; };
+      const paint = (best) => {
+        box.dataset.month = c.period; box.dataset.day = best ? best.d : c.from;
+        box.innerHTML = '<b>🔥 ' + +c.period.slice(5, 7) + '월 피크데이 · ' + md(c.from) + ' ~ ' + md(c.to) + '</b><span>' + (best ? '내 노선 예상 물량 · 가장 많은 날 <strong>' + md(best.d) + ' (' + dw(best.d) + ') ' + escH(best.t) + ' ' + best.q.toLocaleString('ko-KR') + '건</strong>' : '예상 물량이 올라왔습니다.') + ' · 눌러서 보기</span>';
+        box.classList.remove('hidden');
+      };
+      paint(null);
+      api('api_mySchedule', store.get(TOKEN), c.from.slice(0, 7)).then((r) => {
+        if (!r || !r.ok) return; if (r.campRots) CAMP_ROTS = r.campRots;
+        let best = null;
+        r.dates.forEach((d) => { if (d < c.from || d > c.to || d < today) return; const L = peakOfDay(r, d), q = L.reduce((a, x) => a + x.qty, 0); if (L.length && (!best || q > best.q)) best = { d, q, t: L.map((x) => x.code).join(' · ') }; });
+        if (best) paint(best);
+      }).catch(() => {});
+    });
+  }
+  $('#pkBan').addEventListener('click', (e) => { const b = e.currentTarget; scMonth = (b.dataset.day || '').slice(0, 7); scSel = b.dataset.day || ''; openSched(); });
   function pmOfDay(r, d) {
     const done = ((r.pmDone || {})[d] || []).map((x) => x.id);
     return ((r.pumasi || {})[d] || []).filter((x) => !(x.role === '맡김' && x.status === '확정' && done.includes(x.id)));
@@ -2235,7 +2303,7 @@
         : '<span class="v ' + schKind(v, myIds) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const icons = ((r.inst || {})[d] ? '<span title="' + (isStaffUser() ? '일정 메모' : '지시사항') + '">' + instIco() + '</span>' : '') + (schRegId(v0, myIds) ? '<span title="다른 아이디로 업무등록">🆔</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === r.today ? ' td' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
-        '<span class="n"><span>' + day + '</span>' + (day <= 7 ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
+        '<span class="n"><span>' + day + '</span>' + (day <= 7 || peakIn(d) ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
         (d === pdd ? '<em class="pddt">PDD</em>' : '') + (pmWork && (!v || /휴무|휴가/.test(v)) ? '' : chip) + pmChip + '</button>');
     });
     $('#scBody').innerHTML = rcNote(r) + '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
@@ -2246,7 +2314,7 @@
   function monthDsel(r) {
     const d = scSel, bk = (r.backup || {})[d] || [];
     const pm = pmOfDay(r, d).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : x.status === '확정' ? ' 확정' : '') + '</b>' + escH(x.text) + '</button>').join('');
-    const extra = pmDoneRow(r, d) + pm;
+    const extra = pmDoneRow(r, d) + pm + peakBox(r, d);
     return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', pmWork: pmCell(r, d).work && (!r.cells[d] || /휴무|휴가/.test(r.cells[d])), baseRoute: r.baseRoute || '', camp: r.camp || '', ids: schIdsOf(r), instLbl: instLbl(), inst: (r.inst || {})[d] || '',
       sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk.length ? ' · 들어오는 백업 <b>' + bk.length + '</b>명' : ' · 이 날 들어오는 백업 없음') : ''), extra });
   }

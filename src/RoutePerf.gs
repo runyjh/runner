@@ -801,3 +801,162 @@ function api_myFb(token) {
     return out;
   });
 }
+
+// ───────────────────────── 피크 예상 물량 (쿠팡 Peak_Demand 파일 · route_peak) ─────────────────────────
+// 매달 피크데이(보통 1~7일)의 캠프 · 라우트별 예상 물량. 수행률 · SLA 화면에서 올리고, 켜 두면 기사 앱 '내 스케줄'의 그날 내 노선에 보인다.
+// '평소 대비' = 최근 정산 2달의 그 라우트 하루 평균 배송 수량(routeVolumes_ avgQ)과 비교 — 비교할 자료가 없으면 건수만.
+const PK_TOTAL = 'TOTAL';
+function pkSettings_() { return { drvOn: !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(appSet_().peakDrvOn)) }; }
+function pkAll_() { let rows = []; try { rows = readAll_(SH.RPK).filter(function (o) { return o.key && o.date && o.code; }); } catch (e) { rows = []; } return rows; }
+/** 피크월 요약 [{ period, from, to, camps, routes, total:{날짜:합계}, maxDate, maxQty, file, uploadedAt }] (오래된 달부터) */
+function pkPeriods_(all) {
+  const by = {};
+  all.forEach(function (o) {
+    const p = by[o.period] || (by[o.period] = { period: o.period, from: o.date, to: o.date, campSet: {}, routes: {}, total: {}, sum: {}, file: o.file, uploadedAt: o.uploadedAt });
+    if (o.date < p.from) p.from = o.date; if (o.date > p.to) p.to = o.date;
+    if (str_(o.uploadedAt) > str_(p.uploadedAt)) { p.uploadedAt = o.uploadedAt; p.file = o.file; }
+    p.campSet[o.camp] = 1;
+    const q = Number(o.qty) || 0;
+    if (o.code === PK_TOTAL) p.total[o.date] = (p.total[o.date] || 0) + q; else { p.routes[o.camp + '|' + o.code] = 1; p.sum[o.date] = (p.sum[o.date] || 0) + q; }
+  });
+  return Object.keys(by).sort().map(function (k) {
+    const p = by[k], tot = Object.keys(p.total).length ? p.total : p.sum;
+    let md = '', mq = -1; Object.keys(tot).sort().forEach(function (d) { if (tot[d] > mq) { mq = tot[d]; md = d; } });
+    return { period: p.period, from: p.from, to: p.to, camps: Object.keys(p.campSet).length, campNames: Object.keys(p.campSet).sort(), routes: Object.keys(p.routes).length, total: tot, maxDate: md, maxQty: mq < 0 ? 0 : mq, file: p.file, uploadedAt: p.uploadedAt };
+  });
+}
+/** 라우트 변경이력으로 이어지는 다른 코드들 (앞 · 뒤, 1:1 로 이어진 것만) — 파일에 옛 코드가 있어도 지금 코드로 찾을 수 있게 */
+function pkAliases_(edges, camp, code) {
+  const out = rlnChain_(edges, camp, code).map(function (x) { return x.camp + '|' + x.code; });
+  const inTo = {}, outFrom = {};
+  edges.forEach(function (e) { if (e.kind === RLK.END || !e.toCode) return; const f = e.fromCamp + '|' + e.fromCode, t = e.toCamp + '|' + e.toCode; (inTo[t] = inTo[t] || []).push(f); (outFrom[f] = outFrom[f] || []).push(t); });
+  let cur = camp + '|' + code, guard = 0;
+  while (guard++ < 20) {
+    const nx = outFrom[cur]; if (!nx || nx.length !== 1 || (inTo[nx[0]] || []).length !== 1 || out.indexOf(nx[0]) >= 0 || nx[0] === camp + '|' + code) break;
+    out.push(nx[0]); cur = nx[0];
+  }
+  return out;
+}
+/** 평소 하루 평균 배송 수량 { '캠프|코드': 건수 } — 정산 자료가 없으면 빈 것 */
+function pkAvg_() {
+  const out = {};
+  try { const v = routeVolumes_().vol || {}; Object.keys(v).forEach(function (k) { const n = Number(v[k].avgQ) || 0; if (n > 0 && (Number(v[k].days) || 0) >= 5) out[k] = n; }); } catch (e) { /* 정산 DB 없음 */ }
+  return out;
+}
+/**
+ * 관리자: 피크 예상 물량 저장. p = { file, period:'yyyy-MM', rows:[{ wave, camp, code('723_D'|'Total'), date, qty }], push:true|false }
+ *  같은 날짜·캠프·라우트는 덮어쓴다. push = 그 캠프 기사들에게 휴대폰 알림.
+ */
+function adm_peakSave(token, p) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    p = p || {};
+    const period = str_(p.period);
+    if (!/^\d{4}-\d{2}$/.test(period)) fail_('피크 월(연 · 월)을 확인해 주세요.');
+    const file = str_(p.file).slice(0, 120), now = nowText_();
+    const list = [], seen = {};
+    (Array.isArray(p.rows) ? p.rows : []).forEach(function (r) {
+      const camp = rpfCamp_(r.camp), date = normDate_(r.date), isTot = /^total$/i.test(str_(r.code)), code = isTot ? PK_TOTAL : rpfCode_(r.code);
+      const qty = Number(String(r.qty == null ? '' : r.qty).replace(/,/g, ''));
+      if (!camp || !date || !code || isNaN(qty) || qty < 0 || (!isTot && !/^\d/.test(code))) return;
+      const key = date + '|' + camp + '|' + code; if (seen[key]) return; seen[key] = 1;
+      list.push({ key: key, period: period, date: date, wave: str_(r.wave).slice(0, 12), camp: camp, code: code, qty: String(Math.round(qty)), file: file, uploadedAt: now, by: a.name });
+    });
+    if (!list.length) fail_('저장할 줄이 없습니다. (캠프 · 라우트 · 날짜 · 물량을 읽지 못함)');
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    let added = 0, changed = 0, unchanged = 0;
+    try {
+      const sh = sheet_(SH.RPK), c = cols_(SH.RPK, true), byKey = {};
+      pkAll_().forEach(function (o) { byKey[o.key] = o; });
+      const upd = [], add = [];
+      list.forEach(function (o) { const old = byKey[o.key]; if (!old) add.push(o); else if (str_(old.qty) === o.qty && str_(old.period) === o.period) unchanged++; else upd.push({ row: old._row, o: o }); });
+      const toArr = function (o) { const arr = new Array(c.__w).fill(''); Object.keys(o).forEach(function (k) { if (c[k] !== undefined) arr[c[k]] = safeText_(o[k]); }); return arr; };
+      rpfWriteRows_(sh, upd, c.__w, toArr);
+      if (add.length) {
+        const r0 = sh.getLastRow() + 1;
+        if (r0 + add.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), Math.max(500, add.length));
+        sh.getRange(r0, 1, add.length, c.__w).setNumberFormat('@').setValues(add.map(toArr));
+      }
+      SpreadsheetApp.flush();
+      rpfBump_();
+      added = add.length; changed = upd.length;
+    } finally { lock.releaseLock(); }
+    const mm = Number(period.slice(5, 7)), ds = list.map(function (o) { return o.date; }).sort(), md = function (d) { return Number(d.slice(5, 7)) + '/' + Number(d.slice(8, 10)); };
+    let memo = null;
+    if (perfMemoOn_()) memo = uploadMemo_(a, mm + '월 피크 예상 물량 업로드', md(ds[0]) + '~' + md(ds[ds.length - 1]), false);
+    logAdmin_(a, '피크 예상 물량 업로드', period, '새로 ' + added + ' · 바뀜 ' + changed + ' · 같음 ' + unchanged + (file ? ' · ' + file : ''));
+    // 휴대폰 알림: 파일에 있는 캠프 소속 기사 (기사 앱 공유가 켜져 있을 때만)
+    let pushed = 0;
+    if (p.push && pkSettings_().drvOn) {
+      try {
+        const camps = {}; list.forEach(function (o) { camps[o.camp] = 1; });
+        pushed = pmPushSend_(readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.status === ST.ACTIVE && camps[rpfCamp_(o.schCamp || '')]; }).map(function (o) {
+          return { driverId: String(o.id), title: '🔥 ' + mm + '월 피크데이 예상 물량이 올라왔습니다', text: md(ds[0]) + '~' + md(ds[ds.length - 1]) + ' · 내 스케줄에서 그날 내 노선의 예상 물량을 확인해 주세요.', jobId: '', kind: 'peak' };
+        })) || 0;
+      } catch (e) { softFail_('피크 물량 알림 실패', e); }
+    }
+    return { ok: true, added: added, changed: changed, unchanged: unchanged, memo: memo, pushed: pushed };
+  });
+}
+/** 관리자: 피크 예상 물량 — 피크월 목록 + 고른 달(없으면 가장 최근)의 줄 + 평소 평균 + 설정 */
+function adm_peakList(token, period) {
+  return run_(function () {
+    requireAdmin_(token);
+    const all = pkAll_(), periods = pkPeriods_(all);
+    const cur = periods.filter(function (x) { return x.period === str_(period); })[0] || periods[periods.length - 1] || null;
+    const rows = cur ? all.filter(function (o) { return o.period === cur.period; }).map(function (o) { return { date: o.date, wave: o.wave, camp: o.camp, code: o.code, qty: Number(o.qty) || 0 }; }) : [];
+    const avgAll = pkAvg_(), edges = rows.length ? rlnEdges_() : [], avg = {}, seen = {};
+    rows.forEach(function (r) {
+      const k = r.camp + '|' + r.code; if (seen[k] || r.code === PK_TOTAL) return; seen[k] = 1;
+      const hit = [k].concat(pkAliases_(edges, r.camp, r.code)).filter(function (x) { return avgAll[x]; })[0];
+      if (hit) avg[k] = avgAll[hit];
+    });
+    return { ok: true, periods: periods, period: cur ? cur.period : '', rows: rows, avg: avg, set: pkSettings_(), today: todayText_() };
+  });
+}
+/** 관리자: 기사 앱 공유 켜기 · 끄기 */
+function adm_peakSet(token, f) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    f = f || {};
+    if (f.drvOn !== undefined) { appSetPut_('peakDrvOn', f.drvOn ? 'ON' : 'OFF', '기사 앱에 피크 예상 물량 (ON/OFF)'); logAdmin_(a, '피크 예상 물량 설정', '기사 앱 공유', f.drvOn ? 'ON' : 'OFF'); }
+    rpfBump_();
+    return { ok: true, set: pkSettings_() };
+  });
+}
+/**
+ * 기사 앱: 피크 예상 물량 (관리자가 켜 두었을 때만). 끝난 지 35일이 안 된 피크월과 다가오는 피크월.
+ *  { on, cur:{period,from,to}|null(다가오는 · 진행 중인 피크), periods:[{period,from,to}], q:{ 날짜:{ '캠프|코드': 건수 } }, avg:{ '캠프|코드': 평소 하루 평균 } }
+ *  앱은 그날 내가 타는 노선(스케줄 칸 · 품앗이)만 골라 보여 준다. 변경이력으로 이어진 옛 · 새 코드로도 찾을 수 있게 같은 값을 함께 넣는다.
+ */
+function api_myPeak(token) {
+  return run_(function () {
+    pmUser_(token);
+    const set = pkSettings_();
+    if (!set.drvOn) return { ok: true, on: false, periods: [], q: {}, avg: {} };
+    const ck = cache_(), key = 'mypk:' + rpfVer_() + ':' + todayText_(), hit = ck.get(key);
+    if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 */ } }
+    const today = todayText_(), all = pkAll_();
+    const periods = pkPeriods_(all).filter(function (p) { return p.to >= addDaysText_(today, -35); });
+    const out = { ok: true, on: true, today: today, cur: null, periods: periods.map(function (p) { return { period: p.period, from: p.from, to: p.to }; }), q: {}, avg: {} };
+    const c = periods.filter(function (p) { return p.to >= today; })[0];
+    if (c) out.cur = { period: c.period, from: c.from, to: c.to };
+    if (!periods.length) return out;
+    const pset = {}; periods.forEach(function (p) { pset[p.period] = 1; });
+    const rows = all.filter(function (o) { return pset[o.period] && o.code !== PK_TOTAL; });
+    const edges = rlnEdges_(), avgAll = pkAvg_(), al = {};
+    const aliasOf = function (camp, code) { const k = camp + '|' + code; return al[k] || (al[k] = pkAliases_(edges, camp, code)); };
+    rows.forEach(function (o) { (out.q[o.date] = out.q[o.date] || {})[o.camp + '|' + o.code] = Number(o.qty) || 0; });
+    rows.forEach(function (o) {
+      const k = o.camp + '|' + o.code, as = aliasOf(o.camp, o.code), q = out.q[o.date];
+      as.forEach(function (x) { if (q[x] === undefined) q[x] = Number(o.qty) || 0; });
+      if (out.avg[k] === undefined) {
+        const hit2 = [k].concat(as).filter(function (x) { return avgAll[x]; })[0];
+        if (hit2) { out.avg[k] = avgAll[hit2]; as.forEach(function (x) { if (out.avg[x] === undefined) out.avg[x] = avgAll[hit2]; }); }
+      }
+    });
+    try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
+    return out;
+  });
+}
