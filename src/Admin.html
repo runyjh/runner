@@ -1244,6 +1244,12 @@
   .nlab { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--sub); cursor: pointer; }
   .nlab:hover { color: var(--brand); text-decoration: underline; }
   .sg tr.note td.c { font-weight: 500; text-align: left; background: #fffdf5; color: var(--ink); } /* 비고 줄은 글에 휴무·휴가가 들어가도 검정 글씨 */
+  /* 비고 줄: 글은 줄바꿈해 전부 · 5줄 넘는 칸은 접어 두고 [펼치기] */
+  #sGrid tr.note td.c { vertical-align: top; padding: 4px 5px; } #sGrid tr.note td.c .cv { display: block; font-size: 11.5px !important; line-height: 1.4 !important; letter-spacing: 0 !important; }
+  #sGrid tr.note:not(.open) td.c .cv { max-height: 7em; overflow: hidden; }
+  #sGrid tr.note td.c.more::after { content: '⋯ 더 있음'; position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 5px 1px; font-size: 10.5px; font-weight: 800; color: #b45309; background: linear-gradient(transparent, #fffdf5 55%); text-align: right; pointer-events: none; }
+  .sg .nfold { display: block; margin-top: 3px; border: 0; background: #fff1d6; color: #a15c00; border-radius: 6px; padding: 1px 7px; font-size: 10.5px; font-weight: 800; cursor: pointer; white-space: normal; text-align: left; } .sg .nfold.hidden { display: none; }
+  .sg tr.note td.f2 { vertical-align: top; padding-top: 6px; padding-bottom: 6px; }
   .sg tr.calc td.cc { white-space: normal; word-break: keep-all; overflow-wrap: break-word; text-align: center; vertical-align: middle; padding: 4px 6px; font-size: 11px; line-height: 1.45; width: 104px; min-width: 104px; max-width: 104px; overflow: hidden; }
   .sg tr.calc.mi td.cc { color: #e00; font-weight: 700; background: #fff6f6; }
   .sg tr.calc.mi td.cc .cc-sub { color: #6b7280; font-weight: 600; font-size: 10.5px; }
@@ -8602,7 +8608,7 @@
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>';
       }
       if (r.kind === 'n') {
-        return '<tr class="note' + (ri && srows[ri - 1].kind !== 'n' ? ' gtop' : '') + '"><td class="fx f2 lab"><i class="rlab">비고</i><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button></td><td class="fx f3 lab"></td><td class="fx f4 lab"></td>' +
+        return '<tr class="note' + (ri && srows[ri - 1].kind !== 'n' ? ' gtop' : '') + (noteOpen(r.row) ? ' open' : '') + '" data-nrow="' + esc(r.row) + '"><td class="fx f2 lab"><i class="rlab">비고</i><button class="nlab" data-note="' + esc(r.row) + '" title="이름 바꾸기·지우기">' + esc(r.note.label) + '</button><button type="button" class="nfold hidden" data-nfold="' + esc(r.row) + '"></button></td><td class="fx f3 lab"></td><td class="fx f4 lab"></td>' +
           dates.map((dt, ci) => tdCell(r, ri, dt, ci)).join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>';
       }
       const d = r.d, gtop = prevCamp !== null && prevCamp !== r.camp, firstOfCamp = prevCamp !== r.camp;
@@ -9067,7 +9073,7 @@
     dates.forEach((dt, i) => { if (dt >= pdd) return; unMerge(unMi[i]).forEach((x) => { const mm = String(x).match(/^(\S+)\s+(.+)$/); if (mm) K.mip.push({ i: i, camp: mm[1], key: 'un|' + mm[1] + '|' + mm[2].replace(/\(.*\)/, ''), row: '', drv: '', drvs: [], names: ['담당 없음'], label: groupRoutes(mm[2].replace(/\(.*\)/, '')), list: [mm[2]], full: !/\(/.test(mm[2]), un: true }); }); });
     // 캠프 머리줄: 지난 미입차 칸 수
     $$('#sGrid tr.cgrp em.camppast').forEach((em) => { const n = K.mip.filter((x) => x.camp === em.dataset.cp).length; em.textContent = n ? '지난 미입차 ' + n : ''; em.classList.toggle('hidden', !n); });
-    SCHK = K; paintChk(); paintDupNo();
+    SCHK = K; paintChk(); paintDupNo(); paintNoteFold();
   }
   // ───── 같은 근무자 연결 (한 사람이 두 명의 아이디를 날짜를 나눠 씀 · 정산서는 명의별로 따로) ─────
   const wlNo = () => { try { return JSON.parse(localStorage.getItem('runner.wl.no') || '[]'); } catch (e) { return []; } };
@@ -9156,6 +9162,26 @@
     bx.classList.remove('hidden');
     bx.innerHTML = Object.keys(by).map(Number).sort((a, b) => a - b).map((i) => '<div class="d"><b>' + md(i) + '</b><div>' + by[i].map((x) => '<button type="button" data-chkgo="' + i + '"' + (x.row ? ' data-chkrow="' + esc(x.row) + '"' : '') + ' title="누르면 그 날짜' + (x.row ? ' · 그 기사 칸' : '') + '으로 이동">' + esc(x.t) + '</button>').join('') + '</div></div>').join('');
   }
+  // ── 비고 줄(업무 관련): 글은 줄바꿈해 전부 보이고, 5줄을 넘는 칸이 있으면 접기/펼치기 ──
+  let _noteOpen = null;
+  const noteOpenSet = () => { if (_noteOpen) return _noteOpen; try { _noteOpen = new Set(JSON.parse(localStorage.getItem('runner.sch.noteopen') || '[]')); } catch (e) { _noteOpen = new Set(); } return _noteOpen; };
+  const noteOpen = (id) => noteOpenSet().has(id);
+  function paintNoteFold() {
+    $$('#sGrid tr.note').forEach((tr) => {
+      const btn = tr.querySelector('.nfold'); if (!btn) return;
+      const open = tr.classList.contains('open');
+      let n = 0;
+      tr.querySelectorAll('td.c').forEach((td) => { const cv = td.querySelector('.cv'); const over = !!cv && !open && cv.scrollHeight > cv.clientHeight + 1; td.classList.toggle('more', over); if (over) n++; });
+      btn.classList.toggle('hidden', !open && !n);
+      btn.textContent = open ? '▴ 접기' : '▾ 펼치기 (' + n + '칸 더 있음)';
+    });
+  }
+  $('#sWrap').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-nfold]'); if (!b) return;
+    const st = noteOpenSet(), id = b.dataset.nfold; if (st.has(id)) st.delete(id); else st.add(id);
+    try { localStorage.setItem('runner.sch.noteopen', JSON.stringify(Array.from(st))); } catch (er) { /* 무시 */ }
+    b.closest('tr').classList.toggle('open', st.has(id)); paintNoteFold();
+  });
   // ── 지난 미입차 (수행률 확인용): 주차별 · 노선별 ──
   let sMiTab = '', sMiWk = '';
   const miTab = (K) => (sMiTab === 'past' && K.mip.length ? 'past' : sMiTab === 'next' ? 'next' : K.mi.length ? 'next' : K.mip.length ? 'past' : 'next');
