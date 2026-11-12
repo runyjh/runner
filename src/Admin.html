@@ -854,6 +854,13 @@
   .rp-table td.wkc { text-align: center; white-space: nowrap; } .rp-table td.wkc small { display: block; font-size: 10px; color: var(--sub); margin-top: 1px; }
   .rp-table tr.bad td { background: #fff8f0; } .rp-table tr.imp td { background: #fff1f1; }
   .rp-table td.rc { cursor: pointer; } .rp-table td.rc:hover b { text-decoration: underline; }
+  /* 파일 올리기 상자: 끌어다 놓기 + [파일 찾기] */
+  .updrop { display: flex; align-items: center; gap: 14px; border: 2px dashed #c7d2e0; border-radius: 14px; background: #f8fafc; padding: 14px 18px; margin: 0 0 14px; transition: border-color .12s, background .12s; }
+  .updrop .ud-ic { width: 40px; height: 40px; border-radius: 50%; background: #e3efff; color: #1b64da; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; flex: 0 0 auto; }
+  .updrop .ud-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .updrop .ud-tx b { font-size: 15px; } .updrop .ud-tx span { font-size: 12.5px; color: var(--sub); line-height: 1.5; }
+  .updrop.drag { border-color: #3182f6; background: #eef5ff; } .updrop.over { border-style: solid; background: #dbeafe; }
+  .updrop.sm { display: inline-flex; gap: 10px; padding: 5px 6px 5px 12px; margin: 0; border-width: 1.5px; border-radius: 10px; vertical-align: middle; } .updrop.sm .ud-tx { flex-direction: row; align-items: baseline; gap: 6px; flex: 0 1 auto; } .updrop.sm .ud-tx b { font-size: 13.5px; white-space: nowrap; } .updrop.sm .ud-tx span { font-size: 12px; white-space: nowrap; }
+  html.m .updrop { flex-wrap: wrap; } html.m .updrop .ud-tx { flex: 1 1 200px; } html.m .updrop.sm { display: flex; flex-wrap: wrap; } html.m .updrop.sm .ud-tx { flex-wrap: wrap; } html.m .updrop.sm .ud-tx span { white-space: normal; }
   .rp-sum { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; } .rp-sum span { padding: 4px 10px; border-radius: 8px; background: var(--gray-weak); font-size: 13px; } .rp-sum span b { margin-left: 4px; }
   .rp-sum span.bad { background: #fde8e8; color: #c62828; }
   .rp-on { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
@@ -1671,7 +1678,7 @@
       <div class="tools">
         <select class="inp" id="evMonth" title="정산월"></select>
         <input class="inp search" id="evQ" placeholder="기사·사업자번호·상호 검색" style="width:200px">
-        <button class="btn" id="stHtBtn" title="홈택스 → 전자세금계산서 → 매입 목록조회 엑셀을 올리면 이 정산월의 기사별 계산서 금액을 대조해 발행 완료로 체크">홈택스 대조</button><input type="file" id="stHtFile" accept=".xls,.xlsx,.csv" class="hidden">
+        <div class="updrop sm" data-up="#stHtFile" title="홈택스 → 전자세금계산서 → 매입 목록조회 엑셀을 올리면 이 정산월의 기사별 계산서 금액을 대조해 발행 완료로 체크"><span class="ud-tx"><b>홈택스 대조</b><span>매입 목록조회 엑셀을 끌어다 놓거나</span></span><button class="btn sm" id="stHtBtn" type="button">파일 찾기</button></div><input type="file" id="stHtFile" accept=".xls,.xlsx,.csv" class="hidden">
         <button class="btn ghost" id="evReload">새로고침</button>
       </div>
     </div>
@@ -1706,7 +1713,7 @@
         <div class="field"><label class="lb" for="irBizNo">사업장관리번호 (엑셀 양식에 칸이 있으면 들어감)</label><input class="inp" id="irBizNo" placeholder="예: 12345678900"></div>
       </div>
       <div class="field"><span class="lb">공단 엑셀 양식 (선택)</span>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn sm ghost" type="button" id="irTplPick">토탈서비스에서 받은 양식 올리기</button><button class="btn sm ghost danger-t hidden" type="button" id="irTplDel">양식 지우기</button><span class="sub" id="irTplName" style="font-size:12.5px"></span><input type="file" id="irTplFile" accept=".xlsx" class="hidden"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="updrop sm" data-up="#irTplFile"><span class="ud-tx"><b>공단 양식 올리기</b><span>토탈서비스에서 받은 엑셀을 끌어다 놓거나</span></span><button class="btn sm ghost" type="button" id="irTplPick">파일 찾기</button></div><button class="btn sm ghost danger-t hidden" type="button" id="irTplDel">양식 지우기</button><span class="sub" id="irTplName" style="font-size:12.5px"></span><input type="file" id="irTplFile" accept=".xlsx" class="hidden"></div>
         <div class="db-note" style="margin-top:6px">토탈서비스 일괄 등록 화면에서 받은 엑셀 양식을 한 번 올려 두면, 그 양식의 머리글(성명·주민등록번호·직종부호·자격취득일·월보수액·고용/산재 등) 순서대로 채워서 내보냅니다. 올리지 않으면 신고서(별지 제55호의2) 항목 순서의 기본 양식으로 내보냅니다.</div>
       </div>
       <div class="m-actions" style="margin-top:8px"><button class="btn sm ghost" type="button" id="irCfgClose">닫기</button><button class="btn sm" type="button" id="irCfgSave">설정 저장</button></div>
@@ -1951,8 +1958,13 @@
    </section>
    <section id="view-perf" class="hidden">
     <div class="head">
-      <h2>노선 수행률 · SLA <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 '수행률 안내' · 월간 SLA 점수 파일</small></h2>
-      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 주간 '수행률 안내' 또는 월간 SLA 점수 엑셀 (파일 종류 자동 인식 · 같은 기간은 덮어씀)">수행률·SLA 업로드</button><input type="file" id="rpFile" accept=".xlsx" class="hidden"></div>
+      <h2>노선 수행률 · SLA <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 파일</small></h2>
+      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 파일 3가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">쿠팡 파일 올리기</button><input type="file" id="rpFile" accept=".xlsx" class="hidden"></div>
+    </div>
+    <div class="updrop" data-up="#rpFile">
+      <div class="ud-ic">⬆</div>
+      <div class="ud-tx"><b>쿠팡 파일을 여기로 끌어다 놓으세요</b><span>주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 — 어떤 파일인지 자동으로 알아보고, 저장 전에 미리보기를 보여 줍니다 (같은 기간은 덮어씀 · 엑셀 .xlsx)</span></div>
+      <button class="btn" type="button" data-upfind>파일 찾기</button>
     </div>
     <div class="rp-box" id="perfBox"></div>
    </section>
@@ -6713,7 +6725,7 @@
         '</div>' +
       '<div class="table-wrap rt-table rp-table"><table><thead><tr><th>캠프</th><th>라우트</th><th>최신 등급</th><th>추세 (8주)</th><th>개선 요청</th>' +
         wks.map((w) => '<th title="' + esc(w) + '">' + esc(rpWkLabel(w)) + '</th>').join('') + '</tr></thead><tbody id="rpRows"></tbody></table><div class="empty hidden" id="rpEmpty"></div></div>' +
-      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">등급: <span class="gr g1">1</span> <span class="gr g2">2</span> 95% 초과 · <span class="gr g3">3</span> <span class="gr g4">4</span> 95% 미만(위탁 조정 대상). 칸의 작은 숫자는 배송 수행률(%). 라우트를 누르면 전체 이력. 매주 쿠팡 파일을 [수행률 업로드]로 올리면 이력이 쌓입니다 (같은 주차는 덮어씀 · 한 주 시작은 일요일).</p></div>');
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">등급: <span class="gr g1">1</span> <span class="gr g2">2</span> 95% 초과 · <span class="gr g3">3</span> <span class="gr g4">4</span> 95% 미만(위탁 조정 대상). 칸의 작은 숫자는 배송 수행률(%). 라우트를 누르면 전체 이력. 매주 쿠팡 파일을 [쿠팡 파일 올리기]로 올리면 이력이 쌓입니다 (같은 주차는 덮어씀 · 한 주 시작은 일요일).</p></div>');
     rpRenderRows();
   }
   function rpRenderRows() {
@@ -6728,7 +6740,7 @@
         wks.map((w) => { const r = x.byWeek[w]; return '<td class="wkc">' + (r ? lnMark(r, hk) + grBadge(r.grade) + (r.perf != null ? '<small>' + r.perf + '%</small>' : '') : '<span class="sub">-</span>') + '</td>'; }).join('') + '</tr>';
     }).join('');
     const em = $('#rpEmpty'); em.classList.toggle('hidden', !!list.length);
-    em.textContent = RP.rows.length ? '조건에 맞는 라우트가 없습니다.' : '올린 수행률 자료가 없습니다. [수행률 업로드]로 쿠팡 파일을 올려 주세요.';
+    em.textContent = RP.rows.length ? '조건에 맞는 라우트가 없습니다.' : '올린 수행률 자료가 없습니다. [쿠팡 파일 올리기]로 쿠팡 파일을 올려 주세요.';
   }
   // 검색칸: 글자마다 표 전체를 다시 그리지 않고 잠깐(120ms) 멈췄을 때 한 번
   let rpQT = 0;
@@ -6816,6 +6828,32 @@
   $('#rpHistBody').addEventListener('click', (e) => { const a = e.target.closest('a.lnrel'); if (!a) return; e.preventDefault(); const td = document.createElement('td'); td.className = 'rc'; td.dataset.rpc = a.dataset.rpc; td.style.display = 'none'; document.body.appendChild(td); td.click(); td.remove(); });
   // ── 업로드: 쿠팡 파일 읽기 → 미리보기 → 저장 ──
   $('#rpUpBtn').addEventListener('click', () => $('#rpFile').click());
+  // ───── 파일 올리기 상자(.updrop) 공통: 끌어다 놓기 · [파일 찾기] — data-up 이 가리키는 파일 입력에 그대로 넘긴다 (올린 뒤 흐름은 버튼으로 고를 때와 같음) ─────
+  (function () {
+    const boxOf = (t) => (t && t.closest ? t.closest('.updrop') : null);
+    const visBox = () => $$('.updrop').filter((b) => b.offsetParent !== null);
+    const hasFile = (e) => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files'));
+    const give = (box, files) => {
+      const inp = box && $(box.dataset.up); if (!inp || !files || !files.length) return;
+      const ok = String(inp.accept || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean), f = files[0], ext = '.' + String(f.name).split('.').pop().toLowerCase();
+      if (ok.length && !ok.includes(ext)) return toast('이 자리에는 ' + ok.join(' · ') + ' 파일만 올릴 수 있습니다. (올린 파일: ' + f.name + ')');
+      try { const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+      catch (err) { toast('이 브라우저에서는 끌어다 놓기가 안 됩니다. [파일 찾기]를 눌러 주세요.'); }
+    };
+    document.addEventListener('click', (e) => { const b = e.target.closest('.updrop [data-upfind]'); if (b) { const inp = $(boxOf(b).dataset.up); if (inp) inp.click(); } });
+    let n = 0;
+    const mark = (on, at) => visBox().forEach((b) => { b.classList.toggle('drag', on); b.classList.toggle('over', on && b === at); });
+    document.addEventListener('dragenter', (e) => { if (!hasFile(e) || !visBox().length) return; n++; mark(true, boxOf(e.target)); });
+    document.addEventListener('dragover', (e) => { if (!hasFile(e) || !visBox().length) return; e.preventDefault(); const at = boxOf(e.target), v = visBox(); e.dataTransfer.dropEffect = at || v.length === 1 ? 'copy' : 'none'; mark(true, at || (v.length === 1 ? v[0] : null)); });
+    document.addEventListener('dragleave', (e) => { if (!hasFile(e)) return; n = Math.max(0, n - 1); if (!n) mark(false); });
+    document.addEventListener('drop', (e) => {
+      if (!hasFile(e) || !visBox().length) return;
+      e.preventDefault(); n = 0; mark(false);
+      const v = visBox(), at = boxOf(e.target) || (v.length === 1 ? v[0] : null); // 올리기 상자가 하나뿐인 화면은 화면 어디에 놓아도 됨
+      if (!at) return toast('파일을 올리기 상자(점선) 위에 놓아 주세요.');
+      give(at, e.dataTransfer.files);
+    });
+  })();
   let rpUp = null;
   /** 쿠팡 '수행률 안내' 시트 → { wk, rows:[{wk, wave, camp, code, perf, grade, ret, retGrade, improve, f1, f2, f3, parcel, zip, partial}] } */
   function parsePerfSheet(sheets, fileName) {
@@ -6984,7 +7022,7 @@
       (lp ? '<div class="rp-sum"><span>집계기간<b>' + esc(slaPd(lrows[0].from) + '~' + slaPd(lp)) + '</b></span>' +
         (vendor ? '<span class="vend">영업점 총점<b class="sla ' + slaCls(vendor.total) + '">' + vendor.total + '</b>' + (vPrev ? delta(vendor.total, vPrev.total) : '') + '<small class="sub"> (고객만족 ' + (vendor.cs == null ? '-' : vendor.cs) + '/50)</small></span>' : '') +
         '<span>라우트<b>' + routes.length + '</b></span><span>우수 ' + SL.th.good + '↑<b>' + n((r) => r.total >= SL.th.good) + '</b></span><span class="w">주의<b>' + n((r) => r.total >= SL.th.warn && r.total < SL.th.good) + '</b></span><span class="' + (n((r) => r.total < SL.th.warn) ? 'bad' : '') + '">위험 ' + SL.th.warn + '↓<b>' + n((r) => r.total < SL.th.warn) + '</b></span>' +
-        '<span>업로드<b>' + esc(String(lrows[0].uploadedAt || '').slice(0, 16)) + '</b></span></div>' : '<div class="empty">아직 올린 SLA 자료가 없습니다. [수행률 업로드]에 쿠팡 SLA 파일(xlsx)을 올려 주세요.</div>') +
+        '<span>업로드<b>' + esc(String(lrows[0].uploadedAt || '').slice(0, 16)) + '</b></span></div>' : '<div class="empty">아직 올린 SLA 자료가 없습니다. [쿠팡 파일 올리기]에 쿠팡 SLA 파일(xlsx)을 올려 주세요.</div>') +
       '<div class="ptools">' +
         '<select class="inp" id="slCamp" aria-label="캠프">' + opt('', '캠프 전체', SL.f.camp) + camps.map((c) => opt(c, c, SL.f.camp)).join('') + '</select>' +
         '<select class="inp" id="slMode" aria-label="보기">' + opt('', '전체', SL.f.mode) + opt('bad', '위험만 (' + SL.th.warn + '점 미만)', SL.f.mode) + opt('warn', '주의 이상 (' + SL.th.good + '점 미만)', SL.f.mode) + opt('down', '전 기간보다 1점↑ 하락', SL.f.mode) + opt('cs', '고객만족 40점 미만', SL.f.mode) + '</select>' +
@@ -7267,7 +7305,7 @@
         '<span class="hi">둘 다 해당 (+' + fbWonV(S.won1 + S.won2) + '원/건)<b>' + both + '</b></span><span class="' + (none ? 'bad' : '') + '">둘 다 미해당 (0원)<b>' + none + '</b></span>' +
         (estSum ? '<span class="hi">이달 예상 추가금 (공급가)<b>약 ' + wn(Math.round(estSum / 1000) * 1000) + '원</b><small class="sub">모두 해당이면 ' + wn(Math.round(estMaxSum / 1000) * 1000) + '원</small></span>' : '') +
         (mp ? '<span>전월 확정 (' + Number(mp.slice(5, 7)) + '월)<b>둘 다 ' + mRows.filter((r) => fbYes(r.f1) && fbYes(r.f2)).length + ' · 0원 ' + mRows.filter((r) => !fbYes(r.f1) && !fbYes(r.f2)).length + '</b>' + (mWon ? '<small class="sub">약 ' + wn(Math.round(mWon / 1000) * 1000) + '원 (전월 수량 기준 추정)</small>' : '') + '</span>' : '') + '</div>'
-        : '<div class="empty">아직 올린 가중요인 자료가 없습니다. [수행률·SLA 업로드]에 쿠팡 메일의 Weekly 가중요인 파일(xlsx)을 올려 주세요. (파일 종류는 자동 인식)</div>') +
+        : '<div class="empty">아직 올린 가중요인 자료가 없습니다. [쿠팡 파일 올리기]에 쿠팡 메일의 Weekly 가중요인 파일(xlsx)을 올려 주세요. (파일 종류는 자동 인식)</div>') +
       '<div class="ptools">' +
         '<select class="inp" id="fbCamp" aria-label="캠프">' + opt('', '캠프 전체', FW.f.camp) + camps.map((c) => opt(c, c, FW.f.camp)).join('') + '</select>' +
         '<select class="inp" id="fbMode" aria-label="보기">' + opt('', '전체', FW.f.mode) + opt('edge', '경계 (기준 ±5%p)', FW.f.mode) + opt('one', '하나만 미해당', FW.f.mode) + opt('none', '둘 다 미해당', FW.f.mode) + opt('chg', '전월과 달라진 라우트', FW.f.mode) + '</select>' +
@@ -11272,8 +11310,8 @@
       ['기사 노선 정보', '캠프 화면 아래 = 기사들이 앱에 남긴 글 · 숨기기 · 되살리기 · 삭제']
     ],
     'page:perf': [
-      ['하는 일', '쿠팡 주간 <b>수행률 안내</b> · 월간 <b>SLA 점수</b> 엑셀을 올려 노선 · 기사별 수행률 추이 보기'],
-      ['올리기', '[수행률·SLA 업로드] — 파일 종류 자동 인식 · 같은 기간은 덮어씀 · 기사 앱 "내 수행률"에 바로 반영'],
+      ['하는 일', '쿠팡 주간 <b>수행률 안내</b> · 월간 <b>SLA 점수</b> · <b>프레시백 가중요인</b> 엑셀을 올려 노선 · 기사별 수행률 추이 보기'],
+      ['올리기', '[쿠팡 파일 올리기] — 파일 종류 자동 인식 · 같은 기간은 덮어씀 · 기사 앱 "내 수행률"에 바로 반영'],
       ['보기', '캠프 · 기간 고르기 · 낮은 노선부터 정렬 · 기사 정보의 라우트 배정으로 기사와 연결 (배정이 없으면 노선만)']
     ],
     'page:memo': [
@@ -13357,7 +13395,7 @@
       const el = $('#stPnl'), months = [...new Set(S.months.concat([S.month]))].sort().reverse();
       const by = {}; S.rows.forEach((x) => { by[x.bankName || x.bank || '통장'] = (by[x.bankName || x.bank || '통장'] || 0) + 1; });
       el.innerHTML = '<div class="bk-head"><select class="inp" id="bkMonth" style="width:auto;height:34px">' + months.map((m) => '<option value="' + m + '"' + (m === S.month ? ' selected' : '') + '>' + esc(ymTitle(m)) + (S.months.includes(m) ? '' : ' (없음)') + '</option>').join('') + '</select>' +
-          '<button class="btn" id="bkUp">통장 내역 올리기 (PDF·엑셀)</button><input type="file" id="bkFile" accept=".pdf,.xlsx,.csv" class="hidden">' +
+          '<div class="updrop sm" data-up="#bkFile"><span class="ud-tx"><b>통장 내역 올리기</b><span>PDF · 엑셀을 끌어다 놓거나</span></span><button class="btn sm" id="bkUp" type="button">파일 찾기</button></div><input type="file" id="bkFile" accept=".pdf,.xlsx,.csv" class="hidden">' +
           '<span class="sub">카카오뱅크 거래내역서 · 우리은행 거래실적증명서. 여러 통장을 <b>엑셀 한 파일에 시트별로 붙여 넣어</b> 한 번에 올려도 됩니다 (계좌번호 줄로 통장 구분). 비밀번호 걸린 엑셀은 암호를 풀어 저장한 뒤 올려 주세요. 계좌번호는 끝 4자리만 저장합니다.</span></div>' +
         '<div class="bk-sum">' + (S.sum || []).sort((a, b) => b.n - a.n).map((x) => '<span>' + esc(x.cat) + ' <b>' + x.n + '</b> <small>' + (x.in ? '+' + wn(x.in) : '') + (x.out ? ' −' + wn(x.out) : '') + '</small></span>').join('') + (Object.keys(by).length ? '<span style="background:none">' + Object.keys(by).map((k) => esc(k) + ' ' + by[k] + '줄').join(' · ') + '</span>' : '') + '</div>' +
         (S.rows.length ? '<div class="bk-wrap"><table class="bk-table" data-tk-off><thead><tr><th>통장</th><th>날짜</th><th>입/출</th><th class="n">금액</th><th>거래내용</th><th>거래구분</th><th>분류</th><th>연결 · 이름</th><th>메모</th><th></th></tr></thead><tbody id="bkListRows">' +
