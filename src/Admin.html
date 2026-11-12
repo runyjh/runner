@@ -4770,7 +4770,7 @@
       '<td class="cl">' + esc(g.camp) + '</td>' +
       '<td style="white-space:nowrap">' + (g.result === '미입차' ? isRc('미입차') : '<span class="ikc">물량 없음</span>') + '</td>' +
       '<td><span class="ikc">' + esc(g.reason || '—') + '</span></td>' +
-      '<td class="rs">' + esc(g.memo || '') + '<div class="sub">기사스케줄에서 확정한 노선' + (g.result === '미입차' ? ' · 수행률에 셈' : ' · 수행률에 세지 않음') + '</div></td>' +
+      '<td class="rs">' + esc(g.memo || '') + '<div class="sub">기사스케줄에서 확정한 노선</div></td>' +
       '<td class="cl">대체 없음</td><td class="cl">—</td>' +
       '<td class="cl">' + esc(g.by || '') + '</td>' +
       '<td><button type="button" class="btn sm ghost" data-irmgo="' + esc(g.date) + '">스케줄에서 보기</button></td></tr>');
@@ -4824,23 +4824,11 @@
         const rk = x.kind || x.result; r.rs[rk] = (r.rs[rk] || 0) + 1;
       });
     });
-    // 노선 이슈 (기사스케줄에서 미입차로 확정한 노선): 고정 기사의 기본노선이면 그 줄에서 빼고, 담당 없는 노선이면 캠프별 '담당 없음' 줄로 (계획에도 그날 회전을 더함)
-    const vac = {};
-    (IS.rm || []).forEach((x) => {
-      if (x.result !== '미입차' || x.date < from || x.date > to) return;
-      const own = rows.find((r) => r.d.id && shortCampSafe(r.d.camp).replace(/\s+/g, '') === x.camp && r.u[x.unit]);
-      if (own) { own.lost += own.u[x.unit].length; own.rs['노선 확정'] = (own.rs['노선 확정'] || 0) + 1; return; }
-      const c = IS.camps.find((k) => shortCampSafe(k.name).replace(/\s+/g, '') === x.camp), n = isCampRots(c ? c.id : '').length;
-      const v = vac[x.camp] || (vac[x.camp] = { d: { id: '', name: '담당 없음', camp: x.camp, baseRoute: '' }, u: {}, plan: 0, lost: 0, pm: 0, rs: {}, units: [], days: {} });
-      v.plan += n; v.lost += n; if (!v.units.includes(x.unit)) v.units.push(x.unit);
-      if (!v.days[x.date]) { v.days[x.date] = 1; v.rs['노선 확정'] = (v.rs['노선 확정'] || 0) + 1; }
-    });
-    Object.keys(vac).forEach((k) => { vac[k].d.baseRoute = vac[k].units.sort().join(' · '); rows.push(vac[k]); });
     const tot = rows.reduce((a, r) => ({ plan: a.plan + r.plan, lost: a.lost + r.lost, pm: a.pm + r.pm }), { plan: 0, lost: 0, pm: 0 });
     const pct = (p, l) => p ? Math.round((p - l) / p * 1000) / 10 : 100;
     const bad = rows.filter((r) => r.lost || r.pm).sort((a, b) => pct(a.plan, a.lost) - pct(b.plan, b.lost));
     $('#isPerf').innerHTML = '<div class="pf"><div class="pf-h"><b>노선 수행률</b><span class="big">' + pct(tot.plan, tot.lost) + '%</span>' +
-      '<small>' + isMd0(from) + ' ~ ' + isMd0(to) + ' · 고정 노선 ' + rows.filter((r) => r.d.id).length + '개 · 계획 ' + tot.plan.toLocaleString() + '회전 · 뺀 ' + tot.lost + '회전' + (tot.pm ? ' · 우리 인원 대체(업체백업·품앗이) ' + tot.pm + '회전(수행으로 봄)' : '') + '</small></div>' +
+      '<small>' + isMd0(from) + ' ~ ' + isMd0(to) + ' · 고정 노선 ' + rows.length + '개 · 계획 ' + tot.plan.toLocaleString() + '회전 · 뺀 ' + tot.lost + '회전' + (tot.pm ? ' · 우리 인원 대체(업체백업·품앗이) ' + tot.pm + '회전(수행으로 봄)' : '') + '</small></div>' +
       (bad.length ? '<table><thead><tr><th class="l">캠프</th><th class="l">노선</th><th class="l">기사</th><th>계획</th><th>뺀 회전</th><th>우리 인원 대체</th><th class="l">수행률</th><th class="l">사유</th></tr></thead><tbody>' +
         bad.map((r) => { const p = pct(r.plan, r.lost); return '<tr class="' + (p < 95 ? 'bad' : '') + '"><td class="l">' + esc(shortCampSafe(r.d.camp)) + '</td><td class="l"><b>' + esc(r.d.baseRoute) + '</b></td><td class="l">' + esc(r.d.name) + '</td><td>' + r.plan + '</td><td>' + (r.lost || '—') + '</td><td>' + (r.pm || '—') + '</td>' +
           '<td class="l"><span class="bar"><em style="width:' + p + '%"></em></span><b>' + p + '%</b></td><td class="l">' + Object.keys(r.rs).map((k) => isKc(k) + (r.rs[k] > 1 ? '<span class="sub"> ' + r.rs[k] + '일</span>' : '')).join(' ') + '</td></tr>'; }).join('') + '</tbody></table>'
