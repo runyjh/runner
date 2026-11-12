@@ -1373,6 +1373,7 @@
   .ikc.k-고장 { background: #eef2ff; color: #4338ca; } .ikc.k-물량조율 { background: #e7f6ee; color: #0b6b3a; } .ikc.k-노쇼 { background: #2b2f36; color: #fff; }
   .ikc.mi { background: #e5484d; color: #fff; }
   .is-tb td { vertical-align: middle; }
+  .is-tb tr.rm td { background: #fafafa; } .is-tb .ikc.rmk { background: #1f2937; color: #fff; border-color: #1f2937; }
   .is-tb td.rs { max-width: 260px; white-space: pre-wrap; word-break: break-all; font-size: 13px; }
   .is-tb td.cl { font-size: 12.5px; color: var(--sub); white-space: nowrap; }
   .is-tb td.cl.warn { color: #c2410c; font-weight: 700; }
@@ -4709,7 +4710,7 @@
     api('adm_issueList', { from: $('#isFrom').value, to: $('#isTo').value }).then((r) => {
       if (seq !== IS.seq) return;
       if (!r.ok) return toast(r.msg);
-      IS.list = r.issues || []; IS.from = r.from; IS.to = r.to; isTakeMeta(r);
+      IS.list = r.issues || []; IS.rm = r.routeMiss || []; IS.from = r.from; IS.to = r.to; isTakeMeta(r);
       renderIssue();
     }).catch(() => {});
   }
@@ -4717,6 +4718,19 @@
     const q = $('#isQ').value.trim().toLowerCase(), mo = $('#isMiOnly').checked;
     return IS.list.filter((x) => (skipTab || IS.code === '전체' || (IS.code === IS.unset ? isUnsetOf(x) : isTabOf(x) === IS.code)) && (!mo || x.mi) && (!IS.drv || x.driverId === IS.drv) &&
       (!q || [x.name, x.camp, x.reason, x.action, x.kind, x.result, x.cut, x.sub, x.subWho, x.cell].join(' ').toLowerCase().includes(q)));
+  }
+  // 노선 이슈 (기사스케줄 [미입차로 확정]): 같은 날 · 캠프 · 결과 · 사유끼리 한 줄로 묶는다
+  function isRouteRows() {
+    const q = $('#isQ').value.trim().toLowerCase(), mo = $('#isMiOnly').checked;
+    if (IS.drv || (IS.code !== '전체' && IS.code !== '미입차')) return [];
+    const by = new Map();
+    (IS.rm || []).forEach((x) => {
+      if ((mo || IS.code === '미입차') && x.result !== '미입차') return;
+      const k = [x.date, x.camp, x.result, x.reason, x.memo, x.by].join('|');
+      const g = by.get(k) || { date: x.date, camp: x.camp, result: x.result, reason: x.reason, memo: x.memo, by: x.by, units: [] };
+      if (!g.units.includes(x.unit)) g.units.push(x.unit); by.set(k, g);
+    });
+    return Array.from(by.values()).filter((g) => !q || [g.camp, g.units.join(' '), g.result, g.reason, g.memo, '노선'].join(' ').toLowerCase().includes(q)).map((g) => { g.units.sort(); return g; });
   }
   function renderIssue() {
     // 결과 탭 + 사유 미정 + 예전 기록
@@ -4748,8 +4762,19 @@
         '<span class="sc"><i><em style="width:' + Math.round(g.score / maxSc * 100) + '%"></em></i>' + (Math.round(g.score * 10) / 10) + '</span></button>').join('');
     const list = isFiltered(false);
     const miN = list.filter((x) => x.mi).reduce((a, x) => a + (x.miDays || 1), 0);
-    $('#isCount').textContent = list.length + '건' + (miN ? ' · 미입차 ' + miN + '일' : '');
-    $('#isRows').innerHTML = list.map((x) => {
+    const rmRows = isRouteRows(), rmMi = rmRows.filter((g) => g.result === '미입차').reduce((n, g) => n + g.units.length, 0);
+    $('#isCount').textContent = list.length + '건' + (miN ? ' · 미입차 ' + miN + '일' : '') + (rmRows.length ? ' · 노선 이슈 ' + rmRows.length + '건' + (rmMi ? ' (미입차 노선 ' + rmMi + '개)' : '') : '');
+    const rmHtml = rmRows.map((g) => '<tr class="rm' + (g.result === '미입차' ? ' mi' : '') + '" data-irm="' + esc(g.date) + '">' +
+      '<td style="white-space:nowrap">' + esc(isMd(g.date)) + '</td>' +
+      '<td><span class="ikc rmk">노선</span> <b>' + esc(g.units.join(' · ')) + '</b></td>' +
+      '<td class="cl">' + esc(g.camp) + '</td>' +
+      '<td style="white-space:nowrap">' + (g.result === '미입차' ? isRc('미입차') : '<span class="ikc">물량 없음</span>') + '</td>' +
+      '<td><span class="ikc">' + esc(g.reason || '—') + '</span></td>' +
+      '<td class="rs">' + esc(g.memo || '') + '<div class="sub">기사스케줄에서 확정한 노선</div></td>' +
+      '<td class="cl">대체 없음</td><td class="cl">—</td>' +
+      '<td class="cl">' + esc(g.by || '') + '</td>' +
+      '<td><button type="button" class="btn sm ghost" data-irmgo="' + esc(g.date) + '">스케줄에서 보기</button></td></tr>');
+    const rowHtml = list.map((x) => {
       const range = x.end && x.end !== x.date ? isMd0(x.date) + ' ~ ' + isMd0(x.end) + ' <span class="sub">(' + isDays(x.date, x.end).length + '일)</span>' : esc(isMd(x.date));
       return '<tr data-iid="' + esc(x.id) + '" class="' + (x.mi ? 'mi' : '') + (isUnsetOf(x) ? ' unset' : '') + '">' +
         '<td style="white-space:nowrap">' + range + '</td>' +
@@ -4762,9 +4787,13 @@
         '<td class="cl">' + esc(x.cell || '—') + (x.link === 'Y' ? ' <span class="sub" title="기사스케줄 칸과 연동">🔗</span>' : '') + '</td>' +
         '<td class="cl" title="' + esc(x.at) + '">' + esc(x.by) + '</td>' +
         '<td><button type="button" class="btn sm ' + (isUnsetOf(x) ? '' : 'ghost') + '" data-iedit="' + esc(x.id) + '">' + (isUnsetOf(x) ? '사유 입력' : '수정') + '</button></td></tr>';
-    }).join('');
+    });
+    // 날짜 최신순으로 기사 이슈와 노선 이슈를 섞어 보여 준다
+    const mix = list.map((x, i) => ({ d: x.date, h: rowHtml[i], o: 0 })).concat(rmRows.map((g, i) => ({ d: g.date, h: rmHtml[i], o: 1 })));
+    mix.sort((p, q) => (p.d < q.d ? 1 : p.d > q.d ? -1 : p.o - q.o));
+    $('#isRows').innerHTML = mix.map((m) => m.h).join('');
     $('#isEmpty').textContent = IS.list.length ? '조건에 맞는 이슈가 없습니다.' : '이 기간에 기록된 이슈가 없습니다. 오른쪽 위 + 이슈 등록으로 기록하세요.';
-    $('#isEmpty').classList.toggle('hidden', list.length > 0);
+    $('#isEmpty').classList.toggle('hidden', list.length + rmRows.length > 0);
   }
   /**
    * 노선 수행률 (11/1 이후 · 오늘까지): 고정 노선 기사마다 계획 회전 = 날짜 수 × 기본노선 회전 수,
@@ -4816,6 +4845,8 @@
   $('#isMiOnly').addEventListener('change', renderIssue);
   $('#isReload').addEventListener('click', loadIssue);
   $('#isRows').addEventListener('click', (e) => {
+    const rg = e.target.closest('[data-irmgo]');
+    if (rg) { const dt = rg.dataset.irmgo; $('.nav a[data-view="sched"]').click(); try { sMode = 'month'; sBasis = 'cal'; sMonth = monthOf(dt); schedGo(dt); } catch (err) { /* 기사스케줄을 못 열면 메뉴만 이동 */ } return; }
     const ed = e.target.closest('[data-iedit]');
     if (ed) isOpen(IS.list.find((i) => i.id === ed.dataset.iedit));
   });
