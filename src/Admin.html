@@ -8738,8 +8738,14 @@
     const have = new Set(); who.forEach((w) => w.units.forEach((x) => have.add(x)));
     return { need, who, miss: need.filter((x) => !have.has(x)), rots, camp };
   }
+  /** 담당 없음 창에서 '이날만 용차업체' 로 지정한 업체 이름 (없으면 '') */
+  function unVendorDay(camp, units, dt) {
+    const v = (SD.vendorDays || []).find((x) => x.date === dt && shortCamp((SD.camps.find((c) => c.id === x.campId) || {}).name || '') === camp && SchedCalc.routeExpand(x.code).some((u) => units.includes(u)));
+    return v ? v.name : '';
+  }
   /** 그날 그 노선을 맡은 용차업체 이름 (정산관리 → 용차업체 '맡은 노선') · 없으면 '' */
   function unVendor(camp, units, dt) {
+    const dv = unVendorDay(camp, units, dt); if (dv) return dv; // 그날만 업체가 뛴 것으로 지정한 노선 (담당 없음 창)
     const v = (SD.vendorRoutes || []).find((x) => shortCamp(x.camp) === camp && (!x.from || dt >= x.from) && (!x.to || dt <= x.to) && units.some((u) => (x.units || []).includes(u)));
     return v ? v.name : '';
   }
@@ -8799,6 +8805,15 @@
     $('#uaBody').innerHTML = '<h3 class="ce-h">' + esc(c.camp + ' ' + UA.code) + ' · ' + esc(ceMd(UA.dt)) + '</h3>' +
       '<div class="ce-s"><span>담당 기사 없음 · ' + (c.miss.length ? '<b style="color:#c2410c">비어 있는 물량 ' + esc(groupRoutes(missU.join(','))) + ' · ' + esc(missR.join(' ')) + '</b>' : '<b style="color:#0b6b3a">✓ 모든 회전이 채워졌습니다</b>') + '</span></div>' +
       (vd ? '<div class="ce-hint" style="margin:-6px 0 10px;color:#5f3dc4;font-weight:700">🚚 ' + esc(vd) + ' 용차가 맡은 노선 · 우리 인원이 안 들어가도 됩니다</div>' : '') +
+      (function () { // 용차업체: 이날만 업체가 뛴 것으로 지정 (바로 저장) · 계속 맡기는 노선은 정산관리 › 용차업체로 안내
+        const dayV = ((SD.vendorDays || []).find((x) => x.date === UA.dt && x.campId === UA.cid && x.code === UA.code) || {}).name || '', VS = SD.vendors || [], period = vd && !dayV;
+        return '<div class="ce-ln"><span>🚚 용차업체</span><div>' +
+          (period ? '<div class="ce-hint" style="margin:0 0 6px">' + esc(vd) + ' 가 기간으로 맡은 노선입니다 (정산관리 › 용차업체 「맡은 노선」).</div>'
+            : VS.length ? '<div class="ce-g">' + VS.map((v) => '<button type="button" class="ce-c' + (dayV === v.name ? ' on' : '') + '" data-uavd="' + esc(v.name) + '">' + esc(v.name) + (dayV === v.name ? '<small>이날 지정됨 · 누르면 풀기</small>' : '') + '</button>').join('') + '</div>' +
+              '<div class="ce-hint" style="margin:6px 0 0">업체를 누르면 <b>이날만</b> 그 업체가 뛴 것으로 표시되고 미입차에서 빠집니다 (바로 저장). 업체 정산은 업체 아이디 배송으로 자동 계산됩니다.</div>'
+            : '<div class="ce-hint" style="margin:0 0 6px">등록된 용차업체가 없습니다.</div>') +
+          '<button type="button" class="btn sm ghost" data-uavgo style="margin-top:6px">계속 맡기는 노선 · 업체 등록 → 정산관리 › 용차업체 ▸</button></div></div>';
+      })() +
       (c.who.length ? '<div class="ce-ln"><span>지금 뛰는 기사</span><div>' + c.who.map((w) => '<div class="ua-w"><b>' + esc(w.name) + '</b> <span class="sub">' + esc(ceDisp(sget(w.key, UA.dt), w.key)) + '</span> <button type="button" class="btn sm ghost" data-uadel="' + esc(w.key) + '">배정 빼기</button></div>').join('') + '</div></div>' : '') +
       '<div class="ce-ln"><span>회전</span><div class="ce-g">' + all.map((r) => '<button type="button" class="ce-c' + (UA.rots.includes(r) ? ' on' : '') + '" data-uar="' + r + '">' + r + '</button>').join('') + '</div></div>' +
       '<div class="ce-ln"><span>뛸 기사</span><div><div class="ce-alt"><select class="inp" data-uadrv><option value="">' + (UA.pm ? '정하지 않음 (품앗이 창에서 고르기)' : '기사 고르기') + '</option>' +
@@ -8832,6 +8847,20 @@
     const t = e.target;
     if (t.closest('[data-uaclose]')) return uaClose();
     if (t.closest('[data-uasave]')) return uaSave();
+    if (t.closest('[data-uavgo]')) { uaClose(); const a = $('.nav a[data-view="settle"]'); if (a) { a.dataset.stGo = 'vendors'; a.click(); delete a.dataset.stGo; } return; }
+    const vb = t.closest('[data-uavd]');
+    if (vb) {
+      if (UA.busy) return; UA.busy = true;
+      const on = vb.classList.contains('on'), name = vb.dataset.uavd;
+      api('adm_schUnVendor', { campId: UA.cid, code: UA.code, date: UA.dt, vendor: on ? '' : name }).then((r) => {
+        if (!r.ok) return toast(r.msg);
+        const out = (SD.vendorDays || []).filter((x) => x.date < SD.dates[0] || x.date > SD.dates[SD.dates.length - 1]);
+        SD.vendorDays = out.concat((r.days || []).filter((x) => x.date >= SD.dates[0] && x.date <= SD.dates[SD.dates.length - 1]));
+        renderSched(); uaPaint();
+        toast(on ? ceMd(UA.dt) + ' ' + UA.code + ' 용차업체 지정을 풀었습니다.' : ceMd(UA.dt) + ' ' + UA.code + ' → ' + name + ' 용차로 표시했습니다.');
+      }).catch(() => {}).finally(() => { UA.busy = false; });
+      return;
+    }
     const rb = t.closest('[data-uar]');
     if (rb) { const r = rb.dataset.uar; UA.rots = UA.rots.includes(r) ? UA.rots.filter((x) => x !== r) : UA.rots.concat(r); return uaPaint(); }
     const sb = t.closest('[data-uasub]'); if (sb && !sb.disabled) { UA.sub = sb.dataset.uasub; return uaPaint(); }

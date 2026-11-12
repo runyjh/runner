@@ -5025,7 +5025,8 @@ function schRead_(sun, end) {
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
     issues: issues, issueKinds: SCH_ISSUE.KINDS, pmLocks: pmLocks,
-    vendorRoutes: VP.routes, vendors: VP.vendors
+    vendorRoutes: VP.routes, vendors: VP.vendors,
+    vendorDays: (function () { try { return typeof schUnvRead_ === 'function' ? schUnvRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, campId: x.campId, code: x.code, name: x.vendor }; }) : []; } catch (e) { return []; } })()
   };
 }
 

@@ -84,3 +84,44 @@ function schYongSync_(savedList) {
   if (res.added || res.removed) { try { stlBump_(); } catch (e) { /* 정산 캐시 */ } }
   return res.added || res.removed || res.warn.length ? res : null;
 }
+
+// ───── 담당 없음 노선: '이날은 용차업체가 뜀' 날짜 지정 (기사스케줄 표시 · 미입차 계산용) ─────
+//  계속 맡기는 노선은 정산관리 › 용차업체 '맡은 노선'(기간)에 등록하고, 여기는 하루 단위로 지정한다.
+//  업체 정산은 업체 아이디 배송으로 자동 계산되므로 정산 줄은 만들지 않는다.
+const SCH_UNV = { SHEET: 'unvendor', HEAD: ['날짜', '캠프ID', '노선', '업체', '작성자', '작성일시'] };
+/** [{ row, date, campId, code, vendor }] (탭이 없으면 빈 목록) */
+function schUnvRead_() {
+  const sh = schSS_().getSheetByName(SCH_UNV.SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, SCH_UNV.HEAD.length).getValues().map(function (r, i) {
+    return { row: i + 2, date: r[0] instanceof Date ? ymd_(r[0]) : str_(r[0]), campId: str_(r[1]), code: str_(r[2]), vendor: str_(r[3]) };
+  }).filter(function (x) { return x.date && x.campId && x.code && x.vendor; });
+}
+/** o = { campId, code, date, vendor } · vendor 가 비면 지정 풀기 → { ok, days } */
+function adm_schUnVendor(token, o) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    o = o || {};
+    const d = parseYmd_(o.date); if (!d) fail_('날짜를 확인해 주세요.');
+    const date = ymd_(d), campId = str_(o.campId), code = str_(o.code), vendor = str_(o.vendor);
+    if (!campId || !code) fail_('캠프 · 노선을 확인해 주세요.');
+    if (vendor) {
+      let okV = false;
+      try { okV = stlVendors_().list.some(function (v) { return v.name === vendor && !v.stopped; }); } catch (e) { okV = false; }
+      if (!okV) fail_('용차업체 「' + vendor + '」 가 정산관리 용차업체 목록에 없습니다.');
+    }
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    try {
+      const book = schSS_();
+      let sh = book.getSheetByName(SCH_UNV.SHEET);
+      if (!sh) { if (!vendor) return { ok: true, days: [] }; sh = book.insertSheet(SCH_UNV.SHEET); sh.getRange(1, 1, 1, SCH_UNV.HEAD.length).setValues([SCH_UNV.HEAD]); }
+      const hit = schUnvRead_().filter(function (x) { return x.date === date && x.campId === campId && x.code === code; });
+      // 같은 날 · 같은 노선은 한 줄만: 아래에서부터 지우고 새로 적는다
+      hit.map(function (x) { return x.row; }).sort(function (p, q) { return q - p; }).forEach(function (r) { sh.deleteRow(r); });
+      if (vendor) sh.getRange(sh.getLastRow() + 1, 1, 1, SCH_UNV.HEAD.length).setValues([[date, campId, code, vendor, a.name || a.loginId || '', nowText_()]]);
+    } finally { lock.releaseLock(); }
+    try { fsMark_('sch', { by: a.loginId }); } catch (e) { /* 사본 표시는 실패해도 저장은 됨 */ }
+    return { ok: true, days: schUnvRead_().map(function (x) { return { date: x.date, campId: x.campId, code: x.code, name: x.vendor }; }) };
+  });
+}
