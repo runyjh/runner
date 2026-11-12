@@ -4874,7 +4874,7 @@ function schDriver_(o) {
  */
 function adm_schWeek(token, start) {
   return run_(function () {
-    requireAdmin_(token);
+    stg_(); requireAdmin_(token); stg_('auth');
     const base = parseYmd_(start) || new Date();
     const sun = sundayOf_(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
     const fsT0 = Date.now(), res = schRead_(sun, addDays_(sun, SCH_DAYS - 1));
@@ -4889,7 +4889,7 @@ function adm_schWeek(token, start) {
  */
 function adm_schRange(token, from, to) {
   return run_(function () {
-    requireAdmin_(token);
+    stg_(); requireAdmin_(token); stg_('auth');
     const a = parseYmd_(from), b = parseYmd_(to);
     if (!a || !b || b < a) fail_('기간을 확인해 주세요.');
     if ((b - a) / 86400000 > 61) fail_('한 번에 62일까지 볼 수 있습니다.');
@@ -4918,6 +4918,7 @@ function schRead_(sun, end) {
       else if (!rowIds[id]) { rowIds[id] = 1; cells[id] = row; }
     });
   }
+  stg_('sheet'); // (속도 측정) 스케줄 시트 읽기
   // 비고 줄은 첫 줄(업무 관련) 하나만 쓴다: 예전에 만든 둘째·셋째 비고 줄은 한 번만 지우고, 그 줄의 메모는 첫 줄로 옮긴다
   if (!props_().SCH_NOTE_TRIM) {
     const lock = scriptLock_();
@@ -4948,13 +4949,15 @@ function schRead_(sun, end) {
     n.cells = {};
     Object.keys(nm[n.id] || {}).forEach(function (d) { n.cells[d] = schNoteText_(nm[n.id][d]); });
   });
-  const m = master_();
+  stg_('note');
+  const m = master_(); stg_('master');
   const routes = {};
   m.routes.forEach(function (r) { if (r.status !== RST.OFF) (routes[r.campId] = routes[r.campId] || []).push(r.code); });
   // 캠프 이름은 노선관리(camps)에서, 이름·노선은 기사 정보에서 바로 가져온다
   const campName = {};
   m.camps.forEach(function (c) { campName[c.id] = c.name; });
   try { rcApplyDue_(); } catch (e) { softFail_('노선 변경 예약 적용 실패', e); }
+  stg_('rcdue');
   const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(function (o) {
     const d = schDriver_(o);
     if (d.campId && !campName[d.campId]) { d.campId = ''; d.camp = ''; } // 노선관리에서 지워진 캠프
@@ -4962,6 +4965,7 @@ function schRead_(sun, end) {
     d.extra = extraAssignOf_(o).filter(function (x) { return campName[x.c]; });
     return d;
   });
+  stg_('drv');
   // 같은 근무자 연결: 명의 기사(workerId 가 있는 기사)는 줄을 만들지 않고, 근무자 줄에 '다른 명의 아이디'(alias)로 붙인다
   //  → 기사스케줄 표 · 미입차/중복 계산 · 어드민 업로드 표 모두 근무자 한 줄만 본다 (명의 기사 줄의 예전 칸은 시트에 그대로 남음)
   (function () {
@@ -5033,8 +5037,10 @@ function schRead_(sun, end) {
     const d = byDrv[id.slice(SCH_PM_PREFIX.length)];
     return { id: id, driverId: d.id, name: d.name, loginId: d.loginId || '', campId: d.campId || '' };
   }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+  stg_('mid'); // 노선 변경 · 이슈 · 품앗이 줄 등
   let pmMarks = {}, pmTips = {};
   try { pmMarks = pmAdminMarks_(cells, dates, byDrv, pmTips); } catch (e) { pmMarks = {}; pmTips = {}; }
+  stg_('pmmark');
   const VP = typeof schVendorPack_ === 'function' ? schVendorPack_() : { vendors: [], routes: [] };
   return {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
