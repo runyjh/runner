@@ -9105,28 +9105,27 @@
         const inCamp = drvRows.filter((r) => shortCamp(r.camp) === camp && !(r.seg && !segIn(r.seg, dt)));
         const A = [];
         inCamp.forEach((r) => {
-          const v = String(sget(r.row, dt) || ''), is = issOf(r.d.mainId || r.d.id, dt).find((x) => /미입차|노쇼|병가/.test(x.result || ''));
-          const word = is ? is.result : (v.match(/미입차|노쇼|병가/) || [''])[0]; if (!word) return;
+          const v = String(sget(r.row, dt) || ''), is = issOf(r.d.mainId || r.d.id, dt).find((x) => /미입차|노쇼|병가/.test(x.result || '') || (!x.result && x.mi));
+          const word = is ? (is.result || (v.match(/미입차|노쇼|병가/) || ['미입차'])[0]) : (v.match(/미입차|노쇼|병가/) || [''])[0]; if (!word) return;
           const o = is && is.orig ? is.orig[dt] : '', us = o && /\d{3,4}[A-Za-z]/.test(o) ? unitsOf(o) : baseU.get(r);
           if (us.includes(unit)) A.push({ r: r, word: word, is: is });
         });
         if (A.length) return { why: A.map((a) => a.r.d.name + ' ' + a.word).join(' · '), names: A.map((a) => a.r.d.name), row: A[0].r.key || A[0].r.row,
-          cause: A.map((a) => '🚩 ' + a.r.d.name + ' ' + a.word + (a.is ? (a.is.kind ? ' · ' + a.is.kind : '') + (a.is.sub ? ' · 대체 ' + a.is.sub + (a.is.subWho ? ' ' + a.is.subWho : '') : ' · 대체 없음') : ' · 이슈 기록 없음')).join(' / ') };
+          cause: A.map((a) => '🚩 ' + a.r.d.name + ' ' + a.word + (a.is ? (a.is.kind && a.is.kind !== a.word ? ' · ' + a.is.kind : '') + (a.is.reason ? ' (' + String(a.is.reason).slice(0, 30) + ')' : '') + (a.is.sub ? ' · 대체 ' + a.is.sub + (a.is.subWho ? ' ' + a.is.subWho : '') : ' · 대체 없음') : ' · 이슈 기록 없음')).join(' / ') };
         const own = inCamp.filter((r) => baseU.get(r).includes(unit));
-        if (own.length) return { why: '배정 없음', names: own.map((r) => r.d.name), row: own[0].key || own[0].row, cause: '담당 ' + own.map((r) => r.d.name + ' ' + stOf(String(sget(r.row, dt) || ''))).join(' · ') + ' — 대신 뛴 사람 없음' };
+        if (own.length) return { why: '배정 없음', names: own.map((r) => r.d.name), row: own[0].key || own[0].row, cause: '담당 ' + own.map((r) => { const v = String(sget(r.row, dt) || ''), st = stOf(v); return r.d.name + ' ' + (st === '다른 노선' ? '→ ' + v.replace(/\s*\[[^\]]*\]/g, '').slice(0, 28) + ' 뜀' : st); }).join(' · ') + ' — 이 노선은 대신 뛴 사람 없음' };
         return { why: '담당 없음', cause: '담당 기사가 없는 노선', names: ['담당 없음'], row: '', un: true };
       };
       // (캠프, 노선 글자) 별로 날짜마다 한 칸
       const byUnit = new Map();
       const put = (i, x, un) => {
-        const mm = String(x).match(/^(\S+)\s+(.+)$/); if (!mm) return;
-        mm[2].split(/,(?![^(]*\))/).forEach((tok) => {
-          const tm = tok.trim().match(/^([0-9A-Za-z]+)(\(.*\))?$/); if (!tm) return;
-          SchedCalc.routeExpand(tm[1]).forEach((u) => {
-            const k = mm[1] + '|' + u; if (!byUnit.has(k)) byUnit.set(k, { camp: mm[1], unit: u, cells: {} });
-            const c = byUnit.get(k).cells; if (c[i]) { if (!tm[2]) c[i].rot = ''; return; }
-            c[i] = Object.assign({ rot: tm[2] || '' }, causeOf(mm[1], u, i, un));
-          });
+        // '군포1 110A,110B(D2,F3)' = 110A·110B 둘 다 D2·F3 가 빔 (괄호는 그 줄 전체에 붙는 회전)
+        const mm = String(x).match(/^(\S+)\s+([0-9A-Za-z,]+)\s*(\(.*\))?$/); if (!mm) return;
+        const rot = mm[3] || '';
+        SchedCalc.routeExpand(mm[2]).forEach((u) => {
+          const k = mm[1] + '|' + u; if (!byUnit.has(k)) byUnit.set(k, { camp: mm[1], unit: u, cells: {} });
+          const c = byUnit.get(k).cells; if (c[i]) { if (!rot) c[i].rot = ''; return; }
+          c[i] = Object.assign({ rot: rot }, causeOf(mm[1], u, i, un));
         });
       };
       dates.forEach((dt, i) => { if (dt >= pdd) return; scalc.missing[i].filter((x) => campOk(x.split(' ')[0])).forEach((x) => put(i, x, false)); unMi[i].forEach((x) => put(i, x, true)); });
@@ -9155,6 +9154,20 @@
     });
     return out;
   }
+  /** 이미 연결된 명의인데, 명의 줄(숨김)에 출근이 남아 있고 근무자 칸에는 그 아이디가 없는 날 → [{ worker, owner, n }] (그 출근이 계산에서 빠져 미입차로 잡힘) */
+  function wlLeft() {
+    const out = [];
+    srows.forEach((r) => {
+      if (r.kind !== 'd' || r.d.ex || r.staff) return;
+      (r.d.alias || []).forEach((a) => {
+        const oc = SD.cells[a.id]; if (!oc) return;
+        const lid = ceLid(a.login);
+        const n = SD.dates.filter((dt) => { const ov = String(oc[dt] || ''); if (!ov || !SchedCalc.isWorkDay(ov, [])) return false; const wv = String(sget(r.row, dt) || ''); return wv.toLowerCase().indexOf('(' + lid + ')') < 0 && (!wv || /^(휴무|고정휴무|추가휴무|휴가)$/.test(wv)); }).length;
+        if (n) out.push({ worker: r.d, owner: { id: a.id, name: a.name, loginId: a.login }, n: n });
+      });
+    });
+    return out;
+  }
   const wlMd = (d) => { const p = d.split('-'); return +p[1] + '/' + +p[2] + ' (' + DOW[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
   let WL = null;
   function wlOpen(ownerId, workerId) {
@@ -9163,7 +9176,8 @@
       if (!r.ok) { $('#wlModal').classList.add('hidden'); return toast(r.msg); }
       WL = { ownerId: ownerId, workerId: workerId, r: r };
       const o = r.owner, w = r.worker;
-      $('#wlBody').innerHTML = '<h3 class="ce-h">같은 근무자로 연결할까요?</h3>' +
+      const already = ((SD.drivers.find((x) => x.id === workerId) || {}).alias || []).some((x) => x.id === ownerId);
+      $('#wlBody').innerHTML = '<h3 class="ce-h">' + (already ? '이미 연결된 명의 — 남은 칸을 옮길까요?' : '같은 근무자로 연결할까요?') + '</h3>' +
         '<p class="ce-s" style="line-height:1.6"><b>' + esc(o.login) + '</b> 는 <b>' + esc(o.name) + '</b> 명의 아이디입니다. 지금 <b>' + esc(w.name) + '</b> 칸에서 쓰고 있습니다.</p>' +
         '<div class="ce-pv" style="line-height:1.7">연결하면<br>· 스케줄은 <b>' + esc(w.name) + ' 한 줄</b>로 봅니다 (' + esc(o.name) + ' 줄은 숨김)<br>· 정산서 · 세금계산서는 지금처럼 <b>명의별로 따로</b> 나옵니다<br>· 근무일수는 아이디별로 나눠 셉니다</div>' +
         '<div class="ce-ln"><span>옮기는 칸</span><div>' + (r.moves.length ? '<b>' + r.moves.length + '칸</b> — ' + esc(o.name) + ' 줄의 출근을 ' + esc(w.name) + ' 줄로 (그날 ' + esc(w.name) + ' 칸이 비었거나 쉬는 날)<div class="ce-hint" style="max-height:92px;overflow:auto">' + r.moves.map((m) => esc(wlMd(m.date)) + ' ' + esc(m.to.replace(/\s*업무등록$/, ''))).join(' · ') + '</div>' : '없음') + '</div></div>' +
@@ -9207,7 +9221,8 @@
     const bad = K.mi.length + K.du.length + K.nov.length;
     const pddI = SD.dates.indexOf(pddDate());
     box.innerHTML = (pddI >= 0 ? '<button type="button" class="pddp" id="sPddGo" title="누르면 PDD 날짜 열로 이동">오늘 PDD · ' + md(pddI) + ' ▸</button>' : '<small>점검</small>') + CHK_DEF.map((d) => '<button type="button" class="chip ' + d[0] + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' zero') + (sChkOpen === d[0] ? ' on' : '') + '" data-chk="' + d[0] + '"' + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' disabled') + '>' + d[1] + ' <i>' + K[d[0]].length + '</i>' + (d[0] === 'mi' && K.mip.length ? '<em class="pst">지난 ' + K.mip.length + '</em>' : '') + '</button>').join('') +
-      (bad ? '' : '<span class="ok">✓ 내일부터 비는 노선 · 중복 · 확인할 칸 없음</span>') + wlHints().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.worker.name) + ' 칸에 ' + esc(h.owner.name) + ' 명의 아이디(' + esc(h.owner.loginId) + ')가 있습니다 — 한 사람이 두 아이디를 쓰는 경우 연결">🔗 ' + esc(h.worker.name) + ' ↔ ' + esc(h.owner.name) + ' 연결하기</button>').join('') + '<button type="button" class="lg" id="sLgBtn">색 안내 ⓘ</button>' +
+      (bad ? '' : '<span class="ok">✓ 내일부터 비는 노선 · 중복 · 확인할 칸 없음</span>') + wlHints().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.worker.name) + ' 칸에 ' + esc(h.owner.name) + ' 명의 아이디(' + esc(h.owner.loginId) + ')가 있습니다 — 한 사람이 두 아이디를 쓰는 경우 연결">🔗 ' + esc(h.worker.name) + ' ↔ ' + esc(h.owner.name) + ' 연결하기</button>').join('') +
+      wlLeft().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.owner.name) + ' 명의 줄(숨김)에 출근으로 적힌 날이 ' + esc(h.worker.name) + ' 줄로 아직 옮겨지지 않았습니다 — 그 출근이 계산에서 빠져 미입차로 잡힙니다. 누르면 옮길 칸을 미리 봅니다">🔗 ' + esc(h.owner.name) + ' 명의 칸 ' + h.n + '일 옮기기</button>').join('') + '<button type="button" class="lg" id="sLgBtn">색 안내 ⓘ</button>' +
       '<div class="xpick"><button type="button" class="btn ghost sm" id="sColBtn" title="표 오른쪽에 보일 정보 칸 고르기">⚙ 오른쪽 칸</button><div class="smore-box' + (sColOpen ? '' : ' hidden') + '" id="sColBox"><div class="smore-h">오른쪽에 보일 칸</div>' +
       EX_COLS.map((c) => '<label class="check"><input type="checkbox" data-excol="' + c.k + '"' + (exOn().includes(c.k) ? ' checked' : '') + '> ' + c.t + '<small>' + c.src + '</small></label>').join('') + '</div></div>' +
       '<div class="slg2"><b>아이콘</b><span>🚩 이슈</span><span><i class="wy">⚠</i> 확인 필요 (빈 칸 · 규칙 밖 글자 · 내 노선 비어 있음)</span><span><i class="dbx">중복 ①</i> 같은 번호끼리 겹침</span><span>📌 지시사항</span><span>📅 일정 메모</span><span>🤝 품앗이</span></div>';
