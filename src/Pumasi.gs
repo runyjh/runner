@@ -1064,7 +1064,7 @@ function pmPushSend_(list) {
     }
     return sent;
   } catch (e) {
-    console.error('푸시 전송 실패: ' + (e && e.message));
+    softFail_('푸시 전송 실패', e);
     return 0;
   }
 }

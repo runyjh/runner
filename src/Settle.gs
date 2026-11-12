@@ -219,7 +219,7 @@ function stlSS_() {
     try { book.setSpreadsheetTimeZone(CFG.TZ); } catch (e) { /* 무시 */ }
     p.setProperty('STL_DB_ID', book.getId());
     _props = null;
-    try { installSheetTriggers_(book); } catch (e) { console.error('정산 DB 트리거 설치 실패: ' + e); }
+    try { installSheetTriggers_(book); } catch (e) { softFail_('정산 DB 트리거 설치 실패', e); }
     cache_().put('stl:trg', '1', CFG.CACHE_MAX);
     stlTouchAll_();
     return (_stlSS = book);
@@ -230,7 +230,7 @@ function stlSS_() {
 /** 정산 DB 에 편집 트리거가 있는지 6시간에 한 번만 확인 (손으로 고친 내용을 캐시에 반영하기 위해) */
 function stlEnsureTrigger_(book) {
   if (cache_().get('stl:trg')) return;
-  try { installSheetTriggers_(book); cache_().put('stl:trg', '1', CFG.CACHE_MAX); } catch (e) { console.error('정산 DB 트리거 확인 실패: ' + e); }
+  try { installSheetTriggers_(book); cache_().put('stl:trg', '1', CFG.CACHE_MAX); } catch (e) { softFail_('정산 DB 트리거 확인 실패', e); }
 }
 // ── 탭별 버전 (캐시 키). 버전이 바뀌면 그 탭의 예전 캐시는 쓰지 않는다 ──
 function stlTv_() {
@@ -371,7 +371,7 @@ function stlBatchGet_(names) {
         out[want[i]] = { head: (vals[0] || []).map(String), rows: vals.slice(1) };
       });
       done = want.every(function (n) { return out[n]; });
-    } catch (e) { console.error('batchGet 실패, 탭마다 읽기로 바꿈: ' + e); }
+    } catch (e) { softFail_('batchGet 실패, 탭마다 읽기로 바꿈', e); }
   }
   if (!done) {
     want.forEach(function (n) {
@@ -1042,7 +1042,7 @@ function stlMigrateIdsV2_() {
     diff.push(row);
   });
   const log = { at: now, notes: notes.slice(0, 60), diff: diff.map(function (d) { return Object.assign({}, d, { changed: d.changed.slice(0, 20) }); }) };
-  try { PropertiesService.getScriptProperties().setProperty('STL_IDS_V2_LOG', JSON.stringify(log).slice(0, 8500)); } catch (e) { console.error('옮김 기록 저장 실패: ' + e); }
+  try { PropertiesService.getScriptProperties().setProperty('STL_IDS_V2_LOG', JSON.stringify(log).slice(0, 8500)); } catch (e) { softFail_('옮김 기록 저장 실패', e); }
   try { logAdmin_({ name: '시스템' }, '아이디 관리 → 기사 정보관리 옮김', notes.length + '건', diff.map(function (d) { return d.month + ' 바뀐 정산서 ' + d.changed.length; }).join(', ')); } catch (e) { /* 무시 */ }
   return log;
 }
@@ -1410,7 +1410,7 @@ function stlSchedule_(from, to) {
       const row = out[id] || (out[id] = {});
       dates.forEach(function (d, j) { const v = str_(block[i][cols[j] - c0]); if (v) row[d] = v; });
     });
-  } catch (e) { console.error('스케줄 읽기 실패: ' + e); }
+  } catch (e) { softFail_('스케줄 읽기 실패', e); }
   return out;
 }
 
@@ -3153,7 +3153,7 @@ function stlLastCloseSet_(month, rows) {
     const left = (rows || []).map(function (r) { return r.month; }).sort();
     if (!left.length) p.deleteProperty('STL_LAST_CLOSE');
     else if (!cur || left.indexOf(cur.month) < 0) p.setProperty('STL_LAST_CLOSE', JSON.stringify({ month: left[left.length - 1], at: cur ? cur.at : Date.now(), old: true }));
-  } catch (e) { console.error('STL_LAST_CLOSE: ' + (e && e.message)); }
+  } catch (e) { softFail_('STL_LAST_CLOSE', e); }
 }
 /** 기사 앱용: 최근 20일 안에 마감한 달 (없으면 null) */
 function stlLastClose_() {
@@ -3188,7 +3188,7 @@ function adm_stlClose(token, month, close) {
           pmPushSend_(readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.status === ST.ACTIVE; }).map(function (o) {
             return { driverId: String(o.id), title: mm + '월 정산서가 마감되었습니다', text: '정산서 보기에서 지급 금액과 내역을 확인해 주세요.', jobId: '', kind: 'slip' };
           }));
-        } catch (e) { console.error('마감 알림 실패: ' + (e && e.message)); }
+        } catch (e) { softFail_('마감 알림 실패', e); }
       } else {
         stlWriteAll_('stl_close', others);
         stlReplaceMonth_('stl_closed', month, []);
@@ -3331,7 +3331,7 @@ function stlTaxCheck_(token, month, rows, dry) {
         if (list.length) docUpsert_(SH.INVCHK, month, list, a, function (x) {
           return { driverId: str_(x.driverId), name: str_(x.name), total: String(Math.round(stlNum_(x.total) || 0)), done: x.done ? 'Y' : '', date: x.done ? (stlYmd_(x.date) || todayText_()) : '', approvalNo: str_(x.approvalNo).slice(0, 40), memo: str_(x.memo).slice(0, 200) };
         });
-      } catch (e) { console.error('홈택스 대조 → 발행 체크 저장 실패: ' + (e && e.message)); }
+      } catch (e) { softFail_('홈택스 대조 → 발행 체크 저장 실패', e); }
     }
     const cnt = function (re) { return out.filter(function (x) { return re.test(x.status); }).length; };
     return { ok: true, month: month, rows: out.sort(function (p, q) { return (p.status === '완료') - (q.status === '완료') || Math.abs(q.diff) - Math.abs(p.diff); }), unmatched: unmatched,
@@ -3732,7 +3732,7 @@ function adm_stlTableSave(token, name, month, rows, seen) {
     }
     // 아이디 관리 → 기사 정보관리 연동 (없는 명의자는 기사로 등록, 메인 아이디는 쿠팡플렉스 아이디·단가코드 맞춤)
     let sync = null;
-    if (name === 'ids') { try { sync = stlIdsToDrivers_(token); } catch (e) { console.error('기사 정보 연동 실패: ' + (e && e.message)); } }
+    if (name === 'ids') { try { sync = stlIdsToDrivers_(token); } catch (e) { softFail_('기사 정보 연동 실패', e); } }
     // 저장 직후 화면에 쓸 표 (다시 부르지 않아도 되게)
     let table = null;
     try { table = stlTableView_(name, month); } catch (e) { table = null; }
@@ -3829,7 +3829,7 @@ function stlSyncIdType_(driverId, loginId, oldType, newType) {
     });
     if (n) stlBump_();
     return n;
-  } catch (e) { console.error('아이디 단가코드 맞추기 실패: ' + (e && e.message)); return 0; }
+  } catch (e) { softFail_('아이디 단가코드 맞추기 실패', e); return 0; }
 }
 
 // ───────────────────────── 아이디 관리 ↔ 기사 정보관리 연동 ─────────────────────────
@@ -3858,7 +3858,7 @@ function stlEnsureIdFor_(o) {
       mode: '', insEx: '', fbCut: '', status: o.status === ST.STOPPED ? '정지' : '사용', memo: '기사 정보관리에서 자동 추가'
     }]);
     stlBump_();
-  } catch (e) { console.error('아이디 관리 연동 실패: ' + (e && e.message)); }
+  } catch (e) { softFail_('아이디 관리 연동 실패', e); }
 }
 /**
  * 아이디 관리 → 기사 정보관리: 저장한 뒤 한 번.

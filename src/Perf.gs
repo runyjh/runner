@@ -57,8 +57,59 @@ function errLog_(kind, fn, msg, x) {
     const a = new Array(cols.__w).fill('');
     Object.keys(o).forEach(function (key) { if (cols[key] !== undefined) a[cols[key]] = safeText_(o[key]); });
     sh.appendRow(a); // 동시에 여러 실행이 적어도 줄이 겹치지 않는다
+    try { if (!c.get('el:mir')) { c.put('el:mir', '1', 1800); maintMirror_(); } } catch (e2) { /* 사본은 다음 기회에 */ }
   } catch (e) { try { console.error('오류 기록 실패: ' + (e && e.message)); } catch (x2) { /* 무시 */ } }
 }
+/** 기능은 계속되지만 한 부분이 실패한 경우 (연동 · 알림 · 사본 복사 …): 실행 기록에 찍고 오류 기록(error_log)에도 '연동 실패'로 남긴다. 절대 예외를 내지 않는다 */
+function softFail_(label, e) {
+  const msg = String(e && e.message || e || '');
+  try { console.error(label + ': ' + msg); } catch (x) { /* 무시 */ }
+  try { errLog_('연동 실패', (typeof _curFn !== 'undefined' && _curFn) || '', label + ': ' + msg); } catch (x) { /* 무시 */ }
+}
+/**
+ * 유지보수용 사본: 오류 기록(최근 14일 · 같은 오류는 한 줄로 묶음)과 자료 점검 결과를 스케줄 DB 의 maint_errors · maint_check 탭에 적는다.
+ *  개발 쪽(Claude)이 읽을 수 있는 파일은 스케줄 DB 라서 여기로 복사한다. 사람 이름(누가)은 넣지 않는다 · 내용은 이미 메일·전화번호를 지운 글.
+ *  절대 예외를 내지 않는다.
+ */
+function maintMirror_() {
+  try {
+    if (!props_().SCH_DB_ID) return 0;
+    const book = schSS_(), now = nowText_();
+    const put = function (name, head, rows) {
+      let sh = book.getSheetByName(name);
+      if (!sh) sh = book.insertSheet(name);
+      sh.clearContents();
+      const all = [head].concat(rows.length ? rows : [head.map(function () { return ''; })]);
+      sh.getRange(1, 1, all.length, head.length).setValues(all);
+    };
+    const cut = Utilities.formatDate(new Date(Date.now() - 14 * 864e5), CFG.TZ, 'yyyy-MM-dd'), by = {};
+    readAll_(SH.ERR).forEach(function (r) {
+      const at = str_(r.at); if (!at || at.slice(0, 10) < cut) return;
+      const k = [r.app, r.kind, r.view, r.fn, r.msg].join('|');
+      const o = by[k] || (by[k] = { first: at, last: at, app: str_(r.app), kind: str_(r.kind), view: str_(r.view), fn: str_(r.fn), msg: str_(r.msg), n: 0, u0: str_(r.upd), u1: str_(r.upd) });
+      o.n++; if (at < o.first) { o.first = at; o.u0 = str_(r.upd) || o.u0; } if (at >= o.last) { o.last = at; o.u1 = str_(r.upd) || o.u1; }
+    });
+    const list = Object.keys(by).map(function (k) { return by[k]; }).sort(function (p, q) { return p.last < q.last ? 1 : -1; }).slice(0, 400);
+    put('maint_errors', ['마지막', '처음', '앱', '종류', '화면', '함수', '내용', '횟수(10분에 1번까지)', '처음 업데이트', '마지막 업데이트', '복사 시각'],
+      list.map(function (o, i) { return [o.last, o.first, o.app, o.kind, o.view, o.fn, safeText_(o.msg), o.n, o.u0, o.u1, i ? '' : now]; }));
+    let dc = {}; try { dc = JSON.parse(appSet_().dataCheck || '{}'); } catch (e) { dc = {}; }
+    const rows = [];
+    (dc.items || []).forEach(function (x) { (x.list && x.list.length ? x.list : ['']).forEach(function (t, i) { rows.push([i ? '' : str_(dc.at), i ? '' : x.k, i ? '' : x.label, i ? '' : x.n, safeText_(t), i ? '' : x.hint || '']); }); });
+    if (!rows.length) rows.push([str_(dc.at), '', '이상 없음', 0, '', '']);
+    put('maint_check', ['확인 시각', '열쇠', '항목', '건수', '내용', '안내'], rows);
+    return list.length;
+  } catch (e) { try { console.error('유지보수 사본 실패: ' + (e && e.message)); } catch (x) { /* 무시 */ } return -1; }
+}
+/** 관리자: 자료 점검을 지금 다시 하고 유지보수 사본도 새로 만든다 → { ok, check } */
+function adm_maintSync(token) {
+  return run_(function () {
+    requireAdmin_(token);
+    const res = dataCheck_();
+    const n = maintMirror_();
+    return { ok: true, check: res, mirrored: n };
+  });
+}
+
 /**
  * 실제 자료 자체 검사 (읽기만 · 아무것도 고치지 않음). 범위: 7일 전 ~ 14일 뒤 (올인원 규칙 시작일 이후).
  *  ⑥ 배차 확정 품앗이가 기사스케줄 품앗이 줄 칸에 없음   ⑦ 연동 이슈가 있는 날인데 칸이 그 이슈와 다름   ⑧ 이번 달·지난달 정산 계산이 오류 없이 끝나고 금액에 숫자가 아닌 값이 없는지
@@ -113,6 +164,48 @@ function dataCheckLive_(drivers, today) {
     });
     if (a8.length) out.push({ k: 'stlRun', label: '정산 계산이 정상으로 끝나지 않음', list: a8, hint: '프로그램 쪽 문제입니다. 개발 쪽에 알려 주세요.' });
   }
+  const soft = function (k, fn) { try { fn(); } catch (e) { out.push({ k: k, label: '점검 항목을 끝내지 못함 (' + k + ')', list: [String(e && e.message || e).slice(0, 200)], hint: '프로그램 쪽 문제입니다. 개발 쪽에 알려 주세요.' }); } };
+  // ⑨ 노선 이관 적용일 뒤에 옛 번호가 남음 (건너뛴 기사 · 칸에 적힌 옛 번호)
+  soft('moveLeft', function () {
+    if (typeof rcMoveFix_ !== 'function') return;
+    const virt = { base: {}, cell: {} }, a9 = [], sc = function (n) { return str_(n).replace(/\s*캠프\s*$/, ''); };
+    rcRows_().filter(function (c) { return c.kind === RCK.MOVE && c.date; }).sort(rcSort_).forEach(function (mv) {
+      const r = rcMoveFix_(null, mv, true, false, virt), lab = sc(mv.fromCamp) + ' ' + mv.fromRoute + '→' + sc(mv.toCamp) + ' ' + mv.toRoute;
+      r.drivers.forEach(function (d) { a9.push(lab + ' · 기사 ' + d.name + ' ' + d.from); });
+      r.cells.slice(0, 20).forEach(function (c) { a9.push(lab + ' · ' + day(c.date) + ' ' + c.name + ' ' + c.old.replace(/\n/g, ' ')); });
+      if (r.cells.length > 20) a9.push(lab + ' · 칸 ' + (r.cells.length - 20) + '개 더');
+    });
+    if (a9.length) out.push({ k: 'moveLeft', label: '노선 이관 뒤 옛 번호가 남아 있음', list: a9, hint: '기사스케줄 위쪽 [🔀 이관 뒤 옛 번호 … 맞추기]를 누르면 한 번에 맞춰집니다.' });
+  });
+  // ⑩⑪ 기사스케줄 칸으로 보는 것: 품앗이로 맡긴 날 맡긴 기사도 출근 · 예약 없이 칸에 '변경'만 적힘
+  soft('cells2', function () {
+    if (!props_().SCH_DB_ID || from > to) return;
+    const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+    const dates = issDates_(from, to).filter(function (d) { return h.dates[d] !== undefined; });
+    if (!dates.length || last < 2) return;
+    const cs = dates.map(function (d) { return h.dates[d]; }), c0 = Math.min.apply(null, cs), c1 = Math.max.apply(null, cs);
+    const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues(), block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+    const cell = {}, byId = {};
+    drivers.forEach(function (o) { byId[o.id] = o; });
+    ids.forEach(function (r, i) { const id = str_(r[0]); if (!id || cell[id]) return; const row = cell[id] = {}; dates.forEach(function (d) { row[d] = str_(block[i][h.dates[d] - c0]); }); });
+    const a10 = [];
+    pmData_().jobs.forEach(function (j) {
+      if (j.status !== PST.DONE || !j.posterId || !j.acceptedId || !cell[j.posterId] || cell[j.posterId][j.date] === undefined) return;
+      if (schWorkDay_(cell[j.posterId][j.date], [])) a10.push(day(j.date) + ' ' + (j.poster || '') + ' → ' + (j.accepted || '') + ' · ' + str_(j.camp).replace(/\s*캠프$/, '') + ' ' + str_(j.route) + ' (맡긴 기사 칸: ' + cell[j.posterId][j.date].replace(/\n/g, ' ') + ')');
+    });
+    if (a10.length) out.push({ k: 'pmBoth', label: '품앗이로 맡긴 날인데 맡긴 기사도 출근', list: a10, hint: '맡긴 기사가 직접 뛰면 그 칸을 눌러 [품앗이 취소하고 출근으로], 품앗이가 맞으면 맡긴 기사 칸을 휴무로 바꿔 주세요.' });
+    const by = rcByDriver_(), a11 = [];
+    Object.keys(cell).forEach(function (id) {
+      const o = byId[id]; if (!o || !/^\d/.test(str_(o.baseRoute))) return; // 고정 노선 기사만 (백업은 그날 뛸 노선을 적은 것)
+      dates.forEach(function (d) {
+        const v = cell[id][d];
+        if (!v || !/변경/.test(v) || !/\d{3,4}[A-Za-z]/.test(v)) return;
+        if ((by[id] || []).some(function (c) { return Math.abs((parseYmd_(c.date) - parseYmd_(d)) / 864e5) <= 1; })) return;
+        a11.push(day(d) + ' ' + o.name + ' · ' + v.replace(/\n/g, ' ') + ' (기본노선 ' + (o.baseRoute || '-') + ')');
+      });
+    });
+    if (a11.length) out.push({ k: 'chgNoRc', label: "칸에 '변경'만 적혀 있고 노선 변경 예약이 없음", list: a11, hint: "그 날부터 기본노선이 바뀌는 것이면 칸을 눌러 [이 날부터 노선 이관] 또는 기사 설정의 노선 변경 예약으로 등록해 주세요. 안 하면 그 뒤 '출근'이 옛 노선으로 계산됩니다." });
+  });
   return out;
 }
 /** 화면이 보낸 오류 목록 [{ k: 종류, v: 화면, f: 함수, m: 내용, u: 업데이트 }] (한 번에 10건까지) */

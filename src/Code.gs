@@ -1798,8 +1798,8 @@ function detailOf_(o) {
 function adm_listDrivers(token) {
   return run_(function () {
     const a = requireAdmin_(token);
-    if (typeof stlEnsureIdsV2_ === 'function') { try { stlEnsureIdsV2_(); } catch (e) { console.error('아이디 옮김 실패: ' + (e && e.message)); } }
-    try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); } // 적용일이 된 노선 변경을 먼저
+    if (typeof stlEnsureIdsV2_ === 'function') { try { stlEnsureIdsV2_(); } catch (e) { softFail_('아이디 옮김 실패', e); } }
+    try { rcApplyDue_(); } catch (e) { softFail_('노선 변경 예약 적용 실패', e); } // 적용일이 된 노선 변경을 먼저
     const sh = sheet_(SH.DRIVERS), c = cols_(SH.DRIVERS), last = sh.getLastRow();
     let rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
     // 기사ID가 겹친 줄이 있으면 먼저 고친다 (겹치면 한 명을 고를 때 다른 기사도 같이 선택됨)
@@ -1821,7 +1821,7 @@ function adm_listDrivers(token) {
       if (counts[o.status] !== undefined) counts[o.status]++;
     });
     // 기사코드: 비어 있으면 자동으로 (R001, R002 … 가입 순서, 한 번 정하면 그대로)
-    if (list.some(function (r) { return !r.driverCode; })) { try { fillDriverCodes_(); list.forEach(function (r) { if (!r.driverCode) { const x = driverById_(r.id); if (x) r.driverCode = x.driverCode; } }); } catch (e) { console.error('기사코드 자동 채우기 실패: ' + e); } }
+    if (list.some(function (r) { return !r.driverCode; })) { try { fillDriverCodes_(); list.forEach(function (r) { if (!r.driverCode) { const x = driverById_(r.id); if (x) r.driverCode = x.driverCode; } }); } catch (e) { softFail_('기사코드 자동 채우기 실패', e); } }
     // 서브아이디: 다른 기사의 서브로 등록된 아이디면 표시
     const subOf = {};
     list.forEach(function (r) { [r.subId1, r.subId2].forEach(function (x) { if (x) subOf[String(x).toLowerCase()] = r.name; }); });
@@ -1965,14 +1965,14 @@ function updateDriverCore_(a, id, changes, seenRev) {
       });
       rcTouch_();
     }
-  } catch (e) { console.error('노선 변경 이력 기록 실패: ' + (e && e.message)); }
+  } catch (e) { softFail_('노선 변경 이력 기록 실패', e); }
   // 기본노선을 추가 배정 캠프로 바꿈(서로 맞바꿈) → 오늘부터의 기사스케줄 칸도 줄끼리 맞바꿈
   try {
     if (f.schCampId !== undefined && f.extraAssign !== undefined && o.schCampId && f.schCampId && f.schCampId !== o.schCampId) {
       const oldEx = extraAssignOf_(o).map(function (x) { return x.c; }), newEx = extraAssignOf_({ extraAssign: f.extraAssign }).map(function (x) { return x.c; });
       if (oldEx.indexOf(f.schCampId) >= 0 && newEx.indexOf(o.schCampId) >= 0) schSwapAssign_(o, f, todayText_());
     }
-  } catch (e) { console.error('추가 배정 칸 맞바꾸기 실패: ' + (e && e.message)); }
+  } catch (e) { softFail_('추가 배정 칸 맞바꾸기 실패', e); }
   if (f.loginId) forgetDriver_({ loginId: f.loginId });
   // 단가코드이 바뀌면 정산 아이디(본인 쿠팡플렉스 아이디)의 단가코드도 맞춘다
   if (f.driverType !== undefined && f.driverType !== o.driverType && typeof stlSyncIdType_ === 'function') stlSyncIdType_(o.id, f.loginId || o.loginId, o.driverType, f.driverType);
@@ -3670,11 +3670,12 @@ function cleanupSessions() {
     if (gone.length) delRows_(sh, gone);
   } finally {
     lock.releaseLock();
-    try { pmAlertCleanup_(); } catch (e) { console.error('품앗이 알림 정리 실패: ' + (e && e.message)); } // 60일 지난 품앗이 알림 정리
-    try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); } // 적용일이 된 노선 변경
+    try { pmAlertCleanup_(); } catch (e) { softFail_('품앗이 알림 정리 실패', e); } // 60일 지난 품앗이 알림 정리
+    try { rcApplyDue_(); } catch (e) { softFail_('노선 변경 예약 적용 실패', e); } // 적용일이 된 노선 변경
     try { dataCheck_(); } catch (e) { console.error('자료 점검 실패: ' + (e && e.message)); errLog_('서버 오류', 'dataCheck_', String(e && e.message || e)); } // 자료 점검 (읽기만)
-    try { if (typeof stlLegacyRouteFixAll_ === 'function') stlLegacyRouteFixAll_(); } catch (e) { console.error('그날 노선 되살리기 실패: ' + (e && e.message)); } // 기존 정산 이식 달 (한 번씩만)
-    try { perfRollup_(); } catch (e) { console.error('속도 기록 요약 실패: ' + (e && e.message)); } // 7일 지난 속도 기록 → 하루 요약으로 · 60일 지난 오류 기록 정리
+    try { if (typeof stlLegacyRouteFixAll_ === 'function') stlLegacyRouteFixAll_(); } catch (e) { softFail_('그날 노선 되살리기 실패', e); } // 기존 정산 이식 달 (한 번씩만)
+    try { perfRollup_(); } catch (e) { softFail_('속도 기록 요약 실패', e); } // 7일 지난 속도 기록 → 하루 요약으로 · 60일 지난 오류 기록 정리
+    try { maintMirror_(); } catch (e) { /* 사본은 실패해도 됨 */ } // 오류 기록 · 자료 점검 결과를 스케줄 DB 의 maint_ 탭으로 (유지보수용)
   }
 }
 
@@ -4658,7 +4659,7 @@ function schSS_() {
     }
     p.setProperty('SCH_DB_ID', book.getId());
     _props = null;
-    try { installSheetTriggers_(book); } catch (e) { console.error('스케줄 DB 트리거 설치 실패: ' + e); }
+    try { installSheetTriggers_(book); } catch (e) { softFail_('스케줄 DB 트리거 설치 실패', e); }
     cache_().remove('sch:h');
     return (_schSS = book);
   } finally {
@@ -4941,7 +4942,7 @@ function schRead_(sun, end) {
   // 캠프 이름은 노선관리(camps)에서, 이름·노선은 기사 정보에서 바로 가져온다
   const campName = {};
   m.camps.forEach(function (c) { campName[c.id] = c.name; });
-  try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); }
+  try { rcApplyDue_(); } catch (e) { softFail_('노선 변경 예약 적용 실패', e); }
   const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name; }).map(function (o) {
     const d = schDriver_(o);
     if (d.campId && !campName[d.campId]) { d.campId = ''; d.camp = ''; } // 노선관리에서 지워진 캠프
@@ -5015,7 +5016,7 @@ function schRead_(sun, end) {
       });
     });
     if (fix.length) pmSchApply_(fix, true); // 읽는 길이므로 잠금을 기다리지 않는다: 다른 저장이 진행 중이면 이번엔 화면 값만 맞추고 시트는 다음 조회 때
-  } catch (e) { console.error('품앗이 칸 잠금·복구 실패: ' + (e && e.message)); }
+  } catch (e) { softFail_('품앗이 칸 잠금·복구 실패', e); }
   const pmRows = Object.keys(cells).filter(function (id) { return id.indexOf(SCH_PM_PREFIX) === 0 && byDrv[id.slice(SCH_PM_PREFIX.length)]; }).map(function (id) {
     const d = byDrv[id.slice(SCH_PM_PREFIX.length)];
     return { id: id, driverId: d.id, name: d.name, loginId: d.loginId || '', campId: d.campId || '' };
@@ -5494,7 +5495,7 @@ function api_mySchedule(token, month) {
           });
         });
       }
-    } catch (e) { console.error('추가 배정 줄 읽기 실패: ' + (e && e.message)); }
+    } catch (e) { softFail_('추가 배정 줄 읽기 실패', e); }
     // 내 캠프에 들어오는 백업 (기사스케줄 '백업 명단' 과 같은 규칙) · 직함자(소속 = 운영자 가짜 캠프)는 백업 줄 대신 다른 직원 스케줄
     if (info.title && isStaffCamp_(info.camp)) {
       out.camp = ''; out.backup = {};
@@ -5562,7 +5563,7 @@ function api_campSchedule(token, month, campId) {
     }
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, holidays: {}, camp: '', drivers: [], backup: {} , campRots: campRotMap_() };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
-    try { rcApplyDue_(); } catch (e) { console.error('노선 변경 예약 적용 실패: ' + (e && e.message)); }
+    try { rcApplyDue_(); } catch (e) { softFail_('노선 변경 예약 적용 실패', e); }
     const all0 = readAll_(SH.DRIVERS).filter(function (o) { return o.id; }), lk = schLinkMap_(all0);
     // 같은 근무자 연결: 명의 기사는 목록에서 빼고 (스케줄은 근무자 한 줄), 명의 계정으로 들어오면 근무자로 본다
     const all = all0.filter(function (o) { return !lk.workerOf[o.id]; });
@@ -6261,7 +6262,7 @@ function drvLinkSubs_(a, o, before) {
       });
       if (bump) stlBump_();
     }
-  } catch (e) { console.error('서브아이디 연동 실패: ' + (e && e.message)); msg.push('서브아이디 연동 중 오류: ' + (e && e.message)); }
+  } catch (e) { softFail_('서브아이디 연동 실패', e); msg.push('서브아이디 연동 중 오류: ' + (e && e.message)); }
   return msg;
 }
 
@@ -7212,7 +7213,7 @@ function adm_rcSetDate(token, f) {
         while ((m = re.exec(str_(c.memo)))) last0 = m;
         if (last0 && last0[2] === date && last0[1] > date) for (let dd = date; dd < last0[1]; dd = addDaysText_(dd, 1)) keep.push({ date: dd, campId: c.fromCampId, camp: c.fromCamp, base: c.fromRoute });
         let kept0 = 0;
-        try { kept0 = rcKeepCellCamp_(c.driverId, keep, c.toCampId, c.toRoute); } catch (e) { console.error('칸 캠프 붙이기 실패: ' + (e && e.message)); }
+        try { kept0 = rcKeepCellCamp_(c.driverId, keep, c.toCampId, c.toRoute); } catch (e) { softFail_('칸 캠프 붙이기 실패', e); }
         return { ok: true, change: rcView_(c, rcCampNames_()), old: old, kept: kept0, same: true };
       }
       over.forEach(function (x) { writeFields_(SH.RCHG, x._row, { status: RCS.OFF, memo: (x.memo ? x.memo + ' / ' : '') + '적용일 정정(' + date + ')으로 지움' }); });
@@ -7220,7 +7221,7 @@ function adm_rcSetDate(token, f) {
       if (first) ['fromCampId', 'fromCamp', 'fromRoute'].forEach(function (k) { if (first[k] !== undefined) { fix[k] = first[k]; c[k] = first[k]; } }); // 지운 변경의 '이전 캠프·노선'을 이어받는다
       writeFields_(SH.RCHG, c._row, fix);
       let kept = 0;
-      try { kept = rcKeepCellCamp_(c.driverId, keep, c.toCampId, c.toRoute); } catch (e) { console.error('칸 캠프 붙이기 실패: ' + (e && e.message)); }
+      try { kept = rcKeepCellCamp_(c.driverId, keep, c.toCampId, c.toRoute); } catch (e) { softFail_('칸 캠프 붙이기 실패', e); }
       rcTouch_();
       logAdmin_(a, '노선 변경 적용일 정정', c.name + ' (' + c.driverId + ')', old + ' → ' + date + ' · ' + (c.fromCamp || '') + ' ' + (c.fromRoute || '') + ' → ' + (c.toCamp || '') + ' ' + (c.toRoute || ''));
       return { ok: true, change: rcView_(Object.assign({}, c, { date: date }), rcCampNames_()), old: old, kept: kept };
@@ -7371,7 +7372,7 @@ function adm_rcMove(token, f, dry) {
       });
       if (date <= today) rcApply_(mv, now);
       bumpMaster_(); rcTouch_();
-      try { plan.cellFixed = rcMoveFix_(a, mv, false, true).cells.length; } catch (e) { plan.cellFixed = 0; console.error('이관 칸 맞추기 실패: ' + (e && e.message)); }
+      try { plan.cellFixed = rcMoveFix_(a, mv, false, true).cells.length; } catch (e) { plan.cellFixed = 0; softFail_('이관 칸 맞추기 실패', e); }
       logAdmin_(a, '노선 이관', fromCamp.name + ' ' + fromNum + ' → ' + toCamp.name + ' ' + toNum, date + ' · 기사 ' + made.length + '명' + (copied ? ' · 단가 ' + copied + '줄 복사' : '') + (newCampName ? ' · 새 캠프' : ''));
       plan.dry = false; plan.to.campId = toCamp.id; plan.made = made; plan.copied = copied; plan.moveId = mv.id;
       return plan;
