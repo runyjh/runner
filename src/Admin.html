@@ -2726,7 +2726,7 @@
     if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     // 오래 걸리는 작업(이관·정산서 올리기·초기화·마감·사본 다시 만들기)은 60초에 끊지 않는다 — 끊으면 서버는 계속 도는데 화면은 "다시 시도"라 해서 두 번 처리될 수 있음
-    const LONG_MS = { adm_stlTaxCheck: 180000, adm_schLegacyPull: 240000, adm_stlLegacyCompare: 300000, adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
+    const LONG_MS = { adm_stlTaxCheck: 180000, adm_schLegacyPull: 240000, adm_maintSync: 240000, adm_stlLegacyCompare: 300000, adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
     const timer = setTimeout(() => { if (ctl) ctl.abort(); }, LONG_MS[fn] || 60000);
     return fetch(RUNNER_API, {
       method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',
@@ -14051,10 +14051,15 @@
     if (!c || !c.at) { box.classList.add('hidden'); return; }
     const items = c.items || [], at = String(c.at).slice(5, 16).replace('-', '/');
     box.classList.remove('hidden');
-    box.innerHTML = '<div class="db-top"><b>자료 점검</b><span class="sub" style="font-size:11.5px">' + esc(at) + ' 확인</span></div>' +
+    box.innerHTML = '<div class="db-top"><b>자료 점검</b><span class="sub" style="font-size:11.5px">' + esc(at) + ' 확인</span><button type="button" class="btn sm ghost" id="dcNow" style="margin-left:auto" title="자료 점검을 지금 다시 하고, 오류 기록 · 점검 결과를 유지보수용 탭으로 내보냅니다 (1분쯤 걸릴 수 있음)">지금 다시 점검</button></div>' +
       (!items.length ? '<div class="sub" style="font-size:12.5px">이상 없음 ✅</div>' :
         items.map((x) => '<details class="dc-it"><summary><span>' + esc(x.label) + '</span><b>' + x.n + '</b></summary><div class="dc-l">' + (x.list || []).map((t) => '<span>' + esc(t) + '</span>').join('') + (x.n > (x.list || []).length ? '<span class="sub">외 ' + (x.n - x.list.length) + '건</span>' : '') + '</div>' + (x.hint ? '<p class="sub">' + esc(x.hint) + '</p>' : '') + '</details>').join(''));
   }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('#dcNow'); if (!b || b.disabled) return;
+    b.disabled = true; b.textContent = '점검 중…';
+    api('adm_maintSync').then((r) => { if (!r.ok) { b.disabled = false; b.textContent = '지금 다시 점검'; return toast(r.msg); } dcPaint(r.check); toast('자료 점검을 다시 했습니다' + (r.mirrored >= 0 ? ' · 오류 기록 ' + r.mirrored + '종을 유지보수 탭으로 내보냈습니다.' : '.')); }).catch(() => { b.disabled = false; b.textContent = '지금 다시 점검'; });
+  });
   // ───── 시작 (모든 변수 선언 뒤에 실행) ─────
   (function boot() {
     const t = store.get();

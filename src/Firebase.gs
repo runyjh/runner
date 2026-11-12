@@ -112,7 +112,7 @@ function fsPut_(docs, atMs) {
     }
     return n;
   } catch (e) {
-    console.error('Firestore 복사 실패 (시트는 저장됨): ' + (e && e.message));
+    softFail_('Firestore 복사 실패 (시트는 저장됨)', e);
     try { cache_().put('fs:err', nowText_() + ' ' + String(e && e.message).slice(0, 300), 21600); } catch (x) { /* 무시 */ }
     try { cache_().put('fs:down', '1', 600); } catch (x) { /* 무시 */ }
     return 0;
@@ -129,7 +129,7 @@ function fsDel_(paths) {
       payload: JSON.stringify({ writes: paths.map(function (p) { return { delete: base + '/' + p }; }) })
     });
     return res.getResponseCode() < 300 ? paths.length : 0;
-  } catch (e) { console.error('Firestore 지우기 실패: ' + (e && e.message)); return 0; }
+  } catch (e) { softFail_('Firestore 지우기 실패', e); return 0; }
 }
 
 // ───────────────────────── 사본 화면 2개 (속도 측정으로 고름 · 2026-11-06) ─────────────────────────
@@ -166,7 +166,7 @@ function fsDirty_(area, extra) {
     if (d.areas[key] || (!area && d.areas.any)) return; // 이번 실행에서 이미 알렸음 (영역 알림이 있었으면 일반 알림은 생략)
     d.areas[key] = 1; d.areas.any = 1;
     fsPut_([{ path: 'pub/meta', data: { dirtyAt: now, nbAt: ar.nb || 0, schAt: ar.sch || 0, schBy: ar.schBy || '', pmAt: ar.pm || 0, pmBy: ar.pmBy || '', tmAt: ar.tm || 0 } }], now);
-  } catch (e) { console.error('fsDirty_: ' + (e && e.message)); }
+  } catch (e) { softFail_('fsDirty_', e); }
 }
 /** 실행 안에서만 쓰는 임시 세션으로 기사 앱 함수 부르기 (사본 만들기용) */
 function fsAs_(driverId, fn, args) {
@@ -192,7 +192,7 @@ function fsSaveAdmSched_(start, res, t0) {
 function fsBuildSched_(withHome) {
   const sun = sundayOf_(new Date()), start = Utilities.formatDate(sun, CFG.TZ, 'yyyy-MM-dd');
   const t0 = Date.now(), docs = [];
-  try { const a = schRead_(sun, addDays_(sun, SCH_DAYS - 1)); fsClean_(a); docs.push({ path: 'adm/sched', data: { start: start, res: a } }); } catch (e) { console.error('fs adm/sched: ' + e); }
+  try { const a = schRead_(sun, addDays_(sun, SCH_DAYS - 1)); fsClean_(a); docs.push({ path: 'adm/sched', data: { start: start, res: a } }); } catch (e) { softFail_('fs adm/sched', e); }
   if (withHome === false) return fsPut_(docs, t0);
   // 로그인(세션)이 살아 있는 기사만 — 나머지는 앱을 열 때 서버에서 읽으며 사본이 생김
   const now = Date.now(), live = {};
@@ -217,7 +217,7 @@ function fsCodeCheck_() {
     const h = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_1, src, Utilities.Charset.UTF_8));
     const sp = PropertiesService.getScriptProperties();
     if (sp.getProperty('FS_CODE') !== h) { sp.setProperty('FS_CODE', h); fsDirty_(); return true; }
-  } catch (e) { console.error('fsCodeCheck_: ' + (e && e.message)); }
+  } catch (e) { softFail_('fsCodeCheck_', e); }
   return false;
 }
 function fsSync() {
@@ -247,7 +247,7 @@ function fsEnsureTrigger_() {
     const have = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'fsSync'; });
     if (!have) ScriptApp.newTrigger('fsSync').timeBased().everyMinutes(1).create();
     cache_().put('fs:trg', '1', 21600);
-  } catch (e) { console.error('fsSync 트리거 설치 실패: ' + e); }
+  } catch (e) { softFail_('fsSync 트리거 설치 실패', e); }
 }
 /** 관리자: Firestore 사본 상태 */
 function adm_fsStatus(token) {
