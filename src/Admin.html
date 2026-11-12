@@ -1512,6 +1512,14 @@
   .mmore .mm-card button:first-of-type, .mmore .mm-card p + button { border-top: 0; } .mmore .mm-card button small { margin-left: auto; color: var(--sub); font-size: 12px; font-weight: 500; }
   .mmore .mm-card.pc { background: #fafafa; } .mmore .mm-card.pc button { color: #6b7280; font-weight: 600; }
   .mmore .mm-me { text-align: center; color: var(--sub); font-size: 12px; margin-top: 4px; }
+  /* ── 휴대폰 공통 틀: 보기 기본 — 설명 · 표 도구 · PC 전용 버튼은 숨기고, 칩은 한 줄(옆으로 밀기) ── */
+  html.m .pg-help, html.m main > section > p.sub, html.m .tkbar, html.m .head .tools [id$="Reload"], html.m #reloadBtn { display: none !important; }
+  html.m #drvNew, html.m #coBtn, html.m #bibNew, html.m #xpOpen, html.m #campNew, html.m #rpUpBtn, html.m #view-perf > .updrop, html.m #paPostSw, html.m #paOfferSw, html.m #acCatEdit, html.m #acNew,
+  html.m #paFrom, html.m #paTo, html.m #isFrom, html.m #isTo, html.m .is-mionly, html.m #tiFromStl, html.m #tiNew, html.m #view-einv .updrop, html.m #irCfgBtn, html.m #irXlsx, html.m #stRecalc, html.m #stGearBtn { display: none !important; }
+  html.m .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-left: -12px; margin-right: -12px; padding: 0 12px; } html.m .tabs::-webkit-scrollbar { display: none; } html.m .tabs > * { flex: none; }
+  html.m .head h2 small.sub { display: none; }
+  html.m #wtabs, html.m #dBulk, html.m #view-drivers table.tk-card td.tk-k, html.m [data-ract="camp-edit"], html.m [data-ract="camp-del"], html.m [data-ract="route-add"], html.m [data-rcopen="move"], html.m #perfBox .rp-top .grow, html.m #perfBox .rp-on { display: none !important; }
+  html.m #view-drivers table.tk-card td[data-l="직급"], html.m #view-drivers table.tk-card td[data-l="서브아이디"], html.m #view-drivers table.tk-card td[data-l="쿠팡플렉스 아이디"], html.m #view-drivers table.tk-card td[data-l="가입일"], html.m #view-drivers table.tk-card td[data-l="비고"] { display: none !important; }
   .mseg { display: none; }
   html.m .mseg { display: flex; background: #e9ecef; border-radius: 12px; padding: 3px; margin: 0 0 12px; }
   html.m .mseg.hidden { display: none; }
@@ -2141,7 +2149,7 @@
       <button type="button" data-mmv="perf" data-mmtab="pk">🔥 피크 예상 물량</button>
       <button type="button" data-mmv="route">🧭 노선관리</button>
     </div>
-    <div class="mm-card pc"><p>PC에서 하는 일 <small>(표가 넓어 PC를 권합니다 · 눌러서 열 수는 있습니다)</small></p>
+    <div class="mm-card pc"><p>확인용 <small>(휴대폰에서는 보기만 · 처리는 PC에서)</small></p>
       <button type="button" data-mmv="settle">정산관리</button>
       <button type="button" data-mmv="settle" data-mmgo="pnl">매입·매출</button>
       <button type="button" data-mmv="taxinv">세금계산서 역발행</button>
@@ -2149,7 +2157,6 @@
       <button type="button" data-mmv="insrep">산재/고용 신고 상황</button>
       <button type="button" data-mmv="board">게시판 관리</button>
       <button type="button" data-mmv="acc">계정관리</button>
-      <button type="button" data-mmv="uiset">올인원 설정</button>
     </div>
     <div class="mm-card">
       <button type="button" data-mmc="#uiSw">🖥 PC 화면으로 보기</button>
@@ -3042,6 +3049,7 @@
     if (UPD) $('#updNo').textContent = ' · 업데이트 ' + UPD;
     driversLoaded = false;
     uiLoad();
+    try { if (document.documentElement.classList.contains('m')) $('#q').placeholder = '이름 · 아이디 · 연락처 · 차량'; } catch (e) { /* 무시 */ }
     setTimeout(() => { try { liveStart(); } catch (e) {} }, 3000); // 실시간 갱신 구독 (Firestore pub/meta)
     // 새로고침하면 보던 메뉴 그대로 (이 창을 닫으면 잊음)
     let sv0 = '';
