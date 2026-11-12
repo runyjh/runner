@@ -5029,6 +5029,7 @@ function schRead_(sun, end) {
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
     issues: issues, issueKinds: SCH_ISSUE.KINDS, pmLocks: pmLocks,
     vendorRoutes: VP.routes, vendors: VP.vendors, routeMoves: routeMoves,
+    routeMiss: (function () { try { return typeof schRmRead_ === 'function' ? schRmRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, camp: x.camp, unit: x.unit, result: x.result, reason: x.reason, memo: x.memo, by: x.by }; }) : []; } catch (e) { return []; } })(),
     vendorDays: (function () { try { return typeof schUnvRead_ === 'function' ? schUnvRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, campId: x.campId, code: x.code, name: x.vendor }; }) : []; } catch (e) { return []; } })()
   };
 }
