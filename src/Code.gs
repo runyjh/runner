@@ -6027,7 +6027,28 @@ function schHolidayGroups_(from, to) {
   return { myeong: myeong, other: other };
 }
 /** 출근으로 세는 칸 (화면 출근일수와 같은 규칙) / 쉰 칸 */
-function schIsWork_(v) { const s = str_(v); return !!s && s !== '휴가' && !/휴무|용차|병가|퇴사|미입차|업무/.test(s); }
+/**
+ * 근무일 판정 하나 (정산 근무일수 · 관리자앱 출근일수 · 기사 앱 통계가 같은 규칙) — 그 기사가 그날 직접 일했는가
+ *  근무 O: 출근 · 노선 글자(담당/다른 노선) · 노선·라우트 변경 · '(서브아이디) 업무등록' (그 기사에게 등록된 서브아이디로 뛴 날)
+ *  근무 X: 휴무·휴가·병가·퇴사·미입차·노쇼·용차 · '(본인 아이디) 업무등록' 처럼 등록 서브가 아닌 아이디 (업체 아이디만 쓰인 날) · 추가업무등록
+ *          · 규칙으로 읽을 수 없는 글자 (일정 메모는 칸이 아니라 지시사항·일정 메모 칸에)
+ *  subIds = 그 기사의 서브아이디 목록 (없으면 서브아이디 업무등록을 근무로 보지 않음)
+ */
+function schWorkDay_(v, subIds) {
+  const s = str_(v);
+  if (!s) return false;
+  if (/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(s)) return false;
+  if (/업무/.test(s)) {
+    if (!/업무등록/.test(s) || /추가업무등록/.test(s)) return false;
+    const ids = [];
+    s.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, function (m0, id) { if (!/^[DF]\d$/i.test(id)) ids.push(id.toLowerCase()); return m0; });
+    const subs = (subIds || []).map(function (x) { return str_(x).toLowerCase(); }).filter(Boolean);
+    return ids.length > 0 && ids.some(function (id) { return subs.indexOf(id) >= 0; });
+  }
+  return /^출근/.test(s) || /\d{3,4}[A-Za-z]/.test(s) || /변경/.test(s);
+}
+function schSubIdsOf_(o) { return o ? [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean) : []; }
+function schIsWork_(v, subIds) { return schWorkDay_(v, subIds); }
 function schIsRest_(v) { return /휴무|휴가|병가/.test(str_(v)); }
 /** 기사 한 명의 스케줄 칸 { 날짜: 글자 } (스케줄 DB · 없으면 빈 객체) */
 function schCellsOf_(driverId, dates) {

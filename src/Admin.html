@@ -7906,12 +7906,17 @@
         return [];
       }).filter(Boolean);
     }
-    /** 출근일수: 빈칸·휴무·용차·병가·퇴사·미입차·업무(등록)·'휴가' 를 뺀 칸 수 */
-    function isWorkDay(v) {
+    /** 출근일수 = 근무일 판정 하나 (서버 schWorkDay_ 와 같은 규칙): 출근 · 노선 글자 · 변경 · '(등록 서브아이디) 업무등록' 만 근무 — 쉬는 날 · 용차 · 노쇼 · 등록 서브가 아닌 아이디 · 읽을 수 없는 글자는 아님 */
+    function isWorkDay(v, subs) {
       const s = String(v || '').trim();
       if (!s) return false;
-      if (s === '휴가') return false;
-      return !['휴무', '용차', '병가', '퇴사', '미입차', '업무'].some((w) => s.includes(w));
+      if (/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(s)) return false;
+      if (/업무/.test(s)) {
+        if (!/업무등록/.test(s) || /추가업무등록/.test(s)) return false;
+        const ids = []; s.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, (m0, id) => { if (!/^[DF]\d$/i.test(id)) ids.push(id.toLowerCase()); return m0; });
+        return ids.length > 0 && ids.some((id) => (subs || []).includes(id));
+      }
+      return /^출근/.test(s) || /\d{3,4}[A-Za-z]/.test(s) || /변경/.test(s);
     }
     /** 기본노선 '530AB (F3)' → { routes: '530AB', rot: 'F3' } */
     /** '205C(D1),205D' 처럼 노선 바로 뒤 괄호 = 그 노선만의 회전 → per['205C']=['D1'], 글자에서는 뺌 */
@@ -7935,7 +7940,7 @@
       const defRotArr = (camp) => (camps[camp] && camps[camp].length ? camps[camp] : ALL_ROTS);
       const campNames = Object.keys(camps).sort((a, b) => b.length - a.length);
       const counts = {};
-      rows.forEach((r) => { counts[r.key] = r.cells.filter(isWorkDay).length; });
+      rows.forEach((r) => { counts[r.key] = r.cells.filter((v, i) => (r.recv && r.recv[i]) || isWorkDay(v, r.subs)).length; }); // 품앗이를 받아 뛴 날은 칸이 휴무·빈칸이어도 근무일
 
       // 1) 백업 명단: 백업·예비·용차 기사의 칸에서 노선을 뽑아 캠프별로
       const roster = {};
@@ -8435,7 +8440,8 @@
     const rows = schSegDrivers().filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
       key: d._key, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type, baseAt: d._baseAt ? SD.dates.map((dt) => d._baseAt[dt] || d.baseRoute) : null,
       cells: SD.dates.map((dt) => (segIn(d._seg, dt) ? sget(d.id, dt) : '')),
-      active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null
+      active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null,
+      subs: cellSubsOf(d.id), recv: SD.dates.map((dt) => (((SD.pmTips || {})[d.id] || {})[dt] || []).some((t) => t.to === d.name && t.from !== d.name))
     }));
     scalc = SchedCalc.compute(rows, campRot, SD.dates.length);
   }
