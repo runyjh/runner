@@ -2771,7 +2771,10 @@
   const admKeep = {
     get(k) { try { return JSON.parse(sessionStorage.getItem(ADM_KEEP + k) || 'null'); } catch (e) { return null; } },
     set(k, v) { try { sessionStorage.setItem(ADM_KEEP + k, JSON.stringify(v)); } catch (e) { try { sessionStorage.removeItem(ADM_KEEP + k); } catch (x) {} } },
-    clear() { try { Object.keys(sessionStorage).forEach((k) => { if (k.indexOf(ADM_KEEP) === 0) sessionStorage.removeItem(k); }); localStorage.removeItem(ADM_KEEP + 'me'); } catch (e) {} },
+    clear() { try { Object.keys(sessionStorage).forEach((k) => { if (k.indexOf(ADM_KEEP) === 0) sessionStorage.removeItem(k); }); Object.keys(localStorage).forEach((k) => { if (k.indexOf(ADM_KEEP) === 0) localStorage.removeItem(k); }); } catch (e) {} },
+    // 앱을 닫았다 열어도 남는 보관 (자동 로그인이면 이 기기에, 아니면 이 창에만 — 토큰과 같은 곳 · 로그아웃하면 지움) → 휴대폰에서 앱을 열자마자 직전 내용이 보인다
+    getP(k) { try { return JSON.parse(localStorage.getItem(ADM_KEEP + k) || sessionStorage.getItem(ADM_KEEP + k) || 'null'); } catch (e) { return null; } },
+    setP(k, v) { let st = null; try { st = localStorage.getItem(TOKEN) ? localStorage : sessionStorage; st.setItem(ADM_KEEP + k, JSON.stringify(v)); } catch (e) { try { if (st) st.removeItem(ADM_KEEP + k); } catch (x) {} } },
     // 로그인한 관리자 이름·아이디 (화면을 먼저 띄울 때 씀 · 자동 로그인이면 이 PC 에, 아니면 이 창에만 — 토큰과 같은 곳)
     me(v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(ADM_KEEP + 'me') || sessionStorage.getItem(ADM_KEEP + 'me') || 'null'); (localStorage.getItem(TOKEN) ? localStorage : sessionStorage).setItem(ADM_KEEP + 'me', JSON.stringify(v)); } catch (e) { return null; } }
   };
@@ -8850,6 +8853,7 @@
     const p = dt.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getDay() === 0;
   }
   let sLoadSeq = 0;
+  let sStale = false; // 보관해 둔 직전 자료를 먼저 그린 상태 (새 자료를 받는 중)
   function loadSched(start) {
     if (!SD.dates.length) $('#sWrap').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     paintModeUi();
@@ -8868,14 +8872,17 @@
     // 처음 여는 것이면(새로고침·배포 뒤) 이 창에 보관해 둔 같은 기간 자료를 먼저 그린다 → 서버 응답(평균 7초)을 기다리지 않고 바로 보임.
     //  곧 새 자료로 다시 그리고, 그 사이 고친 칸은 저장 때 서버가 이전 값과 대조한다 (다른 곳에서 바뀌었으면 저장하지 않고 알림)
     if (!SD.dates.length && !start) {
-      const c = admKeep.get('sched'), tdy = ymdLocal(new Date());
-      if (c && c.r && c.mode === sMode && Array.isArray(c.r.dates) && (sMode === 'month' ? c.month === (sMonth || monthOf(tdy)) : c.r.dates.includes(tdy))) { try { if (sMode === 'month' && !sMonth) sMonth = c.month; apply(c.r); } catch (e) { SD.dates = []; } }
+      // 휴대폰 달력 · 홈은 달력 달(1일~말일) 자료를 쓴다 → 처음부터 그 기간으로 받는다 (2주로 받았다가 한 달로 다시 받지 않게)
+      if (mobOn()) { const t = new Date(); sMode = 'month'; sBasis = 'cal'; if (!sMonth) sMonth = monthOf(ymdLocal(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1))); }
+      const c = admKeep.getP('sched'), tdy = ymdLocal(new Date());
+      if (c && c.r && c.mode === sMode && (c.basis || '') === (sMode === 'month' ? sBasis : '') && Array.isArray(c.r.dates) && (sMode === 'month' ? c.month === (sMonth || monthOf(tdy)) : c.r.dates.includes(tdy))) { try { if (sMode === 'month' && !sMonth) sMonth = c.month; sStale = true; apply(c.r); } catch (e) { SD.dates = []; sStale = false; } }
     }
     return fetchSched(start).then((r) => {
       if (seq !== sLoadSeq) return;
-      if (!r.ok) return toast(r.msg);
+      if (!r.ok) { sStale = false; return toast(r.msg); }
+      sStale = false;
       apply(r);
-      admKeep.set('sched', { mode: sMode, month: sMode === 'month' ? sMonth : '', r: r });
+      admKeep.setP('sched', { mode: sMode, basis: sMode === 'month' ? sBasis : '', month: sMode === 'month' ? sMonth : '', r: r });
     }).catch(() => {});
   }
   function renderSchedCamps() {
@@ -9986,7 +9993,8 @@
   function hmLoad() {
     const ym = ymdLocal(new Date()).slice(0, 7);
     if (HM.p || (HM.ym === ym && HM.memos && Date.now() - HM.at < 300000)) return;
-    HM.p = api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { HM.ym = ym; HM.memos = r.memos || []; HM.at = Date.now(); if (sTd) { try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } } }).catch(() => {}).finally(() => { HM.p = null; });
+    if (!HM.memos) { const km = admKeep.getP('hmemo'); if (km && km.ym === ym && Array.isArray(km.memos)) { HM.ym = ym; HM.memos = km.memos; } }
+    HM.p = api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { HM.ym = ym; HM.memos = r.memos || []; HM.at = Date.now(); admKeep.setP('hmemo', { ym: ym, memos: HM.memos }); if (sTd) { try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } } }).catch(() => {}).finally(() => { HM.p = null; });
   }
   /** 휴대폰 기사스케줄 화면의 모드: 'my' 내 스케줄 · 'today' 오늘(PDD 한눈에) · '' 관리용 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   function schMode(m) {
@@ -10038,7 +10046,7 @@
       const memos = (HM.memos || []).filter((m) => m.date === tdy && !m.note).sort((x, y) => (x.done ? 1 : 0) - (y.done ? 1 : 0)), left = memos.filter((m) => !m.done).length;
       const pk = PKM && PKM.cur && tdy >= (() => { const p = PKM.cur.from.split('-'); return ymdLocal(new Date(+p[0], +p[1] - 1, +p[2] - 3)); })() && tdy <= PKM.cur.to ? PKM.cur : null;
       const q = (v, ic, l) => '<button type="button" data-tdgo="' + v + '"><i>' + ic + '</i>' + l + '</button>';
-      box.innerHTML = '<div class="td-hi"><b>' + esc(who.name || '관리자') + ' 님</b><small>' + esc(mobMd(tdy)) + ' · 내일 배송(PDD) ' + esc(mobMd(pdd)) + '</small></div>' +
+      box.innerHTML = '<div class="td-hi"><b>' + esc(who.name || '관리자') + ' 님</b><small>' + esc(mobMd(tdy)) + ' · 내일 배송(PDD) ' + esc(mobMd(pdd)) + (sStale ? ' · <span style="color:var(--brand)">새로 받는 중…</span>' : '') + '</small></div>' +
         (pk ? '<button type="button" class="td-pk" data-tdgo="peak"><b>🔥 ' + +pk.period.slice(5, 7) + '월 피크데이 · ' + rpMd(pk.from) + ' ~ ' + rpMd(pk.to) + '</b>예상 물량 보기 ›</button>' : '') +
         '<div class="smb-card"><span class="td-pill">오늘 PDD · ' + esc(mobMd(pdd)) + '</span><p class="smb-hint" style="margin:6px 0 0">실제 출근일 ' + pv + ' 저녁 입차 · 휴무 ' + T.off + ' · 백업 ' + T.bk + (T.yc.length ? ' · 용차 ' + T.yc.length : '') + '</p>' +
         '<div class="td-grid">' + tile('r', T.mi.length, '미입차 노선') + tile('y', chk.length, '확인 필요') + '<div class="g"><b>' + T.work + '</b>출근</div>' + tile('n', T.pm.length, '품앗이') + '</div></div>' +
