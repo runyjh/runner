@@ -10175,7 +10175,8 @@
     const head = '<h3 class="ce-h">' + esc(d.name) + ' · ' + esc(ceMd(c.dt)) + '</h3>' +
       '<div class="ce-s"><span>' + (rt ? esc(ceCampName(pk.campId)) + ' <b>' + esc(groupRoutes(ceCodes())) + '</b> · ' + esc((pk.rots.length && !Object.keys(pk.per || {}).length ? rots.filter((x) => pk.rots.includes(x)) : rots).join(' ')) + (Object.keys(pk.per || {}).length ? ' (글자마다 다름)' : '') : '담당 노선 없음') + '</span>' +
       '<button type="button" class="ce-lk" data-cetog>노선 바꾸기 ' + (c.open ? '▾' : '▸') + '</button></div>';
-    const pkBox = c.open ? '<div class="ce-pk"><select class="inp" data-cecamp>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((x) => '<option value="' + esc(x.id) + '"' + (x.id === pk.campId ? ' selected' : '') + '>' + esc(x.name) + (x.id === myCamp ? ' (소속)' : '') + '</option>').join('') + '</select>' +
+    const realCamp = (x) => !/^운영자/.test(String(x.name).replace(/\s/g, '')); // '운영자'는 직원 소속 구분일 뿐 노선이 있는 캠프가 아니다 → 고르는 목록에서 뺌
+    const pkBox = c.open ? '<div class="ce-pk"><select class="inp" data-cecamp>' + (SD.camps.some((x) => x.id === pk.campId && realCamp(x)) ? '' : '<option value="">캠프를 고르세요</option>') + SD.camps.filter(realCamp).sort((a, b) => koSort(a.name, b.name)).map((x) => '<option value="' + esc(x.id) + '"' + (x.id === pk.campId ? ' selected' : '') + '>' + esc(x.name) + (x.id === myCamp ? ' (소속)' : '') + '</option>').join('') + '</select>' +
       unitPickerHtml('ce', pk.campId ? ceRoutes() : [], pk.units, '', '').replace(/<div class="rchips">[\s\S]*?<\/div>/, '') + (pk.units.length ? rotGridHtml('ce', pk, rots) : '') +
       '<div class="ce-x">그 밖에 <button type="button" class="ce-c' + (c.st === '노선변경' ? ' on' : '') + '" data-cest="노선변경">노선변경</button><button type="button" class="ce-c' + (c.st === '라우트변경' ? ' on' : '') + '" data-cest="라우트변경">라우트변경</button></div></div>' : '';
     const grp = ceGrp(c.st), gSub = (CE_GRP.find((x) => x[0] === grp) || [0, []])[1];
