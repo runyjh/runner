@@ -1147,6 +1147,7 @@
   .ce-alt { display: flex; gap: 10px; align-items: center; } .ce-alt select { flex: 1; min-width: 0; height: 40px; }
   .ce-alt label { font-size: 13px; font-weight: 700; color: #14532d; white-space: nowrap; display: flex; align-items: center; gap: 5px; cursor: pointer; }
   .ce-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .sg td.c .cv-ins { display: block; font-style: normal; font-size: 10px; font-weight: 600; line-height: 1.3; color: #92400e; background: #fff7e6; border-radius: 4px; margin: 2px 2px 1px; padding: 1px 3px; text-align: left; white-space: normal; overflow-wrap: anywhere; word-break: keep-all; }
   .sg td.c .cv-yv { display: block; font-style: normal; font-size: 10px; font-weight: 700; line-height: 1.25; opacity: .85; } .sg td.c .cv-yv.id { font-weight: 600; opacity: .7; }
   .ce-g5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; } .ce-g5 .ce-c { padding: 11px 2px; font-size: 14px; white-space: nowrap; }
   .ce-g2 { margin-top: 6px; } .ce-c.sm { padding: 6px 9px; font-size: 12.5px; }
@@ -8233,6 +8234,8 @@
     return { vendor: rest.replace(/\s+/g, ' ').trim(), id: id, charge: charge };
   }
   const yongText = (y) => '용차' + (y.vendor ? ' ' + y.vendor : '') + (y.vendor && y.id ? ' (' + y.id + ')' : '') + (y.vendor && !y.charge ? ' (청구없음)' : '');
+  /** 칸 아래 메모 (지시사항 · 일정 메모): 본인이 기사 앱에서 확인하는 글 — 칸 상태(출근·휴무 …)는 규칙대로 두고 메모는 따로 보여 준다 */
+  const insHtml = (ins) => (ins && ins.reason ? '<i class="cv-ins">📌 ' + esc(ins.reason) + '</i>' : '');
   function cellHtml(v, row) {
     const s = String(v || '').trim();
     if (!s) return '';
@@ -8732,7 +8735,7 @@
     if (cellBad(v, r, dt)) cls.push('bad');
     if (iss.length || dt < pddDate()) { /* 표시 안 함 */ } else if (mis) cls.push('mis'); else if (nov && !pm) cls.push('nov'); // 품앗이로 맡긴 칸은 '배정 안 됨' 아님
     const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
-    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pmLabel(r, dt, pm)) + '"' : '') + '>' + cellHtml(v, r.row) + '</td>';
+    return '<td class="' + cls.join(' ') + '" data-r="' + ri + '" data-c="' + ci + '"' + (pm ? ' data-pm="' + esc(pmLabel(r, dt, pm)) + '"' : '') + '>' + cellHtml(v, r.row) + insHtml(ins) + '</td>';
   }
   /** 품앗이 배차 확정 표시: 일을 준 기사 칸 '▶ 받은 기사' · 받은 기사 칸 '◀ 준 기사' (서버 pmAdminMarks_) */
   /** 품앗이 칸에 보일 글자: 맡긴 기사 칸 = '🤝 받은기사 / 품앗이 맡김' · 받은 기사 칸 = '🤝 맡긴기사 / 품앗이 받음' (일감이 여러 개면 줄마다 · 노선은 마우스를 올리면 보임) */
@@ -9053,7 +9056,8 @@
       const want = ['c', cellKindRow(v, r.row), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', pm && !v ? 'pmgive' : '', pm && PM_ONLY.test(v) ? 'pmonly' : '', r.kind === 'p' && pmLockOf(r.row, dt) ? 'pmlk' : '', iss.length || dt < pdd ? '' : mis ? 'mis' : nov && !pm ? 'nov' : '', cellBad(v, r, dt) ? 'bad' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
-      if (td.__v !== v || td.__vr !== r.row) { td.innerHTML = cellHtml(v, r.row); td.__v = v; td.__vr = r.row; }
+      const vk = v + '\u0001' + (ins ? ins.reason : '');
+      if (td.__v !== vk || td.__vr !== r.row) { td.innerHTML = cellHtml(v, r.row) + insHtml(ins); td.__v = vk; td.__vr = r.row; }
       const tip = [cellTipRaw(v), ins ? '📌 ' + ins.reason : '', issTip(iss), pm && !pmTipList(r, dt).length ? '품앗이 ' + pm : '', mis ? '⚠ 미배정 노선: ' + mis.join(', ') + ' (그날 아무도 안 뜀)' : nov ? '배정 안 됨 (출근·휴무 등을 입력해 주세요)' : ''].filter(Boolean).join('\n');
       td.removeAttribute('title'); void tip;
       if (pm) td.setAttribute('data-pm', pmLabel(r, dt, pm)); else td.removeAttribute('data-pm');
@@ -9521,7 +9525,7 @@
   function cePaint() {
     const c = CE; if (!c) return;
     if (c.mode === 'multi') return cePaintMulti();
-    const insRow = '<div class="ce-ln"><span>📌 지시사항</span><div><textarea id="ceIns" maxlength="200" placeholder="예: 7시까지 상차지 도착, 하이탑 차량">' + esc(c.ins) + '</textarea></div></div>';
+    const insRow = '<div class="ce-ln"><span>📌 ' + (c.r && c.r.staff ? '일정 메모' : '지시사항') + '</span><div><textarea id="ceIns" maxlength="200" placeholder="' + (c.r && c.r.staff ? '예: 쿠팡이츠 간담회 13:00 (신분증)' : '예: 7시까지 상차지 도착, 하이탑 차량') + '">' + esc(c.ins) + '</textarea></div></div>';
     if (c.mode === 'pm') {
       $('#ceBody').innerHTML = '<h3 class="ce-h">🤝 품앗이 · ' + esc(c.d.name) + ' · ' + esc(ceMd(c.dt)) + '</h3><div class="ce-s">이 칸은 품앗이가 걸려 있어 품앗이 내용만 보여 줍니다.</div>' +
         c.jobs.map((t) => '<div class="ce-job"><div class="ce-kv"><span>맡긴 기사</span><b>' + esc(t.from || '-') + '</b></div><div class="ce-kv"><span>받은 기사</span><b>' + esc(t.to || '-') + '</b></div>' +
