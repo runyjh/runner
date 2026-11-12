@@ -10061,7 +10061,9 @@
     }
     if (!sMobDay || !dates.includes(sMobDay)) sMobDay = dates.includes(pdd) ? pdd : dates[0];
     const [yy, mo] = dates[0].split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
-    const camps = SD.camps.slice().sort((a, b) => koSort(a.name, b.name));
+    // 캠프 목록: 운영자 전용 가짜 캠프(노선 없음)는 빼고, 직함자 줄이 있으면 맨 끝에 '관리자·운영자·대표' 묶음으로
+    const camps = SD.camps.filter((c) => !/^운영자/.test(String(c.name || '').replace(/\s+/g, ''))).sort((a, b) => koSort(a.name, b.name));
+    if (SD.drivers.some((d) => isStaffRow(d) && !d.ex && d.status === '승인') || sf.camp === '__staff') camps.push({ id: '__staff', name: STAFF_GROUP });
     const top = '<div class="smb-top"><div class="seg" id="smbMode"><button type="button" data-smb="drv"' + (sMob === 'drv' ? ' class="on"' : '') + '>한 달</button><button type="button" data-smb="camp"' + (sMob === 'camp' ? ' class="on"' : '') + '>캠프</button></div>' +
       '<div class="smb-more"><button type="button" class="btn ghost" id="smbMore">⋯</button><div class="smore-box hidden" id="smbMoreBox"><button type="button" class="btn ghost" data-smbgo="table">표로 보기</button><button type="button" class="btn ghost" data-smbgo="reload">새로고침</button></div></div></div>';
     const nav = (ttl) => '<div class="smb-nav"><button type="button" data-smbmv="-1" aria-label="이전 달">◀</button><span>' + yy + '년 ' + mo + '월 · ' + esc(ttl) + '</span><button type="button" data-smbmv="1" aria-label="다음 달">▶</button></div>';
@@ -10076,7 +10078,7 @@
     if (sMob === 'camp') {
       if (!sf.camp || !camps.some((c) => c.id === sf.camp)) { sf.camp = camps.length ? camps[0].id : ''; $('#sCamp').value = sf.camp; return renderSched(); }
       const C = camps.find((c) => c.id === sf.camp), cs = shortCamp(C.name);
-      const rows = srows.filter((r) => r.kind === 'd' && !r.staff && shortCamp(r.camp) === cs);
+      const rows = sf.camp === '__staff' ? srows.filter((r) => r.kind === 'd' && r.staff) : srows.filter((r) => r.kind === 'd' && !r.staff && shortCamp(r.camp) === cs);
       const miOf = (i) => (SCHK ? SCHK.mi.filter((x) => x.i === i && String(x.t).split(' ')[0] === cs) : []);
       const bkOf = (i) => (scalc && scalc.roster[cs] ? scalc.roster[cs][i] || [] : []);
       const wkOf = (dt) => rows.filter((r) => (!r.seg || segIn(r.seg, dt)) && (isWorkDayCell(sget(r.row, dt)) || !!cellNorm(sget(r.row, dt), r.row, dt) || (pmMark(r.row, dt) && /받음|◀/.test(pmLabel(r, dt, pmMark(r.row, dt)))))).length;
@@ -10089,8 +10091,8 @@
         list.map((r) => { const c = mobCell(r, d), base = r.d.baseRoute && /^\d/.test(r.d.baseRoute) ? groupRoutes(baseCodes(r.d)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
           const own = shortCamp(r.camp || '');
           const rt = c.kind === 'k-work' || c.kind === 'k-other' ? (c.top === '출근' ? base : c.top.indexOf(own + ' ') === 0 ? c.top.slice(own.length + 1) : c.top) : base;
-          return '<button type="button" class="smb-row' + (/미입차|노쇼/.test(c.top) ? ' warn' : '') + '" data-smbrow="' + esc(r.key || r.row) + '"><span class="l"><b class="rt' + (rt ? '' : ' none') + '">' + esc(rt || '—') + '</b><span class="nm">' + esc(r.d.name) + (r.d.type ? '<small>' + esc(r.d.type) + '</small>' : '') + (r.d.ex ? '<small>추가</small>' : '') + '</span></span>' +
-            '<span class="r"><span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-other' || c.kind === 'k-work' ? '출근' : c.top) + '</span>' + (c.kind === 'k-other' ? '<small>담당 아닌 노선</small>' : '') +
+          return '<button type="button" class="smb-row' + (/미입차|노쇼/.test(c.top) ? ' warn' : '') + '" data-smbrow="' + esc(r.key || r.row) + '"><span class="l"><b class="rt' + (rt ? '' : ' none') + '">' + esc(rt || '—') + '</b><span class="nm">' + esc(r.d.name) + (r.staff && r.d.title ? '<small>' + esc(r.d.title) + '</small>' : r.d.type ? '<small>' + esc(r.d.type) + '</small>' : '') + (r.d.ex ? '<small>추가</small>' : '') + '</span></span>' +
+            '<span class="r"><span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-other' || c.kind === 'k-work' ? '출근' : c.top) + '</span>' + (c.kind === 'k-other' && !r.staff ? '<small>담당 아닌 노선</small>' : '') +
             (c.sub ? '<small style="color:#15803d;font-weight:700">' + esc(c.sub) + '</small>' : '') + (iss ? '<small>' + esc(iss.kind + (iss.sub ? ' · ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</small>' : '') + (ins ? '<small>📌 ' + esc(ins.reason) + '</small>' : '') + '</span></button>'; }).join('') +
         UN.map((code) => { const c = unCover(sf.camp, code, d); return '<button type="button" class="smb-row' + (c.miss.length ? ' warn' : '') + '" data-smbun="' + esc(code) + '"><span class="l"><b class="rt">' + esc(code) + '</b><span class="nm">담당 없음</span></span><span class="r"><span class="smb-pill ' + (c.miss.length ? 'k-mi' : 'k-work') + '">' + (c.miss.length ? '미입차' : esc(c.who.map((w) => w.name).join(', '))) + '</span><small>눌러서 기사 배정</small></span></button>'; }).join('') +
         (list.length || UN.length ? '' : '<p class="smb-hint">이 캠프 기사가 없습니다.</p>') +
