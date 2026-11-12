@@ -36,7 +36,7 @@ const STL_TABS = {
   stl_vendors: {
     name: '업체명', price: '건당 단가', ins: '산재·고용 공제', bizNo: '사업자번호', ceo: '대표자', phone: '연락처', addr: '사업장 주소', bizType: '업태', bizItem: '종목',
     bank: '은행', account: '계좌번호', holder: '예금주', email: '이메일', status: '상태', memo: '메모', ids: '쿠팡 아이디',
-    routes: '맡은 노선', rFrom: '노선 시작일', rTo: '노선 종료일'
+    routes: '맡은 노선', rFrom: '노선 시작일', rTo: '노선 종료일', perf: '수행률 보존'
   },
   // 한 아이디로 여러 기사가 일할 때: 그 기간 그 아이디로 일한 기사 (지급은 명의자, 일시단가·근무일 판단에 씀)
   stl_usage: { cid: '쿠팡ID', name: '일한 기사', driverId: '기사ID', from: '시작일', to: '종료일', memo: '메모', settle: '정산' },
@@ -1102,7 +1102,8 @@ function stlVendors_() {
       bank: str_(r.bank), account: str_(r.account), holder: str_(r.holder), email: str_(r.email), addr: str_(r.addr), bizType: str_(r.bizType), bizItem: str_(r.bizItem), stopped: r.status === '정지' || r.status === '중지',
       ids: str_(r.ids).split(/[,\s]+/).map(function (x) { return x.trim(); }).filter(Boolean), _row: r._row,
       // 맡은 노선 (장기 용차): '인천7 919CD, 시흥2 708CD' · 기간 안에 그 노선을 배송한 모르는 아이디는 이 업체 정산으로 · 기사스케줄 담당 없음 줄 '업체 용차' · 쿠팡 업로드는 미입차
-      routes: stlVendorRoutes_(r.routes), rFrom: stlYmd_(r.rFrom) || '', rTo: stlYmd_(r.rTo) || ''
+      routes: stlVendorRoutes_(r.routes), rFrom: stlYmd_(r.rFrom) || '', rTo: stlYmd_(r.rTo) || '',
+      perf: !/^n/i.test(str_(r.perf)) // 수행률 보존: 업체 아이디로 뛰어도 우리 수행률이 유지되는 업체 (빈칸 = Y) · N 이면 러너 아이디로 뛴 날만 유지
     };
     by[k] = v; list.push(v);
   });
@@ -3404,7 +3405,8 @@ const STL_EDIT = {
     ['type', '단가코드', [''].concat(STL_TYPES)], ['mode', '정산 방식 (빈칸=단가코드별 노선 단가)', STL_MODES], ['insEx', '산재·고용 제외', ['', 'Y']], ['fbCut', '프레시백 차감 (13% 또는 금액)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text']] },
   vendors: { sheet: 'stl_vendors', scope: 'all', cols: [['name', '업체명', 'text'], ['ids', '쿠팡 아이디 (쉼표로 여러 개)', 'text'], ['price', '지급 단가 (러너 → 업체 · VAT포함 · 비우면 외부용차단가)', 'money'], ['ins', '산재·고용 공제', ['Y', 'N']], ['bizNo', '사업자번호', 'text'], ['ceo', '대표자', 'text'], ['phone', '연락처', 'text'], ['addr', '사업장 주소', 'text'], ['bizType', '업태', 'text'], ['bizItem', '종목', 'text'],
     ['bank', '은행', 'text'], ['account', '계좌번호', 'text'], ['holder', '예금주', 'text'], ['email', '이메일 (계산서)', 'text'], ['status', '상태', STL_ID_STATUS], ['memo', '메모', 'text'],
-    ['routes', '맡은 노선 (예: 인천7 919CD · 기간 안 모르는 아이디 자동 묶음 · 스케줄 업체 용차 · 쿠팡 업로드 미입차)', 'text'], ['rFrom', '노선 시작일', 'date'], ['rTo', '노선 종료일 (비우면 계속)', 'date']] },
+    ['routes', '맡은 노선 (예: 인천7 919CD · 기간 안 모르는 아이디 자동 묶음 · 스케줄 업체 용차 · 쿠팡 업로드 미입차)', 'text'], ['rFrom', '노선 시작일', 'date'], ['rTo', '노선 종료일 (비우면 계속)', 'date'],
+    ['perf', '수행률 보존 (Y = 업체 아이디로 뛰어도 우리 수행률 유지 · N = 러너 아이디로 뛴 날만 유지 · 빈칸 = Y)', ['', 'Y', 'N']]] },
   usage: { sheet: 'stl_usage', scope: 'all', cols: [['cid', '쿠팡ID', 'cid'], ['name', '일한 기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일 (비우면 계속)', 'date'], ['memo', '메모', 'text'], ['settle', '정산 (비우면 일한 기사 본인 정산 · 명의자 = 서브 인원)', ['', '명의자']]] },
   tmp: { sheet: 'stl_tmp', scope: 'all', cols: [['name', '기사', 'person', 'driverId'], ['from', '시작일', 'date'], ['to', '종료일', 'date'], ['price', '일시단가 (VAT포함)', 'money'], ['routes', '적용 노선 (비우면 전체)', 'text'], ['memo', '메모', 'text']] },
   adjust: { sheet: 'stl_adjust', scope: 'month', cols: [['name', '명의자 (정산 아이디)', 'acct', 'acct'], ['item', '항목', 'item'], ['amt', '금액', 'money'], ['memo', '정산서 메모 (기사 정산서에 보임)', 'text'], ['note', '관리자 메모 (정산서에 안 보임)', 'text']] },

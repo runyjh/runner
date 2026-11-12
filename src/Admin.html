@@ -1148,8 +1148,12 @@
   .mi-d { color: #cbd5e1; font-style: normal; } .mi-g { color: #94a3b8; }
   .mi-n { display: inline-block; min-width: 24px; border-radius: 999px; background: #e5484d; color: #fff; padding: 1px 7px; }
   .schk .chip em.pst.soft, .sg .camppast.soft { color: #475569; background: #eef1f5; }
-  .mi-kp3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
+  .mi-kp3 { display: grid; grid-template-columns: 1.15fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 6px; }
   .mi-k3 { border-radius: 12px; padding: 10px 13px; border: 1px solid #edf0f3; } .mi-k3 h4 { margin: 0; font-size: 13.5px; } .mi-k3 b { display: block; font-size: 22px; line-height: 1.3; } .mi-k3 p { margin: 2px 0 0; font-size: 11.5px; color: #4e5968; line-height: 1.5; }
+  .mi-k3.t { background: #191f28; border-color: #191f28; color: #fff; } .mi-k3.t p { color: #cbd5e1; }
+  .mi-tg.vd { background: #f3f0ff; color: #5f3dc4; }
+  .subg2 { display: inline-flex; gap: 5px; align-items: center; margin-left: 4px; padding-left: 9px; border-left: 2px solid #e5e8eb; }
+  .is-chips button small, .ce-c.sm small { display: block; font-size: 10.5px; font-weight: 500; opacity: .8; }
   .mi-k3.a { background: #fff5f5; border-color: #f5c2c2; } .mi-k3.a b { color: #e5484d; } .mi-k3.b { background: #fff8eb; border-color: #f5d38a; } .mi-k3.b b { color: #b45309; } .mi-k3.c { background: #f3f5f8; } .mi-k3.c b { color: #475569; }
   .mi-sec { display: flex; align-items: center; gap: 8px; margin: 14px 0 5px; flex-wrap: wrap; } .mi-sec i { font-style: normal; font-size: 12px; font-weight: 800; color: #fff; border-radius: 999px; padding: 1px 10px; } .mi-sec small { color: var(--sub); }
   .mi-sec i.a { background: #e5484d; } .mi-sec i.b { background: #f59e0b; } .mi-sec i.c { background: #94a3b8; }
@@ -2192,7 +2196,7 @@
       <div class="is-qty"><label for="isMQty">뺀 수량 (선택)</label><input class="inp" id="isMQty" placeholder="예: 80개" maxlength="20"></div></div>
     <div class="field"><span class="lb" id="isMReasonLb">3. 사유 — 왜 그랬나</span><div class="is-chips" id="isMKind"></div>
       <textarea class="inp" id="isMReason" style="height:54px;margin-top:8px" maxlength="200" placeholder="상세 사유 (예: 몸살 호소, 허리 통증으로 병원)"></textarea></div>
-    <div class="field"><span class="lb">4. 대체 — 뺀 물량은 누가 <span class="sub">(업체백업 = 우리 백업 기사 투입 · 품앗이 = 우리 기사끼리 일 주고받기)</span></span><div class="is-chips" id="isMSub"></div>
+    <div class="field"><span class="lb">4. 이 노선은 누가 뛰었나 <span class="sub">(우리 기사 · 용차업체가 뛰면 수행률 유지 · 대체 없음 = 쿠친 · 캠프 반납 · 빈 채로 → 수행률 영향)</span></span><div class="is-chips" id="isMSub"></div>
       <select class="inp hidden" id="isMSubWho" style="margin-top:8px"></select></div>
     <div class="field"><label class="lb" for="isMAction">조치 · 메모</label><textarea class="inp" id="isMAction" style="height:44px" maxlength="200" placeholder="예: 기사에게 주의 · 캠프에 연락함"></textarea></div>
     <div class="is-prev" id="isMCell"></div>
@@ -4870,7 +4874,7 @@
     const reasons = IS.reasons.concat(ISM.kind && !IS.reasons.includes(ISM.kind) ? [ISM.kind] : []);
     $('#isMKind').innerHTML = reasons.map((k) => '<button type="button" data-k="' + esc(k) + '" class="' + (ISM.kind === k ? 'on' : '') + '">' + esc(k) + '</button>').join('');
     $('#isMReasonLb').textContent = '3. 사유 — 왜 그랬나' + (ISM.res === '노쇼' ? ' (노쇼는 선택)' : '');
-    $('#isMSub').innerHTML = IS.subs.map((k) => '<button type="button" data-sub="' + esc(k) + '" class="' + (ISM.sub === k ? 'on' : '') + '">' + esc(k === '품앗이' ? '품앗이 (우리 인원)' : k === '업체백업' ? '업체백업 (우리 백업 기사)' : k) + '</button>').join('');
+    $('#isMSub').innerHTML = subBtns(ISM.sub, 'sub', '');
     $('#isMSubWho').classList.toggle('hidden', !IS_OURS(ISM.sub));
     $('#isMBase').textContent = d ? '기본노선: ' + (d.baseRoute || '없음') + (d.camp ? ' · ' + shortCampSafe(d.camp) : '') + (isSrcRoute(d) !== (d.baseRoute || '') ? ' · 이날 칸: ' + isSrcRoute(d) : '') : '';
     const a = $('#isMDate').value, b = $('#isMEnd').value || a;
@@ -5049,7 +5053,7 @@
   }
   function iqPaint() {
     $('#iqKind').innerHTML = IS.reasons.map((k) => '<button type="button" data-k="' + esc(k) + '" class="' + (IQ.kind === k ? 'on' : '') + '">' + esc(k) + '</button>').join('');
-    $('#iqSub2').innerHTML = IS.subs.map((k) => '<button type="button" data-sub="' + esc(k) + '" class="' + (IQ.sub === k ? 'on' : '') + '">' + esc(k) + '</button>').join('');
+    $('#iqSub2').innerHTML = subBtns(IQ.sub, 'sub', '');
     $('#iqSubWho').classList.toggle('hidden', !IS_OURS(IQ.sub));
     if (IS_OURS(IQ.sub) && !$('#iqSubWho').options.length) $('#iqSubWho').innerHTML = '<option value="">대신 뛴 우리 기사 (선택)</option>' + IS.drivers.filter((d) => !IQ.cur || d.id !== IQ.cur.driverId).map((d) => '<option>' + esc(d.name) + '</option>').join('');
   }
@@ -9053,6 +9057,16 @@
     document.addEventListener('keydown', hide);
   })();
   /** 칸의 지시사항 (스케줄 이슈 중 구분 '지시') */
+  // ── 대체 방법은 세 가지로: 우리 기사(업체백업 · 품앗이) / 용차업체(외부용차) / 대체 없음(쿠친 · 캠프 반납 · 없음 — 우리 수행률에서는 같은 것) · 저장 값은 예전 낱말 그대로 ──
+  const SUBG = [['our', '우리 기사', '백업 · 품앗이'], ['vend', '용차업체', '외부용차'], ['none', '대체 없음', '쿠친 · 캠프 반납 · 빈 채로']];
+  const subG = (v) => (v === '업체백업' || v === '품앗이' ? 'our' : v === '외부용차' ? 'vend' : v ? 'none' : '');
+  const subPick = (cur, g) => (g === 'our' ? (subG(cur) === 'our' ? cur : '업체백업') : g === 'vend' ? '외부용차' : (subG(cur) === 'none' ? cur : '없음'));
+  /** 묶음 버튼 (+ 우리 기사일 때 업체백업 / 품앗이 고르기) — attr = 값을 담는 data 속성 이름 (누르면 예전처럼 그 값으로 켜고 끔) */
+  function subBtns(cur, attr, cls) {
+    return SUBG.map((g) => '<button type="button" class="' + cls + (subG(cur) === g[0] ? ' on' : '') + '" data-' + attr + '="' + esc(subPick(cur, g[0])) + '">' + g[1] + '<small>' + g[2] + '</small></button>').join('') +
+      (subG(cur) === 'our' ? '<span class="subg2">' + [['업체백업', '우리 백업 기사'], ['품앗이', '우리 기사끼리']].map((x) => '<button type="button" class="' + cls + ' s2' + (cur === x[0] ? ' on' : '') + '" data-' + attr + '="' + x[0] + '">' + x[0] + '<small>' + x[1] + '</small></button>').join('') + '</span>' : '') +
+      (subG(cur) === 'none' && cur !== '없음' ? '<span class="subg2 mi-g">기록: ' + esc(cur) + '</span>' : '');
+  }
   /** 이슈 관리의 이슈 (지시 제외) */
   function issOf(row, dt) { return (SD.issues || []).filter((x) => x.driverId === row && x.kind !== '지시' && x.date <= dt && dt <= (x.end || x.date)); }
   function issTip(list) { return list.map((x) => '🚩 ' + (x.result ? x.result + (x.cut ? '(' + x.cut + ' 뺌)' : '') + ' · ' : '') + x.kind + (x.sub ? ' · 대체 ' + x.sub + (x.subWho ? ' ' + x.subWho : '') : '') + (x.mi ? ' · 미입차' + (x.miDays > 1 ? ' ' + x.miDays + '일 (' + Number(x.date.slice(5, 7)) + '/' + Number(x.date.slice(8)) + '~' + Number(x.end.slice(5, 7)) + '/' + Number(x.end.slice(8)) + ')' : '') : '') + (x.reason ? ' · ' + x.reason : '')).join('\n'); }
@@ -9065,13 +9079,13 @@
     const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f2 lab" title="' + sub + '"><i class="rlab">' + lab + '</i>' + sub.replace(' (자동)', '') + '</td><td class="fx f3 lab"></td><td class="fx f4 lab"></td>' +
       vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + (dates[i] === pdd ? ' today' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>';
     // 담당 없음 노선(기본노선 주인 없음)도 그날 아무도 안 뛴 물량은 미입차로 · 용차업체가 맡은 노선은 미입차 아님 → 보라색 안내 줄
-    const UN = unassignedRoutes(), unMi = dates.map(() => []), unMiM = dates.map(() => []), unVd = dates.map(() => []);
+    const UN = unassignedRoutes(), unMi = dates.map(() => []), unMiM = dates.map(() => []), unVd = dates.map(() => []), unVdM = dates.map(() => []);
     Object.keys(UN).forEach((cid) => UN[cid].forEach((code) => dates.forEach((dt, i) => {
       const c = unCover(cid, code, dt); if (!c.miss.length || !campOk(c.camp)) return;
       const us = Array.from(new Set(c.miss.map((x) => x.split('|')[0]))), rs = Array.from(new Set(c.miss.map((x) => x.split('|')[1])));
       const txt = c.camp + ' ' + groupRoutes(us.sort().join(',')) + (rs.length < c.rots.length ? '(' + c.rots.filter((r) => rs.includes(r)).join(',') + ')' : '');
       const vd = unVendor(c.camp, us, dt);
-      if (vd) unVd[i].push(txt + ' · ' + vd); else { unMi[i].push(txt); unMiM[i].push({ cid: cid, code: code }); }
+      if (vd) { unVd[i].push(txt + ' · ' + vd); unVdM[i].push({ camp: c.camp, units: us, vendor: vd, cid: cid, code: code }); } else { unMi[i].push(txt); unMiM[i].push({ cid: cid, code: code }); }
     })));
     // 같은 캠프·같은 회전 줄은 하나로 (강서1 527B,529A + 강서1 530A → 강서1 527B,529A,530A)
     const unMerge = (arr) => { const m = new Map(); arr.forEach((x) => { const mm = String(x).match(/^(\S+)\s+([0-9A-Z,]+)(\(.*\))?$/); if (!mm) { m.set(x, null); return; } const k = mm[1] + '|' + (mm[3] || ''); if (!m.has(k)) m.set(k, { c: mm[1], r: [], t: mm[3] || '' }); mm[2].split(',').forEach((u) => { if (!m.get(k).r.includes(u)) m.get(k).r.push(u); }); });
@@ -9168,14 +9182,28 @@
         });
       };
       dates.forEach((dt, i) => { if (dt >= pdd) return; scalc.missing[i].filter((x) => campOk(x.split(' ')[0])).forEach((x) => put(i, x, false)); unMi[i].forEach((x, j) => put(i, x, true, unMiM[i][j])); });
+      // 용차업체가 뛴 날: 노선은 배송됐지만, '수행률 보존'이 N 인 업체가 업체 아이디로 뛴 날은 우리 수행률에 잡힌다 → 미입차 쪽에 [용차] 꼬리표로
+      const vNoPerf = (name) => { const v = (SD.vendors || []).find((x) => x.name === name); return !!v && v.perf === false ? v : null; };
+      const addV = (camp, unit, i, cz) => { const k = camp + '|' + unit; if (!byUnit.has(k)) byUnit.set(k, { camp: camp, unit: unit, cells: {} }); const c = byUnit.get(k).cells; if (!c[i]) c[i] = Object.assign({ rot: '', meta: null }, cz); };
+      dates.forEach((dt, i) => {
+        if (dt >= pdd) return;
+        drvRows.forEach((r) => {
+          if ((r.seg && !segIn(r.seg, dt)) || drvGone(r.d, dt) || !campOk(shortCamp(r.camp))) return;
+          const yg = yongParse(String(sget(r.row, dt) || '')); if (!yg || !yg.vendor) return;
+          const v = vNoPerf(yg.vendor); if (!v) return;
+          if (yg.id && !(v.ids || []).some((x) => String(x).replace(/@.*/, '').toLowerCase() === yg.id.toLowerCase())) return; // 러너 아이디로 뛴 날은 수행률 유지
+          baseU.get(r).forEach((u) => addV(shortCamp(r.camp), u, i, { kind: 'vend', why: yg.vendor + ' 용차', names: [r.d.name], row: r.key || r.row, cause: '용차 ' + yg.vendor + ' 가 ' + r.d.name + ' 노선 수행 — 수행률 보존 안 되는 업체 (업체 아이디)' }));
+        });
+        unVdM[i].forEach((x) => { if (vNoPerf(x.vendor)) x.units.forEach((u) => addV(x.camp, u, i, { kind: 'vend', why: x.vendor + ' 용차', names: ['담당 없음'], row: '', un: true, cause: '용차 ' + x.vendor + ' 수행 (담당 없는 노선) — 수행률 보존 안 되는 업체' })); });
+      });
       // 같은 날 · 같은 사유로 빈 노선 글자는 한 칸으로 (404A·404B·404C → 404ABC) — 한 기사가 하루 빠진 것은 한 번
       const byDay = new Map();
       byUnit.forEach((u) => Object.keys(u.cells).map(Number).forEach((i) => { const c = u.cells[i], k = u.camp + '§' + i + '§' + c.rot + '§' + c.cause + (c.un ? '§' + u.unit.replace(/[A-Za-z]+$/, '') : ''); if (!byDay.has(k)) byDay.set(k, { camp: u.camp, i: i, c: c, units: [] }); byDay.get(k).units.push(u.unit); }));
       byDay.forEach((g) => { const lb = groupRoutes(g.units.sort().join(',')), c = g.c; K.mip.push({ i: g.i, camp: g.camp, key: g.camp + '|' + lb, label: lb, row: c.row, names: c.names, why: c.why, cause: c.cause, un: !!c.un, full: !c.rot, rot: c.rot, list: [lb + (c.rot ? ' ' + c.rot : '')],
-        cat: c.rot ? 'B' : c.kind === 'iss' || c.kind === 'route' ? 'A' : c.kind === 'none' ? 'X' : 'C', kind: c.kind, drv: c.drv || '', meta: c.meta, units: g.units.slice() }); });
+        cat: c.rot ? 'B' : c.kind === 'iss' || c.kind === 'route' || c.kind === 'vend' ? 'A' : c.kind === 'none' ? 'X' : 'C', kind: c.kind, drv: c.drv || '', meta: c.meta, units: g.units.slice() }); });
     })();
     // 캠프 머리줄: 지난 미입차 칸 수
-    $$('#sGrid tr.cgrp em.camppast').forEach((em) => { const n = K.mip.filter((x) => x.camp === em.dataset.cp && x.cat !== 'X').length; const nA = K.mip.filter((x) => x.camp === em.dataset.cp && x.cat === 'A').length, nC = n - nA; em.textContent = n ? (nA ? '지난 미입차 ' + nA : '') + (nA && nC ? ' · ' : '') + (nC ? '확인 ' + nC : '') : ''; em.classList.toggle('hidden', !n); em.classList.toggle('soft', !nA); });
+    $$('#sGrid tr.cgrp em.camppast').forEach((em) => { const n = K.mip.filter((x) => x.camp === em.dataset.cp && x.cat !== 'X').length; const nA = K.mip.filter((x) => x.camp === em.dataset.cp && (x.cat === 'A' || x.cat === 'B')).length, nC = n - nA; em.textContent = n ? (nA ? '수행률 영향 ' + nA : '') + (nA && nC ? ' · ' : '') + (nC ? '확인 ' + nC : '') : ''; em.classList.toggle('hidden', !n); em.classList.toggle('soft', !nA); });
     SCHK = K; paintChk(); paintDupNo(); paintNoteFold();
   }
   // ───── 같은 근무자 연결 (한 사람이 두 명의 아이디를 날짜를 나눠 씀 · 정산서는 명의별로 따로) ─────
@@ -9260,7 +9288,7 @@
     const md = (i) => { const p = SD.dates[i].split('-'); return +p[1] + '/' + +p[2] + ' (' + DOW[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
     const bad = K.mi.length + K.du.length + K.nov.length;
     const pddI = SD.dates.indexOf(pddDate());
-    box.innerHTML = (pddI >= 0 ? '<button type="button" class="pddp" id="sPddGo" title="누르면 PDD 날짜 열로 이동">오늘 PDD · ' + md(pddI) + ' ▸</button>' : '<small>점검</small>') + CHK_DEF.map((d) => '<button type="button" class="chip ' + d[0] + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' zero') + (sChkOpen === d[0] ? ' on' : '') + '" data-chk="' + d[0] + '"' + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' disabled') + '>' + d[1] + ' <i>' + K[d[0]].length + '</i>' + (d[0] === 'mi' && K.mip.length ? '<em class="pst">지난 미입차 ' + K.mip.filter((x) => x.cat === 'A').length + '</em><em class="pst soft">확인 ' + K.mip.filter((x) => x.cat === 'B' || x.cat === 'C').length + '</em>' : '') + '</button>').join('') +
+    box.innerHTML = (pddI >= 0 ? '<button type="button" class="pddp" id="sPddGo" title="누르면 PDD 날짜 열로 이동">오늘 PDD · ' + md(pddI) + ' ▸</button>' : '<small>점검</small>') + CHK_DEF.map((d) => '<button type="button" class="chip ' + d[0] + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' zero') + (sChkOpen === d[0] ? ' on' : '') + '" data-chk="' + d[0] + '"' + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' disabled') + '>' + d[1] + ' <i>' + K[d[0]].length + '</i>' + (d[0] === 'mi' && K.mip.length ? '<em class="pst" title="지난 날짜의 미입차 + 물량조율 (수행률이 깎이는 날)">수행률 영향 ' + K.mip.filter((x) => x.cat === 'A' || x.cat === 'B').length + '</em><em class="pst soft" title="아직 확인하지 않은 날">확인 ' + K.mip.filter((x) => x.cat === 'C').length + '</em>' : '') + '</button>').join('') +
       (bad ? '' : '<span class="ok">✓ 내일부터 비는 노선 · 중복 · 확인할 칸 없음</span>') + wlHints().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.worker.name) + ' 칸에 ' + esc(h.owner.name) + ' 명의 아이디(' + esc(h.owner.loginId) + ')가 있습니다 — 한 사람이 두 아이디를 쓰는 경우 연결">🔗 ' + esc(h.worker.name) + ' ↔ ' + esc(h.owner.name) + ' 연결하기</button>').join('') +
       wlLeft().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.owner.name) + ' 명의 줄(숨김)에 출근으로 적힌 날이 ' + esc(h.worker.name) + ' 줄로 아직 옮겨지지 않았습니다 — 그 출근이 계산에서 빠져 미입차로 잡힙니다. 누르면 옮길 칸을 미리 봅니다">🔗 ' + esc(h.owner.name) + ' 명의 칸 ' + h.n + '일 옮기기</button>').join('') + '<button type="button" class="lg" id="sLgBtn">색 안내 ⓘ</button>' +
       '<div class="xpick"><button type="button" class="btn ghost sm" id="sColBtn" title="표 오른쪽에 보일 정보 칸 고르기">⚙ 오른쪽 칸</button><div class="smore-box' + (sColOpen ? '' : ' hidden') + '" id="sColBox"><div class="smore-h">오른쪽에 보일 칸</div>' +
@@ -9317,9 +9345,10 @@
     const wLab = (w) => weekOfMonth(dates[w.is[0]]) + '주차 ' + mdS(dates[w.is[0]]) + '~' + mdS(dates[w.is[w.is.length - 1]]);
     const wseg = '<div class="seg">' + '<button type="button" data-miwk="all" class="' + (sMiWk === 'all' ? 'on' : '') + '">기간 전체 <small>' + K.mip.filter((x) => x.cat !== 'X').length + '</small></button>' + wks.map((w) => '<button type="button" data-miwk="' + w.k + '" class="' + (sMiWk === w.k ? 'on' : '') + '">' + wLab(w) + ' <small>' + w.n + '</small></button>').join('') + '</div>';
     const cards = '<div class="mi-kp3">' +
-      '<div class="mi-k3 a"><h4>① 미입차 (확정)</h4><b>' + cnt.A + '건</b><p>기사가 미입차 · 노쇼 · 병가였거나, 확인해서 노선 미입차로 확정한 날 — <u>수행률로 볼 숫자</u></p></div>' +
-      '<div class="mi-k3 b"><h4>② 회전 일부 빔 (물량조율)</h4><b>' + cnt.B + '건</b><p>노선은 들어갔지만 D1 · D2 · F3 중 일부를 못 채운 날 — 미입차와 따로 셉니다</p></div>' +
-      '<div class="mi-k3 c"><h4>③ 자료 확인 필요</h4><b>' + cnt.C + '건</b><p>이슈는 없는데 표에 뛴 사람이 안 적힌 날 — 실제로 뛰었으면 고치고, 진짜 비었으면 [미입차로 확정]. 확인하면 여기서 사라집니다</p></div></div>';
+      '<div class="mi-k3 t"><h4>수행률 영향</h4><b>' + (cnt.A + cnt.B) + '건</b><p>= 미입차 ' + cnt.A + ' + 물량조율 ' + cnt.B + ' — 원인이 무엇이든 우리 업체 수행률이 깎이는 날</p></div>' +
+      '<div class="mi-k3 a"><h4>① 미입차 (확정)</h4><b>' + cnt.A + '건</b><p>노선 전체가 빈 날 — 기사 사유 · 노선 사유(확정) · 수행률 보존 안 되는 용차</p></div>' +
+      '<div class="mi-k3 b"><h4>② 물량조율 (회전 일부 빔)</h4><b>' + cnt.B + '건</b><p>노선은 들어갔지만 D1 · D2 · F3 중 일부를 못 채운 날</p></div>' +
+      '<div class="mi-k3 c"><h4>③ 확인 필요 (집계 전)</h4><b>' + cnt.C + '건</b><p>이슈는 없는데 표에 뛴 사람이 안 적힌 날 — 실제로 뛰었으면 고치고, 진짜 비었으면 [미입차로 확정]. 확인하면 여기서 사라집니다</p></div></div>';
     const sect = (cat, tag, sub) => {
       const rows = new Map();
       P.filter((x) => x.cat === cat).forEach((x) => { if (!rows.has(x.key)) rows.set(x.key, { camp: x.camp, label: x.label, cells: [] }); rows.get(x.key).cells.push(x); });
@@ -9331,7 +9360,7 @@
         list.map((r) => {
           r.cells.sort((p, q) => p.i - q.i);
           const by = new Map(); r.cells.forEach((x) => { if (!by.has(x.cause)) by.set(x.cause, []); by.get(x.cause).push(x); });
-          const tg = (x) => (cat !== 'A' ? '' : x.kind === 'route' ? '<i class="mi-tg rt" title="기사 잘못은 아닌데 노선이 빈 날 — 확인해서 확정한 것">노선</i>' : '<i class="mi-tg dr" title="기사가 미입차 · 노쇼 · 병가">기사</i>');
+          const tg = (x) => (cat !== 'A' ? '' : x.kind === 'route' ? '<i class="mi-tg rt" title="기사 잘못은 아닌데 노선이 빈 날 — 확인해서 확정한 것">노선</i>' : x.kind === 'vend' ? '<i class="mi-tg vd" title="배송은 됐지만 수행률이 보존되지 않는 용차업체가 업체 아이디로 뛴 날">용차</i>' : '<i class="mi-tg dr" title="기사가 미입차 · 노쇼 · 병가">기사</i>');
           const rk = esc(cat + '|' + r.camp + '|' + r.label);
           const causes = Array.from(by.entries()).map(([c, xs]) => tg(xs[0]) + esc(c) + (by.size > 1 ? ' <span class="mi-g">(' + xs.map((x) => mdS(dates[x.i])).join(', ') + ')</span>' : '')).join('<br>') + (cat === 'A' && r.cells.some((x) => x.kind === 'route') ? '<div><button type="button" class="mi-x" data-mifix="rmx" data-rk="' + rk + '" title="확정을 취소하고 「자료 확인 필요」로 되돌립니다">확정 취소</button></div>' : '');
           const chips = r.cells.map((x) => '<button type="button" class="mi-dt ' + lc + '" data-chkgo="' + x.i + '"' + (x.row ? ' data-chkrow="' + esc(x.row) + '"' : '') + ' title="' + esc(x.cause) + '">' + mdS(dates[x.i]) + ' ' + dwS(x.i) + '</button>').join(' ');
@@ -9344,7 +9373,7 @@
     };
     return seg + wseg + '<span class="mi-sum">' + mdS(dates[0]) + ' ~ 어제' + (sMode === 'month' ? '' : ' · 2주 보기입니다 — 한 달 전체는 「한 달」 보기에서') + '</span></div>' + cards +
       sect('A', '① 미입차', '그날 미입차 · 노쇼 · 병가인 기사가 뛰기로 했던 노선 (이슈의 원래 칸 → 없으면 기본노선)') +
-      sect('B', '② 회전 일부 빔', '일부 회전만 빈 날') +
+      sect('B', '② 물량조율', '일부 회전만 빈 날 (수행률 영향에 같이 셈)') +
       sect('C', '③ 자료 확인 필요', '실제로 뛰었는데 표에 안 적힌 것이면 고치고(날짜를 누르면 그 칸으로) · 진짜 비었으면 [미입차로 확정] → ① 로 올라갑니다') +
       (cnt.X ? sect('X', '물량 없음으로 뺀 날', '미입차로 세지 않습니다') : '') +
       '<div class="mi-note">· 한 노선은 담당이 여럿이어도 하루 한 번만 셉니다. · 용차 · 품앗이 · 다른 기사가 대신 뛴 날, 노선 이관으로 이름만 바뀐 노선(예: 안양1 110 ↔ 군포1 212)은 빈 것으로 보지 않습니다.</div>';
@@ -10034,10 +10063,11 @@
     const perRow = c.st && c.st !== '출근' && !/변경$/.test(c.st) ? '<div class="ce-ln"><span>기간</span><div class="ce-per"><b>' + esc(ceMd(c.dt)) + '</b> 부터 <input type="date" class="inp" id="ceEnd" min="' + esc(c.dt) + '" value="' + esc(c.end) + '"> 까지' +
       (c.end > c.dt ? ' <em>' + (Math.round((new Date(c.end + 'T00:00:00') - new Date(c.dt + 'T00:00:00')) / 864e5) + 1) + '일</em>' : '') + '</div></div>' : '';
     let issRow = '';
-    if (ceIssRes() && c.x0 && c.x0.date < c.dt && (c.st === c.v0 || !c.touched)) issRow = '<div class="ce-ln"><span>사유 · 대체</span><div class="ce-hint" style="margin:0">' + esc(ceMd(c.x0.date)) + '부터 이어진 이슈입니다. 사유 · 대체는 아래 <b>이슈 상세</b>에서 고쳐 주세요.</div></div>';
+    if (ceIssRes() && c.x0 && c.x0.date < c.dt && (c.st === c.v0 || !c.touched)) issRow = '<div class="ce-ln"><span>사유 · 대체</span><div class="ce-hint" style="margin:0">' + esc(ceMd(c.x0.date)) + '부터 이어진 이슈입니다. 사유 · 대체는 아래 <b>이어진 이슈 고치기</b>에서 고쳐 주세요.</div></div>';
     else if (ceIssOn()) issRow = '<div class="ce-ln"><span>사유</span><div><div class="ce-g">' + IS.reasons.map((k) => '<button type="button" class="ce-c sm' + (c.ik === k ? ' on' : '') + '" data-ceik="' + esc(k) + '">' + esc(k) + '</button>').join('') + '</div>' +
       '<input class="inp" id="ceIr" maxlength="200" placeholder="' + (c.ik === '기타' ? '사유를 적어 주세요 (필수)' : '메모 (선택)') + '" value="' + esc(c.ir) + '" style="margin-top:6px"></div></div>' +
-      '<div class="ce-ln"><span>대체 방법</span><div><div class="ce-g">' + IS.subs.map((k) => '<button type="button" class="ce-c sm' + (c.isub === k ? ' on' : '') + '" data-ceisub="' + esc(k) + '">' + esc(k) + '</button>').join('') + '</div>' +
+      '<div class="ce-ln"><span>누가 뛰었나</span><div><div class="ce-g">' + subBtns(c.isub, 'ceisub', 'ce-c sm') + '</div>' +
+      (subG(c.isub) === 'none' ? '<div class="ce-hint">대체 없음 = 쿠친이 들어왔든 캠프에 반납했든 우리 수행률에서는 같습니다 (구분은 위 메모에)</div>' : subG(c.isub) === 'vend' ? '<div class="ce-hint">용차업체가 이 기사 노선을 뛴 날이면 상태를 <b>용차</b>로 바꿔 업체를 고르는 것이 정확합니다 (미입차로 세지 않음)</div>' : '') +
       (c.x0 && c.x0.subWho ? '<div class="ce-hint">지금 대체 인원: <b>' + esc(c.x0.subWho) + '</b></div>' : '') + '</div></div>';
     const idRow = c.subs.length ? '<div class="ce-ln"><span>아이디</span><div><div class="ce-g"><button type="button" class="ce-c' + (c.st === '출근' && !c.sub ? ' on' : '') + '" data-cesub="">본인 · ' + esc((d.mainId && (SD.drivers.find((x) => x.id === d.mainId) || {}).name) || d.name) + (d.loginId ? '<small>' + esc(ceLid(d.loginId)) + '</small>' : '') + '</button>' +
       c.subs.map((x, i) => '<button type="button" class="ce-c' + (c.st === '출근' && c.sub === x ? ' on' : '') + '" data-cesub="' + esc(x) + '"' + (subOk ? '' : ' disabled title="노선을 먼저 고르세요"') + '>' + (aliasMap().get(ceLid(x)) ? esc(aliasMap().get(ceLid(x)).name) + ' 명의' : '서브' + (c.subs.length > 1 ? ' ' + (i + 1) : '') + (ceSubName(x) ? ' · ' + esc(ceSubName(x)) : '')) + '<small>' + esc(x) + '</small></button>').join('') + '</div>' +
@@ -10077,7 +10107,7 @@
     const pv = '<div class="ce-pv">저장하면 → ' + pvL.join('<br>＋ ') + '</div>';
     const links = '<div class="ce-lks">' + (pk.units.length && !d.ex ? '<button type="button" class="ce-lb" data-cepmgo>🤝 품앗이로 맡기기</button>' : '') +
       (d.ex ? '' : '<button type="button" class="ce-lb" data-cercgo>🔀 이 날부터 노선 이관</button>') +
-      (issOf(c.did, c.dt).length ? '<button type="button" class="ce-lb" data-ceissgo>⚠ 이슈 상세</button>' : d.ex ? '' : '<button type="button" class="ce-lb" data-ceissnew>＋ 이슈 등록</button>') +
+      (issOf(c.did, c.dt).length ? (c.x0 && c.x0.date < c.dt ? '<button type="button" class="ce-lb" data-ceissgo title="이 칸은 ' + esc(ceMd(c.x0.date)) + '부터 이어진 이슈입니다 — 시작한 날의 기록을 엽니다">⚠ 이어진 이슈 고치기</button>' : '') : d.ex ? '' : '<button type="button" class="ce-lb" data-ceissnew>＋ 이슈 등록</button>') +
       (d.ex ? '' : '<button type="button" class="ce-lb" data-cedrvgo>👤 기사 설정</button>') + '</div>';
     $('#ceBody').innerHTML = head + pkBox + stRow + idRow + yongRow + perRow + issRow + altRow + insRow + pv + links +
       '<div class="m-actions"><button type="button" class="btn ghost" data-ceclose>닫기</button><button type="button" class="btn" data-cesave' + (c.busy ? ' disabled' : '') + '>' + (c.busy ? '저장 중…' : '저장') + '</button></div>';

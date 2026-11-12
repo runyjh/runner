@@ -30,7 +30,7 @@ function schVendorPack_() {
   try {
     stlVendors_().list.forEach(function (v) {
       if (v.stopped) return;
-      out.vendors.push({ name: v.name, ids: v.ids });
+      out.vendors.push({ name: v.name, ids: v.ids, perf: v.perf !== false });
       (v.routes || []).forEach(function (r) { out.routes.push({ name: v.name, camp: r.camp, code: r.code, units: r.units, from: v.rFrom || '', to: v.rTo || '' }); });
     });
   } catch (e) { /* 정산 DB 를 못 읽으면 빈 목록 */ }
