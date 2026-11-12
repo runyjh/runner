@@ -148,57 +148,6 @@ function adm_perfList(token, weeksN) {
     return out;
   });
 }
-/**
- * 관리자: 스케줄 기준 수행률 예상 (이번 주 · 다음 주, 일~토 = 쿠팡 주차)
- *  쿠팡 수행률은 쿠팡이 주는 자료이고, 여기는 '지금 스케줄대로면 어느 라우트가 몇 회전 비는가'만 미리 본다.
- *  계획 = 사용 중 라우트 × 캠프 회전 × 7일 · 빠짐 = 쿠팡 업로드 표에서 미입차로 나가는 회전 (업로드 표와 같은 계산)
- *  뺀다: 수행률 보존 용차업체가 맡은 노선 · [물량 없음]으로 확정한 노선
- *  → { ok, today, weeks: [{ from, to, plan, lost, pct }], rows: [{ camp, code, w: [{ plan, lost, pct, days: ['11/17 D1,D2,F3 담당 없음'] } × 2] }] } (빠지는 라우트만)
- */
-function adm_perfForecast(token) {
-  return run_(function () {
-    requireAdmin_(token);
-    const t = parseYmd_(todayText_()), sun = sundayOf_(new Date(t.getFullYear(), t.getMonth(), t.getDate()));
-    const data = schRead_(sun, addDays_(sun, 13));
-    const co = companyInfo_();
-    const res = schBuildUpload_(data, { bizNo: co.branchBizNo || '', wave: 'WAVE1', target: ymd_(sun), maxDays: schMaxDays_() });
-    const short = function (n) { return str_(n).replace(/\s*캠프\s*$/, '').replace(/\s+/g, ''); };
-    const units = function (code) { const out = []; (str_(code).toUpperCase().match(/\d+[A-Z]+/g) || []).forEach(function (m) { const n = m.match(/\d+/)[0]; m.replace(/\d+/, '').split('').forEach(function (l) { if (out.indexOf(n + l) < 0) out.push(n + l); }); }); return out; };
-    const ALL = ['D1', 'D2', 'F3'], rotOf = {}, campName = {};
-    data.camps.forEach(function (c) { const r = str_(c.rot).split(',').map(function (x) { return x.trim().toUpperCase(); }).filter(function (x) { return ALL.indexOf(x) >= 0; }); rotOf[short(c.name)] = r.length ? r : ALL; campName[c.id] = short(c.name); });
-    const wkOf = function (d) { const i = data.dates.indexOf(d); return i < 0 ? -1 : i < 7 ? 0 : 1; };
-    const movedOut = function (cid, rt, date) { return (data.rcMoves || []).some(function (m) { return m.fromCampId === cid && m.date <= date && String(rt).indexOf(String(m.fromRoute)) === 0; }); };
-    // 계획 회전
-    const R = {}, row = function (camp, code) { const k = camp + '|' + code; return R[k] || (R[k] = { camp: camp, code: code, w: [{ plan: 0, lost: 0, days: [] }, { plan: 0, lost: 0, days: [] }] }); };
-    Object.keys(data.routes || {}).forEach(function (cid) {
-      const camp = campName[cid]; if (!camp || isStaffCamp_(camp)) return;
-      (data.routes[cid] || []).forEach(function (code) { units(code).forEach(function (u) { data.dates.forEach(function (d) { if (!movedOut(cid, u, d)) row(camp, u).w[wkOf(d)].plan += (rotOf[camp] || ALL).length; }); }); });
-    });
-    const keepPerf = {}; (data.vendors || []).forEach(function (v) { if (v.perf !== false) keepPerf[v.name] = 1; });
-    const noVol = {}; (data.routeMiss || []).forEach(function (x) { if (x.result === '물량없음') noVol[x.date + '|' + x.camp + '|' + x.unit] = 1; });
-    (res.missing || []).forEach(function (m) {
-      const date = str_(m[0]), camp = short(m[2]), w = wkOf(date); if (w < 0) return;
-      const why = str_(m[8]).replace(/^사유:\s*/, '');
-      if (why.split(/,\s*/).some(function (x) { const v = x.match(/^용차업체\s+(.+)$/); return v && keepPerf[v[1].trim()]; })) return; // 수행률 보존 업체가 뛰는 노선
-      const rots = str_(m[6]).split(',').filter(Boolean);
-      str_(m[7]).split(',').filter(Boolean).forEach(function (u) {
-        if (noVol[date + '|' + camp + '|' + u]) return;
-        const r = row(camp, u).w[w];
-        if (!r.plan) r.plan = (rotOf[camp] || ALL).length * 7; // 노선관리에 없는 라우트(기사 기본노선으로만 있는 경우)
-        r.lost += rots.length;
-        r.days.push(Number(date.slice(5, 7)) + '/' + Number(date.slice(8)) + ' ' + rots.join(',') + (why ? ' ' + why : ''));
-      });
-    });
-    const pct = function (p, l) { return p ? Math.round(Math.max(0, p - l) / p * 1000) / 10 : 100; };
-    const weeks = [0, 1].map(function (i) {
-      let plan = 0, lost = 0; Object.keys(R).forEach(function (k) { plan += R[k].w[i].plan; lost += Math.min(R[k].w[i].lost, R[k].w[i].plan); });
-      return { from: data.dates[i * 7], to: data.dates[i * 7 + 6], plan: plan, lost: lost, pct: pct(plan, lost), routes: Object.keys(R).filter(function (k) { return R[k].w[i].plan; }).length };
-    });
-    const rows = Object.keys(R).map(function (k) { return R[k]; }).filter(function (r) { return r.w[0].lost || r.w[1].lost; });
-    rows.forEach(function (r) { r.w.forEach(function (x) { x.lost = Math.min(x.lost, x.plan); x.pct = pct(x.plan, x.lost); x.days = x.days.slice(0, 14); }); });
-    return { ok: true, today: todayText_(), weeks: weeks, rows: rows };
-  });
-}
 /** 관리자: 설정 (기사 앱 표시 · 메모 자동) */
 function adm_perfSet(token, f) {
   return run_(function () {
