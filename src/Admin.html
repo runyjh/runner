@@ -863,6 +863,10 @@
   html.m .updrop { flex-wrap: wrap; } html.m .updrop .ud-tx { flex: 1 1 200px; } html.m .updrop.sm { display: flex; flex-wrap: wrap; } html.m .updrop.sm .ud-tx { flex-wrap: wrap; } html.m .updrop.sm .ud-tx span { white-space: normal; }
   .rp-sum { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; } .rp-sum span { padding: 4px 10px; border-radius: 8px; background: var(--gray-weak); font-size: 13px; } .rp-sum span b { margin-left: 4px; }
   .rp-sum span.bad { background: #fde8e8; color: #c62828; }
+  .pk-table td, .pk-table th { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; } .pk-table td:nth-child(-n+2), .pk-table th:nth-child(-n+2) { text-align: left; }
+  .pk-table tr.tot td { font-weight: 800; background: #fafafa; } .pk-table .hot { background: #fee2e2; color: #b91c1c; font-weight: 800; border-radius: 5px; padding: 1px 5px; }
+  .pk-table .up { color: #c2410c; font-weight: 700; } .pk-table .dn { color: #15803d; font-weight: 700; }
+  .pk-up table { border-collapse: collapse; width: 100%; min-width: 0; table-layout: fixed; font-size: 12px; margin-top: 8px; } .pk-up th:first-child { width: 22%; } .pk-up td, .pk-up th { padding: 4px 3px; line-height: 1.3; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; } .pk-up td:first-child, .pk-up th:first-child { text-align: left; }
   .rp-on { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
   .rp-on b.on { color: var(--ok); } .rp-on b.off { color: var(--sub); }
   .rp-top { padding-bottom: 8px; } .rp-top .xp-head { flex-wrap: wrap; gap: 8px; } .rp-tabs { margin: 0; } .rp-tabs .tab { padding: 6px 12px; }
@@ -1492,7 +1496,30 @@
   }
   /* 휴대폰 화면(html.m): 위 막대(로고 · 🔍 · 지금 메뉴 ☰) → 누르면 묶음별 메뉴 */
   html.m #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
-  html.m main { padding: 16px 12px; min-width: 0; }
+  html.m main { padding: 16px 12px calc(76px + env(safe-area-inset-bottom, 0px)); min-width: 0; }
+  /* 휴대폰: 아래 탭 5개 · 더보기 (☰ 메뉴 대신) */
+  .mtab, .mmore { display: none; }
+  html.m .mtab { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html.m .mtab button { flex: 1; border: 0; background: none; font: inherit; font-size: 11px; font-weight: 700; color: #8b95a1; padding: 7px 0 6px; cursor: pointer; min-height: 54px; }
+  html.m .mtab button i { display: block; font-style: normal; font-size: 19px; line-height: 23px; filter: grayscale(1); opacity: .65; }
+  html.m .mtab button.on { color: var(--brand); } html.m .mtab button.on i { filter: none; opacity: 1; }
+  html.m .mmore { display: block; position: fixed; inset: 0; bottom: calc(54px + env(safe-area-inset-bottom, 0px)); z-index: 39; background: var(--bg, #f3f4f6); overflow-y: auto; padding: 12px 12px 20px; }
+  html.m .mmore.hidden { display: none; }
+  .mmore .mm-top { display: flex; align-items: center; justify-content: space-between; margin: 2px 2px 10px; } .mmore .mm-top b { font-size: 18px; }
+  .mmore .mm-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px; margin-bottom: 10px; }
+  .mmore .mm-card p { margin: 10px 0 2px; font-size: 12px; font-weight: 800; color: var(--sub); } .mmore .mm-card p small { font-weight: 500; }
+  .mmore .mm-card button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-top: 1px solid #f1f2f4; background: none; font: inherit; font-size: 15px; font-weight: 700; text-align: left; padding: 14px 2px; cursor: pointer; color: var(--ink); }
+  .mmore .mm-card button:first-of-type, .mmore .mm-card p + button { border-top: 0; } .mmore .mm-card button small { margin-left: auto; color: var(--sub); font-size: 12px; font-weight: 500; }
+  .mmore .mm-card.pc { background: #fafafa; } .mmore .mm-card.pc button { color: #6b7280; font-weight: 600; }
+  .mmore .mm-me { text-align: center; color: var(--sub); font-size: 12px; margin-top: 4px; }
+  .mseg { display: none; }
+  html.m .mseg { display: flex; background: #e9ecef; border-radius: 12px; padding: 3px; margin: 0 0 12px; }
+  html.m .mseg.hidden { display: none; }
+  html.m .mseg button { flex: 1; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 700; color: #4b5563; padding: 9px 0; border-radius: 9px; cursor: pointer; white-space: nowrap; }
+  html.m .mseg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  #view-sched.my .smb-top, #view-sched.my .smb-pick, #view-sched.my #sCount { display: none !important; }
+  html.m .side .navbtn { display: none !important; } /* ☰ 메뉴는 아래 탭 · 더보기로 대신함 */
+  html.m .toast { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
   html.m .side { overflow: visible; }
   html.m .side { position: sticky; top: 0; z-index: 15; height: auto; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
   html.m .side .logo { padding: 0; white-space: nowrap; font-size: 15px; } html.m .side .logo .rlogo { width: 26px; }
@@ -1574,6 +1601,7 @@
   </aside>
 
   <main>
+   <div class="mseg hidden" id="mSeg" role="tablist" aria-label="관리"><button type="button" data-ms="sched">스케줄</button><button type="button" data-ms="pumasi">품앗이</button><button type="button" data-ms="issue">이슈</button></div>
    <section id="view-drivers">
     <div class="head">
       <h2>기사 정보관리</h2>
@@ -1958,12 +1986,12 @@
    </section>
    <section id="view-perf" class="hidden">
     <div class="head">
-      <h2>노선 수행률 · SLA <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 파일</small></h2>
-      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 파일 3가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">쿠팡 파일 올리기</button><input type="file" id="rpFile" accept=".xlsx" class="hidden"></div>
+      <h2>노선 수행률 · SLA <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 파일</small></h2>
+      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">쿠팡 파일 올리기</button><input type="file" id="rpFile" accept=".xlsx" class="hidden"></div>
     </div>
     <div class="updrop" data-up="#rpFile">
       <div class="ud-ic">⬆</div>
-      <div class="ud-tx"><b>쿠팡 파일을 여기로 끌어다 놓으세요</b><span>주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 — 어떤 파일인지 자동으로 알아보고, 저장 전에 미리보기를 보여 줍니다 (같은 기간은 덮어씀 · 엑셀 .xlsx)</span></div>
+      <div class="ud-tx"><b>쿠팡 파일을 여기로 끌어다 놓으세요</b><span>주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 — 어떤 파일인지 자동으로 알아보고, 저장 전에 미리보기를 보여 줍니다 (같은 기간은 덮어씀 · 엑셀 .xlsx)</span></div>
       <button class="btn" type="button" data-upfind>파일 찾기</button>
     </div>
     <div class="rp-box" id="perfBox"></div>
@@ -2085,6 +2113,42 @@
     </div>
    </section>
   </main>
+  <!-- 휴대폰 화면: 아래 탭 5개 + 더보기 (PC 화면에서는 안 보임) -->
+  <nav class="mtab" id="mTab" aria-label="주 메뉴">
+    <button type="button" data-mt="my"><i>🚚</i>내 스케줄</button>
+    <button type="button" data-mt="dash"><i>◉</i>오늘</button>
+    <button type="button" data-mt="mng"><i>▦</i>관리</button>
+    <button type="button" data-mt="drivers"><i>👤</i>기사</button>
+    <button type="button" data-mt="more"><i>≡</i>더보기</button>
+  </nav>
+  <div class="mmore hidden" id="mMore">
+    <div class="mm-top"><b>더보기</b><button type="button" class="btn ghost sm" data-mmx>닫기</button></div>
+    <div class="mm-card"><p>휴대폰에서 쓰는 메뉴</p>
+      <button type="button" data-mmv="notice">📢 공지사항</button>
+      <button type="button" data-mmv="memo">🗒 업무스케줄</button>
+      <button type="button" data-mmv="bib">🔢 배번호 관리</button>
+      <button type="button" data-mmv="perf">📊 수행률 · SLA</button>
+      <button type="button" data-mmv="perf" data-mmtab="pk">🔥 피크 예상 물량</button>
+      <button type="button" data-mmv="route">🧭 노선관리</button>
+    </div>
+    <div class="mm-card pc"><p>PC에서 하는 일 <small>(표가 넓어 PC를 권합니다 · 눌러서 열 수는 있습니다)</small></p>
+      <button type="button" data-mmv="settle">정산관리</button>
+      <button type="button" data-mmv="settle" data-mmgo="pnl">매입·매출</button>
+      <button type="button" data-mmv="taxinv">세금계산서 역발행</button>
+      <button type="button" data-mmv="einv">전자세금계산서 발행</button>
+      <button type="button" data-mmv="insrep">산재/고용 신고 상황</button>
+      <button type="button" data-mmv="board">게시판 관리</button>
+      <button type="button" data-mmv="acc">계정관리</button>
+      <button type="button" data-mmv="uiset">올인원 설정</button>
+    </div>
+    <div class="mm-card">
+      <button type="button" data-mmc="#uiSw">🖥 PC 화면으로 보기</button>
+      <button type="button" data-mmc="#apOpen">🔑 비밀번호 변경</button>
+      <button type="button" data-mmc="#pfOpen">⏱ 속도 측정</button>
+      <button type="button" data-mmc="#logoutBtn">로그아웃</button>
+    </div>
+    <div class="mm-me" id="mmMe"></div>
+  </div>
 </div>
 
 <!-- ───────────── 기사 상세 ───────────── -->
@@ -2970,7 +3034,10 @@
     uiLoad();
     setTimeout(() => { try { liveStart(); } catch (e) {} }, 3000); // 실시간 갱신 구독 (Firestore pub/meta)
     // 새로고침하면 보던 메뉴 그대로 (이 창을 닫으면 잊음)
-    try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv; } catch (e) {}
+    let sv0 = '';
+    try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv0 = sv; } catch (e) {}
+    // 휴대폰: 처음 열면 내 스케줄 (내 기사 줄이 없는 계정은 오늘 화면)
+    try { if (!sv0 && document.documentElement.classList.contains('m') && localStorage.getItem('runner.m.nomy') !== '1') { schMy(true); currentView = 'sched'; } } catch (e) { /* 기본 화면으로 */ }
     switchView(currentView);
   }
   $('#loginForm').addEventListener('submit', (e) => {
@@ -3869,7 +3936,47 @@
     try { if (window.__schMob) window.__schMob(); } catch (e) { /* 기사스케줄을 아직 안 열었음 */ }
   });
   uiSwLabel();
-  function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; }
+  function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; try { mTabSync(); } catch (e) { /* 아직 준비 전 */ } }
+  // ── 휴대폰 아래 탭 · 더보기 (메뉴 이동은 왼쪽 메뉴의 같은 항목을 누르는 것과 똑같이 처리 → 화면 여는 규칙이 하나)
+  const MT_MNG = ['sched', 'pumasi', 'issue'];
+  let mMng = 'sched';
+  try { const v = localStorage.getItem('runner.m.mng'); if (MT_MNG.includes(v)) mMng = v; } catch (e) { /* 기본값 */ }
+  const mTabOf = () => (currentView === 'sched' && sMy ? 'my' : currentView === 'dash' ? 'dash' : MT_MNG.includes(currentView) ? 'mng' : currentView === 'drivers' ? 'drivers' : 'more');
+  function mTabSync() {
+    const more = !$('#mMore').classList.contains('hidden'), cur = more ? 'more' : mTabOf();
+    $$('#mTab button').forEach((b) => b.classList.toggle('on', b.dataset.mt === cur));
+    $('#mSeg').classList.toggle('hidden', mTabOf() !== 'mng');
+    $$('#mSeg button').forEach((b) => b.classList.toggle('on', b.dataset.ms === currentView));
+    if (mTabOf() === 'mng' && mMng !== currentView) { mMng = currentView; try { localStorage.setItem('runner.m.mng', mMng); } catch (e) { /* 무시 */ } }
+  }
+  function mMoreShow(on) { $('#mMore').classList.toggle('hidden', !on); if (on) { $('#mMore').scrollTop = 0; $('#mmMe').textContent = ($('#meName').textContent || '') + ($('#updNo').textContent || ''); } mTabSync(); }
+  const navGo = (v, stGo) => { const a = $$('.nav a[data-view="' + v + '"]').find((x) => (x.dataset.stGo || '') === (stGo || '')); if (a) a.click(); };
+  /** 기사스케줄 화면을 '내 스케줄'(on) 또는 관리용(off)으로 연다 */
+  function mSchedGo(my) {
+    const was = sMy; schMy(my);
+    if (currentView !== 'sched') navGo('sched'); else if (was !== my) { try { if (window.__schMob) window.__schMob(); } catch (x) { /* 무시 */ } mTabSync(); }
+  }
+  $('#mTab').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mt]'); if (!b) return;
+    const t = b.dataset.mt;
+    if (t === 'more') return mMoreShow($('#mMore').classList.contains('hidden'));
+    mMoreShow(false);
+    if (t === 'my') mSchedGo(true);
+    else if (t === 'mng') { if (mMng === 'sched') mSchedGo(false); else { schMy(false); navGo(mMng); } }
+    else { schMy(false); navGo(t); }
+    window.scrollTo(0, 0);
+  });
+  $('#mSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ms]'); if (!b) return;
+    if (b.dataset.ms === 'sched') mSchedGo(false); else { schMy(false); navGo(b.dataset.ms); }
+    window.scrollTo(0, 0);
+  });
+  $('#mMore').addEventListener('click', (e) => {
+    if (e.target.closest('[data-mmx]')) return mMoreShow(false);
+    const v = e.target.closest('[data-mmv]'), c = e.target.closest('[data-mmc]');
+    if (v) { mMoreShow(false); schMy(false); if (v.dataset.mmv === 'perf') RP.tab = v.dataset.mmtab || 'wk'; navGo(v.dataset.mmv, v.dataset.mmgo || ''); if (v.dataset.mmv === 'perf' && currentView === 'perf') rpRender(); window.scrollTo(0, 0); return; }
+    if (c) { mMoreShow(false); const t = $(c.dataset.mmc); if (t) t.click(); }
+  });
   new MutationObserver(navCur).observe($('.nav'), { subtree: true, attributes: true, attributeFilter: ['class'] });
   function switchView(v) {
     if (v !== currentView && !viewRestoring) { viewHist.push(currentView); if (viewHist.length > 30) viewHist.shift(); }
@@ -3908,7 +4015,7 @@
     if (v === 'issue') loadIssue();
     $('#view-settle').classList.toggle('hidden', v !== 'settle');
     if (v === 'settle') loadSettle();
-    if (v === 'sched') loadSched();
+    if (v === 'sched') { loadSched(); loadPkm(); }
     if (v === 'bib') loadBib();
     if (v === 'route') loadRoutes();
     // 기사 정보는 스케줄·배번호·정산·초기화 화면에서도 바뀌므로, 다른 메뉴에서 돌아오면 다시 불러온다 (선택 탭은 유지)
@@ -6687,7 +6794,7 @@
   // 수행률·SLA 는 한 메뉴(view-perf)에 탭 둘. 라우트 변경이력은 노선관리 → 변경이력 탭 (lnRender 공용)
   const rpViewOn = () => currentView === 'perf';
   const rpBox = () => $('#perfBox');
-  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)'], ['fb', '프레시백 가중요인']];
+  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)'], ['fb', '프레시백 가중요인'], ['pk', '🔥 피크 예상 물량']];
   const rpTabNow = () => { const ts = rpTabs().map((t) => t[0]); if (ts.indexOf(RP.tab) < 0) RP.tab = ts[0]; return RP.tab; };
   $('#rpReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
   function rpList() {
@@ -6709,6 +6816,7 @@
       '<a class="btn sm ghost" href="#" data-view="route" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 종료 — 노선관리에서 관리합니다">라우트 변경이력 → 노선관리</a></span></div></div>';
     if (tab === 'sla') return slaRender(box);
     if (tab === 'fb') return fbRender(box);
+    if (tab === 'pk') return pkRender(box);
     if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; }
     const wks = RP.weeks.slice(-8).reverse(), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw); // 최신 주차가 앞
     const camps = [...new Set(RP.rows.map((r) => r.camp))].sort(koSort);
@@ -6787,6 +6895,7 @@
     if (e.target.id === 'rpUpBtn2' || e.target.id === 'rpUpBtn3') return $('#rpFile').click();
     const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); return; }
     if (fbClick(e)) return;
+    if (pkClick(e)) return;
     lnClick(e);
   }));
   // 노선관리 변경이력 탭: 같은 핸들러
@@ -6904,8 +7013,13 @@
       const sheets = await readXlsx(await f.arrayBuffer());
       const isSla = sheets.some((sh) => sh.rows.some((r) => r && r.some((v) => /data\s*end\s*date/i.test(String(v == null ? '' : v)))));
       const isFb = !isSla && sheets.some((sh) => sh.rows.slice(0, 8).some((r) => r && r.some((v) => /가중요인/.test(String(v == null ? '' : v)))));
-      $('#rpUpKind').classList.toggle('hidden', isSla || isFb);
-      if (isFb) {
+      const pk = !isSla && !isFb ? parsePeakSheet(sheets, f.name) : null;
+      $('#rpUpKind').classList.toggle('hidden', isSla || isFb || !!pk);
+      if (pk) {
+        rpUp = { file: f.name, kind: 'pk', P: pk };
+        if (!PK.loaded) await loadPk();
+        pkUpPreview();
+      } else if (isFb) {
         const blocks = parseFbSheet(sheets);
         if (!blocks.length) throw new Error('가중요인 파일에서 표(Wave · Camp · Route · 가중요인1 · 가중요인2)를 찾지 못했습니다.');
         rpUp = { file: f.name, kind: 'fb', blocks };
@@ -6949,6 +7063,7 @@
     const U = rpUp; if (!U) return;
     if (U.kind === 'sla') return slaUpSave();
     if (U.kind === 'fb') return fbUpSave();
+    if (U.kind === 'pk') return pkUpSave();
     const wk = +$('#rpUpWk').value, year = +$('#rpUpYear').value;
     if (!(wk >= 1 && wk <= 53)) return toast('주차(1~53)를 확인해 주세요.');
     if (!(year >= 2020 && year <= 2100)) return toast('연도를 확인해 주세요.');
@@ -7181,6 +7296,128 @@
     } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
   }
   // ───── 프레시백 가중요인 (쿠팡 Weekly·월간 '가중요인 해당여부' 파일 · route_fb) ─────
+  // ───── 피크 예상 물량 (쿠팡 Peak_Demand 파일 · route_peak) — 올리면 기사 앱 '내 스케줄'의 그날 내 노선에 보인다 ─────
+  const PK = { periods: [], period: '', rows: [], avg: {}, set: { drvOn: true }, today: '', loaded: false, loading: null, f: { camp: '' } };
+  const pkDow = (d) => { const p = String(d).split('-'); return DOW[new Date(+p[0], +p[1] - 1, +p[2]).getDay()]; };
+  function loadPk(force, period) {
+    if (PK.loading) return PK.loading;
+    if (PK.loaded && !force) return Promise.resolve(PK);
+    PK.loading = api('adm_peakList', period || '').then((r) => {
+      if (!r.ok) { toast(r.msg); return PK; }
+      PK.periods = r.periods || []; PK.period = r.period || ''; PK.rows = r.rows || []; PK.avg = r.avg || {}; PK.set = r.set || PK.set; PK.today = r.today || ''; PK.loaded = true;
+      if (rpViewOn() && RP.tab === 'pk') rpRender();
+      return PK;
+    }).catch(() => PK).finally(() => { PK.loading = null; });
+    return PK.loading;
+  }
+  /** 쿠팡 Peak_Demand 시트 → { ym, days:[{m,d}], rows:[{wave,camp,code,q:[…]}] } · 피크 파일이 아니면 null (머리글: 야간/주간 · 영업점 · 캠프 · Route · 11/01(일) …) */
+  function parsePeakSheet(sheets, fileName) {
+    const txt = (v) => String(v == null ? '' : v).trim(), isDay = (v) => /^\d{1,2}\s*[\/.]\s*\d{1,2}\s*(\([일월화수목금토]\))?$/.test(txt(v));
+    for (const sh of sheets) {
+      const hi = sh.rows.slice(0, 15).findIndex((r) => r && r.some((v) => /^route$/i.test(txt(v))) && r.some((v) => /^(캠프|camp)$/i.test(txt(v))) && r.filter(isDay).length >= 3 && !r.some((v) => /등급|수행률|가중요인/.test(txt(v))));
+      if (hi < 0) continue;
+      const H = sh.rows[hi], ci = { camp: H.findIndex((v) => /^(캠프|camp)$/i.test(txt(v))), code: H.findIndex((v) => /^route$/i.test(txt(v))), wave: H.findIndex((v) => /야간|주간|wave/i.test(txt(v))) };
+      const dc = []; H.forEach((v, i) => { if (isDay(v)) { const m = txt(v).match(/^(\d{1,2})\s*[\/.]\s*(\d{1,2})/); dc.push({ i, m: +m[1], d: +m[2] }); } });
+      const rows = []; let lastCamp = '';
+      for (let r = hi + 1; r < sh.rows.length; r++) {
+        const row = sh.rows[r] || [], camp = txt(row[ci.camp]) || lastCamp, code = txt(row[ci.code]);
+        if (txt(row[ci.camp])) lastCamp = txt(row[ci.camp]);
+        if (!camp || !code || !(/^total$/i.test(code) || /\d/.test(code))) continue;
+        const q = dc.map((c) => { const n = Number(String(row[c.i] == null ? '' : row[c.i]).replace(/,/g, '')); return txt(row[c.i]) === '' || isNaN(n) ? null : Math.round(n); });
+        if (q.every((x) => x == null)) continue;
+        rows.push({ wave: ci.wave >= 0 ? txt(row[ci.wave]) : '', camp: rpCamp(camp), code: /^total$/i.test(code) ? 'Total' : normCode(code).replace(/[^0-9A-Z]/g, ''), q });
+      }
+      if (!rows.length) continue;
+      const fm = String(fileName || '').match(/(20\d{2})\D{0,2}(\d{1,2})(?!\d)/), now = new Date();
+      const ym = fm && +fm[2] >= 1 && +fm[2] <= 12 ? fm[1] + '-' + String(+fm[2]).padStart(2, '0') : now.getFullYear() + '-' + String(dc[0].m).padStart(2, '0');
+      return { ym, days: dc.map((c) => ({ m: c.m, d: c.d })), rows, sheet: sh.name };
+    }
+    return null;
+  }
+  /** 피크 월(yyyy-MM)과 머리글의 월/일 → 날짜 (12월 파일에 1월 날짜가 섞이면 다음 해) */
+  const pkDate = (ym, x) => { const y = +ym.slice(0, 4), pm = +ym.slice(5, 7), yy = x.m < pm - 6 ? y + 1 : x.m > pm + 6 ? y - 1 : y; return yy + '-' + String(x.m).padStart(2, '0') + '-' + String(x.d).padStart(2, '0'); };
+  function pkUpPreview() {
+    const U = rpUp; if (!U || U.kind !== 'pk') return;
+    const P = U.P, ym = U.ym || P.ym, dates = P.days.map((x) => pkDate(ym, x));
+    const routes = P.rows.filter((r) => r.code !== 'Total'), tots = P.rows.filter((r) => r.code === 'Total'), camps = [...new Set(P.rows.map((r) => r.camp))];
+    const campTot = (c) => { const t = tots.find((r) => r.camp === c); return t ? t.q : P.days.map((x, i) => routes.filter((r) => r.camp === c).reduce((a, r) => a + (r.q[i] || 0), 0)); };
+    const all = P.days.map((x, i) => camps.reduce((a, c) => a + (campTot(c)[i] || 0), 0)), mx = Math.max.apply(null, all), mi = all.indexOf(mx);
+    const had = PK.periods.some((p) => p.period === ym);
+    const known = new Set(); RT.camps.forEach((c) => routesOf(c.id).forEach((rt) => { const L = GK.slice(1).map((k) => rt[k]).filter(Boolean); (L.length ? L.map((x) => rt.g1 + x) : [rt.code]).forEach((cd) => known.add(rpCamp(c.name) + '|' + cd)); }));
+    const unknown = RT.camps.length ? routes.filter((r) => !known.has(r.camp + '|' + r.code)) : [];
+    $('#rpUpInfo').innerHTML = '<b>' + esc(U.file) + '</b><br>쿠팡 <b>피크 예상 물량</b> 파일 · ' + rpMd(dates[0]) + ' (' + pkDow(dates[0]) + ') ~ ' + rpMd(dates[dates.length - 1]) + ' (' + pkDow(dates[dates.length - 1]) + ') · 캠프 ' + camps.length + ' · 라우트 ' + routes.length +
+      '<br>가장 많은 날: <b>' + rpMd(dates[mi]) + ' (' + pkDow(dates[mi]) + ') ' + mx.toLocaleString('ko-KR') + '건</b>' + (had ? ' · <span style="color:var(--danger)">이 달 자료가 이미 있습니다 — 같은 날짜·라우트는 덮어씁니다</span>' : '');
+    $('#rpUpDetail').innerHTML = '<div class="pk-up"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="lb" for="pkUpYm" style="margin:0">피크 월</label><input class="inp" type="month" id="pkUpYm" value="' + esc(ym) + '" style="width:160px">' +
+      '<label class="check"><input type="checkbox" id="pkUpPush"' + (U.push === undefined ? (!had && PK.set.drvOn && dates[dates.length - 1] >= ymdLocal(new Date()) ? ' checked' : '') : U.push ? ' checked' : '') + (PK.set.drvOn ? '' : ' disabled') + '> 이 캠프 기사들에게 휴대폰 알림 보내기</label></div>' +
+      (PK.set.drvOn ? '' : '<div class="sub" style="margin-top:4px">기사 앱 공유가 꺼져 있어 알림을 보내지 않습니다. (피크 예상 물량 탭에서 켤 수 있습니다)</div>') +
+      '<table><thead><tr><th>캠프 합계</th>' + dates.map((d) => '<th>' + rpMd(d) + '<br>' + pkDow(d) + '</th>').join('') + '</tr></thead><tbody>' +
+      camps.map((c) => '<tr><td>' + esc(c) + ' <small class="sub">' + routes.filter((r) => r.camp === c).length + '</small></td>' + campTot(c).map((v) => '<td>' + (v == null ? '-' : v.toLocaleString('ko-KR')) + '</td>').join('') + '</tr>').join('') +
+      '<tr style="font-weight:800"><td>전체</td>' + all.map((v) => '<td>' + v.toLocaleString('ko-KR') + '</td>').join('') + '</tr></tbody></table>' +
+      (unknown.length ? '<div style="margin-top:6px;color:var(--danger)">노선관리에 없는 라우트 ' + unknown.length + '개: ' + unknown.map((r) => esc(r.camp + ' ' + r.code)).join(', ') + ' — 저장은 됩니다. 코드가 바뀐 라우트는 변경이력으로 이어 붙여 보여 줍니다.</div>' : '') +
+      '<div class="sub" style="margin-top:6px">저장하면 기사 앱 「내 스케줄」에서 그날 본인이 타는 노선의 예상 물량만 보입니다' + (RP.memoOn ? ' · 업무스케줄에 "' + +ym.slice(5, 7) + '월 피크 예상 물량 업로드" 한 줄이 적힙니다' : '') + '.</div></div>';
+  }
+  $('#rpUpDetail').addEventListener('change', (e) => {
+    const U = rpUp; if (!U || U.kind !== 'pk') return;
+    if (e.target.id === 'pkUpPush') U.push = e.target.checked;
+    if (e.target.id === 'pkUpYm' && /^\d{4}-\d{2}$/.test(e.target.value)) { U.ym = e.target.value; pkUpPreview(); }
+  });
+  async function pkUpSave() {
+    const U = rpUp; if (!U || U.kind !== 'pk') return;
+    const P = U.P, ym = U.ym || P.ym, rows = [];
+    P.rows.forEach((r) => P.days.forEach((x, i) => { if (r.q[i] != null) rows.push({ wave: r.wave, camp: r.camp, code: r.code, date: pkDate(ym, x), qty: r.q[i] }); }));
+    const push = !!($('#pkUpPush') || {}).checked;
+    const b = $('#rpUpOk'); b.disabled = true; b.textContent = '저장 중…';
+    try {
+      const r = await api('adm_peakSave', { file: U.file, period: ym, rows, push });
+      if (!r.ok) { toast(r.msg); return; }
+      $('#rpUpModal').classList.add('hidden'); rpUp = null;
+      toast('피크 예상 물량을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged + (push ? ' · 알림 ' + (r.pushed || 0) + '건' : '') + (r.memo ? ' · 업무스케줄에 메모' : ''));
+      await loadPk(true, ym); loadPkm(true);
+      RP.tab = 'pk'; if (currentView !== 'perf') switchView('perf'); else rpRender();
+    } catch (e) { /* api 가 토스트 */ } finally { b.disabled = false; b.textContent = '저장'; }
+  }
+  function pkRender(box) {
+    if (!PK.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); loadPk(); return; }
+    const cur = PK.periods.find((p) => p.period === PK.period);
+    const opt = (v, t, c) => '<option value="' + esc(v) + '"' + (String(c) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
+    const share = '<span class="rp-on">기사 앱에 공유 <b class="' + (PK.set.drvOn ? 'on' : 'off') + '">' + (PK.set.drvOn ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-pkset="drv">' + (PK.set.drvOn ? '끄기' : '켜기') + '</button></span>';
+    if (!cur) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">피크 예상 물량</h4><span class="grow"></span>' + share + '</div><div class="empty">아직 올린 피크 예상 물량이 없습니다. 쿠팡이 보내는 <b>Peak_Demand</b> 엑셀을 위쪽 상자에 끌어다 놓거나 [쿠팡 파일 올리기]로 올려 주세요. (파일 종류는 자동으로 알아봅니다)</div></div>'); return; }
+    const dates = Object.keys(cur.total).sort(), camps = cur.campNames || [];
+    if (PK.f.camp && camps.indexOf(PK.f.camp) < 0) PK.f.camp = '';
+    const by = {}; PK.rows.forEach((r) => { const k = r.camp + '|' + r.code; (by[k] = by[k] || { camp: r.camp, code: r.code, q: {} }).q[r.date] = r.qty; });
+    const num = (v) => (v == null ? '-' : Number(v).toLocaleString('ko-KR'));
+    const pct = (p) => (p == null ? '<span class="sub">-</span>' : Math.abs(p) < 3 ? '<span class="sub">비슷</span>' : '<span class="' + (p > 0 ? 'up">+' : 'dn">') + p + '%</span>');
+    const meanOf = (o) => { const v = dates.map((d) => o.q[d]).filter((x) => x != null); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : 0; };
+    const line = (o, tot, p) => { const v = dates.map((d) => o.q[d]), mx = Math.max.apply(null, v.filter((x) => x != null).concat([0]));
+      return '<tr' + (tot ? ' class="tot"' : '') + '><td>' + (tot ? esc(o.camp) : '') + '</td><td>' + (tot ? '합계' : esc(o.code)) + '</td>' + v.map((x) => '<td>' + (x != null && x === mx && mx > 0 ? '<span class="hot">' + num(x) + '</span>' : num(x)) + '</td>').join('') + '<td>' + pct(p) + '</td></tr>'; };
+    let body = '', noAvg = 0, nRoutes = 0;
+    camps.filter((c) => !PK.f.camp || c === PK.f.camp).forEach((c) => {
+      const rs = Object.keys(by).map((k) => by[k]).filter((o) => o.camp === c && o.code !== 'TOTAL').sort((a, b) => koSort(a.code, b.code));
+      const withAvg = rs.filter((o) => PK.avg[o.camp + '|' + o.code]);
+      nRoutes += rs.length; noAvg += rs.length - withAvg.length;
+      const tot = by[c + '|TOTAL'] || { camp: c, code: 'TOTAL', q: dates.reduce((m, d) => { m[d] = rs.reduce((a, o) => a + (o.q[d] || 0), 0); return m; }, {}) };
+      const tp = withAvg.length && withAvg.length * 2 >= rs.length ? Math.round((withAvg.reduce((a, o) => a + meanOf(o), 0) / withAvg.reduce((a, o) => a + PK.avg[o.camp + '|' + o.code], 0) - 1) * 100) : null;
+      body += line(tot, true, tp) + rs.map((o) => { const a = PK.avg[o.camp + '|' + o.code]; return line(o, false, a ? Math.round((meanOf(o) / a - 1) * 100) : null); }).join('');
+    });
+    const st = PK.today && cur.to < PK.today ? '지난 피크' : PK.today && cur.from <= PK.today ? '진행 중' : '다가오는 피크';
+    box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">피크 예상 물량</h4><span class="xp-sum">' + +cur.period.slice(0, 4) + '년 ' + +cur.period.slice(5, 7) + '월 · ' + rpMd(cur.from) + '~' + rpMd(cur.to) + ' · ' + st + '</span><span class="grow"></span>' + share + '</div>' +
+      '<div class="rp-sum"><span>캠프<b>' + cur.camps + '</b></span><span>라우트<b>' + cur.routes + '</b></span><span class="bad">가장 많은 날<b>' + rpMd(cur.maxDate) + ' (' + pkDow(cur.maxDate) + ') ' + num(cur.maxQty) + '건</b></span><span>업로드<b>' + esc(String(cur.uploadedAt || '').slice(0, 16)) + '</b></span></div>' +
+      '<div class="ptools">' + (PK.periods.length > 1 ? '<select class="inp" id="pkPeriod" aria-label="피크 월">' + PK.periods.slice().reverse().map((p) => opt(p.period, +p.period.slice(0, 4) + '년 ' + +p.period.slice(5, 7) + '월', PK.period)).join('') + '</select>' : '') +
+        '<select class="inp" id="pkCamp" aria-label="캠프">' + opt('', '캠프 전체', PK.f.camp) + camps.map((c) => opt(c, c, PK.f.camp)).join('') + '</select></div>' +
+      '<div class="table-wrap rt-table pk-table"><table><thead><tr><th>캠프</th><th>라우트</th>' + dates.map((d) => '<th>' + rpMd(d) + ' ' + pkDow(d) + '</th>').join('') + '<th title="피크 기간 하루 평균 ÷ 평소 하루 평균 (최근 정산 두 달의 배송 수량)">평소 대비</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">빨간 칸 = 그 라우트에서 가장 많은 날. <b>평소 대비</b> = 피크 기간 하루 평균 ÷ 최근 정산 두 달의 하루 평균 배송 수량' + (noAvg ? ' — 비교할 정산 자료가 없는 라우트 ' + noAvg + '개는 「-」 (기사 앱에도 건수만 보입니다)' : '') +
+      '. 캠프 합계는 쿠팡 파일의 Total 값 그대로입니다 (라우트 합과 조금 다를 수 있음). 기사 앱에는 「내 스케줄」에서 그날 본인이 타는 노선의 건수만 보이고, 피크 3일 전부터 홈에 안내가 뜹니다.</p></div>');
+  }
+  function pkClick(e) {
+    const sb = e.target.closest('[data-pkset]'); if (!sb) return false;
+    sb.disabled = true;
+    api('adm_peakSet', { drvOn: !PK.set.drvOn }).then((r) => { if (!r.ok) return toast(r.msg); PK.set = r.set; rpRender(); toast('기사 앱 피크 예상 물량 공유를 ' + (r.set.drvOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { sb.disabled = false; });
+    return true;
+  }
+  rpBox().addEventListener('change', (e) => {
+    if (e.target.id === 'pkCamp') { PK.f.camp = e.target.value; rpRender(); }
+    if (e.target.id === 'pkPeriod') { PK.loaded = false; rpRender(); loadPk(true, e.target.value); }
+  });
   const FW = { cum: [], day: [], month: [], periods: [], days: [], set: { th1: 95, th2: 75, won1: 14, won2: 9, drvOn: true }, vol: {}, volMonths: [], loaded: false, loading: null, f: { camp: '', mode: '', q: '' } };
   const fbWonV = (w) => Math.round(w * 1.1); // 공급가 → 부가세 포함 (기사가 실제 받는 금액 표기)
   const fbYes = (v) => String(v || '').replace(/\s/g, '') === '해당';
@@ -8754,7 +8991,7 @@
     const hcell = (dt, i) => {
       const p = dt.split('-'), dow = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
       const tags = [];
-      if (+p[2] <= 7) tags.push('<i class="tg-peak" title="피크데이 (매달 1~7일 · 물량 많은 날)">🔥 피크</i>');
+      if (pkmIn(dt)) tags.push('<i class="tg-peak" title="피크데이 (쿠팡 피크 예상 물량 파일의 날짜 · PDD 기준)">🔥 피크</i>');
       if (SD.holidays[dt]) tags.push('<i class="tg-hol">' + esc(SD.holidays[dt]) + '</i>');
       return '<th class="dc' + (dt === today ? ' today' : '') + (dow === 0 || SD.holidays[dt] ? ' sun' : dow === 6 ? ' sat' : '') + (sepCol(i) ? ' wk2' : '') + '" data-col="' + i + '">' +
         '<b>' + +p[1] + '/' + +p[2] + ' (' + DOW[dow] + ')</b><small>' + weekOfMonth(dt) + '주차</small>' + tags.join('') + '</th>';
@@ -9667,6 +9904,50 @@
   // ───── 휴대폰 기사스케줄: [한 달 / 캠프] 달력 (기사앱 '내 스케줄'과 같은 틀 · 관리자는 캠프·기사를 골라 보고, 누르면 칸 입력 창) ─────
   let sMob = 'camp', sMobDay = '', sMobDrv = '';
   try { const v = localStorage.getItem('runner.sch.mob'); if (v === 'drv' || v === 'table' || v === 'camp') sMob = v; } catch (e) { /* 기본값 */ }
+  // ── 피크 예상 물량 (기사 앱과 같은 자료 · 날짜 🔥 표시와 내 스케줄의 그날 예상 물량)
+  let PKM = null, pkmP = null;
+  const pkmIn = (d) => !!PKM && (PKM.periods || []).some((p) => d >= p.from && d <= p.to);
+  function loadPkm(force) {
+    if (pkmP && !force) return pkmP;
+    const had = JSON.stringify((PKM && PKM.periods) || []);
+    pkmP = api('adm_peakMap').then((r) => {
+      PKM = r && r.ok ? r : PKM;
+      if (PKM && JSON.stringify(PKM.periods || []) !== had && SD.dates.length && !$('#view-sched').classList.contains('hidden') && SD.dates.some(pkmIn)) renderSched();
+      return PKM;
+    }).catch(() => PKM);
+    setTimeout(() => { pkmP = null; }, 600000);
+    return pkmP;
+  }
+  /** 그날 그 줄이 타는 노선의 예상 물량 [{ camp, code, qty, pct }] (기사 앱 peakOfDay 와 같은 규칙) */
+  function pkmOfDay(r, dt) {
+    const q = PKM && PKM.q && PKM.q[dt]; if (!q || !r || r.kind !== 'd') return [];
+    const c = mobCell(r, dt); let t = '';
+    if (c.kind === 'k-work' || c.kind === 'k-other') t = c.top === '출근' ? (r.d.baseRoute && /^\d/.test(r.d.baseRoute) ? baseCodes(r.d) : '') : c.top;
+    else if (c.kind === 'pmk' && /받음|◀/.test(c.full)) t = c.full;
+    if (!t) return [];
+    let camp = shortCamp(r.camp || r.d.camp || '').replace(/\s/g, ''); const out = [], seen = {};
+    String(t).toUpperCase().split(/[\s,/·()]+/).forEach((tok) => {
+      if (/^[가-힣]+\d+$/.test(tok)) { camp = tok; return; }
+      const m = tok.match(/^(\d{2,4})([A-Z]+)$/); if (!m) return;
+      m[2].split('').forEach((ch) => { const k = camp + '|' + m[1] + ch; if (seen[k] || q[k] === undefined) return; seen[k] = 1; const avg = (PKM.avg || {})[k] || 0; out.push({ camp, code: m[1] + ch, qty: q[k], pct: avg ? Math.round((q[k] / avg - 1) * 100) : null }); });
+    });
+    return out;
+  }
+  function pkmBox(r, dt) {
+    const L = pkmOfDay(r, dt); if (!L.length) return '';
+    const pc = (p) => (p == null ? '' : Math.abs(p) < 3 ? ' <small style="color:var(--sub)">평소와 비슷</small>' : ' <small style="font-weight:700;color:' + (p > 0 ? '#c2410c">평소보다 +' : '#15803d">평소보다 ') + p + '%</small>');
+    return '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:10px 12px;margin:10px 0 0;text-align:left"><b style="color:#9a3412;font-size:14px">🔥 피크 예상 물량</b>' +
+      L.map((x) => '<div style="margin-top:6px;font-size:14px"><b style="display:inline-block;min-width:52px">' + esc(x.code) + '</b> <b style="font-size:16px">' + x.qty.toLocaleString('ko-KR') + '건</b>' + pc(x.pct) + '</div>').join('') +
+      '<div style="margin-top:7px;font-size:12px;color:#7c2d12">' + (L.length > 1 ? '합계 ' + L.reduce((a, x) => a + x.qty, 0).toLocaleString('ko-KR') + '건 · ' : '') + '쿠팡 예상치라 실제와 다를 수 있습니다.</div></div>';
+  }
+  let sMy = false, sMobKeep = '';
+  /** 내 스케줄 모드: 관리자 본인 줄만 한 달 달력으로 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
+  function schMy(on) {
+    on = !!on && document.documentElement.classList.contains('m'); if (on === sMy) return;
+    sMy = on; if (on) { sMobKeep = sMob; sMob = 'drv'; } else if (sMobKeep) sMob = sMobKeep;
+    const v = $('#view-sched'); v.classList.toggle('my', on);
+    const h = v.querySelector('.head h2'); if (h && h.firstChild && h.firstChild.nodeType === 3) h.firstChild.nodeValue = on ? '내 스케줄 ' : '기사스케줄 ';
+  }
   const mobOn = () => document.documentElement.classList.contains('m') && sMob !== 'table';
   const mobSet = (v) => { sMob = v; try { localStorage.setItem('runner.sch.mob', v); } catch (e) { /* 무시 */ } };
   /** 달력 화면은 달력 달(1일~말일) 자료가 필요 → 2주·정산 기준으로 열려 있으면 한 달로 바꿔 다시 읽는다 (true = 다시 읽는 중) */
@@ -9693,6 +9974,13 @@
     if (!on || !SD.dates.length) { if (!on) box.innerHTML = ''; return; }
     if (mobNeedMonth()) { box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; return; }
     const dates = SD.dates, pdd = pddDate();
+    let myNone = false;
+    if (sMy) { // 아래 탭 → 내 스케줄: 관리자 아이디와 같은 쿠팡 아이디(없으면 같은 이름)의 기사 줄
+      const who = (typeof me !== 'undefined' && me) || {}, want = String(who.loginId || '').toLowerCase();
+      const mine = SD.drivers.find((d) => !d.ex && want && String(d.loginId || '').toLowerCase() === want) || SD.drivers.find((d) => !d.ex && who.name && d.name === who.name);
+      myNone = !mine; if (mine) sMobDrv = mine.id;
+      try { if (mine) localStorage.removeItem('runner.m.nomy'); else localStorage.setItem('runner.m.nomy', '1'); } catch (e) { /* 무시 */ }
+    }
     if (!sMobDay || !dates.includes(sMobDay)) sMobDay = dates.includes(pdd) ? pdd : dates[0];
     const [yy, mo] = dates[0].split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
     const camps = SD.camps.slice().sort((a, b) => koSort(a.name, b.name));
@@ -9700,11 +9988,12 @@
       '<div class="smb-more"><button type="button" class="btn ghost" id="smbMore">⋯</button><div class="smore-box hidden" id="smbMoreBox"><button type="button" class="btn ghost" data-smbgo="table">표로 보기</button><button type="button" class="btn ghost" data-smbgo="reload">새로고침</button></div></div></div>';
     const nav = (ttl) => '<div class="smb-nav"><button type="button" data-smbmv="-1" aria-label="이전 달">◀</button><span>' + yy + '년 ' + mo + '월 · ' + esc(ttl) + '</span><button type="button" data-smbmv="1" aria-label="다음 달">▶</button></div>';
     const grid = (cellFn) => '<div class="smb-grid">' + DOW.map((w, i) => '<div class="wd' + (i === 0 ? ' sun' : '') + '">' + w + '</div>').join('') + new Array(lead).fill('<div class="smb-c blank"></div>').join('') +
-      dates.map((dt, i) => { const dow = (lead + i) % 7; return '<button type="button" class="smb-c' + (dow === 0 || SD.holidays[dt] ? ' sun' : '') + (dt === pdd ? ' pdd' : '') + (dt === sMobDay ? ' sel' : '') + (dt < pdd ? ' past' : '') + '" data-smbd="' + dt + '"><span class="n">' + +dt.slice(8) + '</span>' + cellFn(dt, i) + '</button>'; }).join('') + '</div>';
+      dates.map((dt, i) => { const dow = (lead + i) % 7; return '<button type="button" class="smb-c' + (dow === 0 || SD.holidays[dt] ? ' sun' : '') + (dt === pdd ? ' pdd' : '') + (dt === sMobDay ? ' sel' : '') + (dt < pdd ? ' past' : '') + '" data-smbd="' + dt + '"><span class="n">' + +dt.slice(8) + (pkmIn(dt) ? '<span title="피크데이" style="font-size:10px">🔥</span>' : '') + '</span>' + cellFn(dt, i) + '</button>'; }).join('') + '</div>';
     const d = sMobDay, di = dates.indexOf(d), prev = (() => { const p = d.split('-'); const t = new Date(+p[0], +p[1] - 1, +p[2] - 1); return (t.getMonth() + 1) + '/' + t.getDate() + ' (' + DOW[t.getDay()] + ')'; })();
     const sat = (() => { const t = new Date(SD.today + 'T00:00:00'); t.setDate(t.getDate() - t.getDay() + 6); return ymdLocal(t); })();
     const dh = (ttl) => '<div class="smb-dh">' + esc(ttl) + (d === pdd ? '<em>PDD</em>' : '') + (SD.holidays[d] ? ' <span style="color:var(--danger);font-size:12px">' + esc(SD.holidays[d]) + '</span>' : '') + '<small class="' + (d > sat ? 'est">예상 · 변동 있음' : 'fix">확정') + '</small></div>';
     let html = top;
+    if (myNone) { box.innerHTML = '<div class="smb-card"><div class="smb-dh">내 스케줄</div><p class="smb-hint" style="margin:6px 0 10px">이 관리자 계정과 아이디 · 이름이 같은 기사 줄이 없습니다. 배송을 나가는 관리자는 기사 정보관리에 같은 아이디(또는 이름)로 등록되어 있어야 여기에 보입니다.</p><button type="button" class="btn" data-smbmng>기사 스케줄 관리로 가기</button></div>'; return; }
     if (sMob === 'camp') {
       if (!sf.camp || !camps.some((c) => c.id === sf.camp)) { sf.camp = camps.length ? camps[0].id : ''; $('#sCamp').value = sf.camp; return renderSched(); }
       const C = camps.find((c) => c.id === sf.camp), cs = shortCamp(C.name);
@@ -9730,7 +10019,7 @@
     } else {
       if (sf.camp) { sf.camp = ''; $('#sCamp').value = ''; return renderSched(); }
       const drvs = Array.from(new Map(srows.filter((r) => r.kind === 'd' && !r.d.ex).map((r) => [r.d.id, r.d])).values());
-      if (!sMobDrv || !drvs.some((x) => x.id === sMobDrv)) sMobDrv = drvs.length ? drvs[0].id : '';
+      if (!sMy && (!sMobDrv || !drvs.some((x) => x.id === sMobDrv))) sMobDrv = drvs.length ? drvs[0].id : '';
       const D = drvs.find((x) => x.id === sMobDrv);
       html += '<div class="smb-pick"><select class="inp" id="smbDrv" aria-label="기사">' + drvs.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === sMobDrv ? ' selected' : '') + '>' + esc(x.name + ' · ' + (shortCamp(x.camp || '') || '-') + (x.baseRoute ? ' · ' + x.baseRoute : '')) + '</option>').join('') + '</select></div>';
       if (!D) html += '<p class="smb-hint">표시할 기사가 없습니다.</p>';
@@ -9747,8 +10036,10 @@
             '<div class="big">' + (rt ? esc(shortCamp(r.camp || D.camp || '')) + ' <b>' + esc(rt) + '</b>' : c.kind === 'none' ? '<span style="color:#94a3b8">아직 정해지지 않음</span>' : '담당 <b>' + esc(base || '없음') + '</b>') + '</div>' +
             '<span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-work' ? '출근' : c.full) + '</span>' + (c.sub && c.kind !== 'k-yong' ? ' <span class="smb-pill" style="background:#dcfce7;color:#15803d">' + esc(c.sub) + ' 업무등록</span>' : '') +
             (iss ? '<p class="smb-hint" style="margin:8px 0 0">이슈: ' + esc(iss.result + ' · ' + iss.kind + (iss.sub ? ' · 대체 ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</p>' : '') + (ins ? '<p class="smb-hint" style="margin:6px 0 0">📌 ' + esc(ins.reason) + '</p>' : '') +
+            pkmBox(r, d) +
             '<button type="button" class="btn" data-smbrow="' + esc(r.key || r.row) + '">이 날 고치기</button></div>';
         }
+        if (sMy) html += '<button type="button" class="btn ghost" data-smbmng="' + esc(shortCamp(D.camp || '')) + '" style="width:100%;margin-top:10px">' + esc(shortCamp(D.camp || '') || '캠프') + ' 캠프 스케줄 보기</button>';
       }
     }
     box.innerHTML = html;
@@ -9757,6 +10048,7 @@
   const isWorkDayCell = (v) => { const s = String(v || '').trim(); return !!s && s !== '휴가' && !['휴무', '용차', '병가', '퇴사', '미입차', '노쇼', '업무'].some((w) => s.includes(w)); };
   $('#sMobBox').addEventListener('click', (e) => {
     const t = e.target;
+    const mg = t.closest('[data-smbmng]'); if (mg) { const c = SD.camps.find((x) => shortCamp(x.name) === mg.dataset.smbmng); schMy(false); if (c) { mobSet('camp'); sf.camp = c.id; $('#sCamp').value = c.id; } renderSched(); try { mTabSync(); } catch (x) { /* 무시 */ } window.scrollTo(0, 0); return; }
     const mb = t.closest('[data-smb]'); if (mb) { if (mb.dataset.smb !== sMob) { mobSet(mb.dataset.smb); paintMob(); } return; }
     if (t.closest('#smbMore')) { $('#smbMoreBox').classList.toggle('hidden'); return; }
     const go = t.closest('[data-smbgo]'); if (go) { if (go.dataset.smbgo === 'table') { mobSet('table'); paintMob(); } else schedGo(SD.dates[0]); return; }
@@ -11310,7 +11602,7 @@
       ['기사 노선 정보', '캠프 화면 아래 = 기사들이 앱에 남긴 글 · 숨기기 · 되살리기 · 삭제']
     ],
     'page:perf': [
-      ['하는 일', '쿠팡 주간 <b>수행률 안내</b> · 월간 <b>SLA 점수</b> · <b>프레시백 가중요인</b> 엑셀을 올려 노선 · 기사별 수행률 추이 보기'],
+      ['하는 일', '쿠팡 주간 <b>수행률 안내</b> · 월간 <b>SLA 점수</b> · <b>프레시백 가중요인</b> · <b>피크 예상 물량</b> 엑셀을 올려 노선 · 기사별 수행률 추이 보기'],
       ['올리기', '[쿠팡 파일 올리기] — 파일 종류 자동 인식 · 같은 기간은 덮어씀 · 기사 앱 "내 수행률"에 바로 반영'],
       ['보기', '캠프 · 기간 고르기 · 낮은 노선부터 정렬 · 기사 정보의 라우트 배정으로 기사와 연결 (배정이 없으면 노선만)']
     ],
