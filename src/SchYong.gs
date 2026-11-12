@@ -125,3 +125,50 @@ function adm_schUnVendor(token, o) {
     return { ok: true, days: schUnvRead_().map(function (x) { return { date: x.date, campId: x.campId, code: x.code, name: x.vendor }; }) };
   });
 }
+
+// ───── 노선 미입차 확정 (기사스케줄 › 미입차 노선 › 지난 것 › ③ 자료 확인 필요에서 확인한 결과) ─────
+//  기사 개인 이슈가 아니라 '그 노선이 그날 비었다'는 확인 기록. 결과: 미입차(수행률에 셈) / 물량없음(세지 않고 목록에서 뺌)
+const SCH_RMISS = { SHEET: 'routemiss', HEAD: ['날짜', '캠프', '노선', '결과', '사유', '메모', '작성자', '작성일시'], RESULTS: ['미입차', '물량없음'] };
+/** [{ row, date, camp(짧은 이름), unit(404C), result, reason, memo, by }] */
+function schRmRead_() {
+  const sh = schSS_().getSheetByName(SCH_RMISS.SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, SCH_RMISS.HEAD.length).getValues().map(function (r, i) {
+    return { row: i + 2, date: r[0] instanceof Date ? ymd_(r[0]) : str_(r[0]), camp: str_(r[1]), unit: str_(r[2]).toUpperCase(), result: str_(r[3]), reason: str_(r[4]), memo: str_(r[5]), by: str_(r[6]) };
+  }).filter(function (x) { return x.date && x.camp && x.unit && x.result; });
+}
+/** o = { items: [{ date, camp, units: ['404C'] }], result: '미입차' | '물량없음' | ''(확정 취소), reason, memo } → { ok, list } */
+function adm_schRouteMiss(token, o) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    o = o || {};
+    const result = str_(o.result), reason = str_(o.reason).slice(0, 40), memo = str_(o.memo).slice(0, 200);
+    if (result && SCH_RMISS.RESULTS.indexOf(result) < 0) fail_('결과를 확인해 주세요.');
+    const want = {};
+    (o.items || []).forEach(function (it) {
+      const d = parseYmd_(it && it.date), camp = str_(it && it.camp).replace(/\s*캠프\s*$/, '').replace(/\s+/g, '');
+      if (!d || !camp) return;
+      (it.units || []).forEach(function (u) { u = str_(u).toUpperCase(); if (/^\d{2,4}[A-Z]$/.test(u)) want[ymd_(d) + '|' + camp + '|' + u] = { date: ymd_(d), camp: camp, unit: u }; });
+    });
+    const keys = Object.keys(want);
+    if (!keys.length) fail_('날짜 · 노선을 골라 주세요.');
+    if (keys.length > 400) fail_('한 번에 400건까지 확정할 수 있습니다.');
+    const lock = scriptLock_();
+    lock.waitLock(30000);
+    try {
+      const book = schSS_();
+      let sh = book.getSheetByName(SCH_RMISS.SHEET);
+      if (!sh) { if (!result) return { ok: true, list: [] }; sh = book.insertSheet(SCH_RMISS.SHEET); sh.getRange(1, 1, 1, SCH_RMISS.HEAD.length).setValues([SCH_RMISS.HEAD]); }
+      // 같은 날 · 같은 노선은 한 줄만: 있던 줄은 지우고(아래에서부터) 새로 적는다
+      schRmRead_().filter(function (x) { return want[x.date + '|' + x.camp + '|' + x.unit]; }).map(function (x) { return x.row; }).sort(function (p, q) { return q - p; }).forEach(function (r) { sh.deleteRow(r); });
+      if (result) {
+        const now = nowText_(), by = a.name || a.loginId || '';
+        const rows = keys.map(function (k) { const w = want[k]; return [w.date, w.camp, w.unit, result, reason, memo, by, now]; });
+        sh.getRange(sh.getLastRow() + 1, 1, rows.length, SCH_RMISS.HEAD.length).setValues(rows);
+      }
+    } finally { lock.releaseLock(); }
+    try { fsMark_('sch', { by: a.loginId }); } catch (e) { /* 사본 표시는 실패해도 저장은 됨 */ }
+    try { logAdmin_(a, result ? '노선 미입차 확정' : '노선 미입차 확정 취소', keys.length + '건', (result || '') + (reason ? ' · ' + reason : '')); } catch (e) { /* 기록 실패는 무시 */ }
+    return { ok: true, list: schRmRead_().map(function (x) { return { date: x.date, camp: x.camp, unit: x.unit, result: x.result, reason: x.reason, memo: x.memo, by: x.by }; }) };
+  });
+}
