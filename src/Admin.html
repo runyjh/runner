@@ -8897,6 +8897,8 @@
       if (!r.ok) { sStale = false; return toast(r.msg); }
       sStale = false;
       apply(r);
+      // 휴대폰: 홈이 뜬 뒤 한가할 때 이슈 · 품앗이 목록을 미리 받아 둔다 → 관리 탭을 열면 바로 보인다 (앱을 연 뒤 한 번만)
+      if (!loadSched.pre && document.documentElement.classList.contains('m')) { loadSched.pre = true; setTimeout(() => { try { if (!IS.list.length) loadIssue(); } catch (e) { /* 무시 */ } setTimeout(() => { try { if (!PA.jobs.length) loadPumasi(); } catch (e) { /* 무시 */ } }, 1500); }, 2500); }
       { const t = new Date(), tdy = ymdLocal(t), tmr = ymdLocal(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1));
         if (Array.isArray(r.dates) && (r.dates.includes(tdy) || r.dates.includes(tmr))) admKeep.setP('sched', { mode: sMode, basis: sMode === 'month' ? sBasis : '', month: sMode === 'month' ? sMonth : '', r: r }); }
     }).catch(() => {});
