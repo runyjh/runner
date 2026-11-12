@@ -8600,8 +8600,8 @@
     SD.camps.forEach((c) => { campById[c.id] = c; });
     const rows = schSegDrivers().filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
       key: d._key, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type, baseAt: d._baseAt ? SD.dates.map((dt) => d._baseAt[dt] || d.baseRoute) : null,
-      cells: SD.dates.map((dt) => (segIn(d._seg, dt) ? sget(d.id, dt) : '')),
-      active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null,
+      cells: SD.dates.map((dt) => (segIn(d._seg, dt) && !drvGone(d, dt) ? sget(d.id, dt) : '')),
+      active: d._seg || SD.dates.some((dt) => drvGone(d, dt)) ? SD.dates.map((dt) => segIn(d._seg, dt) && !drvGone(d, dt)) : null, // 퇴사일 이후 · 휴직: 그 기사의 담당 노선을 '채워야 할 노선'으로 보지 않는다
       subs: cellSubsOf(d.id).concat(aliasOf(d)), recv: SD.dates.map((dt) => (((SD.pmTips || {})[d.id] || {})[dt] || []).some((t) => t.to === d.name && t.from !== d.name))
     }));
     const moves = (SD.routeMoves || []).map((m) => ({ a: { camp: shortCamp(m.fromCamp), num: (String(m.from).match(/\d+/) || [''])[0] }, b: { camp: shortCamp(m.toCamp), num: (String(m.to).match(/\d+/) || [''])[0] } })).filter((m) => m.a.camp && m.a.num && m.b.camp && m.b.num);
@@ -8901,6 +8901,8 @@
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#uaModal').classList.contains('hidden')) uaClose(); });
   $('#sWrap').addEventListener('click', (e) => { const td = e.target.closest('#sGrid td.uc[data-ucid]'); if (!td) return; uaOpen(td.dataset.ucid, td.dataset.ucode, SD.dates[+td.dataset.c]); });
+  /** 그날 이 기사가 없는가 (휴직 · 퇴사일 다음 날부터) — 담당 노선 · 미입차 · 확인 필요 계산에서 빠지고 칸도 쓰지 않는다 */
+  const drvGone = (d, dt) => !!d && (d.workStatus === '휴직' || (d.workStatus === '퇴사' && (!d.leaveDate || dt >= d.leaveDate)) || (!!d.leaveDate && dt >= d.leaveDate));
   /** 배정 안 된 칸: 소속 캠프가 있는 재직 기사(추가 배정 줄·휴직·퇴사일 이후 제외)의 빈 칸 */
   function noAssign(r, dt, v) {
     if (v || r.kind !== 'd') return false;
@@ -8912,6 +8914,7 @@
   function tdCell(r, ri, dt, ci) {
     if (r.seg && !segIn(r.seg, dt)) return offSegTd(r, ri, dt, ci);
     const v = sget(r.row, dt), k = r.row + '|' + dt;
+    if (r.kind === 'd' && !v && drvGone(r.d, dt)) return '<td class="c rcoff' + (sepCol(ci) ? ' wk2' : '') + '" data-r="' + ri + '" data-c="' + ci + '" title="' + (r.d.workStatus === '휴직' ? '휴직 중' : '퇴사일 이후') + ' — 입력하지 않는 칸"></td>';
     const cls = ['c', cellKindRow(v, r.row)];
     if (sPending[k]) cls.push('pend');
     if (scalc && scalc.dupCells.has((r.key || r.row) + '|' + ci)) cls.push('dup');
@@ -9129,7 +9132,7 @@
       const causeOf = (camp, unit, i, un) => {
         const dt = dates[i];
         if (un) return { why: '담당 없음', cause: '담당 기사가 없는 노선 · 그날 배정된 기사도 용차업체도 없음', names: ['담당 없음'], row: '', un: true, kind: 'un' };
-        const inCamp = drvRows.filter((r) => shortCamp(r.camp) === camp && !(r.seg && !segIn(r.seg, dt)));
+        const inCamp = drvRows.filter((r) => shortCamp(r.camp) === camp && !(r.seg && !segIn(r.seg, dt)) && !drvGone(r.d, dt));
         const A = [];
         inCamp.forEach((r) => {
           const v = String(sget(r.row, dt) || ''), is = issOf(r.d.mainId || r.d.id, dt).find((x) => /미입차|노쇼|병가/.test(x.result || '') || (!x.result && x.mi));
@@ -9528,6 +9531,7 @@
     $$('td.c', tb).forEach((td) => {
       const r = srows[+td.dataset.r], ci = +td.dataset.c, dt = SD.dates[ci];
       if (!r || (r.seg && !segIn(r.seg, dt))) return;
+      if (r.kind === 'd' && drvGone(r.d, dt) && !sget(r.row, dt)) return; // 퇴사일 이후 · 휴직 빈 칸은 그대로 (입력하지 않는 칸)
       const v = sget(r.row, dt), k = r.row + '|' + dt;
       const ins = r.kind === 'd' ? instOf(r.row, dt) : null, pm = r.kind === 'd' ? pmMark(r.row, dt) : '', iss = r.kind === 'd' ? issOf(r.row, dt) : [];
       const nov = noAssign(r, dt, v), mis = scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
@@ -9775,6 +9779,7 @@
     if (!sAct || sEdit) return;
     if (segOff(sAct.r, sAct.c)) { const sg = srows[sAct.r].seg; return toast('이 날은 ' + (SD.dates[sAct.c] < sg.from ? '이전' : '새') + ' 캠프 줄에서 입력해 주세요. (노선 변경 예약)'); }
     const r = srows[sAct.r], dt = SD.dates[sAct.c];
+    if (r && r.kind === 'd' && r.d && drvGone(r.d, dt) && !sget(r.row, dt)) return toast(r.d.name + ' 기사님은 이날 ' + (r.d.workStatus === '휴직' ? '휴직 중' : '퇴사일 이후') + '입니다. 입력하려면 기사 정보관리에서 재직 상태를 먼저 고쳐 주세요.');
     if (r && r.kind === 'p' && pmLockOf(r.row, dt)) return toast(PM_LOCK_MSG);
     // 기사 칸: 글자를 바로 치는 빠른 입력이 아니면 가운데 큰 창 (품앗이 칸은 품앗이 창)
     if (r && r.kind === 'd' && r.d) return ceOpenAt(sAct.r, sAct.c); // 기사 칸은 글자를 직접 치지 않고 항상 칸 입력 창 (여러 칸을 골랐으면 한꺼번에)
