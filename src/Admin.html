@@ -9032,8 +9032,7 @@
   function pmLabel(r, dt, pm) {
     const list = pmTipList(r, dt), me = r.d ? r.d.name : '';
     if (!list.length) return '🤝 품앗이 ' + pm;
-    // 둘째 줄에 노선을 같이 (품앗이 줄을 숨겨도 어느 노선인지 보이게): '🤝 배만호 / 맡김 212CD' · '🤝 이현모 / 받음 212CD'
-    return list.map((t) => (t.from === me && t.to !== me ? '🤝 ' + (t.to || '') + '\n맡김' : '🤝 ' + (t.from || '러너') + '\n받음') + (t.route ? ' ' + t.route : '')).join('\n');
+    return list.map((t) => (t.from === me && t.to !== me ? '🤝 ' + (t.to || '') + '\n품앗이 맡김' : '🤝 ' + (t.from || '러너') + '\n품앗이 받음')).join('\n');
   }
   /** 품앗이 칸에서 숨길 칸 글자 (품앗이만 보이게) — 노선 글자 등 다른 값은 그대로 둠 */
   const PM_ONLY = /^(출근|휴무|고정휴무|추가휴무|휴가)?$/;
