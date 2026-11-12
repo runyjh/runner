@@ -6327,6 +6327,12 @@ function schBuildUpload_(data, opt) {
     };
     return base;
   });
+  // 품앗이 줄(PM+기사ID): 받은 사람이 그날 그 노선을 타므로 백업 줄처럼 출력한다 (본인 줄이 휴무여도 입차로 잡힘)
+  (data.pmRows || []).forEach(function (pr) {
+    const d = data.drivers.filter(function (x) { return x.id === pr.driverId; })[0];
+    if (!d || !d.loginId || str_(d.type) === '운영자' || str_(d.title) === '운영자') return;
+    info.push({ key: pr.id, camp: '백업', name: d.name, id: d.loginId, defRt: '', cells: data.cells[pr.id] || {}, leaveFrom: d.leaveDate || '' });
+  });
 
   const leftInfo = {};
   info.forEach(function (r) { if (r.leaveFrom) leftInfo[r.key] = { name: r.name, from: r.leaveFrom }; });
@@ -6529,6 +6535,12 @@ function schBuildUpload_(data, opt) {
         if (date < opt.target || (v.from && date < v.from) || (v.to && date > v.to)) return;
         v.units.forEach(function (rt) { const bk = [date, camp, rt].join('|'); baseRouteSet[bk] = 1; const a = vendorOwner[bk] || (vendorOwner[bk] = []); if (a.indexOf(v.name) < 0) a.push(v.name); });
       });
+    });
+    // 기사스케줄 '담당 없음' 창에서 그날만 용차업체로 지정한 노선: 비고가 '담당 없음' 대신 '용차업체 OOO' 로 나가게
+    (data.vendorDays || []).forEach(function (x) {
+      const camp = campById[x.campId];
+      if (!camp || dates.indexOf(x.date) < 0 || x.date < opt.target) return;
+      routeExpand(x.code).forEach(function (rt) { const bk = [x.date, camp, rt].join('|'); baseRouteSet[bk] = 1; const a = vendorOwner[bk] || (vendorOwner[bk] = []); if (a.indexOf(x.name) < 0) a.push(x.name); });
     });
     // 담당 없음 노선 (노선관리에 사용 중인데 그날 기본노선 주인도, 용차업체도 없음): 아무도 안 뛰면 미입차로 · 비고 '담당 없음'
     //  (화면 아래 '미입차 노선' 줄과 같게 · 이관 예약으로 그날부터 다른 캠프로 옮겨 가는 노선은 뺀다 — 적용일에 자동 정지됨)

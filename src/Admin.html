@@ -395,6 +395,10 @@
   .cash .row { display: flex; align-items: center; gap: 14px; padding: 10px 4px; border-top: 1px solid #f0f1f3; font-size: 14px; } .cash .row input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 auto; }
   .cash .row .t { flex: 1; min-width: 0; } .cash .row .t small { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; } .cash .row .b { color: var(--sub); font-size: 12.5px; min-width: 150px; } .cash .row .m { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 130px; text-align: right; }
   .cash .row .m input { width: 130px; text-align: right; } .cash .row .dt { width: 130px; }
+  /* 휴대폰: 통장 잔액 줄은 3칸씩 줄바꿈 · 배분 줄은 [체크 + 이름] 한 줄, [통장 · 금액 · 날짜] 아랫줄 (글자가 세로로 눌리지 않게) */
+  html.m .banks { flex-wrap: wrap; } html.m .banks > div { flex: 1 1 30%; border-bottom: 1px solid var(--line); padding: 8px 10px; } html.m .banks small { white-space: normal; overflow: visible; } html.m .banks .lnk { flex: 1 1 30%; justify-content: center; padding: 10px; }
+  html.m .cash .row { flex-wrap: wrap; gap: 6px 10px; } html.m .cash .row .t { flex: 1 1 calc(100% - 40px); } html.m .cash .row .b { flex: 1 1 100%; min-width: 0; padding-left: 28px; }
+  html.m .cash .row .m { flex: 1 1 0; min-width: 0; text-align: left; padding-left: 28px; } html.m .cash .row .m input { width: 100%; max-width: 160px; } html.m .cash .row .dt { flex: 0 0 150px; width: 150px; }
   .cash .row.done .t { color: var(--sub); } .cash .row.done .m { color: var(--sub); }
   .cash .row.tot { font-weight: 800; border-top: 2px solid #1f2937; border-bottom: 1px solid #f0f1f3; } .cash .row.left .m { color: var(--brand); } .cash .row.left.neg .m { color: var(--danger); }
   .cash .tag { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px; background: var(--gray-weak); color: var(--sub); margin-left: 6px; } .cash .tag.draft { background: var(--warn-weak); color: var(--warn); } .cash .tag.diff { background: var(--danger-weak); color: var(--danger); } .cash .tag.ok { background: #f0fdf4; color: #16a34a; }
@@ -14372,7 +14376,7 @@
           SUB.filter((x) => x[0] === view && x[1] === go).forEach((x) => x[2].forEach(([sel, tag, kids]) => {
             $$(sel).forEach((b) => {
               const bl = (b.querySelector('.stt') ? tx(b.querySelector('.stt')) : tx(b)).replace(/^[⬆📅⚠📖+\s]+/u, '').replace(/\s*\d+$/, '').trim(); if (!bl) return;
-              const steps = [a].concat(tag === '더보기' ? [$('#sMoreBtn'), b] : [b]);
+              const steps = [a].concat(tag === '더보기' ? [$('#sMore'), b] : [b]);
               out.push({ kind: 'sub', d: 1, group: gname, col, label: bl, path: label + ' › ' + bl, tag: tag === '탭' || tag === '보기' ? '' : tag, steps, kw: b.title || '' });
               const k = kids && kids[b.dataset.st || b.dataset.step];
               if (k) $$(k).forEach((c) => out.push({ kind: 'sub', d: 2, group: gname, col, label: tx(c), path: label + ' › ' + bl + ' › ' + tx(c), steps: steps.concat([c]), kw: c.title || '' }));
