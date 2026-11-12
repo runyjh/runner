@@ -1492,7 +1492,24 @@
   }
   /* 휴대폰 화면(html.m): 위 막대(로고 · 🔍 · 지금 메뉴 ☰) → 누르면 묶음별 메뉴 */
   html.m #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-content: start; }
-  html.m main { padding: 16px 12px; min-width: 0; }
+  html.m main { padding: 16px 12px calc(76px + env(safe-area-inset-bottom, 0px)); min-width: 0; }
+  /* 휴대폰: 아래 탭 5개 · 더보기 (☰ 메뉴 대신) */
+  .mtab, .mmore { display: none; }
+  html.m .mtab { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html.m .mtab button { flex: 1; border: 0; background: none; font: inherit; font-size: 11px; font-weight: 700; color: #8b95a1; padding: 7px 0 6px; cursor: pointer; min-height: 54px; }
+  html.m .mtab button i { display: block; font-style: normal; font-size: 19px; line-height: 23px; filter: grayscale(1); opacity: .65; }
+  html.m .mtab button.on { color: var(--brand); } html.m .mtab button.on i { filter: none; opacity: 1; }
+  html.m .mmore { display: block; position: fixed; inset: 0; bottom: calc(54px + env(safe-area-inset-bottom, 0px)); z-index: 39; background: var(--bg, #f3f4f6); overflow-y: auto; padding: 12px 12px 20px; }
+  html.m .mmore.hidden { display: none; }
+  .mmore .mm-top { display: flex; align-items: center; justify-content: space-between; margin: 2px 2px 10px; } .mmore .mm-top b { font-size: 18px; }
+  .mmore .mm-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px; margin-bottom: 10px; }
+  .mmore .mm-card p { margin: 10px 0 2px; font-size: 12px; font-weight: 800; color: var(--sub); } .mmore .mm-card p small { font-weight: 500; }
+  .mmore .mm-card button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-top: 1px solid #f1f2f4; background: none; font: inherit; font-size: 15px; font-weight: 700; text-align: left; padding: 14px 2px; cursor: pointer; color: var(--ink); }
+  .mmore .mm-card button:first-of-type, .mmore .mm-card p + button { border-top: 0; } .mmore .mm-card button small { margin-left: auto; color: var(--sub); font-size: 12px; font-weight: 500; }
+  .mmore .mm-card.pc { background: #fafafa; } .mmore .mm-card.pc button { color: #6b7280; font-weight: 600; }
+  .mmore .mm-me { text-align: center; color: var(--sub); font-size: 12px; margin-top: 4px; }
+  html.m .side .navbtn { display: none !important; } /* ☰ 메뉴는 아래 탭 · 더보기로 대신함 */
+  html.m .toast { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
   html.m .side { overflow: visible; }
   html.m .side { position: sticky; top: 0; z-index: 15; height: auto; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
   html.m .side .logo { padding: 0; white-space: nowrap; font-size: 15px; } html.m .side .logo .rlogo { width: 26px; }
@@ -2085,6 +2102,45 @@
     </div>
    </section>
   </main>
+  <!-- 휴대폰 화면: 아래 탭 5개 + 더보기 (PC 화면에서는 안 보임) -->
+  <nav class="mtab" id="mTab" aria-label="주 메뉴">
+    <button type="button" data-mt="dash"><i>◉</i>오늘</button>
+    <button type="button" data-mt="sched"><i>▦</i>스케줄</button>
+    <button type="button" data-mt="issue"><i>🚩</i>이슈</button>
+    <button type="button" data-mt="pumasi"><i>🤝</i>품앗이</button>
+    <button type="button" data-mt="more"><i>≡</i>더보기</button>
+  </nav>
+  <div class="mmore hidden" id="mMore">
+    <div class="mm-top"><b>더보기</b><button type="button" class="btn ghost sm" data-mmx>닫기</button></div>
+    <div class="mm-card">
+      <button type="button" data-mmy>🚚 내 배송 스케줄<small>내 줄만 한 달 달력으로</small></button>
+    </div>
+    <div class="mm-card"><p>휴대폰에서 쓰는 메뉴</p>
+      <button type="button" data-mmv="drivers">👤 기사 정보관리</button>
+      <button type="button" data-mmv="notice">📢 공지사항</button>
+      <button type="button" data-mmv="memo">🗒 업무스케줄</button>
+      <button type="button" data-mmv="bib">🔢 배번호 관리</button>
+      <button type="button" data-mmv="perf">📊 수행률 · SLA</button>
+      <button type="button" data-mmv="route">🧭 노선관리</button>
+    </div>
+    <div class="mm-card pc"><p>PC에서 하는 일 <small>(표가 넓어 PC를 권합니다 · 눌러서 열 수는 있습니다)</small></p>
+      <button type="button" data-mmv="settle">정산관리</button>
+      <button type="button" data-mmv="settle" data-mmgo="pnl">매입·매출</button>
+      <button type="button" data-mmv="taxinv">세금계산서 역발행</button>
+      <button type="button" data-mmv="einv">전자세금계산서 발행</button>
+      <button type="button" data-mmv="insrep">산재/고용 신고 상황</button>
+      <button type="button" data-mmv="board">게시판 관리</button>
+      <button type="button" data-mmv="acc">계정관리</button>
+      <button type="button" data-mmv="uiset">올인원 설정</button>
+    </div>
+    <div class="mm-card">
+      <button type="button" data-mmc="#uiSw">🖥 PC 화면으로 보기</button>
+      <button type="button" data-mmc="#apOpen">🔑 비밀번호 변경</button>
+      <button type="button" data-mmc="#pfOpen">⏱ 속도 측정</button>
+      <button type="button" data-mmc="#logoutBtn">로그아웃</button>
+    </div>
+    <div class="mm-me" id="mmMe"></div>
+  </div>
 </div>
 
 <!-- ───────────── 기사 상세 ───────────── -->
@@ -3869,7 +3925,33 @@
     try { if (window.__schMob) window.__schMob(); } catch (e) { /* 기사스케줄을 아직 안 열었음 */ }
   });
   uiSwLabel();
-  function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; }
+  function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; try { mTabSync(); } catch (e) { /* 아직 준비 전 */ } }
+  // ── 휴대폰 아래 탭 · 더보기 (메뉴 이동은 왼쪽 메뉴의 같은 항목을 누르는 것과 똑같이 처리 → 화면 여는 규칙이 하나)
+  const MT_VIEWS = ['dash', 'sched', 'issue', 'pumasi'];
+  function mTabSync() {
+    const more = !$('#mMore').classList.contains('hidden');
+    $$('#mTab button').forEach((b) => b.classList.toggle('on', more ? b.dataset.mt === 'more' : (MT_VIEWS.includes(currentView) ? b.dataset.mt === currentView : b.dataset.mt === 'more')));
+  }
+  function mMoreShow(on) { $('#mMore').classList.toggle('hidden', !on); if (on) { $('#mMore').scrollTop = 0; $('#mmMe').textContent = ($('#meName').textContent || '') + ($('#updNo').textContent || ''); } mTabSync(); }
+  const navGo = (v, stGo) => { const a = $$('.nav a[data-view="' + v + '"]').find((x) => (x.dataset.stGo || '') === (stGo || '')); if (a) a.click(); };
+  $('#mTab').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mt]'); if (!b) return;
+    if (b.dataset.mt === 'more') return mMoreShow($('#mMore').classList.contains('hidden'));
+    mMoreShow(false); window.__mySch = ''; navGo(b.dataset.mt);
+    window.scrollTo(0, 0);
+  });
+  $('#mMore').addEventListener('click', (e) => {
+    if (e.target.closest('[data-mmx]')) return mMoreShow(false);
+    const v = e.target.closest('[data-mmv]'), c = e.target.closest('[data-mmc]');
+    if (v) { mMoreShow(false); navGo(v.dataset.mmv, v.dataset.mmgo || ''); window.scrollTo(0, 0); return; }
+    if (c) { mMoreShow(false); const t = $(c.dataset.mmc); if (t) t.click(); return; }
+    if (e.target.closest('[data-mmy]')) { // 내 배송 스케줄: 관리자 아이디와 같은 쿠팡 아이디(또는 이름)의 기사 줄을 한 달 달력으로
+      mMoreShow(false); window.__mySch = (me && (me.loginId || me.name)) || '';
+      try { mobSet('drv'); } catch (x) { /* 무시 */ }
+      if (currentView === 'sched') { try { if (window.__schMob) window.__schMob(); } catch (x) { /* 무시 */ } } else navGo('sched');
+      window.scrollTo(0, 0);
+    }
+  });
   new MutationObserver(navCur).observe($('.nav'), { subtree: true, attributes: true, attributeFilter: ['class'] });
   function switchView(v) {
     if (v !== currentView && !viewRestoring) { viewHist.push(currentView); if (viewHist.length > 30) viewHist.shift(); }
@@ -9693,6 +9775,13 @@
     if (!on || !SD.dates.length) { if (!on) box.innerHTML = ''; return; }
     if (mobNeedMonth()) { box.innerHTML = '<div style="padding:40px"><div class="spin"></div></div>'; return; }
     const dates = SD.dates, pdd = pddDate();
+    if (window.__mySch) { // 더보기 → 내 배송 스케줄
+      const want = String(window.__mySch).toLowerCase(), who = (typeof me !== 'undefined' && me) || {};
+      const mine = SD.drivers.find((d) => !d.ex && String(d.loginId || '').toLowerCase() === want) || SD.drivers.find((d) => !d.ex && who.name && d.name === who.name);
+      window.__mySch = '';
+      if (mine) { mobSet('drv'); sMobDrv = mine.id; sMobDay = dates.includes(pdd) ? pdd : dates[0]; }
+      else toast('관리자 계정과 같은 아이디 · 이름의 기사 줄이 없습니다. 달력에서 기사를 골라 주세요.');
+    }
     if (!sMobDay || !dates.includes(sMobDay)) sMobDay = dates.includes(pdd) ? pdd : dates[0];
     const [yy, mo] = dates[0].split('-').map(Number), lead = new Date(yy, mo - 1, 1).getDay();
     const camps = SD.camps.slice().sort((a, b) => koSort(a.name, b.name));
