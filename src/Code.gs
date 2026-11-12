@@ -47,6 +47,7 @@ const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: '
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
   id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
+  workerId: '실제 근무자 기사ID', // 같은 근무자 연결: 이 기사는 명의(아이디)만 있고 실제로는 그 기사가 뜀 → 스케줄은 근무자 한 줄 · 정산서는 명의별로 따로
   subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
   driverType: '단가코드', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
@@ -71,7 +72,7 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
-  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn'];
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId'];
 // 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -4848,7 +4849,8 @@ function schDriver_(o) {
     campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute, fixedOff: o.fixedOff, extraOff: o.extraOff,
     workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
     workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o),
-    subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean) // 칸 편집기 '서브아이디 업무등록' 추천용
+    subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean), // 칸 편집기 '서브아이디 업무등록' 추천용
+    workerId: str_(o.workerId), alias: []
   };
 }
 
@@ -4946,6 +4948,17 @@ function schRead_(sun, end) {
     d.extra = extraAssignOf_(o).filter(function (x) { return campName[x.c]; });
     return d;
   });
+  // 같은 근무자 연결: 명의 기사(workerId 가 있는 기사)는 줄을 만들지 않고, 근무자 줄에 '다른 명의 아이디'(alias)로 붙인다
+  //  → 기사스케줄 표 · 미입차/중복 계산 · 어드민 업로드 표 모두 근무자 한 줄만 본다 (명의 기사 줄의 예전 칸은 시트에 그대로 남음)
+  (function () {
+    const byId = {}; drivers.forEach(function (d) { byId[d.id] = d; });
+    for (let i = drivers.length - 1; i >= 0; i--) {
+      const d = drivers[i], w = d.workerId && d.workerId !== d.id ? byId[d.workerId] : null;
+      if (!w || w.workerId) continue; // 근무자가 없거나 근무자도 다른 사람에게 연결돼 있으면 연결로 보지 않음
+      if (d.loginId) w.alias.push({ id: d.id, name: d.name, login: d.loginId });
+      drivers.splice(i, 1);
+    }
+  })();
   // 추가 배정 → 그 캠프에 한 줄 더 (같은 기사 · 행ID EX기사ID@캠프ID)
   drivers.slice().forEach(function (d) {
     (d.extra || []).forEach(function (x) {

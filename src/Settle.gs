@@ -1386,6 +1386,7 @@ function stlWorkCtx_(ctx) {
   if (ctx._work) return ctx._work;
   const w = { subs: {}, recv: {} };
   try { pmData_().jobs.forEach(function (j) { if (j.status === PST.DONE && j.acceptedId && j.date) w.recv[j.acceptedId + '|' + j.date] = 1; }); } catch (e) { /* 품앗이 자료 없음 */ }
+  w.linkOf = function (id) { const o = (ctx.D && ctx.D.byId && ctx.D.byId[id]) || null; const wid = o ? str_(o.workerId) : ''; return wid && wid !== id && ctx.D.byId[wid] && !str_(ctx.D.byId[wid].workerId) ? wid : ''; }; // 명의 기사 → 실제 근무자
   w.subsOf = function (id) { if (w.subs[id] === undefined) { const o = (ctx.D && ctx.D.byId && ctx.D.byId[id]) || null; w.subs[id] = schSubIdsOf_(o); } return w.subs[id]; };
   ctx._work = w; return w;
 }
@@ -2086,7 +2087,7 @@ function won_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3
 
 /** 근무일: 날짜마다 그 묶음 아이디로 일한 기사(사용 기록 → 명의자)의 기사스케줄 칸이 출근이면 1일 */
 function stlGroupSched_(ctx, g, sched, P, cidDays) {
-  const cells = {}, per = {}, cidW = {}, WK = stlWorkCtx_(ctx);
+  const cells = {}, per = {}, cidW = {}, WK = stlWorkCtx_(ctx), linkWork = {};
   let days = 0;
   schDateRange_(parseYmd_(P.from), parseYmd_(P.to)).forEach(function (d) {
     const ws = {};
@@ -2097,11 +2098,15 @@ function stlGroupSched_(ctx, g, sched, P, cidDays) {
       if (w !== g.ownerId && ctx.groupOf && ctx.groupOf[w] && ctx.groupOf[w] !== g.key) return;
       ws[w] = 1;
       (cidW[c] = cidW[c] || {})[w] = 1;
+      const lw = WK.linkOf(w); // 같은 근무자 연결: 이 아이디의 명의 기사는 줄이 없고, 근무자 줄에서 이 아이디가 적힌 날이 근무일
+      if (lw) { const lv = (sched[lw] || {})[d]; if (lv && !/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(lv) && schCellIds_(lv).indexOf(stlLogin_(c).toLowerCase()) >= 0) { per[c] = (per[c] || 0) + 1; linkWork[d] = lv; } return; }
       const v = (sched[w] || {})[d];
       if (WK.recv[w + '|' + d] || (v && stlIsWorkDay_(v, WK.subsOf(w)))) per[c] = (per[c] || 0) + 1;
     });
     let cell = '', work = false;
+    if (linkWork[d]) { cell = linkWork[d]; work = true; }
     Object.keys(ws).forEach(function (w) {
+      if (WK.linkOf(w)) return; // 명의 기사 줄의 예전 칸은 보지 않음
       const v = (sched[w] || {})[d];
       if (WK.recv[w + '|' + d]) { if (!work) cell = v || '품앗이 받음'; work = true; return; } // 칸은 휴무·빈칸이어도 품앗이를 받아 뛴 날은 근무일
       if (!v) return;
