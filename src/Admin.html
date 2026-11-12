@@ -8570,7 +8570,14 @@
   /** 기본노선 칸: 잘리지 않게 줄바꿈 · 회전은 작은 표시 · 옛 캠프 줄이면 아래에 '→ 군포1 212AB' (옮겨 간 곳) */
   function baseRouteHtml(r) {
     const d = r.d;
-    let h = d.baseRoute ? cellLineHtml(d.baseRoute, []) : '';
+    // 같은 캠프 안에서 노선만 바뀌는 예약: 적용일 전에는 지금 노선을 보여 주고, 아래에 '11/19~ 204ABC' (바뀔 노선) — 적용일이 되면 새 노선만
+    let base = d.baseRoute, nx = null;
+    if (d._grp && d._grp.length > 1) {
+      const tdy = SD.today || ymdLocal(new Date()), cur = d._grp.filter((sg) => sg.from <= tdy).pop() || d._grp[0];
+      base = cur.baseRoute; nx = d._grp[d._grp.indexOf(cur) + 1] || null;
+    }
+    let h = base ? cellLineHtml(base, []) : '';
+    if (nx) h += '<small class="rcb mv" title="' + esc(mdOf(nx.from) + '부터 ' + (nx.baseRoute || '') + ' (그 전까지는 ' + (base || '') + ')') + '">' + esc(mdOf(nx.from) + '~ ' + (nx.baseRoute || '')) + '</small>';
     if (r.seg && d._segs) {
       const next = d._segs[d._si + 1];
       if (next) h += '<small class="rcb mv" title="' + esc(mdOf(next.from) + '부터 ' + (next.camp || '') + ' ' + (next.baseRoute || '') + (rcIsMove(d, next.from) ? ' (노선 이관)' : ' (노선 변경)')) + '">→ ' + esc(shortCamp(next.camp || '') + ' ' + (next.baseRoute || '')) + '</small>';
