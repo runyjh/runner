@@ -3037,7 +3037,7 @@
     let sv0 = '';
     try { const sv = sessionStorage.getItem('runner.admView'); if (sv && document.getElementById('view-' + sv)) currentView = sv0 = sv; } catch (e) {}
     // 휴대폰: 처음 열면 내 스케줄 (내 기사 줄이 없는 계정은 오늘 화면)
-    try { if (!sv0 && document.documentElement.classList.contains('m') && localStorage.getItem('runner.m.nomy') !== '1') { schMy(true); currentView = 'sched'; } } catch (e) { /* 기본 화면으로 */ }
+    try { if (!sv0 && document.documentElement.classList.contains('m') && localStorage.getItem('runner.m.nomy') !== '1') { schMy(true); currentView = 'sched'; } else if (sv0 === 'sched' && sessionStorage.getItem('runner.admMy') === '1') schMy(true); } catch (e) { /* 기본 화면으로 */ }
     switchView(currentView);
   }
   $('#loginForm').addEventListener('submit', (e) => {
@@ -9947,6 +9947,7 @@
   function schMy(on) {
     on = !!on && document.documentElement.classList.contains('m'); if (on === sMy) return;
     sMy = on; if (on) { sMobKeep = sMob; sMob = 'drv'; } else if (sMobKeep) sMob = sMobKeep;
+    try { sessionStorage.setItem('runner.admMy', on ? '1' : '0'); } catch (e) { /* 무시 */ }
     const v = $('#view-sched'); v.classList.toggle('my', on);
     const h = v.querySelector('.head h2'); if (h && h.firstChild && h.firstChild.nodeType === 3) h.firstChild.nodeValue = on ? '내 스케줄 ' : '기사스케줄 ';
   }
@@ -9979,7 +9980,8 @@
     let myNone = false;
     if (sMy) { // 아래 탭 → 내 스케줄: 관리자 아이디와 같은 쿠팡 아이디(없으면 같은 이름)의 기사 줄
       const who = (typeof me !== 'undefined' && me) || {}, want = String(who.loginId || '').toLowerCase();
-      const mine = SD.drivers.find((d) => !d.ex && want && String(d.loginId || '').toLowerCase() === want) || SD.drivers.find((d) => !d.ex && who.name && d.name === who.name);
+      let pick = ''; try { pick = localStorage.getItem('runner.m.myrow.' + want) || ''; } catch (e) { /* 무시 */ }
+      const mine = (pick && SD.drivers.find((d) => !d.ex && d.id === pick)) || SD.drivers.find((d) => !d.ex && want && String(d.loginId || '').toLowerCase() === want) || SD.drivers.find((d) => !d.ex && who.name && d.name === who.name);
       myNone = !mine; if (mine) sMobDrv = mine.id;
       try { if (mine) localStorage.removeItem('runner.m.nomy'); else localStorage.setItem('runner.m.nomy', '1'); } catch (e) { /* 무시 */ }
     }
@@ -9995,7 +9997,8 @@
     const sat = (() => { const t = new Date(SD.today + 'T00:00:00'); t.setDate(t.getDate() - t.getDay() + 6); return ymdLocal(t); })();
     const dh = (ttl) => '<div class="smb-dh">' + esc(ttl) + (d === pdd ? '<em>PDD</em>' : '') + (SD.holidays[d] ? ' <span style="color:var(--danger);font-size:12px">' + esc(SD.holidays[d]) + '</span>' : '') + '<small class="' + (d > sat ? 'est">예상 · 변동 있음' : 'fix">확정') + '</small></div>';
     let html = top;
-    if (myNone) { box.innerHTML = '<div class="smb-card"><div class="smb-dh">내 스케줄</div><p class="smb-hint" style="margin:6px 0 10px">이 관리자 계정과 아이디 · 이름이 같은 기사 줄이 없습니다. 배송을 나가는 관리자는 기사 정보관리에 같은 아이디(또는 이름)로 등록되어 있어야 여기에 보입니다.</p><button type="button" class="btn" data-smbmng>기사 스케줄 관리로 가기</button></div>'; return; }
+    const myPick = (cur) => '<select class="inp" id="smbMyPick" aria-label="내 줄 고르기" style="width:100%"><option value="">— 내 이름을 골라 주세요 —</option>' + SD.drivers.filter((x) => !x.ex && x.status === '승인').sort((x, y) => (isStaffRow(y) ? 1 : 0) - (isStaffRow(x) ? 1 : 0) || koSort(x.name, y.name)).map((x) => '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + '>' + esc(x.name + (x.title || (TITLES.includes(x.type) ? x.type : '') ? ' ' + (x.title || x.type) : ' · ' + (shortCamp(x.camp || '') || '-'))) + '</option>').join('') + '</select>';
+    if (myNone) { box.innerHTML = '<div class="smb-card"><div class="smb-dh">내 스케줄</div><p class="smb-hint" style="margin:6px 0 10px">이 관리자 계정과 아이디 · 이름이 같은 기사 줄을 찾지 못했습니다. 아래에서 본인 이름을 한 번 골라 두면 이 휴대폰에서는 계속 그 줄이 내 스케줄로 보입니다.</p>' + myPick('') + '<button type="button" class="btn ghost" data-smbmng style="width:100%;margin-top:10px">기사 스케줄 관리로 가기</button></div>'; return; }
     if (sMob === 'camp') {
       if (!sf.camp || !camps.some((c) => c.id === sf.camp)) { sf.camp = camps.length ? camps[0].id : ''; $('#sCamp').value = sf.camp; return renderSched(); }
       const C = camps.find((c) => c.id === sf.camp), cs = shortCamp(C.name);
@@ -10028,20 +10031,21 @@
       else {
         const cnt = { w: 0, o: 0, s: 0, m: 0, y: 0 };
         dates.forEach((dt) => { const r = mobRowFor(D.id, dt); if (!r) return; const v = sget(r.row, dt); if (!v) return; if (/^용차/.test(v)) cnt.y++; else if (/병가/.test(v)) cnt.s++; else if (/미입차|노쇼/.test(v)) cnt.m++; else if (/휴무|휴가/.test(v)) cnt.o++; else if (isWorkDayCell(v) || cellNorm(v, r.row)) cnt.w++; });
-        html += '<div class="smb-cal">' + nav(D.name) + '<div class="smb-sum">근무 ' + cnt.w + '일 · 쉬는 날 ' + cnt.o + '일' + (cnt.s ? ' · 병가 ' + cnt.s + '일' : '') + (cnt.m ? ' · 미입차 ' + cnt.m + '일' : '') + (cnt.y ? ' · 용차 ' + cnt.y + '일' : '') + '</div>' +
+        html += '<div class="smb-cal">' + nav(D.name + (D.title || (TITLES.includes(D.type) ? D.type : '') ? ' ' + (D.title || D.type) : '')) + '<div class="smb-sum">근무 ' + cnt.w + '일 · 쉬는 날 ' + cnt.o + '일' + (cnt.s ? ' · 병가 ' + cnt.s + '일' : '') + (cnt.m ? ' · 미입차 ' + cnt.m + '일' : '') + (cnt.y ? ' · 용차 ' + cnt.y + '일' : '') + '</div>' +
           grid((dt) => { const r = mobRowFor(D.id, dt); if (!r) return ''; const c = mobCell(r, dt); return '<span class="v ' + c.kind + '">' + esc(c.kind === 'none' ? '·' : c.top) + '</span>' + (c.sub && c.kind !== 'k-yong' ? '<span class="sb">서브</span>' : '') + (instOf(r.row, dt) ? '<span>' + (r.staff ? '📅' : '📌') + '</span>' : ''); }) + '</div>';
         const r = mobRowFor(D.id, d);
         if (r) {
           const c = mobCell(r, d), base = D.baseRoute && /^\d/.test(D.baseRoute) ? groupRoutes(baseCodes(D)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
           const rt = c.kind === 'k-work' || c.kind === 'k-other' ? (c.top === '출근' ? base : c.top) : '';
           html += '<div class="smb-card">' + dh(mobMd(d)) + '<p class="smb-hint" style="margin:2px 0 0">실제 출근일 ' + prev + ' 저녁 입차</p>' +
-            '<div class="big">' + (rt ? esc(shortCamp(r.camp || D.camp || '')) + ' <b>' + esc(rt) + '</b>' : c.kind === 'none' ? '<span style="color:#94a3b8">아직 정해지지 않음</span>' : '담당 <b>' + esc(base || '없음') + '</b>') + '</div>' +
+            '<div class="big">' + (rt ? (r.staff ? '' : esc(shortCamp(r.camp || D.camp || '')) + ' ') + '<b>' + esc(rt) + '</b>' : c.kind === 'none' ? '<span style="color:#94a3b8">아직 정해지지 않음</span>' : r.staff ? '<b>' + esc(c.top || c.full) + '</b>' : '담당 <b>' + esc(base || '없음') + '</b>') + '</div>' +
             '<span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-work' ? '출근' : c.full) + '</span>' + (c.sub && c.kind !== 'k-yong' ? ' <span class="smb-pill" style="background:#dcfce7;color:#15803d">' + esc(c.sub) + ' 업무등록</span>' : '') +
             (iss ? '<p class="smb-hint" style="margin:8px 0 0">이슈: ' + esc(iss.result + ' · ' + iss.kind + (iss.sub ? ' · 대체 ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</p>' : '') + (ins ? '<p class="smb-hint" style="margin:6px 0 0">📌 ' + esc(ins.reason) + '</p>' : '') +
             pkmBox(r, d) +
             '<button type="button" class="btn" data-smbrow="' + esc(r.key || r.row) + '">이 날 고치기</button></div>';
         }
-        if (sMy) html += '<button type="button" class="btn ghost" data-smbmng="' + esc(shortCamp(D.camp || '')) + '" style="width:100%;margin-top:10px">' + esc(shortCamp(D.camp || '') || '캠프') + ' 캠프 스케줄 보기</button>';
+        if (sMy) { const st = isStaffRow(D), cs = st ? '' : shortCamp(D.camp || ''); html += '<button type="button" class="btn ghost" data-smbmng="' + esc(cs) + '" style="width:100%;margin-top:10px">' + esc(cs ? cs + ' 캠프 스케줄 보기' : '캠프 스케줄 보기') + '</button>' +
+          '<details style="margin-top:10px"><summary class="smb-hint" style="cursor:pointer">내 줄이 아니면 바꾸기</summary><div style="margin-top:6px">' + myPick(D.id) + '</div></details>'; }
       }
     }
     box.innerHTML = html;
@@ -10050,7 +10054,7 @@
   const isWorkDayCell = (v) => { const s = String(v || '').trim(); return !!s && s !== '휴가' && !['휴무', '용차', '병가', '퇴사', '미입차', '노쇼', '업무'].some((w) => s.includes(w)); };
   $('#sMobBox').addEventListener('click', (e) => {
     const t = e.target;
-    const mg = t.closest('[data-smbmng]'); if (mg) { const c = SD.camps.find((x) => shortCamp(x.name) === mg.dataset.smbmng); schMy(false); if (c) { mobSet('camp'); sf.camp = c.id; $('#sCamp').value = c.id; } renderSched(); try { mTabSync(); } catch (x) { /* 무시 */ } window.scrollTo(0, 0); return; }
+    const mg = t.closest('[data-smbmng]'); if (mg) { const c = SD.camps.find((x) => shortCamp(x.name) === mg.dataset.smbmng); schMy(false); mobSet('camp'); if (c) { sf.camp = c.id; $('#sCamp').value = c.id; } renderSched(); try { mTabSync(); } catch (x) { /* 무시 */ } window.scrollTo(0, 0); return; }
     const mb = t.closest('[data-smb]'); if (mb) { if (mb.dataset.smb !== sMob) { mobSet(mb.dataset.smb); paintMob(); } return; }
     if (t.closest('#smbMore')) { $('#smbMoreBox').classList.toggle('hidden'); return; }
     const go = t.closest('[data-smbgo]'); if (go) { if (go.dataset.smbgo === 'table') { mobSet('table'); paintMob(); } else schedGo(SD.dates[0]); return; }
@@ -10062,6 +10066,7 @@
   $('#sMobBox').addEventListener('change', (e) => {
     if (e.target.id === 'smbCamp') { sf.camp = e.target.value; $('#sCamp').value = sf.camp; renderSched(); }
     if (e.target.id === 'smbDrv') { sMobDrv = e.target.value; paintMob(); }
+    if (e.target.id === 'smbMyPick') { try { const k = 'runner.m.myrow.' + String((me && me.loginId) || '').toLowerCase(); if (e.target.value) localStorage.setItem(k, e.target.value); else localStorage.removeItem(k); } catch (x) { /* 무시 */ } paintMob(); }
   });
   function refreshAfterChange(changedRows) {
     UNC = null;
