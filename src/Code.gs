@@ -5062,6 +5062,20 @@ function adm_schSave(token, changes) {
         });
       }
     } catch (e) { /* 품앗이 자료를 못 읽으면 그대로 저장 */ }
+    // 품앗이로 맡긴 날(배차 확정)에 맡긴 기사 본인 칸을 '출근'으로 바꾸는 것도 막는다 — 품앗이가 그대로 남아 두 사람이 같은 노선으로 잡히고 정산 연동도 남는다.
+    //  (화면에서는 '품앗이 취소하고 출근으로'를 먼저 거치므로, 여기 걸리는 것은 품앗이를 취소하지 않고 저장한 경우뿐)
+    try {
+      const cand = changes.filter(function (x) { return x.row.indexOf(SCH_PM_PREFIX) !== 0 && !/^NOTE\d+$/.test(x.row) && schWorkDay_(x.value, []) && !schWorkDay_(x.old, []); });
+      if (cand.length) {
+        const given = {};
+        pmData_().jobs.forEach(function (j) { if (j.status === PST.DONE && j.posterId && j.acceptedId) given[j.posterId + '|' + j.date] = 1; });
+        changes = changes.filter(function (x) {
+          if (cand.indexOf(x) < 0 || !given[x.row + '|' + x.date]) return true;
+          pmLocked.push({ row: x.row, date: x.date, current: String(x.old == null ? '' : x.old), given: true });
+          return false;
+        });
+      }
+    } catch (e) { /* 품앗이 자료를 못 읽으면 그대로 저장 */ }
     if (!changes.length) return { ok: true, saved: 0, conflicts: [], pmLocked: pmLocked };
     changes.forEach(function (x) {
       x.value = String(x.value == null ? '' : x.value).replace(/\r\n?/g, '\n').trim();
@@ -7292,7 +7306,6 @@ function adm_rcMove(token, f, dry) {
       if (v.campId !== fromCamp.id) return;
       const u = rcUnits_(v.baseRoute);
       if (!u.units.some(function (x) { return x.num === fromNum; })) return;
-      if (u.units.some(function (x) { return x.num !== fromNum; })) { check.push(d.name + ' (' + v.baseRoute + ' — 다른 번호도 맡고 있어 직접 정해 주세요)'); return; }
       drivers.push({ id: d.id, name: d.name, status: d.status, from: v.baseRoute, to: swap(v.baseRoute) });
     });
     // 확인할 것: 옛 노선에 걸린 진행 중 품앗이 일감, 일시단가
@@ -7318,6 +7331,8 @@ function adm_rcMove(token, f, dry) {
       prices: { from: priceFrom.length, to: priceTo.length, copy: !!f.copyPrice && priceFrom.length > 0 && !priceTo.length },
       drivers: drivers, check: check, warnings: warn
     };
+    // 적용일부터 스케줄 칸에 적힌 옛 번호 (백업 기사가 적어 둔 '서초1 404ABC' 등) → 새 번호로 바꿀 칸 수
+    try { plan.cellFix = rcMoveFix_(a, { date: date, fromCampId: fromCamp.id, fromCamp: fromCamp.name, fromRoute: fromNum, toCampId: toCamp ? toCamp.id : '', toCamp: toCampLabel, toRoute: toNum }, true, true).cells.length; } catch (e) { plan.cellFix = 0; }
     if (dry) return plan;
     const lock = scriptLock_();
     lock.waitLock(30000);
@@ -7356,10 +7371,110 @@ function adm_rcMove(token, f, dry) {
       });
       if (date <= today) rcApply_(mv, now);
       bumpMaster_(); rcTouch_();
+      try { plan.cellFixed = rcMoveFix_(a, mv, false, true).cells.length; } catch (e) { plan.cellFixed = 0; console.error('이관 칸 맞추기 실패: ' + (e && e.message)); }
       logAdmin_(a, '노선 이관', fromCamp.name + ' ' + fromNum + ' → ' + toCamp.name + ' ' + toNum, date + ' · 기사 ' + made.length + '명' + (copied ? ' · 단가 ' + copied + '줄 복사' : '') + (newCampName ? ' · 새 캠프' : ''));
       plan.dry = false; plan.to.campId = toCamp.id; plan.made = made; plan.copied = copied; plan.moveId = mv.id;
       return plan;
     } finally { lock.releaseLock(); }
+  });
+}
+
+/**
+ * 노선 이관 뒤 맞추기 (잠금 안에서 · dry 면 목록만):
+ *  (1) 적용일에 옛 캠프에서 옛 번호를 아직 맡고 있는 기사 → 그 번호만 새 번호로 노선 변경 (skipDrivers 면 건너뜀)
+ *  (2) 적용일부터 스케줄 칸에 적힌 옛 번호 → 새 번호 ('서초1 404ABC' → '서초1 204ABC' · 캠프가 바뀌는 이관이면 캠프 이름도)
+ *      품앗이 줄(일감 기준으로 잠긴 칸)과 비고 줄은 건드리지 않는다.
+ * virt = { base: {기사ID: 기본노선}, cell: {'행|열': 글자} } — 미리보기에서 이관 여러 건을 차례로 겹쳐 볼 때
+ * → { drivers: [{ id, name, from, to }], cells: [{ row, col, date, name, old, value }] }
+ */
+function rcMoveFix_(a, mv, dry, skipDrivers, virt) {
+  const out = { drivers: [], cells: [] };
+  const fromNum = str_(mv.fromRoute).replace(/[^0-9]/g, ''), toNum = str_(mv.toRoute).replace(/[^0-9]/g, ''), date = str_(mv.date);
+  if (!fromNum || !toNum || !date || (fromNum === toNum && mv.fromCampId === mv.toCampId)) return out;
+  virt = virt || { base: {}, cell: {} };
+  const m = master_(), today = todayText_();
+  const short = function (n) { return str_(n).replace(/\s*캠프\s*$/, '').replace(/\s+/g, ''); };
+  const campName = {}; m.camps.forEach(function (c) { campName[c.id] = c.name; });
+  const fromShort = short(campName[mv.fromCampId] || mv.fromCamp), toShort = short(campName[mv.toCampId] || mv.toCamp);
+  const has = new RegExp('(^|[^0-9])' + fromNum + '(?=[A-Za-z])'), swap = function (t) { return str_(t).replace(new RegExp('(^|[^0-9])' + fromNum + '(?=[A-Za-z])', 'g'), '$1' + toNum); };
+  const all = readAll_(SH.DRIVERS).filter(function (d) { return d.id && d.name; });
+  let by = rcByDriver_();
+  const at = function (d, dt) { const v = rcAt_({ campId: d.schCampId, camp: d.schCamp, baseRoute: d.baseRoute }, by[d.id], dt, today); if (virt.base[d.id] !== undefined && dt >= date) v.baseRoute = virt.base[d.id]; return v; };
+  if (!skipDrivers) {
+    all.forEach(function (d) {
+      const v = at(d, date);
+      if (v.campId !== mv.fromCampId) return;
+      const u = rcUnits_(v.baseRoute);
+      if (u.special || !u.units.some(function (x) { return x.num === fromNum; })) return;
+      const to = swap(v.baseRoute);
+      out.drivers.push({ id: d.id, name: d.name, from: v.baseRoute, to: to });
+      if (dry) { virt.base[d.id] = to; return; }
+      const o = driverById_(d.id);
+      if (o) rcAddDriver_(a, o, date, mv.toCampId, to, fromShort + ' ' + fromNum + ' → ' + toShort + ' ' + toNum + ' 이관 (다른 번호도 맡는 기사)', mv.id || '');
+    });
+    if (!dry && out.drivers.length) { rcTouch_(); by = rcByDriver_(); }
+  }
+  if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return out;
+  const h = schHeader_(), sh = schSheet_(), last = sh.getLastRow();
+  const days = Object.keys(h.dates).filter(function (d) { return d >= date; });
+  if (last < 2 || !days.length) return out;
+  const cols = days.map(function (d) { return h.dates[d]; }), c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
+  const ids = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).getValues().map(function (r) { return str_(r[0]); });
+  const block = sh.getRange(2, c0 + 1, last - 1, c1 - c0 + 1).getValues();
+  const drv = {}; all.forEach(function (d) { drv[d.id] = d; });
+  const sameCamp = mv.fromCampId === mv.toCampId;
+  const toHasOld = !sameCamp && m.routes.some(function (r) { return r.campId === mv.toCampId && r.g1 === fromNum; }); // 옮겨 간 캠프에 같은 번호가 따로 있으면 캠프 이름 없는 칸은 건드리지 않는다
+  ids.forEach(function (id, i) {
+    if (!id || /^NOTE\d+$/.test(id) || id.indexOf(SCH_PM_PREFIX) === 0) return;
+    const ex = schExParse_(id), d = drv[ex ? ex.driverId : id];
+    days.forEach(function (dt) {
+      const c = h.dates[dt], vk = (i + 2) + '|' + c;
+      const raw = block[i][c - c0], v = virt.cell[vk] !== undefined ? virt.cell[vk] : (raw instanceof Date ? '' : str_(raw));
+      if (!v || !has.test(v)) return;
+      const camp = ex ? ex.campId : d ? at(d, dt).campId : '';
+      const nv = v.split(/\r?\n/).map(function (ln) {
+        if (!has.test(ln)) return ln;
+        const pm = ln.match(/^(\s*)([가-힣]+\s?\d+)(\s+)([\s\S]*)$/);
+        if (pm) return pm[2].replace(/\s+/g, '') === fromShort && has.test(pm[4]) ? pm[1] + toShort + pm[3] + swap(pm[4]) : ln; // 캠프 이름이 적힌 칸: 옛 캠프일 때만
+        if (!/^\s*\d/.test(ln)) return ln; // 노선으로 시작하지 않는 글(메모 등)은 그대로
+        if (camp === mv.toCampId && (sameCamp || !toHasOld)) return swap(ln);                // 같은 캠프 번호 바뀜 · 같이 옮겨 간 기사
+        if (camp === mv.fromCampId && !sameCamp) return toShort + ' ' + swap(ln.trim());      // 옛 캠프에 남은 기사가 적어 둔 옛 번호 → '새캠프 새번호'
+        return ln;
+      }).join('\n');
+      if (nv === v) return;
+      out.cells.push({ row: i + 2, col: c + 1, date: dt, name: d ? d.name : id, old: v, value: nv });
+      if (dry) virt.cell[vk] = nv; else sh.getRange(i + 2, c + 1).setValue(nv);
+    });
+  });
+  return out;
+}
+/** 관리자: 이미 등록한 노선 이관 전부를 다시 맞춘다 (건너뛴 기사 · 옛 번호 칸). dry = true 면 미리보기 → { ok, moves: [{ label, date, drivers, cells }], drivers, cells } */
+function adm_rcMoveFix(token, dry) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const run = function () {
+      const campName = rcCampNames_(), short = function (n) { return str_(n).replace(/\s*캠프\s*$/, ''); };
+      const virt = { base: {}, cell: {} }, moves = [];
+      rcRows_(true).filter(function (c) { return c.kind === RCK.MOVE && c.date; }).sort(rcSort_).forEach(function (mv) {
+        const r = rcMoveFix_(a, mv, !!dry, false, virt);
+        if (!r.drivers.length && !r.cells.length) return;
+        moves.push({ label: short(campName[mv.fromCampId] || mv.fromCamp) + ' ' + mv.fromRoute + ' → ' + short(campName[mv.toCampId] || mv.toCamp) + ' ' + mv.toRoute, date: mv.date,
+          drivers: r.drivers.map(function (x) { return { name: x.name, from: x.from, to: x.to }; }),
+          cells: r.cells.length, sample: r.cells.slice(0, 6).map(function (x) { return { date: x.date, name: x.name, old: x.old, value: x.value }; }) });
+      });
+      return moves;
+    };
+    let moves;
+    if (dry) moves = run();
+    else {
+      const lock = scriptLock_();
+      lock.waitLock(30000);
+      try { moves = run(); bumpMaster_(); rcTouch_(); } finally { lock.releaseLock(); }
+      fsMark_('sch', { by: a.loginId });
+      const nd = moves.reduce(function (n, x) { return n + x.drivers.length; }, 0), nc = moves.reduce(function (n, x) { return n + x.cells; }, 0);
+      if (nd || nc) logAdmin_(a, '노선 이관 뒤 맞추기', moves.map(function (x) { return x.label; }).join(', '), '기사 ' + nd + '명 · 칸 ' + nc + '개');
+    }
+    return { ok: true, dry: !!dry, moves: moves, drivers: moves.reduce(function (n, x) { return n + x.drivers.length; }, 0), cells: moves.reduce(function (n, x) { return n + x.cells; }, 0) };
   });
 }
 

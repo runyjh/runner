@@ -3725,7 +3725,7 @@
     if (!m) { $('#mmList').innerHTML = '<div class="card" style="color:var(--sub)">불러오는 중…</div>'; return; }
     const list = m.memos.filter((x) => x.date === MM.day);
     $('#mmList').innerHTML = list.length ? list.map((x) => '<div class="mmi' + (x.done ? ' done' : '') + '">' +
-      (x.note ? '' : '<button type="button" class="ck" data-mmdone="' + escH(x.id) + '" aria-label="완료 표시">' + (x.done ? '✓' : '') + '</button>') +
+      '<button type="button" class="ck" data-mmdone="' + escH(x.id) + '" aria-label="완료 표시">' + (x.done ? '✓' : '') + '</button>' +
       '<div class="bd">' + (x.time ? '<span class="tm">' + escH(x.time) + '</span>' : '') + (x.cat ? '<span class="cat">' + escH(x.cat) + '</span>' : '') +
       '<div class="tx">' + escH(x.content) + '</div>' +
       '<div class="mt"><span>' + escH(x.author || '') + '</span><button type="button" data-mmedit="' + escH(x.id) + '">수정</button><button type="button" class="del" data-mmdel="' + escH(x.id) + '">삭제</button></div></div></div>').join('')

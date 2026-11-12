@@ -1282,7 +1282,7 @@ function pmAdminMarks_(cells, dates, byDrv, tips) {
     if (j.acceptedId) add(j.acceptedId, j.date, '◀ ' + (j.poster || ''));
     // 마우스를 올리면 보이는 일감 정보 (배차일 · 구분 · 입차시간 · 캠프·라우트 · 준 기사 → 받은 기사)
     if (tips) {
-      const t = { id: j.id, date: j.date, kind: j.kind || '', time: str_(j.time), camp: str_(j.camp), route: str_(j.route), area: str_(j.area), from: j.poster || '', to: j.accepted || '' };
+      const t = { id: j.id, date: j.date, kind: j.kind || '', time: str_(j.time), camp: str_(j.camp), route: str_(j.route), area: str_(j.area), from: j.poster || '', to: j.accepted || '', fromId: j.posterId || '', toId: j.acceptedId || '' };
       [j.posterId, j.acceptedId].forEach(function (id) { if (!id) return; const m = tips[id] || (tips[id] = {}); (m[j.date] = m[j.date] || []).push(t); });
     }
   });
