@@ -4987,6 +4987,9 @@ function schRead_(sun, end) {
     if (show.length) d.changes = show.map(function (c) { return rcView_(c, campName); });
   });
   try { rcRows_().forEach(function (c) { if (c.kind === RCK.MOVE && c.status === RCS.WAIT) rcMoves.push(rcView_(c, campName)); }); } catch (e) { /* 무시 */ }
+  // 노선 이관 기록 (예약 · 적용 모두): 이관 전후로 이름만 바뀐 같은 노선 → 미입차 계산이 '옛 이름 = 새 이름'으로 본다
+  const routeMoves = [];
+  try { rcRows_().forEach(function (c) { if (c.kind === RCK.MOVE) routeMoves.push({ date: c.date, fromCamp: campName[c.fromCampId] || c.fromCamp || '', from: str_(c.fromRoute), toCamp: campName[c.toCampId] || c.toCamp || '', to: str_(c.toRoute) }); }); } catch (e) { /* 무시 */ }
   if (last >= 2) schSyncCopies_(sh, h, drivers, touched ? null : fixed);
   const holidays = {};
   dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
@@ -5025,7 +5028,7 @@ function schRead_(sun, end) {
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
     issues: issues, issueKinds: SCH_ISSUE.KINDS, pmLocks: pmLocks,
-    vendorRoutes: VP.routes, vendors: VP.vendors,
+    vendorRoutes: VP.routes, vendors: VP.vendors, routeMoves: routeMoves,
     vendorDays: (function () { try { return typeof schUnvRead_ === 'function' ? schUnvRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, campId: x.campId, code: x.code, name: x.vendor }; }) : []; } catch (e) { return []; } })()
   };
 }

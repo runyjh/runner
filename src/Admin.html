@@ -1129,7 +1129,7 @@
   .schk-box.big { max-height: 560px; padding: 12px 14px; }
   .schk .chip em.pst { font-style: normal; font-size: 11px; font-weight: 800; color: #b91c1c; background: #fde8e8; border-radius: 999px; padding: 0 7px; line-height: 18px; }
   .sg .camppast { color: #b91c1c; background: #fde8e8; border-radius: 999px; padding: 0 7px; font-weight: 800; margin-left: 6px; font-size: 11px; font-style: normal; cursor: help; }
-  .mi-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; } .mi-top .seg button { border: 0; background: none; padding: 5px 12px; }
+  .mi-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; } .mi-top .seg button { border: 0; background: none; padding: 5px 12px; } .mi-top .seg button small { color: #94a3b8; font-weight: 700; }
   .mi-top .seg button.on { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
   .mi-sum { margin-left: auto; color: var(--sub); } .mi-sum b { color: #e5484d; font-size: 14px; }
   .mi-kp { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -1147,6 +1147,20 @@
   .schk-box .mi-m.pt { background: #fde8e8; color: #b91c1c; box-shadow: inset 0 0 0 1px #e5484d; } .schk-box .mi-m.pt:hover { background: #fbd5d5; }
   .mi-d { color: #cbd5e1; font-style: normal; } .mi-g { color: #94a3b8; }
   .mi-n { display: inline-block; min-width: 24px; border-radius: 999px; background: #e5484d; color: #fff; padding: 1px 7px; }
+  .schk .chip em.pst.soft, .sg .camppast.soft { color: #475569; background: #eef1f5; }
+  .mi-kp3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
+  .mi-k3 { border-radius: 12px; padding: 10px 13px; border: 1px solid #edf0f3; } .mi-k3 h4 { margin: 0; font-size: 13.5px; } .mi-k3 b { display: block; font-size: 22px; line-height: 1.3; } .mi-k3 p { margin: 2px 0 0; font-size: 11.5px; color: #4e5968; line-height: 1.5; }
+  .mi-k3.a { background: #fff5f5; border-color: #f5c2c2; } .mi-k3.a b { color: #e5484d; } .mi-k3.b { background: #fff8eb; border-color: #f5d38a; } .mi-k3.b b { color: #b45309; } .mi-k3.c { background: #f3f5f8; } .mi-k3.c b { color: #475569; }
+  .mi-sec { display: flex; align-items: center; gap: 8px; margin: 14px 0 5px; flex-wrap: wrap; } .mi-sec i { font-style: normal; font-size: 12px; font-weight: 800; color: #fff; border-radius: 999px; padding: 1px 10px; } .mi-sec small { color: var(--sub); }
+  .mi-sec i.a { background: #e5484d; } .mi-sec i.b { background: #f59e0b; } .mi-sec i.c { background: #94a3b8; }
+  .mi-t3 { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; table-layout: fixed; }
+  .mi-t3 th, .mi-t3 td { border-bottom: 1px solid #edf0f3; padding: 5px 8px; text-align: left; vertical-align: middle; overflow-wrap: anywhere; word-break: keep-all; line-height: 1.45; }
+  .mi-t3 th { background: #fafbfc; color: var(--sub); font-weight: 700; font-size: 11.5px; } .mi-t3 th small { font-weight: 500; }
+  .mi-t3 .c1 { width: 150px; } .mi-t3 .c2 { width: 30%; } .mi-t3 .c4 { width: 56px; text-align: center; } .mi-t3 .c5 { width: 90px; } .mi-t3 .c6 { width: 190px; }
+  .schk-box .mi-dt { display: inline-block; border: 0; border-radius: 6px; padding: 1px 7px; margin: 1px 3px 1px 0; font-size: 11.5px; font-weight: 700; }
+  .schk-box .mi-dt.a { background: #fde8e8; color: #b91c1c; } .schk-box .mi-dt.b { background: #fff1d6; color: #a15c00; } .schk-box .mi-dt.c { background: #eef1f5; color: #475569; } .schk-box .mi-dt:hover { box-shadow: inset 0 0 0 1px currentColor; }
+  .schk-box .mi-fix { border: 1px solid #bfdbfe; background: #eff6ff; color: #1b4fc4; border-radius: 7px; padding: 3px 9px; font-size: 11.5px; font-weight: 800; text-align: left; }
+  .mi-n.b { background: #f59e0b; } .mi-n.c { background: #94a3b8; }
   .mi-none { padding: 14px 4px; color: var(--sub); } .mi-note { margin-top: 8px; font-size: 11.5px; color: var(--sub); line-height: 1.6; }
   .mi-h { font-weight: 800; font-size: 13.5px; margin: 14px 0 6px; } .mi-rank { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
   .mi-r { border: 1px solid #edf0f3; border-radius: 10px; padding: 7px 11px; } .mi-r b { font-size: 13px; } .mi-r span { float: right; color: #e5484d; font-weight: 800; } .mi-r small { display: block; color: #8b95a1; margin-top: 1px; }
@@ -7999,7 +8013,7 @@
      * rows: [{ key, camp(짧은 캠프명 예: 강서1, 없으면 ''), name, baseRoute, type, cells: [날짜별 글자] }]
      * camps: { 짧은캠프명: ['D1','D2','F3'] }  (캠프별 기본 회전)
      */
-    function compute(rows, camps, nDays) {
+    function compute(rows, camps, nDays, moves) {
       const defRotArr = (camp) => (camps[camp] && camps[camp].length ? camps[camp] : ALL_ROTS);
       const campNames = Object.keys(camps).sort((a, b) => b.length - a.length);
       const counts = {};
@@ -8107,6 +8121,10 @@
           const hasKey = KEYWORDS.some((k) => routeList.join(',').includes(k));
           if (routeList.length && (flat.includes('업무') || hasKey || isValidRouteList(routeList.join(',')))) addPresent(finalCamp, routeList, rotArr, r.key, per);
         });
+        // 노선 이관: 이름만 바뀐 같은 노선 (안양1 110 ↔ 군포1 212) — 한쪽 이름으로 뛰었으면 다른 쪽 이름의 담당 노선도 채워진 것으로 본다
+        const eqOf = (camp, rt) => { const m = String(rt).match(/^(\d+)([A-Za-z]+)$/); if (!m || !moves || !moves.length) return []; const out = [];
+          moves.forEach((mv) => { if (mv.a.camp === camp && mv.a.num === m[1]) out.push([mv.b.camp, mv.b.num + m[2]]); else if (mv.b.camp === camp && mv.b.num === m[1]) out.push([mv.a.camp, mv.a.num + m[2]]); }); return out; };
+        const has = (camp, rt, rot) => present.has([camp, rt, rot].join('|')) || eqOf(camp, rt).some((e) => present.has([e[0], e[1], rot].join('|')));
         // 미입차 모으기
         const miss = new Map();
         const addMissing = (camp, rt, rot) => { const k = camp + '|' + rt; if (!miss.has(k)) miss.set(k, new Set()); miss.get(k).add(rot); };
@@ -8118,11 +8136,11 @@
         });
         byRoute.forEach((rots, k) => { const [camp, rt] = k.split('|'); defRotArr(camp).filter((x) => !rots.has(x)).forEach((x) => addMissing(camp, rt, x)); });
         explicitMi.forEach(({ baseCamp, defRt }) => routeExpand(defRt).forEach((rt) => defRotArr(baseCamp).forEach((rot) => {
-          if (!present.has([baseCamp, rt, rot].join('|'))) addMissing(baseCamp, rt, rot);
+          if (!has(baseCamp, rt, rot)) addMissing(baseCamp, rt, rot);
         })));
         baseRouteSet.forEach((k) => {
           const [camp, rt] = k.split('|');
-          const covered = defRotArr(camp).some((rot) => present.has([camp, rt, rot].join('|')));
+          const covered = defRotArr(camp).some((rot) => has(camp, rt, rot));
           if (!covered) defRotArr(camp).forEach((rot) => addMissing(camp, rt, rot));
         });
         const grouped = new Map();
@@ -8578,7 +8596,8 @@
       active: d._seg ? SD.dates.map((dt) => segIn(d._seg, dt)) : null,
       subs: cellSubsOf(d.id).concat(aliasOf(d)), recv: SD.dates.map((dt) => (((SD.pmTips || {})[d.id] || {})[dt] || []).some((t) => t.to === d.name && t.from !== d.name))
     }));
-    scalc = SchedCalc.compute(rows, campRot, SD.dates.length);
+    const moves = (SD.routeMoves || []).map((m) => ({ a: { camp: shortCamp(m.fromCamp), num: (String(m.from).match(/\d+/) || [''])[0] }, b: { camp: shortCamp(m.toCamp), num: (String(m.to).match(/\d+/) || [''])[0] } })).filter((m) => m.a.camp && m.a.num && m.b.camp && m.b.num);
+    scalc = SchedCalc.compute(rows, campRot, SD.dates.length, moves);
   }
 
   /** PDD(배송 예정일) = 오늘 기준 내일. 표에서 파란색으로 강조하는 열 */
@@ -9035,13 +9054,13 @@
     const line = (cls, lab, sub, vals) => '<tr class="calc ' + cls + '"><td class="fx f2 lab" title="' + sub + '"><i class="rlab">' + lab + '</i>' + sub.replace(' (자동)', '') + '</td><td class="fx f3 lab"></td><td class="fx f4 lab"></td>' +
       vals.map((v, i) => '<td class="cc' + (sepCol(i) ? ' wk2' : '') + (dates[i] === pdd ? ' today' : '') + '">' + v + '</td>').join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>';
     // 담당 없음 노선(기본노선 주인 없음)도 그날 아무도 안 뛴 물량은 미입차로 · 용차업체가 맡은 노선은 미입차 아님 → 보라색 안내 줄
-    const UN = unassignedRoutes(), unMi = dates.map(() => []), unVd = dates.map(() => []);
+    const UN = unassignedRoutes(), unMi = dates.map(() => []), unMiM = dates.map(() => []), unVd = dates.map(() => []);
     Object.keys(UN).forEach((cid) => UN[cid].forEach((code) => dates.forEach((dt, i) => {
       const c = unCover(cid, code, dt); if (!c.miss.length || !campOk(c.camp)) return;
       const us = Array.from(new Set(c.miss.map((x) => x.split('|')[0]))), rs = Array.from(new Set(c.miss.map((x) => x.split('|')[1])));
       const txt = c.camp + ' ' + groupRoutes(us.sort().join(',')) + (rs.length < c.rots.length ? '(' + c.rots.filter((r) => rs.includes(r)).join(',') + ')' : '');
       const vd = unVendor(c.camp, us, dt);
-      if (vd) unVd[i].push(txt + ' · ' + vd); else unMi[i].push(txt);
+      if (vd) unVd[i].push(txt + ' · ' + vd); else { unMi[i].push(txt); unMiM[i].push({ cid: cid, code: code }); }
     })));
     // 같은 캠프·같은 회전 줄은 하나로 (강서1 527B,529A + 강서1 530A → 강서1 527B,529A,530A)
     const unMerge = (arr) => { const m = new Map(); arr.forEach((x) => { const mm = String(x).match(/^(\S+)\s+([0-9A-Z,]+)(\(.*\))?$/); if (!mm) { m.set(x, null); return; } const k = mm[1] + '|' + (mm[3] || ''); if (!m.has(k)) m.set(k, { c: mm[1], r: [], t: mm[3] || '' }); mm[2].split(',').forEach((u) => { if (!m.get(k).r.includes(u)) m.get(k).r.push(u); }); });
@@ -9101,7 +9120,7 @@
       const stOf = (v) => (!v ? '빈 칸' : /병가/.test(v) ? '병가' : /노쇼/.test(v) ? '노쇼' : /미입차/.test(v) ? '미입차' : /휴무|휴가/.test(v) ? '휴무' : /용차/.test(v) ? '용차' : '다른 노선');
       const causeOf = (camp, unit, i, un) => {
         const dt = dates[i];
-        if (un) return { why: '담당 없음', cause: '담당 기사가 없는 노선', names: ['담당 없음'], row: '', un: true };
+        if (un) return { why: '담당 없음', cause: '담당 기사가 없는 노선 · 그날 배정된 기사도 용차업체도 없음', names: ['담당 없음'], row: '', un: true, kind: 'un' };
         const inCamp = drvRows.filter((r) => shortCamp(r.camp) === camp && !(r.seg && !segIn(r.seg, dt)));
         const A = [];
         inCamp.forEach((r) => {
@@ -9110,32 +9129,39 @@
           const o = is && is.orig ? is.orig[dt] : '', us = o && /\d{3,4}[A-Za-z]/.test(o) ? unitsOf(o) : baseU.get(r);
           if (us.includes(unit)) A.push({ r: r, word: word, is: is });
         });
-        if (A.length) return { why: A.map((a) => a.r.d.name + ' ' + a.word).join(' · '), names: A.map((a) => a.r.d.name), row: A[0].r.key || A[0].r.row,
+        if (A.length) return { kind: 'iss', why: A.map((a) => a.r.d.name + ' ' + a.word).join(' · '), names: A.map((a) => a.r.d.name), row: A[0].r.key || A[0].r.row,
           cause: A.map((a) => '🚩 ' + a.r.d.name + ' ' + a.word + (a.is ? (a.is.kind && a.is.kind !== a.word ? ' · ' + a.is.kind : '') + (a.is.reason ? ' (' + String(a.is.reason).slice(0, 30) + ')' : '') + (a.is.sub ? ' · 대체 ' + a.is.sub + (a.is.subWho ? ' ' + a.is.subWho : '') : ' · 대체 없음') : ' · 이슈 기록 없음')).join(' / ') };
         const own = inCamp.filter((r) => baseU.get(r).includes(unit));
-        if (own.length) return { why: '배정 없음', names: own.map((r) => r.d.name), row: own[0].key || own[0].row, cause: '담당 ' + own.map((r) => { const v = String(sget(r.row, dt) || ''), st = stOf(v); return r.d.name + ' ' + (st === '다른 노선' ? '→ ' + v.replace(/\s*\[[^\]]*\]/g, '').slice(0, 28) + ' 뜀' : st); }).join(' · ') + ' — 이 노선은 대신 뛴 사람 없음' };
-        return { why: '담당 없음', cause: '담당 기사가 없는 노선', names: ['담당 없음'], row: '', un: true };
+        if (own.length) return { kind: own.some((r) => stOf(String(sget(r.row, dt) || '')) === '다른 노선') ? 'other' : 'own', drv: own[0].d.id, why: '배정 없음', names: own.map((r) => r.d.name), row: own[0].key || own[0].row, cause: '담당 ' + own.map((r) => { const v = String(sget(r.row, dt) || ''), st = stOf(v); return r.d.name + ' ' + (st === '다른 노선' ? '→ ' + v.replace(/\s*\[[^\]]*\]/g, '').slice(0, 28) + ' 뜀' : st); }).join(' · ') + ' — 이 노선은 대신 뛴 사람 없음' };
+        return { why: '담당 없음', cause: '담당 기사가 없는 노선 · 그날 배정된 기사도 용차업체도 없음', names: ['담당 없음'], row: '', un: true, kind: 'un' };
       };
       // (캠프, 노선 글자) 별로 날짜마다 한 칸
       const byUnit = new Map();
-      const put = (i, x, un) => {
+      const put = (i, x, un, meta) => {
         // '군포1 110A,110B(D2,F3)' = 110A·110B 둘 다 D2·F3 가 빔 (괄호는 그 줄 전체에 붙는 회전)
         const mm = String(x).match(/^(\S+)\s+([0-9A-Za-z,]+)\s*(\(.*\))?$/); if (!mm) return;
         const rot = mm[3] || '';
         SchedCalc.routeExpand(mm[2]).forEach((u) => {
           const k = mm[1] + '|' + u; if (!byUnit.has(k)) byUnit.set(k, { camp: mm[1], unit: u, cells: {} });
           const c = byUnit.get(k).cells; if (c[i]) { if (!rot) c[i].rot = ''; return; }
-          c[i] = Object.assign({ rot: rot }, causeOf(mm[1], u, i, un));
+          const cz = causeOf(mm[1], u, i, un);
+          if (rot) { // 일부 회전만 빈 날: 누가 어느 회전을 뛰었는지
+            const dt = dates[i], all = String(((SD.camps.find((c) => shortCamp(c.name) === mm[1]) || {}).rot) || 'D1,D2,F3').split(',').filter(Boolean), ran = all.filter((r0) => rot.indexOf(r0) < 0);
+            const who = drvRows.filter((r) => { if (r.seg && !segIn(r.seg, dt)) return false; const v = String(sget(r.row, dt) || ''); if (!v || /휴무|휴가|병가|미입차|노쇼/.test(v)) return false; const pm = v.match(/^\s*([가-힣]+\d)\s+/), cp = pm ? pm[1] : shortCamp(r.camp); return cp === mm[1] && (v === '출근' ? baseU.get(r) : unitsOf(v)).includes(u); }).map((r) => r.d.name);
+            if (who.length) { cz.cause = who.join(' · ') + ' — ' + (ran.length ? ran.join(' · ') + ' 만 뜀' : '일부만 뜀'); if (!cz.row) { const r0 = drvRows.find((r) => r.d.name === who[0]); if (r0) cz.row = r0.key || r0.row; } }
+          }
+          c[i] = Object.assign({ rot: rot, meta: meta || null }, cz);
         });
       };
-      dates.forEach((dt, i) => { if (dt >= pdd) return; scalc.missing[i].filter((x) => campOk(x.split(' ')[0])).forEach((x) => put(i, x, false)); unMi[i].forEach((x) => put(i, x, true)); });
+      dates.forEach((dt, i) => { if (dt >= pdd) return; scalc.missing[i].filter((x) => campOk(x.split(' ')[0])).forEach((x) => put(i, x, false)); unMi[i].forEach((x, j) => put(i, x, true, unMiM[i][j])); });
       // 같은 날 · 같은 사유로 빈 노선 글자는 한 칸으로 (404A·404B·404C → 404ABC) — 한 기사가 하루 빠진 것은 한 번
       const byDay = new Map();
       byUnit.forEach((u) => Object.keys(u.cells).map(Number).forEach((i) => { const c = u.cells[i], k = u.camp + '§' + i + '§' + c.rot + '§' + c.cause + (c.un ? '§' + u.unit.replace(/[A-Za-z]+$/, '') : ''); if (!byDay.has(k)) byDay.set(k, { camp: u.camp, i: i, c: c, units: [] }); byDay.get(k).units.push(u.unit); }));
-      byDay.forEach((g) => { const lb = groupRoutes(g.units.sort().join(',')), c = g.c; K.mip.push({ i: g.i, camp: g.camp, key: g.camp + '|' + lb, label: lb, row: c.row, names: c.names, why: c.why, cause: c.cause, un: !!c.un, full: !c.rot, list: [lb + (c.rot ? ' ' + c.rot : '')] }); });
+      byDay.forEach((g) => { const lb = groupRoutes(g.units.sort().join(',')), c = g.c; K.mip.push({ i: g.i, camp: g.camp, key: g.camp + '|' + lb, label: lb, row: c.row, names: c.names, why: c.why, cause: c.cause, un: !!c.un, full: !c.rot, rot: c.rot, list: [lb + (c.rot ? ' ' + c.rot : '')],
+        cat: c.rot ? 'B' : c.kind === 'iss' ? 'A' : 'C', kind: c.kind, drv: c.drv || '', meta: c.meta }); });
     })();
     // 캠프 머리줄: 지난 미입차 칸 수
-    $$('#sGrid tr.cgrp em.camppast').forEach((em) => { const n = K.mip.filter((x) => x.camp === em.dataset.cp).length; em.textContent = n ? '지난 미입차 ' + n : ''; em.classList.toggle('hidden', !n); });
+    $$('#sGrid tr.cgrp em.camppast').forEach((em) => { const n = K.mip.filter((x) => x.camp === em.dataset.cp).length; const nA = K.mip.filter((x) => x.camp === em.dataset.cp && x.cat === 'A').length, nC = n - nA; em.textContent = n ? (nA ? '지난 미입차 ' + nA : '') + (nA && nC ? ' · ' : '') + (nC ? '확인 ' + nC : '') : ''; em.classList.toggle('hidden', !n); em.classList.toggle('soft', !nA); });
     SCHK = K; paintChk(); paintDupNo(); paintNoteFold();
   }
   // ───── 같은 근무자 연결 (한 사람이 두 명의 아이디를 날짜를 나눠 씀 · 정산서는 명의별로 따로) ─────
@@ -9220,7 +9246,7 @@
     const md = (i) => { const p = SD.dates[i].split('-'); return +p[1] + '/' + +p[2] + ' (' + DOW[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
     const bad = K.mi.length + K.du.length + K.nov.length;
     const pddI = SD.dates.indexOf(pddDate());
-    box.innerHTML = (pddI >= 0 ? '<button type="button" class="pddp" id="sPddGo" title="누르면 PDD 날짜 열로 이동">오늘 PDD · ' + md(pddI) + ' ▸</button>' : '<small>점검</small>') + CHK_DEF.map((d) => '<button type="button" class="chip ' + d[0] + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' zero') + (sChkOpen === d[0] ? ' on' : '') + '" data-chk="' + d[0] + '"' + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' disabled') + '>' + d[1] + ' <i>' + K[d[0]].length + '</i>' + (d[0] === 'mi' && K.mip.length ? '<em class="pst">지난 ' + K.mip.length + '</em>' : '') + '</button>').join('') +
+    box.innerHTML = (pddI >= 0 ? '<button type="button" class="pddp" id="sPddGo" title="누르면 PDD 날짜 열로 이동">오늘 PDD · ' + md(pddI) + ' ▸</button>' : '<small>점검</small>') + CHK_DEF.map((d) => '<button type="button" class="chip ' + d[0] + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' zero') + (sChkOpen === d[0] ? ' on' : '') + '" data-chk="' + d[0] + '"' + (K[d[0]].length || (d[0] === 'mi' && K.mip.length) ? '' : ' disabled') + '>' + d[1] + ' <i>' + K[d[0]].length + '</i>' + (d[0] === 'mi' && K.mip.length ? '<em class="pst">지난 미입차 ' + K.mip.filter((x) => x.cat === 'A').length + '</em><em class="pst soft">확인 ' + K.mip.filter((x) => x.cat !== 'A').length + '</em>' : '') + '</button>').join('') +
       (bad ? '' : '<span class="ok">✓ 내일부터 비는 노선 · 중복 · 확인할 칸 없음</span>') + wlHints().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.worker.name) + ' 칸에 ' + esc(h.owner.name) + ' 명의 아이디(' + esc(h.owner.loginId) + ')가 있습니다 — 한 사람이 두 아이디를 쓰는 경우 연결">🔗 ' + esc(h.worker.name) + ' ↔ ' + esc(h.owner.name) + ' 연결하기</button>').join('') +
       wlLeft().map((h) => '<button type="button" class="chip wl" data-wlo="' + esc(h.owner.id) + '" data-wlw="' + esc(h.worker.id) + '" title="' + esc(h.owner.name) + ' 명의 줄(숨김)에 출근으로 적힌 날이 ' + esc(h.worker.name) + ' 줄로 아직 옮겨지지 않았습니다 — 그 출근이 계산에서 빠져 미입차로 잡힙니다. 누르면 옮길 칸을 미리 봅니다">🔗 ' + esc(h.owner.name) + ' 명의 칸 ' + h.n + '일 옮기기</button>').join('') + '<button type="button" class="lg" id="sLgBtn">색 안내 ⓘ</button>' +
       '<div class="xpick"><button type="button" class="btn ghost sm" id="sColBtn" title="표 오른쪽에 보일 정보 칸 고르기">⚙ 오른쪽 칸</button><div class="smore-box' + (sColOpen ? '' : ' hidden') + '" id="sColBox"><div class="smore-h">오른쪽에 보일 칸</div>' +
@@ -9230,7 +9256,7 @@
     if (!sChkOpen || !(K[sChkOpen].length || (sChkOpen === 'mi' && K.mip.length))) { sChkOpen = ''; bx.classList.add('hidden'); bx.classList.remove('big'); bx.innerHTML = ''; return; }
     bx.classList.toggle('big', sChkOpen === 'mi' && miTab(K) === 'past');
     if (sChkOpen === 'mi') {
-      const seg = '<div class="mi-top"><div class="seg"><button type="button" data-mitab="next" class="' + (miTab(K) === 'next' ? 'on' : '') + '">앞으로 (PDD~) ' + K.mi.length + '</button><button type="button" data-mitab="past" class="' + (miTab(K) === 'past' ? 'on' : '') + '">지난 미입차 ' + K.mip.length + '</button></div>';
+      const seg = '<div class="mi-top"><div class="seg"><button type="button" data-mitab="next" class="' + (miTab(K) === 'next' ? 'on' : '') + '">앞으로 (PDD~) ' + K.mi.length + '</button><button type="button" data-mitab="past" class="' + (miTab(K) === 'past' ? 'on' : '') + '">지난 것 ' + K.mip.length + '</button></div>';
       if (miTab(K) === 'past') { bx.classList.remove('hidden'); bx.innerHTML = miPastHtml(K, seg); return; }
       const byN = {}; K.mi.forEach((x) => { (byN[x.i] = byN[x.i] || []).push(x); });
       bx.classList.remove('hidden');
@@ -9266,43 +9292,43 @@
   const miTab = (K) => (sMiTab === 'past' && K.mip.length ? 'past' : sMiTab === 'next' ? 'next' : K.mi.length ? 'next' : K.mip.length ? 'past' : 'next');
   const sunOf = (ds) => { const p = ds.split('-').map(Number), d = new Date(p[0], p[1] - 1, p[2]); d.setDate(d.getDate() - d.getDay()); return ymdLocal(d); };
   function miPastHtml(K, seg) {
-    const P = K.mip, dates = SD.dates, pdd = pddDate(), mdS = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8));
+    const dates = SD.dates, pdd = pddDate(), mdS = (d) => Number(d.slice(5, 7)) + '/' + Number(d.slice(8)), dwS = (i) => DOW[new Date(dates[i] + 'T00:00:00').getDay()];
     const wks = [], wkOf = {};
-    dates.forEach((dt, i) => { const k = sunOf(dt); if (!wkOf[k]) { wkOf[k] = { k: k, is: [], n: 0, camps: {}, past: false }; wks.push(wkOf[k]); } wkOf[k].is.push(i); if (dt < pdd) wkOf[k].past = true; });
-    P.forEach((x) => { const w = wkOf[sunOf(dates[x.i])]; w.n++; w.camps[x.camp] = (w.camps[x.camp] || 0) + 1; });
-    const wLab = (w) => weekOfMonth(dates[w.is[0]]) + '주차', wRng = (w) => mdS(dates[w.is[0]]) + '~' + mdS(dates[w.is[w.is.length - 1]]);
-    const pastW = wks.filter((w) => w.past);
-    if (sMiWk !== 'all' && !(wkOf[sMiWk] && wkOf[sMiWk].past)) { const hit = pastW.filter((w) => w.n); sMiWk = (hit.length ? hit[hit.length - 1] : pastW[pastW.length - 1] || { k: 'all' }).k; }
-    const cur = sMiWk === 'all' ? null : wkOf[sMiWk];
-    // 줄: 기사(담당 노선)별
-    const rows = new Map();
-    P.forEach((x) => { if (!rows.has(x.key)) rows.set(x.key, { key: x.key, camp: x.camp, names: [], label: x.label, un: x.un, cells: {}, tot: 0, wk: {} }); const r = rows.get(x.key); x.names.forEach((n) => { if (!r.names.includes(n)) r.names.push(n); }); r.cells[x.i] = x; r.tot++; const wk = sunOf(dates[x.i]); r.wk[wk] = (r.wk[wk] || 0) + 1; });
-    const all = Array.from(rows.values());
-    const mark = (x) => '<button type="button" class="mi-m' + (x.full ? '' : ' pt') + '" data-chkgo="' + x.i + '"' + (x.row ? ' data-chkrow="' + esc(x.row) + '"' : '') + ' title="' + esc(mdS(dates[x.i]) + ' · ' + x.camp + ' ' + x.list.join(',') + ' — 누르면 그 칸으로 이동') + '">' + (x.full ? '미입차' : '일부') + '<small>' + esc(x.full ? x.why : (String(x.list[0]).match(/\(.*\)$/) || [''])[0] + ' ' + x.why) + '</small></button>';
-    const issTxt = (r, from, to) => { const by = new Map(); Object.keys(r.cells).map(Number).sort((p, q) => p - q).forEach((i) => { if (dates[i] < from || dates[i] > to) return; const c = r.cells[i].cause; if (!by.has(c)) by.set(c, []); by.get(c).push(mdS(dates[i])); });
-      return Array.from(by.entries()).map(([c, ds]) => (r.un ? '<span class="mi-g">' + esc(c) + '</span>' : esc(c) + ' <span class="mi-g">(' + esc(ds.join(', ')) + ')</span>')).join('<br>'); };
-    const cnt = (n) => '<b class="mi-n">' + n + '</b>';
-    const groupBy = (list) => { const by = {}; list.forEach((r) => { (by[r.camp] = by[r.camp] || []).push(r); }); return Object.keys(by).sort((a, b) => a.localeCompare(b, 'ko')).map((c) => [c, by[c]]); };
-    let tbl;
-    if (cur) {
-      const is = cur.is, list = all.filter((r) => is.some((i) => r.cells[i]));
-      tbl = !list.length ? '<div class="mi-none">' + wLab(cur) + ' (' + wRng(cur) + ') 에는 미입차 노선이 없습니다.</div>' :
-        '<table class="mi-t"><thead><tr><th class="l">노선</th>' + is.map((i) => { const dw = new Date(dates[i] + 'T00:00:00').getDay(); return '<th class="' + (dates[i] >= pdd ? 'fu' : dw === 0 ? 'sun' : dw === 6 ? 'sat' : '') + '">' + mdS(dates[i]) + ' ' + DOW[dw] + (dates[i] === pdd ? ' PDD' : '') + '</th>'; }).join('') + '<th class="nc">이번 주</th><th class="nc">기간 누적</th><th class="l">누구 · 왜</th></tr></thead><tbody>' +
-        groupBy(list).map(([c, rs]) => '<tr class="cg"><td colspan="' + (is.length + 4) + '">' + esc(c) + ' · ' + rs.reduce((n, r) => n + is.filter((i) => r.cells[i]).length, 0) + '칸</td></tr>' +
-          rs.sort((a, b) => (b.wk[cur.k] || 0) - (a.wk[cur.k] || 0) || a.label.localeCompare(b.label)).map((r) => '<tr><td class="l"><b>' + esc(r.label) + '</b><small>' + esc(r.names.join(' · ')) + '</small></td>' + is.map((i) => '<td>' + (r.cells[i] ? mark(r.cells[i]) : '<i class="mi-d">·</i>') + '</td>').join('') + '<td>' + cnt(r.wk[cur.k] || 0) + '</td><td>' + cnt(r.tot) + '</td><td class="l w">' + issTxt(r, dates[is[0]], dates[is[is.length - 1]]) + '</td></tr>').join('')).join('') + '</tbody></table>';
-    } else {
-      tbl = !all.length ? '<div class="mi-none">이 기간에는 미입차 노선이 없습니다.</div>' :
-        '<table class="mi-t"><thead><tr><th class="l">노선</th>' + pastW.map((w) => '<th>' + wLab(w) + '<br><small>' + wRng(w) + '</small></th>').join('') + '<th class="nc">기간 누적</th><th class="l">누구 · 왜</th></tr></thead><tbody>' +
-        groupBy(all).map(([c, rs]) => '<tr class="cg"><td colspan="' + (pastW.length + 3) + '">' + esc(c) + ' · ' + rs.reduce((n, r) => n + r.tot, 0) + '칸</td></tr>' +
-          rs.sort((a, b) => b.tot - a.tot || a.label.localeCompare(b.label)).map((r) => '<tr><td class="l"><b>' + esc(r.label) + '</b><small>' + esc(r.names.join(' · ')) + '</small></td>' + pastW.map((w) => '<td>' + (r.wk[w.k] ? '<button type="button" class="mi-m" data-miwk="' + w.k + '" title="누르면 그 주 보기">' + r.wk[w.k] + '회</button>' : '<i class="mi-d">·</i>') + '</td>').join('') + '<td>' + cnt(r.tot) + '</td><td class="l w">' + issTxt(r, dates[0], dates[dates.length - 1]) + '</td></tr>').join('')).join('') + '</tbody></table>';
-    }
-    const campTxt = (w) => Object.keys(w.camps).sort((a, b) => w.camps[b] - w.camps[a]).map((c) => esc(c) + ' ' + w.camps[c]).join(' · ');
-    const kp = '<div class="mi-kp">' + wks.map((w) => '<button type="button" class="mi-k' + (w.n ? ' r' : '') + (cur && cur.k === w.k ? ' cur' : '') + '" data-miwk="' + w.k + '"' + (w.past ? '' : ' disabled') + '><span>' + wLab(w) + ' (' + wRng(w) + ')</span><b>' + (w.past ? (w.n ? w.n + '칸' : '0') : '—') + '</b><small>' + (w.past ? campTxt(w) || '미입차 없음' : '아직 지나지 않음') + '</small></button>').join('') +
-      '<button type="button" class="mi-k' + (P.length ? ' r' : '') + (cur ? '' : ' cur') + '" data-miwk="all"><span>기간 전체 (' + mdS(dates[0]) + '~' + mdS(dates[dates.length - 1]) + ')</span><b>' + P.length + '칸</b><small>노선 ' + all.length + '개 · 주차별 횟수 보기</small></button></div>';
-    const top8 = all.slice().sort((a, b) => b.tot - a.tot).slice(0, 8), mx = top8.length ? top8[0].tot : 1;
-    const rank = top8.length ? '<div class="mi-h">노선별 미입차 횟수 · ' + mdS(dates[0]) + ' ~ 어제</div><div class="mi-rank">' + top8.map((r) => '<div class="mi-r"><b>' + esc(r.camp + ' ' + r.label) + '</b><span>' + r.tot + '회</span><small>' + esc(r.names.join(' · ')) + ' · ' + pastW.filter((w) => r.wk[w.k]).map((w) => wLab(w) + ' ' + r.wk[w.k]).join(' · ') + '</small><div class="bar"><i style="width:' + Math.round(r.tot / mx * 100) + '%"></i></div></div>').join('') + '</div>' : '';
-    return seg + '<span class="mi-sum">' + (cur ? wLab(cur) + ' 미입차 <b>' + cur.n + '칸</b>' : '기간 전체 <b>' + P.length + '칸</b>') + (sMode === 'month' ? '' : ' · 2주 보기입니다 — 한 달 전체는 「한 달」 보기에서') + '</span></div>' + kp + tbl +
-      '<div class="mi-note">· 빨간 칸을 누르면 표의 그 날짜 · 그 기사 칸으로 이동합니다. · 용차 · 품앗이 · 다른 기사가 대신 뛴 날은 미입차가 아닙니다 (「미입차 노선」과 같은 규칙). · 「일부」 = 그 노선의 일부 회전만 빈 날. · 한 노선은 담당이 여럿이어도 하루 한 번만 셉니다. · 누구 때문인지 = 그날 미입차·노쇼·병가인 기사 중 그 노선을 뛰기로 했던 사람 (없으면 담당 기사의 그날 칸).</div>' + rank;
+    dates.forEach((dt, i) => { if (dt >= pdd) return; const k = sunOf(dt); if (!wkOf[k]) { wkOf[k] = { k: k, is: [], n: 0 }; wks.push(wkOf[k]); } wkOf[k].is.push(i); });
+    K.mip.forEach((x) => { const w = wkOf[sunOf(dates[x.i])]; if (w) w.n++; });
+    if (!sMiWk || (sMiWk !== 'all' && !wkOf[sMiWk])) sMiWk = 'all';
+    const P = K.mip.filter((x) => sMiWk === 'all' || sunOf(dates[x.i]) === sMiWk);
+    const cnt = { A: 0, B: 0, C: 0 }; P.forEach((x) => { cnt[x.cat]++; });
+    const wLab = (w) => weekOfMonth(dates[w.is[0]]) + '주차 ' + mdS(dates[w.is[0]]) + '~' + mdS(dates[w.is[w.is.length - 1]]);
+    const wseg = '<div class="seg">' + '<button type="button" data-miwk="all" class="' + (sMiWk === 'all' ? 'on' : '') + '">기간 전체 <small>' + K.mip.length + '</small></button>' + wks.map((w) => '<button type="button" data-miwk="' + w.k + '" class="' + (sMiWk === w.k ? 'on' : '') + '">' + wLab(w) + ' <small>' + w.n + '</small></button>').join('') + '</div>';
+    const cards = '<div class="mi-kp3">' +
+      '<div class="mi-k3 a"><h4>① 미입차 (확정)</h4><b>' + cnt.A + '건</b><p>기사가 미입차 · 노쇼 · 병가였고 대신 뛴 사람이 없는 날 — <u>수행률로 볼 숫자</u></p></div>' +
+      '<div class="mi-k3 b"><h4>② 회전 일부 빔 (물량조율)</h4><b>' + cnt.B + '건</b><p>노선은 들어갔지만 D1 · D2 · F3 중 일부를 못 채운 날 — 미입차와 따로 셉니다</p></div>' +
+      '<div class="mi-k3 c"><h4>③ 자료 확인 필요</h4><b>' + cnt.C + '건</b><p>이슈는 없는데 표에 뛴 사람이 안 적힌 날 — 입력이 빠졌거나 날짜가 안 맞는 것. 고치면 사라집니다</p></div></div>';
+    const sect = (cat, tag, sub) => {
+      const rows = new Map();
+      P.filter((x) => x.cat === cat).forEach((x) => { if (!rows.has(x.key)) rows.set(x.key, { camp: x.camp, label: x.label, cells: [] }); rows.get(x.key).cells.push(x); });
+      const list = Array.from(rows.values()).sort((p, q) => q.cells.length - p.cells.length || (p.camp + p.label).localeCompare(q.camp + q.label, 'ko'));
+      const lc = cat.toLowerCase(), head = '<div class="mi-sec"><i class="' + lc + '">' + tag + '</i><small>' + sub + '</small></div>';
+      if (!list.length) return head + '<div class="mi-none">없습니다.</div>';
+      return head + '<table class="mi-t3"><thead><tr><th class="c1">노선</th><th class="c2">' + (cat === 'C' ? '왜 비어 보이나' : '누구 · 왜') + '</th>' + (cat === 'B' ? '<th class="c5">빈 회전</th>' : '') + '<th>날짜 <small>(누르면 그 칸으로)</small></th><th class="c4">건수</th>' + (cat === 'C' ? '<th class="c6">고치기</th>' : '') + '</tr></thead><tbody>' +
+        list.map((r) => {
+          r.cells.sort((p, q) => p.i - q.i);
+          const by = new Map(); r.cells.forEach((x) => { if (!by.has(x.cause)) by.set(x.cause, []); by.get(x.cause).push(x); });
+          const causes = Array.from(by.entries()).map(([c, xs]) => esc(c) + (by.size > 1 ? ' <span class="mi-g">(' + xs.map((x) => mdS(dates[x.i])).join(', ') + ')</span>' : '')).join('<br>');
+          const chips = r.cells.map((x) => '<button type="button" class="mi-dt ' + lc + '" data-chkgo="' + x.i + '"' + (x.row ? ' data-chkrow="' + esc(x.row) + '"' : '') + ' title="' + esc(x.cause) + '">' + mdS(dates[x.i]) + ' ' + dwS(x.i) + '</button>').join(' ');
+          const f = r.cells.find((x) => x.kind === 'un' && x.meta) || r.cells.find((x) => x.kind === 'other' && x.drv) || r.cells[0];
+          const fix = cat !== 'C' ? '' : '<td class="c6">' + (f.kind === 'un' && f.meta ? '<button type="button" class="mi-fix" data-mifix="un" data-ucid="' + esc(f.meta.cid) + '" data-ucode="' + esc(f.meta.code) + '" data-c="' + f.i + '" title="그날 뛴 용차업체를 지정하거나 기사를 배정합니다 (첫 날짜부터)">용차업체 · 기사 지정 ▸</button>'
+            : f.kind === 'other' && f.drv ? '<button type="button" class="mi-fix" data-mifix="drv" data-drv="' + esc(f.drv) + '" title="담당 기사가 그날 다른 노선을 뛰었습니다 — 캠프·노선이 바뀐 날짜(적용일)가 실제와 맞는지 확인">담당 기사 설정 (적용일) ▸</button>'
+            : '<span class="mi-g">날짜를 눌러 칸에서 입력</span>') + '</td>';
+          return '<tr><td class="c1"><b>' + esc(r.camp + ' ' + r.label) + '</b></td><td class="c2">' + causes + '</td>' + (cat === 'B' ? '<td class="c5">' + esc(Array.from(new Set(r.cells.map((x) => String(x.rot).replace(/[()]/g, '').replace(/,/g, ' · ')))).join(' / ')) + '</td>' : '') + '<td>' + chips + '</td><td class="c4"><b class="mi-n ' + lc + '">' + r.cells.length + '</b></td>' + fix + '</tr>';
+        }).join('') + '</tbody></table>';
+    };
+    return seg + wseg + '<span class="mi-sum">' + mdS(dates[0]) + ' ~ 어제' + (sMode === 'month' ? '' : ' · 2주 보기입니다 — 한 달 전체는 「한 달」 보기에서') + '</span></div>' + cards +
+      sect('A', '① 미입차', '그날 미입차 · 노쇼 · 병가인 기사가 뛰기로 했던 노선 (이슈의 원래 칸 → 없으면 기본노선)') +
+      sect('B', '② 회전 일부 빔', '일부 회전만 빈 날') +
+      sect('C', '③ 자료 확인 필요', '실제로 뛰었는데 표에 안 적힌 것이면 고쳐 주세요 · 진짜 미입차면 그 칸에서 이슈를 남기면 ① 로 올라갑니다') +
+      '<div class="mi-note">· 한 노선은 담당이 여럿이어도 하루 한 번만 셉니다. · 용차 · 품앗이 · 다른 기사가 대신 뛴 날, 노선 이관으로 이름만 바뀐 노선(예: 안양1 110 ↔ 군포1 212)은 빈 것으로 보지 않습니다.</div>';
   }
   let sColOpen = false;
   $('#sChk').addEventListener('change', (e) => { const c = e.target.closest('[data-excol]'); if (c) { sColOpen = true; exSet(c.dataset.excol, c.checked); } });
@@ -9319,6 +9345,8 @@
   $('#sChkBox').addEventListener('click', (e) => {
     const tb = e.target.closest('[data-mitab]'); if (tb) { sMiTab = tb.dataset.mitab; return paintChk(); }
     const wk = e.target.closest('[data-miwk]'); if (wk) { sMiWk = wk.dataset.miwk; return paintChk(); }
+    const fx = e.target.closest('[data-mifix]');
+    if (fx) { if (fx.dataset.mifix === 'un') return uaOpen(fx.dataset.ucid, fx.dataset.ucode, SD.dates[+fx.dataset.c]); const nb = $('#sGrid .dname[data-drv="' + fx.dataset.drv + '"]'); if (nb) nb.click(); else toast('표에서 그 기사를 찾을 수 없습니다 (검색 · 캠프 선택을 풀어 보세요).'); return; }
     const b = e.target.closest('[data-chkgo]'); if (!b) return;
     const ci = +b.dataset.chkgo, ri = b.dataset.chkrow ? srows.findIndex((x) => (x.key || x.row) === b.dataset.chkrow) : -1;
     const el = (ri >= 0 && $('#sGrid td.c[data-r="' + ri + '"][data-c="' + ci + '"]')) || $('#sGrid th.dc[data-col="' + ci + '"]'); if (!el) return;
