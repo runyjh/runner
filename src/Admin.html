@@ -10733,7 +10733,8 @@
   function pkmOfDay(r, dt) {
     const q = PKM && PKM.q && PKM.q[dt]; if (!q || !r || r.kind !== 'd') return [];
     const c = mobCell(r, dt); let t = '';
-    if (c.kind === 'k-work' || c.kind === 'k-other') t = c.top === '출근' ? (r.d.baseRoute && /^\d/.test(r.d.baseRoute) ? baseCodes(r.d) : '') : c.top;
+    const Dp = drvAt(rowDrv(r.row), dt) || r.d; // 그날의 담당 노선 (노선 변경 전후가 다름)
+    if (c.kind === 'k-work' || c.kind === 'k-other') t = c.top === '출근' ? (Dp.baseRoute && /^\d/.test(Dp.baseRoute) ? baseCodes(Dp) : '') : c.top;
     else if (c.kind === 'pmk' && /받음|◀/.test(c.full)) t = c.full;
     if (!t) return [];
     let camp = shortCamp(r.camp || r.d.camp || '').replace(/\s/g, ''); const out = [], seen = {};
@@ -10874,7 +10875,7 @@
       const list = rows.filter((r) => !r.seg || segIn(r.seg, d)).map((r, i) => [r, i]).sort((a, b) => (b[0].d.id === myId ? 1 : 0) - (a[0].d.id === myId ? 1 : 0) || a[1] - b[1]).map((x) => x[0]);
       const UN = unassignedRoutes()[sf.camp] || [];
       html += dh(cs + ' · ' + mobMd(d)) + '<p class="smb-hint">실제 출근일 ' + prev + ' 저녁 입차 · 기사 ' + list.length + '명 · 근무 ' + wkOf(d) + '명 · 백업 ' + bkOf(di).length + '명</p>' +
-        list.map((r) => { const c = mobCell(r, d), base = r.d.baseRoute && /^\d/.test(r.d.baseRoute) ? groupRoutes(baseCodes(r.d)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
+        list.map((r) => { const Dd = drvAt(rowDrv(r.row), d) || r.d; const c = mobCell(r, d), base = Dd.baseRoute && /^\d/.test(Dd.baseRoute) ? groupRoutes(baseCodes(Dd)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
           const own = shortCamp(r.camp || '');
           const rt = c.kind === 'k-work' || c.kind === 'k-other' ? (c.top === '출근' ? base : c.top.indexOf(own + ' ') === 0 ? c.top.slice(own.length + 1) : c.top) : base;
           return '<button type="button" class="smb-row' + (/미입차|노쇼/.test(c.top) ? ' warn' : '') + '" data-smbrow="' + esc(r.key || r.row) + '"><span class="l"><b class="rt' + (rt ? '' : ' none') + '">' + esc(rt || '—') + '</b><span class="nm">' + esc(r.d.name) + (r.d.id === myId ? '<small class="me-tag">나</small>' : '') + (r.staff && r.d.title ? '<small>' + esc(r.d.title) + '</small>' : r.d.type ? '<small>' + esc(r.d.type) + '</small>' : '') + (r.d.ex ? '<small>추가</small>' : '') + '</span></span>' +
@@ -10889,7 +10890,7 @@
       const drvs = (() => { const mp = new Map(), tdy = SD.today || ymdLocal(new Date()); srows.forEach((r) => { if (r.kind !== 'd' || r.d.ex) return; if (!mp.has(r.d.id) || segIn(r.seg, tdy)) mp.set(r.d.id, r.d); }); return Array.from(mp.values()); })().map((x, i) => [x, i]).sort((a, b) => (b[0].id === myId ? 1 : 0) - (a[0].id === myId ? 1 : 0) || a[1] - b[1]).map((x) => x[0]);
       if (!sMy && (!sMobDrv || !drvs.some((x) => x.id === sMobDrv))) sMobDrv = drvs.length ? drvs[0].id : '';
       const D = drvs.find((x) => x.id === sMobDrv);
-      html += '<div class="smb-pick"><select class="inp" id="smbDrv" aria-label="기사">' + drvs.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === sMobDrv ? ' selected' : '') + '>' + esc((x.id === myId ? '★ 나 · ' : '') + x.name + ' · ' + (shortCamp(x.camp || '') || '-') + (x.baseRoute ? ' · ' + x.baseRoute : '')) + '</option>').join('') + '</select></div>';
+      html += '<div class="smb-pick"><select class="inp" id="smbDrv" aria-label="기사">' + drvs.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === sMobDrv ? ' selected' : '') + '>' + esc((() => { const xt = drvAt(x, SD.today || ymdLocal(new Date())) || x; return (x.id === myId ? '★ 나 · ' : '') + x.name + ' · ' + (shortCamp(xt.camp || '') || '-') + (xt.baseRoute ? ' · ' + xt.baseRoute : ''); })()) + '</option>').join('') + '</select></div>';
       if (!D) html += '<p class="smb-hint">표시할 기사가 없습니다.</p>';
       else {
         const cnt = { w: 0, o: 0, s: 0, m: 0, y: 0 };
