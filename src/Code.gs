@@ -825,7 +825,7 @@ const FS_READ_FNS = ['adm_ntPhoto', 'api_ntPhoto', 'api_ntAdmPhoto', 'api_ntAdmL
   'api_pmAttach', 'api_pmAvailList', 'api_pmAvailMine', 'api_pmForm', 'api_pmJob', 'api_pmList', 'api_pmMine', 'api_pmPrice', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel',
   // 읽기만 하는 함수인데 빠져 있던 것 (부를 때마다 '자료가 바뀜' 표시가 찍혔음 · 2026-11-11 점검)
   'adm_stlAdjSummary', 'adm_campThumbs', 'adm_pmMeta', 'adm_bankList', 'adm_bankPreview', 'adm_accCats', 'adm_stlDriveList', 'adm_stlFbView', 'adm_stlReportExtra', 'adm_stlReportYear', 'adm_stlBank',
-  'adm_seenList', 'adm_seenNudge', 'api_seen', 'api_seenAck', 'adm_mailStatus' // 확인 기록: 스케줄 · 공지 자료를 바꾸지 않음
+  'adm_seenList', 'adm_seenNudge', 'api_seen', 'api_seenAck', 'adm_mailStatus', 'api_mailPing' // 확인 기록: 스케줄 · 공지 자료를 바꾸지 않음
 ];
 /** Firestore 사본: 데이터가 바뀜 (Firebase.gs · 없으면 아무것도 안 함) */
 function fsMark_(area, extra) { if (typeof fsDirty_ === 'function') fsDirty_(area, extra); }

@@ -9,7 +9,7 @@ const MAIL_ST = { SAVED: '저장', HOLD: '확인 필요', SKIP: '쿠팡 파일 �
 const MAIL_KIND = { wk: '주간 수행률', sla: 'SLA 점수', fb: '가중요인', pk: '피크 물량' };
 var _sysAdmin = null; // 이 실행 안에서만 쓰는 '자동 수집' 관리자 (열쇠 확인 뒤에만 만들어짐 · 밖으로 나가지 않음)
 
-function mailCfg_() { const p = props_(); return { hash: str_(p.MAIL_KEY_HASH), on: str_(p.MAIL_ON) !== '0' }; }
+function mailCfg_() { const p = props_(); return { hash: str_(p.MAIL_KEY_HASH), on: str_(p.MAIL_ON) !== '0', ping: str_(p.MAIL_PING) }; }
 
 /** xlsx(바이트) → [{ name, rows }] — 관리자앱 readXlsx 와 같은 모양 (숫자는 Number · 글자는 String · 빈칸은 '') */
 function mailXlsx_(bytes) {
@@ -135,6 +135,15 @@ function api_mailFile(key, f) {
   });
 }
 
+/** 수집기 → 올인원: '살아 있음' 신호 (새 메일이 없어도 30분에 한 번) → 화면에 '수집기 마지막 확인 시각' */
+function api_mailPing(key) {
+  return run_(function () {
+    const cfg = mailCfg_();
+    if (!cfg.hash || !key || sha256b64_(String(key)) !== cfg.hash) return { ok: false, code: 'KEY', msg: '수집 키가 맞지 않습니다.' };
+    PropertiesService.getScriptProperties().setProperty('MAIL_PING', nowText_()); _props = null;
+    return { ok: true, on: cfg.on };
+  });
+}
 /** 관리자: 자동 수집 상태 + 최근 기록 */
 function adm_mailStatus(token) {
   return run_(function () {
@@ -142,7 +151,7 @@ function adm_mailStatus(token) {
     const cfg = mailCfg_();
     let rows = [];
     try { rows = readAll_(SH.MAILLOG).filter(function (o) { return o.at; }).slice(-200).reverse().map(function (o) { return { at: o.at, from: o.from, subject: o.subject, mailAt: o.mailAt, file: o.file, kind: o.kind, status: o.status, period: o.period, detail: o.detail }; }); } catch (e) { rows = []; }
-    return { ok: true, hasKey: !!cfg.hash, on: cfg.on, rows: rows };
+    return { ok: true, hasKey: !!cfg.hash, on: cfg.on, ping: cfg.ping, now: nowText_(), rows: rows };
   });
 }
 /** 관리자: 수집 키 새로 만들기 (예전 키는 바로 못 쓰게 됨) → { ok, key } · 키는 이때 한 번만 보여 준다 */
