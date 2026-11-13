@@ -581,6 +581,10 @@
   .mg-sec { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; font-size: 13px; }
   .mg-sec h4 { margin: 0 0 6px; font-size: 14px; }
   .mg-sec ul { margin: 4px 0 0; padding-left: 18px; max-height: 220px; overflow: auto; }
+  .mu-f { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; } .mu-f.bad { border-color: #fecaca; background: #fef2f2; } .mu-f.ok { border-color: #a7f3d0; background: #ecfdf5; }
+  .mu-k { flex: none; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 800; color: #fff; white-space: nowrap; margin-top: 1px; background: #94a3b8; } .mu-k.wk { background: #1d5fd6; } .mu-k.sla { background: #15803d; } .mu-k.fb { background: #b45309; } .mu-k.pk { background: #dc2626; }
+  .mu-x { flex: 1; min-width: 0; } .mu-x b { display: block; font-size: 14px; overflow-wrap: anywhere; } .mu-x small { display: block; color: var(--sub); font-size: 12.5px; line-height: 1.5; margin-top: 2px; overflow-wrap: anywhere; } .mu-x small em { font-style: normal; color: var(--danger); font-weight: 700; }
+  .mu-x button { border: 0; background: none; color: var(--brand); font: inherit; font-size: 12.5px; font-weight: 700; padding: 4px 0 0; cursor: pointer; } .mu-f input[type=checkbox] { flex: none; width: 20px; height: 20px; margin-top: 2px; } .mu-st { flex: none; font-weight: 800; font-size: 13px; white-space: nowrap; }
   .up-sum { background: var(--gray-weak); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; line-height: 1.7; }
   .m-box.slip-box { width: min(1080px, 100%); max-height: 94vh; display: flex; flex-direction: column; padding: 0; }
   .slip { overflow: auto; padding: 18px 22px; font-size: 12.5px; }
@@ -2100,11 +2104,11 @@
    <section id="view-perf" class="hidden">
     <div class="head">
       <h2>노선 수행률 · SLA <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 파일</small></h2>
-      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">쿠팡 파일 올리기</button><input type="file" id="rpFile" accept=".xlsx" class="hidden"></div>
+      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">쿠팡 파일 올리기</button><input type="file" id="rpFile" multiple accept=".xlsx" class="hidden"></div>
     </div>
     <div class="updrop" data-up="#rpFile">
       <div class="ud-ic">⬆</div>
-      <div class="ud-tx"><b>쿠팡 파일을 여기로 끌어다 놓으세요</b><span>주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 — 어떤 파일인지 자동으로 알아보고, 저장 전에 미리보기를 보여 줍니다 (같은 기간은 덮어씀 · 엑셀 .xlsx)</span></div>
+      <div class="ud-tx"><b>쿠팡 파일을 여기로 끌어다 놓으세요 (여러 개 가능)</b><span>주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 — 어떤 파일인지 자동으로 알아보고, 저장 전에 미리보기를 보여 줍니다 (같은 기간은 덮어씀 · 엑셀 .xlsx)</span></div>
       <button class="btn" type="button" data-upfind>파일 찾기</button>
     </div>
     <div class="rp-box" id="perfBox"></div>
@@ -2770,6 +2774,14 @@
     </div>
     <p class="sub" id="stUpNote" style="font-size:13px"></p>
     <div class="m-actions"><button type="button" class="btn ghost" id="stUpCancel">닫기</button><button class="btn" id="stUpOk">반영</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="rpMuModal">
+  <div class="m-box" style="width:min(640px,100%)">
+    <h3 id="rpMuTitle">쿠팡 파일 여러 개 올리기</h3>
+    <p class="sub" id="rpMuSub" style="margin:0 0 10px;font-size:13px"></p>
+    <div id="rpMuList" style="max-height:56vh;overflow:auto"></div>
+    <div class="m-actions"><button type="button" class="btn ghost" id="rpMuCancel">닫기</button><button type="button" class="btn" id="rpMuOk">모두 저장</button></div>
   </div>
 </div>
 <div class="modal hidden" id="rpUpModal">
@@ -7222,7 +7234,7 @@
       const inp = box && $(box.dataset.up); if (!inp || !files || !files.length) return;
       const ok = String(inp.accept || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean), f = files[0], ext = '.' + String(f.name).split('.').pop().toLowerCase();
       if (ok.length && !ok.includes(ext)) return toast('이 자리에는 ' + ok.join(' · ') + ' 파일만 올릴 수 있습니다. (올린 파일: ' + f.name + ')');
-      try { const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+      try { const dt = new DataTransfer(); (inp.multiple ? Array.from(files).filter((x) => !ok.length || ok.includes('.' + String(x.name).split('.').pop().toLowerCase())) : [f]).forEach((x) => dt.items.add(x)); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); }
       catch (err) { toast('이 브라우저에서는 끌어다 놓기가 안 됩니다. [파일 찾기]를 눌러 주세요.'); }
     };
     document.addEventListener('click', (e) => { const b = e.target.closest('.updrop [data-upfind]'); if (b) { const inp = $(boxOf(b).dataset.up); if (inp) inp.click(); } });
@@ -7281,40 +7293,109 @@
     }
     return { wk: latest, year, wks: wks.sort((a, b) => a - b), rows, sheet: sh.name };
   }
+  /** 파일 하나를 읽어 종류를 알아낸다 → { file, kind: wk|sla|fb|pk, … } (못 읽으면 오류) */
+  async function rpDetect(f) {
+    const sheets = await readXlsx(await f.arrayBuffer());
+    const has = (re, top) => sheets.some((sh) => (top ? sh.rows.slice(0, top) : sh.rows).some((r) => r && r.some((v) => re.test(String(v == null ? '' : v)))));
+    const isSla = has(/data\s*end\s*date/i), isFb = !isSla && has(/가중요인/, 8);
+    const pk = !isSla && !isFb ? parsePeakSheet(sheets, f.name) : null;
+    if (pk) return { file: f.name, kind: 'pk', P: pk };
+    if (isFb) { const blocks = parseFbSheet(sheets); if (!blocks.length) throw new Error('가중요인 파일에서 표(Wave · Camp · Route · 가중요인1 · 가중요인2)를 찾지 못했습니다.'); return { file: f.name, kind: 'fb', blocks }; }
+    if (isSla) { const blocks = parseSlaSheet(sheets); if (!blocks.length) throw new Error('SLA 파일에서 점수 표(Category · Camp · Route · Total Score)를 찾지 못했습니다.'); return { file: f.name, kind: 'sla', blocks }; }
+    return { file: f.name, kind: 'wk', P: parsePerfSheet(sheets, f.name) };
+  }
+  /** 파일 하나의 자세한 미리보기 창 (지금까지 쓰던 창) */
+  async function rpUpOpen(U) {
+    rpUp = U;
+    $('#rpUpKind').classList.toggle('hidden', U.kind !== 'wk');
+    if (U.kind === 'pk') { if (!PK.loaded) await loadPk(); pkUpPreview(); }
+    else if (U.kind === 'fb') { if (!FW.loaded) await loadFb(); fbUpPreview(); }
+    else if (U.kind === 'sla') { if (!SL.loaded) await loadSla(); slaUpPreview(); }
+    else { $('#rpUpYear').value = U.year || U.P.year; $('#rpUpWk').value = U.wkv || U.P.wk; rpUpPreview(); }
+    $('#rpUpModal').classList.remove('hidden');
+  }
+  /** 미리보기 창 닫기 — 여러 개 올리기에서 연 창이면 목록으로 돌아간다 (saved = 그 파일을 저장했음) */
+  function rpUpClose(saved) {
+    const U = rpUp; rpUp = null; $('#rpUpModal').classList.add('hidden');
+    if (U && U.mu) { if (saved) { U.done = '저장됨'; U.on = false; } else if (U.kind === 'wk') { const w = +$('#rpUpWk').value, y = +$('#rpUpYear').value; if (w >= 1 && w <= 53) U.wkv = w; if (y >= 2020 && y <= 2100) U.year = y; } rpMuPaint(); }
+  }
+  // ───── 여러 파일 한 번에 올리기: 종류를 자동으로 알아보고 한 창에서 확인 → [모두 저장] ─────
+  let rpMu = null;
+  const MU_KIND = { wk: '주간 수행률', sla: 'SLA 점수', fb: '가중요인', pk: '🔥 피크 물량' };
+  function rpMuLine(U) {
+    if (U.kind === 'wk') { const P = U.P, wk = U.wkv || P.wk, L = P.rows.filter((r) => r.wk === P.wk), bad = L.filter((r) => /^[34]$/.test(String(r.grade).replace(/\D/g, ''))).length, imp = L.filter((r) => r.improve).length;
+      return esc((U.year || P.year) + '년 WK' + wk + ' · 라우트 ' + L.length + '개') + ' · ' + (bad ? '<em>3~4등급 ' + bad + '</em>' : '3~4등급 0') + ' · ' + (imp ? '<em>개선 요청 ' + imp + '</em>' : '개선 요청 0'); }
+    if (U.kind === 'sla') return esc(U.blocks.map((b) => (b.from ? slaPd(b.from) + '~' : '~') + slaPd(b.to) + ' · 라우트 ' + b.rows.length + '개').join(' / ') + ' · 같은 기간은 덮어씀');
+    if (U.kind === 'fb') return esc(U.blocks.map((b) => b.kind + ' ' + (b.kind === '일별' ? slaPd(b.date) : slaPd(b.from) + '~' + slaPd(b.to))).join(', ') + ' · 라우트 ' + Math.max.apply(null, U.blocks.map((b) => b.rows.length)) + '개');
+    const P = U.P, ym = U.ym || P.ym, ds = P.days.map((x) => pkDate(ym, x)), rt = P.rows.filter((r) => r.code !== 'Total');
+    return esc(+ym.slice(5, 7) + '월 · ' + rpMd(ds[0]) + ' ~ ' + rpMd(ds[ds.length - 1]) + ' · 캠프 ' + new Set(P.rows.map((r) => r.camp)).size + ' · 라우트 ' + rt.length + (rpMuPush(U) ? ' · 기사 알림 보냄' : ''));
+  }
+  function rpMuPush(U) { // 피크 알림: 한 개 올릴 때의 기본값과 같은 규칙 (새 달 · 공유 켜짐 · 아직 안 지남)
+    if (U.push !== undefined) return !!U.push;
+    const P = U.P, ym = U.ym || P.ym, last = pkDate(ym, P.days[P.days.length - 1]);
+    return !!(PK.loaded && PK.set.drvOn && !PK.periods.some((p) => p.period === ym) && last >= ymdLocal(new Date()));
+  }
+  function rpMuPaint() {
+    const M = rpMu; if (!M) return;
+    const sel = M.items.filter((x) => x.on && !x.done && !x.err), left = M.items.filter((x) => !x.done && !x.err).length;
+    $('#rpMuTitle').textContent = '파일 ' + M.items.length + '개를 읽었습니다';
+    $('#rpMuSub').textContent = M.busy ? '저장 중 ' + M.n + ' / ' + M.total + ' … 창을 닫지 말아 주세요.' : M.fin ? '끝났습니다. 결과를 확인해 주세요.' : '종류는 자동으로 알아봤습니다. 확인하고 한 번에 저장하세요. 주차·피크 월을 고치려면 [자세히]를 누르세요.';
+    $('#rpMuList').innerHTML = M.items.map((U, i) => '<div class="mu-f' + (U.err || U.fail ? ' bad' : U.done ? ' ok' : '') + '"><span class="mu-k ' + (U.kind || '') + '">' + (MU_KIND[U.kind] || '알 수 없음') + '</span><span class="mu-x"><b>' + esc(U.file) + '</b>' +
+      (U.err ? '<small><em>' + esc(U.err) + ' · 저장하지 않음</em></small>' : '<small>' + rpMuLine(U) + '</small>' + (U.fail ? '<small><em>저장 실패: ' + esc(U.fail) + '</em></small>' : '') + (U.done && U.done !== '저장됨' ? '<small>' + esc(U.done) + '</small>' : '') + (U.done || M.busy ? '' : '<button type="button" data-mud="' + i + '">자세히 ›</button>')) + '</span>' +
+      (U.err ? '' : U.done ? '<span class="mu-st" style="color:#047857">✓ 저장됨</span>' : U.busy ? '<span class="mu-st" style="color:var(--brand)">저장 중…</span>' : '<input type="checkbox" data-muc="' + i + '" aria-label="이 파일 저장"' + (U.on ? ' checked' : '') + (M.busy ? ' disabled' : '') + '>') + '</div>').join('');
+    const ok = $('#rpMuOk'); ok.disabled = !!M.busy || !sel.length; ok.textContent = M.busy ? '저장 중…' : sel.length ? sel.length + '개 모두 저장' : '저장할 파일 없음'; ok.classList.toggle('hidden', !left);
+    $('#rpMuCancel').disabled = !!M.busy;
+  }
+  /** 파일 하나를 조용히 저장 (창 · 화면 이동 없이) → 결과 한 줄. 실패하면 오류를 던진다 */
+  async function rpMuSave(U) {
+    const cnt = (r) => '새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged;
+    if (U.kind === 'wk') { const P = U.P, wk = U.wkv || P.wk, year = U.year || P.year, shift = wk - P.wk;
+      const rows = P.rows.map((r) => Object.assign({}, r, { wk: r.wk + shift, year: r.wk + shift < 1 ? year - 1 : year, perf: r.perf === '' ? '' : String(r.perf), ret: r.ret === '' ? '' : String(r.ret) }));
+      const r = await api('adm_perfSave', { year, wk, file: U.file, rows }); if (!r.ok) throw new Error(r.msg); return cnt(r); }
+    if (U.kind === 'sla') { const out = []; for (const B of U.blocks) { const r = await api('adm_slaSave', { from: B.from, to: B.to, file: U.file, vendor: B.vendor, rows: B.rows }); if (!r.ok) throw new Error(r.msg); out.push('~' + slaPd(r.period) + ' ' + cnt(r)); } return out.join(' / '); }
+    if (U.kind === 'fb') { const r = await api('adm_fbSave', { file: U.file, blocks: U.blocks.map((x) => ({ kind: x.kind, from: x.from, to: x.to, date: x.date, rows: x.rows })) }); if (!r.ok) throw new Error(r.msg); return cnt(r) + (r.skippedOld ? ' · 더 최신 자료가 있어 건너뜀 ' + r.skippedOld : ''); }
+    const P = U.P, ym = U.ym || P.ym, rows = [], push = rpMuPush(U);
+    P.rows.forEach((r) => P.days.forEach((x, i) => { if (r.q[i] != null) rows.push({ wave: r.wave, camp: r.camp, code: r.code, date: pkDate(ym, x), qty: r.q[i] }); }));
+    const r = await api('adm_peakSave', { file: U.file, period: ym, rows, push }); if (!r.ok) throw new Error(r.msg); return cnt(r) + (push ? ' · 알림 ' + (r.pushed || 0) + '건' : '');
+  }
+  $('#rpMuList').addEventListener('click', (e) => {
+    const M = rpMu; if (!M || M.busy) return;
+    const d = e.target.closest('[data-mud]'); if (d) { const U = M.items[+d.dataset.mud]; if (U && !U.err && !U.done) { U.mu = true; rpUpOpen(U).catch((err) => toast('미리보기를 열지 못했습니다: ' + (err && err.message || err))); } }
+  });
+  $('#rpMuList').addEventListener('change', (e) => { const c = e.target.closest('[data-muc]'); if (c && rpMu) { rpMu.items[+c.dataset.muc].on = c.checked; rpMuPaint(); } });
+  $('#rpMuCancel').addEventListener('click', () => { if (rpMu && rpMu.busy) return; $('#rpMuModal').classList.add('hidden'); rpMu = null; });
+  $('#rpMuOk').addEventListener('click', async () => {
+    const M = rpMu; if (!M || M.busy) return;
+    const todo = M.items.filter((x) => x.on && !x.done && !x.err); if (!todo.length) return;
+    M.busy = true; M.total = todo.length; M.n = 0;
+    for (const U of todo) { M.n++; U.busy = true; U.fail = ''; rpMuPaint();
+      try { U.done = await rpMuSave(U); U.on = false; } catch (err) { U.fail = String(err && err.message || err || '서버에 닿지 못했습니다'); }
+      U.busy = false; }
+    M.busy = false; M.fin = true; rpMuPaint();
+    const okN = todo.filter((x) => x.done).length, kinds = new Set(todo.filter((x) => x.done).map((x) => x.kind));
+    toast(okN + '개 저장' + (okN < todo.length ? ' · 실패 ' + (todo.length - okN) + '개 (빨간 줄을 확인해 주세요)' : ' 완료'));
+    try { // 저장된 종류만 다시 받아 화면에 반영
+      if (kinds.has('sla')) await loadSla(true);
+      if (kinds.has('fb')) await loadFb(true);
+      if (kinds.has('pk')) { await loadPk(true); loadPkm(true); }
+      if (kinds.has('wk') || kinds.has('sla')) await loadPerf(true);
+      if (kinds.size) { if (kinds.size === 1) RP.tab = [...kinds][0]; if (currentView !== 'perf') switchView('perf'); else rpRender(); }
+    } catch (x) { /* 목록은 새로고침으로 다시 받을 수 있음 */ }
+  });
   $('#rpFile').addEventListener('change', async (e) => {
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    toast('파일 읽는 중…');
-    try {
-      const sheets = await readXlsx(await f.arrayBuffer());
-      const isSla = sheets.some((sh) => sh.rows.some((r) => r && r.some((v) => /data\s*end\s*date/i.test(String(v == null ? '' : v)))));
-      const isFb = !isSla && sheets.some((sh) => sh.rows.slice(0, 8).some((r) => r && r.some((v) => /가중요인/.test(String(v == null ? '' : v)))));
-      const pk = !isSla && !isFb ? parsePeakSheet(sheets, f.name) : null;
-      $('#rpUpKind').classList.toggle('hidden', isSla || isFb || !!pk);
-      if (pk) {
-        rpUp = { file: f.name, kind: 'pk', P: pk };
-        if (!PK.loaded) await loadPk();
-        pkUpPreview();
-      } else if (isFb) {
-        const blocks = parseFbSheet(sheets);
-        if (!blocks.length) throw new Error('가중요인 파일에서 표(Wave · Camp · Route · 가중요인1 · 가중요인2)를 찾지 못했습니다.');
-        rpUp = { file: f.name, kind: 'fb', blocks };
-        if (!FW.loaded) await loadFb();
-        fbUpPreview();
-      } else if (isSla) {
-        const blocks = parseSlaSheet(sheets);
-        if (!blocks.length) throw new Error('SLA 파일에서 점수 표(Category · Camp · Route · Total Score)를 찾지 못했습니다.');
-        rpUp = { file: f.name, kind: 'sla', blocks };
-        if (!SL.loaded) await loadSla();
-        slaUpPreview();
-      } else {
-        const P = parsePerfSheet(sheets, f.name);
-        rpUp = { file: f.name, kind: 'wk', P };
-        $('#rpUpYear').value = P.year; $('#rpUpWk').value = P.wk;
-        rpUpPreview();
-      }
-      $('#rpUpModal').classList.remove('hidden');
-    } catch (err) { toast('파일을 읽지 못했습니다: ' + (err && err.message || err)); }
+    const fs = Array.from(e.target.files || []); e.target.value = '';
+    if (!fs.length) return;
+    if (rpMu && rpMu.busy) return toast('앞의 파일을 저장하는 중입니다. 끝난 뒤 다시 올려 주세요.');
+    toast(fs.length > 1 ? '파일 ' + fs.length + '개 읽는 중…' : '파일 읽는 중…');
+    if (fs.length === 1) { try { await rpUpOpen(await rpDetect(fs[0])); } catch (err) { toast('파일을 읽지 못했습니다: ' + (err && err.message || err)); } return; }
+    const items = [];
+    for (const f of fs) { try { const U = await rpDetect(f); U.on = true; items.push(U); } catch (err) { items.push({ file: f.name, kind: '', err: /\.xlsx$/i.test(f.name) ? '쿠팡 수행률 · SLA · 가중요인 · 피크 파일이 아닙니다' : '엑셀(.xlsx) 파일이 아닙니다' }); } }
+    // 같은 종류 · 같은 기간 파일이 둘이면 뒤의 것만 켠다 (서로 덮어쓰므로)
+    const sig = (U) => U.kind === 'wk' ? 'wk' + U.P.year + '-' + U.P.wk : U.kind === 'sla' ? 'sla' + U.blocks.map((b) => b.to).join() : U.kind === 'pk' ? 'pk' + U.P.ym : U.kind === 'fb' ? 'fb' + U.blocks.map((b) => b.kind + (b.date || b.to)).join() : '';
+    items.forEach((U, i) => { if (!U.err && items.slice(i + 1).some((V) => !V.err && sig(V) === sig(U))) { U.on = false; } });
+    try { if (items.some((U) => U.kind === 'pk') && !PK.loaded) await loadPk(); } catch (x) { /* 알림 기본값만 못 정함 */ }
+    rpMu = { items: items, busy: false, fin: false, n: 0, total: 0 };
+    rpMuPaint(); $('#rpMuModal').classList.remove('hidden');
   });
   const rpPctTxt = (v) => { if (v === '' || v == null) return '-'; const s = String(v).trim(); if (/%$/.test(s)) return s; const n = Number(s); return isNaN(n) ? s : Math.round((n <= 1.5 ? n * 100 : n) * 10) / 10 + '%'; };
   function rpUpPreview() {
@@ -7334,7 +7415,7 @@
       (RP.memoOn ? '<div style="margin-top:6px" class="sub">저장하면 업무스케줄에 "' + wk + '주차 수행률 업로드' + (bad.length || imp.length ? ' (' + [bad.length ? '3~4등급 ' + bad.length : '', imp.length ? '개선 요청 ' + imp.length : ''].filter(Boolean).join(' · ') + ')' : '') + '" 한 줄이 적힙니다.</div>' : '');
   }
   $('#rpUpWk').addEventListener('input', rpUpPreview); $('#rpUpYear').addEventListener('input', rpUpPreview);
-  $('#rpUpCancel').addEventListener('click', () => { $('#rpUpModal').classList.add('hidden'); rpUp = null; });
+  $('#rpUpCancel').addEventListener('click', () => rpUpClose(false));
   $('#rpUpOk').addEventListener('click', () => {
     const U = rpUp; if (!U) return;
     if (U.kind === 'sla') return slaUpSave();
@@ -7348,7 +7429,7 @@
     const b = $('#rpUpOk'); b.disabled = true; b.textContent = '저장 중…';
     api('adm_perfSave', { year, wk, file: U.file, rows }).then((r) => {
       if (!r.ok) return toast(r.msg);
-      $('#rpUpModal').classList.add('hidden'); rpUp = null;
+      rpUpClose(true);
       toast('수행률을 저장했습니다. 새로 ' + r.added + '줄 · 바뀜 ' + r.changed + '줄 · 같음 ' + r.unchanged + '줄 (' + (r.weeks || []).map(rpWkLabel).join(', ') + ')' + (r.memo ? ' · 업무스케줄에 메모를 적었습니다' : ''));
       return loadPerf(true).then(() => { if (!rpViewOn()) switchView('perf'); else { RP.tab = 'wk'; rpRender(); } });
     }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
@@ -7565,7 +7646,7 @@
         if (!r.ok) { toast(r.msg); return; }
         out.push('~' + slaPd(r.period) + ' 새로 ' + r.added + '·바뀜 ' + r.changed + '·같음 ' + r.unchanged + (r.memo ? ' (메모)' : ''));
       }
-      $('#rpUpModal').classList.add('hidden'); rpUp = null;
+      rpUpClose(true);
       toast('SLA 점수를 저장했습니다. ' + out.join(' / '));
       await loadSla(true); await loadPerf(true);
       RP.tab = 'sla'; if (currentView !== 'perf') switchView('perf'); else rpRender();
@@ -7649,12 +7730,12 @@
     try {
       const r = await api('adm_peakSave', { file: U.file, period: ym, rows, push });
       if (!r.ok) { toast(r.msg); return; }
-      $('#rpUpModal').classList.add('hidden'); rpUp = null;
+      rpUpClose(true);
       toast('피크 예상 물량을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged + (push ? ' · 알림 ' + (r.pushed || 0) + '건' : '') + (r.memo ? ' · 업무스케줄에 메모' : ''));
       await loadPk(true, ym); loadPkm(true);
       RP.tab = 'pk'; if (currentView !== 'perf') switchView('perf'); else rpRender();
     } catch (e) { // 응답만 끊기고 저장은 됐을 수 있음 → 실제 저장된 내용을 다시 읽어 보여 준다
-      try { await loadPk(true, ym); loadPkm(true); if (PK.periods.some((p) => p.period === ym)) { $('#rpUpModal').classList.add('hidden'); rpUp = null; RP.tab = 'pk'; rpRender(); toast('응답이 끊겼지만 저장은 되어 있습니다. 아래 표를 확인해 주세요.'); } } catch (x) { /* 그대로 둠 */ }
+      try { await loadPk(true, ym); loadPkm(true); if (PK.periods.some((p) => p.period === ym)) { rpUpClose(true); RP.tab = 'pk'; rpRender(); toast('응답이 끊겼지만 저장은 되어 있습니다. 아래 표를 확인해 주세요.'); } } catch (x) { /* 그대로 둠 */ }
     } finally { b.disabled = false; b.textContent = '저장'; }
   }
   function pkRender(box) {
@@ -7774,7 +7855,7 @@
     try {
       const r = await api('adm_fbSave', { file: U.file, blocks: U.blocks.map((x) => ({ kind: x.kind, from: x.from, to: x.to, date: x.date, rows: x.rows })) });
       if (!r.ok) { toast(r.msg); return; }
-      $('#rpUpModal').classList.add('hidden'); rpUp = null;
+      rpUpClose(true);
       toast('가중요인을 저장했습니다. 새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged + (r.skippedOld ? ' · 더 최신 자료가 있어 건너뜀 ' + r.skippedOld : '') + (r.memo ? ' · 업무스케줄에 메모' : ''));
       await loadFb(true);
       RP.tab = 'fb'; if (currentView !== 'perf') switchView('perf'); else rpRender();
