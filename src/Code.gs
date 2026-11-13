@@ -485,19 +485,12 @@ function doGet(e) {
   const prm = (e && e.parameter) || {};
   if (prm.ping) return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
   // 깃허브 페이지로 옮긴 뒤: 스크립트 속성 PAGES_URL 이 있으면 예전 주소는 새 주소 안내 화면을 보여 준다 (?stay=1 이면 예전 화면)
-  const pages = str_(props_().PAGES_URL).replace(/\/+$/, '');
-  if (pages && !prm.stay) return movePage_(pages + '/' + (prm.page === 'admin' ? 'admin/' : ''), prm.page === 'admin');
-  // 템플릿 평가 없이 파일을 그대로 내보내 첫 화면 응답을 빠르게 한다.
-  // 웹앱 주소 뒤에 ?page=admin 을 붙이면 관리자 화면
-  if (prm.page === 'admin') {
-    return HtmlService.createHtmlOutputFromFile('Admin')
-      .setTitle('러너 올인원 관리자')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('러너 올인원')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+  // 화면은 깃허브 페이지에서 연다. 구글 서버에는 화면 파일(Admin.html · Index.html, 약 1.9MB)을 올리지 않는다 → 호출마다 읽어 들일 프로그램이 작아진다 (.claspignore)
+  //  예전 구글 주소로 들어오면 새 주소 안내만 보여 준다 (PAGES_URL 이 없으면 기본 주소)
+  const pages = str_(props_().PAGES_URL).replace(/\/+$/, '') || PAGES_DEFAULT_URL;
+  return movePage_(pages + '/' + (prm.page === 'admin' ? 'admin/' : ''), prm.page === 'admin');
 }
+const PAGES_DEFAULT_URL = 'https://runyjh.github.io/runner';
 
 /** 러너 심볼 (화면 로고와 같은 모양, 색은 글자색을 따름) */
 const RUNNER_LOGO_SVG = '<svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg>';
@@ -5042,14 +5035,19 @@ function schRead_(sun, end) {
   try { pmMarks = pmAdminMarks_(cells, dates, byDrv, pmTips); } catch (e) { pmMarks = {}; pmTips = {}; }
   stg_('pmmark');
   const VP = typeof schVendorPack_ === 'function' ? schVendorPack_() : { vendors: [], routes: [] };
+  stg_('vendor');
+  const rmList = (function () { try { return typeof schRmRead_ === 'function' ? schRmRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, camp: x.camp, unit: x.unit, result: x.result, reason: x.reason, memo: x.memo, by: x.by }; }) : []; } catch (e) { return []; } })();
+  stg_('rmiss');
+  const unvList = (function () { try { return typeof schUnvRead_ === 'function' ? schUnvRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, campId: x.campId, code: x.code, name: x.vendor }; }) : []; } catch (e) { return []; } })();
+  stg_('unv');
   return {
     ok: true, start: ymd_(sun), today: todayText_(), dates: dates, holidays: holidays, maxDays: schMaxDays_(),
     camps: m.camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; }),
     routes: routes, drivers: drivers, cells: cells, notes: notes, pmRows: pmRows, pmMarks: pmMarks, pmTips: pmTips, rcMoves: rcMoves,
     issues: issues, issueKinds: SCH_ISSUE.KINDS, pmLocks: pmLocks,
     vendorRoutes: VP.routes, vendors: VP.vendors, routeMoves: routeMoves,
-    routeMiss: (function () { try { return typeof schRmRead_ === 'function' ? schRmRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, camp: x.camp, unit: x.unit, result: x.result, reason: x.reason, memo: x.memo, by: x.by }; }) : []; } catch (e) { return []; } })(),
-    vendorDays: (function () { try { return typeof schUnvRead_ === 'function' ? schUnvRead_().filter(function (x) { return x.date >= dates[0] && x.date <= dates[dates.length - 1]; }).map(function (x) { return { date: x.date, campId: x.campId, code: x.code, name: x.vendor }; }) : []; } catch (e) { return []; } })()
+    routeMiss: rmList,
+    vendorDays: unvList
   };
 }
 
