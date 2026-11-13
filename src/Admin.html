@@ -3578,6 +3578,9 @@
         '<div class="field full"><label class="lb">세금계산서 역발행</label><select class="inp" data-k="tiOn">' +
           '<option value=""' + (d.tiOn === 'Y' ? '' : ' selected') + '>지정 안 함 — 기사 앱에 세금계산서 안 보임</option>' +
           '<option value="Y"' + (d.tiOn === 'Y' ? ' selected' : '') + '>역발행 기사 — 기사 앱 정산서에 세금계산서 보임</option></select></div>' +
+        '<div class="field"><label class="lb">산재·고용 입직신고</label><select class="inp" data-k="enr">' +
+          '<option value=""' + (d.enr ? '' : ' selected') + '>자동 — 토탈서비스 양식으로 판단</option><option value="대상"' + (d.enr === '대상' ? ' selected' : '') + '>입직신고 대상</option><option value="완료"' + (d.enr === '완료' ? ' selected' : '') + '>입직신고 완료</option></select></div>' +
+        fld('enrAt', '입직신고일', d.enrAt, { type: 'date' }) +
       '</div></div>' +
       '<div class="sec"><h4>서류</h4><div class="docs">' + docs + '</div>' +
         (d.docFolder ? '<div style="margin-top:8px;font-size:12px"><a href="' + esc(d.docFolder) + '" target="_blank" rel="noopener">서류 폴더 열기 (드라이브)</a></div>' : '') + '</div>' +
@@ -4836,12 +4839,13 @@
       '<div class="dcs"><small>산재 (공단 전체)</small><b>' + dWon(sum(tg, 'sanAll')) + '</b><em>고용 대상 ' + tg.filter((x) => x.goyOn).length + '명</em></div>' +
       '<div class="dcs"><small>고용 (공단 전체)</small><b>' + dWon(sum(tg, 'goyAll')) + '</b></div>' +
       '<div class="dcs' + (done.length >= tg.length && tg.length ? ' ok' : ' bad') + '"><small>신고 완료</small><b>' + done.length + '/' + tg.length + '명</b></div>' +
-      (IR.info && IR.info.cfg && IR.info.cfg.enrolled ? (function () { const nn = tg.filter((x) => irEnrolled(x) === false); return '<div class="dcs' + (nn.length ? ' bad' : ' ok') + '" title="' + esc(nn.map((x) => x.name).join(', ')) + '"><small>입직신고 대상</small><b>' + nn.length + '명</b><em>토탈서비스 양식에 성명 없음</em></div>'; })() : '') +
+      (IR.info && ((IR.info.cfg && IR.info.cfg.enrolled) || IR.rows.some((x) => x.enr)) ? (function () { const nn = tg.filter((x) => irEnrEff(x) === false); return '<div class="dcs' + (nn.length ? ' bad' : ' ok') + '" title="' + esc(nn.map((x) => x.name).join(', ')) + '"><small>입직신고 대상</small><b>' + nn.length + '명</b><em>직접 고름 · 양식에 성명 없음</em></div>'; })() : '') +
       (noRrn.length ? '<div class="dcs bad"><small>주민등록번호 없음</small><b>' + noRrn.length + '명</b><em>기사 정보관리에서 입력</em></div>' : '');
-    const tabs = [['신고 대상', tg.length], ['미신고', tg.filter((x) => !x.done).length], ['신고 완료', done.length], ['제외', all.length - tg.length], ['전체', all.length]];
+    const enrNeed = tg.filter((x) => irEnrEff(x) === false), enrDone = tg.filter((x) => irEnrEff(x) === true);
+    const tabs = [['신고 대상', tg.length], ['미신고', tg.filter((x) => !x.done).length], ['신고 완료', done.length]].concat(enrNeed.length || enrDone.length ? [['입직신고 대상', enrNeed.length], ['입직신고 완료', enrDone.length]] : []).concat([['제외', all.length - tg.length], ['전체', all.length]]);
     $('#irTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (IR.tab === k ? ' on' : '') + '" data-irt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
     const q = $('#irQ').value.trim().toLowerCase();
-    const list0 = all.filter((x) => !x.parent && (IR.tab === '전체' || (IR.tab === '신고 대상' && irTarget(x)) || (IR.tab === '미신고' && irTarget(x) && !x.done) || (IR.tab === '신고 완료' && irTarget(x) && x.done) || (IR.tab === '제외' && !irTarget(x))) &&
+    const list0 = all.filter((x) => !x.parent && (IR.tab === '전체' || (IR.tab === '신고 대상' && irTarget(x)) || (IR.tab === '입직신고 대상' && irTarget(x) && irEnrEff(x) === false) || (IR.tab === '입직신고 완료' && irTarget(x) && irEnrEff(x) === true) || (IR.tab === '미신고' && irTarget(x) && !x.done) || (IR.tab === '신고 완료' && irTarget(x) && x.done) || (IR.tab === '제외' && !irTarget(x))) &&
       (!q || [x.name, x.memo].concat((x.kids || []).map((k) => (all.find((y) => y.acct === k) || {}).name)).join(' ').toLowerCase().includes(q)));
     // 하위 기사는 상위 기사 바로 밑에 붙여 보여 줌 (보험료는 상위 기사에 합산)
     const list = [];
@@ -4883,7 +4887,7 @@
     $('#irEmpty').classList.toggle('hidden', list.length > 0);
     irSelPaint();
   }
-  function irSelPaint() { dcSel(IR.sel, '#irRows', '#irAll', '#irBulk', 'data-irck', '<button type="button" class="btn sm" data-irbulk="1">신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="0">미신고로</button><button type="button" class="btn sm ghost" data-irbulk="x">⬇ 고른 기사만 엑셀</button>'); }
+  function irSelPaint() { dcSel(IR.sel, '#irRows', '#irAll', '#irBulk', 'data-irck', '<button type="button" class="btn sm" data-irbulk="1">신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="0">미신고로</button><button type="button" class="btn sm ghost" data-irbulk="x">⬇ 고른 기사만 엑셀</button><span style="width:1px;height:20px;background:var(--line);margin:0 4px"></span><button type="button" class="btn sm ghost" data-irbulk="e완료">입직신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="e대상">입직신고 대상으로</button>'); }
   function irSave(list) {
     const pay = list.map((x) => ({ acct: x.acct, driverId: x.driverId, name: x.name, bosu: x.bosu, san: x.sanOn, goy: x.goyOn, start: x.start, done: x.done, date: x.date, memo: x.memo }));
     return api('adm_insRepSet', IR.month, pay).then((r) => { if (!r.ok) { toast(r.msg); loadInsRep(); } return r; });
@@ -4917,6 +4921,7 @@
   }
   /** 입직신고 안 된 기사인가 (토탈서비스 양식에 이름 없음) — 양식을 안 올렸으면 null */
   function iyNoEnr(d) {
+    if (d.enr) return d.enr === '대상'; // 기사 정보에서 직접 고른 값이 먼저
     if (!IY.enr) return null;
     const n = String(d.name || ''), cands = [n].concat((n.match(/\(([^)]+)\)/) || [])[1] ? [n.match(/\(([^)]+)\)/)[1]] : [], [n.replace(/\s*\(.*\)\s*$/, '')]).map(irNm).filter(Boolean);
     return !cands.some((c) => IY.enr.has(c));
@@ -4937,7 +4942,7 @@
       '<div class="dcs' + (bad.length ? ' bad' : ' ok') + '"><small>미신고 있는 기사 (기한 지남)</small><b>' + bad.length + '명</b><em>' + noN + '건 · 공단 납부 ' + dWon(noAmt) + '원</em></div>' +
       (wait.length ? '<div class="dcs"><small>신고 전 (기한 안)</small><b style="color:#c2410c">' + wait.length + '명</b><em>' + waitM.map((m) => esc(eyMon(m)) + '분 ~' + esc(dMd(r.dues[m]))).join(' · ') + '</em></div>' : '') +
       '<div class="dcs ok"><small>기한 지난 달 모두 신고</small><b>' + (tgt.length - bad.length) + '명</b></div>' +
-      (IY.enr ? '<div class="dcs' + (noEnr.length ? ' bad' : ' ok') + '" title="' + esc(noEnr.map((d) => d.name).join(', ')) + '"><small>입직신고 대상</small><b>' + noEnr.length + '명</b><em>토탈서비스 양식에 성명 없음</em></div>' : '');
+      (IY.enr || all.some((d) => d.enr) ? '<div class="dcs' + (noEnr.length ? ' bad' : ' ok') + '" title="' + esc(noEnr.map((d) => d.name).join(', ')) + '"><small>입직신고 대상</small><b>' + noEnr.length + '명</b><em>직접 고름 · 양식에 성명 없음</em></div>' : '');
     const tabs = [['미신고 있는 기사', bad.length], ['신고 전', wait.length], ['신고 대상 전체', tgt.length], ['전체', all.length]];
     $('#iyTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (IY.tab === k ? ' on' : '') + '" data-iyt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
     const q = $('#iyQ').value.trim().toLowerCase();
@@ -5027,6 +5032,7 @@
     }).catch(() => {});
   }
   $('#irRows').addEventListener('change', (e) => { const s = e.target.closest('[data-irpar]'); if (s && s.value) irMerge(s.dataset.irpar, s.value); });
+  $('#irRows').addEventListener('change', (e) => { const s = e.target.closest('[data-irenr]'); if (s && s.dataset.irenr) irEnrSave([s.dataset.irenr], s.value); });
   $('#irRows').addEventListener('click', (e) => {
     const pe = e.target.closest('[data-irpared]');
     if (pe) { IR.parEdit = IR.parEdit === pe.dataset.irpared ? '' : pe.dataset.irpared; renderInsRep(); const s = $('#irRows [data-irpar]'); if (s) s.focus(); return; }
@@ -5041,6 +5047,7 @@
     if (e.target.closest('[data-dcclr]')) { IR.sel.clear(); return renderInsRep(); }
     const b = e.target.closest('[data-irbulk]'); if (!b) return;
     if (b.dataset.irbulk === 'x') return irExport(Array.from(IR.sel));
+    if (b.dataset.irbulk[0] === 'e') { const v = b.dataset.irbulk.slice(1), ids = [...new Set(IR.rows.filter((x) => IR.sel.has(x.acct) && x.driverId).map((x) => x.driverId))]; if (!confirm(ids.length + '명을 ' + (v === '완료' ? '입직신고 완료(오늘 날짜)' : '입직신고 대상') + '으로 바꿀까요?')) return; IR.sel.clear(); return irEnrSave(ids, v); }
     const on = b.dataset.irbulk === '1';
     const list = IR.rows.filter((x) => IR.sel.has(x.acct) && irTarget(x) && x.done !== on);
     if (!list.length) return toast('바꿀 줄이 없습니다.');
@@ -5087,10 +5094,24 @@
     const n = String(x.name || ''), cands = [n].concat((n.match(/\(([^)]+)\)/) || [])[1] ? [n.match(/\(([^)]+)\)/)[1]] : [], [n.replace(/\s*\(.*\)\s*$/, '')]).map(irNm).filter(Boolean);
     return cands.some((c) => IR.enrSet.has(c));
   }
+  /** 입직신고 여부 (실제로 쓰는 값): 기사 정보에서 직접 고른 값(완료·대상)이 먼저 · 없으면 토탈서비스 양식으로 자동 */
+  function irEnrEff(x) { return x.enr === '완료' ? true : x.enr === '대상' ? false : irEnrolled(x); }
   function irEnrTag(x) {
-    const v = irEnrolled(x);
-    if (v === null) return '<span class="sm" title="⚙ 신고 설정에서 토탈서비스 양식을 올리면 표시">—</span>';
-    return v ? '<span class="dc-tag y">완료</span>' : '<span class="dc-tag w" style="background:#fde8e8;color:#c81e1e;font-weight:800" title="토탈서비스 양식에 성명이 없음 — 먼저 노무제공자 입직신고(피보험자격 취득신고)가 필요">입직신고 대상</span>';
+    const v = irEnrEff(x), auto = !x.enr, a0 = irEnrolled(x), autoTx = a0 === null ? '자동 (양식 없음)' : '자동 (양식 ' + (a0 ? '완료' : '대상') + ')';
+    const col = v === true ? 'background:#e6f4ea;color:#0b6b3a;border-color:#b7dfc4' : v === false ? 'background:#fde8e8;color:#c81e1e;border-color:#f5c2c2' : '';
+    return '<select class="inp" data-irenr="' + esc(x.driverId || '') + '" title="입직신고 여부 — 고르면 기사 정보에 저장 (자동 = 토탈서비스 양식에 성명이 있으면 완료)" style="height:28px;font-size:12px;font-weight:800;padding:0 6px;min-width:120px;' + col + '"' + (x.driverId ? '' : ' disabled') + '>' +
+      '<option value=""' + (auto ? ' selected' : '') + '>' + esc(autoTx) + '</option><option value="대상"' + (x.enr === '대상' ? ' selected' : '') + '>입직신고 대상</option><option value="완료"' + (x.enr === '완료' ? ' selected' : '') + '>입직신고 완료</option></select>' +
+      (x.enr === '완료' && x.enrAt ? '<div class="sm" style="font-size:11px">' + esc(x.enrAt) + '</div>' : '');
+  }
+  /** 입직신고 저장 (기사 정보 drivers 탭) → 같은 기사의 모든 줄에 반영 */
+  function irEnrSave(ids, val) {
+    if (!ids.length) return toast('기사를 골라 주세요.');
+    return api('adm_insEnrSet', ids, val, '').then((r) => {
+      if (!r.ok) { toast(r.msg); return renderInsRep(); }
+      IR.rows.forEach((x) => { if (ids.includes(x.driverId)) { x.enr = r.value; x.enrAt = r.date; } });
+      if (IY.info) IY.info.drivers.forEach((d) => { if (ids.includes(d.driverId)) { d.enr = r.value; d.enrAt = r.date; } });
+      renderInsRep(); toast(r.n + '명을 ' + (r.value === '완료' ? '입직신고 완료로' : r.value === '대상' ? '입직신고 대상으로' : '자동(양식 대조)으로') + ' 바꿨습니다.');
+    }).catch(() => {});
   }
   /** 공단 양식 머리글 → 채울 값 종류 */
   function irKey(h) {

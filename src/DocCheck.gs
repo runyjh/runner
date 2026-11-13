@@ -172,7 +172,7 @@ function insRows_(month) {
       const sanAll = sanOn ? Math.round(bosu * (cfg.san + cfg.commute)) : 0, goyAll = goyOn ? Math.round(bosu * cfg.goy) : 0;
       const start0 = c.start || (lastStart[d.id] && lastStart[d.id].v) || stlYmd_(o.approvedAt) || stlYmd_(o.createdAt) || '';
       return {
-        acct: d.id, driverId: d.ownerId || '', name: d.name, rrn: o.rrn || '', hasRrn: !!o.rrnEnc, leave: o.leaveDate || '',
+        acct: d.id, driverId: d.ownerId || '', name: d.name, rrn: o.rrn || '', hasRrn: !!o.rrnEnc, leave: o.leaveDate || '', enr: str_(o.enr), enrAt: str_(o.enrAt),
         supply: d.supply, invoice: d.invoice, bosu: bosu, excluded: excluded, sanOn: sanOn, goyOn: goyOn,
         sanD: d.san || 0, goyD: d.goy || 0, runner: d.runnerIns || 0, sanAll: sanAll, goyAll: goyAll,
         start: start0, done: docYn_(c.done), date: c.date || '', memo: c.memo || '', by: c.by || '', at: c.at || '',
@@ -234,7 +234,7 @@ function adm_insYear(token, year, from) {
       x.rows.forEach(function (r) {
         let d = drv[r.acct];
         if (!d) { d = drv[r.acct] = { acct: r.acct, driverId: r.driverId, name: r.name, hasRrn: r.hasRrn, cells: {} }; order.push(d); }
-        d.name = r.name; d.hasRrn = r.hasRrn;
+        d.name = r.name; d.hasRrn = r.hasRrn; d.enr = r.enr; d.enrAt = r.enrAt;
         const tgt = !r.parent && !r.excluded && (r.sanOn || r.goyOn);
         const stt = r.parent ? 'sub' : !tgt ? 'out' : r.done ? 'done' : startM && m < startM ? 'skip' : today > x.due ? 'no' : 'wait';
         d.cells[m] = { st: stt, base: r.invoice, supply: r.supply, bosu: r.bosu, sanOn: r.sanOn, goyOn: r.goyOn, ded: (r.sanD || 0) + (r.goyD || 0),
@@ -331,5 +331,24 @@ function adm_insRepExport(token, month, accts, over) {
     });
     logAdmin_(a, '산재·고용 신고 엑셀 출력', r.month, out.length + '명 (주민번호 포함)');
     return { ok: true, month: r.month, cfg: r.cfg, rows: out, noRrn: noRrn };
+  });
+}
+
+/** 입직신고 완료 / 대상 / 자동(빈칸) 한꺼번에 — 기사 정보(drivers 탭 입직신고·입직신고일)에 저장 */
+function adm_insEnrSet(token, driverIds, value, date) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    value = str_(value);
+    if (value && ['완료', '대상'].indexOf(value) < 0) fail_('입직신고는 완료 / 대상 중에서 골라 주세요.');
+    const ids = (Array.isArray(driverIds) ? driverIds : []).map(str_).filter(function (x, i, l) { return x && l.indexOf(x) === i; }).slice(0, 300);
+    if (!ids.length) fail_('기사를 골라 주세요.');
+    const d = value === '완료' ? (stlYmd_(date) || todayText_()) : '';
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    let n = 0;
+    try {
+      ids.forEach(function (id) { if (driverById_(id)) { updateDriverCore_(a, id, { enr: value, enrAt: d }); n++; } });
+    } finally { lock.releaseLock(); }
+    return { ok: true, n: n, value: value, date: d };
   });
 }

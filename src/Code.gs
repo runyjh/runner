@@ -49,6 +49,7 @@ const D = {
   id: '기사ID', loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
   workerId: '실제 근무자 기사ID', // 같은 근무자 연결: 이 기사는 명의(아이디)만 있고 실제로는 그 기사가 뜀 → 스케줄은 근무자 한 줄 · 정산서는 명의별로 따로
   subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
+  enr: '입직신고', enrAt: '입직신고일', // 산재·고용(노무제공자) 입직신고: 완료 / 대상 / 빈칸(토탈서비스 양식으로 자동 판단)
   driverType: '단가코드', driverCode: '기사코드', title: '직함',
   birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
@@ -72,7 +73,7 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
-  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId'];
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId', 'enr', 'enrAt'];
 // 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -1750,6 +1751,7 @@ function fixAdminRow_(sh, c, o) {
 
 // ───────────────────────── 관리자 : 기사 정보관리 ─────────────────────────
 const D_EDIT_LABEL = {
+  enr: '입직신고', enrAt: '입직신고일',
   loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', address: '주소',
   driverType: '단가코드', driverCode: '기사코드', title: '직함',
   qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
@@ -1792,7 +1794,7 @@ function qualFmt_(v) {
 function detailOf_(o) {
   const out = listRow_(o);
   ['birthDate', 'address', 'qualDate', 'qualNo', 'licenseType', 'maxLoad', 'bankName', 'accountHolder',
-    'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail', 'extraAssign', 'tiOn',
+    'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail', 'extraAssign', 'tiOn', 'enr', 'enrAt',
     'updatedAt', 'pwChangedAt', 'docFolder'].forEach(function (k) { out[k] = o[k]; });
   out.qualNo = qualFmt_(o.qualNo);
   out.rrn = o.rrn; out.licenseNo = o.licenseNo; out.account = o.account;
@@ -2149,6 +2151,8 @@ function driverFields_(changes, o) {
         f.workStatus = str_(v);
         if (f.workStatus && WSTAT.indexOf(f.workStatus) < 0) fail_('근무상태는 ' + WSTAT.join(' / ') + ' 중에서 골라 주세요.');
         if (f.workStatus === '재직') f.workStatus = '';
+        // 퇴사로 바꾸면 입직신고를 '대상'으로 되돌림 (다시 일하면 새로 입직신고해야 함)
+        if (f.workStatus === '퇴사' && str_(o.workStatus) !== '퇴사' && str_(o.enr) === '완료' && changes.enr === undefined) { f.enr = '대상'; f.enrAt = ''; changed.push('입직신고 → 대상 (퇴사)'); }
         break;
       case 'leaveDate': {
         const d = str_(v);
@@ -2184,6 +2188,8 @@ function driverFields_(changes, o) {
         f.bizNo = d ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : ''; break;
       }
       case 'bizName': f.bizName = opt(v, '상호', 100); break;
+      case 'enr': f.enr = str_(v); if (f.enr && ['완료', '대상'].indexOf(f.enr) < 0) fail_('입직신고는 완료 / 대상 중에서 골라 주세요.'); break;
+      case 'enrAt': { const d = str_(v); if (d && !parseYmd_(d)) fail_('입직신고일을 확인해 주세요.'); f.enrAt = d ? ymd_(parseYmd_(d)) : ''; break; }
       case 'tiOn': f.tiOn = /^(y|yes|예|역발행|true|1)$/i.test(str_(v)) ? 'Y' : ''; break; // Y = 기사 앱 정산서에 역발행 세금계산서를 보여 줌
       case 'extraAssign': f.extraAssign = extraAssignNorm_(v, changes.schCampId !== undefined ? str_(changes.schCampId) : o.schCampId); break;
       case 'bizCeo': f.bizCeo = opt(v, '대표자', 50); break;
