@@ -440,6 +440,9 @@
   .sl-warn { background: #fdf3e2; color: #8a5a00; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
   .mc .pmdot { font-size: 9.5px; color: #8a5a00; font-weight: 700; }
   .pkban { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; background: linear-gradient(135deg, #fff4ea, #ffe6d3); border: 1px solid #fdba74; border-radius: var(--radius); padding: 13px 16px; margin: 0 0 12px; }
+  .chgbox { background: #fff7ed; border: 1px solid #fdba74; border-radius: var(--radius); padding: 13px 16px; margin: 0 0 12px; } .chgbox h4 { margin: 0 0 6px; font-size: 15px; color: #9a3412; }
+  .chgbox .cg { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; font-size: 14px; line-height: 1.45; border-top: 1px dashed #fed7aa; } .chgbox .cg:first-of-type { border-top: 0; } .chgbox .cg i { font-style: normal; flex: none; font-weight: 800; color: #7c2d12; white-space: nowrap; }
+  .chgbox .cg span { min-width: 0; overflow-wrap: anywhere; } .chgbox .cg s { color: #9ca3af; } .chgbox .cg b { color: #111827; } .chgbox .cgb { display: flex; gap: 8px; margin-top: 10px; } .chgbox .cgb button { flex: 1; border: 0; border-radius: 10px; padding: 11px 0; font: inherit; font-weight: 800; font-size: 14.5px; cursor: pointer; background: #ea580c; color: #fff; } .chgbox .cgb button.g { flex: 0 0 38%; background: #fff; color: #9a3412; border: 1px solid #fdba74; }
   .pkban b { display: block; font-size: 15px; color: #9a3412; } .pkban span { display: block; font-size: 13px; color: #7c2d12; margin-top: 4px; line-height: 1.5; } .pkban span strong { font-weight: 800; }
   .pkbox { background: #fff7ed; border: 1px solid #fdba74; border-radius: 12px; padding: 11px 13px; margin-top: 10px; }
   .pkbox > b { color: #9a3412; font-size: 14px; } .pkbox .pkr { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-top: 7px; font-size: 14px; }
@@ -855,6 +858,7 @@
     <div class="hello"><h2><svg class="rlogo" viewBox="30 24 740 588" aria-hidden="true" focusable="false"><path fill="currentColor" d="M541.1 447.8 C628.1 428.7 683.2 395.1 671.3 339 C659.1 281.2 586.5 237.9 501.9 206.5 C440.8 183.8 373.3 167.3 317.7 156 C293.5 150.1 271.9 144.8 268.7 144 L230.8 39.7 L227.7 31.1 L224.5 39.7 L192.9 124.4 C159.4 116.5 51.5 91.3 37.3 87.9 L58.8 106.1 C58.8 106.1 168.3 198.4 172.6 202.1 L122.3 335.8 L104.1 384.1 C128.2 362.4 206.1 292.2 237.5 263.9 C259.7 282.9 321.6 336.1 332.8 345.8 L324.9 320.6 C324.9 320.6 295.7 228.2 292.4 217.8 L336.5 190.5 L336.1 189.6 L279.8 207.3 L273.2 209.3 L275.6 216.8 L302.1 299 C279.5 279 242.9 246.6 242.9 246.6 L237.7 242.1 L232.1 246.5 L155.8 306.6 L181.8 202.1 L182.5 199.3 L180.6 197.5 L88.6 114.6 C123.1 123.7 196.3 143 196.3 143 L204.6 145.2 L206.6 137.2 C206.6 137.2 223.1 72.1 227.8 53.7 C233 72.8 255.2 153 255.2 153 L256.4 157.1 L260.8 158.3 C260.8 158.3 311.7 171.3 344.2 179.7 C355.9 182.6 366.2 189.5 373.4 199.1 C378 205.2 381.8 211.8 384.5 218.9 C388.8 230.4 389.8 246.2 387.9 264.7 C385.2 290.6 376.9 322.1 364 355.7 C361.6 361.7 359.2 367.8 356.5 374 C348.5 392.9 339.1 412.3 328.6 431.6 C321.6 444.4 314.1 457.2 306.2 469.8 C272.5 522.9 230.9 571.9 185.5 604 C228.3 598.6 279 593.8 337.2 590.7 C370.1 549.7 396.7 507.5 418.3 465.9 C417.6 465.6 416.9 465.2 416.1 464.9 C417.1 464.8 418 464.8 418.9 464.7 C418.7 465.1 418.5 465.5 418.3 465.9 C480.1 494.4 540.6 534.2 583.9 589.2 C621.4 590.6 720.9 598.3 762 601.3 C723 537.5 604.7 483.9 541.1 447.8 Z M485 289.8 C522.1 302.8 551.1 319.5 553.9 340 C556.2 357.4 518.2 362.8 463.2 361.9 C472 336.8 479.2 312.6 485 289.8 Z"/></svg><span id="homeName">기사님, 안녕하세요</span></h2><p>오늘도 안전 운행하세요.</p></div>
     <div class="ntcard hidden" id="ntCard"></div>
     <button type="button" class="pkban hidden" id="pkBan"></button>
+    <div class="chgbox hidden" id="chgBox"></div>
     <div class="menu">
       <button class="tile" id="mSched" type="button"><i class="ti">📅</i><b>스케줄</b><span>한 달 일정 · 내 캠프 →</span></button>
       <button class="tile" id="mSettle" type="button"><i class="ti">💰</i><b>정산서 보기</b><span>월별 정산서·계산서 →</span></button>
@@ -1515,6 +1519,7 @@
     setTimeout(() => { if (window.pmAlertStart) window.pmAlertStart(); }, 0); // (알림 함수는 뒤에서 선언되므로 한 박자 뒤에)
     if (saved) setTimeout(() => restoreView(saved), 0);
     setTimeout(swrPrefetch, 4000);
+    setTimeout(() => { try { seenBoot(); } catch (e) { /* 확인 기록은 없어도 됨 */ } }, 6000); // 급한 것들이 끝난 뒤 조용히
     setTimeout(() => { if (window.slPrefetch) window.slPrefetch(); }, 9000); // 정산서를 보는 기사만 뒤에서 미리 (위 미리 받기가 끝난 뒤)
   }
   function goLogin() {
@@ -1522,7 +1527,7 @@
     if (last) $('#lgId').value = last;
     show('login');
   }
-  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); if (window.scReset) window.scReset(); if (window.peakReset) window.peakReset(); try { $('#pkBan').classList.add('hidden'); } catch (e) { /* 무시 */ } try { SLC.tok = ''; SLC.months = null; SLC.slips = {}; SLC.at = 0; } catch (e) { /* 아직 선언 전 */ } try { localStorage.removeItem('runner.slUsed'); localStorage.removeItem('runner.slPreAt'); } catch (e) { /* 무시 */ } } // 다음 로그인(공용 폰의 다른 기사)에 고른 캠프가 남지 않게
+  function clearSession() { store.del(TOKEN); store.del(USER); swrClear(); if (window.scReset) window.scReset(); if (window.peakReset) window.peakReset(); if (window.seenReset) window.seenReset(); try { $('#pkBan').classList.add('hidden'); } catch (e) { /* 무시 */ } try { SLC.tok = ''; SLC.months = null; SLC.slips = {}; SLC.at = 0; } catch (e) { /* 아직 선언 전 */ } try { localStorage.removeItem('runner.slUsed'); localStorage.removeItem('runner.slPreAt'); } catch (e) { /* 무시 */ } } // 다음 로그인(공용 폰의 다른 기사)에 고른 캠프가 남지 않게
 
   // ───── 화면 문구 (관리자앱 → 올인원 설정 → 기사앱 에서 바꿈) ─────
   // 키 = "d:화면id:기본 문구". 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. ※ 관리자앱 uiDrvScan 과 같은 규칙
@@ -2226,6 +2231,53 @@
       '<div class="pkn">' + (L.length > 1 ? '합계 ' + sum.toLocaleString('ko-KR') + '건 · ' : '') + '쿠팡 예상치라 실제와 다를 수 있습니다.' + (L.some((x) => x.pct != null) ? ' 평소 = 최근 정산 두 달의 하루 평균.' : '') + '</div></div>';
   }
   /** 홈 배너: 피크 3일 전부터 끝나는 날까지 · 누르면 내 스케줄의 그 달로 */
+  // ───── 확인 기록: 공지 · 정산서를 처음 연 것, 앱을 연 것을 서버에 알린다 (기기에 '보냄' 표시 → 같은 것은 다시 안 보냄) · 스케줄 변경은 [확인했습니다] ─────
+  const SEEN = { q: [], t: 0, boot: '', chg: [] };
+  const seenDoneKey = () => { let u = null; try { u = JSON.parse(store.get(USER) || 'null'); } catch (e) {} return 'runner.seenDone.' + ((u && (u.id || u.loginId)) || ''); };
+  function seenSend(kind, key) {
+    const token = store.get(TOKEN); if (!token || !key) return;
+    const k = kind + ':' + key; if (ntGet(seenDoneKey()).includes(k) || SEEN.q.some((x) => x.k === kind && x.key === key)) return;
+    SEEN.q.push({ k: kind, key: String(key) });
+    clearTimeout(SEEN.t); SEEN.t = setTimeout(seenFlush, 2500);
+  }
+  function seenFlush(open) {
+    const token = store.get(TOKEN); if (!token) return;
+    const items = SEEN.q.splice(0); if (open) items.push({ k: 'open', key: '' });
+    if (!items.length) return;
+    const dk = seenDoneKey();
+    api('api_seen', token, items).then((r) => {
+      if (!r || !r.ok) { if (!r || r.code !== 'EXPIRED') items.forEach((x) => { if (x.k !== 'open') SEEN.q.push(x); }); return; }
+      const done = ntGet(dk); items.forEach((x) => { const k = x.k + ':' + x.key; if (x.k !== 'open' && !done.includes(k)) done.push(k); }); ntPut(dk, done);
+      SEEN.chg = r.changes || []; chgPaint();
+    }).catch(() => { items.forEach((x) => { if (x.k !== 'open') SEEN.q.push(x); }); });
+  }
+  /** 홈을 열 때 한 번 (같은 로그인으로 30분 안에 다시 열면 생략) */
+  function seenBoot() {
+    const token = store.get(TOKEN); if (!token) return;
+    const mark = token.slice(-8) + '|' + Math.floor(Date.now() / 1800000);
+    if (SEEN.boot === mark) { chgPaint(); return; }
+    SEEN.boot = mark; seenFlush(true);
+  }
+  const chgTxt = (v) => String(v || '').replace(/\s*\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)\s*/g, ' ').replace(/업무등록/g, '').replace(/\s+/g, ' ').trim() || '빈칸';
+  function chgPaint() {
+    const box = $('#chgBox'); if (!box) return;
+    const L = SEEN.chg || [];
+    if (!L.length || !store.get(TOKEN)) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    const md = (d) => { const p = d.split('-'); return +p[1] + '/' + +p[2] + ' (' + DOWK[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + ')'; };
+    box.innerHTML = '<h4>📅 내 스케줄이 바뀌었습니다</h4>' + L.slice(0, 8).map((x) => '<div class="cg"><i>' + md(x.date) + '</i><span><s>' + escH(chgTxt(x.old)) + '</s> → <b>' + escH(chgTxt(x.value)) + '</b></span></div>').join('') +
+      (L.length > 8 ? '<div class="cg"><span>외 ' + (L.length - 8) + '건</span></div>' : '') +
+      '<div class="cgb"><button type="button" class="g" data-cg="see">스케줄 보기</button><button type="button" data-cg="ok">확인했습니다</button></div>';
+    box.classList.remove('hidden');
+  }
+  $('#chgBox').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cg]'); if (!b) return;
+    const L = SEEN.chg || [];
+    if (b.dataset.cg === 'see') { if (L.length) { scMonth = L[0].date.slice(0, 7); scSel = L[0].date; } openSched(); return; }
+    const token = store.get(TOKEN); if (!token) return;
+    b.disabled = true; b.textContent = '보내는 중…';
+    api('api_seenAck', token, L.map((x) => x.date)).then((r) => { if (r && r.ok) { SEEN.chg = []; chgPaint(); } else { b.disabled = false; b.textContent = '확인했습니다'; } }).catch(() => { b.disabled = false; b.textContent = '확인했습니다'; });
+  });
+  window.seenReset = () => { SEEN.q = []; SEEN.chg = []; SEEN.boot = ''; try { chgPaint(); } catch (e) { /* 무시 */ } };
   function loadPeakHome() {
     const box = $('#pkBan'); if (!box) return;
     loadPeak().then((P) => {
@@ -2439,7 +2491,7 @@
       }).catch(() => {});
     }
   }
-  function markSeen(n) { const seen = ntGet(NT_SEEN); if (!seen.includes(ntKey(n))) { seen.push(ntKey(n)); ntPut(NT_SEEN, seen); } }
+  function markSeen(n) { try { seenSend('notice', n.id); } catch (e) { /* 확인 기록은 없어도 됨 */ } const seen = ntGet(NT_SEEN); if (!seen.includes(ntKey(n))) { seen.push(ntKey(n)); ntPut(NT_SEEN, seen); } }
   function openNotices(id) {
     ntOpen.clear(); if (id) ntOpen.add(id);
     $('#ntAdmGo').classList.toggle('hidden', !isStaffUser());
@@ -3226,6 +3278,7 @@
     if (cur && months.some((m) => m.month === cur)) $('#slMonth').value = cur;
   }
   function slipPaint(r) {
+    try { if (r && r.month && $('#v-settle').classList.contains('on')) seenSend('slip', r.month); } catch (e) { /* 확인 기록은 없어도 됨 */ }
     slTax = r.taxInv || [];
     $('#slBody').innerHTML = (r.closed ? '' : '<div class="sl-warn">⚠️ 아직 마감 전이라 금액이 바뀔 수 있습니다. 세금계산서는 마감 후 금액으로 발행해 주세요.</div>') + taxCards(slTax) + r.slips.map((sl) => slipCard(r, sl)).join('');
   }
