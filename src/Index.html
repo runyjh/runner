@@ -545,6 +545,9 @@
   .mmi .ck { flex: 0 0 auto; width: 26px; height: 26px; border: 2px solid #c5ccd3; border-radius: 8px; background: #fff; color: #fff; font-size: 15px; font-weight: 800; line-height: 1; padding: 0; margin-top: 1px; }
   .mmi.done .ck { background: #12b886; border-color: #12b886; } .mmi.done .tx { color: #9aa4ae; text-decoration: line-through; }
   .mmi .bd { flex: 1; min-width: 0; } .mmi .tm { font-size: 12.5px; font-weight: 800; color: var(--brand); margin-right: 6px; } .mmi .cat { font-size: 11.5px; font-weight: 700; color: #8a4b00; background: #fff4d6; border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+  .mmpin { background: #fffbea; border: 1px solid #f5d77a; border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; } .mmpin h4 { margin: 0 0 4px; font-size: 13px; color: #8a6100; }
+  .mmpin .pi { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-top: 1px dashed #f0dfa6; font-size: 14px; } .mmpin .pi:first-of-type { border-top: 0; } .mmpin .pi .t { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; } .mmpin .pi small { display: block; color: #a07a1a; font-size: 12px; }
+  .mmi .rp { font-size: 11.5px; font-weight: 700; color: #5b3cc4; background: #efe9ff; border-radius: 6px; padding: 1px 6px; margin-right: 6px; } .mmi .pn { font-size: 11.5px; font-weight: 700; color: #8a6100; background: #fff1c2; border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
   .mmi .tx { font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
   .mmi .mt { display: flex; gap: 10px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--sub); } .mmi .mt span { flex: 1; } .mmi .mt button { border: 0; background: none; color: var(--brand); font-size: 12.5px; font-weight: 700; padding: 2px 0; } .mmi .mt button.del { color: #e03131; }
   /* 내 캠프 → 기사 연락처 (쿠팡 아이디 · 전화) */
@@ -908,6 +911,7 @@
   <!-- ───────────── 러너 업무스케줄 (직함자 전용 · 관리자앱 업무스케줄과 같은 데이터) ───────────── -->
   <section id="v-memo" class="view">
     <div class="topbar"><button class="back" id="mmBack" aria-label="뒤로">←</button><h2>러너 업무스케줄</h2></div>
+    <div class="mmpin hidden" id="mmPin"></div>
     <div class="card mmcal"><div class="mmnav"><button type="button" data-mmm="-1" aria-label="이전 달">◀</button><b class="mmym" id="mmYm"></b><button type="button" data-mmm="1" aria-label="다음 달">▶</button><button type="button" class="mmtd" id="mmToday">오늘</button></div>
       <div class="mmgrid" id="mmGrid"></div></div>
     <div class="mmnav"><button type="button" data-mmv="-1" aria-label="전날">◀</button><label class="mmd"><b id="mmDay"></b><input type="date" id="mmPick" aria-label="날짜 고르기"></label><button type="button" data-mmv="1" aria-label="다음날">▶</button></div>
@@ -3822,7 +3826,7 @@
     return api('api_memoMonth', tok, ym).then((r) => {
       if (seq !== MM.seq) return;
       if (!pmOk(r, '업무스케줄을 불러오지 못했습니다.')) { if (!MM.months[ym]) $('#mmList').innerHTML = '<div class="card" style="color:var(--sub)">' + escH((r && r.msg) || '불러오지 못했습니다.') + '</div>'; return; }
-      MM.months[ym] = { at: Date.now(), memos: r.memos || [], hol: r.holidays || {} }; mmPaint();
+      MM.months[ym] = { at: Date.now(), memos: r.memos || [], hol: r.holidays || {} }; MM.pinned = r.pinned || []; mmPaint();
     }).catch(() => netErr());
   }
   /** 한 달 달력: 날짜마다 메모 수 (안 끝난 게 있으면 주황 · 다 끝났으면 초록) · 누르면 그날 */
@@ -3848,10 +3852,15 @@
     mmCal();
     const m = MM.months[MM.day.slice(0, 7)];
     if (!m) { $('#mmList').innerHTML = '<div class="card" style="color:var(--sub)">불러오는 중…</div>'; return; }
+    const pins = MM.pinned || [], DW = ['일', '월', '화', '수', '목', '금', '토'];
+    $('#mmPin').classList.toggle('hidden', !pins.length);
+    $('#mmPin').innerHTML = '<h4>📌 항상 보기 ' + pins.length + '건</h4>' + pins.map((x) => '<div class="pi"><button type="button" class="ck" data-mmpin="' + escH(x.id) + '" aria-label="완료 (항상 보기에서 빠짐)" style="flex:0 0 auto;width:24px;height:24px;border:2px solid #d9b44a;border-radius:7px;background:#fff;padding:0"></button><span class="t">' + (x.time ? '<b>' + escH(x.time) + '</b> ' : '') + escH(x.content) +
+      '<small>' + escH(x.date.slice(5).replace('-', '/')) + (x.until ? ' · ' + escH(x.until.slice(5).replace('-', '/')) + '까지' : '') + ' · ' + escH(x.author || '') + '</small></span></div>').join('');
+    const repTx = (r) => !r ? '' : r[0] === 'W' ? '매주 ' + DW[+r.slice(1)] : r[0] === 'M' ? '매월 ' + (+r.slice(1)) + '일' : '매년 ' + (+r.slice(1, 3)) + '/' + (+r.slice(3, 5));
     const list = m.memos.filter((x) => x.date === MM.day);
     $('#mmList').innerHTML = list.length ? list.map((x) => '<div class="mmi' + (x.done ? ' done' : '') + '">' +
       '<button type="button" class="ck" data-mmdone="' + escH(x.id) + '" aria-label="완료 표시">' + (x.done ? '✓' : '') + '</button>' +
-      '<div class="bd">' + (x.time ? '<span class="tm">' + escH(x.time) + '</span>' : '') + (x.cat ? '<span class="cat">' + escH(x.cat) + '</span>' : '') +
+      '<div class="bd">' + (x.base ? '<span class="rp">🔁 ' + escH(repTx(x.rep)) + '</span>' : '') + (x.pin ? '<span class="pn">📌 항상 보기</span>' : '') + (x.time ? '<span class="tm">' + escH(x.time) + '</span>' : '') + (x.cat ? '<span class="cat">' + escH(x.cat) + '</span>' : '') +
       '<div class="tx">' + escH(x.content) + '</div>' +
       '<div class="mt"><span>' + escH(x.author || '') + '</span><button type="button" data-mmedit="' + escH(x.id) + '">수정</button><button type="button" class="del" data-mmdel="' + escH(x.id) + '">삭제</button></div></div></div>').join('')
       : '<div class="card" style="color:#b0b8c1;text-align:center">이 날은 업무 메모가 없습니다.</div>';
@@ -3948,14 +3957,19 @@
     const dn = e.target.closest('[data-mmdone]');
     if (dn) {
       const x = mmFind(dn.dataset.mmdone); if (!x || dn.disabled) return; dn.disabled = true;
-      return api('api_memoSave', store.get(TOKEN), { id: x.id, done: !x.done }).then((r) => { if (pmOk(r, '저장하지 못했습니다.')) { mmPut(r.memo); mmPaint(); } else dn.disabled = false; }).catch(() => { dn.disabled = false; netErr(); });
+      return api('api_memoSave', store.get(TOKEN), { id: x.id, done: !x.done }).then((r) => { if (pmOk(r, '저장하지 못했습니다.')) { if (x.pin) return mmLoad(true); mmPut(r.memo); mmPaint(); } else dn.disabled = false; }).catch(() => { dn.disabled = false; netErr(); });
+    }
+    const pn = e.target.closest('[data-mmpin]');
+    if (pn) {
+      if (pn.disabled) return; pn.disabled = true; pn.textContent = '✓';
+      return api('api_memoSave', store.get(TOKEN), { id: pn.dataset.mmpin, done: true }).then((r) => { if (pmOk(r, '저장하지 못했습니다.')) { toast('완료 — 항상 보기에서 뺐습니다.'); mmLoad(true); } else { pn.disabled = false; pn.textContent = ''; } }).catch(() => { pn.disabled = false; pn.textContent = ''; netErr(); });
     }
     const dl = e.target.closest('[data-mmdel]');
     if (dl) {
       const x = mmFind(dl.dataset.mmdel); if (!x) return;
-      return pmAsk('메모 삭제', '이 메모를 지울까요? 관리자앱 업무스케줄에서도 지워집니다.\n\n' + x.content.slice(0, 60), '삭제').then((ok) => {
+      return pmAsk('메모 삭제', (x.base ? '🔁 반복 메모입니다. 지우면 모든 날짜에서 사라집니다. 이 날만 빼려면 삭제 대신 완료를 눌러 주세요.\n\n' : '이 메모를 지울까요? 관리자앱 업무스케줄에서도 지워집니다.\n\n') + x.content.slice(0, 60), '삭제').then((ok) => {
         if (ok === null) return;
-        return api('api_memoDelete', store.get(TOKEN), x.id).then((r) => { if (!pmOk(r, '지우지 못했습니다.')) return; Object.keys(MM.months).forEach((k) => { MM.months[k].memos = MM.months[k].memos.filter((y) => y.id !== x.id); }); if (MM.edit === x.id) mmReset(); mmPaint(); toast('지웠습니다.'); });
+        return api('api_memoDelete', store.get(TOKEN), x.id).then((r) => { if (!pmOk(r, '지우지 못했습니다.')) return; if (x.base || x.pin) { toast('지웠습니다.'); return mmLoad(true); } Object.keys(MM.months).forEach((k) => { MM.months[k].memos = MM.months[k].memos.filter((y) => y.id !== x.id); }); if (MM.edit === x.id) mmReset(); mmPaint(); toast('지웠습니다.'); });
       }).catch(() => netErr());
     }
   });
@@ -3966,7 +3980,10 @@
     const memo = MM.edit ? { id: MM.edit, content: tx, time: $('#mmTime').value } : { date: MM.day, content: tx, time: $('#mmTime').value };
     api('api_memoSave', store.get(TOKEN), memo).then((r) => {
       go.disabled = false; if (!pmOk(r, '저장하지 못했습니다.')) return;
-      mmPut(r.memo); toast(MM.edit ? '고쳤습니다.' : '추가했습니다.'); mmReset(); mmPaint();
+      const wasRep = MM.edit && MM.edit.indexOf('@') > 0;
+      toast(MM.edit ? '고쳤습니다.' : '추가했습니다.'); mmReset();
+      if (wasRep) return mmLoad(true); // 반복 메모는 모든 날짜를 새로
+      mmPut(r.memo); mmPaint();
     }).catch(() => { go.disabled = false; netErr(); });
   });
   // 홈: 게시판 최근 글 3개

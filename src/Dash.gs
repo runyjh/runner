@@ -100,13 +100,25 @@ function dashMain_() {
     try { out.route.fb = fbSummary_(); } catch (e) { out.route.fb = null; }
 
     // ── 업무스케줄 (메모)
-    const memos = readAll_(SH.MEMO).map(function (o) { o.date = normDate_(o.date) || o.date; return o; }).filter(function (o) { return o.id && o.date; })
-      .map(function (o) { const m = memoView_(o); m._date = o.date; return m; });
+    const memos = [], pinnedM = [];
+    readAll_(SH.MEMO).map(function (o) { o.date = normDate_(o.date) || o.date; return o; }).filter(function (o) { return o.id && o.date; })
+      .forEach(function (o) {
+        const m = memoView_(o);
+        if (m.rep) { // 반복: 오늘~일주일 안에 걸리는 날짜만 펼침
+          [today.slice(0, 7), ymd_(addDays_(t0, 6)).slice(0, 7)].filter(function (x, i, l) { return l.indexOf(x) === i; }).forEach(function (ym) {
+            memoRepDates_(m.rep, o.date, m.until, ym).forEach(function (d) { if (d >= today) { const x = memoOcc_(m, o.repDone, d); x._date = d; memos.push(x); } });
+          });
+          return;
+        }
+        if (memoPinnedNow_(m, today)) pinnedM.push(m);
+        m._date = o.date; memos.push(m);
+      });
     const wk = ymd_(addDays_(t0, 6));
     out.memo = {
       today: memos.filter(function (m) { return m._date === today && !m.note; }).sort(memoSort_).map(function (m) { return { time: m.time || '', text: String(m.content || '').slice(0, 60), done: !!m.done }; }),
       week: memos.filter(function (m) { return m._date > today && m._date <= wk && !m.done && !m.note; }).length,
-      overdue: memos.filter(function (m) { return m._date < today && !m.done && !m.note; }).length
+      overdue: memos.filter(function (m) { return m._date < today && !m.done && !m.note; }).length,
+      pinned: pinnedM.sort(memoSort_).map(function (m) { return { text: String(m.content || '').slice(0, 60), until: m.until }; })
     };
 
     // ── 공지사항

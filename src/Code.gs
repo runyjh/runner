@@ -153,10 +153,11 @@ const L = { at: '시각', admin: '관리자', action: '작업', target: '대상'
 // work_memo 시트 (업무스케줄: 관리자 전용 날짜별 메모). 시트에서 직접 줄을 추가해도 된다.
 const M = {
   id: '메모ID', date: '날짜', time: '시간', content: '내용', done: '완료',
-  author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', cat: '비고 줄'
+  author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', cat: '비고 줄',
+  pin: '항상 보기', until: '까지', rep: '반복', repDone: '반복 완료일'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전해서 자동으로 추가하는 열 (시트별)
-const AUTO_ADD_COLS = { work_memo: ['cat'], camps: ['cpCode'] };
+const AUTO_ADD_COLS = { work_memo: ['cat', 'pin', 'until', 'rep', 'repDone'], camps: ['cpCode'] };
 // 예전 버전이 쓰던 머리글 (지금은 정산 DB 로 옮겨짐). 남아 있어도 '이름 바뀐 머리글'로 보지 않는다
 const LEGACY_HEADS = { drivers: ['정산 대상 기사ID', '기사 일시단가', '기사 일시단가 노선', '기사 일시단가 시작일', '기사 일시단가 종료일'] };
 const M_NOTES = {
@@ -2439,9 +2440,33 @@ function memoView_(o) {
   return {
     id: o.id, date: o.date, time: o.time, content: o.content, done: String(o.done).toUpperCase() === 'Y',
     author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt, cat: o.cat || '',
-    note: o.author === SCH_NOTE_AUTHOR // 기사스케줄 비고에서 옮겨 온 글 (할 일이 아니므로 '미완료' 로 세지 않음)
+    note: o.author === SCH_NOTE_AUTHOR, // 기사스케줄 비고에서 옮겨 온 글 (할 일이 아니므로 '미완료' 로 세지 않음)
+    pin: String(o.pin || '').toUpperCase() === 'Y', until: normDate_(o.until) || '', rep: memoRepOk_(o.rep) ? str_(o.rep) : ''
   };
 }
+// ── 업무스케줄: 📌 항상 보기 · 🔁 반복 ──
+// 반복 규칙(rep 열): M20 = 매월 20일 (그 달에 없는 날이면 말일) · W3 = 매주 수요일 (0=일) · Y0125 = 매년 1월 25일
+// 메모의 날짜 = 반복 시작일, 까지(until) = 끝나는 날. 반복 메모는 날짜마다 '메모ID@날짜' 로 펼쳐 보이고, 완료는 그 날짜만 (반복 완료일 열에 쉼표로)
+function memoRepOk_(r) { return /^(M([1-9]|[12]\d|3[01])|W[0-6]|Y(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01]))$/.test(str_(r)); }
+/** 반복 메모가 ym 달에 걸리는 날짜들 */
+function memoRepDates_(rep, start, until, ym) {
+  if (!memoRepOk_(rep)) return [];
+  const y = +ym.slice(0, 4), mo = +ym.slice(5, 7), last = new Date(y, mo, 0).getDate(), out = [];
+  const pad = function (n) { return ('0' + n).slice(-2); }, day = function (d) { return ym + '-' + pad(d); };
+  if (rep[0] === 'M') out.push(day(Math.min(+rep.slice(1), last)));
+  else if (rep[0] === 'Y') { if (+rep.slice(1, 3) === mo && +rep.slice(3, 5) <= last) out.push(day(+rep.slice(3, 5))); }
+  else { const w = +rep.slice(1); for (let d = 1; d <= last; d++) if (new Date(y, mo - 1, d).getDay() === w) out.push(day(d)); }
+  return out.filter(function (d) { return (!start || d >= start) && (!until || d <= until); });
+}
+/** 반복 메모 1건 → 그 날짜의 보기 (id = 메모ID@날짜) */
+function memoOcc_(m, repDone, d) {
+  const x = Object.assign({}, m);
+  x.id = m.id + '@' + d; x.base = m.id; x.start = m.date; x.date = d;
+  x.done = (',' + str_(repDone) + ',').indexOf(',' + d + ',') >= 0;
+  return x;
+}
+/** 지금 '항상 보기' 인 메모: 📌 이고 완료 안 됐고 까지 날짜가 안 지난 것 */
+function memoPinnedNow_(m, today) { return m.pin && !m.done && !m.rep && (!m.until || m.until >= today); }
 function memoSort_(a, b) {
   return a.date !== b.date ? (a.date < b.date ? -1 : 1)
     : a.time !== b.time ? (!a.time ? 1 : !b.time ? -1 : a.time < b.time ? -1 : 1)
@@ -2461,20 +2486,23 @@ function memoMonth_(ym) {
     const list = [];
     let pastUndone = 0;
     const today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
+    const pinned = [];
     rows.forEach(function (v) {
       const o = {};
-      Object.keys(M).forEach(function (k) { o[k] = str_(v[c[k]]); });
+      Object.keys(M).forEach(function (k) { o[k] = c[k] === undefined ? '' : str_(v[c[k]]); });
       o.date = normDate_(o.date) || o.date;
       if (!o.id || !o.date) return;
       const m = memoView_(o);
+      if (m.rep) { memoRepDates_(m.rep, o.date, m.until, ym).forEach(function (d) { list.push(memoOcc_(m, o.repDone, d)); }); return; } // 반복: 그 달 날짜마다
+      if (memoPinnedNow_(m, today)) pinned.push(m);
       if (o.date.indexOf(ym) === 0) list.push(m);
       if (!m.done && !m.note && o.date < today) pastUndone++;
     });
-    list.sort(memoSort_);
+    list.sort(memoSort_); pinned.sort(memoSort_);
     let noteLabels = [];
     try { noteLabels = schNotes_().map(function (n) { return n.label; }); } catch (e) { /* 스케줄 DB 가 없으면 비움 */ }
     const holidays = {}; Object.keys(HOLIDAYS).forEach(function (d) { if (d.indexOf(ym) === 0) holidays[d] = HOLIDAYS[d]; });
-    return { ok: true, memos: list, pastUndone: pastUndone, today: today, noteLabels: noteLabels, holidays: holidays };
+    return { ok: true, memos: list, pinned: pinned, pastUndone: pastUndone, today: today, noteLabels: noteLabels, holidays: holidays };
   }
 }
 
@@ -2492,7 +2520,7 @@ function adm_memoPastUndone(token) {
       o.date = normDate_(o.date) || o.date;
       if (!o.id || !o.date) return;
       const m = memoView_(o);
-      if (!m.done && !m.note && o.date < today) list.push(m);
+      if (!m.rep && !m.done && !m.note && o.date < today) list.push(m);
     });
     list.sort(memoSort_);
     return { ok: true, memos: list };
@@ -2523,6 +2551,12 @@ function memoSave_(a, memo) {
     }
     if (memo.done !== undefined) f.done = memo.done ? 'Y' : '';
     if (memo.cat !== undefined) f.cat = str_(memo.cat).slice(0, 30);
+    if (memo.pin !== undefined) f.pin = memo.pin ? 'Y' : '';
+    if (memo.until !== undefined) { f.until = str_(memo.until) ? normDate_(memo.until) : ''; if (f.until === '' && str_(memo.until)) fail_('까지 날짜를 확인해 주세요.'); }
+    if (memo.rep !== undefined) { f.rep = str_(memo.rep); if (f.rep && !memoRepOk_(f.rep)) fail_('반복 설정을 확인해 주세요.'); }
+    // 반복 메모의 한 날짜(메모ID@날짜): 완료는 그 날짜만, 내용·시간 등은 반복 전체를 고친다 (날짜는 못 옮김)
+    let occ = '';
+    if (memo.id && String(memo.id).indexOf('@') > 0) { occ = String(memo.id).split('@')[1]; memo = Object.assign({}, memo, { id: String(memo.id).split('@')[0] }); delete f.date; }
 
     const lock = scriptLock_();
     lock.waitLock(20000);
@@ -2533,16 +2567,23 @@ function memoSave_(a, memo) {
         const id = newMemoId_();
         const row = appendObj_(SH.MEMO, {
           id: id, date: f.date, time: f.time || '', content: f.content, done: f.done || '', cat: f.cat || '',
+          pin: f.pin || '', until: f.until || '', rep: f.rep || '',
           author: a.name, createdAt: now, updatedAt: now
         });
         return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
       }
       const row = findRow_(SH.MEMO, 'id', String(memo.id));
       if (!row) fail_('메모를 찾을 수 없습니다. 시트에서 지워졌을 수 있습니다. 새로고침해 주세요.');
-      if (!Object.keys(f).length) return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
+      const view = function () { const o = readObj_(SH.MEMO, row), m = memoView_(o); return occ && m.rep ? memoOcc_(m, o.repDone, occ) : m; };
+      if (occ && f.done !== undefined) { // 반복의 그 날짜만 완료/해제
+        const o0 = readObj_(SH.MEMO, row), set = str_(o0.repDone).split(',').filter(function (d) { return d && d !== occ; });
+        if (f.done) set.push(occ);
+        delete f.done; f.repDone = set.sort().join(',');
+      }
+      if (!Object.keys(f).length) return { ok: true, memo: view() };
       f.updatedAt = now;
       writeFields_(SH.MEMO, row, f);
-      return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
+      return { ok: true, memo: view() };
     } finally {
       lock.releaseLock();
     }
@@ -2557,7 +2598,7 @@ function memoDelete_(id) {
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
-      const row = findRow_(SH.MEMO, 'id', String(id || ''));
+      const row = findRow_(SH.MEMO, 'id', String(id || '').split('@')[0]); // 반복의 한 날짜를 지우면 반복 전체를 지운다
       if (!row) return { ok: true }; // 이미 지워짐
       sheet_(SH.MEMO).deleteRow(row);
       return { ok: true };
