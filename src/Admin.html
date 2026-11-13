@@ -4624,7 +4624,7 @@
   });
 
   // ── 전자세금계산서 연간 보기: 기사 × 월 발행 현황 · 미발행 인원 · 기사별 1년 내역 ──
-  const EY = { mode: 'month', year: '', info: null, tab: '미발행 있는 기사', open: '', seq: 0 };
+  const EY = { mode: 'month', year: '', info: null, tab: '미발행 있는 기사', open: '', seq: 0, keep: new Set() }; // keep = 방금 바꾼 기사 (다 발행해도 탭을 바꾸기 전까지 줄을 남김)
   const eyMon = (m) => Number(m.slice(5, 7)) + '월';
   function evModeSet(mode) {
     EY.mode = mode;
@@ -4641,7 +4641,7 @@
     api.apply(null, ['adm_einvYear'].concat(args)).then((r) => {
       if (seq !== EY.seq) return;
       if (!r.ok) return toast(r.msg);
-      EY.info = r; EY.year = r.year;
+      EY.info = r; EY.year = r.year; EY.keep.clear();
       $('#eyYear').innerHTML = (r.years.length ? r.years : [r.year]).slice().reverse().map((y) => '<option value="' + esc(y) + '"' + (y === r.year ? ' selected' : '') + '>' + esc(y) + '년</option>').join('');
       $('#eyFrom').innerHTML = '<option value="">처음부터</option>' + r.months.map((m) => '<option value="' + esc(m) + '"' + (m === r.from ? ' selected' : '') + '>' + esc(dMon(m)) + '부터</option>').join('') + (r.from && !r.months.includes(r.from) ? '<option value="' + esc(r.from) + '" selected>' + esc(dMon(r.from)) + '부터</option>' : '');
       renderEinvYear();
@@ -4654,7 +4654,7 @@
     const bad = all.filter((d) => noCells(d).length), noSum = all.reduce((a, d) => a + noCells(d).reduce((b, m) => b + (d.cells[m].total || 0), 0), 0);
     const noN = all.reduce((a, d) => a + noCells(d).length, 0);
     $('#evCount').textContent = r.year + '년 · 미발행 ' + bad.length + '명';
-    $('#eyInfo').innerHTML = '<b>' + esc(r.year) + '년</b> 정산월 기준 (' + (ms.length ? esc(eyMon(ms[0])) + '~' + esc(eyMon(ms[ms.length - 1])) : '정산 없음') + ') · 칸을 누르면 그 달 <b>월별</b> 화면으로 가서 바로 체크할 수 있습니다 · 기사 이름을 누르면 1년 내역이 펼쳐집니다' +
+    $('#eyInfo').innerHTML = '<b>' + esc(r.year) + '년</b> 정산월 기준 (' + (ms.length ? esc(eyMon(ms[0])) + '~' + esc(eyMon(ms[ms.length - 1])) : '정산 없음') + ') · 칸을 누르면 <b>발행 완료 ↔ 미발행</b>이 바로 바뀝니다 (역발행은 자동) · 기사 이름을 누르면 1년 내역이 펼쳐집니다 (승인번호·메모는 <b>월별 ›</b>)' +
       (r.from ? ' · <b>' + esc(dMon(r.from)) + '</b> 전 달은 체크 기록이 없어 미발행으로 세지 않습니다 (회색 \'기록 전\')' : '');
     $('#eySum').innerHTML = '<div class="dcs"><small>올해 대상</small><b>' + all.length + '명</b></div>' +
       '<div class="dcs' + (bad.length ? ' bad' : ' ok') + '"><small>미발행 있는 기사</small><b>' + bad.length + '명</b><em>' + noN + '건 · ' + dWon(noSum) + '원</em></div>' +
@@ -4662,19 +4662,36 @@
     const tabs = [['미발행 있는 기사', bad.length], ['전체', all.length]];
     $('#eyTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (EY.tab === k ? ' on' : '') + '" data-eyt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
     const q = $('#eyQ').value.trim().toLowerCase();
-    let list = all.filter((d) => (EY.tab === '전체' || noCells(d).length) && (!q || [d.name, d.bizNo, d.bizName, d.vendor].join(' ').toLowerCase().includes(q)));
+    let list = all.filter((d) => (EY.tab === '전체' || noCells(d).length || EY.keep.has(d.acct)) && (!q || [d.name, d.bizNo, d.bizName, d.vendor].join(' ').toLowerCase().includes(q)));
     list = list.slice().sort((a, b) => noCells(b).length - noCells(a).length || a.name.localeCompare(b.name, 'ko'));
     $('#eyHead').innerHTML = '<tr><th>기사</th>' + ms.map((m) => '<th class="ec">' + esc(eyMon(m)) + '</th>').join('') + '<th class="num">미발행</th><th class="num">미발행 금액</th></tr>';
     const lab = { done: '✓ 발행', ti: '역발행', no: '미발행', skip: '기록 전' };
     $('#eyRows').innerHTML = list.map((d) => {
       const nc = noCells(d), amt = nc.reduce((a, m) => a + (d.cells[m].total || 0), 0), open = EY.open === d.acct;
       return '<tr class="eyr' + (open ? ' open' : '') + '" data-eya="' + esc(d.acct) + '"><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' + (d.vendor ? ' <span class="dc-tag">용차업체</span>' : '') + '</td>' +
-        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-eym="' + esc(m) + '" title="' + esc(dMon(m) + ' · ' + dWon(c.total) + '원') + '">' + lab[c.st] + '</button>' : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
+        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-eym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' title="' + esc(dMon(m) + ' · ' + dWon(c.total) + '원 · ' + (c.st === 'ti' ? '역발행은 자동 (바꿀 수 없음)' : c.st === 'done' ? '누르면 미발행으로' : '누르면 발행 완료로')) + '">' + (c.busy ? '저장 중…' : lab[c.st]) + '</button>' : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
         '<td class="num">' + (nc.length ? '<b style="color:#c81e1e">' + nc.length + '건</b>' : '<span class="sm">없음</span>') + '</td><td class="num">' + (amt ? dWon(amt) : '') + '</td></tr>' +
         (open ? '<tr class="eyd"><td colspan="' + (ms.length + 3) + '">' + eyDetail(d) + '</td></tr>' : '');
     }).join('');
     $('#eyEmpty').textContent = all.length ? (EY.tab === '미발행 있는 기사' && !q ? '이 해에 미발행 기사가 없습니다. 👍' : '조건에 맞는 기사가 없습니다.') : '이 해에 세금계산서 금액이 있는 정산이 없습니다.';
     $('#eyEmpty').classList.toggle('hidden', list.length > 0);
+  }
+  /** 연간 표에서 바로 발행 완료 ↔ 미발행 (역발행은 자동이라 못 바꿈) — 월별 화면의 체크와 같은 기록(inv_checks) */
+  function eyToggle(acct, m) {
+    const d = EY.info.drivers.find((x) => x.acct === acct), c = d && d.cells[m]; if (!c || c.busy) return;
+    if (c.st === 'ti') return toast('역발행 계산서가 있어 자동으로 발행 처리된 달입니다.');
+    const on = c.st !== 'done';
+    if (!on && !confirm(d.name + ' · ' + dMon(m) + '\n\n발행 완료를 미발행으로 되돌릴까요?')) return;
+    const prev = { st: c.st, date: c.date };
+    EY.keep.add(acct); c.busy = true; renderEinvYear();
+    const date = on ? (c.date || dToday()) : '';
+    api('adm_einvSet', m, [{ acct: d.acct, driverId: d.driverId, name: d.name, total: c.total, done: on, date: date, approvalNo: c.approvalNo || '', memo: c.memo || '' }]).then((r) => {
+      c.busy = false;
+      if (!r.ok) { Object.assign(c, prev); renderEinvYear(); return toast(r.msg); }
+      c.st = on ? 'done' : (EY.info.from && m < EY.info.from ? 'skip' : 'no'); c.date = date;
+      if (EV.month === m) EV.rows = []; // 월별 화면을 다시 열면 새로 읽게
+      renderEinvYear(); toast(d.name + ' ' + dMon(m) + (on ? ' 발행 완료로 체크했습니다.' : ' 미발행으로 바꿨습니다.'));
+    }).catch(() => { c.busy = false; Object.assign(c, prev); renderEinvYear(); });
   }
   /** 기사 1명의 1년 내역: 월별 줄 + 상·하반기(부가세 신고 기간) 소계 + 1년 합계 */
   function eyDetail(d) {
@@ -4687,7 +4704,7 @@
       '<table class="eyd-tb"><thead><tr><th>정산월</th><th class="num">공급가액</th><th class="num">세액</th><th class="num">합계금액</th><th>발행 여부</th><th>발행일</th><th>승인번호</th><th>메모</th></tr></thead><tbody>';
     [1, 2].forEach((h) => {
       const l = half(h); if (!l.length) return;
-      l.forEach((m) => { const c = d.cells[m]; html += '<tr><td>' + esc(dMon(m)) + '</td><td class="num">' + dWon(c.supply) + '</td><td class="num">' + dWon(c.tax) + '</td><td class="num"><b>' + dWon(c.total) + '</b></td><td>' + stx[c.st] + '</td><td>' + esc(c.date || '') + '</td><td>' + esc(c.approvalNo || '') + '</td><td>' + esc(c.memo || '') + '</td></tr>'; });
+      l.forEach((m) => { const c = d.cells[m]; html += '<tr><td>' + esc(dMon(m)) + ' <button type="button" class="btn sm ghost" data-eygo="' + esc(m) + '" data-eya="' + esc(d.acct) + '" style="height:22px;padding:0 6px;font-size:11px" title="그 달 월별 화면에서 승인번호·메모 적기">월별 ›</button></td><td class="num">' + dWon(c.supply) + '</td><td class="num">' + dWon(c.tax) + '</td><td class="num"><b>' + dWon(c.total) + '</b></td><td>' + (c.st === 'ti' ? stx.ti : '<button type="button" class="dc-st' + (c.st === 'done' ? ' on' : '') + '" data-eym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' style="min-width:64px;height:24px;font-size:11.5px">' + (c.busy ? '저장 중…' : c.st === 'done' ? '발행 완료' : c.st === 'skip' ? '기록 전' : '미발행') + '</button>') + '</td><td>' + esc(c.date || '') + '</td><td>' + esc(c.approvalNo || '') + '</td><td>' + esc(c.memo || '') + '</td></tr>'; });
       html += line(h === 1 ? '상반기 (1~6월 · 부가세 1기)' : '하반기 (7~12월 · 부가세 2기)', sum(l), l.filter((m) => d.cells[m].st === 'no').length);
     });
     html += line('1년 합계', sum(ms), ms.filter((m) => d.cells[m].st === 'no').length) + '</tbody></table>';
@@ -4697,14 +4714,17 @@
   $('#eyYear').addEventListener('change', (e) => { EY.open = ''; loadEinvYear(e.target.value); });
   $('#eyFrom').addEventListener('change', (e) => { loadEinvYear(EY.year, e.target.value); toast('집계 시작월을 바꿨습니다.'); });
   $('#eyQ').addEventListener('input', (e) => { if (!e.isComposing) renderEinvYear(); });
-  $('#eyTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-eyt]'); if (b) { EY.tab = b.dataset.eyt; renderEinvYear(); } });
+  $('#eyTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-eyt]'); if (b) { EY.tab = b.dataset.eyt; EY.keep.clear(); renderEinvYear(); } });
   $('#eyRows').addEventListener('click', (e) => {
     const c = e.target.closest('[data-eym]');
-    if (c) { // 그 달 월별 화면으로 가서 그 기사만 보이게
-      const d = EY.info.drivers.find((x) => x.acct === c.closest('tr').dataset.eya);
-      $('#evQ').value = d ? d.name : ''; EV.tab = '전체'; EV.rows = []; EV.month = c.dataset.eym;
+    if (c) { const t = c.closest('tr.eyr'); return eyToggle(t ? t.dataset.eya : EY.open, c.dataset.eym); }
+    const go = e.target.closest('[data-eygo]');
+    if (go) { // 그 달 월별 화면으로 가서 그 기사만 보이게 (승인번호·메모 적기)
+      const d = EY.info.drivers.find((x) => x.acct === go.dataset.eya);
+      $('#evQ').value = d ? d.name : ''; EV.tab = '전체'; EV.rows = []; EV.month = go.dataset.eygo;
       evModeSet('month'); return;
     }
+    if (e.target.closest('.eyd')) return;
     const r = e.target.closest('[data-eya]'); if (!r) return;
     EY.open = EY.open === r.dataset.eya ? '' : r.dataset.eya; renderEinvYear();
   });
