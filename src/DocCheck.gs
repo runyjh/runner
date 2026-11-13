@@ -39,6 +39,13 @@ function adm_einvList(token, month) {
   return run_(function () {
     requireAdmin_(token);
     const mm = docMonth_(month); month = mm.month;
+    const x = einvRows_(month);
+    return { ok: true, month: month, months: mm.months, writeDate: x.writeDate, due: x.due, closed: x.closed, rows: x.rows };
+  });
+}
+/** 한 정산월의 기사(정산ID)별 계산서 금액 · 발행 체크 · 역발행 (월별 · 연간 보기 공용) */
+function einvRows_(month) {
+  {
     const res = stlResult_(month, false), sum = res.summary || {}, dates = sum.dates || {};
     // 러너가 역발행한 계산서 (기사 앱 공개 N 은 빼고)
     const ti = {};
@@ -69,7 +76,41 @@ function adm_einvList(token, month) {
       };
     });
     rows.sort(function (a, b) { return koCmp_(a.name, b.name); });
-    return { ok: true, month: month, months: mm.months, writeDate: dates.write || '', due: dates.invoice || '', closed: !!sum.closed, rows: rows };
+    return { writeDate: dates.write || '', due: dates.invoice || '', closed: !!sum.closed, rows: rows };
+  }
+}
+/**
+ * 연간 보기: 그 해 정산월(데이터 있는 달)마다 기사별 발행 여부를 모아 기사 × 월 표로.
+ * from = 집계 시작 정산월 (app_settings einvFrom) — 그보다 앞 달은 체크 기록이 없어 '미발행'으로 잡히지 않게 뺀다.
+ */
+function adm_einvYear(token, year, from) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (from !== undefined && from !== null) { // 집계 시작월 바꾸기
+      from = str_(from);
+      if (from && !stlMonthOk_(from)) fail_('집계 시작월을 확인해 주세요.');
+      appSetPut_('einvFrom', from, '전자세금계산서 연간 보기: 이 정산월부터 미발행을 셈');
+      cache_().remove('appset');
+      logAdmin_(a, '계산서 연간 집계 시작월', from || '처음부터', '');
+    }
+    const st = stlMonths_(), withData = (st.withData || []).slice().sort();
+    const years = withData.map(function (m) { return m.slice(0, 4); }).filter(function (y, i, l) { return l.indexOf(y) === i; });
+    year = /^\d{4}$/.test(str_(year)) ? str_(year) : (years.length ? years[years.length - 1] : String(new Date().getFullYear()));
+    const startM = str_(appSet_().einvFrom);
+    const months = withData.filter(function (m) { return m.slice(0, 4) === year; });
+    const drv = {}, order = [];
+    months.forEach(function (m) {
+      const skip = startM && m < startM;
+      einvRows_(m).rows.forEach(function (r) {
+        let d = drv[r.acct];
+        if (!d) { d = drv[r.acct] = { acct: r.acct, driverId: r.driverId, name: r.name, vendor: r.vendor, bizNo: r.bizNo, bizName: r.bizName, cells: {} }; order.push(d); }
+        d.name = r.name; if (r.bizNo) d.bizNo = r.bizNo; if (r.bizName) d.bizName = r.bizName;
+        d.cells[m] = { st: r.ti ? 'ti' : r.done ? 'done' : (skip ? 'skip' : 'no'), supply: r.supply, tax: r.tax, total: r.total,
+          date: r.ti ? r.ti.date : r.date, approvalNo: r.approvalNo, memo: r.memo };
+      });
+    });
+    order.sort(function (p, q) { return koCmp_(p.name, q.name); });
+    return { ok: true, year: year, years: years, months: months, from: startM, drivers: order };
   });
 }
 /** list = [{ acct, driverId, name, total, done, date, approvalNo, memo }] */

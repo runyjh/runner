@@ -1393,6 +1393,13 @@
   .dc-tb input.dcd { width: 130px; } .dc-tb input.dca { width: 130px; } .dc-tb input.dcm { width: 160px; }
   .dc-st { display: inline-flex; align-items: center; justify-content: center; min-width: 74px; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12.5px; font-weight: 800; color: #c81e1e; cursor: pointer; white-space: nowrap; }
   .dc-st.on { background: #12a150; border-color: #12a150; color: #fff; }
+  /* 전자세금계산서 연간 보기 */
+  .ey-tb td.ec, .ey-tb th.ec { text-align: center; white-space: nowrap; min-width: 62px; }
+  .ey-tb .eyc { display: inline-block; min-width: 54px; padding: 3px 6px; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer; border: 0; background: none; }
+  .ey-tb .eyc.done { color: #0b6b3a; } .ey-tb .eyc.ti { color: var(--brand); } .ey-tb .eyc.no { background: #fde8e8; color: #c81e1e; } .ey-tb .eyc.skip { color: #adb5bd; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
+  .ey-tb tr.eyr { cursor: pointer; } .ey-tb tr.eyr:hover td { background: #f8fafc; } .ey-tb tr.eyr.open td { background: #f1f6ff; }
+  .ey-tb tr.eyd > td { background: #fbfcfe; padding: 10px 14px 14px; }
+  .eyd-tb { width: 100%; border-collapse: collapse; font-size: 12.5px; } .eyd-tb th, .eyd-tb td { padding: 5px 8px; border-bottom: 1px solid #eef1f4; text-align: left; white-space: nowrap; } .eyd-tb .num { text-align: right; } .eyd-tb tr.sub td { background: #f4f6f9; font-weight: 800; }
   .dc-st.ti { background: #e8f0fd; border-color: #b9d0f7; color: var(--brand); cursor: default; }
   .dc-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: #eef1f4; color: #4e5968; white-space: nowrap; }
   .irpar-b { border: 1px dashed #cbd5e1; background: #fff; color: #64748b; border-radius: 6px; font-size: 11px; padding: 1px 6px; cursor: pointer; opacity: .55; } tr:hover .irpar-b { opacity: 1; } .irpar-b:hover { border-color: #2563eb; color: #2563eb; }
@@ -1774,12 +1781,30 @@
     <div class="head">
       <h2>전자세금계산서 발행 <small id="evCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
       <div class="tools">
+        <div class="seg" id="evMode"><button type="button" data-evm="month" class="on">월별</button><button type="button" data-evm="year">연간</button></div>
+        <span class="evmo" style="display:contents">
         <select class="inp" id="evMonth" title="정산월"></select>
         <input class="inp search" id="evQ" placeholder="기사·사업자번호·상호 검색" style="width:200px">
         <div class="updrop sm" data-up="#stHtFile" title="홈택스 → 전자세금계산서 → 매입 목록조회 엑셀을 올리면 이 정산월의 기사별 계산서 금액을 대조해 발행 완료로 체크"><span class="ud-tx"><b>홈택스 대조</b><span>매입 목록조회 엑셀을 끌어다 놓거나</span></span><button class="btn sm" id="stHtBtn" type="button">파일 찾기</button></div><input type="file" id="stHtFile" accept=".xls,.xlsx,.csv" class="hidden">
+        </span>
+        <span class="evyo hidden" style="display:contents">
+        <select class="inp" id="eyYear" title="연도 (정산월 기준)" style="min-width:110px"></select>
+        <input class="inp search" id="eyQ" placeholder="기사·사업자번호·상호 검색" style="width:200px">
+        <label class="sub" style="font-size:12.5px;display:flex;align-items:center;gap:6px;white-space:nowrap">집계 시작 <select class="inp" id="eyFrom" title="이 정산월부터 미발행을 셉니다 (그 앞 달은 체크 기록이 없어 빼고 봄)" style="height:34px;min-width:140px"></select></label>
+        </span>
         <button class="btn ghost" id="evReload">새로고침</button>
       </div>
     </div>
+    <div id="eyBox" class="hidden">
+      <p class="sub" style="margin:-4px 0 10px;font-size:13px" id="eyInfo"></p>
+      <div class="dc-sum" id="eySum"></div>
+      <div class="tabs" id="eyTabs"></div>
+      <div class="table-wrap">
+        <table class="dc-tb ey-tb"><thead id="eyHead"></thead><tbody id="eyRows"></tbody></table>
+        <div class="empty hidden" id="eyEmpty"></div>
+      </div>
+    </div>
+    <div id="evBox">
     <p class="sub" style="margin:-4px 0 10px;font-size:13px" id="evInfo"></p>
     <div class="dc-sum" id="evSum"></div>
     <div class="tabs" id="evTabs"></div>
@@ -1790,6 +1815,7 @@
         <tbody id="evRows"></tbody>
       </table>
       <div class="empty hidden" id="evEmpty"></div>
+    </div>
     </div>
    </section>
    <section id="view-insrep" class="hidden">
@@ -4072,7 +4098,7 @@
     $('#view-taxinv').classList.toggle('hidden', v !== 'taxinv');
     if (v === 'taxinv') loadTax();
     $('#view-einv').classList.toggle('hidden', v !== 'einv');
-    if (v === 'einv') loadEinv();
+    if (v === 'einv') { if (EY.mode === 'year') loadEinvYear(); else loadEinv(); }
     $('#view-insrep').classList.toggle('hidden', v !== 'insrep');
     if (v === 'insrep') loadInsRep();
     if (v === 'board') loadBoardAdm();
@@ -4555,7 +4581,7 @@
     return api('adm_einvSet', EV.month, pay).then((r) => { if (!r.ok) { toast(r.msg); loadEinv(); } return r; });
   }
   $('#evMonth').addEventListener('change', (e) => { EV.rows = []; loadEinv(e.target.value); });
-  $('#evReload').addEventListener('click', () => loadEinv());
+  $('#evReload').addEventListener('click', () => (EY.mode === 'year' ? loadEinvYear() : loadEinv()));
   $('#evQ').addEventListener('input', (e) => { if (!e.isComposing) renderEinv(); });
   $('#evTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-evt]'); if (b) { EV.tab = b.dataset.evt; renderEinv(); } });
   $('#evAll').addEventListener('change', (e) => { $$('#evRows [data-evck]').forEach((c) => { c.checked = e.target.checked; if (e.target.checked) EV.sel.add(c.dataset.evck); else EV.sel.delete(c.dataset.evck); }); evSelPaint(); });
@@ -4595,6 +4621,92 @@
     list.forEach((x) => { x.done = on; x.date = on ? (x.date || dToday()) : ''; x.savedTotal = on ? x.total : 0; });
     EV.sel.clear(); renderEinv();
     evSave(list).then((r) => { if (r && r.ok) toast(list.length + '명을 ' + (on ? '발행 완료로' : '미발행으로') + ' 바꿨습니다.'); }).catch(() => {});
+  });
+
+  // ── 전자세금계산서 연간 보기: 기사 × 월 발행 현황 · 미발행 인원 · 기사별 1년 내역 ──
+  const EY = { mode: 'month', year: '', info: null, tab: '미발행 있는 기사', open: '', seq: 0 };
+  const eyMon = (m) => Number(m.slice(5, 7)) + '월';
+  function evModeSet(mode) {
+    EY.mode = mode;
+    $$('#evMode [data-evm]').forEach((b) => b.classList.toggle('on', b.dataset.evm === mode));
+    $$('#view-einv .evmo').forEach((x) => x.classList.toggle('hidden', mode !== 'month'));
+    $$('#view-einv .evyo').forEach((x) => x.classList.toggle('hidden', mode !== 'year'));
+    $('#evBox').classList.toggle('hidden', mode !== 'month'); $('#eyBox').classList.toggle('hidden', mode !== 'year');
+    if (mode === 'year') loadEinvYear(); else { $('#evCount').textContent = ''; loadEinv(); }
+  }
+  function loadEinvYear(year, from) {
+    const seq = ++EY.seq;
+    if (!EY.info) $('#eyRows').innerHTML = '<tr><td class="sub">1년치 정산 결과를 모으는 중… (달마다 정산을 다시 보므로 조금 걸립니다)</td></tr>';
+    const args = from === undefined ? [year || EY.year || ''] : [year || EY.year || '', from];
+    api.apply(null, ['adm_einvYear'].concat(args)).then((r) => {
+      if (seq !== EY.seq) return;
+      if (!r.ok) return toast(r.msg);
+      EY.info = r; EY.year = r.year;
+      $('#eyYear').innerHTML = (r.years.length ? r.years : [r.year]).slice().reverse().map((y) => '<option value="' + esc(y) + '"' + (y === r.year ? ' selected' : '') + '>' + esc(y) + '년</option>').join('');
+      $('#eyFrom').innerHTML = '<option value="">처음부터</option>' + r.months.map((m) => '<option value="' + esc(m) + '"' + (m === r.from ? ' selected' : '') + '>' + esc(dMon(m)) + '부터</option>').join('') + (r.from && !r.months.includes(r.from) ? '<option value="' + esc(r.from) + '" selected>' + esc(dMon(r.from)) + '부터</option>' : '');
+      renderEinvYear();
+    }).catch(() => {});
+  }
+  function renderEinvYear() {
+    const r = EY.info; if (!r) return;
+    const all = r.drivers, ms = r.months;
+    const noCells = (d) => ms.filter((m) => d.cells[m] && d.cells[m].st === 'no');
+    const bad = all.filter((d) => noCells(d).length), noSum = all.reduce((a, d) => a + noCells(d).reduce((b, m) => b + (d.cells[m].total || 0), 0), 0);
+    const noN = all.reduce((a, d) => a + noCells(d).length, 0);
+    $('#evCount').textContent = r.year + '년 · 미발행 ' + bad.length + '명';
+    $('#eyInfo').innerHTML = '<b>' + esc(r.year) + '년</b> 정산월 기준 (' + (ms.length ? esc(eyMon(ms[0])) + '~' + esc(eyMon(ms[ms.length - 1])) : '정산 없음') + ') · 칸을 누르면 그 달 <b>월별</b> 화면으로 가서 바로 체크할 수 있습니다 · 기사 이름을 누르면 1년 내역이 펼쳐집니다' +
+      (r.from ? ' · <b>' + esc(dMon(r.from)) + '</b> 전 달은 체크 기록이 없어 미발행으로 세지 않습니다 (회색 \'기록 전\')' : '');
+    $('#eySum').innerHTML = '<div class="dcs"><small>올해 대상</small><b>' + all.length + '명</b></div>' +
+      '<div class="dcs' + (bad.length ? ' bad' : ' ok') + '"><small>미발행 있는 기사</small><b>' + bad.length + '명</b><em>' + noN + '건 · ' + dWon(noSum) + '원</em></div>' +
+      '<div class="dcs ok"><small>모두 발행</small><b>' + (all.length - bad.length) + '명</b></div>';
+    const tabs = [['미발행 있는 기사', bad.length], ['전체', all.length]];
+    $('#eyTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (EY.tab === k ? ' on' : '') + '" data-eyt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
+    const q = $('#eyQ').value.trim().toLowerCase();
+    let list = all.filter((d) => (EY.tab === '전체' || noCells(d).length) && (!q || [d.name, d.bizNo, d.bizName, d.vendor].join(' ').toLowerCase().includes(q)));
+    list = list.slice().sort((a, b) => noCells(b).length - noCells(a).length || a.name.localeCompare(b.name, 'ko'));
+    $('#eyHead').innerHTML = '<tr><th>기사</th>' + ms.map((m) => '<th class="ec">' + esc(eyMon(m)) + '</th>').join('') + '<th class="num">미발행</th><th class="num">미발행 금액</th></tr>';
+    const lab = { done: '✓ 발행', ti: '역발행', no: '미발행', skip: '기록 전' };
+    $('#eyRows').innerHTML = list.map((d) => {
+      const nc = noCells(d), amt = nc.reduce((a, m) => a + (d.cells[m].total || 0), 0), open = EY.open === d.acct;
+      return '<tr class="eyr' + (open ? ' open' : '') + '" data-eya="' + esc(d.acct) + '"><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' + (d.vendor ? ' <span class="dc-tag">용차업체</span>' : '') + '</td>' +
+        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-eym="' + esc(m) + '" title="' + esc(dMon(m) + ' · ' + dWon(c.total) + '원') + '">' + lab[c.st] + '</button>' : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
+        '<td class="num">' + (nc.length ? '<b style="color:#c81e1e">' + nc.length + '건</b>' : '<span class="sm">없음</span>') + '</td><td class="num">' + (amt ? dWon(amt) : '') + '</td></tr>' +
+        (open ? '<tr class="eyd"><td colspan="' + (ms.length + 3) + '">' + eyDetail(d) + '</td></tr>' : '');
+    }).join('');
+    $('#eyEmpty').textContent = all.length ? (EY.tab === '미발행 있는 기사' && !q ? '이 해에 미발행 기사가 없습니다. 👍' : '조건에 맞는 기사가 없습니다.') : '이 해에 세금계산서 금액이 있는 정산이 없습니다.';
+    $('#eyEmpty').classList.toggle('hidden', list.length > 0);
+  }
+  /** 기사 1명의 1년 내역: 월별 줄 + 상·하반기(부가세 신고 기간) 소계 + 1년 합계 */
+  function eyDetail(d) {
+    const ms = EY.info.months.filter((m) => d.cells[m]);
+    const stx = { done: '<span style="color:#0b6b3a;font-weight:800">발행 완료</span>', ti: '<span style="color:var(--brand);font-weight:800">역발행</span>', no: '<span style="color:#c81e1e;font-weight:800">미발행</span>', skip: '<span class="sm">기록 전</span>' };
+    const sum = (l) => l.reduce((a, m) => { const c = d.cells[m]; a.s += c.supply || 0; a.t += c.tax || 0; a.g += c.total || 0; return a; }, { s: 0, t: 0, g: 0 });
+    const line = (lab, x, n) => '<tr class="sub"><td>' + lab + '</td><td class="num">' + dWon(x.s) + '</td><td class="num">' + dWon(x.t) + '</td><td class="num">' + dWon(x.g) + '</td><td colspan="4">' + (n ? '<span style="color:#c81e1e">미발행 ' + n + '건</span>' : '') + '</td></tr>';
+    const half = (h) => ms.filter((m) => (Number(m.slice(5, 7)) <= 6) === (h === 1));
+    let html = '<div style="font-weight:800;margin-bottom:6px">' + esc(d.name) + ' · ' + esc(EY.info.year) + '년 내역 <span class="sm" style="font-weight:500">' + esc(d.bizNo || '사업자번호 없음') + (d.bizName ? ' · ' + esc(d.bizName) : '') + '</span></div>' +
+      '<table class="eyd-tb"><thead><tr><th>정산월</th><th class="num">공급가액</th><th class="num">세액</th><th class="num">합계금액</th><th>발행 여부</th><th>발행일</th><th>승인번호</th><th>메모</th></tr></thead><tbody>';
+    [1, 2].forEach((h) => {
+      const l = half(h); if (!l.length) return;
+      l.forEach((m) => { const c = d.cells[m]; html += '<tr><td>' + esc(dMon(m)) + '</td><td class="num">' + dWon(c.supply) + '</td><td class="num">' + dWon(c.tax) + '</td><td class="num"><b>' + dWon(c.total) + '</b></td><td>' + stx[c.st] + '</td><td>' + esc(c.date || '') + '</td><td>' + esc(c.approvalNo || '') + '</td><td>' + esc(c.memo || '') + '</td></tr>'; });
+      html += line(h === 1 ? '상반기 (1~6월 · 부가세 1기)' : '하반기 (7~12월 · 부가세 2기)', sum(l), l.filter((m) => d.cells[m].st === 'no').length);
+    });
+    html += line('1년 합계', sum(ms), ms.filter((m) => d.cells[m].st === 'no').length) + '</tbody></table>';
+    return html;
+  }
+  $('#evMode').addEventListener('click', (e) => { const b = e.target.closest('[data-evm]'); if (b && b.dataset.evm !== EY.mode) evModeSet(b.dataset.evm); });
+  $('#eyYear').addEventListener('change', (e) => { EY.open = ''; loadEinvYear(e.target.value); });
+  $('#eyFrom').addEventListener('change', (e) => { loadEinvYear(EY.year, e.target.value); toast('집계 시작월을 바꿨습니다.'); });
+  $('#eyQ').addEventListener('input', (e) => { if (!e.isComposing) renderEinvYear(); });
+  $('#eyTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-eyt]'); if (b) { EY.tab = b.dataset.eyt; renderEinvYear(); } });
+  $('#eyRows').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-eym]');
+    if (c) { // 그 달 월별 화면으로 가서 그 기사만 보이게
+      const d = EY.info.drivers.find((x) => x.acct === c.closest('tr').dataset.eya);
+      $('#evQ').value = d ? d.name : ''; EV.tab = '전체'; EV.rows = []; EV.month = c.dataset.eym;
+      evModeSet('month'); return;
+    }
+    const r = e.target.closest('[data-eya]'); if (!r) return;
+    EY.open = EY.open === r.dataset.eya ? '' : r.dataset.eya; renderEinvYear();
   });
 
   // ── 산재/고용 신고 상황 ──
