@@ -598,6 +598,10 @@
   .al-chips { display: flex; flex-wrap: wrap; gap: 6px; } .al-chips span { border-radius: 999px; padding: 4px 10px; font-size: 12.5px; background: #fff; border: 1px solid #d8dee8; } .al-chips span.x { border-color: #fecaca; background: #fef2f2; color: #b91c1c; font-weight: 700; } .al-chips span small { color: #94a3b8; }
   .al-note { font-size: 12.5px; color: var(--sub); line-height: 1.6; margin: 4px 2px 0; } .al-pick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; } .al-pick .inp { min-width: 0; }
   html.m .al-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } html.m .al-bar { display: none; } html.m .al-row { flex-wrap: wrap; } html.m .al-row .bt { flex: 1 1 100%; justify-content: flex-start; } html.m .al-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .ml-code { width: 100%; height: 190px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.45; border: 1px solid #d8dee8; border-radius: 10px; padding: 10px; background: #0f172a; color: #e2e8f0; white-space: pre; resize: vertical; }
+  .ml-steps { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; line-height: 1.75; } .ml-steps li { margin-bottom: 4px; } .ml-key { display: block; margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: #fff7ed; border: 1px solid #fdba74; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
+  .ml-k { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 800; color: #fff; background: #94a3b8; white-space: nowrap; } .ml-k.wk { background: #1d5fd6; } .ml-k.sla { background: #15803d; } .ml-k.fb { background: #b45309; } .ml-k.pk { background: #dc2626; }
+  html.m .ml-setup { display: none; }
   .up-sum { background: var(--gray-weak); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; line-height: 1.7; }
   .m-box.slip-box { width: min(1080px, 100%); max-height: 94vh; display: flex; flex-direction: column; padding: 0; }
   .slip { overflow: auto; padding: 18px 22px; font-size: 12.5px; }
@@ -7284,7 +7288,7 @@
   // 수행률·SLA 는 한 메뉴(view-perf)에 탭 둘. 라우트 변경이력은 노선관리 → 변경이력 탭 (lnRender 공용)
   const rpViewOn = () => currentView === 'perf';
   const rpBox = () => $('#perfBox');
-  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)'], ['fb', '프레시백 가중요인'], ['pk', '🔥 피크 예상 물량']];
+  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)'], ['fb', '프레시백 가중요인'], ['pk', '🔥 피크 예상 물량'], ['mail', '📧 메일 자동 수집']];
   const rpTabNow = () => { const ts = rpTabs().map((t) => t[0]); if (ts.indexOf(RP.tab) < 0) RP.tab = ts[0]; return RP.tab; };
   $('#rpReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
   function rpList() {
@@ -7307,6 +7311,7 @@
     if (tab === 'sla') return slaRender(box);
     if (tab === 'fb') return fbRender(box);
     if (tab === 'pk') return pkRender(box);
+    if (tab === 'mail') return mailRender(box);
     if (!RP.loaded) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); return; }
     const wks = RP.weeks.slice(-8).reverse(), lw = RP.latest, lrows = RP.rows.filter((r) => r.week === lw); // 최신 주차가 앞
     const camps = [...new Set(RP.rows.map((r) => r.camp))].sort(koSort);
@@ -7383,7 +7388,7 @@
     }
     const go = e.target.closest('a[data-rtab="ln"]'); if (go) { e.preventDefault(); rtab = 'ln'; switchView('route'); if (RT.camps.length) renderCampMain(); return; }
     if (e.target.id === 'rpUpBtn2' || e.target.id === 'rpUpBtn3') return $('#rpFile').click();
-    const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); return; }
+    const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); if (RP.tab === 'mail') loadMail(true); return; }
     if (fbClick(e)) return;
     if (pkClick(e)) return;
     lnClick(e);
@@ -7718,6 +7723,86 @@
     const nt = AL.d.notices.find((x) => x.id === n.dataset.alnudge); if (!nt || !confirm('「' + nt.title + '」을 아직 안 본 기사에게 휴대폰 알림을 보냅니다. 보낼까요?')) return;
     n.disabled = true; n.textContent = '보내는 중…';
     api('adm_seenNudge', nt.id).then((r) => { if (!r.ok) return toast(r.msg); toast('안 본 기사 ' + r.target + '명 중 알림 ' + r.pushed + '건을 보냈습니다.' + (r.pushed < r.target ? ' (알림을 켜지 않은 기사는 받지 못합니다)' : '')); }).catch(() => {}).finally(() => { n.disabled = false; n.textContent = '안 본 사람에게 알림'; });
+  });
+  // ───── 메일 자동 수집: 메일 계정의 수집기가 쿠팡 메일의 엑셀을 올인원으로 보냄 → 종류를 알아보고 자동 저장 (mail_log) ─────
+  const ML = { d: null, key: '', loading: null, open: false };
+  function loadMail(force) {
+    if (ML.loading) return ML.loading;
+    if (ML.d && !force) return Promise.resolve();
+    ML.loading = api('adm_mailStatus').then((r) => { if (!r.ok) return toast(r.msg); ML.d = r; if (rpViewOn() && RP.tab === 'mail') rpRender(); }).catch(() => {}).finally(() => { ML.loading = null; });
+    return ML.loading;
+  }
+  const mailCode = (key) => [
+    '/** 러너 올인원 — 쿠팡 메일 수집기. 쿠팡 메일을 받는 구글 계정의 Apps Script 에 붙여 넣고 install 을 한 번 실행합니다. */',
+    "const ALLINONE_URL = '" + (RUNNER_API || '여기에_올인원_웹앱_주소(…/exec)') + "';",
+    "const MAIL_KEY = '" + (key || '여기에_수집_키를_붙여_넣으세요') + "';",
+    "const SEARCH = 'has:attachment filename:xlsx newer_than:7d'; // 최근 7일 · 엑셀 첨부가 있는 메일",
+    '',
+    '/** 처음 한 번 실행: 10분마다 collect 가 돌도록 예약하고 바로 한 번 수집합니다. */',
+    'function install() {',
+    '  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });',
+    "  ScriptApp.newTrigger('collect').timeBased().everyMinutes(10).create();",
+    '  collect();',
+    '}',
+    '/** 자동 수집을 멈출 때 실행 */',
+    'function uninstall() { ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); }); }',
+    '',
+    'function collect() {',
+    '  const lock = LockService.getScriptLock();',
+    '  if (!lock.tryLock(1000)) return;',
+    '  try {',
+    '    const P = PropertiesService.getScriptProperties();',
+    "    let done = JSON.parse(P.getProperty('done') || '[]');",
+    '    const seen = {}; done.forEach(function (k) { seen[k] = 1; });',
+    '    const t0 = Date.now(); let stop = false;',
+    '    GmailApp.search(SEARCH, 0, 30).forEach(function (th) {',
+    '      th.getMessages().forEach(function (m) {',
+    '        const id = m.getId();',
+    '        if (stop || seen[id] || Date.now() - t0 > 240000) return;',
+    '        let ok = true;',
+    '        m.getAttachments().forEach(function (a) {',
+    '          if (stop || !/\\.xlsx$/i.test(a.getName()) || a.getSize() > 9000000) return;',
+    '          try {',
+    "            const res = UrlFetchApp.fetch(ALLINONE_URL, { method: 'post', contentType: 'text/plain;charset=utf-8', muteHttpExceptions: true,",
+    "              payload: JSON.stringify({ fn: 'api_mailFile', args: [MAIL_KEY, { name: a.getName(), b64: Utilities.base64Encode(a.getBytes()), from: m.getFrom(), subject: m.getSubject(),",
+    "                date: Utilities.formatDate(m.getDate(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm'), msgId: id }] }) });",
+    '            const r = JSON.parse(res.getContentText());',
+    "            if (!r || !r.ok) { ok = false; if (r && (r.code === 'KEY' || r.code === 'OFF')) { stop = true; console.log('올인원: ' + r.msg); } }",
+    "          } catch (e) { ok = false; console.log('보내지 못함: ' + e); }",
+    '        });',
+    '        if (ok && !stop) { done.push(id); seen[id] = 1; }',
+    '      });',
+    '    });',
+    "    P.setProperty('done', JSON.stringify(done.slice(-350)));",
+    '  } finally { lock.releaseLock(); }',
+    '}'
+  ].join('\n');
+  function mailRender(box) {
+    const D = ML.d;
+    if (!D) { box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="spin"></div></div>'); loadMail(); return; }
+    const kc = { '주간 수행률': 'wk', 'SLA 점수': 'sla', '가중요인': 'fb', '피크 물량': 'pk' };
+    const stc = (st) => st === '저장' ? 'al-ok' : st === '확인 필요' || st === '실패' ? 'al-no' : 'al-dim';
+    const last = D.rows.find((r) => r.status === '저장'), hold = D.rows.filter((r) => r.status === '확인 필요' || r.status === '실패').length;
+    const setupOpen = ML.open || !D.hasKey || !!ML.key;
+    box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">메일 자동 수집 <small class="sub">쿠팡 메일의 엑셀 첨부를 10분마다 가져와 자동으로 저장합니다</small></h4><span class="grow"></span>' +
+      '<span class="rp-on">자동 수집 <b class="' + (D.on && D.hasKey ? 'on' : 'off') + '">' + (!D.hasKey ? '설정 전' : D.on ? 'ON' : 'OFF') + '</b>' + (D.hasKey ? ' <button class="btn sm ghost" data-mlset="' + (D.on ? '0' : '1') + '">' + (D.on ? '끄기' : '켜기') + '</button>' : '') + '</span></div>' +
+      '<div class="rp-sum"><span>최근 저장<b>' + (last ? esc(alT(last.at)) + ' · ' + esc(last.kind || '') : '없음') + '</b></span><span class="' + (hold ? 'bad' : '') + '">확인 필요 · 실패<b>' + hold + '</b></span><span>기록<b>' + D.rows.length + '</b></span></div>' +
+      '<div class="ml-setup"><details' + (setupOpen ? ' open' : '') + ' id="mlSetup"><summary style="cursor:pointer;font-weight:700;font-size:13.5px">설정 방법 (처음 한 번 · PC에서)</summary>' +
+      '<ol class="ml-steps"><li><button class="btn sm" data-mlkey>' + (D.hasKey ? '수집 키 다시 만들기' : '수집 키 만들기') + '</button> ' + (ML.key ? '<span class="ml-key">' + esc(ML.key) + '</span><small class="sub">이 키는 지금만 보입니다. 아래 코드에 이미 들어 있습니다.</small>' : D.hasKey ? '<small class="sub">키는 이미 만들어져 있습니다. 수집기를 새로 설치할 때만 다시 만드세요 (다시 만들면 예전 키는 못 씁니다).</small>' : '<small class="sub">올인원과 수집기만 아는 암호입니다.</small>') + '</li>' +
+      '<li><b>쿠팡 메일을 받는 구글 계정</b>으로 로그인한 뒤 <b>script.google.com</b> → [새 프로젝트]를 엽니다.</li>' +
+      '<li>처음 있는 글자를 모두 지우고 아래 코드를 붙여 넣은 뒤 저장합니다. <button class="btn sm ghost" data-mlcopy>코드 복사</button><textarea class="ml-code" id="mlCode" readonly spellcheck="false">' + esc(mailCode(ML.key)) + '</textarea>' + (ML.key ? '' : '<small class="sub">※ 코드의 MAIL_KEY 자리는 [수집 키 만들기]를 누르면 자동으로 채워집니다.</small>') + '</li>' +
+      '<li>위쪽 함수 고르는 칸에서 <b>install</b> 을 고르고 [실행] → 구글 권한 승인 화면에서 직접 승인합니다 (메일 읽기 · 외부 연결 · 예약 실행).</li>' +
+      '<li>끝입니다. 이 화면을 새로고침하면 아래 기록에 가져온 파일이 보입니다. 멈추려면 위 [끄기] 또는 수집기에서 uninstall 을 실행합니다.</li></ol></details></div>' +
+      (D.rows.length ? '<div class="al-card" style="margin-top:12px;padding:6px 4px">' + D.rows.map((r) => '<div class="al-row"><span class="tx"><b>' + (r.kind ? '<span class="ml-k ' + (kc[r.kind] || '') + '">' + esc(r.kind) + '</span> ' : '') + esc(r.file) + '</b><small>' + (r.period ? esc(r.period) + ' · ' : '') + esc(r.detail || '') + '</small><small>' + esc(alT(r.at)) + ' 처리 · 메일 ' + esc(r.mailAt || '') + ' · ' + esc(r.subject || '') + '</small></span><span class="v ' + stc(r.status) + '">' + esc(r.status) + '</span></div>').join('') + '</div>'
+        : '<div class="empty" style="margin-top:12px">아직 가져온 메일이 없습니다.' + (D.hasKey ? ' 수집기가 설치되어 있으면 10분 안에 최근 7일 메일부터 들어옵니다.' : '') + '</div>') +
+      '<p class="al-note">· 주간 수행률 · SLA 점수 · 가중요인 · 피크 물량으로 알아본 파일만 저장합니다 (같은 기간은 덮어씀 · 손으로 올릴 때와 같은 규칙). 다른 엑셀은 "쿠팡 파일 아님"으로만 남습니다.<br>· 주차나 연도를 분명히 읽지 못한 수행률 파일은 저장하지 않고 "확인 필요"로 남깁니다. 그때는 [쿠팡 파일 올리기]로 직접 올려 주세요.</p></div>');
+  }
+  document.addEventListener('click', (e) => {
+    const k = e.target.closest('[data-mlkey]'), c = e.target.closest('[data-mlcopy]'), t = e.target.closest('[data-mlset]');
+    if (k) { if (ML.d && ML.d.hasKey && !confirm('수집 키를 다시 만들면 지금 설치된 수집기는 멈춥니다(코드를 새 키로 바꿔야 함). 다시 만들까요?')) return;
+      k.disabled = true; api('adm_mailKeyNew').then((r) => { if (!r.ok) return toast(r.msg); ML.key = r.key; ML.open = true; if (ML.d) ML.d.hasKey = true; rpRender(); toast('수집 키를 만들었습니다. 아래 코드를 복사해 수집기에 붙여 넣으세요.'); }).catch(() => {}).finally(() => { k.disabled = false; }); }
+    if (c) { const v = ($('#mlCode') || {}).value || ''; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast('코드를 복사했습니다.'), () => { const ta = $('#mlCode'); if (ta) { ta.select(); toast('코드를 선택했습니다. Ctrl+C 로 복사해 주세요.'); } }); }
+    if (t) { t.disabled = true; api('adm_mailSet', t.dataset.mlset === '1').then((r) => { if (!r.ok) return toast(r.msg); if (ML.d) ML.d.on = r.on; rpRender(); toast('자동 수집을 ' + (r.on ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { t.disabled = false; }); }
   });
   // ───── SLA 점수 (쿠팡 '[QF] Vendor SLA' 월간 파일 · route_sla) ─────
   const SL = { rows: [], periods: [], th: { good: 95, warn: 90 }, campMap: {}, loaded: false, loading: null, f: { camp: '', mode: '', q: '' } };
