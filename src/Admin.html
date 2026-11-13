@@ -8984,10 +8984,14 @@
     const s = String(v || '').trim();
     if (!s || /\n/.test(s) || /추가업무등록|변경/.test(s) || /^용차/.test(s)) return null;
     const d = drvAt(rowDrv(row), dt); if (!d) return null;
+    mvPairs();
     const mk = row + '\u0001' + s + '\u0001' + (d.baseRoute || '') + '\u0001' + (d.campId || '');
     if (_cnMemo.has(mk)) return _cnMemo.get(mk);
     const out = cellNorm0(s, d); _cnMemo.set(mk, out); return out;
   }
+  let _mvSrc = null, _mvList = [];
+  const mvPairs = () => { if (_mvSrc !== SD.routeMoves) { _mvSrc = SD.routeMoves; const cp = (x) => shortCamp(x).replace(/\s/g, ''), nm = (x) => (String(x).match(/\d+/) || [''])[0];
+    _mvList = (SD.routeMoves || []).map((x) => ({ a: { camp: cp(x.fromCamp), num: nm(x.from) }, b: { camp: cp(x.toCamp), num: nm(x.to) } })).filter((x) => x.a.camp && x.a.num && x.b.camp && x.b.num); _cnMemo = new Map(); } return _mvList; };
   function cellNorm0(s, d) {
     const ids = [];
     let t = s.replace(/\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, (m0, id) => (/^[DF]\d$/i.test(id) ? m0 : (ids.push(id), ' ')));
@@ -9005,6 +9009,16 @@
     const mine = mineAll && (d.type !== '백업' || comp0(p) === comp0(b));
     const all = sdCampRots(d.campId || ''), comp = (x) => composeUnits(x.units, '', x.rots.length ? x.rots : all, all, x.per || {});
     const whole = mine && comp(p) === comp(b), cn = camp || own;
+    // 노선 이관: 이름만 바뀐 같은 노선 (안양1 110 ↔ 군포1 212) — 칸에 다른 쪽 이름으로 적혀 있어도 그날의 담당 노선이면 담당으로 본다
+    if (!mine && b && d.type !== '백업') {
+      const num = (m[2].match(/^\d+/) || [''])[0], rest = m[2].trim().slice(num.length);
+      if (num && !/\d{3,}/.test(rest)) for (const mv of mvPairs()) {
+        const to = mv.a.camp === cn && mv.a.num === num ? mv.b : mv.b.camp === cn && mv.b.num === num ? mv.a : null;
+        if (!to || to.camp !== own) continue;
+        const p2 = parseBR(to.num + rest);
+        if (p2.units.length && p2.units.every((u) => b.units.includes(u))) { const w2 = comp(p2) === comp(b); return { text: w2 ? '출근' : to.num + rest, ids: ids, kind: 'k-work', mine: true, whole: w2, moved: true }; }
+      }
+    }
     return { text: whole ? '출근' : (mine || !cn ? '' : cn + ' ') + m[2].trim(), ids: ids, kind: mine ? 'k-work' : 'k-other', mine: mine, whole: whole };
   }
   /** 규칙으로 읽을 수 없는 칸 글자인가 (기사 줄 · 올인원 규칙 기간) — 상태 낱말 · 용차 · 노선(+아이디) · 변경/추가업무등록 표기가 아니면 true */
@@ -10363,7 +10377,7 @@
     } else {
       if (sf.camp) { sf.camp = ''; $('#sCamp').value = ''; return renderSched(); }
       const MY = myDrv(), myId = MY ? MY.id : '';
-      const drvs = Array.from(new Map(srows.filter((r) => r.kind === 'd' && !r.d.ex).map((r) => [r.d.id, r.d])).values()).map((x, i) => [x, i]).sort((a, b) => (b[0].id === myId ? 1 : 0) - (a[0].id === myId ? 1 : 0) || a[1] - b[1]).map((x) => x[0]);
+      const drvs = (() => { const mp = new Map(), tdy = SD.today || ymdLocal(new Date()); srows.forEach((r) => { if (r.kind !== 'd' || r.d.ex) return; if (!mp.has(r.d.id) || segIn(r.seg, tdy)) mp.set(r.d.id, r.d); }); return Array.from(mp.values()); })().map((x, i) => [x, i]).sort((a, b) => (b[0].id === myId ? 1 : 0) - (a[0].id === myId ? 1 : 0) || a[1] - b[1]).map((x) => x[0]);
       if (!sMy && (!sMobDrv || !drvs.some((x) => x.id === sMobDrv))) sMobDrv = drvs.length ? drvs[0].id : '';
       const D = drvs.find((x) => x.id === sMobDrv);
       html += '<div class="smb-pick"><select class="inp" id="smbDrv" aria-label="기사">' + drvs.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === sMobDrv ? ' selected' : '') + '>' + esc((x.id === myId ? '★ 나 · ' : '') + x.name + ' · ' + (shortCamp(x.camp || '') || '-') + (x.baseRoute ? ' · ' + x.baseRoute : '')) + '</option>').join('') + '</select></div>';
@@ -10375,10 +10389,11 @@
           grid((dt) => { const r = mobRowFor(D.id, dt); if (!r) return ''; const c = mobCell(r, dt); return '<span class="v ' + c.kind + '">' + esc(c.kind === 'none' ? '·' : c.top) + '</span>' + (c.sub && c.kind !== 'k-yong' ? '<span class="sb">서브</span>' : '') + (instOf(r.row, dt) ? '<span>' + (r.staff ? '📅' : '📌') + '</span>' : ''); }) + '</div>';
         const r = mobRowFor(D.id, d);
         if (r) {
-          const c = mobCell(r, d), base = D.baseRoute && /^\d/.test(D.baseRoute) ? groupRoutes(baseCodes(D)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
+          const Dd = drvAt(rowDrv(r.row), d) || r.d || D; // 그날의 캠프 · 담당 노선 (노선 변경 · 이관 전후가 다름)
+          const c = mobCell(r, d), base = Dd.baseRoute && /^\d/.test(Dd.baseRoute) ? groupRoutes(baseCodes(Dd)) : '', ins = instOf(r.row, d), iss = issOf(r.row, d)[0];
           const rt = c.kind === 'k-work' || c.kind === 'k-other' ? (c.top === '출근' ? base : c.top) : '';
           html += '<div class="smb-card">' + dh(mobMd(d)) + '<p class="smb-hint" style="margin:2px 0 0">실제 출근일 ' + prev + ' 저녁 입차</p>' +
-            '<div class="big">' + (rt ? (r.staff ? '' : esc(shortCamp(r.camp || D.camp || '')) + ' ') + '<b>' + esc(rt) + '</b>' : c.kind === 'none' ? '<span style="color:#94a3b8">아직 정해지지 않음</span>' : r.staff ? '<b>' + esc(c.top || c.full) + '</b>' : '담당 <b>' + esc(base || '없음') + '</b>') + '</div>' +
+            '<div class="big">' + (rt ? (r.staff || /^[가-힣]+\s?\d+\s/.test(rt) ? '' : esc(shortCamp(Dd.camp || r.camp || D.camp || '')) + ' ') + '<b>' + esc(rt) + '</b>' : c.kind === 'none' ? '<span style="color:#94a3b8">아직 정해지지 않음</span>' : r.staff ? '<b>' + esc(c.top || c.full) + '</b>' : '담당 <b>' + esc(base || '없음') + '</b>') + '</div>' +
             '<span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-work' ? '출근' : c.full) + '</span>' + (c.sub && c.kind !== 'k-yong' ? ' <span class="smb-pill" style="background:#dcfce7;color:#15803d">' + esc(c.sub) + ' 업무등록</span>' : '') +
             (iss ? '<p class="smb-hint" style="margin:8px 0 0">이슈: ' + esc(iss.result + ' · ' + iss.kind + (iss.sub ? ' · 대체 ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</p>' : '') + (ins ? '<p class="smb-hint" style="margin:6px 0 0">📌 ' + esc(ins.reason) + '</p>' : '') +
             pkmBox(r, d) +
