@@ -118,7 +118,7 @@ function dashMain_() {
       today: memos.filter(function (m) { return m._date === today && !m.note; }).sort(memoSort_).map(function (m) { return { time: m.time || '', text: String(m.content || '').slice(0, 60), done: !!m.done }; }),
       week: memos.filter(function (m) { return m._date > today && m._date <= wk && !m.done && !m.note; }).length,
       overdue: memos.filter(function (m) { return m._date < today && !m.done && !m.note; }).length,
-      pinned: pinnedM.sort(memoSort_).map(function (m) { return { text: String(m.content || '').slice(0, 60), until: m.until }; })
+      pinned: pinnedM.sort(memoSort_).map(function (m) { return { text: String(m.content || '').slice(0, 60), until: m.until, color: m.color }; })
     };
 
     // ── 공지사항

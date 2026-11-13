@@ -755,6 +755,11 @@
   .add-row #memoCat.hidden { display: none; }
   .add-row textarea { grid-column: 1 / -1; height: 64px; }
   .add-row .btn { grid-column: 1 / -1; }
+  /* 메모 글자색 */
+  .mc-빨강 { color: #e03131 !important; } .mc-파랑 { color: #1c64f2 !important; } .mc-보라 { color: #7c3aed !important; } .mc-주황 { color: #ea580c !important; } .mc-초록 { color: #16a34a !important; }
+  .done .mc-빨강, .done.mc-빨강, .done .mc-파랑, .done.mc-파랑, .done .mc-보라, .done.mc-보라, .done .mc-주황, .done.mc-주황, .done .mc-초록, .done.mc-초록 { opacity: .55; }
+  .mcol { display: inline-flex; align-items: center; gap: 4px; } .mcol button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #d0d5db; padding: 0; cursor: pointer; }
+  .mcol button.on { box-shadow: 0 0 0 2px var(--ink); } .mcol button[data-c=""] { background: #191f28; } .mcol button[data-c="빨강"] { background: #e03131; } .mcol button[data-c="파랑"] { background: #1c64f2; } .mcol button[data-c="보라"] { background: #7c3aed; } .mcol button[data-c="주황"] { background: #ea580c; } .mcol button[data-c="초록"] { background: #16a34a; }
   .memo-opt { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; }
   .memo-opt .check { margin: 0; white-space: nowrap; } .memo-opt select { height: 32px; width: auto; padding: 0 8px; font-size: 13px; }
   .memo-opt .rep-tx { color: var(--brand); font-weight: 700; white-space: nowrap; } .memo-opt .until { display: flex; align-items: center; gap: 4px; color: var(--sub); white-space: nowrap; } .memo-opt .until input { height: 32px; width: 140px; font-size: 13px; }
@@ -2007,7 +2012,7 @@
           <input class="inp" id="memoDate" type="date" title="날짜">
           <select class="inp" id="memoCat" title="기사스케줄의 어느 비고 줄에 보일지"></select>
           <textarea class="inp" id="memoText" placeholder="할 일, 메모를 입력하세요. (Ctrl+Enter 로 추가)"></textarea>
-          <div class="memo-opt"><label class="check" title="날짜와 관계없이 업무스케줄 맨 위·대시보드에 계속 보입니다 (완료하면 빠짐)"><input type="checkbox" id="memoPin" data-o="pin"> 📌 항상 보기</label>
+          <div class="memo-opt"><span class="mcol" id="memoColor" data-o="color" data-v="" title="글자색"></span><label class="check" title="날짜와 관계없이 업무스케줄 맨 위·대시보드에 계속 보입니다 (완료하면 빠짐)"><input type="checkbox" id="memoPin" data-o="pin"> 📌 항상 보기</label>
             <select class="inp" id="memoRep" data-o="rep" title="정해진 날마다 자동으로 보이게"><option value="">🔁 반복 안 함</option><option value="W">매주</option><option value="M">매월</option><option value="Y">매년</option></select>
             <span class="rep-tx" id="memoRepTx" data-o="reptx"></span>
             <label class="until hidden" id="memoUntilL" data-o="untilL" title="이 날까지만 (비우면 계속)">까지 <input class="inp" type="date" id="memoUntil" data-o="until"></label></div>
@@ -4312,7 +4317,7 @@
   }
   function dsMemoPaint() {
     const list = (DSB.memos || []).filter((m) => m.date === DSB.memoDay), pins = DSB.pinned || [];
-    $('#dsMemoList').innerHTML = (pins.length ? '<ul class="db-list ds-memo">' + pins.map((m) => '<li style="background:#fffbea"><span class="tm">📌</span><span class="t">' + esc(m.content).replace(/\n/g, '<br>') + (m.until ? ' <small style="color:#a07a1a">~' + esc(m.until.slice(5).replace('-', '/')) + '</small>' : '') + '</span></li>').join('') + '</ul>' : '') + (list.length ? '<ul class="db-list ds-memo">' + list.map((m) => '<li class="' + (m.done ? 'done' : '') + (m.note ? ' note' : '') + '"><span class="tm">' + esc(m.time || (m.note ? '비고' : '')) + '</span><span class="t">' + esc(m.content).replace(/\n/g, '<br>') + '</span>' + (m.done ? '<span class="ok">완료</span>' : '') + '</li>').join('') + '</ul>' : '<div class="db-empty">이날 적힌 업무가 없습니다.</div>');
+    $('#dsMemoList').innerHTML = (pins.length ? '<ul class="db-list ds-memo">' + pins.map((m) => '<li style="background:#fffbea"><span class="tm">📌</span><span class="t' + (m.color ? ' mc-' + m.color : '') + '">' + esc(m.content).replace(/\n/g, '<br>') + (m.until ? ' <small style="color:#a07a1a">~' + esc(m.until.slice(5).replace('-', '/')) + '</small>' : '') + '</span></li>').join('') + '</ul>' : '') + (list.length ? '<ul class="db-list ds-memo">' + list.map((m) => '<li class="' + (m.done ? 'done' : '') + (m.note ? ' note' : '') + '"><span class="tm">' + esc(m.time || (m.note ? '비고' : '')) + '</span><span class="t' + (m.color ? ' mc-' + m.color : '') + '">' + esc(m.content).replace(/\n/g, '<br>') + '</span>' + (m.done ? '<span class="ok">완료</span>' : '') + '</li>').join('') + '</ul>' : '<div class="db-empty">이날 적힌 업무가 없습니다.</div>');
   }
   const dsShift = (n) => { const p = (DSB.memoDay || ymdLocal(new Date())).split('-'); dsMemo(dsYmd(new Date(+p[0], +p[1] - 1, +p[2] + n))); };
   $('#dsMemoPrev').addEventListener('click', () => dsShift(-1));
@@ -5902,16 +5907,28 @@
     tx.textContent = rp.value ? repTxt(repNow(rp.value)) + ' · ' + date.slice(5).replace('-', '/') + '부터' : '';
     ul.classList.toggle('hidden', !rp.value && !pin.checked);
   }
+  const MCOLS = ['', '빨강', '파랑', '보라', '주황', '초록'];
+  const mcCls = (x) => x && x.color ? ' mc-' + x.color : '';
+  const mcolHtml = (cur) => MCOLS.map((c) => '<button type="button" data-c="' + c + '" class="' + (c === (cur || '') ? 'on' : '') + '" title="' + (c || '기본(검정)') + '" aria-label="글자색 ' + (c || '기본') + '"></button>').join('');
   function memoOptHtml(m) {
     const k = m.rep ? m.rep[0] : '';
-    return '<div class="memo-opt"><label class="check"><input type="checkbox" data-o="pin"' + (m.pin ? ' checked' : '') + '> 📌 항상 보기</label>' +
+    return '<div class="memo-opt"><span class="mcol" data-o="color" data-v="' + esc(m.color || '') + '">' + mcolHtml(m.color) + '</span><label class="check"><input type="checkbox" data-o="pin"' + (m.pin ? ' checked' : '') + '> 📌 항상 보기</label>' +
       '<select class="inp" data-o="rep">' + [['', '🔁 반복 안 함'], ['W', '매주'], ['M', '매월'], ['Y', '매년']].map(([v, t]) => '<option value="' + v + '"' + (v === k ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>' +
       '<span class="rep-tx" data-o="reptx"></span><label class="until hidden" data-o="untilL">까지 <input class="inp" type="date" data-o="until" value="' + esc(m.until || '') + '"></label></div>';
   }
+  $('#memoColor').innerHTML = mcolHtml('');
+  // 글자색 고르기 (추가 칸 · 수정 칸 공용)
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.mcol [data-c]'); if (!b) return;
+    const box = b.closest('.mcol'); box.dataset.v = b.dataset.c;
+    $$('[data-c]', box).forEach((x) => x.classList.toggle('on', x === b));
+    const ta = box.closest('.add-row, .edit'); const t = ta && $('textarea', ta);
+    if (t) { MCOLS.forEach((c) => c && t.classList.remove('mc-' + c)); if (b.dataset.c) t.classList.add('mc-' + b.dataset.c); }
+  });
   function renderPins() {
     const box = $('#pinBox');
     box.classList.toggle('hidden', !pinned.length);
-    box.innerHTML = '<h4>📌 항상 보기 ' + pinned.length + '건</h4>' + pinned.map((x) => '<div class="pi" data-pid="' + esc(x.id) + '"><input type="checkbox" data-pact="done" title="완료 (항상 보기에서 빠짐)"><span class="t">' + (x.time ? '<b>' + esc(x.time) + '</b> ' : '') + esc(x.content) +
+    box.innerHTML = '<h4>📌 항상 보기 ' + pinned.length + '건</h4>' + pinned.map((x) => '<div class="pi" data-pid="' + esc(x.id) + '"><input type="checkbox" data-pact="done" title="완료 (항상 보기에서 빠짐)"><span class="t' + mcCls(x) + '">' + (x.time ? '<b>' + esc(x.time) + '</b> ' : '') + esc(x.content) +
       '<br><small>' + esc(dateLabel(x.date)) + (x.until ? ' · ' + esc(x.until.slice(5).replace('-', '/')) + '까지' : '') + ' · ' + esc(x.author || '') + '</small></span><button type="button" data-pact="go">그 날짜 ›</button></div>').join('');
   }
   const catOf = (x) => (x.cat && noteLabels.includes(x.cat) ? x.cat : (noteLabels[0] || ''));
@@ -5953,7 +5970,7 @@
     for (let i = 0; i < first; i++) html += '<div class="cal-day blank"></div>';
     for (let d = 1; d <= days; d++) {
       const ds = memoMonth + '-' + pad2(d), dow = (first + d - 1) % 7, list = byDate[ds] || [];
-      const items = list.slice(0, 3).map((x) => '<div class="mi' + (x.done ? ' done' : (ds < memoToday && !x.note && !x.base ? ' late' : '')) + '">' +
+      const items = list.slice(0, 3).map((x) => '<div class="mi' + (x.done ? ' done' : (ds < memoToday && !x.note && !x.base ? ' late' : '')) + mcCls(x) + '">' +
         (x.base ? '🔁 ' : x.pin ? '📌 ' : '') + (x.time ? x.time + ' ' : '') + esc(x.content.split('\n')[0]) + '</div>').join('');
       const more = list.length > 3 ? '<div class="more">+' + (list.length - 3) + '건</div>' : '';
       html += '<div class="cal-day' + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '') + (ds === memoToday ? ' today' : '') + (ds === selDate ? ' sel' : '') +
@@ -5982,7 +5999,7 @@
   function memoHtml(x) {
     return '<div class="memo' + (x.done ? ' done' : '') + '" data-id="' + esc(x.id) + '">' +
       '<input type="checkbox" data-act="done"' + (x.done ? ' checked' : '') + ' title="완료">' +
-      '<div class="txt">' + (x.pin ? '<span class="bdg2 pin">📌 항상 보기' + (x.until ? ' ~' + esc(x.until.slice(5).replace('-', '/')) : '') + '</span>' : '') + (x.base ? '<span class="bdg2 rep" title="' + esc(x.start) + '부터' + (x.until ? ' ' + esc(x.until) + '까지' : '') + ' · 완료는 이 날짜만">🔁 ' + esc(repTxt(x.rep)) + '</span>' : '') + (noteLabels.length ? '<span class="cat" title="기사스케줄 비고 줄">' + esc(catOf(x)) + '</span>' : '') + (x.time ? '<b>' + esc(x.time) + '</b>' : '') + esc(x.content) + '</div>' +
+      '<div class="txt' + mcCls(x) + '">' + (x.pin ? '<span class="bdg2 pin">📌 항상 보기' + (x.until ? ' ~' + esc(x.until.slice(5).replace('-', '/')) : '') + '</span>' : '') + (x.base ? '<span class="bdg2 rep" title="' + esc(x.start) + '부터' + (x.until ? ' ' + esc(x.until) + '까지' : '') + ' · 완료는 이 날짜만">🔁 ' + esc(repTxt(x.rep)) + '</span>' : '') + (noteLabels.length ? '<span class="cat" title="기사스케줄 비고 줄">' + esc(catOf(x)) + '</span>' : '') + (x.time ? '<b>' + esc(x.time) + '</b>' : '') + esc(x.content) + '</div>' +
       '<div class="acts"><button type="button" data-act="edit">수정</button><button type="button" data-act="del">삭제</button></div>' +
       '<div class="by">' + esc(x.author || '') + (x.updatedAt ? ' · ' + esc(String(x.updatedAt).slice(5, 16)) : '') + '</div></div>';
   }
@@ -5998,9 +6015,10 @@
     const cat = $('#memoCat').value && $('#memoCat').value !== noteLabels[0] ? $('#memoCat').value : '';
     const rp = repOf($('#memoRep').value, date), pin = $('#memoPin').checked, until = (rp || pin) ? $('#memoUntil').value : '';
     if (until && until < date) { b.disabled = false; return toast('까지 날짜가 시작 날짜보다 앞입니다.'); }
-    api('adm_memoSave', { date: date, time: time, content: content, cat: cat, pin: pin, rep: rp, until: until }).then((r) => {
+    const color = $('#memoColor').dataset.v || '';
+    api('adm_memoSave', { date: date, time: time, content: content, cat: cat, pin: pin, rep: rp, until: until, color: color }).then((r) => {
       if (!r.ok) return toast(r.msg);
-      $('#memoText').value = ''; $('#memoTime').value = '';
+      $('#memoText').value = ''; $('#memoTime').value = ''; // 글자색은 이어서 쓸 수 있게 그대로 둠
       if (rp || pin) { $('#memoPin').checked = false; $('#memoRep').value = ''; $('#memoUntil').value = ''; memoOptSync($('#memoAdd'), selDate); toast(rp ? '🔁 ' + repTxt(rp) + ' 반복 메모를 추가했습니다.' : '📌 항상 보기 메모를 추가했습니다.'); return openMonth(memoMonth, selDate); }
       upsertMemo(r.memo);
       if (r.memo.date !== selDate) toast(dateLabel(r.memo.date) + '에 추가했습니다.');
@@ -6051,7 +6069,7 @@
         '<input class="inp" type="date" data-f="date" value="' + esc(m.base ? m.start : m.date) + '"' + (m.base ? ' title="반복 시작일"' : '') + '>' +
         '<input class="inp" type="time" data-f="time" value="' + esc(m.time) + '">' +
         (noteLabels.length ? '<select class="inp" data-f="cat" title="기사스케줄 비고 줄"></select>' : '') +
-        '<textarea class="inp" data-f="content">' + esc(m.content) + '</textarea>' + memoOptHtml(m) +
+        '<textarea class="inp' + mcCls(m) + '" data-f="content">' + esc(m.content) + '</textarea>' + memoOptHtml(m) +
         '<div class="row-btns"><button type="button" class="btn sm ghost" data-act="cancel">취소</button><button type="button" class="btn sm" data-act="save">저장</button></div></div>';
       if ($('[data-f="cat"]', box)) fillCats($('[data-f="cat"]', box), catOf(m));
       box._orig = { rep: m.rep, date: m.base ? m.start : m.date };
@@ -6067,7 +6085,7 @@
       const rk = $('[data-o="rep"]', box).value, rp = m.rep && rk === m.rep[0] && date === (m.base ? m.start : m.date) ? m.rep : repOf(rk, date), pin = $('[data-o="pin"]', box).checked, until = (rp || pin) ? $('[data-o="until"]', box).value : '';
       if (until && until < date) { e.target.disabled = false; return toast('까지 날짜가 시작 날짜보다 앞입니다.'); }
       // 반복의 한 날짜를 고치면 반복 전체(시작일 포함)를 고친다 → 원본 ID 로 저장
-      api('adm_memoSave', { id: m.base || id, date: date, time: time, content: content, cat: cat, pin: pin, rep: rp, until: until }).then((r) => {
+      api('adm_memoSave', { id: m.base || id, date: date, time: time, content: content, cat: cat, pin: pin, rep: rp, until: until, color: $('[data-o="color"]', box).dataset.v || '' }).then((r) => {
         if (!r.ok) { toast(r.msg); e.target.disabled = false; return; }
         box.dataset.done = '1';
         if (m.base || m.pin || rp || pin) { toast(rp ? '🔁 ' + repTxt(rp) + ' 반복으로 저장했습니다.' : '저장했습니다.'); return openMonth(memoMonth, selDate); }

@@ -154,10 +154,10 @@ const L = { at: '시각', admin: '관리자', action: '작업', target: '대상'
 const M = {
   id: '메모ID', date: '날짜', time: '시간', content: '내용', done: '완료',
   author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', cat: '비고 줄',
-  pin: '항상 보기', until: '까지', rep: '반복', repDone: '반복 완료일'
+  pin: '항상 보기', until: '까지', rep: '반복', repDone: '반복 완료일', color: '글자색'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전해서 자동으로 추가하는 열 (시트별)
-const AUTO_ADD_COLS = { work_memo: ['cat', 'pin', 'until', 'rep', 'repDone'], camps: ['cpCode'] };
+const AUTO_ADD_COLS = { work_memo: ['cat', 'pin', 'until', 'rep', 'repDone', 'color'], camps: ['cpCode'] };
 // 예전 버전이 쓰던 머리글 (지금은 정산 DB 로 옮겨짐). 남아 있어도 '이름 바뀐 머리글'로 보지 않는다
 const LEGACY_HEADS = { drivers: ['정산 대상 기사ID', '기사 일시단가', '기사 일시단가 노선', '기사 일시단가 시작일', '기사 일시단가 종료일'] };
 const M_NOTES = {
@@ -2441,8 +2441,13 @@ function memoView_(o) {
     id: o.id, date: o.date, time: o.time, content: o.content, done: String(o.done).toUpperCase() === 'Y',
     author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt, cat: o.cat || '',
     note: o.author === SCH_NOTE_AUTHOR, // 기사스케줄 비고에서 옮겨 온 글 (할 일이 아니므로 '미완료' 로 세지 않음)
-    pin: String(o.pin || '').toUpperCase() === 'Y', until: normDate_(o.until) || '', rep: memoRepOk_(o.rep) ? str_(o.rep) : ''
+    pin: String(o.pin || '').toUpperCase() === 'Y', until: normDate_(o.until) || '', rep: memoRepOk_(o.rep) ? str_(o.rep) : '',
+    color: MEMO_COLORS.indexOf(str_(o.color)) >= 0 ? str_(o.color) : ''
   };
+}
+/** 메모 글자색 (시트에는 한글로: 빨강·파랑·보라·주황·초록 · 비우면 기본 검정) */
+const MEMO_COLORS = ['빨강', '파랑', '보라', '주황', '초록'];
+function memoColorOk_(c) { return !c || MEMO_COLORS.indexOf(c) >= 0;
 }
 // ── 업무스케줄: 📌 항상 보기 · 🔁 반복 ──
 // 반복 규칙(rep 열): M20 = 매월 20일 (그 달에 없는 날이면 말일) · W3 = 매주 수요일 (0=일) · Y0125 = 매년 1월 25일
@@ -2552,6 +2557,7 @@ function memoSave_(a, memo) {
     if (memo.done !== undefined) f.done = memo.done ? 'Y' : '';
     if (memo.cat !== undefined) f.cat = str_(memo.cat).slice(0, 30);
     if (memo.pin !== undefined) f.pin = memo.pin ? 'Y' : '';
+    if (memo.color !== undefined) { f.color = str_(memo.color); if (!memoColorOk_(f.color)) fail_('글자색을 확인해 주세요.'); }
     if (memo.until !== undefined) { f.until = str_(memo.until) ? normDate_(memo.until) : ''; if (f.until === '' && str_(memo.until)) fail_('까지 날짜를 확인해 주세요.'); }
     if (memo.rep !== undefined) { f.rep = str_(memo.rep); if (f.rep && !memoRepOk_(f.rep)) fail_('반복 설정을 확인해 주세요.'); }
     // 반복 메모의 한 날짜(메모ID@날짜): 완료는 그 날짜만, 내용·시간 등은 반복 전체를 고친다 (날짜는 못 옮김)
@@ -2567,7 +2573,7 @@ function memoSave_(a, memo) {
         const id = newMemoId_();
         const row = appendObj_(SH.MEMO, {
           id: id, date: f.date, time: f.time || '', content: f.content, done: f.done || '', cat: f.cat || '',
-          pin: f.pin || '', until: f.until || '', rep: f.rep || '',
+          pin: f.pin || '', until: f.until || '', rep: f.rep || '', color: f.color || '',
           author: a.name, createdAt: now, updatedAt: now
         });
         return { ok: true, memo: memoView_(readObj_(SH.MEMO, row)) };
