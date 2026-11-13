@@ -236,3 +236,36 @@ function tiForDriver_(driverId, month) {
   return readAll_(SH.TAXINV).filter(function (r) { return r.id && r.month === month && r.pub !== 'N' && (r.supDriverId === driverId || r.supId === driverId); })
     .map(tiOut_).map(function (t) { delete t.createdAt; delete t.updatedAt; delete t.supId; return t; });
 }
+
+// ── 세금계산서 그림을 구글 드라이브에 연·월 폴더로 저장 ──
+// 기본 폴더: 드라이브 '매입_계산서' 폴더 (app_settings tiPngFolder 로 바꿀 수 있음) → 2026년 / 10월 폴더 (없으면 만듦)
+const TI_PNG_FOLDER = '1E4paY0gl8H8m5fJe4VhXyvVWYLA4G-jl';
+function tiSubFolder_(parent, name) {
+  const it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+/** data = PNG base64 · name = 파일 이름 · date = 작성일자(yyyy-MM-dd) → { url, path } · 같은 이름이 있으면 새 그림으로 바꿈 */
+function adm_tiPngSave(token, data, name, date) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    const ymd = stlYmd_(date);
+    if (!ymd) fail_('작성일자를 확인해 주세요.');
+    if (!data || String(data).length > CFG.MAX_FILE_B64) fail_('그림이 너무 크거나 비었습니다.');
+    name = str_(name).replace(/[\\\/:*?"<>|]+/g, '_').slice(0, 150) || ('세금계산서_' + ymd + '.png');
+    if (!/\.png$/i.test(name)) name += '.png';
+    let root;
+    try { root = DriveApp.getFolderById(str_(appSet_().tiPngFolder) || TI_PNG_FOLDER); } catch (e) { fail_('세금계산서 저장 폴더를 열 수 없습니다. 폴더 공유(편집 권한)를 확인해 주세요.'); }
+    const lock = scriptLock_(); // 같은 달 폴더가 두 번 만들어지지 않게
+    lock.waitLock(20000);
+    let folder;
+    try {
+      const yf = tiSubFolder_(root, ymd.slice(0, 4) + '년');
+      folder = tiSubFolder_(yf, Number(ymd.slice(5, 7)) + '월');
+      const old = folder.getFilesByName(name);
+      while (old.hasNext()) old.next().setTrashed(true);
+    } finally { lock.releaseLock(); }
+    const f = folder.createFile(Utilities.newBlob(Utilities.base64Decode(String(data)), 'image/png', name));
+    logAdmin_(a, '세금계산서 그림 드라이브 저장', name, ymd.slice(0, 7));
+    return { ok: true, url: f.getUrl(), path: ymd.slice(0, 4) + '년/' + Number(ymd.slice(5, 7)) + '월/' + name };
+  });
+}

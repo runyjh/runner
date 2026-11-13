@@ -481,14 +481,15 @@
   .stw.sub { background: #eef3fb; color: #2b5797; }
   .stw li.wdone { color: var(--ok); }
   .stw summary { cursor: pointer; font-weight: 700; }
-  .ti-ed { display: grid; grid-template-columns: 380px 1fr; gap: 16px; padding: 14px 16px 18px; }
+  .ti-ed { display: grid; grid-template-columns: 480px minmax(0, 1fr); gap: 16px; padding: 14px 16px 18px; }
   @media (max-width: 980px) { .ti-ed { grid-template-columns: 1fr; } }
   .ti-ed .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-bottom: 10px; }
   .ti-ed .fg label { font-size: 12px; color: var(--sub); display: flex; flex-direction: column; gap: 2px; }
   .ti-ed .fg label.w2 { grid-column: 1 / -1; }
   .ti-ed h4 { margin: 10px 0 6px; font-size: 13px; }
   .ti-ed .inp { height: 34px; font-size: 13.5px; }
-  .ti-it { width: 100%; border-collapse: collapse; font-size: 12.5px; } .ti-it td, .ti-it th { padding: 2px; } .ti-it .inp { height: 30px; padding: 0 6px; font-size: 12.5px; }
+  .ti-it { width: 100%; min-width: 0; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; } .ti-it td, .ti-it th { padding: 2px; } .ti-it .inp { height: 30px; padding: 0 6px; font-size: 12.5px; width: 100% !important; min-width: 0; }
+  .ti-it th:nth-child(1) { width: 54px; } .ti-it th:nth-child(3) { width: 42px; } .ti-it th:nth-child(4) { width: 40px; } .ti-it th:nth-child(5) { width: 104px; } .ti-it th:nth-child(6) { width: 112px; }
   .ti-prev svg { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
   .ti-prev .tg { display: flex; gap: 6px; margin-bottom: 6px; }
   .ti-nts { cursor: pointer; }
@@ -14951,7 +14952,8 @@
   }
   function openTax(t) {
     TX.cur = t ? JSON.parse(JSON.stringify(t)) : tiBlank();
-    if (t) TX.cur.items.forEach((it) => { const tot = (it.qty || 0) * (it.price || 0); it.fixed = it.supply + it.tax === tot && Math.round(tot / 1.1) !== it.supply; });
+    // 저장된 공급가액·세액이 '수량×단가' 계산과 다르면 직접 넣은(또는 정산서) 금액 → 그대로 둔다
+    if (t) TX.cur.items.forEach((it) => { const tot = (it.qty || 0) * (it.price || 0); it.fixed = (it.supply || it.tax) ? (it.supply + it.tax !== tot || Math.round(tot / 1.1) !== it.supply) : false; });
     TX.dirty = false;
     $('#tiTitle').textContent = t ? '세금계산서 ' + t.id + ' · ' + t.sup.name : '세금계산서 직접 작성';
     $('#tiDel').classList.toggle('hidden', !t);
@@ -14973,10 +14975,11 @@
         '<label>기사 앱<select class="inp" data-tf="pub"><option value="1"' + (t.pub ? ' selected' : '') + '>공개 (정산서 보기에서 보임)</option><option value="0"' + (t.pub ? '' : ' selected') + '>숨김</option></select></label>' +
         '<label class="w2">비고' + inp('note', t.note) + '</label>' +
         '<label>현금' + inp('cash', t.cash || '', '', 'number') + '</label><label>수표' + inp('check', t.check || '', '', 'number') + '</label><label>어음' + inp('bill', t.bill || '', '', 'number') + '</label><label>외상미수금' + inp('credit', t.credit || '', '', 'number') + '</label></div>' +
-      '<h4>품목 (4줄까지 · 단가는 부가세 포함)</h4><table class="ti-it"><thead><tr><th>월-일</th><th>품목</th><th>규격</th><th>수량</th><th>단가</th></tr></thead><tbody>' +
+      '<h4>품목 (4줄까지 · 단가는 부가세 포함 · 합계금액을 직접 넣으면 그 금액으로)</h4><table class="ti-it"><thead><tr><th>월-일</th><th>품목</th><th>규격</th><th>수량</th><th>단가</th><th title="부가세 포함 합계 — 직접 넣으면 공급가액 = 합계÷1.1 (반올림) · 세액 = 나머지">합계금액</th></tr></thead><tbody>' +
         [0, 1, 2, 3].map((i) => { const it = t.items[i] || {}; return '<tr><td><input class="inp" data-it="' + i + '.md" value="' + esc(it.md || '') + '" placeholder="10-31" style="width:62px"></td><td><input class="inp" data-it="' + i + '.name" value="' + esc(it.name || '') + '"></td><td><input class="inp" data-it="' + i + '.spec" value="' + esc(it.spec || '') + '" style="width:60px"></td>' +
-          '<td><input class="inp" type="number" data-it="' + i + '.qty" value="' + esc(it.qty || '') + '" style="width:54px"></td><td><input class="inp" type="number" data-it="' + i + '.price" value="' + esc(it.price || '') + '" style="width:100px"></td></tr>' +
-          (it.name || it.price ? '<tr><td></td><td colspan="4" class="sub" style="font-size:11.5px">공급가액 ' + wn(it.supply) + ' · 세액 ' + wn(it.tax) + (it.fixed ? ' (정산서 금액 그대로)' : '') + '</td></tr>' : ''); }).join('') + '</tbody></table>' +
+          '<td><input class="inp" type="number" data-it="' + i + '.qty" value="' + esc(it.qty || '') + '" style="width:54px"></td><td><input class="inp" type="number" data-it="' + i + '.price" value="' + esc(it.price || '') + '" style="width:100px"></td>' +
+          '<td><input class="inp" type="number" data-it="' + i + '.total" value="' + esc((it.supply || it.tax) ? (it.supply || 0) + (it.tax || 0) : '') + '" style="width:120px' + (it.fixed ? ';border-color:var(--brand);font-weight:700' : '') + '" placeholder="직접 입력"></td></tr>' +
+          (it.name || it.price || it.supply ? '<tr><td></td><td colspan="5" class="sub" style="font-size:11.5px">공급가액 ' + wn(it.supply) + ' · 세액 ' + wn(it.tax) + (it.fixed ? ' (합계금액 직접 입력 · 정산서 금액 그대로)' : '') + '</td></tr>' : ''); }).join('') + '</tbody></table>' +
       '<p style="margin:8px 0 0"><b>공급가액 ' + wn(t.supply) + ' · 세액 ' + wn(t.tax) + ' · 합계 ' + wn(t.total) + '</b></p></div>' +
       '<div class="ti-prev"><div class="tg"><span class="sub" style="font-size:12px">미리보기 — 기사님께는 위쪽(공급자 보관용 · 적색)이 전달됩니다.</span></div>' + TAXDOC.svg(t, 'sup') + '<div style="height:10px"></div>' + TAXDOC.svg(t, 'buy') + '</div>';
   }
@@ -14995,7 +14998,14 @@
     if (el.dataset.it) {
       const [i, k] = el.dataset.it.split('.'), t = TX.cur;
       while (t.items.length <= +i) t.items.push({ md: '', name: '', spec: '', qty: 1, price: 0, supply: 0, tax: 0, note: '' });
-      const it = t.items[+i]; it[k] = k === 'qty' || k === 'price' ? Number(el.value) || 0 : el.value;
+      const it = t.items[+i];
+      if (k === 'total') { // 합계금액 직접 입력: 공급가액 = 합계÷1.1 (반올림) · 세액 = 나머지 · 단가 = 합계÷수량
+        const tot = Math.round(Number(el.value) || 0);
+        if (!tot) { it.fixed = false; it.supply = 0; it.tax = 0; }
+        else { it.fixed = true; it.supply = Math.round(tot / 1.1); it.tax = tot - it.supply; const q = Number(it.qty) || 1; it.qty = q; it.price = Math.round(tot / q); }
+        TX.dirty = true; return tiRe();
+      }
+      it[k] = k === 'qty' || k === 'price' ? Number(el.value) || 0 : el.value;
       if (k === 'qty' || k === 'price') it.fixed = false;
       TX.dirty = true; return tiRe();
     }
@@ -15019,8 +15029,23 @@
     if (!TX.cur.id || !confirm('이 세금계산서를 지울까요?')) return;
     api('adm_tiBulk', [TX.cur.id], 'delete').then((r) => { if (!r.ok) return toast(r.msg); toast('지웠습니다.'); TX.sel.delete(TX.cur.id); $('#tiModal').classList.add('hidden'); loadTax(); }).catch(() => {});
   });
-  $('#tiPngSup').addEventListener('click', () => { tiCalc(TX.cur); TAXDOC.png(TX.cur, 'sup').then((b) => TAXDOC.download(b, TAXDOC.fileName(TX.cur, 'sup'))).catch((er) => toast(er.message)); });
-  $('#tiPngBuy').addEventListener('click', () => { tiCalc(TX.cur); TAXDOC.png(TX.cur, 'buy').then((b) => TAXDOC.download(b, TAXDOC.fileName(TX.cur, 'buy'))).catch((er) => toast(er.message)); });
+  /** 그림 버튼: 내 컴퓨터로 받고 + 구글 드라이브 세금계산서 폴더의 '연도/월' 폴더(작성일자 기준 · 없으면 만듦)에도 저장 */
+  function tiPngGo(copy, btn) {
+    if (btn.disabled) return;
+    tiCalc(TX.cur);
+    const t = TX.cur, name = TAXDOC.fileName(t, copy), lab = btn.textContent;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(t.date || ''))) return toast('작성일자를 먼저 넣어 주세요.');
+    btn.disabled = true; btn.textContent = '드라이브에 저장 중…';
+    TAXDOC.png(t, copy).then((b) => {
+      TAXDOC.download(b, name);
+      return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(new Error('그림을 읽지 못했습니다.')); fr.readAsDataURL(b); });
+    }).then((b64) => api('adm_tiPngSave', b64, name, t.date)).then((r) => {
+      if (!r.ok) return toast(r.msg);
+      toast('드라이브 매입_계산서 › ' + r.path.split('/').slice(0, 2).join(' › ') + ' 폴더에 저장했습니다.');
+    }).catch((er) => toast(er && er.message ? er.message : '저장하지 못했습니다.')).finally(() => { btn.disabled = false; btn.textContent = lab; });
+  }
+  $('#tiPngSup').addEventListener('click', (e) => tiPngGo('sup', e.currentTarget));
+  $('#tiPngBuy').addEventListener('click', (e) => tiPngGo('buy', e.currentTarget));
 
   // ───── 게시판 관리 ─────
   const BM = { status: '전체', posts: [], count: {}, cur: '' };
