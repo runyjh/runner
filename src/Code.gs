@@ -5543,7 +5543,7 @@ function api_mySchedule(token, month) {
     try {
       if (wkCur) {
         const sg = rcSegs_(wkCur, rcByDriver_()[rowId] || [], dates), cn2 = rcCampNames_();
-        if (sg) { const bA = {}, cA = {}; sg.forEach(function (x) { dates.forEach(function (d) { if (d < x.from || d > x.to) return; if (str_(x.baseRoute) !== out.baseRoute) bA[d] = str_(x.baseRoute); if (str_(x.campId) !== wkCur.campId) cA[d] = cn2[x.campId] || x.camp || ''; }); }); if (Object.keys(bA).length) out.baseAt = bA; if (Object.keys(cA).length) out.campAt = cA; }
+        if (sg) { const bA = {}, cA = {}; sg.forEach(function (x) { dates.forEach(function (d) { if (d < x.from || d > x.to) return; if (str_(x.baseRoute) !== out.baseRoute) bA[d] = str_(x.baseRoute); if (str_(x.campId) !== wkCur.campId) cA[d] = str_(cn2[x.campId] || x.camp || '').replace(/\s*캠프\s*$/, ''); }); }); if (Object.keys(bA).length) out.baseAt = bA; if (Object.keys(cA).length) out.campAt = cA; }
       }
     } catch (e) { /* 없으면 지금 노선 그대로 */ }
     stg_('rc');
@@ -5726,8 +5726,11 @@ function api_campSchedule(token, month, campId) {
         if (o.status !== ST.ACTIVE) return;
         const days = {};
         let any = false, route = '';
-        dates.forEach(function (d) { const v = rcBy[o.id] ? at(o, d) : { campId: o.schCampId, baseRoute: o.baseRoute }; if (v.campId === cid) { days[d] = 1; any = true; if (!route || d === ref) route = v.baseRoute; } });
-        if (any) { inCamp[o.id] = { days: days, route: route }; return; }
+        const rAt = {};
+        dates.forEach(function (d) { const v = rcBy[o.id] ? at(o, d) : { campId: o.schCampId, baseRoute: o.baseRoute }; if (v.campId === cid) { days[d] = 1; any = true; rAt[d] = v.baseRoute; if (!route || d === ref) route = v.baseRoute; } });
+        if (any) { // 같은 캠프 안에서 노선만 바뀌는 기사: 날짜별 담당 노선 (route 와 다른 날만)
+          const diff = {}; Object.keys(rAt).forEach(function (d) { if (str_(rAt[d]) !== str_(route)) diff[d] = str_(rAt[d]); });
+          inCamp[o.id] = { days: days, route: route, routeAt: Object.keys(diff).length ? diff : null }; return; }
         if (!hasSheet) return;
         // 손님: 그달 칸에 이 캠프 이름이 적힌 날만
         const gd = {}; let g = false;
@@ -5738,6 +5741,7 @@ function api_campSchedule(token, month, campId) {
       const byId = {};
       all.filter(function (o) { return inCamp[o.id]; }).forEach(function (o) {
         byId[o.id] = { id: o.id, name: o.name, route: inCamp[o.id].route || '', type: o.driverType || '', loginId: str_(o.loginId), subIds: [o.subId1, o.subId2].map(str_).filter(Boolean), alias: lk.aliasOf[o.id] || [], phone: o.phone ? fmtPhone_(o.phone) : '', me: o.id === me.id, guest: !!inCamp[o.id].guest, homeCamp: inCamp[o.id].home || '', cells: {}, away: {}, order: 1e9 };
+        if (inCamp[o.id].routeAt) byId[o.id].routeAt = inCamp[o.id].routeAt;
         // 노선 변경·이관으로 이 캠프에 없는 날 (예: 11/11부터 군포1로 간 기사는 그날부터 안양1 목록에서 빠짐)
         if (!inCamp[o.id].guest) { const off = {}; let n = 0; dates.forEach(function (d) { if (!inCamp[o.id].days[d]) { off[d] = 1; n++; } }); if (n) byId[o.id].off = off; }
       });

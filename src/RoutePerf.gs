@@ -239,13 +239,21 @@ function rpfWorkDays_(driverId, camp, baseRoute) {
   const s = rpfMyCells_(driverId, pd.from, pd.to);
   const campShorts = (s.camps || []).map(function (c) { return rpfCamp_(c.name); });
   const cells = s.cells || {};
+  // 노선 변경(예약 · 적용)이 있는 기사: '출근' 은 그 날짜의 담당 노선 · 캠프로 센다 (없으면 지금 노선 그대로)
+  let rcList = null, rcCur = null;
+  try { const o = driverById_(driverId); rcList = rcByDriver_()[String(driverId)] || null; if (o && rcList && rcList.length) rcCur = { campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute }; } catch (e) { rcCur = null; }
   Object.keys(cells).forEach(function (d) {
     if (d < pd.from || d > pd.to) return;
     let v = String(cells[d] || '').toUpperCase().trim();
     if (!v || /휴무|휴가|병가|미입차|비고|퇴사/.test(v)) return;
     out.total++; if (d <= today) out.done++;
-    if (v === '출근' && baseRoute) v = String(baseRoute).toUpperCase();
     let cp = camp;
+    if (v === '출근') {
+      let at = null; try { at = rcCur ? rcAt_(rcCur, rcList, d, today) : null; } catch (e) { at = null; }
+      const br = at ? str_(at.baseRoute) : baseRoute;
+      if (at && at.camp) cp = rpfCamp_(at.camp) || camp;
+      if (br) v = String(br).toUpperCase();
+    }
     campShorts.forEach(function (c) { if (c && v.indexOf(c.toUpperCase()) >= 0) cp = c; });
     rpfBaseCodes_(v.replace(/[^0-9A-Z가-힣,\s/]/g, ' ')).forEach(function (code) { if (!/^\d/.test(code)) return; const k = cp + '|' + code; out.perRoute[k] = (out.perRoute[k] || 0) + 1; });
   });
