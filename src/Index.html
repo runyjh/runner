@@ -1785,6 +1785,9 @@
   const ROT_FULL = 'D1,D2,F3';
   let CAMP_ROTS = {}; // 기본 회전이 D1,D2,F3 가 아닌 캠프 { '시흥2': 'D1,D2' } (서버 api_mySchedule·api_campSchedule)
   const fullRot = (camp) => CAMP_ROTS[String(camp || '').replace(/\s+/g, '')] || ROT_FULL;
+  /** 그 날짜의 담당 노선 · 캠프 (노선 변경 앞뒤가 다른 날은 서버가 baseAt · campAt 으로 내려 줌) */
+  const brAt = (r, d) => (r && r.baseAt && r.baseAt[d]) || (r && r.baseRoute) || '';
+  const cpAt = (r, d) => (r && r.campAt && r.campAt[d]) || (r && r.camp) || '';
   function schParse(v, baseRoute, homeCamp) {
     if (/^용차\s/.test(String(v || ''))) v = '용차'; // 사무실용 표기(업체 · 아이디 · 청구 여부)는 기사 앱에 보이지 않게
     const per = {};
@@ -2186,7 +2189,7 @@
     const pm = pmOfDay(r, d).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : x.status === '확정' ? ' 확정' : '') + '</b>' + escH(x.text) + '</button>').join('');
     return '<div class="day' + (d === pdd ? ' today' : '') + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + '">' +
       '<div class="dt">' + (+p[1]) + '/' + (+p[2]) + ' (' + DOWK[dow] + ')' + sub + peak + '</div>' +
-      '<div class="vc"><div class="val ' + (v ? schKind(v, schIdsOf(r), r.baseRoute || '', r.camp || '') : 'none') + '">' + (v ? escH(schShow(v)) : '미정') + '</div>' +
+      '<div class="vc"><div class="val ' + (v ? schKind(v, schIdsOf(r), brAt(r, d), cpAt(r, d)) : 'none') + '">' + (v ? escH(schShow(v)) : '미정') + '</div>' +
       (schRegId(v, schIdsOf(r)) ? '<div class="idp">🆔 <b>' + escH(schRegId(v, schIdsOf(r))) + '</b> 아이디로 등록</div>' : '') +
       ((r.inst || {})[d] ? '<div class="inst"><b>' + instLbl() + '</b>' + escH(r.inst[d]) + '</div>' : '') + pmDoneRow(r, d) + pm + bk + '</div></div>';
   }
@@ -2210,7 +2213,7 @@
     const nz = (t) => String(t || '').replace(/\s|캠프$/g, ''), list = [], seen = {};
     const add = (camp, code) => { const k = nz(camp) + '|' + code; if (!seen[k]) { seen[k] = 1; list.push({ camp: nz(camp), code }); } };
     const v = schOwn(String(r.cells[d] || ''), schIdsOf(r));
-    if (v && !/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(v)) v.split(/,\s*(?=[가-힣]+\d*\s+\d)/).forEach((part, i) => { const pc = schParse(part, i === 0 ? r.baseRoute || '' : ''); pc.codes.forEach((c) => add(pc.camp || r.camp, c)); });
+    if (v && !/휴무|휴가|병가|퇴사|미입차|노쇼|용차/.test(v)) v.split(/,\s*(?=[가-힣]+\d*\s+\d)/).forEach((part, i) => { const pc = schParse(part, i === 0 ? brAt(r, d) : ''); pc.codes.forEach((c) => add(pc.camp || cpAt(r, d), c)); });
     const pm = ((r.pumasi || {})[d] || []).filter((x) => x.status === '확정' && x.route);
     pm.filter((x) => x.role === '수행').forEach((x) => schParse(x.route, '').codes.forEach((c) => add(x.camp || r.camp, c)));
     const gave = {}; pm.filter((x) => x.role === '맡김').forEach((x) => schParse(x.route, '').codes.forEach((c) => { gave[nz(x.camp || r.camp) + '|' + c] = 1; }));
@@ -2359,9 +2362,9 @@
       const day = +d.slice(8), dow = (lead + day - 1) % 7, v0 = r.cells[d] || '', v = schOwn(v0, myIds), np = pmOfDay(r, d);
       const pmC = pmCell(r, d), pmChip = pmC.html, pmWork = pmC.work;
       // 칸에는 내 노선(줄임 표기)만. 지시·품앗이·확정완료는 작은 아이콘, 백업/근무 인원 글자는 없음 (아래 요약·상세에)
-      const pc = v ? schParse(v, r.baseRoute || '') : null;
+      const pc = v ? schParse(v, brAt(r, d)) : null;
       const chip = !pc ? '' : pc.routes
-        ? '<span class="v ' + (schKind(v, myIds, r.baseRoute || '', r.camp || '') || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || r.camp) ? '<i class="cp">' + escH(pc.camp || r.camp) + '</i>' : '') + escH(pc.routes) + '</span>'
+        ? '<span class="v ' + (schKind(v, myIds, brAt(r, d), cpAt(r, d)) || 'k-work') + (pc.routes.length > 5 ? ' long' : '') + '">' + ((pc.camp || cpAt(r, d)) ? '<i class="cp">' + escH(pc.camp || cpAt(r, d)) + '</i>' : '') + escH(pc.routes) + '</span>'
         : '<span class="v ' + schKind(v, myIds) + (pc.raw.length > 4 ? ' long' : '') + '">' + escH(pc.raw) + '</span>';
       const icons = ((r.inst || {})[d] ? '<span title="' + (isStaffUser() ? '일정 메모' : '지시사항') + '">' + instIco() + '</span>' : '') + (schRegId(v0, myIds) ? '<span title="다른 아이디로 업무등록">🆔</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === r.today ? ' td' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
@@ -2377,7 +2380,7 @@
     const d = scSel, bk = (r.backup || {})[d] || [];
     const pm = pmOfDay(r, d).map((x) => '<button type="button" class="pmx r-' + escH(x.role) + '" data-pm="' + escH(x.id) + '"><b>🤝 품앗이 ' + escH(x.role) + (x.status && x.status !== '확정' ? ' (' + escH(x.status) + ')' : x.status === '확정' ? ' 확정' : '') + '</b>' + escH(x.text) + '</button>').join('');
     const extra = pmDoneRow(r, d) + pm + peakBox(r, d);
-    return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', pmWork: pmCell(r, d).work && (!r.cells[d] || /휴무|휴가/.test(r.cells[d])), baseRoute: r.baseRoute || '', camp: r.camp || '', ids: schIdsOf(r), instLbl: instLbl(), inst: (r.inst || {})[d] || '',
+    return dselCard({ d, pdd: pddOf(r.today), today: r.today, holiday: r.holidays[d], cell: r.cells[d] || '', pmWork: pmCell(r, d).work && (!r.cells[d] || /휴무|휴가/.test(r.cells[d])), baseRoute: brAt(r, d), camp: cpAt(r, d), ids: schIdsOf(r), instLbl: instLbl(), inst: (r.inst || {})[d] || '',
       sum: (r.camp ? escH(r.camp) + ' 캠프' + (bk.length ? ' · 들어오는 백업 <b>' + bk.length + '</b>명' : ' · 이 날 들어오는 백업 없음') : ''), extra });
   }
   $('#scBody').addEventListener('change', (e) => {

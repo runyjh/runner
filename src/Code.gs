@@ -5517,7 +5517,7 @@ function api_mySchedule(token, month) {
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
     // 같은 근무자 연결: 명의 계정으로 들어와도 근무자 줄(스케줄 한 줄)을 본다 · 그날 쓸 아이디(서브 · 다른 명의)를 앱이 알 수 있게 내려 준다
-    let rowId = String(s.d);
+    let rowId = String(s.d), wkCur = null;
     out.subIds = []; out.alias = [];
     try {
       const allD = readAll_(SH.DRIVERS), lk = schLinkMap_(allD);
@@ -5525,6 +5525,7 @@ function api_mySchedule(token, month) {
       if (wk) {
         rowId = String(wk.id);
         out.baseRoute = str_(wk.baseRoute); out.loginId = str_(wk.loginId);
+        wkCur = { campId: str_(wk.schCampId), camp: str_(wk.schCamp), baseRoute: str_(wk.baseRoute) };
         out.subIds = schSubIdsOf_(wk); out.alias = lk.aliasOf[wk.id] || [];
         if (wk !== meO) out.workerName = wk.name;
       } else out.baseRoute = '';
@@ -5538,6 +5539,13 @@ function api_mySchedule(token, month) {
       out.routeChanges = (rcByDriver_()[String(s.d)] || []).filter(function (c) { return c.status === RCS.WAIT || (c.date >= addDaysText_(t0, -7) && c.memo !== '바로 변경'); })
         .map(function (c) { return { date: c.date, camp: cn[c.toCampId] || c.toCamp, route: c.toRoute, fromCamp: cn[c.fromCampId] || c.fromCamp, fromRoute: c.fromRoute, done: c.status === RCS.DONE }; });
     } catch (e) { out.routeChanges = []; }
+    // 날짜별 담당 노선 · 캠프: 노선 변경(예약 · 적용) 앞뒤가 다른 날만 (없으면 baseRoute 그대로) — '출근' 칸을 그날의 노선으로 보여 주기 위해
+    try {
+      if (wkCur) {
+        const sg = rcSegs_(wkCur, rcByDriver_()[rowId] || [], dates), cn2 = rcCampNames_();
+        if (sg) { const bA = {}, cA = {}; sg.forEach(function (x) { dates.forEach(function (d) { if (d < x.from || d > x.to) return; if (str_(x.baseRoute) !== out.baseRoute) bA[d] = str_(x.baseRoute); if (str_(x.campId) !== wkCur.campId) cA[d] = cn2[x.campId] || x.camp || ''; }); }); if (Object.keys(bA).length) out.baseAt = bA; if (Object.keys(cA).length) out.campAt = cA; }
+      }
+    } catch (e) { /* 없으면 지금 노선 그대로 */ }
     stg_('rc');
     // 품앗이: 내가 뛰는 일감(수행)·맡긴 일감(맡김)·지원 중인 일감
     try { out.pumasi = pmScheduleOf_(String(s.d), dates); } catch (e) { out.pumasi = {}; }
