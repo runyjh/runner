@@ -352,3 +352,21 @@ function adm_insEnrSet(token, driverIds, value, date) {
     return { ok: true, n: n, value: value, date: d };
   });
 }
+/** 연간 보기 일괄: items = [{ month, list: [adm_insRepSet 와 같은 줄] }] → 한 번에 저장 */
+function adm_insRepSetMany(token, items) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    items = (Array.isArray(items) ? items : []).slice(0, 24);
+    let n = 0;
+    items.forEach(function (it) {
+      if (!it || !stlMonthOk_(it.month)) return;
+      const list = (Array.isArray(it.list) ? it.list : []).slice(0, 500);
+      n += docUpsert_(SH.INSREP, it.month, list, a, function (x) {
+        return { driverId: str_(x.driverId), name: str_(x.name), bosu: String(Math.round(stlNum_(x.bosu) || 0)), san: x.san ? 'Y' : '', goy: x.goy ? 'Y' : '',
+          start: stlYmd_(x.start) || '', done: x.done ? 'Y' : '', date: x.done ? (stlYmd_(x.date) || todayText_()) : '', memo: str_(x.memo).slice(0, 200) };
+      });
+    });
+    logAdmin_(a, '산재·고용 신고 일괄 체크 (연간)', items.map(function (it) { return it.month; }).join(', '), n + '건');
+    return { ok: true, n: n };
+  });
+}

@@ -1887,6 +1887,7 @@
       <p class="sub" style="margin:-4px 0 10px;font-size:13px" id="iyInfo"></p>
       <div class="dc-sum" id="iySum"></div>
       <div class="tabs" id="iyTabs"></div>
+      <div class="rbulk hidden" id="iyBulk"></div>
       <div class="table-wrap">
         <table class="dc-tb ey-tb"><thead id="iyHead"></thead><tbody id="iyRows"></tbody></table>
         <div class="empty hidden" id="iyEmpty"></div>
@@ -4896,7 +4897,7 @@
   $('#irReload').addEventListener('click', () => (IY.mode === 'year' ? loadInsYear() : loadInsRep()));
   $('#irQ').addEventListener('input', (e) => { if (!e.isComposing) renderInsRep(); });
   // ── 산재/고용 연간 보기: 기사 × 월 신고 현황 · 미신고자 · 기사별 1년 내역 (adm_insYear) ──
-  const IY = { mode: 'month', year: '', info: null, tab: '미신고 있는 기사', open: '', seq: 0, keep: new Set() };
+  const IY = { mode: 'month', year: '', info: null, tab: '미신고 있는 기사', open: '', seq: 0, keep: new Set(), sel: new Set(), bm: '' };
   function irModeSet(mode) {
     IY.mode = mode;
     $$('#irMode [data-irm]').forEach((b) => b.classList.toggle('on', b.dataset.irm === mode));
@@ -4949,16 +4950,17 @@
     let list = all.filter((d) => (IY.tab === '전체' || (IY.tab === '신고 대상 전체' && tgt.includes(d)) || (IY.tab === '미신고 있는 기사' && cellsOf(d, 'no').length) || (IY.tab === '신고 전' && cellsOf(d, 'wait').length) || IY.keep.has(d.acct)) &&
       (!q || String(d.name).toLowerCase().includes(q)));
     list = list.slice().sort((a, b) => cellsOf(b, 'no').length - cellsOf(a, 'no').length || a.name.localeCompare(b.name, 'ko'));
-    $('#iyHead').innerHTML = '<tr><th>기사</th>' + ms.map((m) => '<th class="ec">' + esc(eyMon(m)) + '</th>').join('') + '<th class="num">미신고</th><th class="num">미신고 공단 납부</th></tr>';
+    $('#iyHead').innerHTML = '<tr><th class="ck"><input type="checkbox" id="iyAll" aria-label="보이는 기사 모두 선택"></th><th>기사</th>' + ms.map((m) => '<th class="ec">' + esc(eyMon(m)) + '</th>').join('') + '<th class="num">미신고</th><th class="num">미신고 공단 납부</th></tr>';
     const lab = { done: '✓ 신고', no: '미신고', wait: '신고 전', out: '대상 아님', sub: '합산', skip: '기록 전' };
     $('#iyRows').innerHTML = list.map((d) => {
       const nc = cellsOf(d, 'no'), amt = nc.reduce((a, m) => a + (d.cells[m].pay || 0), 0), open = IY.open === d.acct, ne = iyNoEnr(d);
-      return '<tr class="eyr' + (open ? ' open' : '') + '" data-iya="' + esc(d.acct) + '"><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' +
+      return '<tr class="eyr' + (open ? ' open' : '') + '" data-iya="' + esc(d.acct) + '"><td class="ck"><input type="checkbox" data-iyck="' + esc(d.acct) + '"' + (IY.sel.has(d.acct) ? ' checked' : '') + '></td><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' +
         (ne && tgt.includes(d) ? ' <span class="dc-tag w" style="color:#c81e1e">입직신고 대상</span>' : '') + (!d.hasRrn && tgt.includes(d) ? ' <span class="dc-tag n" title="기사 정보관리에서 주민등록번호를 넣어 주세요">주민번호 없음</span>' : '') + '</td>' +
         ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-iym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' title="' + esc(dMon(m) + ' · 월보수 ' + dWon(c.bosu) + '원 · 공단 납부 ' + dWon(c.pay) + '원' + (c.st === 'sub' ? ' · ' + c.parentName + ' 기사에 합산' : c.st === 'out' ? ' · 신고 대상 아님' : c.st === 'done' ? ' · 누르면 미신고로' : ' · 누르면 신고 완료로 · 기한 ' + (r.dues[m] || ''))) + '">' + (c.busy ? '저장 중…' : lab[c.st]) + '</button>' : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
         '<td class="num">' + (nc.length ? '<b style="color:#c81e1e">' + nc.length + '건</b>' : '<span class="sm">없음</span>') + '</td><td class="num">' + (amt ? dWon(amt) : '') + '</td></tr>' +
-        (open ? '<tr class="eyd"><td colspan="' + (ms.length + 3) + '">' + iyDetail(d) + '</td></tr>' : '');
+        (open ? '<tr class="eyd"><td colspan="' + (ms.length + 4) + '">' + iyDetail(d) + '</td></tr>' : '');
     }).join('');
+    iySelPaint();
     $('#iyEmpty').textContent = all.length ? (IY.tab === '미신고 있는 기사' && !q ? '이 해에 기한이 지난 미신고가 없습니다. 👍' : '조건에 맞는 기사가 없습니다.') : '이 해에 산재·고용 정산이 없습니다.';
     $('#iyEmpty').classList.toggle('hidden', list.length > 0);
   }
@@ -4999,12 +5001,65 @@
       renderInsYear(); toast(d.name + ' ' + dMon(m) + '분 ' + (on ? '신고 완료로 체크했습니다.' : '미신고로 바꿨습니다.'));
     }).catch(() => { c.busy = false; Object.assign(c, prev); renderInsYear(); });
   }
+
+  // ── 연간 보기 선택 · 일괄 처리 ──
+  /** 고른 기사 × 고른 달(비우면 모든 달)에서 바꿀 칸 목록 */
+  function iyTargets(on) {
+    const r = IY.info, ms = IY.bm ? [IY.bm] : r.months, out = [];
+    r.drivers.filter((d) => IY.sel.has(d.acct)).forEach((d) => ms.forEach((m) => {
+      const c = d.cells[m]; if (!c || c.busy) return;
+      if (on ? ['no', 'wait', 'skip'].includes(c.st) && (IY.bm || c.st !== 'skip') : c.st === 'done') out.push({ d, m, c });
+    }));
+    return out;
+  }
+  function iySelPaint() {
+    const r = IY.info; if (!r) return;
+    const vis = $$('#iyRows [data-iyck]').map((c) => c.dataset.iyck);
+    const all = $('#iyAll'); if (all) all.checked = vis.length > 0 && vis.every((k) => IY.sel.has(k));
+    const box = $('#iyBulk'); box.classList.toggle('hidden', !IY.sel.size);
+    if (!IY.sel.size) return;
+    const t1 = iyTargets(true), amt = t1.reduce((a, x) => a + (x.c.pay || 0), 0);
+    box.innerHTML = '<b>' + IY.sel.size + '명 선택</b>' +
+      '<select class="inp" id="iyBm" style="height:30px;width:auto;font-size:13px" title="어느 달을 바꿀지"><option value="">모든 달 (미신고·신고 전)</option>' + r.months.map((m) => '<option value="' + esc(m) + '"' + (m === IY.bm ? ' selected' : '') + '>' + esc(dMon(m)) + '분</option>').join('') + '</select>' +
+      '<button type="button" class="btn sm" data-iyb="1">신고 완료로 (' + t1.length + '건)</button><button type="button" class="btn sm ghost" data-iyb="0">미신고로</button>' +
+      '<span style="width:1px;height:20px;background:var(--line);margin:0 4px"></span><button type="button" class="btn sm ghost" data-iyb="e완료">입직신고 완료로</button><button type="button" class="btn sm ghost" data-iyb="e대상">입직신고 대상으로</button>' +
+      '<span class="sm">' + (t1.length ? '공단 납부 ' + dWon(amt) + '원' : '') + '</span><button type="button" class="btn sm ghost" data-iyclr>선택 풀기</button>';
+  }
+  $('#iyRows').addEventListener('change', (e) => { const c = e.target.closest('[data-iyck]'); if (!c) return; if (c.checked) IY.sel.add(c.dataset.iyck); else IY.sel.delete(c.dataset.iyck); iySelPaint(); });
+  $('#iyHead').addEventListener('change', (e) => { if (e.target.id !== 'iyAll') return; $$('#iyRows [data-iyck]').forEach((c) => { c.checked = e.target.checked; if (e.target.checked) IY.sel.add(c.dataset.iyck); else IY.sel.delete(c.dataset.iyck); }); iySelPaint(); });
+  $('#iyBulk').addEventListener('change', (e) => { if (e.target.id === 'iyBm') { IY.bm = e.target.value; iySelPaint(); } });
+  $('#iyBulk').addEventListener('click', (e) => {
+    if (e.target.closest('[data-iyclr]')) { IY.sel.clear(); return renderInsYear(); }
+    const b = e.target.closest('[data-iyb]'); if (!b) return;
+    const k = b.dataset.iyb, r = IY.info;
+    if (k[0] === 'e') {
+      const v = k.slice(1), ids = [...new Set(r.drivers.filter((d) => IY.sel.has(d.acct) && d.driverId).map((d) => d.driverId))];
+      if (!confirm(ids.length + '명을 ' + (v === '완료' ? '입직신고 완료(오늘 날짜)' : '입직신고 대상') + '으로 바꿀까요?')) return;
+      return Promise.resolve(irEnrSave(ids, v)).then(() => { IY.sel.clear(); renderInsYear(); });
+    }
+    const on = k === '1', tg = iyTargets(on);
+    if (!tg.length) return toast(on ? '고른 기사·달에 미신고(신고 전)인 칸이 없습니다.' : '고른 기사·달에 신고 완료인 칸이 없습니다.');
+    const ppl = new Set(tg.map((x) => x.d.acct)).size, amt = tg.reduce((a, x) => a + (x.c.pay || 0), 0);
+    if (!confirm(ppl + '명 · ' + tg.length + '건 (' + (IY.bm ? dMon(IY.bm) + '분' : '모든 달') + ') · 공단 납부 ' + dWon(amt) + '원\n\n' + (on ? '신고 완료(오늘 날짜)로' : '미신고로') + ' 바꿀까요?')) return;
+    const by = {}, today = dToday();
+    tg.forEach(({ d, m, c }) => { (by[m] = by[m] || []).push({ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: on, date: on ? (c.date || today) : '', memo: c.memo || '' }); c.busy = true; });
+    tg.forEach(({ d }) => IY.keep.add(d.acct));
+    renderInsYear();
+    api('adm_insRepSetMany', Object.keys(by).map((m) => ({ month: m, list: by[m] }))).then((res) => {
+      tg.forEach(({ c }) => { c.busy = false; });
+      if (!res.ok) { renderInsYear(); return toast(res.msg); }
+      tg.forEach(({ m, c }) => { c.st = on ? 'done' : (r.from && m < r.from ? 'skip' : (r.today > (r.dues[m] || '') ? 'no' : 'wait')); c.date = on ? (c.date || today) : ''; });
+      if (by[IR.month]) IR.rows = [];
+      IY.sel.clear(); renderInsYear(); toast(ppl + '명 · ' + tg.length + '건을 ' + (on ? '신고 완료로' : '미신고로') + ' 바꿨습니다.');
+    }).catch(() => { tg.forEach(({ c }) => { c.busy = false; }); renderInsYear(); });
+  });
   $('#irMode').addEventListener('click', (e) => { const b = e.target.closest('[data-irm]'); if (b && b.dataset.irm !== IY.mode) irModeSet(b.dataset.irm); });
   $('#iyYear').addEventListener('change', (e) => { IY.open = ''; loadInsYear(e.target.value); });
   $('#iyFrom').addEventListener('change', (e) => { loadInsYear(IY.year, e.target.value); toast('집계 시작월을 바꿨습니다.'); });
   $('#iyQ').addEventListener('input', (e) => { if (!e.isComposing) renderInsYear(); });
   $('#iyTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-iyt]'); if (b) { IY.tab = b.dataset.iyt; IY.keep.clear(); renderInsYear(); } });
   $('#iyRows').addEventListener('click', (e) => {
+    if (e.target.closest('td.ck')) return; // 선택 칸은 줄 펼치기와 따로
     const c = e.target.closest('[data-iym]');
     if (c) { const t = c.closest('tr.eyr'); return iyToggle(t ? t.dataset.iya : IY.open, c.dataset.iym); }
     if (e.target.closest('.eyd')) return;
