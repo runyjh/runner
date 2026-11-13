@@ -5255,8 +5255,10 @@ function adm_schSave(token, changes) {
       }
       savedList.forEach(function (x) { delete x._r; delete x._c; });
       stg_('write');
-      if (saved) { logSchChange_(a, ok, saved); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } try { if (typeof seenSchChanges_ === 'function') seenSchChanges_(a, savedList); } catch (e) { softFail_('스케줄 변경 확인 기록 실패', e); } } // 정산서 근무일수는 기사스케줄에서 세므로 정산 캐시도 새로
+      if (saved) { logSchChange_(a, ok, saved); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } } // 정산서 근무일수는 기사스케줄에서 세므로 정산 캐시도 새로
       stg_('log');
+      if (saved) { try { if (typeof seenSchChanges_ === 'function') seenSchChanges_(a, savedList); } catch (e) { softFail_('스케줄 변경 확인 기록 실패', e); } }
+      stg_('seen');
       // 칸 → 이슈 (2026-11-01 이후 · 미입차·노쇼·회전 줄임이면 '사유 미정' 이슈를 만들고, 정상으로 고치면 이슈에서 뺌)
       let issueSync = null;
       if (savedList.length) {
