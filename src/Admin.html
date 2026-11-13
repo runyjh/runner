@@ -1413,6 +1413,7 @@
   /* 전자세금계산서 연간 보기 */
   .ey-tb td.ec, .ey-tb th.ec { text-align: center; white-space: nowrap; min-width: 62px; }
   .ey-tb .eyc { display: inline-block; min-width: 54px; padding: 3px 6px; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer; border: 0; background: none; }
+  .ey-tb .eyc.wait { background: #fff1e0; color: #c2410c; } .ey-tb .eyc.out, .ey-tb .eyc.sub { color: #adb5bd; cursor: default; font-weight: 700; }
   .ey-tb .eyc.done { color: #0b6b3a; } .ey-tb .eyc.ti { color: var(--brand); } .ey-tb .eyc.no { background: #fde8e8; color: #c81e1e; } .ey-tb .eyc.skip { color: #adb5bd; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
   .ey-tb tr.eyr { cursor: pointer; } .ey-tb tr.eyr:hover td { background: #f8fafc; } .ey-tb tr.eyr.open td { background: #f1f6ff; }
   .ey-tb tr.eyd > td { background: #fbfcfe; padding: 10px 14px 14px; }
@@ -1843,13 +1844,33 @@
     <div class="head">
       <h2>산재/고용 신고 상황 <small id="irCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
       <div class="tools">
+        <div class="seg" id="irMode"><button type="button" data-irm="month" class="on">월별</button><button type="button" data-irm="year">연간</button></div>
+        <span class="irmo" style="display:contents">
         <select class="inp" id="irMonth" title="정산월 (= 노무제공월)"></select>
         <input class="inp search" id="irQ" placeholder="기사 검색" style="width:160px">
+        </span>
+        <span class="iryo hidden" style="display:contents">
+        <select class="inp" id="iyYear" title="연도 (정산월 = 노무제공월 기준)" style="min-width:110px"></select>
+        <input class="inp search" id="iyQ" placeholder="기사 검색" style="width:160px">
+        <label class="sub" style="font-size:12.5px;display:flex;align-items:center;gap:6px;white-space:nowrap">집계 시작 <select class="inp" id="iyFrom" title="이 정산월부터 미신고를 셉니다 (그 앞 달은 체크 기록이 없어 빼고 봄)" style="height:34px;min-width:140px"></select></label>
+        </span>
         <button class="btn ghost" id="irReload">새로고침</button>
+        <span class="irmo" style="display:contents">
         <button class="btn ghost" id="irCfgBtn" type="button">⚙ 신고 설정</button>
         <button class="btn" id="irXlsx" type="button" title="근로복지공단 고용·산재보험 토탈서비스 '노무제공자 월 보수액 신고' 일괄 등록용 엑셀">⬇ 공단 업로드 엑셀</button>
+        </span>
       </div>
     </div>
+    <div id="iyBox" class="hidden">
+      <p class="sub" style="margin:-4px 0 10px;font-size:13px" id="iyInfo"></p>
+      <div class="dc-sum" id="iySum"></div>
+      <div class="tabs" id="iyTabs"></div>
+      <div class="table-wrap">
+        <table class="dc-tb ey-tb"><thead id="iyHead"></thead><tbody id="iyRows"></tbody></table>
+        <div class="empty hidden" id="iyEmpty"></div>
+      </div>
+    </div>
+    <div id="irBox">
     <p class="sub" style="margin:-4px 0 10px;font-size:13px" id="irInfo"></p>
     <div class="dc-cfg hidden" id="irCfg">
       <div class="grid2">
@@ -1872,6 +1893,7 @@
         <tbody id="irRows"></tbody>
       </table>
       <div class="empty hidden" id="irEmpty"></div>
+    </div>
     </div>
    </section>
    <section id="view-taxinv" class="hidden">
@@ -4134,7 +4156,7 @@
     $('#view-einv').classList.toggle('hidden', v !== 'einv');
     if (v === 'einv') { if (EY.mode === 'year') loadEinvYear(); else loadEinv(); }
     $('#view-insrep').classList.toggle('hidden', v !== 'insrep');
-    if (v === 'insrep') loadInsRep();
+    if (v === 'insrep') { if (IY.mode === 'year') loadInsYear(); else loadInsRep(); }
     if (v === 'board') loadBoardAdm();
     $('#view-acc').classList.toggle('hidden', v !== 'acc');
     $('#view-uiset').classList.toggle('hidden', v !== 'uiset');
@@ -4842,8 +4864,124 @@
     return api('adm_insRepSet', IR.month, pay).then((r) => { if (!r.ok) { toast(r.msg); loadInsRep(); } return r; });
   }
   $('#irMonth').addEventListener('change', (e) => { IR.rows = []; loadInsRep(e.target.value); });
-  $('#irReload').addEventListener('click', () => loadInsRep());
+  $('#irReload').addEventListener('click', () => (IY.mode === 'year' ? loadInsYear() : loadInsRep()));
   $('#irQ').addEventListener('input', (e) => { if (!e.isComposing) renderInsRep(); });
+  // ── 산재/고용 연간 보기: 기사 × 월 신고 현황 · 미신고자 · 기사별 1년 내역 (adm_insYear) ──
+  const IY = { mode: 'month', year: '', info: null, tab: '미신고 있는 기사', open: '', seq: 0, keep: new Set() };
+  function irModeSet(mode) {
+    IY.mode = mode;
+    $$('#irMode [data-irm]').forEach((b) => b.classList.toggle('on', b.dataset.irm === mode));
+    $$('#view-insrep .irmo').forEach((x) => x.classList.toggle('hidden', mode !== 'month'));
+    $$('#view-insrep .iryo').forEach((x) => x.classList.toggle('hidden', mode !== 'year'));
+    $('#irBox').classList.toggle('hidden', mode !== 'month'); $('#iyBox').classList.toggle('hidden', mode !== 'year');
+    if (mode === 'year') loadInsYear(); else { $('#irCount').textContent = ''; loadInsRep(); }
+  }
+  function loadInsYear(year, from) {
+    const seq = ++IY.seq;
+    if (!IY.info) $('#iyRows').innerHTML = '<tr><td class="sub">1년치 정산 결과를 모으는 중… (달마다 정산을 다시 보므로 조금 걸립니다)</td></tr>';
+    const args = from === undefined ? [year || IY.year || ''] : [year || IY.year || '', from];
+    api.apply(null, ['adm_insYear'].concat(args)).then((r) => {
+      if (seq !== IY.seq) return;
+      if (!r.ok) return toast(r.msg);
+      IY.info = r; IY.year = r.year; IY.keep.clear();
+      IY.enr = r.enrolled ? new Set(r.enrolled.map(irNm)) : null;
+      $('#iyYear').innerHTML = (r.years.length ? r.years : [r.year]).slice().reverse().map((y) => '<option value="' + esc(y) + '"' + (y === r.year ? ' selected' : '') + '>' + esc(y) + '년</option>').join('');
+      $('#iyFrom').innerHTML = '<option value="">처음부터</option>' + r.months.map((m) => '<option value="' + esc(m) + '"' + (m === r.from ? ' selected' : '') + '>' + esc(dMon(m)) + '부터</option>').join('') + (r.from && !r.months.includes(r.from) ? '<option value="' + esc(r.from) + '" selected>' + esc(dMon(r.from)) + '부터</option>' : '');
+      renderInsYear();
+    }).catch(() => {});
+  }
+  /** 입직신고 안 된 기사인가 (토탈서비스 양식에 이름 없음) — 양식을 안 올렸으면 null */
+  function iyNoEnr(d) {
+    if (!IY.enr) return null;
+    const n = String(d.name || ''), cands = [n].concat((n.match(/\(([^)]+)\)/) || [])[1] ? [n.match(/\(([^)]+)\)/)[1]] : [], [n.replace(/\s*\(.*\)\s*$/, '')]).map(irNm).filter(Boolean);
+    return !cands.some((c) => IY.enr.has(c));
+  }
+  function renderInsYear() {
+    const r = IY.info; if (!r) return;
+    const all = r.drivers, ms = r.months;
+    const cellsOf = (d, st) => ms.filter((m) => d.cells[m] && d.cells[m].st === st);
+    const tgt = all.filter((d) => ms.some((m) => d.cells[m] && ['done', 'no', 'wait', 'skip'].includes(d.cells[m].st)));
+    const bad = tgt.filter((d) => cellsOf(d, 'no').length), wait = tgt.filter((d) => cellsOf(d, 'wait').length);
+    const noN = all.reduce((a, d) => a + cellsOf(d, 'no').length, 0), noAmt = all.reduce((a, d) => a + cellsOf(d, 'no').reduce((b, m) => b + (d.cells[m].pay || 0), 0), 0);
+    const waitM = ms.filter((m) => all.some((d) => d.cells[m] && d.cells[m].st === 'wait'));
+    const noEnr = tgt.filter((d) => iyNoEnr(d) === true);
+    $('#irCount').textContent = r.year + '년 · 미신고 ' + bad.length + '명';
+    $('#iyInfo').innerHTML = '<b>' + esc(r.year) + '년</b> 노무제공월(정산월) 기준 · 신고 기한 = 다음 달 말일 · <span style="color:#c81e1e;font-weight:700">미신고</span> = 기한 지남 · <span style="color:#c2410c;font-weight:700">신고 전</span> = 아직 기한 안 · 칸을 누르면 <b>신고 완료 ↔ 미신고</b>가 바로 바뀝니다 · 기사 이름을 누르면 1년 내역' +
+      (r.from ? ' · <b>' + esc(dMon(r.from)) + '</b> 전 달은 체크 기록이 없어 미신고로 세지 않습니다 (회색 \'기록 전\')' : '');
+    $('#iySum').innerHTML = '<div class="dcs"><small>올해 신고 대상</small><b>' + tgt.length + '명</b></div>' +
+      '<div class="dcs' + (bad.length ? ' bad' : ' ok') + '"><small>미신고 있는 기사 (기한 지남)</small><b>' + bad.length + '명</b><em>' + noN + '건 · 공단 납부 ' + dWon(noAmt) + '원</em></div>' +
+      (wait.length ? '<div class="dcs"><small>신고 전 (기한 안)</small><b style="color:#c2410c">' + wait.length + '명</b><em>' + waitM.map((m) => esc(eyMon(m)) + '분 ~' + esc(dMd(r.dues[m]))).join(' · ') + '</em></div>' : '') +
+      '<div class="dcs ok"><small>기한 지난 달 모두 신고</small><b>' + (tgt.length - bad.length) + '명</b></div>' +
+      (IY.enr ? '<div class="dcs' + (noEnr.length ? ' bad' : ' ok') + '" title="' + esc(noEnr.map((d) => d.name).join(', ')) + '"><small>입직신고 대상</small><b>' + noEnr.length + '명</b><em>토탈서비스 양식에 성명 없음</em></div>' : '');
+    const tabs = [['미신고 있는 기사', bad.length], ['신고 전', wait.length], ['신고 대상 전체', tgt.length], ['전체', all.length]];
+    $('#iyTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (IY.tab === k ? ' on' : '') + '" data-iyt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
+    const q = $('#iyQ').value.trim().toLowerCase();
+    let list = all.filter((d) => (IY.tab === '전체' || (IY.tab === '신고 대상 전체' && tgt.includes(d)) || (IY.tab === '미신고 있는 기사' && cellsOf(d, 'no').length) || (IY.tab === '신고 전' && cellsOf(d, 'wait').length) || IY.keep.has(d.acct)) &&
+      (!q || String(d.name).toLowerCase().includes(q)));
+    list = list.slice().sort((a, b) => cellsOf(b, 'no').length - cellsOf(a, 'no').length || a.name.localeCompare(b.name, 'ko'));
+    $('#iyHead').innerHTML = '<tr><th>기사</th>' + ms.map((m) => '<th class="ec">' + esc(eyMon(m)) + '</th>').join('') + '<th class="num">미신고</th><th class="num">미신고 공단 납부</th></tr>';
+    const lab = { done: '✓ 신고', no: '미신고', wait: '신고 전', out: '대상 아님', sub: '합산', skip: '기록 전' };
+    $('#iyRows').innerHTML = list.map((d) => {
+      const nc = cellsOf(d, 'no'), amt = nc.reduce((a, m) => a + (d.cells[m].pay || 0), 0), open = IY.open === d.acct, ne = iyNoEnr(d);
+      return '<tr class="eyr' + (open ? ' open' : '') + '" data-iya="' + esc(d.acct) + '"><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' +
+        (ne && tgt.includes(d) ? ' <span class="dc-tag w" style="color:#c81e1e">입직신고 대상</span>' : '') + (!d.hasRrn && tgt.includes(d) ? ' <span class="dc-tag n" title="기사 정보관리에서 주민등록번호를 넣어 주세요">주민번호 없음</span>' : '') + '</td>' +
+        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-iym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' title="' + esc(dMon(m) + ' · 월보수 ' + dWon(c.bosu) + '원 · 공단 납부 ' + dWon(c.pay) + '원' + (c.st === 'sub' ? ' · ' + c.parentName + ' 기사에 합산' : c.st === 'out' ? ' · 신고 대상 아님' : c.st === 'done' ? ' · 누르면 미신고로' : ' · 누르면 신고 완료로 · 기한 ' + (r.dues[m] || ''))) + '">' + (c.busy ? '저장 중…' : lab[c.st]) + '</button>' : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
+        '<td class="num">' + (nc.length ? '<b style="color:#c81e1e">' + nc.length + '건</b>' : '<span class="sm">없음</span>') + '</td><td class="num">' + (amt ? dWon(amt) : '') + '</td></tr>' +
+        (open ? '<tr class="eyd"><td colspan="' + (ms.length + 3) + '">' + iyDetail(d) + '</td></tr>' : '');
+    }).join('');
+    $('#iyEmpty').textContent = all.length ? (IY.tab === '미신고 있는 기사' && !q ? '이 해에 기한이 지난 미신고가 없습니다. 👍' : '조건에 맞는 기사가 없습니다.') : '이 해에 산재·고용 정산이 없습니다.';
+    $('#iyEmpty').classList.toggle('hidden', list.length > 0);
+  }
+  /** 기사 1명의 1년 내역: 월별 줄 + 상·하반기 소계 + 1년 합계 */
+  function iyDetail(d) {
+    const ms = IY.info.months.filter((m) => d.cells[m]);
+    const stx = { out: '<span class="sm">대상 아님</span>', sub: '<span class="sm">상위 기사에 합산</span>' };
+    const yn = (on) => on ? '<span class="dc-tag y">적용</span>' : '<span class="sm">—</span>';
+    const sum = (l) => l.reduce((a, m) => { const c = d.cells[m]; a.b += c.base || 0; a.w += c.bosu || 0; a.d += c.ded || 0; a.p += c.pay || 0; return a; }, { b: 0, w: 0, d: 0, p: 0 });
+    const line = (lab, x, n) => '<tr class="sub"><td>' + lab + '</td><td class="num">' + dWon(x.b) + '</td><td class="num">' + dWon(x.w) + '</td><td></td><td></td><td class="num">' + dWon(x.d) + '</td><td class="num">' + dWon(x.p) + '</td><td colspan="3">' + (n ? '<span style="color:#c81e1e">미신고 ' + n + '건</span>' : '') + '</td></tr>';
+    const half = (h) => ms.filter((m) => (Number(m.slice(5, 7)) <= 6) === (h === 1));
+    let html = '<div style="font-weight:800;margin-bottom:6px">' + esc(d.name) + ' · ' + esc(IY.info.year) + '년 산재/고용 내역</div><table class="eyd-tb"><thead><tr><th>노무제공월</th><th class="num">기준금액</th><th class="num">월보수액</th><th>산재</th><th>고용</th><th class="num">기사 공제</th><th class="num">공단 납부</th><th>신고 여부</th><th>신고일</th><th>자격취득일</th></tr></thead><tbody>';
+    [1, 2].forEach((h) => {
+      const l = half(h); if (!l.length) return;
+      l.forEach((m) => { const c = d.cells[m]; html += '<tr><td>' + esc(dMon(m)) + '</td><td class="num">' + dWon(c.base) + '</td><td class="num"><b>' + dWon(c.bosu) + '</b></td><td>' + yn(c.sanOn) + '</td><td>' + yn(c.goyOn) + '</td><td class="num">' + dWon(c.ded) + '</td><td class="num">' + dWon(c.pay) + '</td><td>' +
+        (stx[c.st] || '<button type="button" class="dc-st' + (c.st === 'done' ? ' on' : '') + '" data-iym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' style="min-width:64px;height:24px;font-size:11.5px">' + (c.busy ? '저장 중…' : c.st === 'done' ? '신고 완료' : c.st === 'wait' ? '신고 전' : c.st === 'skip' ? '기록 전' : '미신고') + '</button>') +
+        '</td><td>' + esc(c.date || '') + '</td><td>' + esc(c.start || '') + '</td></tr>'; });
+      html += line(h === 1 ? '상반기 (1~6월)' : '하반기 (7~12월)', sum(l), l.filter((m) => d.cells[m].st === 'no').length);
+    });
+    html += line('1년 합계', sum(ms), ms.filter((m) => d.cells[m].st === 'no').length) + '</tbody></table>';
+    return html;
+  }
+  /** 연간 표에서 바로 신고 완료 ↔ 미신고 (월별 화면의 체크와 같은 기록: ins_reports) */
+  function iyToggle(acct, m) {
+    const d = IY.info.drivers.find((x) => x.acct === acct), c = d && d.cells[m]; if (!c || c.busy) return;
+    if (c.st === 'out' || c.st === 'sub') return toast(c.st === 'sub' ? c.parentName + ' 기사에 합산해 신고하는 달입니다.' : '신고 대상이 아닌 달입니다.');
+    const on = c.st !== 'done';
+    if (!on && !confirm(d.name + ' · ' + dMon(m) + '분\n\n신고 완료를 미신고로 되돌릴까요?')) return;
+    const prev = { st: c.st, date: c.date };
+    IY.keep.add(acct); c.busy = true; renderInsYear();
+    const date = on ? (c.date || dToday()) : '';
+    api('adm_insRepSet', m, [{ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: on, date: date, memo: c.memo || '' }]).then((res) => {
+      c.busy = false;
+      if (!res.ok) { Object.assign(c, prev); renderInsYear(); return toast(res.msg); }
+      const r = IY.info;
+      c.st = on ? 'done' : (r.from && m < r.from ? 'skip' : (r.today > (r.dues[m] || '') ? 'no' : 'wait')); c.date = date;
+      if (IR.month === m) IR.rows = [];
+      renderInsYear(); toast(d.name + ' ' + dMon(m) + '분 ' + (on ? '신고 완료로 체크했습니다.' : '미신고로 바꿨습니다.'));
+    }).catch(() => { c.busy = false; Object.assign(c, prev); renderInsYear(); });
+  }
+  $('#irMode').addEventListener('click', (e) => { const b = e.target.closest('[data-irm]'); if (b && b.dataset.irm !== IY.mode) irModeSet(b.dataset.irm); });
+  $('#iyYear').addEventListener('change', (e) => { IY.open = ''; loadInsYear(e.target.value); });
+  $('#iyFrom').addEventListener('change', (e) => { loadInsYear(IY.year, e.target.value); toast('집계 시작월을 바꿨습니다.'); });
+  $('#iyQ').addEventListener('input', (e) => { if (!e.isComposing) renderInsYear(); });
+  $('#iyTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-iyt]'); if (b) { IY.tab = b.dataset.iyt; IY.keep.clear(); renderInsYear(); } });
+  $('#iyRows').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-iym]');
+    if (c) { const t = c.closest('tr.eyr'); return iyToggle(t ? t.dataset.iya : IY.open, c.dataset.iym); }
+    if (e.target.closest('.eyd')) return;
+    const r = e.target.closest('[data-iya]'); if (!r) return;
+    IY.open = IY.open === r.dataset.iya ? '' : r.dataset.iya; renderInsYear();
+  });
+
   $('#irTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-irt]'); if (b) { IR.tab = b.dataset.irt; renderInsRep(); } });
   $('#irAll').addEventListener('change', (e) => { $$('#irRows [data-irck]').forEach((c) => { c.checked = e.target.checked; if (e.target.checked) IR.sel.add(c.dataset.irck); else IR.sel.delete(c.dataset.irck); }); irSelPaint(); });
   $('#irRows').addEventListener('change', (e) => {

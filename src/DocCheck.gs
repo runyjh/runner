@@ -143,6 +143,13 @@ function adm_insRepList(token, month) {
   return run_(function () {
     requireAdmin_(token);
     const mm = docMonth_(month); month = mm.month;
+    const x = insRows_(month);
+    return { ok: true, month: month, months: mm.months, due: x.due, closed: x.closed, cfg: x.cfg, rates: x.rates, rows: x.rows };
+  });
+}
+/** 한 정산월(노무제공월)의 기사별 월보수액 · 산재/고용 · 신고 체크 (월별 · 연간 보기 공용) */
+function insRows_(month) {
+  {
     const res = stlResult_(month, false), sum = res.summary || {}, cfg = stlCfg_();
     const rr = Math.min(0.95, Math.max(0, cfg.runner)), dr = 1 - rr;
     const saved = {}, lastStart = {};
@@ -194,8 +201,48 @@ function adm_insRepList(token, month) {
     });
     const p = stlAddMonth_(month, 1).split('-').map(Number);
     const due = ymd_(new Date(p[0], p[1], 0)); // 다음 달 말일
-    return { ok: true, month: month, months: mm.months, due: due, closed: !!sum.closed, cfg: icfg,
+    return { due: due, closed: !!sum.closed, cfg: icfg,
       rates: { expense: cfg.expense, san: cfg.san + cfg.commute, goy: cfg.goy, runner: rr, goyMin: cfg.goyMin, basis: cfg.insBasis }, rows: rows };
+  }
+}
+/**
+ * 연간 보기: 그 해 정산월마다 기사별 신고 상태를 모아 기사 × 월 표로.
+ * 칸 상태: done 신고 완료 · no 미신고(기한 지남) · wait 신고 전(기한 안) · out 대상 아님 · sub 상위 기사에 합산 · skip 집계 시작 전
+ * from = 집계 시작 정산월 (app_settings insFrom)
+ */
+function adm_insYear(token, year, from) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (from !== undefined && from !== null) {
+      from = str_(from);
+      if (from && !stlMonthOk_(from)) fail_('집계 시작월을 확인해 주세요.');
+      appSetPut_('insFrom', from, '산재/고용 신고 연간 보기: 이 정산월부터 미신고를 셈');
+      cache_().remove('appset');
+      logAdmin_(a, '산재/고용 연간 집계 시작월', from || '처음부터', '');
+    }
+    const st = stlMonths_(), withData = (st.withData || []).slice().sort();
+    const years = withData.map(function (m) { return m.slice(0, 4); }).filter(function (y, i, l) { return l.indexOf(y) === i; });
+    year = /^\d{4}$/.test(str_(year)) ? str_(year) : (years.length ? years[years.length - 1] : String(new Date().getFullYear()));
+    const startM = str_(appSet_().insFrom), today = todayText_();
+    const months = withData.filter(function (m) { return m.slice(0, 4) === year; });
+    const drv = {}, order = [], dues = {};
+    let enrolled = null;
+    months.forEach(function (m) {
+      const x = insRows_(m);
+      dues[m] = x.due;
+      if (!enrolled && x.cfg && x.cfg.enrolled) enrolled = x.cfg.enrolled.names || null;
+      x.rows.forEach(function (r) {
+        let d = drv[r.acct];
+        if (!d) { d = drv[r.acct] = { acct: r.acct, driverId: r.driverId, name: r.name, hasRrn: r.hasRrn, cells: {} }; order.push(d); }
+        d.name = r.name; d.hasRrn = r.hasRrn;
+        const tgt = !r.parent && !r.excluded && (r.sanOn || r.goyOn);
+        const stt = r.parent ? 'sub' : !tgt ? 'out' : r.done ? 'done' : startM && m < startM ? 'skip' : today > x.due ? 'no' : 'wait';
+        d.cells[m] = { st: stt, base: r.invoice, supply: r.supply, bosu: r.bosu, sanOn: r.sanOn, goyOn: r.goyOn, ded: (r.sanD || 0) + (r.goyD || 0),
+          pay: (r.sanAll || 0) + (r.goyAll || 0), start: r.start, date: r.date, memo: r.memo, parentName: r.parentName || '' };
+      });
+    });
+    order.sort(function (p, q) { return koCmp_(p.name, q.name); });
+    return { ok: true, year: year, years: years, months: months, dues: dues, from: startM, today: today, enrolled: enrolled, drivers: order };
   });
 }
 /** list = [{ acct, driverId, name, bosu, san, goy, start, done, date, memo }] */
