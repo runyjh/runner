@@ -5488,18 +5488,29 @@ function api_mySchedule(token, month) {
     const fsW = function (o) { return o; };
     if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return fsW(out);
     const h = schHeader_();
-    const row = (function () {
-      const sh = schSheet_(), last = sh.getLastRow();
-      if (last < 2) return 0;
-      const cell = sh.getRange(2, h.fixed['행ID'] + 1, last - 1, 1).createTextFinder(rowId).matchEntireCell(true).matchCase(true).findNext();
-      return cell ? cell.getRow() : 0;
-    })();
     const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
     if (!cols.length) return fsW(out);
     const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
-    if (row) {
-      const vals = schSheet_().getRange(row, c0 + 1, 1, c1 - c0 + 1).getValues()[0];
-      dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c - c0]); if (v) out.cells[d] = v; } });
+    // 내 줄 찾기: 지난번에 찾은 줄 번호를 기억해 두고, 그 줄의 행ID 가 그대로면 한 번만 읽는다 (줄이 밀렸으면 예전처럼 다시 찾음)
+    const sh0 = schSheet_(), idCol = h.fixed['행ID'], rk = 'schrow:' + rowId, takeRow = function (vals) {
+      dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c]); if (v) out.cells[d] = v; } });
+    };
+    let done = false;
+    const memo = Number(cache_().get(rk) || 0);
+    if (memo >= 2) {
+      try {
+        const vals = sh0.getRange(memo, 1, 1, c1 + 1).getValues()[0];
+        if (str_(vals[idCol]) === rowId) { takeRow(vals); done = true; }
+      } catch (e) { /* 줄이 없어졌으면 아래에서 다시 찾음 */ }
+    }
+    if (!done) {
+      const last = sh0.getLastRow();
+      const cell = last >= 2 ? sh0.getRange(2, idCol + 1, last - 1, 1).createTextFinder(rowId).matchEntireCell(true).matchCase(true).findNext() : null;
+      const row = cell ? cell.getRow() : 0;
+      if (row) {
+        takeRow(sh0.getRange(row, 1, 1, c1 + 1).getValues()[0]);
+        try { cache_().put(rk, String(row), 21600); } catch (e) { /* 무시 */ }
+      }
     }
     stg_('cell');
     // 추가 배정 캠프 줄: 그 캠프 칸에 적힌 것을 '캠프 노선' 으로 붙여 보여 줌 (예: 출근 → 강서1 527B)

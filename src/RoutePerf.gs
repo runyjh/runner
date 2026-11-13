@@ -941,7 +941,7 @@ function pkMap_(always) {
     const out = { ok: true, on: true, today: today, cur: null, periods: periods.map(function (p) { return { period: p.period, from: p.from, to: p.to }; }), q: {}, avg: {} };
     const c = periods.filter(function (p) { return p.to >= today; })[0];
     if (c) out.cur = { period: c.period, from: c.from, to: c.to };
-    if (!periods.length) return out;
+    if (!periods.length) { try { ck.put(key, JSON.stringify(out), 21600); } catch (e) { /* 무시 */ } return out; }
     const pset = {}; periods.forEach(function (p) { pset[p.period] = 1; });
     const rows = all.filter(function (o) { return pset[o.period] && o.code !== PK_TOTAL; });
     const edges = rlnEdges_(), avgAll = pkAvg_(), al = {};
@@ -955,7 +955,7 @@ function pkMap_(always) {
         if (hit2) { out.avg[k] = avgAll[hit2]; as.forEach(function (x) { if (out.avg[x] === undefined) out.avg[x] = avgAll[hit2]; }); }
       }
     });
-    try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
+    try { const j = JSON.stringify(out); if (j.length < 95000) ck.put(key, j, 21600); } catch (e) { /* 무시 */ }
     return out;
   }
 }
