@@ -585,6 +585,18 @@
   .mu-k { flex: none; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 800; color: #fff; white-space: nowrap; margin-top: 1px; background: #94a3b8; } .mu-k.wk { background: #1d5fd6; } .mu-k.sla { background: #15803d; } .mu-k.fb { background: #b45309; } .mu-k.pk { background: #dc2626; }
   .mu-x { flex: 1; min-width: 0; } .mu-x b { display: block; font-size: 14px; overflow-wrap: anywhere; } .mu-x small { display: block; color: var(--sub); font-size: 12.5px; line-height: 1.5; margin-top: 2px; overflow-wrap: anywhere; } .mu-x small em { font-style: normal; color: var(--danger); font-weight: 700; }
   .mu-x button { border: 0; background: none; color: var(--brand); font: inherit; font-size: 12.5px; font-weight: 700; padding: 4px 0 0; cursor: pointer; } .mu-f input[type=checkbox] { flex: none; width: 20px; height: 20px; margin-top: 2px; } .mu-st { flex: none; font-weight: 800; font-size: 13px; white-space: nowrap; }
+  .al-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; } .al-tabs button { border: 1px solid #d8dee8; background: #fff; border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13.5px; font-weight: 700; color: #475569; cursor: pointer; white-space: nowrap; } .al-tabs button.on { background: #e8f0ff; border-color: var(--brand); color: var(--brand); }
+  .al-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; } .al-sum div { background: #fff; border-radius: 12px; padding: 10px 14px; font-size: 12.5px; color: var(--sub); } .al-sum b { display: block; font-size: 20px; color: var(--text, #111827); } .al-sum .r b { color: var(--danger); } .al-sum .g b { color: #15803d; }
+  .al-card { background: #fff; border-radius: 14px; padding: 6px 14px; margin-bottom: 12px; } .al-row { display: flex; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid #eef1f5; } .al-row:first-child { border-top: 0; }
+  .al-row .tx { flex: 1; min-width: 0; } .al-row .tx b { display: block; font-size: 14.5px; overflow-wrap: anywhere; } .al-row .tx small { display: block; color: var(--sub); font-size: 12.5px; margin-top: 2px; overflow-wrap: anywhere; } .al-row .tx small s { color: #9ca3af; }
+  .al-row .tx b small { display: inline; font-weight: 500; margin: 0; }
+  .al-row .v { flex: none; font-weight: 800; font-size: 13.5px; white-space: nowrap; text-align: right; } .al-row .v small { display: block; font-weight: 500; color: var(--sub); font-size: 12px; } .al-no { color: var(--danger); } .al-ok { color: #15803d; } .al-dim { color: #94a3b8; }
+  .al-bar { display: inline-block; width: 110px; height: 8px; border-radius: 99px; background: #e5e9f0; vertical-align: middle; margin-right: 8px; overflow: hidden; } .al-bar i { display: block; height: 100%; background: var(--brand); }
+  .al-row .bt { flex: none; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; } .al-row.sel { background: #f6f9ff; margin: 0 -14px; padding-left: 14px; padding-right: 14px; }
+  .al-box { border: 1px solid #cfe0ff; background: #f6f9ff; border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; } .al-box h4 { margin: 0 0 8px; font-size: 14px; } .al-box h5 { margin: 10px 0 6px; font-size: 12.5px; color: var(--sub); font-weight: 700; }
+  .al-chips { display: flex; flex-wrap: wrap; gap: 6px; } .al-chips span { border-radius: 999px; padding: 4px 10px; font-size: 12.5px; background: #fff; border: 1px solid #d8dee8; } .al-chips span.x { border-color: #fecaca; background: #fef2f2; color: #b91c1c; font-weight: 700; } .al-chips span small { color: #94a3b8; }
+  .al-note { font-size: 12.5px; color: var(--sub); line-height: 1.6; margin: 4px 2px 0; } .al-pick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; } .al-pick .inp { min-width: 0; }
+  html.m .al-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } html.m .al-bar { display: none; } html.m .al-row { flex-wrap: wrap; } html.m .al-row .bt { flex: 1 1 100%; justify-content: flex-start; } html.m .al-tabs { flex-wrap: nowrap; overflow-x: auto; }
   .up-sum { background: var(--gray-weak); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; line-height: 1.7; }
   .m-box.slip-box { width: min(1080px, 100%); max-height: 94vh; display: flex; flex-direction: column; padding: 0; }
   .slip { overflow: auto; padding: 18px 22px; font-size: 12.5px; }
@@ -1690,6 +1702,7 @@
       <div class="ng g-com"><p class="ngt">소통</p>
         <a data-view="notice">공지사항</a>
         <a data-view="board">게시판 관리</a>
+        <a data-view="applog">기사앱 확인 기록</a>
       </div>
       <div class="ng g-set"><p class="ngt">설정</p>
         <a data-view="acc">계정관리</a>
@@ -1839,6 +1852,14 @@
       <div class="empty hidden" id="evEmpty"></div>
     </div>
     </div>
+   </section>
+   <section id="view-applog" class="hidden">
+    <div class="head">
+      <h2>기사앱 확인 기록 <small id="alCount" style="font-size:13px;color:var(--sub);font-weight:600"></small></h2>
+      <div class="tools"><button class="btn ghost" id="alReload">새로고침</button></div>
+    </div>
+    <div class="al-tabs" id="alTabs"></div>
+    <div id="alBody"></div>
    </section>
    <section id="view-insrep" class="hidden">
     <div class="head">
@@ -2270,6 +2291,7 @@
     <div class="mm-card"><p>휴대폰에서 쓰는 메뉴</p>
       <button type="button" data-mmv="notice">📢 공지사항</button>
       <button type="button" data-mmv="memo">🗒 업무스케줄</button>
+      <button type="button" data-mmv="applog">👀 기사앱 확인 기록</button>
       <button type="button" data-mmv="bib">🔢 배번호 관리</button>
       <button type="button" data-mmv="perf">📊 수행률 · SLA</button>
       <button type="button" data-mmv="perf" data-mmtab="pk">🔥 피크 예상 물량</button>
@@ -4156,6 +4178,8 @@
     $('#view-einv').classList.toggle('hidden', v !== 'einv');
     if (v === 'einv') { if (EY.mode === 'year') loadEinvYear(); else loadEinv(); }
     $('#view-insrep').classList.toggle('hidden', v !== 'insrep');
+    $('#view-applog').classList.toggle('hidden', v !== 'applog');
+    if (v === 'applog') loadAppLog();
     if (v === 'insrep') { if (IY.mode === 'year') loadInsYear(); else loadInsRep(); }
     if (v === 'board') loadBoardAdm();
     $('#view-acc').classList.toggle('hidden', v !== 'acc');
@@ -7589,6 +7613,89 @@
       toast('수행률을 저장했습니다. 새로 ' + r.added + '줄 · 바뀜 ' + r.changed + '줄 · 같음 ' + r.unchanged + '줄 (' + (r.weeks || []).map(rpWkLabel).join(', ') + ')' + (r.memo ? ' · 업무스케줄에 메모를 적었습니다' : ''));
       return loadPerf(true).then(() => { if (!rpViewOn()) switchView('perf'); else { RP.tab = 'wk'; rpRender(); } });
     }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
+  });
+  // ───── 기사앱 확인 기록 (app_seen): 공지 확인 · 정산서 열람 · 스케줄 변경 확인 · 앱 접속 · 기사별 ─────
+  const AL = { d: null, tab: 'notice', sel: '', drv: '', only: true, loading: null, at: 0 };
+  const AL_TABS = [['notice', '📢 공지 확인'], ['slip', '🧾 정산서 열람'], ['sch', '📅 스케줄 변경 확인'], ['open', '📱 앱 접속'], ['drv', '👤 기사별 보기']];
+  function loadAppLog(force) {
+    if (AL.loading) return AL.loading;
+    if (AL.d && !force && Date.now() - AL.at < 60000) { alRender(); return Promise.resolve(); }
+    if (!AL.d) { $('#alTabs').innerHTML = ''; $('#alBody').innerHTML = '<div class="sec"><div class="spin"></div></div>'; }
+    AL.loading = api('adm_seenList').then((r) => { if (!r.ok) return toast(r.msg); AL.d = r; AL.at = Date.now(); alRender(); }).catch(() => {}).finally(() => { AL.loading = null; });
+    return AL.loading;
+  }
+  const alT = (t) => { const m = String(t || '').match(/^\d{4}-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); return m ? +m[1] + '/' + +m[2] + ' ' + m[3] + ':' + m[4] : String(t || ''); };
+  const alMd = (d) => { const p = String(d || '').split('-'); return p.length >= 3 ? +p[1] + '/' + +p[2].slice(0, 2) : String(d || ''); };
+  const alCell = (v) => String(v || '').replace(/\s*\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)\s*/g, ' ').replace(/업무등록/g, '').replace(/\s+/g, ' ').trim() || '빈칸';
+  function alRender() {
+    const D = AL.d; if (!D) return;
+    const drv = D.drivers.slice().sort((a, b) => koSort(a.camp, b.camp) || koSort(a.name, b.name)), byId = new Map(drv.map((x) => [x.id, x]));
+    const nm = (x) => esc(x.name) + (x.title ? ' ' + esc(x.title) : x.camp ? ' <small>' + esc(x.camp) + '</small>' : '');
+    const rows = D.rows, seenOf = (k, key) => { const m = new Map(); rows.forEach((r) => { if (r.k === k && r.key === key && byId.has(r.d)) m.set(r.d, r.at); }); return m; };
+    const tgt = (n) => drv.filter((x) => !n.targets.length || n.targets.includes(String(x.camp).replace(/\s/g, '')));
+    const opens = new Map(); rows.forEach((r) => { if (r.k === 'open') opens.set(r.d, r); });
+    const dayGap = (t) => { const m = String(t || '').slice(0, 10); if (!m) return null; return Math.round((new Date(D.today + 'T00:00:00') - new Date(m + 'T00:00:00')) / 86400000); };
+    const sch = rows.filter((r) => r.k === 'sch' && byId.has(r.d)), schOpen = sch.filter((r) => !r.ack && r.key >= D.today);
+    $('#alCount').textContent = '기사앱 사용 ' + drv.length + '명';
+    $('#alTabs').innerHTML = AL_TABS.map(([k, l]) => '<button type="button" data-alt="' + k + '"' + (AL.tab === k ? ' class="on"' : '') + '>' + l + (k === 'sch' && schOpen.length ? ' <span class="al-no">' + schOpen.length + '</span>' : '') + '</button>').join('');
+    const chips = (un, se) => '<h5>안 본 사람 ' + un.length + '명</h5><div class="al-chips">' + (un.length ? un.map((x) => '<span class="x">' + nm(x) + '</span>').join('') : '<span>없음</span>') + '</div>' +
+      '<h5>본 사람 ' + se.length + '명</h5><div class="al-chips">' + (se.length ? se.map((x) => '<span>' + nm(x[0]) + ' <small>' + esc(alT(x[1])) + '</small></span>').join('') : '<span>없음</span>') + '</div>';
+    const split = (T, m) => [T.filter((x) => !m.has(x.id)), T.filter((x) => m.has(x.id)).map((x) => [x, m.get(x.id)]).sort((a, b) => (a[1] < b[1] ? -1 : 1))];
+    const note = '<p class="al-note">· 기사가 공지를 열거나 정산서를 열면 처음 본 시각이 한 번 기록됩니다. 스케줄은 이미 정해진 칸을 관리자가 바꿨을 때(오늘 이후 날짜)만 기사앱 홈에 [확인했습니다]가 뜹니다.<br>· 기록은 이 기능을 넣은 뒤부터 쌓입니다. 그 전에 본 것은 알 수 없습니다.</p>';
+    let h = '';
+    if (AL.tab === 'notice') {
+      const live = D.notices.filter((n) => n.live), top = live[0], tm = top ? seenOf('notice', top.id) : null, tT = top ? tgt(top) : [];
+      const stale = drv.filter((x) => { const o = opens.get(x.id), g = o ? dayGap(o.ack || o.at) : null; return g == null || g >= 7; }).length;
+      h += '<div class="al-sum"><div><b>' + drv.length + '명</b>기사앱 사용 기사</div><div class="g"><b>' + (top ? tT.filter((x) => tm.has(x.id)).length + '명' : '-') + '</b>가장 최근 공지 확인</div><div class="r"><b>' + (top ? tT.filter((x) => !tm.has(x.id)).length + '명' : '-') + '</b>아직 안 봄</div><div><b>' + stale + '명</b>7일 넘게 앱 안 엶</div></div>';
+      h += D.notices.length ? '<div class="al-card">' + D.notices.map((n) => { const T = tgt(n), m = seenOf('notice', n.id), ok = T.filter((x) => m.has(x.id)).length, un = T.length - ok;
+        return '<div class="al-row' + (AL.sel === n.id ? ' sel' : '') + '"><span class="tx"><b>' + (n.important ? '<span class="al-no">[중요]</span> ' : '') + esc(n.title) + '</b><small>' + esc(alMd(n.date)) + ' · ' + esc(n.targets.length ? n.targets.join(', ') : '전체') + ' ' + T.length + '명' + (n.live ? '' : ' · 게시 끝남') + '</small></span>' +
+          '<span class="v"><span class="al-bar"><i style="width:' + (T.length ? Math.round(ok / T.length * 100) : 0) + '%"></i></span>' + ok + ' / ' + T.length + '<small class="' + (un ? 'al-no' : 'al-ok') + '">' + (un ? '안 봄 ' + un + '명' : T.length ? '모두 확인' : '대상 없음') + '</small></span>' +
+          '<span class="bt"><button type="button" class="btn sm ghost" data-alsel="' + esc(n.id) + '">' + (AL.sel === n.id ? '접기' : '명단') + '</button>' + (n.live && un ? '<button type="button" class="btn sm" data-alnudge="' + esc(n.id) + '">안 본 사람에게 알림</button>' : '') + '</span></div>' +
+          (AL.sel === n.id ? (() => { const sp = split(T, m); return '<div class="al-box" style="margin-top:4px">' + chips(sp[0], sp[1]) + '</div>'; })() : ''); }).join('') + '</div>'
+        : '<div class="empty">최근 60일 안에 게시한 공지가 없습니다.</div>';
+    } else if (AL.tab === 'slip') {
+      const months = [...new Set(rows.filter((r) => r.k === 'slip').map((r) => r.key))].sort().reverse();
+      h += months.length ? '<div class="al-card">' + months.map((mo) => { const m = seenOf('slip', mo), ok = drv.filter((x) => m.has(x.id)).length;
+        return '<div class="al-row' + (AL.sel === mo ? ' sel' : '') + '"><span class="tx"><b>' + esc(mo.slice(0, 4) + '년 ' + +mo.slice(5, 7) + '월 정산서') + '</b><small>기사앱 사용 기사 ' + drv.length + '명 기준</small></span>' +
+          '<span class="v"><span class="al-bar"><i style="width:' + (drv.length ? Math.round(ok / drv.length * 100) : 0) + '%"></i></span>열람 ' + ok + '명<small class="al-dim">안 엶 ' + (drv.length - ok) + '명</small></span>' +
+          '<span class="bt"><button type="button" class="btn sm ghost" data-alsel="' + esc(mo) + '">' + (AL.sel === mo ? '접기' : '명단') + '</button></span></div>' +
+          (AL.sel === mo ? (() => { const sp = split(drv, m); return '<div class="al-box" style="margin-top:4px">' + chips(sp[0], sp[1]) + '<p class="al-note">정산서가 없는 기사(그 달 근무 없음)도 "안 본 사람"에 들어 있습니다.</p></div>'; })() : ''); }).join('') + '</div>'
+        : '<div class="empty">아직 정산서를 연 기록이 없습니다.</div>';
+    } else if (AL.tab === 'sch') {
+      const L = (AL.only ? schOpen : sch).slice().sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : a.at < b.at ? 1 : -1)).slice(0, 300);
+      h += '<div class="al-pick"><label class="check"><input type="checkbox" id="alOnly"' + (AL.only ? ' checked' : '') + '> 아직 확인 안 한 것만 (오늘 이후)</label></div>';
+      h += L.length ? '<div class="al-card">' + L.map((r) => { const x = byId.get(r.d);
+        return '<div class="al-row"><span class="tx"><b>' + esc(alMd(r.key)) + ' · ' + nm(x) + '</b><small><s>' + esc(alCell(r.old)) + '</s> → <b style="display:inline;font-size:inherit">' + esc(alCell(r.text)) + '</b> · ' + esc(alT(r.at)) + ' 변경' + (r.by ? ' (' + esc(r.by) + ')' : '') + '</small></span>' +
+          '<span class="v ' + (r.ack === '취소' ? 'al-dim">되돌림' : r.ack ? 'al-ok">확인<small>' + esc(alT(r.ack)) + '</small>' : r.key < D.today ? 'al-dim">확인 없이 지남' : 'al-no">미확인') + '</span></div>'; }).join('') + '</div>'
+        : '<div class="empty">' + (AL.only ? '확인을 기다리는 스케줄 변경이 없습니다.' : '스케줄 변경 기록이 없습니다.') + '</div>';
+    } else if (AL.tab === 'open') {
+      const L = drv.map((x) => { const o = opens.get(x.id), t = o ? o.ack || o.at : ''; return { x, t, g: o ? dayGap(t) : null, n: o ? Number(o.text) || 1 : 0 }; }).sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : koSort(a.x.name, b.x.name)));
+      h += '<div class="al-card">' + L.map((r) => '<div class="al-row"><span class="tx"><b>' + nm(r.x) + '</b><small>' + (r.t ? '마지막으로 연 시각 ' + esc(alT(r.t)) + ' · 연 날 ' + r.n + '일' : '앱을 연 기록 없음') + '</small></span>' +
+        '<span class="v ' + (r.g == null ? 'al-dim">기록 없음' : r.g >= 7 ? 'al-no">' + r.g + '일 전' : r.g === 0 ? 'al-ok">오늘' : '">' + r.g + '일 전') + '</span></div>').join('') + '</div>';
+    } else {
+      if (!AL.drv || !byId.has(AL.drv)) AL.drv = drv.length ? drv[0].id : '';
+      const x = byId.get(AL.drv);
+      h += '<div class="al-pick"><select class="inp" id="alDrv" aria-label="기사">' + drv.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === AL.drv ? ' selected' : '') + '>' + esc(d.name + (d.title ? ' ' + d.title : ' · ' + (d.camp || '-'))) + '</option>').join('') + '</select></div>';
+      if (x) {
+        const o = opens.get(x.id), mine = rows.filter((r) => r.d === x.id), ns = D.notices.filter((n) => tgt(n).some((t) => t.id === x.id));
+        h += '<div class="al-card"><div class="al-row"><span class="tx"><b>📱 앱 접속</b><small>' + (o ? '마지막 ' + esc(alT(o.ack || o.at)) + ' · 연 날 ' + (Number(o.text) || 1) + '일' : '기록 없음') + '</small></span></div></div>';
+        h += '<div class="al-card">' + (ns.length ? ns.map((n) => { const r = mine.find((q) => q.k === 'notice' && q.key === n.id); return '<div class="al-row"><span class="tx"><b>📢 ' + esc(n.title) + '</b><small>' + esc(alMd(n.date)) + (n.live ? '' : ' · 게시 끝남') + '</small></span><span class="v ' + (r ? 'al-ok">확인<small>' + esc(alT(r.at)) + '</small>' : 'al-no">안 봄') + '</span></div>'; }).join('') : '<div class="al-row"><span class="tx"><small>받은 공지가 없습니다.</small></span></div>') + '</div>';
+        const sl = mine.filter((r) => r.k === 'slip').sort((a, b) => (a.key < b.key ? 1 : -1)), sc = mine.filter((r) => r.k === 'sch').sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, 40);
+        h += '<div class="al-card">' + (sl.length ? sl.map((r) => '<div class="al-row"><span class="tx"><b>🧾 ' + esc(+r.key.slice(5, 7) + '월 정산서') + '</b></span><span class="v al-ok">열람<small>' + esc(alT(r.at)) + '</small></span></div>').join('') : '<div class="al-row"><span class="tx"><small>정산서를 연 기록이 없습니다.</small></span></div>') + '</div>';
+        h += '<div class="al-card">' + (sc.length ? sc.map((r) => '<div class="al-row"><span class="tx"><b>📅 ' + esc(alMd(r.key)) + ' 스케줄 변경</b><small><s>' + esc(alCell(r.old)) + '</s> → ' + esc(alCell(r.text)) + '</small></span><span class="v ' + (r.ack === '취소' ? 'al-dim">되돌림' : r.ack ? 'al-ok">확인<small>' + esc(alT(r.ack)) + '</small>' : r.key < D.today ? 'al-dim">확인 없이 지남' : 'al-no">미확인') + '</span></div>').join('') : '<div class="al-row"><span class="tx"><small>스케줄 변경 기록이 없습니다.</small></span></div>') + '</div>';
+      }
+    }
+    $('#alBody').innerHTML = h + note;
+  }
+  $('#alTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-alt]'); if (!b) return; AL.tab = b.dataset.alt; AL.sel = ''; alRender(); });
+  $('#alReload').addEventListener('click', () => loadAppLog(true));
+  $('#alBody').addEventListener('change', (e) => { if (e.target.id === 'alDrv') { AL.drv = e.target.value; alRender(); } if (e.target.id === 'alOnly') { AL.only = e.target.checked; alRender(); } });
+  $('#alBody').addEventListener('click', (e) => {
+    const s = e.target.closest('[data-alsel]'); if (s) { AL.sel = AL.sel === s.dataset.alsel ? '' : s.dataset.alsel; return alRender(); }
+    const n = e.target.closest('[data-alnudge]'); if (!n) return;
+    const nt = AL.d.notices.find((x) => x.id === n.dataset.alnudge); if (!nt || !confirm('「' + nt.title + '」을 아직 안 본 기사에게 휴대폰 알림을 보냅니다. 보낼까요?')) return;
+    n.disabled = true; n.textContent = '보내는 중…';
+    api('adm_seenNudge', nt.id).then((r) => { if (!r.ok) return toast(r.msg); toast('안 본 기사 ' + r.target + '명 중 알림 ' + r.pushed + '건을 보냈습니다.' + (r.pushed < r.target ? ' (알림을 켜지 않은 기사는 받지 못합니다)' : '')); }).catch(() => {}).finally(() => { n.disabled = false; n.textContent = '안 본 사람에게 알림'; });
   });
   // ───── SLA 점수 (쿠팡 '[QF] Vendor SLA' 월간 파일 · route_sla) ─────
   const SL = { rows: [], periods: [], th: { good: 95, warn: 90 }, campMap: {}, loaded: false, loading: null, f: { camp: '', mode: '', q: '' } };

@@ -42,7 +42,7 @@ const ST = { PENDING: '승인대기', ACTIVE: '승인', REJECTED: '반려', STOP
 const SH = { DRIVERS: 'drivers', SESSIONS: 'sessions', ADMINS: 'admins', ALOG: 'admin_log', MEMO: 'work_memo', BIB: 'bib_applications',
   CAMPS: 'camps', CIMG: 'camp_images', ROUTES: 'routes', CADDR: 'camp_addresses', PRICES: 'route_prices', NOTICE: 'notices', ACC: 'accounts', ACAT: 'account_categories',
   PJOB: 'pumasi_jobs', PAPP: 'pumasi_apps', PALERT: 'pumasi_alerts', PPUSH: 'push_tokens', PAVAIL: 'pumasi_avail',
-  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', ERR: 'error_log', PDAY: 'perf_daily', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', RPK: 'route_peak', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes', CPROS: 'coupang_roster', INVCHK: 'inv_checks', INSREP: 'ins_reports' };
+  BPOST: 'board_posts', BCMT: 'board_comments', BREP: 'board_reports', BBAN: 'board_bans', BWORD: 'board_words', APPSET: 'app_settings', TAXINV: 'tax_invoices', RCHG: 'route_changes', PERF: 'perf_log', ERR: 'error_log', PDAY: 'perf_daily', RPERF: 'route_perf', RSLA: 'route_sla', RLIN: 'route_lineage', RFB: 'route_fb', RPK: 'route_peak', TEAMS: 'teams_msgs', CTHUMB: 'camp_thumbs', RNOTE: 'route_notes', CPROS: 'coupang_roster', INVCHK: 'inv_checks', INSREP: 'ins_reports', SEEN: 'app_seen' };
 
 // drivers 시트 열 정의. 값 = 시트 머리글 (머리글 이름은 바꾸지 말 것, 순서는 자유)
 const D = {
@@ -377,7 +377,7 @@ const TI = { id: '코드', month: '정산월', date: '작성일자', book1: '권
 // 시트가 없으면 처음 쓸 때 자동으로 만든다 (setup 을 다시 실행하지 않아도 됨)
 const AUTO_SHEETS = ['camps', 'camp_images', 'routes', 'camp_addresses', 'route_prices'];
 // 없으면 처음 쓸 때 만드는 시트 (노선 기준 데이터 캐시와는 무관)
-const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'error_log', 'perf_daily', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'route_peak', 'teams_msgs', 'camp_thumbs', 'route_notes', 'coupang_roster', 'inv_checks', 'ins_reports']);
+const AUTO_CREATE = AUTO_SHEETS.concat(['notices', 'accounts', 'account_categories', 'work_memo', 'pumasi_jobs', 'pumasi_apps', 'pumasi_alerts', 'push_tokens', 'pumasi_avail', 'board_posts', 'board_comments', 'board_reports', 'board_bans', 'board_words', 'app_settings', 'tax_invoices', 'route_changes', 'perf_log', 'error_log', 'perf_daily', 'route_perf', 'route_sla', 'route_lineage', 'route_fb', 'route_peak', 'teams_msgs', 'camp_thumbs', 'route_notes', 'coupang_roster', 'inv_checks', 'ins_reports', 'app_seen']);
 
 /** 머리글 이름 바꿈 (예전 → 지금): 단가코드 = 고정·백업·품앗이·외부용차, 노선 단가도 같은 이름 + '단가' */
 const HEAD_RENAME = {};
@@ -414,6 +414,7 @@ SCHEMA[SH.RSLA] = RSL;
 SCHEMA[SH.RLIN] = RLN;
 SCHEMA[SH.RFB] = RFB;
 SCHEMA[SH.RPK] = RPK;
+SCHEMA[SH.SEEN] = { kind: '종류', driverId: '기사ID', name: '이름', key: '대상', old: '이전', text: '내용', at: '시각', ackAt: '확인시각', by: '처리자' };
 SCHEMA[SH.TEAMS] = TMS;
 // camp_thumbs: 참고 이미지 미리보기(작은 JPEG, base64) — 노선관리 목록은 캠프마다 이 탭 한 번 읽기로 끝 (원본은 크게 볼 때만)
 // 기사 노선 정보 (RouteInfo.gs): 기사 앱 '내 캠프'에서 기사들이 자유롭게 쓰는 노선·캠프 정보 (route = 라우트 코드 · 비우면 캠프 전체)
@@ -821,7 +822,8 @@ const FS_READ_FNS = ['adm_ntPhoto', 'api_ntPhoto', 'api_ntAdmPhoto', 'api_ntAdmL
   'api_changePassword', 'api_myInfo', 'api_mySchedule', 'api_mySettle', 'api_mySlip', 'api_notices', 'api_perf', 'api_ping', 'api_pmAlerts', 'api_pmAlertsRead',
   'api_pmAttach', 'api_pmAvailList', 'api_pmAvailMine', 'api_pmForm', 'api_pmJob', 'api_pmList', 'api_pmMine', 'api_pmPrice', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel',
   // 읽기만 하는 함수인데 빠져 있던 것 (부를 때마다 '자료가 바뀜' 표시가 찍혔음 · 2026-11-11 점검)
-  'adm_stlAdjSummary', 'adm_campThumbs', 'adm_pmMeta', 'adm_bankList', 'adm_bankPreview', 'adm_accCats', 'adm_stlDriveList', 'adm_stlFbView', 'adm_stlReportExtra', 'adm_stlReportYear', 'adm_stlBank'
+  'adm_stlAdjSummary', 'adm_campThumbs', 'adm_pmMeta', 'adm_bankList', 'adm_bankPreview', 'adm_accCats', 'adm_stlDriveList', 'adm_stlFbView', 'adm_stlReportExtra', 'adm_stlReportYear', 'adm_stlBank',
+  'adm_seenList', 'adm_seenNudge', 'api_seen', 'api_seenAck' // 확인 기록: 스케줄 · 공지 자료를 바꾸지 않음
 ];
 /** Firestore 사본: 데이터가 바뀜 (Firebase.gs · 없으면 아무것도 안 함) */
 function fsMark_(area, extra) { if (typeof fsDirty_ === 'function') fsDirty_(area, extra); }
@@ -5253,7 +5255,7 @@ function adm_schSave(token, changes) {
       }
       savedList.forEach(function (x) { delete x._r; delete x._c; });
       stg_('write');
-      if (saved) { logSchChange_(a, ok, saved); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } } // 정산서 근무일수는 기사스케줄에서 세므로 정산 캐시도 새로
+      if (saved) { logSchChange_(a, ok, saved); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } try { if (typeof seenSchChanges_ === 'function') seenSchChanges_(a, savedList); } catch (e) { softFail_('스케줄 변경 확인 기록 실패', e); } } // 정산서 근무일수는 기사스케줄에서 세므로 정산 캐시도 새로
       stg_('log');
       // 칸 → 이슈 (2026-11-01 이후 · 미입차·노쇼·회전 줄임이면 '사유 미정' 이슈를 만들고, 정상으로 고치면 이슈에서 뺌)
       let issueSync = null;
