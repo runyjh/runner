@@ -3983,8 +3983,13 @@
     const m = !document.documentElement.classList.contains('m');
     document.documentElement.classList.toggle('m', m);
     try { localStorage.setItem('runner.ui', m ? 'm' : 'pc'); } catch (e) {}
+    // 화면 종류를 바꾸면 처음부터 다시 연다 (휴대폰 홈 · 캠프 묶음 · 정산 요약처럼 종류마다 다른 상태가 섞이지 않게) — 저장 중인 칸이 있으면 다시 열지 않고 그 자리에서만 바꿈
+    let busy = false; try { busy = !!Object.keys(sPending).length || !!sEdit; } catch (e) { busy = false; }
+    if (!busy) { try { sessionStorage.removeItem('runner.admView'); sessionStorage.removeItem('runner.admMy'); } catch (e) { /* 무시 */ } location.reload(); return; }
     $('.side').classList.remove('open'); uiSwLabel(); if (window.__tkRe) window.__tkRe();
+    try { if (!m) { schMode(''); if (sf.camp === '__staff') { sf.camp = ''; $('#sCamp').value = ''; renderSched(); } } } catch (e) { /* 무시 */ }
     try { if (window.__schMob) window.__schMob(); } catch (e) { /* 기사스케줄을 아직 안 열었음 */ }
+    try { paintStMob(); } catch (e) { /* 무시 */ }
   });
   uiSwLabel();
   function navCur() { const a = $$('.nav a.on'); $('#navCur').textContent = a.length ? a[a.length - 1].textContent.trim() : '메뉴'; try { mTabSync(); } catch (e) { /* 아직 준비 전 */ } }
