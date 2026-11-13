@@ -16,9 +16,12 @@ def grab(start):
     return s[i:k + 1]
 def line(start):
     i = s.index(start); return s[i:s.index('\n', i)]
-parts = [grab('  function parsePerfSheet(sheets, fileName) {'), grab('  function parseSlaSheet(sheets) {'), grab('  function parseFbSheet(sheets) {'), grab('  function parsePeakSheet(sheets, fileName) {'), line('  const pkDate = (ym, x) =>')]
+def block(start, end):
+    i = s.index(start); return s[i:s.index(end, i)].rstrip()
+stl = block('  const ST_RAW_MAP = ', '  function b64(buf)')  # 쿠팡 정산서: 머리글 표 · parseCoupang 까지
+parts = [stl, grab('  function parsePerfSheet(sheets, fileName) {'), grab('  function parseSlaSheet(sheets) {'), grab('  function parseFbSheet(sheets) {'), grab('  function parsePeakSheet(sheets, fileName) {'), line('  const pkDate = (ym, x) =>')]
 out = '''/**
- * 쿠팡 파일 읽기 (서버용) — src/Admin.html 의 parsePerfSheet · parseSlaSheet · parseFbSheet · parsePeakSheet 와 같은 코드.
+ * 쿠팡 파일 읽기 (서버용) — src/Admin.html 의 parsePerfSheet · parseSlaSheet · parseFbSheet · parsePeakSheet · parseCoupang(정산서) 와 같은 코드.
  * ※ 손으로 고치지 말 것. 파서를 고치면 scripts/gen-mailparse.py 를 다시 돌려 만든다.
  */
 const MailParse_ = (function () {
@@ -26,7 +29,7 @@ const MailParse_ = (function () {
   const shortCamp = (n) => String(n || '').replace(/\\s*캠프\\s*$/, '').trim();
   const rpCamp = (name) => shortCamp(name).replace(/\\s/g, '');
 ''' + '\n'.join(parts) + '''
-  return { perf: parsePerfSheet, sla: parseSlaSheet, fb: parseFbSheet, peak: parsePeakSheet, pkDate: pkDate };
+  return { perf: parsePerfSheet, sla: parseSlaSheet, fb: parseFbSheet, peak: parsePeakSheet, pkDate: pkDate, coupang: parseCoupang };
 })();
 '''
 open(os.path.join(root, 'src/MailParse.gs'), 'w', encoding='utf-8').write(out)

@@ -6,7 +6,8 @@
  *  - 기간을 분명히 읽지 못한 파일은 저장하지 않고 '확인 필요' 로 남긴다.
  */
 const MAIL_ST = { SAVED: '저장', HOLD: '확인 필요', SKIP: '쿠팡 파일 아님', FAIL: '실패' };
-const MAIL_KIND = { wk: '주간 수행률', sla: 'SLA 점수', fb: '가중요인', pk: '피크 물량' };
+const MAIL_KIND = { wk: '주간 수행률', sla: 'SLA 점수', fb: '가중요인', pk: '피크 물량', st: '정산서' };
+const MAIL_STL_FROM = 27, MAIL_STL_TO = 5; // 정산서는 매달 27일 ~ 다음 달 5일에 온 메일만 자동 반영
 var _sysAdmin = null; // 이 실행 안에서만 쓰는 '자동 수집' 관리자 (열쇠 확인 뒤에만 만들어짐 · 밖으로 나가지 않음)
 
 function mailCfg_() { const p = props_(); return { hash: str_(p.MAIL_KEY_HASH), on: str_(p.MAIL_ON) !== '0', ping: str_(p.MAIL_PING) }; }
@@ -57,15 +58,16 @@ function mailXlsx_(bytes) {
 function mailDetect_(sheets, name) {
   const has = function (re, top) { return sheets.some(function (sh) { return (top ? sh.rows.slice(0, top) : sh.rows).some(function (r) { return r && r.some(function (v) { return re.test(String(v == null ? '' : v)); }); }); }); };
   const isSla = has(/data\s*end\s*date/i), isFb = !isSla && has(/가중요인/, 8);
-  if (isSla) { const b = MailParse_.sla(sheets); return b.length ? { kind: 'sla', blocks: b } : null; }
-  if (isFb) { const b = MailParse_.fb(sheets); return b.length ? { kind: 'fb', blocks: b } : null; }
+  if (isSla) { const b = MailParse_.sla(sheets); if (b.length) return { kind: 'sla', blocks: b }; }
+  if (isFb) { const b = MailParse_.fb(sheets); if (b.length) return { kind: 'fb', blocks: b }; } // 정산서 머리글에도 '가중요인' 글자가 있어 표가 없으면 아래로
   const pk = MailParse_.peak(sheets, name);
   if (pk) return { kind: 'pk', P: pk };
+  try { const st = MailParse_.coupang(sheets); if (st && st.raw.length) return { kind: 'st', P: st }; } catch (e) { /* 정산서 아님 */ }
   try { return { kind: 'wk', P: MailParse_.perf(sheets, name) }; } catch (e) { return null; }
 }
 
 /** 읽은 파일 하나를 저장 → { status, period, detail } (관리자앱 [쿠팡 파일 올리기] 와 같은 저장 함수 · 같은 기간은 덮어씀) */
-function mailSave_(U, name, sheets) {
+function mailSave_(U, name, sheets, f) {
   const tok = _sysAdmin.token, cnt = function (r) { return '새로 ' + r.added + ' · 바뀜 ' + r.changed + ' · 같음 ' + r.unchanged; };
   const need = function (r) { if (!r || !r.ok) throw new Error((r && r.msg) || '저장하지 못했습니다'); return r; };
   const md = function (d) { return d ? +String(d).slice(5, 7) + '/' + +String(d).slice(8, 10) : ''; };
@@ -78,6 +80,23 @@ function mailSave_(U, name, sheets) {
     const r = need(adm_perfSave(tok, { year: P.year, wk: P.wk, file: name, rows: rows }));
     const L = P.rows.filter(function (x) { return x.wk === P.wk; }), bad = L.filter(function (x) { return /^[34]$/.test(String(x.grade).replace(/\D/g, '')); }).length;
     return { status: MAIL_ST.SAVED, period: P.year + '년 WK' + P.wk, detail: '라우트 ' + L.length + ' · 3~4등급 ' + bad + ' · ' + cnt(r) };
+  }
+  if (U.kind === 'st') {
+    // 쿠팡 정산서: 관리자앱 [드라이브에서 가져오기] 와 같은 순서 (정산월 = 배송일이 가장 많은 달 · 차수 = 마지막 + 1 · 마감된 달은 건너뜀)
+    const P = U.P, month = P.month, won = function (n) { return Math.round(n).toLocaleString('ko-KR'); };
+    const day = +(String(f.date || '').match(/^\d{4}-\d{2}-(\d{2})/) || [0, 0])[1] || +todayText_().slice(8, 10);
+    const sum = '배송일 ' + P.from + '~' + P.to + ' · ' + P.raw.length + '줄 · ID ' + P.ids + ' · 공급가 ' + won(P.total);
+    if (!month) return { status: MAIL_ST.HOLD, period: '', detail: '정산월을 읽지 못했습니다. 정산관리에서 직접 올려 주세요. (' + sum + ')' };
+    const pd = +month.slice(0, 4) + '년 ' + +month.slice(5, 7) + '월';
+    if (!(day >= MAIL_STL_FROM || day <= MAIL_STL_TO)) return { status: MAIL_ST.HOLD, period: pd, detail: '정산서 자동 반영 기간(' + MAIL_STL_FROM + '일 ~ 다음 달 ' + MAIL_STL_TO + '일) 밖에 온 메일이라 반영하지 않았습니다. 필요하면 정산관리에서 직접 올려 주세요. (' + sum + ')' };
+    const sig = sha256b64_(JSON.stringify([P.raw, P.loss])).slice(0, 16);
+    if (readAll_(SH.MAILLOG).some(function (o) { return o.kind === MAIL_KIND.st && o.status === MAIL_ST.SAVED && String(o.detail).indexOf('#' + sig) >= 0; })) return { status: '이미 처리', period: pd, detail: '앞서 반영한 정산서와 내용이 같아 다시 반영하지 않았습니다.' };
+    const ri = need(adm_stlRoundInfo(tok, month));
+    if (ri.closed && !ri.legacy) return { status: MAIL_ST.HOLD, period: pd, detail: '이미 마감된 달이라 반영하지 않았습니다. (' + sum + ')' };
+    const round = Math.min(9, (ri.latest || 0) + 1);
+    const sv = need(adm_stlSaveFile(tok, month, round, name, String(f.b64)));
+    const r = need(adm_stlImport(tok, { month: month, round: round, file: sv.name, url: sv.url, raw: P.raw, loss: P.loss, legacy: !!ri.legacy }));
+    return { status: MAIL_ST.SAVED, period: pd + ' ' + round + '차', detail: (r.legacy ? '쿠팡 매출만 반영 (기존 정산 이식 달) · ' : '') + sum + (P.loss.length ? ' · 분실파손 ' + P.loss.length + '줄 ' + won(P.lossAmt) + '원' : '') + (r.changed ? ' · 변동 ID ' + r.changed : '') + (r.newIds && r.newIds.length ? ' · 새 아이디 ' + r.newIds.length + '개 (아이디 관리에서 확인)' : '') + ' #' + sig };
   }
   if (U.kind === 'sla') {
     const out = [];
@@ -124,7 +143,7 @@ function api_mailFile(key, f) {
     if (!U) { mailLog_(Object.assign(base, { status: MAIL_ST.SKIP })); return { ok: true, status: MAIL_ST.SKIP }; }
     _sysAdmin = { token: '\u0000sys' + Utilities.getUuid(), a: { name: '메일 자동수집', loginId: 'mail', status: AST.ACTIVE } };
     try {
-      const r = mailSave_(U, name, sheets);
+      const r = mailSave_(U, name, sheets, f);
       mailLog_(Object.assign(base, { kind: MAIL_KIND[U.kind], status: r.status, period: r.period, detail: r.detail }));
       return { ok: true, status: r.status, kind: MAIL_KIND[U.kind], period: r.period, detail: r.detail };
     } catch (e) {
