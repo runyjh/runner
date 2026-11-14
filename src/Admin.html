@@ -9812,6 +9812,17 @@
     SD.notes.forEach((n) => rows.push({ kind: 'n', row: n.id, key: n.id, note: n }));
     return rows;
   }
+  /** 품앗이로 넘긴 날: 맡긴 기사 칸이 출근·그 일감 노선이면 그 노선은 받은 기사가 뛴 것 → 계산(중복·미입차·출근일수)에서 뺀다 */
+  function pmGaveCut(d, dt, v) {
+    if (!v) return v;
+    const r = { kind: 'd', row: d.id, d: d }, gave = pmTipList(r, dt).filter((t) => t.from === d.name && t.to !== d.name);
+    if (!gave.length || PM_ONLY.test(v) && v !== '출근') return v;
+    if (v === '출근') { // 담당 노선 전체를 넘긴 날만 (일부만 넘겼으면 나머지는 본인이 뜀)
+      const b = drvAt(d, dt) || d, bu = b.baseRoute && /^\d/.test(b.baseRoute) ? parseBR(b.baseRoute).units.slice().sort().join(',') : '';
+      return bu && gave.some((t) => parseBR(String(t.route || '').replace(/\s+/g, '')).units.slice().sort().join(',') === bu) ? '' : v;
+    }
+    return pmOnly(v, r, dt) ? '' : v;
+  }
   function recalc() {
     const campRot = {};
     SD.camps.forEach((c) => { campRot[shortCamp(c.name)] = String(c.rot || 'D1,D2,F3').split(',').filter(Boolean); });
@@ -9819,7 +9830,7 @@
     SD.camps.forEach((c) => { campById[c.id] = c; });
     const rows = schSegDrivers().filter((d) => d.status === '승인' || Object.keys(SD.cells[d.id] || {}).some((k) => SD.dates.includes(k))).map((d) => ({
       key: d._key, camp: campById[d.campId] ? shortCamp(campById[d.campId].name) : '', name: d.name, baseRoute: d.baseRoute, type: d.type, baseAt: d._baseAt ? SD.dates.map((dt) => d._baseAt[dt] || d.baseRoute) : null,
-      cells: SD.dates.map((dt) => (segIn(d._seg, dt) && !drvGone(d, dt) ? sget(d.id, dt) : '')),
+      cells: SD.dates.map((dt) => (segIn(d._seg, dt) && !drvGone(d, dt) ? pmGaveCut(d, dt, sget(d.id, dt)) : '')),
       active: d._seg || SD.dates.some((dt) => drvGone(d, dt)) ? SD.dates.map((dt) => segIn(d._seg, dt) && !drvGone(d, dt)) : null, // 퇴사일 이후 · 휴직: 그 기사의 담당 노선을 '채워야 할 노선'으로 보지 않는다
       subs: cellSubsOf(d.id).concat(aliasOf(d)), recv: SD.dates.map((dt) => (((SD.pmTips || {})[d.id] || {})[dt] || []).some((t) => t.to === d.name && t.from !== d.name))
     }));
@@ -10173,12 +10184,12 @@
   }
   /** 품앗이 칸에서 숨길 칸 글자 (품앗이만 보이게) — 노선 글자 등 다른 값은 그대로 둠 */
   const PM_ONLY = /^(출근|휴무|고정휴무|추가휴무|휴가)?$/;
-  /** 품앗이 칸을 품앗이로만 보일지: 출근·휴무 등이거나, 받은 기사 칸 글자가 그 일감 노선과 같을 때 (기존 시트에서 '품앗이_103AB' 를 가져와 103AB 로 적힌 칸 등) */
+  /** 품앗이 칸을 품앗이로만 보일지: 출근·휴무 등이거나, 받은/맡긴 기사 칸 글자가 그 일감 노선과 같을 때 (기존 시트에서 '품앗이_103AB' 를 가져와 103AB 로 적힌 칸 등) */
   function pmOnly(v, r, dt) {
     if (PM_ONLY.test(v)) return true;
     const norm = (x) => String(x || '').replace(/\s*\([A-Za-z][A-Za-z0-9_.]{2,}\)\s*/g, ' ').replace(/업무등록/g, ' ').replace(/^\s*[가-힣]+\s?\d+\s+(?=\d)/, '').replace(/\s+/g, '').toUpperCase();
     const me = r && r.d ? r.d.name : '', t = norm(v);
-    return !!t && pmTipList(r, dt).some((j) => j.to === me && norm(j.route || j.area) === t);
+    return !!t && pmTipList(r, dt).some((j) => (j.to === me || j.from === me) && norm(j.route || j.area) === t); // 받은 기사 = 그 일을 뛴 것 · 맡긴 기사 = 그 일을 넘긴 것
   }
   const sPmRowsOn = () => { try { return localStorage.getItem('runner.sch.pmrows') === '1'; } catch (e) { return false; } };
   function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || ''; }
