@@ -4179,7 +4179,7 @@ function mySlip_(u, month) {
       return {
         row: {
           name: d.name, cids: d.cids, workDays: d.workDays, workDaysSrc: d.workDaysSrc, qty: d.qty, pay: d.pay, taxDed: d.taxDed, invoice: d.invoice, supply: d.supply, tax: d.tax,
-          san: d.san, goy: d.goy, depDed: d.depDed, depAdd: d.depAdd, net: d.net, bank: d.bank, holder: d.holder, account: d.account, bizNo: d.bizNo, bizName: d.bizName || '', ownerId: d.ownerId || '', movedIn: d.movedIn, movedOut: d.movedOut
+          san: d.san, goy: d.goy, depDed: d.depDed, depAdd: d.depAdd, net: d.net, bank: d.bank, holder: d.holder, account: d.account, bizNo: d.bizNo, bizName: d.bizName || '', ownerId: d.ownerId || '', movedIn: d.movedIn, movedOut: d.movedOut, ceo: !!sl.row.ceo // 대표: 확인용 (지급하지 않음 · 매출은 러너 수익)
         },
         lines: sl.lines, routes: sl.routes, daily: sl.daily, sched: sl.sched, idUse: sl.idUse || {}, loss: sl.loss,
         yong: (sl.yong || []).map(function (y) { return { date: y.date, route: y.route, camp: y.camp, qty: y.qty, extra: y.extra, cut: y.cut, mine: y.whoId === d.id, ours: !!y.whoId && String(y.whoId).indexOf('v:') !== 0, memo: y.memo }; }),

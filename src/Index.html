@@ -397,6 +397,7 @@
   .sl-line.tot { border-top: 2px solid var(--ink); font-weight: 800; font-size: 15.5px; }
   .sl-line .neg { color: var(--danger); }
   .sl-invc { padding: 14px 16px; }
+  .sl-ceo { padding: 12px 14px; background: #fff4d6; border: 1px solid #f5d38a; color: #8a4b00; font-size: 13.5px; line-height: 1.55; } .sl-ceo > b { display: block; font-size: 15px; margin-bottom: 3px; }
   .sl-invc .sl-hm { align-items: center; margin-bottom: 8px; } .sl-invc .sl-hm b { font-size: 15px; } .sl-invc .sl-dd { white-space: nowrap; flex: none; }
   .sl-ikv { display: flex; flex-direction: column; }
   .sl-ik { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
@@ -3556,9 +3557,11 @@
         (co.email ? kv('이메일', escH(co.email), cp(co.email, '이메일')) : '') +
         kv('작성일자 · 품목', escH(D.writeDate || '-') + ' <small>· 배송(' + escH(r.month) + ') · 청구</small>') +
       '</div><div class="sl-ihint">공급자 ' + escH(supName) + ' → 러너. 홈택스에서 공급가액·세액을 위 숫자 그대로 입력해 발행해 주세요.' + (d.taxDed ? '' : ' 발행 금액은 지급 합계 전액이고, 분실파손·보험·가불 등 공제는 발행 후 실 입금액에서 뺍니다.') + '</div></div>';
-    return invCard +
-      '<div class="sl-card sl-netc"><div class="sl-netrow"><span>실 입금액 <small>(지급 합계 − 공제)</small></span><b' + (d.net < 0 ? ' class="neg"' : '') + '>' + slWon(d.net) + '<small>원</small></b></div>' +
-      '<div class="sl-hs2">' + escH(slMonthTxt(r.month)) + ' ' + slMd(P.from) + '~' + slMd(P.to) + (D.pay ? ' · 지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
+    // 대표 정산서: 내역은 그대로 보여 주되 지급하지 않음 (매출은 러너 수익) → 세금계산서 발행 카드 대신 안내 · 실 입금액은 '확인용'
+    const ceoNote = '<div class="sl-card sl-ceo"><b>대표 정산서 · 지급하지 않음</b><div>이 달 배송 매출은 러너 수익으로 잡힙니다. 아래 금액은 기사 기준으로 계산해 본 <b>확인용</b>이며, 입금·세금계산서 발행 대상이 아닙니다.</div></div>';
+    return (d.ceo ? ceoNote : invCard) +
+      '<div class="sl-card sl-netc"><div class="sl-netrow"><span>' + (d.ceo ? '계산상 금액 <small>(확인용 · 지급 안 함)</small>' : '실 입금액 <small>(지급 합계 − 공제)</small>') + '</span><b' + (d.net < 0 ? ' class="neg"' : '') + '>' + slWon(d.net) + '<small>원</small></b></div>' +
+      '<div class="sl-hs2">' + escH(slMonthTxt(r.month)) + ' ' + slMd(P.from) + '~' + slMd(P.to) + (D.pay && !d.ceo ? ' · 지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
       '<div class="sl-stats2"><div><span>지급 합계' + (d.taxDed ? '' : ' <i>= 계산서</i>') + '</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
       '<div class="sl-card"><h3>지급 내역</h3>' + pays.concat(adds).map((l) => line(l, '')).join('') + '<div class="sl-line tot"><div>지급 합계</div><b>' + slWon(d.pay + d.depAdd) + '</b></div></div>' +
       '<div class="sl-card"><h3>차감 · 공제</h3>' + (deds.length ? deds.map((l) => line(l, '−')).join('') : '<div class="sl-line"><div class="hint">없음</div></div>') + '<div class="sl-line tot"><div>공제 합계</div><b class="neg">−' + slWon(dedSum) + '</b></div></div>' +
