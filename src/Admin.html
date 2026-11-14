@@ -9359,7 +9359,7 @@
   //  · (D1,D2) 같은 괄호 → 작은 회색 표 · [B01] 번호표는 숨김 · '캠프로 변경 / 노선 변경' → 진한 파란 '변경' 표
   //  · (아이디) → 둘째 줄 표: 그 기사 서브아이디로 등록됨 = 초록, 그 밖 = 회색 · '업무등록' 글자는 칸 색(초록)으로 대신
   function groupRoutes(t) {
-    return String(t || '').replace(/\b\d{3}[A-Z]+(?:,\s*\d{3}[A-Z]+)+\b/g, (m) => {
+    return String(t || '').replace(/\b\d{3}[A-Z]+(?:,\s*\d{3}[A-Z]+)+\b(?!\()/g, (m) => { // 바로 뒤 괄호 = 그 노선만의 회전 → 묶지 않음 (529A,529B(D2,F3))
       const out = [];
       m.split(',').map((x) => x.trim()).forEach((x) => {
         const mm = x.match(/^(\d{3})([A-Z]+)$/), last = out[out.length - 1];
@@ -9492,7 +9492,7 @@
   }
   /**
    * 칸 표시 규칙 하나 (기사 줄 · 한 줄짜리 노선 값) — 시트 글자는 그대로, 화면만:
-   *  윗줄 = 그날 뛴 노선: 담당 노선 그대로 = '출근'(파랑) · 담당 노선의 일부 = 노선 글자(파랑) · 담당이 아닌 노선 = '캠프 노선'(노랑, 같은 캠프여도 캠프 이름)
+   *  윗줄 = 그날 뛴 노선: 담당 노선 그대로 = '출근'(파랑) · 담당 노선의 일부 = 노선 글자(파랑) · 담당이 아닌 노선 = 노선 글자(노랑 · 캠프 이름은 다른 캠프일 때만)
    *  아랫줄 = 아이디 표 (다른 아이디로 업무등록한 날만)
    * → { text, ids, kind } · 규칙으로 읽을 수 없는 값이면 null (예전 표시 그대로)
    */
@@ -9501,9 +9501,52 @@
     if (!s || /\n/.test(s) || /추가업무등록|변경/.test(s) || /^용차/.test(s)) return null;
     const d = drvAt(rowDrv(row), dt); if (!d) return null;
     mvPairs();
-    const mk = row + '\u0001' + s + '\u0001' + (d.baseRoute || '') + '\u0001' + (d.campId || '');
+    const s2 = cellCut(s, d, row, dt) || s; // 다른 기사가 같은 노선의 일부 회전을 맡은 날 → 남은 회전만 (205CD + 남 205C(D2,F3) → 205C(D1),205D)
+    const mk = row + '\u0001' + s2 + '\u0001' + (d.baseRoute || '') + '\u0001' + (d.campId || '');
     if (_cnMemo.has(mk)) return _cnMemo.get(mk);
-    const out = cellNorm0(s, d); _cnMemo.set(mk, out); return out;
+    const out = cellNorm0(s2, d); _cnMemo.set(mk, out); return out;
+  }
+  /**
+   * 쿠팡 업로드 규칙을 화면에: 칸에 노선을 통째로 적었어도(205CD · 출근) 그날 다른 기사가 그 노선의 일부 회전(205C (D2,F3))을 맡았으면
+   * 그 회전을 뺀 나머지(205C(D1),205D)로 보여 준다 — 시트 글자는 그대로 · 이미 회전을 좁게 적은 노선은 그대로
+   */
+  const CUT_ID = /\(\s*([A-Za-z][A-Za-z0-9_.]{2,})\s*\)/g, cutIdOut = (v) => v.replace(CUT_ID, (m0, id) => (/^[DF]\d$/i.test(id) ? m0 : ' ')).replace(/\s+/g, ' ').trim();
+  const CUT_RE = /^(?:([가-힣]+\s?\d+)\s+)?(\d{3,4}[A-Za-z][0-9A-Za-z,()\s]*)$/;
+  let _ptMemo = new Map(), _ptTick = false;
+  function partAt(dt) { // 그날 회전을 일부만 적은 칸: '캠프|노선글자' → [{ row, rots }]
+    if (!_ptTick) { _ptTick = true; Promise.resolve().then(() => { _ptMemo = new Map(); _ptTick = false; }); } // 한 번 그리는 동안만 기억
+    if (_ptMemo.has(dt)) return _ptMemo.get(dt);
+    const out = new Map();
+    (SD.drivers || []).forEach((d0) => {
+      const v = String(sget(d0.id, dt) || '').trim(); if (!v || /\n|업무등록|변경/.test(v)) return;
+      const m = cutIdOut(v).match(CUT_RE); if (!m) return;
+      const d = drvAt(d0, dt) || d0, camp = (m[1] || shortCamp(d.camp || '')).replace(/\s/g, ''), cid = cutCampId(camp) || d.campId || '';
+      const all = sdCampRots(cid), p = parseBR(m[2]); if (!all.length) return;
+      p.units.forEach((u) => { const rr = (p.per[u] && p.per[u].length ? p.per[u] : p.rots.length ? p.rots : all).filter((x) => all.includes(x)); if (rr.length && rr.length < all.length) { const k = camp + '|' + u; if (!out.has(k)) out.set(k, []); out.get(k).push({ row: d0.id, rots: rr }); } });
+    });
+    _ptMemo.set(dt, out); return out;
+  }
+  const cutCampId = (camp) => { const c = (SD.camps || []).find((x) => shortCamp(x.name).replace(/\s/g, '') === camp); return c ? c.id : ''; };
+  function cellCut(s, d, row, dt) {
+    let camp0 = '', body = '';
+    if (s === '출근') { if (!d.baseRoute || !/^\d/.test(d.baseRoute) || d.type === '백업') return ''; body = String(d.baseRoute); }
+    else { if (cutIdOut(s) !== s.replace(/\s+/g, ' ').trim()) return ''; const m = s.match(CUT_RE); if (!m) return ''; /* 아이디가 붙은 칸은 그대로 */ camp0 = (m[1] || '').replace(/\s/g, ''); body = m[2]; }
+    const camp = camp0 || shortCamp(d.camp || '').replace(/\s/g, ''), cid = cutCampId(camp) || d.campId || '', all = sdCampRots(cid);
+    if (!all.length) return '';
+    const pm = partAt(dt); if (!pm.size) return '';
+    const p = parseBR(body); if (!p.units.length || !p.units.every((u) => unitRe.test(u))) return '';
+    const me = String(row).split('~')[0];
+    let cut = false; const left = [], per = {};
+    p.units.forEach((u) => {
+      const mine = (p.per[u] && p.per[u].length ? p.per[u] : p.rots.length ? p.rots : all).filter((x) => all.includes(x));
+      if (mine.length < all.length) { left.push(u); per[u] = mine; return; } // 이미 좁게 적은 노선
+      const gone = new Set(); (pm.get(camp + '|' + u) || []).forEach((x) => { if (String(x.row).split('~')[0] !== me) x.rots.forEach((r) => gone.add(r)); });
+      const keep = all.filter((r) => !gone.has(r));
+      if (keep.length < all.length) cut = true;
+      if (keep.length) { left.push(u); per[u] = keep; }
+    });
+    if (!cut || !left.length) return '';
+    return (camp0 ? camp0 + ' ' : '') + composeUnits(left, '', all, all, per);
   }
   let _mvSrc = null, _mvList = [];
   const mvPairs = () => { if (_mvSrc !== SD.routeMoves) { _mvSrc = SD.routeMoves; const cp = (x) => shortCamp(x).replace(/\s/g, ''), nm = (x) => (String(x).match(/\d+/) || [''])[0];
@@ -9535,7 +9578,7 @@
         if (p2.units.length && p2.units.every((u) => b.units.includes(u))) { const w2 = comp(p2) === comp(b); return { text: w2 ? '출근' : to.num + rest, ids: ids, kind: 'k-work', mine: true, whole: w2, moved: true }; }
       }
     }
-    return { text: whole ? '출근' : (mine || !cn ? '' : cn + ' ') + m[2].trim(), ids: ids, kind: mine ? 'k-work' : 'k-other', mine: mine, whole: whole };
+    return { text: whole ? '출근' : (mine || !cn || cn === own ? '' : cn + ' ') + m[2].trim(), ids: ids, kind: mine ? 'k-work' : 'k-other', mine: mine, whole: whole }; // 캠프 이름은 다른 캠프에 들어간 날만
   }
   /** 규칙으로 읽을 수 없는 칸 글자인가 (기사 줄 · 올인원 규칙 기간) — 상태 낱말 · 용차 · 노선(+아이디) · 변경/추가업무등록 표기가 아니면 true */
   const CELL_OKST = /^(출근|휴무|고정휴무|추가휴무|휴가|병가|미입차|노쇼|용차|퇴사|(노선|라우트)\s*변경)$/;
