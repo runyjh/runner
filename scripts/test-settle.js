@@ -131,7 +131,7 @@ scenario('업로드 표', null, function (r) {
     return schBuildUpload_(data, { bizNo: 'x', wave: 'W', target: '2026-11-15', maxDays: 6 }).missing.map(function (x) { return [x[0], x[2], x[7], x[8]].join(' | '); });
   })()`, r.ctx);
   const day = function (d) { return out.filter(function (x) { return x.indexOf(d) === 0; }).sort(); };
-  eq('11/15: 담당 없음 902A 와 용차업체 919CD 가 따로, 출근한 901A 는 없음', day('2026-11-15'), ['2026-11-15 | 인천7 | 902A | 사유: 담당 없음', '2026-11-15 | 인천7 | 919C,919D | 사유: 용차업체 히어로']);
+  eq('11/15: 담당 없음 902A 와 용차업체 919CD 가 따로, 출근한 901A 는 없음', day('2026-11-15'), ['2026-11-15 | 인천7 | 902A | 사유: 담당 없음', '2026-11-15 | 인천7 | 919C,919D | 사유: 용차업체 히어로 입차 · 어드민만 미입차']);
   eq('11/16: 우리 기사가 919CD 를 뛰면 용차업체 줄 없음 · 기본노선 901A 는 미입차', day('2026-11-16'), ['2026-11-16 | 인천7 | 901A | ', '2026-11-16 | 인천7 | 902A | 사유: 담당 없음']);
   eq('이관 예약으로 떠난 안양1 110 은 올리지 않음', out.filter(function (x) { return /안양1/.test(x); }).length, 0);
 });

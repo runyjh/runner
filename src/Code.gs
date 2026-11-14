@@ -6518,7 +6518,7 @@ function schBuildUpload_(data, opt) {
 
   // 운영시트 C~F열에 해당하는 줄: 캠프, 이름, 아이디, 기본노선
   const info = data.drivers.filter(function (d) {
-    if (str_(d.type) === '운영자' || str_(d.title) === '운영자') return false; // 운영자는 업로드 표·쿠팡 업로드에 출력하지 않음
+    // 운영자도 일한 날은 본인 쿠팡 아이디로 출력 (출근 줄만 · 휴무 줄은 쿠팡 엑셀에서 만들지 않음) — 안 내보내면 운영자가 뛴 노선이 미입차로 잡힘
     return d.status === ST.ACTIVE || Object.keys(data.cells[d.id] || {}).some(function (k) { return data.dates.indexOf(k) >= 0; });
   }).map(function (d) {
     // 소속 캠프가 없거나 직원(관리자·운영자·대표) 캠프인 사람은 '백업'으로 두고, 그날 칸에 적힌 캠프·노선·회전으로 출력한다
@@ -6717,7 +6717,7 @@ function schBuildUpload_(data, opt) {
     // 미입차 사유: 그 노선 주인(기본노선 기사)에게 그날 이슈가 있으면 비고에
     const whyOf = function (k) {
       const dt = k.split('|')[0];
-      return (vendorOwner[k] || []).map(function (n) { return '용차업체 ' + n; }).concat(vacant[k] ? ['담당 없음'] : []).concat((baseOwner[k] || []).map(function (id) { return issueBy[dt + '|' + id] || (leftInfo[id] && dt >= leftInfo[id].from ? leftInfo[id].name + ' 퇴사' : ''); })).filter(Boolean);
+      return (vendorOwner[k] || []).map(function (n) { return '용차업체 ' + n + ' 입차 · 어드민만 미입차'; }).concat(vacant[k] ? ['담당 없음'] : []).concat((baseOwner[k] || []).map(function (id) { return issueBy[dt + '|' + id] || (leftInfo[id] && dt >= leftInfo[id].from ? leftInfo[id].name + ' 퇴사' : ''); })).filter(Boolean);
     };
     const byRoute = {};
     Object.keys(present).forEach(function (p) {

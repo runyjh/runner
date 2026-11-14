@@ -716,7 +716,7 @@
   table.up { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; min-width: 100%; }
   table.up th { position: sticky; top: 0; background: #f1f3f4; z-index: 1; font-weight: 700; text-align: left; }
   table.up th, table.up td { border: 1px solid #e5e8eb; padding: 5px 8px; }
-  table.up tr.key td { background: #e3f2fd; } table.up tr.mi td { background: #ffebee; } table.up tr.dup td { background: #fff8e1; }
+  table.up tr.key td { background: #e3f2fd; } table.up tr.mi td { background: #ffebee; } table.up tr.mi.vd td { background: #eef2ff; color: #3949ab; } table.up tr.dup td { background: #fff8e1; }
   table.up tr.sep td { background: #000; padding: 2px; }
   table.up td.n { color: var(--sub); text-align: right; }
   .nlink { display: inline-block; font-size: 10px; font-weight: 700; color: var(--brand); background: var(--brand-weak); border-radius: 4px; padding: 0 4px; margin-left: 2px; }
@@ -11908,20 +11908,21 @@
     const dw = ['일', '월', '화', '수', '목', '금', '토'], mdw = (d) => md(d) + '(' + dw[new Date(d + 'T00:00:00').getDay()] + ')';
     const t = (upRes.weeks || []).slice(0, 4).map((rows, i) => { if (upRes.wkOn && !upRes.wkOn[i]) return null; const ds = upRes.dates.slice(i * 7, i * 7 + 7).filter((d) => d >= upRes.target); return ['w' + (i + 1), mdw(ds[0] || upRes.dates[i * 7]) + ' ~ ' + mdw(upRes.dates[Math.min(upRes.dates.length - 1, i * 7 + 6)]) + ' 출근', '건']; }).filter(Boolean)
       .concat([['mi', '미입차', '건'], ['dup', '중복', '건']]);
-    $('#upTabs').innerHTML = t.map(([k, l, u]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '" title="' + esc(l + ' ' + upRows(k).length + u) + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
+    const miReal = upRes.missing.filter((r) => !/용차업체/.test(r[8] || '')).length;
+    $('#upTabs').innerHTML = t.map(([k, l, u]) => k === 'mi' ? '<button type="button" data-up="mi" class="' + (k === upTab ? 'on' : '') + '" title="실제 빈 노선 ' + miReal + '건 · 용차업체 입차 ' + (upRows('mi').length - miReal) + '건">미입차 ' + upRows('mi').length + '건 (실제 ' + miReal + ')</button>' : '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '" title="' + esc(l + ' ' + upRows(k).length + u) + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
     upTabsFit();
   }
   function upRender() {
     const rows = upRows(upTab), keyOf = (w, i) => upRes.keys[w][i];
     const cls = (r, i) => {
-      if (upTab === 'mi' || r[4] === '미입차') return 'mi';
+      if (upTab === 'mi' || r[4] === '미입차') return /용차업체/.test(r[8] || '') ? 'mi vd' : 'mi'; // 용차업체가 실제로 들어간 노선 (쿠팡 어드민에만 미입차)
       if (upTab === 'dup') return 'dup';
       const w = upWk(upTab);
       return w >= 0 && upRes.keys[w][i] ? 'key' : '';
     };
     const sepAt = -1;
     $('#upInfo').textContent = upTab === 'dup' ? '같은 날 같은 캠프·노선·회전에 2명 이상 — 업로드 전에 정리하세요.'
-      : upTab === 'mi' ? '기사가 없는 노선·회전 (캠프·회전별로 묶음)' : '파란 줄 = 업무등록·업무·선탑·신규 등 확인이 필요한 줄';
+      : upTab === 'mi' ? '빨강 = 실제로 아무도 안 들어간 노선 · 파랑 = 용차업체가 들어감 (쿠팡 어드민에는 미입차로 올라감)' : '파란 줄 = 업무등록·업무·선탑·신규 등 확인이 필요한 줄';
     if (!rows.length) { $('#upWrap').innerHTML = '<div class="empty">' + (upTab === 'dup' ? '중복이 없습니다.' : upTab === 'mi' ? '미입차가 없습니다.' : '해당하는 줄이 없습니다.') + '</div>'; return; }
     $('#upWrap').innerHTML = '<table class="up"><thead><tr><th></th>' + UP_HEAD.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
       rows.map((r, i) => (i === sepAt ? '<tr class="sep"><td colspan="12"></td></tr>' : '') +
