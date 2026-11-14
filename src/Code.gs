@@ -6414,7 +6414,50 @@ function normBackupArea_(v) {
 function schMaxDays_() { const v = Number(PropertiesService.getScriptProperties().getProperty('SCH_MAX_DAYS')); return v >= 1 && v <= 7 ? v : 6; }
 
 /** 계산만 (시트·화면 공용). data = schRead_ 결과 */
+/**
+ * 품앗이로 넘긴 날 (배차 확정): 맡긴 기사 칸이 그 일감 노선이거나, '출근'이고 담당 노선 전체를 넘겼으면 빈 칸으로 본다
+ * (그 노선은 받은 기사의 품앗이 줄이 뛴 것 — 쿠팡 업로드 · 중복 계산에서 두 번 잡히지 않게) · 시트 글자는 그대로
+ */
+function pmGaveCells_(d, cells) {
+  let gave = null;
+  try {
+    if (typeof pmData_ !== 'function') return cells;
+    const m = pmGaveMap_();
+    gave = m[d.id];
+  } catch (e) { return cells; }
+  if (!gave) return cells;
+  const units = function (x) {
+    const out = []; let last = '';
+    String(x || '').replace(/\([^)]*\)/g, '').replace(/^\s*[가-힣]+\s?\d+\s+/, '').toUpperCase().split(',').forEach(function (t) {
+      t = t.trim(); let m2 = t.match(/^(\d+)([A-Z]+)$/);
+      if (m2) { last = m2[1]; m2[2].split('').forEach(function (c) { out.push(last + c); }); return; }
+      m2 = t.match(/^([A-Z]+)$/); if (m2 && last) m2[1].split('').forEach(function (c) { out.push(last + c); });
+    });
+    return out.sort().join(',');
+  };
+  const out = {};
+  Object.keys(cells).forEach(function (dt) {
+    const v = str_(cells[dt]), js = gave[dt];
+    out[dt] = v;
+    if (!v || !js) return;
+    if (v === '출근') { const bu = units(d.baseRoute); if (bu && js.some(function (r) { return units(r) === bu; })) out[dt] = ''; return; }
+    if (/^[가-힣]+\s?\d+\s+\d|^\d/.test(v) && !/[\n(]|업무등록/.test(v.replace(/\((D|F)\d[^)]*\)/g, ''))) { const u = units(v); if (u && js.some(function (r) { return units(r) === u; })) out[dt] = ''; }
+  });
+  return out;
+}
+let PM_GAVE_ = null;
+function pmGaveMap_() { // 기사ID → 날짜 → [넘긴 일감 노선]
+  if (PM_GAVE_) return PM_GAVE_;
+  const m = {};
+  pmData_().jobs.forEach(function (j) {
+    if (j.status !== PST.DONE || !j.posterId || !j.acceptedId || j.posterId === j.acceptedId) return;
+    const dt = pmDate_(j.date); if (!dt) return;
+    ((m[j.posterId] = m[j.posterId] || {})[dt] = m[j.posterId][dt] || []).push(str_(j.route));
+  });
+  PM_GAVE_ = m; return m;
+}
 function schBuildUpload_(data, opt) {
+  PM_GAVE_ = null;
   const SCHED_WORK_WORD = '업무', KEYWORDS = ['업무', '선탑', '신규'];
   const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '추가휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
   const ALL = ['D1', 'D2', 'F3'];
@@ -6473,7 +6516,7 @@ function schBuildUpload_(data, opt) {
     // 소속 캠프가 없거나 직원(관리자·운영자·대표) 캠프인 사람은 '백업'으로 두고, 그날 칸에 적힌 캠프·노선·회전으로 출력한다
     const staff = TITLES.indexOf(str_(d.type)) >= 0 || TITLES.indexOf(str_(d.title)) >= 0 || isStaffCamp_(campById[d.campId] || d.camp || '');
     const campOf = function (id) { return staff ? '백업' : campById[id] || ((d.type === '백업' || d.type === '외부용차') ? '백업' : ''); };
-    const base = { key: d.id, camp: campOf(d.campId), name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: data.cells[d.id] || {}, leaveFrom: d.leaveDate || '' };
+    const base = { key: d.id, camp: campOf(d.campId), name: d.name, id: d.loginId, defRt: d.baseRoute || '', cells: pmGaveCells_(d, data.cells[d.id] || {}), leaveFrom: d.leaveDate || '' };
     // 노선 변경 예약이 걸린 기사: 날짜마다 그날의 캠프·기본노선으로
     if (d.segs) base.at = function (date) {
       const sg = d.segs.filter(function (x) { return x.from <= date && date <= x.to; })[0];
@@ -6481,7 +6524,7 @@ function schBuildUpload_(data, opt) {
     };
     return base;
   });
-  // 품앗이 줄(PM+기사ID): 받은 사람이 그날 그 노선을 타므로 백업 줄처럼 출력한다 (본인 줄이 휴무여도 입차로 잡힘)
+  // 품앗이 줄(PM+기사ID): 받은 사람이 그날 그 노선을 타므로 백업 줄처럼 출력한다 (맡긴 사람 칸의 같은 노선은 pmGaveCells_ 로 뺌 — 중복 아님) (본인 줄이 휴무여도 입차로 잡힘)
   (data.pmRows || []).forEach(function (pr) {
     const d = data.drivers.filter(function (x) { return x.id === pr.driverId; })[0];
     if (!d || !d.loginId || str_(d.type) === '운영자' || str_(d.title) === '운영자') return;
