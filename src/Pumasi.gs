@@ -1300,7 +1300,8 @@ function pmOfficeAuto_() {
     const d = pmData_();
     d.jobs.forEach(function (j) {
       if (!j.byOffice || (j.status !== PST.OPEN && j.status !== PST.TALK) || pmPast_(j)) return;
-      const a = d.apps.filter(function (x) { return x.jobId === j.id && (x.status === PAST.APPLY || x.status === PAST.TALK); })
+      // 지원한 뒤 한 번도 손대지 않은 지원만 (사무실에서 '확정 풀기' · '협의 중' 등으로 처리한 지원은 다시 확정하지 않음 — 수정일시가 바뀜)
+      const a = d.apps.filter(function (x) { return x.jobId === j.id && (x.status === PAST.APPLY || x.status === PAST.TALK) && str_(x.updatedAt) === str_(x.createdAt); })
         .sort(function (x, y) { return String(x.createdAt).localeCompare(String(y.createdAt)); })[0];
       if (!a) return;
       try { pmDecide_('', j.id, a.id, 'accept'); n++; } catch (e) { console.log('사무실 품앗이 자동 확정 실패 ' + j.id + ': ' + (e && e.message)); }
