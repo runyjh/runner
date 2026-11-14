@@ -6450,10 +6450,10 @@ function pmGaveMap_() { // 기사ID → 날짜 → [넘긴 일감 노선]
   pmData_().jobs.forEach(function (j) {
     if (j.status !== PST.DONE || !j.posterId || !j.acceptedId || j.posterId === j.acceptedId) return;
     const dt = pmDate_(j.date); if (!dt) return;
-    // 쿠팡에는 받은 기사 아이디로 올라갈 때만 맡긴 칸을 뺀다 — 받은 사람이 운영자(쿠팡 아이디 없음 · 업로드 제외)이거나
+    // 쿠팡에는 받은 기사 아이디로 올라갈 때만 맡긴 칸을 뺀다 (운영자가 받은 날도 운영자 본인 아이디로) — 받은 사람 아이디가 없거나
     //  '주는 기사 아이디'로 배송하는 일감은 맡긴 기사 아이디로 그대로 올라가야 함 (그 날 받은 사람 품앗이 줄은 pmNoUp_ 로 뺌)
     const t = driverById_(j.acceptedId);
-    if (!t || !t.loginId || str_(t.type) === '운영자' || str_(t.title) === '운영자' || str_(j.useId) === '주는 기사 아이디') { (PM_NOUP_[j.acceptedId] = PM_NOUP_[j.acceptedId] || {})[dt] = 1; return; }
+    if (!t || !t.loginId || str_(j.useId) === '주는 기사 아이디') { (PM_NOUP_[j.acceptedId] = PM_NOUP_[j.acceptedId] || {})[dt] = 1; return; }
     ((m[j.posterId] = m[j.posterId] || {})[dt] = m[j.posterId][dt] || []).push(str_(j.route));
   });
   PM_GAVE_ = m; return m;
@@ -6535,7 +6535,7 @@ function schBuildUpload_(data, opt) {
   // 품앗이 줄(PM+기사ID): 받은 사람이 그날 그 노선을 타므로 백업 줄처럼 출력한다 (맡긴 사람 칸의 같은 노선은 pmGaveCells_ 로 뺌 — 중복 아님) (본인 줄이 휴무여도 입차로 잡힘)
   (data.pmRows || []).forEach(function (pr) {
     const d = data.drivers.filter(function (x) { return x.id === pr.driverId; })[0];
-    if (!d || !d.loginId || str_(d.type) === '운영자' || str_(d.title) === '운영자') return;
+    if (!d || !d.loginId) return; // 운영자도 품앗이로 받은 날은 본인 아이디로 출력 (운영자 본인 줄은 위에서 빠짐)
     info.push({ key: pr.id, camp: '백업', name: d.name, id: d.loginId, defRt: '', cells: pmNoUp_(d.id, data.cells[pr.id] || {}), leaveFrom: d.leaveDate || '' });
   });
 
