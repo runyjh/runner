@@ -1386,10 +1386,11 @@
     const tok = store.get(TOKEN); if (!tok) return;
     const all = swrAll(), now = Date.now();
     const t1 = new Date(), pddMonth = ymdOf(new Date(t1.getFullYear(), t1.getMonth(), t1.getDate() + 1)).slice(0, 7); // 스케줄 화면이 처음 여는 달 (PDD가 있는 달)과 같은 키로
-    [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]], ['api_campSchedule', [tok, pddMonth, undefined]]].forEach((x, i) => {
-      const k = swrKey(x[0], x[1]), c = all[k];
-      if (c && now - c.t < 600000) return;
-      bgIdle(() => { if (store.get(TOKEN) !== tok) return; const c2 = swrAll()[k]; if (c2 && Date.now() - c2.t < 600000) return; apiRead(x[0], x[1], true).catch(() => {}); }); // 화면이 먼저 같은 것을 불렀으면 그 답을 같이 씀
+    // 마이페이지 수행률 · 가중요인: 서버 계산이 무거워(5~7초) 30분에 한 번만 미리 받아 둔다 → 마이페이지를 열면 메뉴·내용이 바로 보임
+    [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]], ['api_campSchedule', [tok, pddMonth, undefined]], ['api_myPerf', [tok], 1800000], ['api_myFb', [tok], 1800000]].forEach((x, i) => {
+      const k = swrKey(x[0], x[1]), c = all[k], age = x[2] || 600000;
+      if (c && now - c.t < age) return;
+      bgIdle(() => { if (store.get(TOKEN) !== tok) return; const c2 = swrAll()[k]; if (c2 && Date.now() - c2.t < age) return; apiRead(x[0], x[1], true).catch(() => {}); }); // 화면이 먼저 같은 것을 불렀으면 그 답을 같이 씀
     });
   }
   const RD1 = { m: {} }; // 읽기만 하는 그 밖의 호출: 같은 것은 한 번만 보내고 1분 동안 그 답을 씀
@@ -3151,7 +3152,7 @@
         ['화물자격증', i.qual ? '등록됨 ✓' : '없음 (품앗이 지원 불가)'], ['은행', i.bank]].map((x) => '<dt>' + x[0] + '</dt><dd>' + escH(x[1] || '-') + '</dd>').join('') + '</dl>';
       $('#myNew').innerHTML = r.stats.waiting ? '<span class="bdg nw">새 지원 ' + r.stats.waiting + '</span>' : ''; // (예전엔 품앗이 목록을 한 번 더 불렀음)
     }).catch(() => { myCardFail(); netErr(); });
-    loadMyPerf(token); loadMyFb(token); loadMyPosted(token);
+    myStatRestore(); loadMyPerf(token); loadMyFb(token); loadMyPosted(token);
   }
   /** 마이페이지: 내가 올린 일감 (품앗이 관리 목록 앞 3개 · 배차일 가까운 순) */
   let myPostedSeq = 0;
@@ -3202,7 +3203,7 @@
         '<p class="sub" style="margin:0 0 6px"><b>연계건 ' + S.th1 + '%</b>: 이달(전월 26일~25일) 누적 연계건 프레시백 회수율이 ' + S.th1 + '% 이상이면 건당 +' + vat(S.won1) + '원 · <b>단독건 ' + S.th2 + '%</b>: 단독건 프레시백 회수율이 ' + S.th2 + '% 이상이면 +' + vat(S.won2) + '원이 이달 전체 배송건에 붙습니다. 예상 금액 = 단가 × 하루 평균 수량(최근 정산서) × 이번 정산기간 스케줄 출근일' + (r.workDays && r.workDays.total ? ' (출근 ' + r.workDays.total + '일' + (r.workDays.done < r.workDays.total ? ' · 오늘까지 ' + r.workDays.done + '일' : '') + ')' : '') + ' · 부가세 포함 · 쿠팡 정산 확정 후 정산서에서 확인.' + (r.backup ? ' 백업 기사는 이번 정산기간(' + (r.period ? md(r.period.from) + '~' + md(r.period.to) : '전월 26일~25일') + ')에 스케줄에 적힌 대로 입차한 라우트를 보여 드립니다.' : '') + '</p>' + rows +
         (estSum ? '<div class="fsum"><span>이달 예상 가중요인 추가금 <small style="display:inline;flex-basis:auto">(출근 ' + (r.workDays ? r.workDays.total : 0) + '일 기준)</small></span><b>약 ' + won0(Math.round(estSum * 1.1 / 1000) * 1000) + '원</b>' + (estMaxSum > estSum ? '<small>모두 해당이면 약 ' + won0(Math.round(estMaxSum * 1.1 / 1000) * 1000) + '원</small>' : '') + '</div>' : '');
       myStat('fb', true);
-    }).catch(() => { myStat('fb', false); });
+    }).catch(() => { if (/불러오는 중/.test(box.textContent)) box.innerHTML = '<div class="sub" style="padding:10px 2px">불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>'; });
   }
   /** 내 라우트의 쿠팡 주간 수행률 등급 — 사무실에서 켜 두었을 때만 보임. 고정: 기본노선 · 백업: 최근 4주 뛴 라우트 · 아래에 캠프 전체(접힘) */
   function loadMyPerf(token) {
@@ -3236,10 +3237,18 @@
         (recent.length ? '<div class="mp-sec">' + (r.period ? '이번 정산기간(' + md(r.period.from) + '~' + md(r.period.to) + ') 입차한 라우트' : '최근 입차한 라우트') + (r.backup ? ' (백업)' : '') + '</div>' + recent.map((rt) => row(rt, (rt.camp && rt.camp !== r.camp ? rt.camp + ' · ' : '') + rt.days + '일')).join('') : '') +
         (!routes.length && !recent.length ? '<div class="sub" style="margin:4px 0 6px">' + (r.backup ? '이번 정산기간 스케줄에 라우트가 적힌 날이 없습니다.' : '아직 올라온 수행률 자료가 없습니다.') + '</div>' : '');
       myStat('perf', true);
-    }).catch(() => {});
+    }).catch(() => { if (/불러오는 중/.test(box.textContent)) box.innerHTML = '<div class="sub" style="padding:10px 2px">불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>'; });
   }
   /** 마이페이지 '내 라우트 …' 접이식 메뉴: 자료가 있으면 메뉴 줄을 보이고(내용은 접힌 채), 없으면 숨김 */
+  // 메뉴(수행률 · 가중요인)를 보여 줄지 지난번 결과를 기억 → 마이페이지를 열자마자 메뉴가 보이고, 내용은 받는 대로 채움
+  const myStatKey = () => { try { const u = JSON.parse(store.get(USER) || '{}'); return 'runner.mystat.' + String(u.loginId || '').toLowerCase(); } catch (e) { return 'runner.mystat.'; } };
+  function myStatRestore() {
+    let m = {}; try { m = JSON.parse(localStorage.getItem(myStatKey()) || '{}'); } catch (e) { m = {}; }
+    ['perf', 'fb'].forEach((k) => { if (!m[k]) return; const btn = $(k === 'perf' ? '#myPerfBtn' : '#myFbBtn'), box = $(k === 'perf' ? '#myPerf' : '#myFb'); btn.classList.remove('hidden'); if (!box.innerHTML.trim()) box.innerHTML = '<div class="sub" style="padding:10px 2px">불러오는 중…</div>'; });
+    $('#myStatMenu').classList.toggle('hidden', $('#myPerfBtn').classList.contains('hidden') && $('#myFbBtn').classList.contains('hidden'));
+  }
   function myStat(k, on) {
+    try { const sk = myStatKey(), m = JSON.parse(localStorage.getItem(sk) || '{}'); m[k] = on ? 1 : 0; localStorage.setItem(sk, JSON.stringify(m)); } catch (e) { /* 무시 */ }
     const btn = $(k === 'perf' ? '#myPerfBtn' : '#myFbBtn'), box = $(k === 'perf' ? '#myPerf' : '#myFb');
     btn.classList.toggle('hidden', !on);
     if (!on) { box.classList.add('hidden'); btn.classList.remove('open'); }
@@ -3331,7 +3340,8 @@
     show('settle');
     const token = pmTok(); if (!token) return;
     const C = slcFor(token), seq = ++SLC.seq;
-    const m0 = C.months && C.months.length ? C.months[0].month : '', had = !!(m0 && C.slips[m0]);
+    // 보관본을 먼저 보여 주는 건 마감된 달(고정본)만 — 마감 전 달은 금액이 바뀔 수 있어 서버에서 새로 받은 것만 보여 줌
+    const m0 = C.months && C.months.length ? C.months[0].month : '', had = !!(m0 && C.slips[m0] && C.slips[m0].r.closed);
     if (had) { slMonthsPaint(C.months, m0); slipPaint(C.slips[m0].r); if (Date.now() - C.at < 60000) return; } // 보관본 먼저 (방금 받은 것이면 다시 받지 않음)
     else $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     if (!had && SLC.pre) { SLC.pre.then(() => { if (seq === SLC.seq) openSettle(); }); return; } // 미리 받는 중이면 그걸 기다림 (두 번 부르지 않음)
@@ -3362,8 +3372,8 @@
   }
   function loadSlip(month) {
     const token = pmTok(); if (!token) return;
-    const C = slcFor(token), seq = ++SLC.seq, had = C.slips[month];
-    if (had) slipPaint(had.r); // 보관본 먼저
+    const C = slcFor(token), seq = ++SLC.seq, had0 = C.slips[month], had = had0 && had0.r.closed ? had0 : null;
+    if (had) slipPaint(had.r); // 보관본 먼저 (마감된 달만)
     else $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     api('api_mySlip', token, month).then((r) => {
       if (seq !== SLC.seq) return;
@@ -3561,7 +3571,9 @@
       '</div><div class="sl-ihint">공급자 ' + escH(supName) + ' → 러너. 홈택스에서 공급가액·세액을 위 숫자 그대로 입력해 발행해 주세요.' + (d.taxDed ? '' : ' 발행 금액은 지급 합계 전액이고, 분실파손·보험·가불 등 공제는 발행 후 실 입금액에서 뺍니다.') + '</div></div>';
     // 대표 정산서: 내역은 그대로 보여 주되 지급하지 않음 (매출은 러너 수익) → 세금계산서 발행 카드 대신 안내 · 실 입금액은 '확인용'
     const ceoNote = '<div class="sl-card sl-ceo"><b>대표 정산서 · 지급하지 않음</b><div>이 달 배송 매출은 러너 수익으로 잡힙니다. 아래 금액은 기사 기준으로 계산해 본 <b>확인용</b>이며, 입금·세금계산서 발행 대상이 아닙니다.</div></div>';
-    return (d.ceo ? ceoNote : invCard) +
+    // 마감 전 달: 금액이 바뀔 수 있으므로 세금계산서 발행 정보를 보여 주지 않음 (예전 금액으로 발행하는 일을 막음)
+    const preNote = '<div class="sl-card sl-ceo"><b>확정 전 정산서 · 세금계산서 발행 금지</b><div>사무실에서 마감하기 전이라 금액이 바뀔 수 있습니다. 마감되면 알림이 가고, 그때 이 화면에 <b>발행 금액</b>이 나옵니다. 그 금액으로 발행해 주세요.</div></div>';
+    return (d.ceo ? ceoNote : !r.closed ? preNote : invCard) +
       '<div class="sl-card sl-netc"><div class="sl-netrow"><span>' + (d.ceo ? '계산상 금액 <small>(확인용 · 지급 안 함)</small>' : '실 입금액 <small>(지급 합계 − 공제)</small>') + '</span><b' + (d.net < 0 ? ' class="neg"' : '') + '>' + slWon(d.net) + '<small>원</small></b></div>' +
       '<div class="sl-hs2">' + escH(slMonthTxt(r.month)) + ' ' + slMd(P.from) + '~' + slMd(P.to) + (D.pay && !d.ceo ? ' · 지급일 <b>' + escH(D.pay) + '</b>' : '') + (d.bank || d.account ? ' · ' + escH([d.bank, d.account].filter(Boolean).join(' ')) : '') + '</div>' +
       '<div class="sl-stats2"><div><span>지급 합계' + (d.taxDed ? '' : ' <i>= 계산서</i>') + '</span><b>' + slWon(d.pay + d.depAdd) + '</b></div><div><span>공제 합계</span><b class="neg">−' + slWon(dedSum) + '</b></div><div><span>배송 · 근무 ' + slWon(d.workDays) + '일</span><b>' + slWon(d.qty) + '건</b></div></div></div>' +
@@ -3887,7 +3899,8 @@
   });
   // ───── 자유게시판 ─────
   /** 알림 대상 열기: 'BD-글ID' 는 게시판 글, 나머지는 품앗이 일감 */
-  function openAlertTarget(id, from) { if (String(id).indexOf('BD-') === 0) return openBdPost(String(id).slice(3), from === 'alerts' ? 'alerts' : 'board'); openPmDetail(id, from); }
+  function openAlertTarget(id, from) { if (String(id).indexOf('SL-') === 0) { const m = String(id).slice(3); openSettle(); setTimeout(() => { if ($('#slMonth') && [...$('#slMonth').options].some((o) => o.value === m)) { $('#slMonth').value = m; loadSlip(m); } }, 300); return; } // 정산서 금액 변경 알림 → 그 달 정산서
+    if (String(id).indexOf('BD-') === 0) return openBdPost(String(id).slice(3), from === 'alerts' ? 'alerts' : 'board'); openPmDetail(id, from); }
   let bdCat = '전체', bdPage = 0, bdPosts = [], bdCats = ['자유', '정보', '질문', '중고·나눔'], bdCurId = '', bdFrom = 'board', bdEditId = '', bdAttach = null, bdRemoveAttach = false, bdReply = null, bdFromHome = 'home';
   const bdAgo = (at) => { try { return agoText(at); } catch (e) { return String(at || '').slice(5, 16); } };
   function openBoard(from) {
