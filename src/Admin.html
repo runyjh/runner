@@ -12002,7 +12002,8 @@
     // 운영자 아이디는 출력하지 않음 (출근 줄·쿠팡 등록 목록 휴무 줄 모두)
     const opIds = new Set((SD.drivers || []).filter((d) => d.loginId && (d.type === '운영자' || d.title === '운영자')).map((d) => String(d.loginId).toLowerCase()));
     const notOp = (id) => !opIds.has(String(id || '').toLowerCase());
-    const work0 = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근' && notOp(r[4])), work = work0.filter((r) => okCamp(r[2]));
+    // 운영자 줄은 품앗이로 받은 날만 서버가 넣어 줌 → 출근 줄만 (휴무 줄은 만들지 않음)
+    const work0 = upRows(tab).filter((r) => r[4] && r[4] !== '미입차' && r[5] === '출근'), work = work0.filter((r) => okCamp(r[2]));
     const skipCamps = Array.from(new Set(work0.filter((r) => !okCamp(r[2])).map((r) => r[2])));
     const dates = upRes.dates.slice(w * 7, w * 7 + 7).filter((d) => d >= upRes.target);
     if (!dates.length) return { rows: [], extra: [], dates };
@@ -12024,7 +12025,7 @@
     const inRoster = new Set(roster.map((x) => x.camp + '|' + x.id));
     const byKey = {}; work.forEach((r) => { (byKey[r[0] + '|' + sc(r[2]) + '|' + r[4]] = byKey[r[0] + '|' + sc(r[2]) + '|' + r[4]] || []).push(r); });
     const extra = [], seenExtra = {};
-    work.forEach((r) => { const k = sc(r[2]) + '|' + r[4]; if (!inRoster.has(k) && dates.indexOf(r[0]) >= 0) { extra.push(r); if (!seenExtra[k]) { seenExtra[k] = 1; roster.push({ camp: sc(r[2]), id: r[4], name: '' }); } } });
+    work.forEach((r) => { const k = sc(r[2]) + '|' + r[4]; if (notOp(r[4]) && !inRoster.has(k) && dates.indexOf(r[0]) >= 0) { extra.push(r); if (!seenExtra[k]) { seenExtra[k] = 1; roster.push({ camp: sc(r[2]), id: r[4], name: '' }); } } });
     roster.sort((a, b) => koSort(a.camp, b.camp) || koSort(nameOf[a.id] || a.id, nameOf[b.id] || b.id));
     const vendor = upRes.cpVendor || '러너/RUNNER', biz = String(upRes.cpBizNo || '6543701141').replace(/\D/g, ''), wave = 'WAVE1';
     const rows = [CP_HEAD];
@@ -12035,6 +12036,7 @@
         if (hit) hit.forEach((r) => rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '출근', r[6] || '', String(r[7] || '').replace(/\s+/g, '')]));
         else rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '휴무', '', '']);
       });
+      work.filter((r) => r[0] === d && !notOp(r[4])).forEach((r) => rows.push([dt, vendor, biz, sc(r[2]), wave, nameOf[r[4]] || '', r[4], '출근', r[6] || '', String(r[7] || '').replace(/\s+/g, '')]));
     });
     return { rows, extra, dates, fromCp, skipCamps };
   }
