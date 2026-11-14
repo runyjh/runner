@@ -1324,7 +1324,7 @@
       st.setItem(SWR.LS, JSON.stringify(all));
     } catch (e) { try { localStorage.removeItem(SWR.LS); sessionStorage.removeItem(SWR.LS); } catch (x) {} } // 저장 공간이 꽉 차면 비움
   }
-  function swrClear() { SWR.mem = {}; try { localStorage.removeItem(SWR.LS); sessionStorage.removeItem(SWR.LS); } catch (e) {} }
+  function swrClear() { SWR.mem = {}; try { ['runner.swr', 'runner.slc'].forEach((k) => { localStorage.removeItem(k); sessionStorage.removeItem(k); }); } catch (e) {} } // runner.slc = 기기에 보관한 마감 정산서
   const swrCopy = (r) => JSON.parse(JSON.stringify(r));
   const swrCopyQ = (r) => (r && typeof r === 'object' ? swrCopy(r) : r);
   function apiRead(fn, args, bgOnly) {
@@ -3308,9 +3308,26 @@
   // 정산서 보관 (이 화면이 열려 있는 동안 메모리에만 · 계좌·금액이 있어 기기에는 저장하지 않음 · 로그아웃·새로고침하면 사라짐)
   //  다시 열면 보관본을 바로 보여 주고 뒤에서 새로 받아 달라졌을 때만 다시 그린다
   const SLC = { tok: '', months: null, slips: {}, seq: 0, at: 0, pre: null };
-  function slcFor(token) { if (SLC.tok !== token) { SLC.tok = token; SLC.months = null; SLC.slips = {}; SLC.at = 0; } return SLC; }
+  // 마감된 달 정산서(고정본)는 기기에도 보관 → 새로고침·앱을 다시 열어도 바로 보이고, 뒤에서 서버와 맞춰 봄 (마감 전 달은 보관하지 않음 · 로그아웃하면 지움)
+  const SLC_LS = 'runner.slc';
+  function slcLoad() { try { const st = swrStore(), o = st && JSON.parse(st.getItem(SLC_LS) || 'null'); return o && o.who === slMe() ? o : null; } catch (e) { return null; } }
+  function slcSave() {
+    try {
+      const st = swrStore(); if (!st || !slMe()) return;
+      const ms = Object.keys(SLC.slips).filter((m) => SLC.slips[m].r && SLC.slips[m].r.closed).sort().reverse().slice(0, 3), slips = {};
+      ms.forEach((m) => { slips[m] = SLC.slips[m].r; });
+      st.setItem(SLC_LS, JSON.stringify({ who: slMe(), months: SLC.months, slips: slips }));
+    } catch (e) { /* 저장 공간 부족 등 → 보관 안 함 */ }
+  }
+  function slcFor(token) {
+    if (SLC.tok !== token) {
+      SLC.tok = token; SLC.months = null; SLC.slips = {}; SLC.at = 0;
+      const o = slcLoad(); if (o) { SLC.months = o.months || null; Object.keys(o.slips || {}).forEach((m) => { slipKeep(token, o.slips[m], true); }); }
+    }
+    return SLC;
+  }
   // 미리 받기: 이 기기에서 정산서를 열어 본 기사만 · 홈이 뜬 뒤 · 화면이 보일 때만 · 10분에 한 번 (기기에는 '열어 봤다'는 표시와 받은 시각만 남김 — 금액·계좌는 메모리에만)
-  const slMe = () => { try { return String((JSON.parse(store.get(USER) || '{}') || {}).id || ''); } catch (e) { return ''; } };
+  const slMe = () => { try { const u = JSON.parse(store.get(USER) || '{}') || {}; return String(u.loginId || u.id || '').toLowerCase(); } catch (e) { return ''; } };
   window.slPrefetch = function () {
     const token = store.get(TOKEN), me = slMe();
     if (!token || !me || SLC.pre || document.hidden) return;
@@ -3335,7 +3352,7 @@
     slTax = r.taxInv || [];
     $('#slBody').innerHTML = (r.closed ? '' : '<div class="sl-warn">⚠️ 아직 마감 전이라 금액이 바뀔 수 있습니다. 세금계산서는 마감 후 금액으로 발행해 주세요.</div>') + taxCards(slTax) + r.slips.map((sl) => slipCard(r, sl)).join('');
   }
-  function slipKeep(token, r) { if (!r || !r.month) return ''; const j = JSON.stringify(r, (k, v) => (k === '_ms' || k === '_st' ? undefined : v)); slcFor(token).slips[r.month] = { r: r, j: j }; return j; }
+  function slipKeep(token, r, noSave) { if (!r || !r.month) return ''; const j = JSON.stringify(r, (k, v) => (k === '_ms' || k === '_st' || k === '_c' ? undefined : v)); (SLC.tok === token ? SLC : slcFor(token)).slips[r.month] = { r: r, j: j }; if (!noSave) slcSave(); return j; }
   function openSettle() {
     show('settle');
     const token = pmTok(); if (!token) return;
