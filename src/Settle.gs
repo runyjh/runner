@@ -4173,8 +4173,15 @@ function mySlip_(u, month) {
       if (!row || seen[row.id] || row.legacyNote || row.vendor || !(r.summary && r.summary.legacy)) return; // 기존 정산 이식 달만 (아이디가 다른 사람에게 넘어간 보통 달의 정산서가 보이지 않게)
       if (row.ownerId ? row.ownerId === u.id : (row.cids || []).some(function (c) { return mine[stlLogin_(c)]; })) { found.push(sl); seen[row.id] = 1; } // 명의자가 있으면 명의자만
     });
-    const slips = found.filter(function (sl) { return !sl.row.legacyNote; }).map(function (sl) {
+    // 대표는 기존 정산서가 없던 달(지급하지 않으므로)도 확인용으로 보여 준다 — 쿠팡 정산서로 계산한 값(ceoView)
+    const slips = found.filter(function (sl) { return !sl.row.legacyNote || sl.row.ceo; }).map(function (sl) {
       const d = sl.row.ceo ? Object.assign({}, sl.row, sl.row.ceoView) : sl.row;
+      if (sl.row.ceo && sl.row.legacyNote) { // 기존 정산 이식 달: 줄이 '(기존 정산서 없음)' 하나뿐 → 계산값으로 줄을 만든다
+        const L = [{ name: '배송 기본', side: '지급', method: '배송기본', taxCut: false, amt: (sl.row.base || 0) + (sl.row.inc || 0), memo: '쿠팡 정산서 기준 (확인용)', unknown: false }];
+        if ((sl.row.fresh || 0) - (sl.row.fbCut || 0)) L.push({ name: '프레시백', side: '지급', method: '프레시백', taxCut: false, amt: (sl.row.fresh || 0) - (sl.row.fbCut || 0), memo: '', unknown: false });
+        if (sl.row.loss) L.push({ name: '분실파손 부담', side: '차감', method: '분실파손', taxCut: false, amt: sl.row.loss, memo: '', unknown: false });
+        sl = Object.assign({}, sl, { lines: L });
+      }
       stlLiveBizName_(d);
       return {
         row: {
