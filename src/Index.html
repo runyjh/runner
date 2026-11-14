@@ -1205,7 +1205,12 @@
       throw e;
     });
   }
+  const FLY = { n: 0 }; // 지금 서버에 나가 있는 호출 수
   function gsCall0(fn, args) {
+    FLY.n++; let done = false; const fin = () => { if (!done) { done = true; FLY.n = Math.max(0, FLY.n - 1); } };
+    return gsCall1(fn, args).then((r) => { fin(); return r; }, (e) => { fin(); throw e; });
+  }
+  function gsCall1(fn, args) {
     if (window.google && google.script && google.script.run) {
       return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
     }
@@ -1299,7 +1304,7 @@
   const SWR_STALE = ['api_notices', 'api_bdRecent', 'api_mySchedule', 'api_campSchedule', 'api_myInfo', 'api_myPerf', 'api_myFb', 'api_myPeak', 'api_pmList', 'api_pmMine', 'api_bdList', 'api_bdPost'];
   const SWR_FRESH = ['api_pmAvailMine', 'api_pmAvailList', 'api_pmForm', 'api_pmPrice', 'api_mySettle', 'api_mySlip', 'api_pmJob']; // 고르는 화면(입력 중) → 옛 값 먼저 안 보여 줌, 15초 재사용만 · 일감 상세는 연락처·배송지 코드가 있어 기기에 남기지 않음
   const SWR_NOWRITE = API_BG.concat(['api_login', 'api_signup', 'api_checkLoginId', 'api_resetVerify', 'api_uiText', 'api_pmAlerts', 'api_pmAttach', 'api_bdAttach', 'api_ntPhoto', 'api_routeInfo', 'api_campImage', 'api_routeNotePhoto', 'api_memoMonth', 'api_ntAdmList', 'api_ntAdmPhoto']); // 첨부 보기는 읽기 → 캐시를 버리지 않음
-  const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40 };
+  const SWR = { mem: {}, writeAt: 0, LS: 'runner.swr', MAX: 40, fly: {} };
   const swrKey = (fn, args) => { const t = String(args[0] || ''); return t.slice(-12) + '|' + fn + '|' + JSON.stringify(args.slice(1)); };
   // 자동 로그인이면 이 기기(localStorage), 아니면 이 창에만(sessionStorage · 창을 닫으면 사라짐) — 로그인 토큰과 같은 곳
   const swrStore = () => { try { return localStorage.getItem(TOKEN) ? localStorage : sessionStorage; } catch (e) { return null; } };
@@ -1318,14 +1323,22 @@
   }
   function swrClear() { SWR.mem = {}; try { localStorage.removeItem(SWR.LS); sessionStorage.removeItem(SWR.LS); } catch (e) {} }
   const swrCopy = (r) => JSON.parse(JSON.stringify(r));
-  function apiRead(fn, args) {
+  const swrCopyQ = (r) => (r && typeof r === 'object' ? swrCopy(r) : r);
+  function apiRead(fn, args, bgOnly) {
     const k = swrKey(fn, args), now = Date.now(), m = SWR.mem[k];
     if (m && now - m.t < 15000 && m.t > SWR.writeAt) return Promise.resolve(swrCopy(m.r));
-    const net = (bg) => (bg ? gsCall(fn, args) : apiNet(fn, args)).then((r) => { if (r && typeof r === 'object') delete r._ms; if (r && r.ok) swrSave(k, r); return r; });
+    const net = (bg) => {
+      const f = SWR.fly[k]; if (f && f.w === SWR.writeAt) return f.p.then(swrCopyQ); // 같은 것이 이미 가는 중 → 그 답을 같이 씀
+      const p = (bg ? gsCall(fn, args) : apiNet(fn, args)).then((r) => { if (r && typeof r === 'object') delete r._ms; if (r && r.ok) swrSave(k, r); return r; });
+      const o = SWR.fly[k] = { p: p, w: SWR.writeAt }; const off = () => { if (SWR.fly[k] === o) delete SWR.fly[k]; }; p.then(off, off);
+      return p.then(swrCopyQ);
+    };
+    if (bgOnly) return net(true); // 뒤에서 미리 받기: 도는 표시 없이 · 같은 것이 가는 중이면 같이 씀
     if (SWR_STALE.includes(fn) && now - SWR.writeAt > 120000) {
       const c = swrAll()[k];
       if (c && c.r && now - c.t < 7 * 86400000 && c.t > SWR.writeAt) {
         const view = curView, old = JSON.stringify(c.r);
+        if (now - c.t < 60000) { const o1 = swrCopy(c.r); o1._c = 1; return Promise.resolve(o1); } // 1분 안에 받은 것 → 서버에 다시 묻지 않음
         net(true).then((r) => { if (r && r.ok && JSON.stringify(r) !== old && curView === view) swrRefresh(); }).catch(() => {});
         const out = swrCopy(c.r); out._c = 1; return Promise.resolve(out);
       }
@@ -1353,6 +1366,19 @@
     }, 200);
   }
   // 홈이 뜬 뒤 뒤에서 미리 받아 두기 (자주 여는 화면 · 10분 안에 받은 게 있으면 건너뜀) → 처음 열 때도 바로 보임
+  // 뒤에서 할 일을 줄 세워, 서버에 나가 있는 호출이 1개 이하일 때 하나씩 (최대 25초 기다리면 그냥 보냄)
+  const BGQ = { q: [], t: 0, since: 0 };
+  function bgIdle(fn) {
+    BGQ.q.push(fn);
+    if (BGQ.t) return;
+    BGQ.since = Date.now();
+    BGQ.t = setInterval(() => {
+      if (!BGQ.q.length) { clearInterval(BGQ.t); BGQ.t = 0; return; }
+      if (FLY.n > 1 && Date.now() - BGQ.since < 25000) return;
+      BGQ.since = Date.now();
+      try { (BGQ.q.shift())(); } catch (e) { /* 무시 */ }
+    }, 600);
+  }
   function swrPrefetch() {
     const tok = store.get(TOKEN); if (!tok) return;
     const all = swrAll(), now = Date.now();
@@ -1360,11 +1386,19 @@
     [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]], ['api_campSchedule', [tok, pddMonth, undefined]]].forEach((x, i) => {
       const k = swrKey(x[0], x[1]), c = all[k];
       if (c && now - c.t < 600000) return;
-      setTimeout(() => { if (store.get(TOKEN) === tok) gsCall(x[0], x[1]).then((r) => { if (r && r.ok) swrSave(k, r); }).catch(() => {}); }, i * 1500);
+      bgIdle(() => { if (store.get(TOKEN) !== tok) return; const c2 = swrAll()[k]; if (c2 && Date.now() - c2.t < 600000) return; apiRead(x[0], x[1], true).catch(() => {}); }); // 화면이 먼저 같은 것을 불렀으면 그 답을 같이 씀
     });
   }
+  const RD1 = { m: {} }; // 읽기만 하는 그 밖의 호출: 같은 것은 한 번만 보내고 1분 동안 그 답을 씀
   const api = (fn, ...args) => {
     if (SWR_STALE.includes(fn) || SWR_FRESH.includes(fn)) return apiRead(fn, args);
+    if (fn === 'api_routeInfo') {
+      const k = swrKey(fn, args), c = RD1.m[k], now = Date.now();
+      if (c && (c.busy || now - c.t < 60000) && c.w === SWR.writeAt) return c.p.then(swrCopyQ);
+      const o = RD1.m[k] = { t: now, w: SWR.writeAt, busy: 1, p: apiNet(fn, args) };
+      o.p.then((r) => { o.busy = 0; o.t = Date.now(); if (!r || !r.ok) delete RD1.m[k]; }, () => { delete RD1.m[k]; });
+      return o.p.then(swrCopyQ);
+    }
     if (!SWR_NOWRITE.includes(fn)) { SWR.writeAt = Date.now(); SWR.mem = {}; } // 저장·지원 등 → 다음 읽기는 새 값
     return apiNet(fn, args);
   };
@@ -1518,9 +1552,8 @@
     setTimeout(() => { try { fsReady(); } catch (e) {} }, 0); // Firestore 준비 (홈 사본)
     setTimeout(() => { if (window.pmAlertStart) window.pmAlertStart(); }, 0); // (알림 함수는 뒤에서 선언되므로 한 박자 뒤에)
     if (saved) setTimeout(() => restoreView(saved), 0);
-    setTimeout(swrPrefetch, 4000);
-    setTimeout(() => { try { seenBoot(); } catch (e) { /* 확인 기록은 없어도 됨 */ } }, 6000); // 급한 것들이 끝난 뒤 조용히
-    setTimeout(() => { if (window.slPrefetch) window.slPrefetch(); }, 9000); // 정산서를 보는 기사만 뒤에서 미리 (위 미리 받기가 끝난 뒤)
+    // 뒤에서 미리 받기 · 확인 기록 · 정산서 미리 받기: 홈의 급한 호출(로그인 확인 · 공지 · 피크 · 게시판)이 끝난 뒤 하나씩
+    setTimeout(() => { swrPrefetch(); bgIdle(() => { try { seenBoot(); } catch (e) { /* 확인 기록은 없어도 됨 */ } }); bgIdle(() => { if (window.slPrefetch) window.slPrefetch(); }); }, 2500);
   }
   function goLogin() {
     const last = store.get(LAST_ID);
@@ -1549,12 +1582,16 @@
   let uidRaf = 0;
   new MutationObserver(() => { if (!uidRaf) uidRaf = requestAnimationFrame(() => { uidRaf = 0; uidApply(); }); }).observe(document.body, { childList: true, subtree: true });
   uidApply();
-  api('api_uiText').then((r) => {
-    if (!r || !r.ok) return;
-    UID.map = r.map || {};
-    try { localStorage.setItem('runner.uiText.d', JSON.stringify(UID.map)); } catch (e) {}
-    uidApply();
-  }).catch(() => {});
+  (() => {
+    let at = 0; try { at = +localStorage.getItem('runner.uiText.t') || 0; } catch (e) { at = 0; }
+    const go = () => api('api_uiText').then((r) => {
+      if (!r || !r.ok) return;
+      UID.map = r.map || {};
+      try { localStorage.setItem('runner.uiText.d', JSON.stringify(UID.map)); localStorage.setItem('runner.uiText.t', String(Date.now())); } catch (e) {}
+      uidApply();
+    }).catch(() => {});
+    if (!at || Date.now() - at > 6 * 3600000) setTimeout(() => (typeof bgIdle === 'function' ? bgIdle(go) : go()), 0); // 처음이거나 6시간 지났을 때만 · 홈의 급한 호출 뒤에
+  })();
 
   (function boot() {
     const token = store.get(TOKEN);
