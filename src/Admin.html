@@ -14883,7 +14883,9 @@
     if (!stLeaveOk()) return; // 공제·가불 등 표에 저장 안 한 줄이 있으면 먼저 묻는다 (마감하면 표를 다시 불러와 지워짐)
     const close = !s.closed;
     if (!confirm(close ? ymTitle(STX.month) + ' 정산을 마감할까요?\n지금 계산 결과가 고정되고, 이 달의 쿠팡 정산서·공제·용차는 고칠 수 없게 됩니다 (입금체크는 계속 가능).' : ymTitle(STX.month) + ' 마감을 풀까요?\n다시 지금 데이터로 계산됩니다.')) return;
-    api('adm_stlClose', STX.month, close).then((r) => { if (!r.ok) return toast(r.msg); toast(close ? '마감했습니다.' : '마감을 풀었습니다.'); STX.sum = null; loadSettle(STX.month, true); }).catch(() => {});
+    api('adm_stlClose', STX.month, close).then((r) => { if (!r.ok) return toast(r.msg); toast(close ? '마감했습니다.' : '마감을 풀었습니다.');
+      if (close && r.changed && r.changed.length) alert('다시 마감하면서 금액이 바뀐 기사 ' + r.changed.length + '명 — 기사 앱으로 알림을 보냈습니다.\n\n' + r.changed.map((c) => '· ' + c.name + ' : 발행 금액 ' + wn(c.from) + ' → ' + wn(c.to) + (c.netFrom !== c.netTo ? ' · 실입금 ' + wn(c.netFrom) + ' → ' + wn(c.netTo) : '') + (c.inv ? '  ⚠ 이미 계산서 받음 → 수정 발행 필요' : '')).join('\n'));
+      if (!close) toast('마감을 풀었습니다. 지금 금액을 기억해 두었다가, 다시 마감할 때 바뀐 기사에게 알림을 보냅니다.'); STX.sum = null; loadSettle(STX.month, true); }).catch(() => {});
   });
   $$('#stTabs .tab').forEach((b) => b.addEventListener('click', () => stShowTab(b.dataset.st)));
   $$('#stCfgTabs .tab').forEach((b) => b.addEventListener('click', () => stCfgTab(b.dataset.cfg)));

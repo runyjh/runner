@@ -3182,6 +3182,8 @@ function adm_stlClose(token, month, close) {
         stlAdvMark_(month, res.summary.advAuto || [], true);
         stlLastCloseSet_(month);
         logAdmin_(a, '정산 마감', month, res.summary.drivers.length + '명');
+        // 마감을 풀었다가 다시 마감: 발행 금액이 바뀐 기사에게 알림 (예전 금액으로 세금계산서를 발행했을 수 있음) · 관리자에게도 목록
+        try { var changed = stlPrevNotify_(month, res); } catch (e) { softFail_('다시 마감 금액 변경 알림 실패', e); }
         // 휴대폰 알림(앱 아이콘 숫자) — 기사 앱 사용 중인 기사 전원. 알림을 누르면 앱이 열리고 '정산서 마감' 안내 창이 뜸
         try {
           const mm = Number(month.slice(5, 7));
@@ -3190,6 +3192,7 @@ function adm_stlClose(token, month, close) {
           }));
         } catch (e) { softFail_('마감 알림 실패', e); }
       } else {
+        try { stlPrevSave_(month); } catch (e) { softFail_('마감 해제 전 금액 기억 실패', e); }
         stlWriteAll_('stl_close', others);
         stlReplaceMonth_('stl_closed', month, []);
         stlAdvMark_(month, [], false);
@@ -3197,11 +3200,38 @@ function adm_stlClose(token, month, close) {
         logAdmin_(a, '정산 마감 해제', month, '');
       }
       stlBump_();
-      return { ok: true };
+      return { ok: true, changed: (typeof changed !== 'undefined' && changed) || [] };
     } finally {
       lock.releaseLock();
     }
   });
+}
+/** 마감을 풀 때: 그 달 정산서별 발행 금액(계산서)·실입금을 기억 (다시 마감할 때 바뀐 기사를 찾으려고) */
+function stlPrevSave_(month) {
+  const snap = stlClosedLoad_(month), sum = snap && snap.summary;
+  if (!sum || !sum.drivers) return;
+  const m = {};
+  sum.drivers.forEach(function (d) { if (d.ceo || d.vendor || !d.ownerId) return; m[d.id] = [d.invoice || 0, d.net || 0, d.ownerId, d.name, d.inv ? 1 : 0]; });
+  PropertiesService.getScriptProperties().setProperty('STL_PREV_' + month, JSON.stringify(m)); _props = null;
+}
+/** 다시 마감할 때: 기억해 둔 금액과 달라진 기사 → 기사 앱 알림(목록 + 휴대폰) · 반환 = [{ name, from, to, inv }] */
+function stlPrevNotify_(month, res) {
+  const sp = PropertiesService.getScriptProperties(), raw = sp.getProperty('STL_PREV_' + month);
+  if (!raw) return [];
+  sp.deleteProperty('STL_PREV_' + month); _props = null;
+  let prev = {}; try { prev = JSON.parse(raw) || {}; } catch (e) { return []; }
+  const mm = Number(month.slice(5, 7)), out = [], alerts = [];
+  res.summary.drivers.forEach(function (d) {
+    const p = prev[d.id]; if (!p || d.ceo || d.vendor) return;
+    if (p[0] === (d.invoice || 0) && p[1] === (d.net || 0)) return;
+    out.push({ name: d.name, from: p[0], to: d.invoice || 0, netFrom: p[1], netTo: d.net || 0, inv: !!p[4] });
+    if (p[0] !== (d.invoice || 0)) alerts.push({ driverId: String(d.ownerId || p[2]), name: d.name, jobId: 'SL-' + month, kind: 'slip',
+      title: '⚠️ ' + mm + '월 정산서 금액이 바뀌었습니다', text: '세금계산서 발행 금액 ' + won_(p[0]) + '원 → ' + won_(d.invoice || 0) + '원. 이미 예전 금액으로 발행했다면 사무실에 알려 주세요.' });
+    else alerts.push({ driverId: String(d.ownerId || p[2]), name: d.name, jobId: 'SL-' + month, kind: 'slip',
+      title: mm + '월 정산서 입금액이 바뀌었습니다', text: '실 입금액 ' + won_(p[1]) + '원 → ' + won_(d.net || 0) + '원 (세금계산서 발행 금액은 그대로).' });
+  });
+  if (alerts.length) { try { pmAlertAdd_(alerts); } catch (e) { softFail_('정산 변경 알림 저장 실패', e); } try { pmPushSend_(alerts); } catch (e) { /* 휴대폰 알림은 없어도 됨 */ } }
+  return out;
 }
 
 /** 마감: 자동 상계한 가불금을 상환금에 더하고 메모에 [2026-10 정산 상계 300,000] 표시 / 마감 해제: 그 표시만큼 되돌림 */
