@@ -3340,7 +3340,8 @@
     show('settle');
     const token = pmTok(); if (!token) return;
     const C = slcFor(token), seq = ++SLC.seq;
-    const m0 = C.months && C.months.length ? C.months[0].month : '', had = !!(m0 && C.slips[m0]);
+    // 보관본을 먼저 보여 주는 건 마감된 달(고정본)만 — 마감 전 달은 금액이 바뀔 수 있어 서버에서 새로 받은 것만 보여 줌
+    const m0 = C.months && C.months.length ? C.months[0].month : '', had = !!(m0 && C.slips[m0] && C.slips[m0].r.closed);
     if (had) { slMonthsPaint(C.months, m0); slipPaint(C.slips[m0].r); if (Date.now() - C.at < 60000) return; } // 보관본 먼저 (방금 받은 것이면 다시 받지 않음)
     else $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     if (!had && SLC.pre) { SLC.pre.then(() => { if (seq === SLC.seq) openSettle(); }); return; } // 미리 받는 중이면 그걸 기다림 (두 번 부르지 않음)
@@ -3371,8 +3372,8 @@
   }
   function loadSlip(month) {
     const token = pmTok(); if (!token) return;
-    const C = slcFor(token), seq = ++SLC.seq, had = C.slips[month];
-    if (had) slipPaint(had.r); // 보관본 먼저
+    const C = slcFor(token), seq = ++SLC.seq, had0 = C.slips[month], had = had0 && had0.r.closed ? had0 : null;
+    if (had) slipPaint(had.r); // 보관본 먼저 (마감된 달만)
     else $('#slBody').innerHTML = '<div class="pmempty">불러오는 중…</div>';
     api('api_mySlip', token, month).then((r) => {
       if (seq !== SLC.seq) return;
