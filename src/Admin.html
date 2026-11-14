@@ -9663,9 +9663,35 @@
   }
   let sLoadSeq = 0;
   let sStale = false; // 보관해 둔 직전 자료를 먼저 그린 상태 (새 자료를 받는 중)
+  // ── 기간별 임시 보관 (이 창에서만): 한 번 본 주·달은 다시 갈 때 바로 그리고, 뒤에서 새 자료로 바꿔 그림 · 앞뒤 주는 미리 받아 둠 ──
+  //  고친 칸은 보관본에도 바로 반영(scPatch) → 다시 와도 내가 고친 값 그대로 · 저장 때 서버가 이전 값과 대조하므로 다른 곳 변경과 섞이지 않음
+  const SCACHE = new Map(), SC_MAX = 8, SCFLY = new Map(); // SCFLY = 미리 받는 중인 기간 (그 사이 그 주로 가면 같은 요청을 기다림)
+  const scSun = (d) => { const p = String(d || ymdLocal(new Date())).split('-').map(Number), t = new Date(p[0], p[1] - 1, p[2]); t.setDate(t.getDate() - t.getDay()); return ymdLocal(t); };
+  const scKey = (start) => sMode === 'month' ? 'm|' + sBasis + '|' + (sMonth || monthOf(start || ymdLocal(new Date()))) : 'w|' + scSun(start);
+  const scPut = (k, r) => { SCACHE.delete(k); SCACHE.set(k, { r: r, t: Date.now() }); while (SCACHE.size > SC_MAX) SCACHE.delete(SCACHE.keys().next().value); };
+  function scSaveCur() { // 지금 화면 자료(고친 칸 포함)를 보관
+    if (!SD.dates || !SD.dates.length || !SD.start) return;
+    try { const k = SD._sk || ('w|' + SD.start), o = SCACHE.get(k), c = JSON.parse(JSON.stringify(SD)); delete c._sk; scPut(k, c); if (o) SCACHE.get(k).t = o.t; } catch (e) { /* 무시 */ }
+  }
+  function scPatch(row, date, v) { SCACHE.forEach((x) => { const r = x.r; if (!r || !r.dates || r.dates.indexOf(date) < 0) return; const c = r.cells[row] = r.cells[row] || {}; if (v) c[date] = v; else delete c[date]; }); }
+  let scPreT = 0;
+  function scPrefetch() { // 2주 보기: 앞뒤 한 주를 미리 (한가할 때 · 이미 2분 안에 받은 건 건너뜀)
+    clearTimeout(scPreT);
+    if (sMode === 'month' || !SD.start) return;
+    scPreT = setTimeout(() => {
+      [shiftDays(SD.start, 7), shiftDays(SD.start, -7)].reduce((pr, st) => pr.then(() => {
+        const k = 'w|' + scSun(st), o = SCACHE.get(k);
+        if (sMode === 'month' || (o && Date.now() - o.t < 120000)) return null;
+        const pr2 = api('adm_schWeek', st).then((r) => { if (r && r.ok) scPut(k, r); SCFLY.delete(k); return r; }).catch((e) => { SCFLY.delete(k); throw e; });
+        SCFLY.set(k, pr2); return pr2.catch(() => {});
+      }), Promise.resolve());
+    }, 1500);
+  }
   function loadSched(start) {
     if (!SD.dates.length) $('#sWrap').innerHTML = '<div style="padding:40px"><div class="spin"></div></div>';
     paintModeUi();
+    scSaveCur();
+    const sk = scKey(start), hit = SCACHE.get(sk);
     const seq = ++sLoadSeq; // ◀▶ 를 빠르게 누르거나 2주↔한 달을 바꾼 뒤 늦게 온 이전 응답은 버린다
     const apply = (r) => {
       Object.assign(SD, r);
@@ -9678,6 +9704,7 @@
       if (sMode === 'month' && !sMonth) sMonth = monthOf(SD.dates[0]);
       paintModeUi(); renderSchedCamps(); renderSched();
     };
+    if (hit && hit.r && hit.r.start !== SD.start) { try { apply(JSON.parse(JSON.stringify(hit.r))); SD._sk = sk; sStale = true; } catch (e) { /* 무시 */ } } // 본 적 있는 기간: 바로 그림 (곧 새 자료로)
     // 처음 여는 것이면(새로고침·배포 뒤) 이 창에 보관해 둔 같은 기간 자료를 먼저 그린다 → 서버 응답(평균 7초)을 기다리지 않고 바로 보임.
     //  곧 새 자료로 다시 그리고, 그 사이 고친 칸은 저장 때 서버가 이전 값과 대조한다 (다른 곳에서 바뀌었으면 저장하지 않고 알림)
     if (!SD.dates.length && !start) {
@@ -9686,11 +9713,13 @@
       const c = admKeep.getP('sched'), tdy = ymdLocal(new Date());
       if (c && c.r && c.mode === sMode && (c.basis || '') === (sMode === 'month' ? sBasis : '') && Array.isArray(c.r.dates) && (sMode === 'month' ? c.month === (sMonth || monthOf(tdy)) : c.r.dates.includes(tdy))) { try { if (sMode === 'month' && !sMonth) sMonth = c.month; sStale = true; apply(c.r); } catch (e) { SD.dates = []; sStale = false; } }
     }
-    return fetchSched(start).then((r) => {
+    return (SCFLY.get(sk) || fetchSched(start)).then((r) => {
       if (seq !== sLoadSeq) return;
       if (!r.ok) { sStale = false; return toast(r.msg); }
       sStale = false;
-      apply(r);
+      apply(r); SD._sk = sk;
+      try { scPut(sk, JSON.parse(JSON.stringify(r))); } catch (e) { /* 무시 */ }
+      scPrefetch();
       // 휴대폰: 홈이 뜬 뒤 한가할 때 이슈 · 품앗이 목록을 미리 받아 둔다 → 관리 탭을 열면 바로 보인다 (앱을 연 뒤 한 번만)
       if (!loadSched.pre && document.documentElement.classList.contains('m')) { loadSched.pre = true; setTimeout(() => { try { if (!IS.list.length) loadIssue(); } catch (e) { /* 무시 */ } setTimeout(() => { try { if (!PA.jobs.length) loadPumasi(); } catch (e) { /* 무시 */ } }, 1500); }, 2500); }
       { const t = new Date(), tdy = ymdLocal(t), tmr = ymdLocal(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1));
@@ -11047,6 +11076,7 @@
       if (!(opts && opts.force) && !pmLockKeeps(x.row, x.date, v)) { lockHit++; return; } // 배차 확정 품앗이 칸은 못 바꿈 (지우기·붙여넣기·끌어 채우기 모두)
       (SD.cells[x.row] = SD.cells[x.row] || {})[x.date] = v;
       if (!v) delete SD.cells[x.row][x.date];
+      scPatch(x.row, x.date, v);
       const k = x.row + '|' + x.date;
       if (v === (sBase[k] || '')) delete sPending[k];
       else sPending[k] = { row: x.row, date: x.date, value: v };
