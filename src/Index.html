@@ -1278,7 +1278,7 @@
   }
   function fsSignOut() { try { const app = window.firebase && firebase.apps.find((a) => a.name === 'rfs'); if (app) app.auth().signOut(); } catch (e) {} fsLs(null); FSR.p = null; FSR.ok = false; }
   // 데이터를 다 읽어 올 때까지 화면을 누를 수 없게 막는다 (뒤에서 도는 알림 확인·공지 등은 제외)
-  const API_BG = ['api_myPeak', 'api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_ntPhoto', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead', 'api_pmAlertsDel'];
+  const API_BG = ['api_myPeak', 'api_perf', 'api_uiText', 'api_fsToken', 'api_bdRecent', 'api_checkSession', 'api_ping', 'api_pmAlerts', 'api_notices', 'api_ntPhoto', 'api_pmPushConfig', 'api_pmPushSave', 'api_pmPushDel', 'api_pmPushLog', 'api_logout', 'api_pmPrice', 'api_pmAlertsRead', 'api_pmAlertsDel', 'api_seen', 'api_seenAck']; // api_seen · api_seenAck: 확인 기록만 남김 — 스케줄 · 공지 자료를 바꾸지 않으므로 받아 둔 화면을 버리지 않는다
   let apiBusy = 0, busyTimer = 0;
   function busy(on) {
     apiBusy = Math.max(0, apiBusy + (on ? 1 : -1));
@@ -1357,7 +1357,7 @@
     const tok = store.get(TOKEN); if (!tok) return;
     const all = swrAll(), now = Date.now();
     const t1 = new Date(), pddMonth = ymdOf(new Date(t1.getFullYear(), t1.getMonth(), t1.getDate() + 1)).slice(0, 7); // 스케줄 화면이 처음 여는 달 (PDD가 있는 달)과 같은 키로
-    [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]]].forEach((x, i) => {
+    [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]], ['api_campSchedule', [tok, pddMonth, undefined]]].forEach((x, i) => {
       const k = swrKey(x[0], x[1]), c = all[k];
       if (c && now - c.t < 600000) return;
       setTimeout(() => { if (store.get(TOKEN) === tok) gsCall(x[0], x[1]).then((r) => { if (r && r.ok) swrSave(k, r); }).catch(() => {}); }, i * 1500);
