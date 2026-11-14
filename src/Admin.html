@@ -11778,6 +11778,7 @@
       $('#pmcUse').innerHTML = M.useIds.map((x) => '<option>' + esc(x) + '</option>').join('');
       $('#pmcTop').innerHTML = M.tops.map((x) => '<option>' + esc(x) + '</option>').join('');
       PMC.mode = 'confirm'; $$('#pmcMode [data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === PMC.mode));
+      if (!/^\d/.test($('#pmcRoute').value.trim())) { $('#pmcRoute').value = ''; pmcFill(); } // '백업' 같은 글자는 노선이 아님 → 받은 기사 칸에서
       pmcNote();
       $('#pmcModal').classList.remove('hidden');
       (did ? $('#pmcTo') : $('#pmcPoster')).focus();
@@ -11794,8 +11795,25 @@
   $('#pmcModal').addEventListener('click', (e) => { if (e.target.id === 'pmcModal') $('#pmcModal').classList.add('hidden'); });
   $('#pmcKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; $$('#pmcKind [data-k]').forEach((x) => x.classList.toggle('on', x === b)); });
   $('#pmcMode').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (!b) return; PMC.mode = b.dataset.m; $$('#pmcMode [data-m]').forEach((x) => x.classList.toggle('on', x === b)); pmcNote(); });
-  $('#pmcTo').addEventListener('change', pmcNote);
-  $('#pmcPoster').addEventListener('change', () => { const d0 = SD.drivers.find((x) => x.id === $('#pmcPoster').value), d = d0 && $('#pmcDate').value ? drvAt(d0, $('#pmcDate').value) || d0 : d0; if (d) { if (d.campId) $('#pmcCamp').value = d.campId; if (!$('#pmcRoute').value) $('#pmcRoute').value = d.baseRoute || ''; } });
+  /**
+   * 캠프 · 노선 미리 채우기: 맡긴 기사의 그날 담당 노선 (노선 번호가 있을 때만 — '백업' · 운영자는 노선이 아님)
+   *  → 없으면 받은 기사의 그날 칸에 적힌 노선 (예: 받은 기사 칸 '군포1 212CD' = 그날 대신 뛴 노선)
+   */
+  function pmcFill() {
+    const dt = $('#pmcDate').value, rt = $('#pmcRoute').value.trim(), at = (id) => { const d0 = SD.drivers.find((x) => x.id === id); return d0 && dt ? drvAt(d0, dt) || d0 : d0; };
+    if (rt && /^\d/.test(rt)) return; // 이미 노선이 있으면 그대로
+    const p = at($('#pmcPoster').value);
+    if (p && p.baseRoute && /^\d/.test(p.baseRoute)) { if (p.campId) $('#pmcCamp').value = p.campId; $('#pmcRoute').value = p.baseRoute; return; }
+    const t = at($('#pmcTo').value); if (!t || !dt) return;
+    const v = String(sget(t.id, dt) || '').replace(/\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)/g, ' ').replace(/업무등록/g, ' ').replace(/\s+/g, ' ').trim(), m = v.match(CUT_RE);
+    if (!m) return;
+    const cid = m[1] ? cutCampId(m[1].replace(/\s/g, '')) : t.campId;
+    if (cid) $('#pmcCamp').value = cid;
+    $('#pmcRoute').value = m[2].trim();
+  }
+  $('#pmcTo').addEventListener('change', () => { pmcFill(); pmcNote(); });
+  $('#pmcPoster').addEventListener('change', pmcFill);
+  $('#pmcDate').addEventListener('change', pmcFill);
   $('#pmcGo').addEventListener('click', () => {
     const kb = $('#pmcKind .on'), kind = kb ? kb.dataset.k : '';
     const job = { posterId: $('#pmcPoster').value, date: $('#pmcDate').value, kind, time: $('#pmcTime').value, campId: $('#pmcCamp').value, route: $('#pmcRoute').value, area: $('#pmcArea').value,
@@ -11803,6 +11821,7 @@
     if (!job.posterId) return toast('맡기는 쪽을 골라 주세요. (기사 또는 러너)');
     if (PMC.mode !== 'open' && !job.toId) return toast('받는 기사를 골라 주세요.');
     if (!job.campId) return toast('캠프를 골라 주세요.');
+    if (/^(백업|예비|용차)/.test(String(job.route || '').trim())) return toast('대신 뛴 노선을 적어 주세요. (예: 212CD) — \'백업\'은 노선이 아닙니다.');
     try { localStorage.setItem('runner.pmcKind', kind); } catch (e) {}
     const b = $('#pmcGo'); b.disabled = true;
     const send = (j) => api('adm_pmCreate', j).then((r) => (r && !r.ok && r.code === 'LOW' ? (confirm(r.msg + '\n\n그래도 이 단가로 등록할까요?') ? send(Object.assign({}, j, { okLow: true })) : null) : r));
