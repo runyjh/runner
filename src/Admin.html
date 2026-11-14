@@ -9187,12 +9187,17 @@
       const missing = [], dups = [], dupCells = new Set(), dupInfo = new Map(); // dupInfo: '행|날짜칸' → [{ camp, route, rot, keys }]
       const missCells = new Map(); // '행|날짜칸' → ['529A', '529B(F3)'] : 그 기사 기본노선 중 그날 아무도 안 뛰는(미배정) 노선
       for (let d = 0; d < nDays; d++) {
-        const baseRouteSet = new Set(), present = new Map(), explicitMi = [];
-        const addPresent = (camp, routeList, rotArr, key, per) => routeList.forEach((rt) => ((per && per[rt] && per[rt].length) ? per[rt] : rotArr).forEach((rot) => {
-          const k = [camp, rt, rot].join('|');
-          if (!present.has(k)) present.set(k, new Set());
-          present.get(k).add(key);
-        }));
+        const baseRouteSet = new Set(), present = new Map(), partOf = new Map(), explicitMi = [];
+        // 회전을 좁게 적은 사람(부분)은 partOf 에도 — 쿠팡 업로드 규칙: '205CD' + '205C (D2,F3)' 는 올릴 수 있음 (부분이 그 회전의 주인 · 전체로 적힌 사람은 나머지 회전)
+        const addPresent = (camp, routeList, rotArr, key, per) => routeList.forEach((rt) => {
+          const rr = (per && per[rt] && per[rt].length) ? per[rt] : rotArr, part = rr.length < defRotArr(camp).length;
+          rr.forEach((rot) => {
+            const k = [camp, rt, rot].join('|');
+            if (!present.has(k)) present.set(k, new Set());
+            present.get(k).add(key);
+            if (part) { if (!partOf.has(k)) partOf.set(k, new Set()); partOf.get(k).add(key); }
+          });
+        });
         rows.forEach((r) => {
           if (r.active && !r.active[d]) return; // 노선 변경 예약: 이 줄은 그날 다른 캠프·노선
           const baseCamp = r.camp || '';
@@ -9297,9 +9302,11 @@
           const [camp, label] = gk.split('|');
           return (camp ? camp + ' ' : '') + grouped.get(gk).sort().join(',') + label;
         }));
-        // 중복: 같은 날 같은 캠프·노선·회전에 두 명 이상
+        // 중복: 같은 날 같은 캠프·노선·회전에 두 명 이상 — 단 한 명이 그 회전만 좁게(부분) 적고 나머지는 전체로 적은 경우는 중복 아님 (쿠팡 업로드 규칙과 같게)
+        //   중복 = 부분끼리 2명 이상, 또는 부분 없이 전체끼리 2명 이상
         const dl = [];
-        present.forEach((who, k) => {
+        present.forEach((all, k) => {
+          const pt = partOf.get(k), who = pt && pt.size ? pt : all;
           if (who.size < 2) return;
           const [camp, rt, rot] = k.split('|');
           const it = { camp, route: rt, rot, keys: Array.from(who) };
