@@ -2783,13 +2783,10 @@
 <div class="modal hidden" id="upModal">
   <div class="m-box wide" style="width:min(1180px,100%)">
     <div class="m-top"><b id="upTitle">어드민 업로드 테이블</b>
-      <a class="btn ghost" id="upSheet" target="_blank" rel="noopener">시트에서 열기</a>
-      <button type="button" class="btn ghost" id="upRegen">다시 만들기</button>
       <button type="button" class="btn ghost" id="upClose">닫기</button></div>
     <div class="up-bar">
       <div class="seg" id="upTabs"></div>
       <span class="up-info" id="upInfo"></span>
-      <label class="check"><input type="checkbox" id="upWithName"> 명단 열 포함</label>
       <button type="button" class="btn ghost" id="upCopy">이 표 복사</button>
       <button type="button" class="btn" id="upXlsx" title="지금 보고 있는 주차 표의 줄 그대로 쿠팡 어드민 업로드 양식(업무일·벤더명·사업자등록번호·캠프명·웨이브·이름·아이디·업무상태·회전·업무라우트)으로">⬇ 쿠팡 업로드 엑셀</button>
     </div>
@@ -11884,9 +11881,15 @@
       upRes = r;
       const d0 = r.dates[0], d1 = r.dates[r.dates.length - 1];
       $('#upTitle').textContent = '어드민 업로드 테이블 · 기사스케줄 화면 첫 날짜 ' + r.target.slice(5).replace('-', '/') + '부터 4주 (주차별)';
-      $('#upSheet').href = r.url || '#'; $('#upSheet').classList.toggle('hidden', !r.url);
+      // 스케줄을 아직 안 넣은 주(출근 0건)는 빼고 — 그 주 미입차·중복도 함께 뺀다 (노선 전부가 미입차로 쌓이지 않게)
+      r.wkOn = (r.weeks || []).map((w) => !!(w && w.length));
+      const live = new Set(); r.wkOn.forEach((on, i) => { if (on) r.dates.slice(i * 7, i * 7 + 7).forEach((d) => live.add(d)); });
+      r.missing = (r.missing || []).filter((x) => live.has(String(x[0]).slice(0, 10)));
+      r.dups = (r.dups || []).filter((x) => live.has(String(x[0]).slice(0, 10)));
+      const nW = r.wkOn.filter(Boolean).length;
+      $('#upTitle').textContent = '어드민 업로드 테이블 · ' + r.target.slice(5).replace('-', '/') + '부터 ' + (nW || 0) + '주' + (nW < 4 ? ' (스케줄이 들어간 주만)' : '');
       if (r.sheetError) toast('화면에는 만들었지만 시트에 쓰지 못했습니다: ' + r.sheetError);
-      upTab = 'w1';
+      upTab = r.wkOn.indexOf(true) >= 0 ? 'w' + (r.wkOn.indexOf(true) + 1) : 'mi';
       upTabsRender(); upRender(); upRosterInfo();
     }).catch(() => { $('#upWrap').innerHTML = ''; });
   }
@@ -11902,7 +11905,8 @@
   function upTabsRender() {
     // 주차(일~토) 탭: '2주차 (11/8~11/14) 출근 170건' — 한 주 시작은 항상 일요일 · 그 주 일요일이 든 달의 N주차 (표 머리글과 같은 셈법)
     const md = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
-    const t = (upRes.weeks || []).slice(0, 4).map((rows, i) => { const ds = upRes.dates.slice(i * 7, i * 7 + 7).filter((d) => d >= upRes.target); return ['w' + (i + 1), (ds[0] ? weekOfMonth(ds[0]) : i + 1) + '주차 (' + md(ds[0] || upRes.dates[i * 7]) + '~' + md(upRes.dates[Math.min(upRes.dates.length - 1, i * 7 + 6)]) + ') 출근', '건']; })
+    const dw = ['일', '월', '화', '수', '목', '금', '토'], mdw = (d) => md(d) + '(' + dw[new Date(d + 'T00:00:00').getDay()] + ')';
+    const t = (upRes.weeks || []).slice(0, 4).map((rows, i) => { if (upRes.wkOn && !upRes.wkOn[i]) return null; const ds = upRes.dates.slice(i * 7, i * 7 + 7).filter((d) => d >= upRes.target); return ['w' + (i + 1), mdw(ds[0] || upRes.dates[i * 7]) + ' ~ ' + mdw(upRes.dates[Math.min(upRes.dates.length - 1, i * 7 + 6)]) + ' 출근', '건']; }).filter(Boolean)
       .concat([['mi', '미입차', '건'], ['dup', '중복', '건']]);
     $('#upTabs').innerHTML = t.map(([k, l, u]) => '<button type="button" data-up="' + k + '" class="' + (k === upTab ? 'on' : '') + '" title="' + esc(l + ' ' + upRows(k).length + u) + '">' + l + ' ' + upRows(k).length + u + '</button>').join('');
     upTabsFit();
@@ -12065,7 +12069,6 @@
     toast('받았습니다: 표와 같은 ' + src.length + '줄 (' + md(ds[0]) + '~' + md(ds[ds.length - 1]) + ')');
   }
   $('#sUpload').addEventListener('click', upMake);
-  $('#upRegen').addEventListener('click', upMake);
   $('#upClose').addEventListener('click', () => $('#upModal').classList.add('hidden'));
   /** 탭 글씨 크기 맞추기: 14px 에서 시작해 탭들이 한 줄 너비를 넘으면 0.5px씩 줄임 (최소 9px) */
   function upTabsFit() {
@@ -12080,7 +12083,7 @@
   $('#upCopy').addEventListener('click', () => {
     const rows = upRows(upTab);
     if (!rows.length) return toast('복사할 줄이 없습니다.');
-    const n = $('#upWithName').checked ? 11 : 9;
+    const n = 9;
     const tsv = rows.map((r) => r.slice(0, n).map((v) => String(v).replace(/[\t\n]/g, ' ')).join('\t')).join('\n');
     const done = () => toast(rows.length + '줄을 복사했습니다. 업로드 엑셀에 붙여넣으세요.');
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done).catch(() => upCopyFallback(tsv, done));

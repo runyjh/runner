@@ -5935,10 +5935,8 @@ function adm_schUploadTable(token, start, scope) {
     const aps = appSet_();
     res.cpVendor = str_(aps.cpVendor) || '러너/RUNNER';
     res.cpBizNo = (str_(aps.cpBizNo) || str_(co.branchBizNo) || '654-37-01141').replace(/\D/g, '');
-    let url = '';
-    const lock = scriptLock_();
-    try { lock.waitLock(20000); url = schWriteUpload_(res); } catch (e) { res.sheetError = String(e && e.message || e); } finally { lock.releaseLock(); }
-    res.url = url;
+    // 표는 화면 · 엑셀로만 (예전 '시트에서 열기'용 시트 쓰기는 뺌 — 만들기가 빨라짐)
+    res.url = '';
     res.ok = true;
     logAdmin_(a, '어드민 업로드 테이블 생성', data.dates[0] + ' ~ ' + data.dates[data.dates.length - 1],
       '출근 ' + res.weeks.reduce(function (a, w) { return a + w.length; }, 0) + '건 · 미입차 ' + res.missing.length + '건 · 중복 ' + res.dups.length + '건 · 주7일 ' + res.over7.length + '건 · 아이디 ' + res.badId.length + '건');
@@ -6452,12 +6450,22 @@ function pmGaveMap_() { // 기사ID → 날짜 → [넘긴 일감 노선]
   pmData_().jobs.forEach(function (j) {
     if (j.status !== PST.DONE || !j.posterId || !j.acceptedId || j.posterId === j.acceptedId) return;
     const dt = pmDate_(j.date); if (!dt) return;
+    // 쿠팡에는 받은 기사 아이디로 올라갈 때만 맡긴 칸을 뺀다 — 받은 사람이 운영자(쿠팡 아이디 없음 · 업로드 제외)이거나
+    //  '주는 기사 아이디'로 배송하는 일감은 맡긴 기사 아이디로 그대로 올라가야 함 (그 날 받은 사람 품앗이 줄은 pmNoUp_ 로 뺌)
+    const t = driverById_(j.acceptedId);
+    if (!t || !t.loginId || str_(t.type) === '운영자' || str_(t.title) === '운영자' || str_(j.useId) === '주는 기사 아이디') { (PM_NOUP_[j.acceptedId] = PM_NOUP_[j.acceptedId] || {})[dt] = 1; return; }
     ((m[j.posterId] = m[j.posterId] || {})[dt] = m[j.posterId][dt] || []).push(str_(j.route));
   });
   PM_GAVE_ = m; return m;
 }
+let PM_NOUP_ = {};
+/** 받은 기사 품앗이 줄에서 쿠팡 업로드로 내보내지 않을 날 (맡긴 기사 아이디로 올라가는 일감) */
+function pmNoUp_(driverId, cells) {
+  const no = PM_NOUP_[driverId]; if (!no) return cells;
+  const out = {}; Object.keys(cells).forEach(function (dt) { out[dt] = no[dt] ? '' : cells[dt]; }); return out;
+}
 function schBuildUpload_(data, opt) {
-  PM_GAVE_ = null;
+  PM_GAVE_ = null; PM_NOUP_ = {}; try { pmGaveMap_(); } catch (e) { /* 품앗이 없음 */ }
   const SCHED_WORK_WORD = '업무', KEYWORDS = ['업무', '선탑', '신규'];
   const EXCL_WORDS = ['휴무', '휴가', '고정휴무', '추가휴무', '계획된 휴무', '업체백업', '퇴사', '노선 변경'];
   const ALL = ['D1', 'D2', 'F3'];
@@ -6528,7 +6536,7 @@ function schBuildUpload_(data, opt) {
   (data.pmRows || []).forEach(function (pr) {
     const d = data.drivers.filter(function (x) { return x.id === pr.driverId; })[0];
     if (!d || !d.loginId || str_(d.type) === '운영자' || str_(d.title) === '운영자') return;
-    info.push({ key: pr.id, camp: '백업', name: d.name, id: d.loginId, defRt: '', cells: data.cells[pr.id] || {}, leaveFrom: d.leaveDate || '' });
+    info.push({ key: pr.id, camp: '백업', name: d.name, id: d.loginId, defRt: '', cells: pmNoUp_(d.id, data.cells[pr.id] || {}), leaveFrom: d.leaveDate || '' });
   });
 
   const leftInfo = {};
