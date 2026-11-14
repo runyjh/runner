@@ -11993,6 +11993,11 @@
     ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   }
   /** 고른 주차 → 쿠팡 양식 줄. 등록 목록(아이디 × 캠프)마다 매일 1줄: 일하면 출근(회전·라우트), 아니면 휴무 */
+  /** 여러 줄의 회전(6)·노선(7) 칸 합치기 */
+  function cpUnion(rs, i, rot) {
+    const set = new Set(); rs.forEach((r) => String(r[i] || '').replace(/\s+/g, '').split(',').filter(Boolean).forEach((x) => set.add(x)));
+    const a = [...set]; return (rot ? ['D1', 'D2', 'F3'].filter((x) => set.has(x)).concat(a.filter((x) => !['D1', 'D2', 'F3'].includes(x))) : a.sort((p, q) => p.localeCompare(q, 'en', { numeric: true }))).join(',');
+  }
   function upCoupang(tab) {
     const w = upWk(tab);
     if (w < 0) return null;
@@ -12034,10 +12039,11 @@
       const dt = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
       roster.forEach((x) => {
         const hit = byKey[d + '|' + x.camp + '|' + x.id];
-        if (hit) hit.forEach((r) => rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '출근', r[6] || '', String(r[7] || '').replace(/\s+/g, '')]));
+        if (hit) rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '출근', cpUnion(hit, 6, true), cpUnion(hit, 7)]); // 같은 날·캠프·아이디는 한 줄 (쿠팡 '중복된 스케쥴 단위' 방지)
         else rows.push([dt, vendor, biz, x.camp, wave, nameOf[x.id] || '', x.id, '휴무', '', '']);
       });
-      work.filter((r) => r[0] === d && !notOp(r[4])).forEach((r) => rows.push([dt, vendor, biz, sc(r[2]), wave, nameOf[r[4]] || '', r[4], '출근', r[6] || '', String(r[7] || '').replace(/\s+/g, '')]));
+      const opBy = {}; work.filter((r) => r[0] === d && !notOp(r[4])).forEach((r) => { (opBy[sc(r[2]) + '|' + r[4]] = opBy[sc(r[2]) + '|' + r[4]] || []).push(r); });
+      Object.keys(opBy).forEach((k) => { const h = opBy[k]; rows.push([dt, vendor, biz, sc(h[0][2]), wave, nameOf[h[0][4]] || '', h[0][4], '출근', cpUnion(h, 6, true), cpUnion(h, 7)]); });
     });
     return { rows, extra, dates, fromCp, skipCamps };
   }

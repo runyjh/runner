@@ -6694,6 +6694,24 @@ function schBuildUpload_(data, opt) {
       });
     });
 
+    // 쿠팡: 업무일·캠프·웨이브·아이디 하나에 한 줄만 (같으면 '중복된 스케쥴 단위' 로 업로드 실패)
+    //  → 같은 날 같은 캠프 같은 아이디 줄이 둘 이상이면 (예: 품앗이 받은 기사 본인 칸 103AB + 품앗이 줄 인천8 103AB) 노선·회전을 합쳐 한 줄로
+    {
+      const at = {}, merged = [];
+      entries.forEach(function (e) {
+        const k = [e.row[0], e.row[2], e.row[3], String(e.row[4]).toLowerCase()].join('|'), m = at[k];
+        if (!m) { at[k] = e; merged.push(e); return; }
+        const rts = {}, rot = {};
+        String(m.row[7]).split(',').concat(String(e.row[7]).split(',')).forEach(function (x) { x = x.trim(); if (x) rts[x] = 1; });
+        String(m.row[6]).split(',').concat(String(e.row[6]).split(',')).forEach(function (x) { x = x.trim(); if (x) rot[x] = 1; });
+        m.row[7] = Object.keys(rts).sort(function (a, b) { return a.localeCompare(b, 'en', { numeric: true }); }).join(',');
+        m.row[6] = rotSort(Object.keys(rot)).join(',');
+        const miss = defRotArr(m.row[2]).filter(function (x) { return !rot[x]; });
+        m.row[8] = miss.length ? '미입차(' + miss.join(',') + ')' : '';
+        m.priority = Math.max(m.priority, e.priority); m.mark = m.mark || e.mark;
+      });
+      entries.length = 0; merged.forEach(function (e) { entries.push(e); });
+    }
     entries.sort(function (p, q) {
       if (p.row[0] !== q.row[0]) return p.row[0] < q.row[0] ? -1 : 1;
       if (p.priority !== q.priority) return q.priority - p.priority;
