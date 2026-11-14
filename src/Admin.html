@@ -4569,7 +4569,7 @@
       (p.write ? '<div class="ce-hint" style="color:#475569">' + (done ? '반영한 칸' : '바뀔 칸') + ' (기존 스케줄 → 올인원' + (p.write > p.writeList.length ? ' · 앞 ' + p.writeList.length + '칸만 표시' : '') + ')</div>' +
         tbl(p.writeList.map((x) => li(x, '<b>' + esc(x.value) + '</b>' + (x.conv ? ' <span class="dc-tag w">표기 바꿈</span>' : '') + '<div class="sub">지금: ' + esc(x.old || '빈 칸') + '</div>')).join(''), '올인원에 넣을 값') : '<div class="ce-pv">올인원과 다른 칸이 없습니다.</div>') +
       (p.needN ? '<div class="ce-hint" style="color:#c2410c;margin-top:10px">확인 필요 — 올인원에서 직접 넣어 주세요' + (p.needN > p.need.length ? ' (앞 ' + p.need.length + '칸만 표시)' : '') + '</div>' + tbl(p.need.map((x) => li(x, esc(x.why || ''))).join(''), '이유') : '') +
-      (p.keptN ? '<div class="ce-hint" style="margin-top:10px">이슈가 걸려 있어 건드리지 않는 칸 ' + p.keptN + '개: ' + esc(p.kept.map((x) => x.name + ' ' + lpMd(x.date)).join(', ')) + '</div>' : '') +
+      (p.keptN ? (() => { const pmK = p.kept.filter((x) => x.why), isK = p.kept.filter((x) => !x.why); return (pmK.length ? '<div class="ce-hint" style="margin-top:10px">🤝 품앗이가 배차 확정된 날이라 건드리지 않는 칸 ' + pmK.length + '개: ' + esc(pmK.map((x) => x.name + ' ' + lpMd(x.date)).join(', ')) + '</div>' : '') + (isK.length ? '<div class="ce-hint" style="margin-top:10px">이슈가 걸려 있어 건드리지 않는 칸 ' + isK.length + '개: ' + esc(isK.map((x) => x.name + ' ' + lpMd(x.date)).join(', ')) + '</div>' : ''); })() : '') +
       (p.noDriver.length ? '<div class="ce-hint" style="margin-top:6px">올인원에서 못 찾은 줄 ' + p.noDriver.length + '개 (건너뜀): ' + esc(p.noDriver.join(', ')) + '</div>' : '') +
       '<div class="ce-hint" style="margin-top:10px">기존 스케줄이 빈 칸이면 올인원 칸은 그대로 둡니다 · 품앗이 줄 · 지시사항은 건드리지 않습니다.</div>' +
       '<div class="m-actions"><button type="button" class="btn ghost" data-lpclose>닫기</button>' + (done || !p.write ? '' : '<button type="button" class="btn" data-lpgo>' + p.write + '칸 가져오기</button>') + '</div>';
@@ -10104,7 +10104,7 @@
     const pm = r.kind === 'd' ? pmMark(r.row, dt) : '';
     if (pm) cls.push('pmk');
     if (pm && !v) cls.push('pmgive');
-    if (pm && PM_ONLY.test(v)) cls.push('pmonly');
+    if (pm && pmOnly(v, r, dt)) cls.push('pmonly');
     if (r.kind === 'p' && pmLockOf(r.row, dt)) cls.push('pmlk');
     const nov = noAssign(r, dt, v);
     const mis = scalc && scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
@@ -10123,6 +10123,13 @@
   }
   /** 품앗이 칸에서 숨길 칸 글자 (품앗이만 보이게) — 노선 글자 등 다른 값은 그대로 둠 */
   const PM_ONLY = /^(출근|휴무|고정휴무|추가휴무|휴가)?$/;
+  /** 품앗이 칸을 품앗이로만 보일지: 출근·휴무 등이거나, 받은 기사 칸 글자가 그 일감 노선과 같을 때 (기존 시트에서 '품앗이_103AB' 를 가져와 103AB 로 적힌 칸 등) */
+  function pmOnly(v, r, dt) {
+    if (PM_ONLY.test(v)) return true;
+    const norm = (x) => String(x || '').replace(/\s*\([A-Za-z][A-Za-z0-9_.]{2,}\)\s*/g, ' ').replace(/업무등록/g, ' ').replace(/^\s*[가-힣]+\s?\d+\s+(?=\d)/, '').replace(/\s+/g, '').toUpperCase();
+    const me = r && r.d ? r.d.name : '', t = norm(v);
+    return !!t && pmTipList(r, dt).some((j) => j.to === me && norm(j.route || j.area) === t);
+  }
   const sPmRowsOn = () => { try { return localStorage.getItem('runner.sch.pmrows') === '1'; } catch (e) { return false; } };
   function pmMark(row, dt) { return ((SD.pmMarks || {})[row] || {})[dt] || ''; }
   /** 배차 확정 품앗이가 적힌 품앗이 줄 칸 (잠금) → [{ id, text, from, to }] · 없으면 null */
@@ -10786,7 +10793,7 @@
   /** 칸 값 → 달력·줄에 쓸 { top(짧은 글자), kind, sub(아이디), full } */
   function mobCell(r, dt) {
     const v = sget(r.row, dt), pm = pmMark(r.row, dt), yg = yongParse(v), n = cellNorm(v, r.row, dt);
-    if (pm && PM_ONLY.test(v)) return { top: '품앗이', kind: 'pmk', sub: '', full: pmLabel(r, dt, pm).replace(/\n/g, ' ') };
+    if (pm && pmOnly(v, r, dt)) return { top: '품앗이', kind: 'pmk', sub: '', full: pmLabel(r, dt, pm).replace(/\n/g, ' ') };
     if (!v) return { top: '', kind: 'none', sub: '', full: '' };
     if (yg) return { top: '용차', kind: 'k-yong', sub: yg.vendor, full: '용차' + (yg.vendor ? ' ' + yg.vendor : '') };
     if (n) return { top: groupRoutes(n.text), kind: n.kind, sub: n.ids.join(', '), full: groupRoutes(n.text) };
@@ -10950,7 +10957,7 @@
       const v = sget(r.row, dt), k = r.row + '|' + dt;
       const ins = r.kind === 'd' ? instOf(r.row, dt) : null, pm = r.kind === 'd' ? pmMark(r.row, dt) : '', iss = r.kind === 'd' ? issOf(r.row, dt) : [];
       const nov = noAssign(r, dt, v), mis = scalc.missCells ? scalc.missCells.get((r.key || r.row) + '|' + ci) : null;
-      const want = ['c', cellKindRow(v, r.row, dt), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', pm && !v ? 'pmgive' : '', pm && PM_ONLY.test(v) ? 'pmonly' : '', r.kind === 'p' && pmLockOf(r.row, dt) ? 'pmlk' : '', iss.length || dt < pdd ? '' : mis ? 'mis' : nov && !pm ? 'nov' : '', cellBad(v, r, dt) ? 'bad' : '']
+      const want = ['c', cellKindRow(v, r.row, dt), sPending[k] ? 'pend' : '', scalc.dupCells.has((r.key || r.row) + '|' + ci) ? 'dup' : '', dt === pdd ? 'today' : '', sepCol(ci) ? 'wk2' : '', ins ? 'inst' : '', iss.length ? 'iss' : '', pm ? 'pmk' : '', pm && !v ? 'pmgive' : '', pm && pmOnly(v, r, dt) ? 'pmonly' : '', r.kind === 'p' && pmLockOf(r.row, dt) ? 'pmlk' : '', iss.length || dt < pdd ? '' : mis ? 'mis' : nov && !pm ? 'nov' : '', cellBad(v, r, dt) ? 'bad' : '']
         .filter(Boolean).join(' ');
       const selCls = ['sel', 'act', 'live-chg'].filter((x) => td.classList.contains(x));
       const vk = v + '\u0001' + (iss.length ? 1 : 0);

@@ -210,6 +210,9 @@ function adm_schLegacyPull(token, apply) {
     readAll_(SH.DRIVERS).forEach(function (o) { if (!o.id) return; if (o.loginId) byLogin[stlLogin_(o.loginId)] = o; (byName[str_(o.name)] = byName[str_(o.name)] || []).push(o); });
     const issues = schIssues_().filter(function (x) { return x.link === 'Y' && x.result && x.kind !== '지시'; });
     const underIssue = function (id, d) { return issues.some(function (x) { return x.driverId === id && x.date <= d && d <= (x.end || x.date); }); };
+    // 올인원에서 배차 확정한 품앗이 날: 맡긴 기사 · 받은 기사 칸은 기존 시트 글자로 덮지 않는다 (기존 시트는 품앗이를 출근·휴무·노선으로만 적어 둠)
+    const pmDay = {};
+    try { pmData_().jobs.forEach(function (j) { if (j.status !== PST.DONE || !j.date) return; [j.posterId, j.acceptedId].forEach(function (id) { if (id) pmDay[id + '|' + j.date] = (j.poster || '러너') + ' → ' + (j.accepted || ''); }); }); } catch (e) { /* 품앗이 없으면 그대로 */ }
     const ctxOf = issCtxMaker_();
     const out = { from: L.from, to: L.to, drivers: 0, total: 0, same: 0, write: [], conv: 0, need: [], kept: [], noDriver: [] };
     // 1) 기존 시트 칸 → 올인원 값 (기사 · 날짜별)
@@ -278,6 +281,7 @@ function adm_schLegacyPull(token, apply) {
       if (cv.kind === 'need') { out.need.push({ name: o.name, date: d, raw: e.raw, why: cv.why }); return; }
       const cur = rowOf[o.id] === undefined ? '' : str_(blk[rowOf[o.id]][c - cMin]); // 줄이 아직 없는 기사는 저장할 때 줄을 만든다
       if (cur === cv.v || (cur && schLegacyMean_(cur, cx) === schLegacyMean_(cv.v, cx))) { out.same++; return; } // 글자가 달라도 뜻이 같으면 그대로 둠 (출근 = 담당 노선)
+      if (pmDay[o.id + '|' + d]) { out.kept.push({ name: o.name, date: d, raw: e.raw, cur: cur, why: '품앗이 ' + pmDay[o.id + '|' + d] }); return; }
       if (underIssue(o.id, d)) { out.kept.push({ name: o.name, date: d, raw: e.raw, cur: cur }); return; }
       if (cv.kind === 'conv') out.conv++;
       out.write.push({ row: o.id, name: o.name, date: d, raw: e.raw, value: cv.v, old: cur, conv: cv.kind === 'conv' });
