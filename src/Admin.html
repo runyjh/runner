@@ -9908,7 +9908,11 @@
     const unRows = (cid) => {
       if (!cid || unDone[cid] || !UN[cid] || !campOf[cid]) return '';
       unDone[cid] = 1;
-      return UN[cid].filter((code) => unShow(cid, code)).map((code) => '<tr class="unas"' + campVars(campColor(cid, false)) + '><td class="fx f2"><span class="unlab" title="' + esc(shortCamp(campOf[cid].name)) + ' — 노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f3"></td><td class="fx f4">' + esc(code) + '</td>' +
+      const list = UN[cid].filter((code) => unShow(cid, code)); if (!list.length) return '';
+      // 기사가 한 명도 없는 캠프 (예: 시흥2): 위 캠프에 붙어 보이지 않게 캠프 머리줄을 따로
+      const hasDrv = srows.some((x) => x.kind === 'd' && !x.staff && x.d.campId === cid), un = UNM[cid] || 0;
+      const head = hasDrv ? '' : '<tr class="cgrp"' + campVars(campColor(cid, false)) + '><td class="fx f2"><b>' + esc(shortCamp(campOf[cid].name)) + '</b><span>기사 0</span>' + (un ? '<em class="campwarn" title="PDD 이후 이 캠프에 아무도 안 뛰는 노선 칸 ' + un + '개">앞으로 미입차 ' + un + '</em>' : '') + '</td><td class="fx f3"></td><td class="fx f4"></td><td colspan="' + (dates.length + exCols().length) + '"></td></tr>';
+      return head + list.map((code) => '<tr class="unas"' + campVars(campColor(cid, false)) + '><td class="fx f2"><span class="unlab" title="' + esc(shortCamp(campOf[cid].name)) + ' — 노선관리에 있는 노선인데 기본노선으로 맡은 기사가 없습니다. 기사 정보관리에서 기본노선을 배정하세요.">담당 없음</span></td><td class="fx f3"></td><td class="fx f4">' + esc(code) + '</td>' +
         dates.map((dt, ci) => { const c = unCellInfo(cid, code, dt); return '<td class="uc ' + c.cls + (sepCol(ci) ? ' wk2' : '') + (dt === pddDate() ? ' today' : '') + '" data-ucid="' + esc(cid) + '" data-ucode="' + esc(code) + '" data-c="' + ci + '" title="눌러서 이 노선을 뛸 기사 배정">' + c.html + '</td>'; }).join('') + '<td class="ex" colspan="' + exCols().length + '"></td></tr>').join('');
     };
     const restUn = () => SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => unRows(c.id)).join('');
