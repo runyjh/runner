@@ -11531,6 +11531,7 @@
     if (String(c.ins || '').trim() !== String(c.ins0 || '').trim()) pvL.push(String(c.ins || '').trim() ? '지시사항 저장' : '지시사항 지움');
     const pv = '<div class="ce-pv">저장하면 → ' + pvL.join('<br>＋ ') + '</div>';
     const links = '<div class="ce-lks">' + (pk.units.length && !d.ex ? '<button type="button" class="ce-lb" data-cepmgo>🤝 품앗이로 맡기기</button>' : '') +
+      (d.ex ? '' : '<button type="button" class="ce-lb" data-cepmtake title="다른 기사 일을 이 기사가 대신 뛴 날 · 품앗이 등록 창을 엽니다">🤝 품앗이로 받기</button>') +
       (d.ex ? '' : '<button type="button" class="ce-lb" data-cercgo>🔀 이 날부터 노선 이관</button>') +
       (issOf(c.did, c.dt).length ? (c.x0 && c.x0.date < c.dt ? '<button type="button" class="ce-lb" data-ceissgo title="이 칸은 ' + esc(ceMd(c.x0.date)) + '부터 이어진 이슈입니다 — 시작한 날의 기록을 엽니다">⚠ 이어진 이슈 고치기</button>' : '') : d.ex ? '' : '<button type="button" class="ce-lb" data-ceissnew>＋ 이슈 등록</button>') +
       (d.ex ? '' : '<button type="button" class="ce-lb" data-cedrvgo>👤 기사 설정</button>') + '</div>';
@@ -11606,6 +11607,7 @@
     const kb = t.closest('[data-ceik]'); if (kb) { c.ik = c.ik === kb.dataset.ceik ? '' : kb.dataset.ceik; return cePaint(); }
     const ib = t.closest('[data-ceisub]'); if (ib) { c.isub = c.isub === ib.dataset.ceisub ? '' : ib.dataset.ceisub; if (c.isub && !ceOurs(c.isub)) c.alt = ''; return cePaint(); }
     if (t.closest('[data-cepmgo]')) { const pre = { poster: c.d.mainId || c.d.id, to: '', campId: c.pk.campId, route: ceCodes(), date: c.dt }, ins = String(c.ins || '').trim(); ceClose(); saveInst(c.did, c.dt, ins, c.ins0); PMC.pre = pre; return pmcOpen(); }
+    if (t.closest('[data-cepmtake]')) { const pre = { take: true, to: c.d.mainId || c.d.id, date: c.dt }, ins = String(c.ins || '').trim(); ceClose(); saveInst(c.did, c.dt, ins, c.ins0); PMC.pre = pre; return pmcOpen(); }
     if (t.closest('[data-cercgo]')) { const b = c.d.baseRoute && /^\d/.test(c.d.baseRoute) ? parseBR(c.d.baseRoute) : null, num = b && b.units.length ? String(b.units[0]).replace(/\D+$/, '') : ''; RC.form = { fromCampId: c.d.campId || '', fromNum: num, toCampId: '', toCampName: '', toNum: '', date: c.dt, copyPrice: true }; ceClose(); return openRc('move'); }
     if (t.closest('[data-ceissgo]')) { const x = issOf(c.did, c.dt)[0]; ceClose(); return x ? isOpen(Object.assign({ camp: c.d.camp || '' }, x)) : null; }
     if (t.closest('[data-ceissnew]')) { const pre = { driverId: c.did, date: c.dt }; ceClose(); return isOpen(null, pre); }
@@ -11713,7 +11715,7 @@
     const go = () => {
       const M = PMC.meta, r = sAct && srows[sAct.r], dt = sAct ? SD.dates[sAct.c] : '';
       const d0 = r && r.kind === 'd' ? r.d : r && r.kind === 'p' ? null : null;
-      const did = PMC.pre && PMC.pre.runner ? '' : PMC.pre && PMC.pre.poster ? PMC.pre.poster : d0 ? d0.mainId || d0.id : '';
+      const did = PMC.pre && (PMC.pre.runner || PMC.pre.take) ? '' : PMC.pre && PMC.pre.poster ? PMC.pre.poster : d0 ? d0.mainId || d0.id : '';
       const drvs = SD.drivers.filter((d) => !d.ex && d.status === '승인').sort((a, b) => koSort(a.name, b.name));
       const opt = (sel) => '<option value="">— 고르기 —</option>' + drvs.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + (d.camp ? ' (' + esc(shortCamp(d.camp)) + ')' : '') + '</option>').join('');
       const pre = PMC.pre || null; PMC.pre = null;
@@ -11723,10 +11725,10 @@
       if (M.kinds.indexOf(kind) < 0) kind = M.kinds[0];
       $('#pmcKind').innerHTML = M.kinds.map((k) => '<button type="button" data-k="' + esc(k) + '"' + (k === kind ? ' class="on"' : '') + '>' + esc(k) + '</button>').join('');
       const d0t = d0 && dt ? drvAt(d0, dt) || d0 : d0; // 그 날짜의 캠프 · 담당 노선
-      const campId = pre && pre.campId ? pre.campId : d0t ? d0t.campId : '';
+      const campId = pre && pre.campId ? pre.campId : pre && pre.take ? '' : d0t ? d0t.campId : '';
       $('#pmcCamp').innerHTML = '<option value="">— 캠프 —</option>' + SD.camps.slice().sort((a, b) => koSort(a.name, b.name)).map((c) => '<option value="' + esc(c.id) + '"' + (c.id === campId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
       const v = r && dt ? sget(r.row, dt) : '', m = /\b(\d{3,4}[A-Z]{1,4})\b/.exec(String(v).toUpperCase());
-      $('#pmcRoute').value = pre && pre.route ? pre.route : m ? m[1] : d0t ? d0t.baseRoute || '' : '';
+      $('#pmcRoute').value = pre && pre.route ? pre.route : pre && pre.take ? '' : m ? m[1] : d0t ? d0t.baseRoute || '' : '';
       ['#pmcTime', '#pmcArea', '#pmcQty', '#pmcDesc'].forEach((x) => { $(x).value = ''; });
       $('#pmcPrice').value = String((M && M.defPrice) || 1100); // 기본 1,100원 (고칠 수 있음)
       $('#pmcPay').innerHTML = M.pays.map((x) => '<option' + (x === (M.payDef || '러너 정산서') ? ' selected' : '') + ((M.paysOff || []).includes(x) ? ' disabled' : '') + '>' + esc(x) + ((M.paysOff || []).includes(x) ? ' (지금은 못 고름)' : '') + '</option>').join('');
@@ -11750,7 +11752,7 @@
   $('#pmcKind').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; $$('#pmcKind [data-k]').forEach((x) => x.classList.toggle('on', x === b)); });
   $('#pmcMode').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (!b) return; PMC.mode = b.dataset.m; $$('#pmcMode [data-m]').forEach((x) => x.classList.toggle('on', x === b)); pmcNote(); });
   $('#pmcTo').addEventListener('change', pmcNote);
-  $('#pmcPoster').addEventListener('change', () => { const d = SD.drivers.find((x) => x.id === $('#pmcPoster').value); if (d) { if (d.campId) $('#pmcCamp').value = d.campId; if (!$('#pmcRoute').value) $('#pmcRoute').value = d.baseRoute || ''; } });
+  $('#pmcPoster').addEventListener('change', () => { const d0 = SD.drivers.find((x) => x.id === $('#pmcPoster').value), d = d0 && $('#pmcDate').value ? drvAt(d0, $('#pmcDate').value) || d0 : d0; if (d) { if (d.campId) $('#pmcCamp').value = d.campId; if (!$('#pmcRoute').value) $('#pmcRoute').value = d.baseRoute || ''; } });
   $('#pmcGo').addEventListener('click', () => {
     const kb = $('#pmcKind .on'), kind = kb ? kb.dataset.k : '';
     const job = { posterId: $('#pmcPoster').value, date: $('#pmcDate').value, kind, time: $('#pmcTime').value, campId: $('#pmcCamp').value, route: $('#pmcRoute').value, area: $('#pmcArea').value,
