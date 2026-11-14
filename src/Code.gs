@@ -791,6 +791,9 @@ var _stg = null, _stgT = 0;
 function stg_(name) { const t = Date.now(); if (!name) { _stg = {}; _stgT = t; return; } if (!_stg) return; _stg[name] = (_stg[name] || 0) + (t - _stgT); _stgT = t; }
 function run_(fn) {
   const t0 = Date.now();
+  try { return run0_(fn, t0); } finally { try { if (typeof rcvEnd_ === 'function') rcvEnd_(); } catch (e) { /* 무시 */ } }
+}
+function run0_(fn, t0) {
   try {
     const r = fn();
     if (r && typeof r === 'object' && !Array.isArray(r)) { r._ms = Date.now() - t0; if (_stg) { r._st = _stg; _stg = null; } } // 서버 처리 시간 (속도 측정)
@@ -933,6 +936,7 @@ function safeText_(v) {
   return typeof v === 'string' && /^[=+]/.test(v) ? ' ' + v : v;
 }
 function writeFields_(name, row, fields) {
+  if (name === SH.MEMO && typeof rcvBump_ === 'function') rcvBump_('memo');
   const c = cols_(name, true), sh = sheet_(name);
   // 붙어 있는 열은 한 번에 쓴다 (호출 수 줄이기). 사이에 낀 다른 열은 건드리지 않는다.
   const cells = Object.keys(fields).filter(function (k) { return c[k] !== undefined; })
@@ -962,6 +966,7 @@ function writeByKey_(name, key, value, row, fields) {
 }
 /** 잠금 안에서만 호출: 마지막 행 다음 줄에 객체를 한 번에 쓴다 */
 function appendObj_(name, obj) {
+  if (name === SH.MEMO && typeof rcvBump_ === 'function') rcvBump_('memo');
   const c = cols_(name, true), sh = sheet_(name);
   const arr = new Array(c.__w).fill('');
   Object.keys(obj).forEach(function (k) { arr[c[k]] = safeText_(obj[k]); });
@@ -2496,11 +2501,12 @@ function adm_memoMonth(token, ym) {
 function memoMonth_(ym) {
   {
     if (!/^\d{4}-\d{2}$/.test(String(ym || ''))) fail_('월 형식이 올바르지 않습니다.');
+    const today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
+    const base = rcvGet_('memo', 'month|' + ym + '|' + today, 600, function () {
     const sh = sheet_(SH.MEMO), c = cols_(SH.MEMO), last = sh.getLastRow();
     const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
     const list = [];
     let pastUndone = 0;
-    const today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
     const pinned = [];
     rows.forEach(function (v) {
       const o = {};
@@ -2514,6 +2520,9 @@ function memoMonth_(ym) {
       if (!m.done && !m.note && o.date < today) pastUndone++;
     });
     list.sort(memoSort_); pinned.sort(memoSort_);
+    return { list: list, pinned: pinned, pastUndone: pastUndone };
+    });
+    const list = base.list, pinned = base.pinned, pastUndone = base.pastUndone;
     let noteLabels = [];
     try { noteLabels = schNotes_().map(function (n) { return n.label; }); } catch (e) { /* 스케줄 DB 가 없으면 비움 */ }
     const holidays = {}; Object.keys(HOLIDAYS).forEach(function (d) { if (d.indexOf(ym) === 0) holidays[d] = HOLIDAYS[d]; });
@@ -2616,7 +2625,7 @@ function memoDelete_(id) {
     try {
       const row = findRow_(SH.MEMO, 'id', String(id || '').split('@')[0]); // 반복의 한 날짜를 지우면 반복 전체를 지운다
       if (!row) return { ok: true }; // 이미 지워짐
-      sheet_(SH.MEMO).deleteRow(row);
+      rcvBump_('memo'); sheet_(SH.MEMO).deleteRow(row);
       return { ok: true };
     } finally {
       lock.releaseLock();
@@ -4226,6 +4235,7 @@ function routeRowObj_(campId, campName, code, status, memo, now) {
 /** 여러 줄을 한 번에 추가 (잠금 안에서만 호출) */
 function appendObjs_(name, objs) {
   if (!objs.length) return 0;
+  if (name === SH.MEMO && typeof rcvBump_ === 'function') rcvBump_('memo');
   const c = cols_(name, true), sh = sheet_(name);
   const rows = objs.map(function (obj) {
     const arr = new Array(c.__w).fill('');
@@ -5057,11 +5067,14 @@ function schRead_(sun, end) {
   // 노선 이관 기록 (예약 · 적용 모두): 이관 전후로 이름만 바뀐 같은 노선 → 미입차 계산이 '옛 이름 = 새 이름'으로 본다
   const routeMoves = [];
   try { rcRows_().forEach(function (c) { if (c.kind === RCK.MOVE) routeMoves.push({ date: c.date, fromCamp: campName[c.fromCampId] || c.fromCamp || '', from: str_(c.fromRoute), toCamp: campName[c.toCampId] || c.toCamp || '', to: str_(c.toRoute) }); }); } catch (e) { /* 무시 */ }
+  stg_('rc');
   if (last >= 2) schSyncCopies_(sh, h, drivers, touched ? null : fixed);
+  stg_('sync');
   const holidays = {};
   dates.forEach(function (d) { if (HOLIDAYS[d]) holidays[d] = HOLIDAYS[d]; });
   let issues = [];
   try { issues = schIssues_(dates[0], dates[dates.length - 1]).map(issView_); } catch (e) { issues = []; }
+  stg_('iss');
   // 품앗이 줄 (대신 뛰는 기사) + 내 일을 품앗이로 맡겨 배차 확정된 칸 표시
   const byDrv = {};
   drivers.forEach(function (d) { byDrv[d.id] = d; });
@@ -5313,8 +5326,11 @@ function schNoteOf_(notes, cat) {
 }
 /** { 비고줄id: { 날짜: [메모…] } } (from~to) */
 function schNoteMemos_(notes, from, to) {
+  if (!notes.length) return {};
+  return rcvGet_('memo', 'note|' + from + '|' + to + '|' + notes.map(function (n) { return n.id + '=' + n.label; }).join(','), 600, function () { return schNoteMemos0_(notes, from, to); });
+}
+function schNoteMemos0_(notes, from, to) {
   const out = {};
-  if (!notes.length) return out;
   readAll_(SH.MEMO).forEach(function (o) {
     o.date = normDate_(o.date) || o.date;
     if (!o.id || !o.date || o.date < from || o.date > to) return;
@@ -5383,11 +5399,13 @@ function schNoteSave_(a, changes) {
     }
     saved++;
   });
+  if (dels.length) rcvBump_('memo');
   delRows_(sheet_(SH.MEMO), dels);
   return { saved: saved, conflicts: conflicts };
 }
 /** 비고 줄 이름이 바뀌면 메모의 '비고 줄' 칸도 바꾼다 / 지우면 첫 줄로 돌린다 */
 function schNoteRelabel_(from, to) {
+  rcvBump_('memo');
   const sh = sheet_(SH.MEMO), c = cols_(SH.MEMO, true), last = sh.getLastRow();
   if (last < 2 || !from) return 0;
   const rng = sh.getRange(2, c.cat + 1, last - 1, 1), vals = rng.getValues();
@@ -5979,6 +5997,7 @@ function schIssueHeadFix_(sh) {
   });
 }
 function schIssueSheet_() {
+  rcvBump_('iss'); // 이 시트를 쓰려는 실행 → 이슈 읽기 캐시를 버림 (끝날 때 한 번 더)
   const book = schSS_();
   let sh = book.getSheetByName(SCH_ISSUE.SHEET);
   if (sh) return sh;
@@ -5998,6 +6017,10 @@ function schIssueSheet_() {
 function schAddDays_(ymd, n) { const d = parseYmd_(ymd); if (!d) return ymd; d.setDate(d.getDate() + n); return ymd_(d); }
 /** 이슈 전체 (from·to 가 있으면 그 기간 · 미입차 기간이 걸치는 것 포함) */
 function schIssues_(from, to) {
+  if (!from && !to) return schIssues0_(); // 전체 읽기 = 고치는 쪽(행 번호를 씀) → 늘 시트에서 바로
+  return rcvGet_('iss', (from || '') + '|' + (to || ''), 300, function () { return schIssues0_(from, to); });
+}
+function schIssues0_(from, to) {
   const sh = schSS_().getSheetByName(SCH_ISSUE.SHEET); // 아직 없으면 (처음 기록할 때 만든다)
   if (!sh) return [];
   const vals = sh.getDataRange().getValues(); // 머리글 + 내용을 한 번에 (시트 호출 4번 → 1번)
