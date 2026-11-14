@@ -261,6 +261,22 @@ function adm_schLegacyPull(token, apply) {
       const camp = u.camp || e.cx.camp;
       Object.keys(u.units).forEach(function (rt) { if (u.units[rt].length < e.cx.rots.length) (part[e.d + '|' + camp + '|' + rt] = part[e.d + '|' + camp + '|' + rt] || []).push({ id: e.o.id, rots: u.units[rt] }); });
     });
+    // 3-2) 노선을 직접 적은 칸도 같게: 기존 시트는 쿠팡 업로드 때문에 '205CD' 처럼 통째로 적어 두지만 (다른 기사 205C (D2,F3)),
+    //      올인원은 '칸 = 그 사람이 한 일' → '205C(D1),205D' 로 (쿠팡 업로드 표는 이걸 다시 205CD (D1,D2,F3) 한 줄로 합쳐 냄)
+    ent.forEach(function (e) {
+      if (e.cv.kind === 'need' || e.cv.v === '출근' || !/\d{3}/.test(e.cv.v) || /[([]|업무등록/.test(e.cv.v)) return;
+      const u = issUnits_(e.cv.v, e.cx.rots); if (!u) return;
+      const camp = u.camp || e.cx.camp;
+      let cut = false; const left = {};
+      Object.keys(u.units).forEach(function (rt) {
+        if (u.units[rt].length < e.cx.rots.length) { left[rt] = u.units[rt]; return; } // 이미 회전을 좁게 적은 노선은 그대로
+        const gone = {}; (part[e.d + '|' + camp + '|' + rt] || []).filter(function (x) { return x.id !== e.o.id; }).forEach(function (x) { x.rots.forEach(function (r) { gone[r] = 1; }); });
+        const keep = u.units[rt].filter(function (r) { return !gone[r]; });
+        if (keep.length < u.units[rt].length) cut = true;
+        if (keep.length) left[rt] = keep;
+      });
+      if (cut && Object.keys(left).length) e.cv = { v: issCompose_(left, e.cx.rots, camp !== e.cx.camp ? camp : ''), kind: 'conv' };
+    });
     ent.forEach(function (e) {
       if (e.cv.kind === 'need' || e.cv.v !== '출근') return;
       const b = issUnits_(e.cx.base, e.cx.rots); if (!b) return;
