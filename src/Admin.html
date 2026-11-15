@@ -1009,6 +1009,11 @@
   .pin.date { width: 128px; text-align: left; }
   .pin.dirty { border-color: var(--warn); background: #fffdf7; }
   .rt-table td.vol .vol-m { display: none; } .tk-ol td.vol .vol-m { display: inline; white-space: nowrap; } .tk-ol td.vol .vol-p, .tk-ol td.volq { display: none; }
+  .xp-seg { display: inline-flex; background: #eef1f5; border-radius: 10px; padding: 3px; gap: 2px; margin-bottom: 8px; } .xp-seg button { border: 0; background: none; padding: 7px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 700; color: var(--sub); cursor: pointer; white-space: nowrap; }
+  .xp-seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .xp-desc { background: #f6f8fb; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.6; color: #4e5968; margin-bottom: 10px; word-break: keep-all; }
+  .xp-desc .xp-mo { display: none; } html.m .xp-desc .xp-pc { display: none; } html.m .xp-desc .xp-mo { display: inline; }
+  html.m .xp-seg { display: flex; } html.m .xp-seg button { flex: 1; padding: 8px 4px; font-size: 13px; }
   .xp-table td.wd-hi { color: #1d4ed8; font-weight: 800; } .xp-table td.wd-lo { color: #98a2b3; }
   .vol-note { margin: 8px 0 0; color: var(--sub); font-size: 12px; line-height: 1.6; word-break: keep-all; } .vol-note b { color: var(--text, #191f28); }
   .rt-table td.vol .vsum { margin-left: 4px; padding: 1px 6px; border-radius: 10px; background: #eef4ff; color: #1d4ed8; font-size: 12px; }
@@ -7162,15 +7167,18 @@
     const box = $('#allPrices');
     const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
     box.innerHTML =
-      '<div class="sec"><div class="xp-head"><h3>전체 단가표</h3><span class="xp-sum" id="xpSum"></span></div>' +
+      '<div class="sec"><div class="xp-head"><h3>' + (XP.wd ? '요일별 물량표' : '전체 단가표') + '</h3><span class="xp-sum" id="xpSum"></span></div>' +
+      '<div class="xp-seg" role="tablist" aria-label="보기"><button type="button" data-xpm="price" class="' + (XP.wd ? '' : 'on') + '">💰 단가 보기</button><button type="button" data-xpm="wd" class="' + (XP.wd ? 'on' : '') + '">📦 물량 보기 (요일별)</button></div>' +
+      '<div class="xp-desc">' + (XP.wd
+        ? '<b>📦 물량 보기</b> — 정산코드(예: 205C)마다 <b>월~일 요일별 하루 평균 배송수량</b>을 봅니다. 전월 쿠팡 정산서 기준이고 <b>보기만</b> 됩니다 (고치는 칸 없음). 가장 많은 요일은 <b style="color:#1d4ed8">파랑</b>, 가장 적은 요일은 회색, 배송이 없던 요일은 「-」.'
+        : '<b>💰 단가 보기</b> — 정산코드마다 <b>원청 · 고정 · 백업 · 품앗이 · 외부용차 단가</b>를 <span class="xp-pc">보고 고칩니다. 칸을 고치고 <b>단가 저장</b>을 눌러야 저장됩니다. 빨간 칸 = 단가가 비어 있음.</span><span class="xp-mo">봅니다 (고치기는 PC 화면에서).</span> 물량 2칸(1일 평균 · 전월 총물량)은 참고용입니다.') + '</div>' +
       '<div class="ptools">' +
         '<select class="inp" id="xpCamp" aria-label="캠프">' + opt('', '캠프 전체', XP.camp) + sortedCamps().map((c) => opt(c.id, c.name, XP.camp)).join('') + '</select>' +
         '<select class="inp" id="xpLevel" aria-label="구분">' + opt('', '구분 전체', XP.level) + [2, 3, 4, 5].map((k) => opt(k, '구분' + k, XP.level)).join('') + '</select>' +
         '<select class="inp" id="xpSt" aria-label="사용여부">' + opt('', '사용여부 전체', XP.st) + ['사용', '정지', '노선 없음'].map((k) => opt(k, k, XP.st)).join('') + '</select>' +
-        '<select class="inp" id="xpEmpty" aria-label="빈 단가 찾기">' + opt('', '빈 단가 찾기', XP.empty) + PKEYS.map((k) => opt(k, PLABEL[k] + ' 빈 것', XP.empty)).join('') + '</select>' +
+        '<select class="inp' + (XP.wd ? ' hidden' : '') + '" id="xpEmpty" aria-label="빈 단가 찾기">' + opt('', '빈 단가 찾기', XP.empty) + PKEYS.map((k) => opt(k, PLABEL[k] + ' 빈 것', XP.empty)).join('') + '</select>' +
         '<input class="inp" id="xpQ" placeholder="캠프·정산코드 검색" value="' + esc(XP.q) + '" autocomplete="off" style="width:150px">' +
-        '<button class="btn sm' + (XP.wd ? '' : ' ghost') + '" id="xpWd" title="정산코드마다 전월 정산서의 요일별 하루 평균 배송수량">' + (XP.wd ? '💰 단가 보기' : '📅 요일별 물량') + '</button>' +
-        '<div class="grow"><span id="xpMsg"></span><button class="btn sm ghost" id="xpCopy">엑셀로 복사</button><button class="btn sm ghost" id="xpReset" disabled>되돌리기</button><button class="btn sm" id="xpSave" disabled>단가 저장</button></div>' +
+        '<div class="grow"><span id="xpMsg"></span><button class="btn sm ghost" id="xpCopy">엑셀로 복사</button><button class="btn sm ghost' + (XP.wd ? ' hidden' : '') + '" id="xpReset" disabled>되돌리기</button><button class="btn sm' + (XP.wd ? ' hidden' : '') + '" id="xpSave" disabled>단가 저장</button></div>' +
       '</div>' +
       '<div class="ptools xp-bulk' + (XP.wd ? ' hidden' : '') + '"><b>일괄 설정</b>' +
         '<select class="inp" id="xpBk" aria-label="일괄 설정할 단가">' + PKEYS.map((k) => opt(k, PLABEL[k], XP.bk || 'p2')).join('') + '</select>' +
@@ -7181,7 +7189,7 @@
       '<div class="table-wrap rt-table pt xp-table"><table><thead><tr>' +
         xpCols().map((c) => '<th class="srt" data-xps="' + c.k + '">' + c.t + (XP.sort.k === c.k ? (XP.sort.d > 0 ? ' ▲' : ' ▼') : '') + '</th>').join('') +
       '</tr></thead><tbody id="xpRows"></tbody></table><div class="empty hidden" id="xpEmptyMsg"></div></div>' +
-      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">정산코드 = 숫자(구분1) + 글자. 칸을 고치고 <b>단가 저장</b>을 누르면 캠프별로 저장됩니다. 빨간 칸은 단가가 비어 있습니다. 머리글을 누르면 정렬됩니다.</p><p class="vol-note">' + volNote() + '</p></div>';
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">정산코드 = 숫자(구분1) + 글자. 머리글을 누르면 정렬됩니다.</p><div class="vol-note">' + volNote() + '</div></div>';
     xpRenderRows();
   }
   function xpCols() {
@@ -7291,7 +7299,13 @@
       xpRenderRows();
       return toast(list.length + '줄의 ' + PLABEL[k] + '를 ' + (raw ? won(raw) + '원으로' : '빈 칸으로') + ' 바꿨습니다. 단가 저장을 눌러야 저장됩니다.');
     }
-    if (e.target.id === 'xpWd') { XP.wd = !XP.wd; if (/^w\d$/.test(XP.sort.k)) XP.sort = { k: '', d: 0 }; return xpRender(); }
+    const xm = e.target.closest('[data-xpm]');
+    if (xm) { // 💰 단가 보기 ↔ 📦 물량 보기
+      const wd = xm.dataset.xpm === 'wd'; if (wd === XP.wd) return;
+      if (wd && xpDirtyN() && !confirm('저장하지 않은 단가가 ' + xpDirtyN() + '줄 있습니다. 물량 보기로 넘어가도 고친 값은 남아 있습니다. 넘어갈까요?')) return;
+      XP.wd = wd; if (/^(w\d|p\d)$/.test(XP.sort.k)) XP.sort = { k: '', d: 0 }; if (wd) XP.empty = '';
+      return xpRender();
+    }
     if (e.target.id === 'xpCopy') {
       const cols = xpCols();
       const lines = [cols.map((c) => c.t).join('\t')].concat(xpList().map((r) => [r.c.name, r.code, '구분' + r.n.level].concat(XP.wd ? WDS.map(([i]) => (r.wd && r.wd[i] != null ? r.wd[i] : '')) : PKEYS.map((k) => xpCur(r, k))).concat([r.vol == null ? '' : Math.round(r.vol), r.volq == null ? '' : Math.round(r.volq), r.st]).join('\t')));
