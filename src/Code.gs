@@ -2956,7 +2956,7 @@ function adm_accList(token) {
     const list = readAll_(SH.ACC).filter(function (o) { return o.id && (o.service || o.loginId); }).map(accView_);
     const cats = accCats_();
     list.forEach(function (x) { if (x.category && cats.indexOf(x.category) < 0) cats.push(x.category); }); // 시트에 직접 쓴 새 분류도 보이게
-    return { ok: true, accounts: list, categories: cats, camps: master_().camps.map(function (c) { return c.name; }) };
+    return { ok: true, accounts: list, categories: cats, camps: master_().camps.filter(function (c) { return !isStaffCamp_(c.name); }).map(function (c) { return c.name; }) };
   });
 }
 
@@ -3875,7 +3875,7 @@ function master_() {
     }
   }
   const data = {
-    camps: readAll_(SH.CAMPS).filter(function (o) { return o.id; }).map(campView_),
+    camps: readAll_(SH.CAMPS).filter(function (o) { return o.id && !isStaffCamp_(o.name); }).map(campView_), // '운영자'(직원 소속 구분)는 쿠팡 캠프가 아니므로 노선관리에 안 나옴
     routes: readAll_(SH.ROUTES).filter(function (o) { return o.id && o.code; }).map(routeView_),
     images: readAll_(SH.CIMG).filter(function (o) { return o.id; }).map(imageView_),
     addresses: readAll_(SH.CADDR).filter(function (o) { return o.id && o.address; }).map(addrView_),
@@ -6109,7 +6109,7 @@ function adm_issueList(token, f) {
     list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.at < b.at ? 1 : -1); });
     const drivers = readAll_(SH.DRIVERS).filter(function (d) { return d.id && d.name && d.status === ST.ACTIVE; })
       .map(function (d) { return { id: d.id, name: d.name, camp: d.schCamp || '', campId: d.schCampId || '', baseRoute: d.baseRoute || '', type: d.driverType || '' }; });
-    const camps = master_().camps.map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; });
+    const camps = master_().camps.filter(function (c) { return !isStaffCamp_(c.name); }).map(function (c) { return { id: c.id, name: c.name, rot: c.rot }; });
     // 노선 이슈: 기사스케줄에서 [미입차로 확정]한 노선 (기사 개인 이슈가 아니라 '그날 그 노선이 비었다'는 기록)
     let routeMiss = [];
     try { routeMiss = schRmRead_().filter(function (x) { return x.date >= from && x.date <= to; }).map(function (x) { return { date: x.date, camp: x.camp, unit: x.unit, result: x.result, reason: x.reason, memo: x.memo, by: x.by }; }); } catch (e) { routeMiss = []; }
