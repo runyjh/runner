@@ -359,6 +359,8 @@
   .day .pmx b { margin-right: 4px; }
   .day .pmx.r-수행 { background: #e5f6ec; color: #0b6b3a; } .day .pmx.r-맡김 { background: #e8f0fd; color: #0a53a8; } .day .pmx.r-지원 { background: #f2f4f6; color: #4e5968; }
   .tile { position: relative; }
+  .tile.m-off { opacity: .55; background: #f1f3f6; } .tile .m-offb { position: absolute; top: 10px; right: 10px; background: #fde68a; color: #92400e; font-size: 11px; font-weight: 700; font-style: normal; padding: 2px 7px; border-radius: 999px; }
+  #menuOffM { align-items: center; } .mo-box { text-align: center; word-break: keep-all; } .mo-ic { font-size: 38px; } .mo-nm { display: block; font-size: 13px; color: #6b7684; margin-top: 4px; } .mo-box b { display: block; font-size: 18px; margin: 4px 0 8px; } .mo-box p { margin: 0 0 16px; font-size: 14px; color: #4e5968; line-height: 1.55; }
   .tbdg { font-style: normal; position: absolute; top: 10px; right: 10px; min-width: 22px; height: 22px; border-radius: 999px; background: var(--danger); color: #fff !important; font-size: 12px !important; font-weight: 800 !important; display: flex; align-items: center; justify-content: center; padding: 0 6px; }
   .pmbanner { position: fixed; left: 50%; top: 12px; transform: translate(-50%, -140%); width: min(448px, calc(100% - 24px)); background: #191f28; color: #fff; border-radius: 14px; padding: 12px 14px; z-index: 60;
     box-shadow: 0 8px 24px rgba(0,0,0,.25); transition: transform .25s ease-out; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; }
@@ -907,6 +909,11 @@
     <span class="nimp">중요 공지</span><b id="ntPopTitle"></b><div class="ntpop-body" id="ntPopBody"></div>
     <button class="btn" type="button" id="ntPopOk">확인했습니다</button></div></div>
 
+  <div class="ihelp hidden" id="menuOffM" role="dialog" aria-modal="true"><div class="ibox ntpop mo-box">
+    <div class="mo-ic">🚧</div><span class="mo-nm" id="moName"></span><b class="mo-txt">해당 메뉴는 준비 중입니다</b>
+    <p class="mo-txt">더 편하게 쓰실 수 있도록 준비하고 있어요. 준비가 끝나면 공지로 알려 드리겠습니다.</p>
+    <button class="btn" type="button" id="moOk" style="width:100%">확인</button></div></div>
+
   <div class="ihelp hidden" id="slPop" role="dialog" aria-modal="true"><div class="ibox ntpop">
     <span class="nimp" style="background:#e8f3ff;color:#1b64da">정산 안내</span><b id="slPopTitle"></b><div class="ntpop-body" id="slPopBody"></div>
     <div style="display:flex;gap:8px;margin-top:4px"><button class="btn ghost" type="button" id="slPopNo" style="flex:1">나중에</button><button class="btn" type="button" id="slPopGo" style="flex:2">정산서 보기</button></div></div></div>
@@ -1387,7 +1394,7 @@
     const all = swrAll(), now = Date.now();
     const t1 = new Date(), pddMonth = ymdOf(new Date(t1.getFullYear(), t1.getMonth(), t1.getDate() + 1)).slice(0, 7); // 스케줄 화면이 처음 여는 달 (PDD가 있는 달)과 같은 키로
     // 마이페이지 수행률 · 가중요인: 서버 계산이 무거워(5~7초) 30분에 한 번만 미리 받아 둔다 → 마이페이지를 열면 메뉴·내용이 바로 보임
-    [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]], ['api_campSchedule', [tok, pddMonth, undefined]], ['api_myPerf', [tok], 1800000], ['api_myFb', [tok], 1800000]].forEach((x, i) => {
+    [['api_mySchedule', [tok, pddMonth]], ['api_myInfo', [tok]], ['api_pmList', [tok, { onlyAvail: !!($('#pmAvail') || {}).checked, q: '' }]], ['api_campSchedule', [tok, pddMonth, undefined]], ['api_myPerf', [tok], 1800000], ['api_myFb', [tok], 1800000]].filter((x) => !menuBlocked({ api_mySchedule: 'sched', api_campSchedule: 'sched', api_pmList: 'pm', api_myPerf: 'my', api_myFb: 'my' }[x[0]], true)).forEach((x, i) => { // 끈 메뉴(준비 중)는 미리 받지 않음
       const k = swrKey(x[0], x[1]), c = all[k], age = x[2] || 600000;
       if (c && now - c.t < age) return;
       bgIdle(() => { if (store.get(TOKEN) !== tok) return; const c2 = swrAll()[k]; if (c2 && Date.now() - c2.t < age) return; apiRead(x[0], x[1], true).catch(() => {}); }); // 화면이 먼저 같은 것을 불렀으면 그 답을 같이 씀
@@ -1434,6 +1441,7 @@
   let viewRestored = false;
   function restoreView(v) {
     if (!v || v === 'home') return false;
+    if (menuBlocked(MENU_VIEW[v], true)) return false; // 끈 메뉴(준비 중)였으면 홈 그대로
     const open = {
       notice: () => openNotices(''), sched: () => openSched(), pumasi: () => openPumasi('home'), pmform: () => openPumasi('home'), pmgive: () => openGive(ssGet('runner.gvMode') || 'me'),
       board: () => openBoard(), bdform: () => openBoard(), bdpost: () => { const id = ssGet('runner.bdId'); if (id) openBdPost(id, 'board'); else openBoard(); },
@@ -1568,7 +1576,7 @@
 
   // ───── 화면 문구 (관리자앱 → 올인원 설정 → 기사앱 에서 바꿈) ─────
   // 키 = "d:화면id:기본 문구". 화면이 다시 그려져도 MutationObserver 가 바꾼 글자를 다시 입힌다. ※ 관리자앱 uiDrvScan 과 같은 규칙
-  const UID_SEL = '#v-home .tile b, #v-home .tile > span, section.view > .topbar h2, .mylist button, .mylist .mylab, .pmban, .links a, section.view .lb, section.view .card > h3';
+  const UID_SEL = '#v-home .tile b, #v-home .tile > span, section.view > .topbar h2, .mylist button, .mylist .mylab, .pmban, .links a, section.view .lb, section.view .card > h3, #menuOffM .mo-txt';
   const UID = { map: {} };
   try { UID.map = JSON.parse(localStorage.getItem('runner.uiText.d') || '{}') || {}; } catch (e) { UID.map = {}; }
   const uidFirst = (el) => { for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) return n; return null; };
@@ -1597,6 +1605,34 @@
     if (!at || Date.now() - at > 6 * 3600000) setTimeout(() => (typeof bgIdle === 'function' ? bgIdle(go) : go()), 0); // 처음이거나 6시간 지났을 때만 · 홈의 급한 호출 뒤에
   })();
 
+  // ───── 메뉴 준비 중 (관리자앱 › 올인원 설정 › 기사앱 에서 켜고 끔) ─────
+  // 로그인 확인(api_checkSession) 때마다 끈 메뉴 목록을 받아 기기에 기억 → 다음에 앱을 열자마자 반영 · 서버도 그 메뉴 자료 요청을 막음
+  const MENU_NM = { sched: '📅 스케줄', settle: '💰 정산서', pm: '🤝 품앗이', my: '👤 마이페이지' }, MENU_TILE = { sched: '#mSched', settle: '#mSettle', pm: '#mPm', my: '#mMy' };
+  const MENU_VIEW = { sched: 'sched', settle: 'settle', pumasi: 'pm', pmform: 'pm', pmgive: 'pm', pmdetail: 'pm', pmalerts: '', pmmine: 'pm', mypage: 'my', myinfo: 'my' };
+  let MENU_OFF = [];
+  const menuKey = () => { try { const u = JSON.parse(store.get(USER) || '{}') || {}; return 'runner.menuOff.' + String(u.loginId || '').toLowerCase(); } catch (e) { return 'runner.menuOff.'; } };
+  function menuPaint() {
+    Object.keys(MENU_TILE).forEach((k) => {
+      const b = $(MENU_TILE[k]); if (!b) return;
+      const off = MENU_OFF.includes(k), sp = b.querySelector(':scope > span');
+      b.classList.toggle('m-off', off);
+      let bd = b.querySelector('.m-offb');
+      if (off && !bd) b.insertAdjacentHTML('beforeend', '<em class="m-offb">준비 중</em>'); else if (!off && bd) bd.remove();
+      if (sp) { if (sp.dataset.t0 === undefined) sp.dataset.t0 = sp.textContent; const want = off ? '준비 중인 메뉴입니다' : sp.dataset.t0; if (sp.textContent !== want) sp.textContent = want; }
+    });
+  }
+  function menuOffLoad() { try { MENU_OFF = JSON.parse(localStorage.getItem(menuKey()) || '[]') || []; } catch (e) { MENU_OFF = []; } menuPaint(); }
+  function menuOffSet(list) { MENU_OFF = Array.isArray(list) ? list : []; try { localStorage.setItem(menuKey(), JSON.stringify(MENU_OFF)); } catch (e) { /* 무시 */ } menuPaint(); }
+  /** 끈 메뉴면 「준비 중」 창을 띄우고 true (silent = 창 없이) */
+  function menuBlocked(k, silent) {
+    if (!k || !MENU_OFF.includes(k)) return false;
+    if (!silent) { $('#moName').textContent = MENU_NM[k] || ''; $('#menuOffM').classList.remove('hidden'); }
+    return true;
+  }
+  $('#moOk').addEventListener('click', () => $('#menuOffM').classList.add('hidden'));
+  $('#menuOffM').addEventListener('click', (e) => { if (e.target.id === 'menuOffM') $('#menuOffM').classList.add('hidden'); });
+  menuOffLoad();
+
   (function boot() {
     const token = store.get(TOKEN);
     if (!token) { goLogin(); api('api_ping').catch(() => {}); return; }
@@ -1609,7 +1645,8 @@
         let persist = false;
         try { persist = !!localStorage.getItem(TOKEN); } catch (e) {}
         store.set(USER, JSON.stringify(r.user), persist);
-        slipPop(r.slipClose);
+        menuOffSet(r.menuOff || []);
+        if (!menuBlocked('settle', true)) slipPop(r.slipClose);
         if (r.mustChange) openChangePw(true, '');
         else if (cached && curView !== 'splash' && curView !== 'login') $('#homeName').textContent = honor(r.user) + ', 안녕하세요'; // 이미 홈(또는 새로고침 전 화면)을 보여 주는 중
         else goHome(r.user);
@@ -1904,6 +1941,7 @@
   const ymdOf = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const pddOf = (today) => { const p = String(today || '').split('-'); return p.length === 3 ? ymdOf(new Date(+p[0], +p[1] - 1, +p[2] + 1)) : ''; };
   function openSched() {
+    if (menuBlocked('sched')) return;
     scMode = 'month'; if (!scMonth) { const t = new Date(); scMonth = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).slice(0, 7); } // 처음은 한 달 (PDD가 있는 달)
     paintScMode();
     show('sched');
@@ -2651,6 +2689,7 @@
   }
   // 목록
   function openPumasi(from) {
+    if (menuBlocked('pm')) return;
     pmFrom = from || 'home'; show('pumasi'); loadPmList();
     // 품앗이 화면을 열면 '새 품앗이 일감' 알림은 읽은 것으로 (카드 숫자 지움)
     const nj = paList.filter((a) => !a.read && a.kind === 'newjob').map((a) => a.id); if (nj.length && window.markAlerts) window.markAlerts(nj);
@@ -2726,7 +2765,7 @@
   });
 
   // 상세
-  function openPmDetail(id, from) { pmCurId = id; pmDetFrom = from || 'pumasi'; ssSet('runner.pmId', id); show('pmdetail'); loadPmDetail(); }
+  function openPmDetail(id, from) { if (menuBlocked('pm')) return; pmCurId = id; pmDetFrom = from || 'pumasi'; ssSet('runner.pmId', id); show('pmdetail'); loadPmDetail(); }
   function pmBackFromDetail() {
     if (pmDetFrom === 'sched') { show('sched'); loadSched(); }
     else if (pmDetFrom === 'mine') { show('pmmine'); loadPmMine(); }
@@ -3036,6 +3075,7 @@
   let gvFrom = 'pumasi';
   let gvSeq = 0;
   function openGive(mode, from) {
+    if (menuBlocked('pm')) return;
     if (from) gvFrom = from;
     if (mode) gvMode = mode;
     ssSet('runner.gvMode', gvMode);
@@ -3138,6 +3178,7 @@
 
   // 마이페이지
   function openMyPage() {
+    if (menuBlocked('my')) return;
     show('mypage'); paintAlertBadges();
     const token = pmTok(); if (!token) return;
     api('api_myInfo', token).then((r) => {
@@ -3330,7 +3371,7 @@
   const slMe = () => { try { const u = JSON.parse(store.get(USER) || '{}') || {}; return String(u.loginId || u.id || '').toLowerCase(); } catch (e) { return ''; } };
   window.slPrefetch = function () {
     const token = store.get(TOKEN), me = slMe();
-    if (!token || !me || SLC.pre || document.hidden) return;
+    if (!token || !me || SLC.pre || document.hidden || menuBlocked('settle', true)) return;
     let used = '', last = 0;
     try { used = localStorage.getItem('runner.slUsed') || ''; last = +localStorage.getItem('runner.slPreAt') || 0; } catch (e) { return; }
     if (used !== me || Date.now() - last < 600000) return;
@@ -3354,6 +3395,7 @@
   }
   function slipKeep(token, r, noSave) { if (!r || !r.month) return ''; const j = JSON.stringify(r, (k, v) => (k === '_ms' || k === '_st' || k === '_c' ? undefined : v)); (SLC.tok === token ? SLC : slcFor(token)).slips[r.month] = { r: r, j: j }; if (!noSave) slcSave(); return j; }
   function openSettle() {
+    if (menuBlocked('settle')) return;
     show('settle');
     const token = pmTok(); if (!token) return;
     const C = slcFor(token), seq = ++SLC.seq;

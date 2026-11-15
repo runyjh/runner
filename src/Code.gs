@@ -1264,7 +1264,8 @@ function api_checkSession(token) {
     if (!s) return { ok: false, code: 'EXPIRED' };
     const info = driverInfo_(s.d);
     if (!info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED' };
-    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId, title: info.title || '' }, slipClose: stlLastClose_() };
+    let menuOff = []; try { menuOff = appMenuOffFor_(s.d); } catch (e) { menuOff = []; } // 끈 메뉴 (기사앱이 열릴 때마다 받아 「준비 중」 표시)
+    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId, title: info.title || '' }, slipClose: stlLastClose_(), menuOff: menuOff };
   });
 }
 
@@ -5467,46 +5468,6 @@ function adm_schNote(token, action, id, label) {
   });
 }
 
-/**
- * 기사스케줄 표 순서 저장 (▲▼ 로 옮긴 결과). list = [{ id: 기사ID, order: 숫자 }]
- * drivers 탭 '스케줄 순서' 열만 한 번 읽고 한 번에 다시 쓴다 (다른 칸은 그대로).
- */
-function adm_schOrder(token, list) {
-  return run_(function () {
-    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
-    if (!Array.isArray(list) || !list.length) return { ok: true, saved: 0 };
-    if (list.length > 1000) fail_('한 번에 너무 많습니다.');
-    const want = {};
-    list.forEach(function (x) {
-      const id = str_(x && x.id), n = Number(x && x.order);
-      if (!id || !(n >= 1 && n <= 99999) || Math.floor(n) !== n) fail_('순서 값이 올바르지 않습니다.');
-      want[id] = String(n);
-    });
-    const lock = scriptLock_();
-    lock.waitLock(20000);
-    try {
-      const c = cols_(SH.DRIVERS, true), sh = sheet_(SH.DRIVERS), last = sh.getLastRow();
-      if (last < 2) fail_('기사를 찾을 수 없습니다.');
-      const ids = sh.getRange(2, c.id + 1, last - 1, 1).getValues();
-      const rng = sh.getRange(2, c.schOrder + 1, last - 1, 1);
-      const cur = rng.getValues();
-      let saved = 0;
-      const gone = [];
-      ids.forEach(function (r, i) {
-        const id = str_(r[0]);
-        if (want[id] !== undefined && str_(cur[i][0]) !== want[id]) { cur[i][0] = want[id]; saved++; gone.push('dv:' + id, 'ir:' + id); }
-      });
-      if (saved) {
-        rng.setNumberFormat('@').setValues(cur);
-        cache_().removeAll(gone);
-        logAdmin_(a, '기사스케줄 순서 변경', saved + '명', '');
-      }
-      return { ok: true, saved: saved };
-    } finally {
-      lock.releaseLock();
-    }
-  });
-}
 
 /**
  * 기사 앱: 내 스케줄
@@ -5519,6 +5480,7 @@ function api_mySchedule(token, month) {
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
     if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    if (appMenuOffFor_(s.d).indexOf('sched') >= 0) return { ok: false, code: 'MENU_OFF', msg: APP_MENU_OFF_MSG }; // 스케줄 메뉴 준비 중
     stg_('auth');
     let dates, ym = '';
     const mm = str_(month).match(/^(\d{4})-(\d{2})$/);
@@ -5668,6 +5630,7 @@ function api_campSchedule(token, month, campId) {
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
     if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    if (appMenuOffFor_(s.d).indexOf('sched') >= 0) return { ok: false, code: 'MENU_OFF', msg: APP_MENU_OFF_MSG }; // 스케줄 메뉴 준비 중
     // 직함자(관리자·운영자·대표)는 캠프를 골라 다른 캠프도 볼 수 있다 (보기만). 일반 기사는 소속 캠프만
     const staff = !!info.title, pickCamp = staff ? str_(campId) : '';
     if (campId && !staff) fail_('소속 캠프만 볼 수 있습니다.');
@@ -6860,56 +6823,6 @@ function schCheckIds_(res) {
 }
 
 /** 스케줄 DB 파일 '어드민 업로드' 탭에 운영시트와 같은 배치로 쓴다. 반환: 탭 주소 */
-function schWriteUpload_(res) {
-  const book = schSS_();
-  let up = book.getSheetByName(UPLOAD.SHEET);
-  const W = UPLOAD.HEAD.length;
-  if (!up) {
-    up = book.insertSheet(UPLOAD.SHEET);
-    if (up.getMaxColumns() < UPLOAD.RIGHT_COL + W) up.insertColumnsAfter(up.getMaxColumns(), UPLOAD.RIGHT_COL + W - up.getMaxColumns());
-    up.getRange(1, UPLOAD.LEFT_COL, 1, 2).setValues([['주차1번', '2주 스케쥴']]);
-    up.getRange(1, UPLOAD.RIGHT_COL, 1, 2).setValues([['주차2번', '확인사항']]);
-    up.getRange(2, UPLOAD.LEFT_COL, 1, W).setValues([UPLOAD.HEAD]);
-    up.getRange(2, UPLOAD.RIGHT_COL, 1, W).setValues([UPLOAD.HEAD]);
-    up.getRange(1, 1, 2, UPLOAD.RIGHT_COL + W).setFontWeight('bold');
-    up.setFrozenRows(2);
-    up.getRange(1, UPLOAD.LEFT_COL).setNote('러너 올인원 기사스케줄 > "어드민 업로드 테이블" 을 누를 때마다 3행부터 새로 만들어집니다.');
-  }
-  const nW = res.weeks.reduce(function (a, w) { return a + w.length; }, 0);
-  const need = UPLOAD.START_ROW + nW + res.missing.length + UPLOAD.GAP * (res.weeks.length + 1) + res.weeks.length;
-  const needR = UPLOAD.START_ROW + res.dups.length + res.missing.length + 4;
-  const rowsNeed = Math.max(need, needR);
-  if (up.getMaxRows() < rowsNeed) up.insertRowsAfter(up.getMaxRows(), rowsNeed - up.getMaxRows());
-  if (up.getMaxColumns() < UPLOAD.RIGHT_COL + W - 1) up.insertColumnsAfter(up.getMaxColumns(), UPLOAD.RIGHT_COL + W - 1 - up.getMaxColumns());
-  const maxRows = up.getMaxRows() - 2;
-  if (maxRows > 0) {
-    const clr = up.getRange(UPLOAD.START_ROW, UPLOAD.LEFT_COL, maxRows, UPLOAD.RIGHT_COL + W - UPLOAD.LEFT_COL);
-    clr.clearContent(); clr.clearFormat();
-  }
-  const put = function (row, col, rows, bg) {
-    if (!rows.length) return;
-    const rng = up.getRange(row, col, rows.length, W);
-    rng.setNumberFormat('@').setValues(rows.map(function (r) { return r.map(safeText_); }));
-    rng.setBackgrounds(bg);
-  };
-  let rowL = UPLOAD.START_ROW;
-  res.weeks.forEach(function (rows0, w) {
-    const rows = res.weeks[w];
-    if (!rows.length) { rowL += UPLOAD.GAP; return; }
-    if (w >= 1) { up.getRange(rowL, UPLOAD.LEFT_COL, 1, W).setBackground(UPLOAD.COLOR.SEP); rowL++; }
-    put(rowL, UPLOAD.LEFT_COL, rows, res.keys[w].map(function (k) { return new Array(W).fill(k ? UPLOAD.COLOR.KEY : '#FFFFFF'); }));
-    rowL += rows.length + UPLOAD.GAP;
-  });
-  put(rowL, UPLOAD.LEFT_COL, res.missing, res.missing.map(function () { return new Array(W).fill(UPLOAD.COLOR.MI); }));
-  let rowR = UPLOAD.START_ROW;
-  put(rowR, UPLOAD.RIGHT_COL, res.dups, res.dups.map(function () { return new Array(W).fill(UPLOAD.COLOR.DUP); }));
-  rowR += res.dups.length;
-  if (res.missing.length) {
-    rowR += 3;
-    put(rowR, UPLOAD.RIGHT_COL, res.missing, res.missing.map(function () { return new Array(W).fill(UPLOAD.COLOR.MI); }));
-  }
-  return book.getUrl() + '#gid=' + up.getSheetId();
-}
 
 // ───────────────────────── 데이터 초기화 (메뉴별) ─────────────────────────
 /*
@@ -7454,22 +7367,6 @@ function adm_rcCancel(token, id) {
   });
 }
 /** 관리자: '바로 변경'으로 남은 노선 변경 이력 지우기 (정정이었을 때 · 줄이 나뉘지 않게). 기사 정보는 그대로 */
-function adm_rcDropHistory(token, id) {
-  return run_(function () {
-    const a = requireAdmin_(token); fsMark_('sch', { by: a.loginId });
-    const lock = scriptLock_();
-    lock.waitLock(20000);
-    try {
-      const c = rcRows_(true).filter(function (x) { return x.id === str_(id); })[0];
-      if (!c) fail_('기록을 찾을 수 없습니다.');
-      if (c.status !== RCS.DONE || c.memo !== '바로 변경') fail_('바로 변경 이력만 지울 수 있습니다. 예약은 취소를 써 주세요.');
-      writeFields_(SH.RCHG, c._row, { status: RCS.OFF, memo: '바로 변경 (정정으로 지움)' });
-      rcTouch_();
-      logAdmin_(a, '노선 변경 이력 지움 (정정)', c.name, c.date + ' ' + c.fromRoute + ' → ' + c.toRoute);
-      return { ok: true };
-    } finally { lock.releaseLock(); }
-  });
-}
 /**
  * 관리자: 쿠팡 노선 이관. f = { fromCampId, fromNum, toCampId 또는 toCampName(새 캠프), toNum, date, copyPrice, memo }
  * dry = true 면 미리보기만 (바뀔 기사·노선·단가·확인할 것). false 면 실제로 만든다.

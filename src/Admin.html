@@ -198,6 +198,31 @@
   .search { width: 260px; }
 
   .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  /* 올인원 설정 · 탭 4개 (기사앱 · 화면 문구 · 자동 연결 · 관리) */
+  .cfg-tabs { display: flex; gap: 6px; margin: 0 0 16px; flex-wrap: wrap; }
+  .cfg-tabs button { padding: 9px 16px; border-radius: 10px; background: #fff; border: 1px solid var(--line); font-size: 14px; font-weight: 600; color: #4e5968; cursor: pointer; }
+  .cfg-tabs button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .cfg-box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; max-width: 900px; }
+  .cfg-box h4 { margin: 0 0 2px; font-size: 15px; } .cfg-box > .sub { font-size: 12.5px; margin: 0 0 10px; }
+  .cfg-g2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
+  .cfg-it { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #edf0f4; border-radius: 10px; padding: 10px 12px; min-width: 0; }
+  .cfg-it b { font-size: 14px; } .cfg-it small { display: block; font-size: 12px; color: var(--sub); margin-top: 1px; } .cfg-it select.inp { height: 34px; min-width: 120px; }
+  .cfg-r { display: flex; align-items: center; gap: 8px; flex: none; } .cfg-st { font-size: 12px; font-weight: 700; } .cfg-st.on { color: #16a34a; } .cfg-st.off { color: #b45309; }
+  .cfg-tg { width: 44px; height: 25px; border-radius: 999px; background: #cbd5e1; border: 0; position: relative; cursor: pointer; flex: none; padding: 0; }
+  .cfg-tg:after { content: ''; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; transition: left .15s; } .cfg-tg.on { background: #22c55e; } .cfg-tg.on:after { left: 22px; }
+  .cfg-warn { background: #fff7e6; border: 1px solid #fcd9a0; color: #92400e; font-size: 12.5px; border-radius: 10px; padding: 8px 10px; margin-top: 8px; line-height: 1.5; }
+  .cfg-ex { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef1f5; font-size: 13px; } .cfg-ex .sub { font-size: 12px; }
+  .cfg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+  .cfg-chip { background: var(--brand-weak); color: var(--brand); border-radius: 999px; padding: 4px 6px 4px 11px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .cfg-chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0 4px; }
+  .cfg-exadd { height: 30px; font-size: 13px; border-style: dashed; max-width: 220px; }
+  .cfg-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-bottom: 14px; max-width: 900px; }
+  .cfg-card { text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+  .cfg-card:hover { border-color: var(--brand); } .cfg-card b { font-size: 14px; } .cfg-card span { font-size: 12.5px; color: var(--sub); } .cfg-card .cfg-go { color: var(--brand); font-weight: 600; margin-top: 4px; }
+  .cfg-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; } .cfg-bar .search { flex: 1; min-width: 200px; }
+  .ui-chips .tab { border-radius: 999px; }
+  html.m .cfg-g2, html.m .cfg-cards { grid-template-columns: 1fr; }
+  html.m .cfg-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; } html.m .cfg-tabs button { padding: 8px 2px; font-size: 13px; white-space: nowrap; text-align: center; justify-content: center; }
   /* 올인원 설정 · 화면 문구 */
   .uitbl td { vertical-align: middle; } .uitbl td.w { color: var(--sub); font-size: 12px; white-space: nowrap; } .uitbl td.d { color: #8b95a1; }
   .uitbl input.inp, .uitbl textarea.inp { height: 34px; } .uitbl textarea.inp { height: auto; min-height: 90px; padding: 8px 10px; line-height: 1.55; font-size: 12.5px; resize: vertical; }
@@ -1793,17 +1818,28 @@
    <section id="view-uiset" class="hidden">
     <div class="head">
       <h2>올인원 설정</h2>
-      <div class="tools">
-        <input class="inp search" id="uiQ" placeholder="🔍 문구 검색 (예: 보험, 정산서)" autocomplete="off">
-        <button class="btn ghost" id="uiEditBtn" type="button">✏️ 문구 편집 모드</button>
-        <button class="btn ghost" id="uiResetAll" type="button" title="이 탭에 보이는 바꾼 문구를 모두 비움 (저장해야 반영)">전체 기본값으로</button>
+    </div>
+    <div class="cfg-tabs" id="cfgTabs"><button type="button" data-cfgt="app" class="on">📱 기사앱</button><button type="button" data-cfgt="text">✏️ 화면 문구</button><button type="button" data-cfgt="link">🔗 자동 연결</button><button type="button" data-cfgt="mng">🛠 관리</button></div>
+    <div class="cfg-sec" id="cfgApp"><div class="sub" style="padding:30px">불러오는 중…</div></div>
+    <div class="cfg-sec hidden" id="cfgText">
+    <div class="cfg-bar">
+        <input class="inp search" id="uiQ" placeholder="🔍 바꿀 글자 검색 (예: 보험, 정산서)" autocomplete="off">
+        <button class="btn ghost" id="uiEditBtn" type="button">✏️ 화면에서 바로 고치기</button>
         <button class="btn" id="uiSaveBtn" type="button">저장 · 바로 반영</button>
-      </div>
     </div>
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">메뉴 · 탭 · 화면 제목 · 설명서 글자를 직접 바꿉니다. <b>기능과 계산은 그대로</b>이고, 바꾼 문구를 비우면 기본 문구가 나옵니다. 화면에서 바로 고치려면 <b>✏️ 문구 편집 모드</b>를 켜세요.</p>
-    <div class="tabs" id="uiTabs"><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="form">창 · 입력칸</button><button class="tab" data-uit="warn">경고 문구</button><button class="tab" data-uit="drv">기사앱</button><button class="tab" data-uit="log">변경 기록</button></div>
+    <div class="tabs ui-chips" id="uiTabs"><button class="tab" data-uit="all">전체</button><button class="tab" data-uit="mine">바꾼 것만</button><button class="tab on" data-uit="menu">메뉴 · 화면 제목</button><button class="tab" data-uit="tab">탭</button><button class="tab" data-uit="guide">설명서</button><button class="tab" data-uit="form">창 · 입력칸</button><button class="tab" data-uit="warn">경고 문구</button><button class="tab" data-uit="drv">기사앱</button></div>
     <div id="uiBody"></div>
-    <details class="rz-all" id="rzAll">
+    </div>
+    <div class="cfg-sec hidden" id="cfgLink"></div>
+    <div class="cfg-sec hidden" id="cfgMng">
+      <div class="cfg-cards">
+        <button type="button" class="cfg-card" data-mng="speed"><b>⏱ 속도 측정</b><span>화면별 서버 호출 · 걸리는 시간</span></button>
+        <button type="button" class="cfg-card" data-mng="log"><b>🕘 문구 변경 기록</b><span>누가 언제 어떤 문구를 바꿨는지</span></button>
+        <button type="button" class="cfg-card" id="uiResetAll"><b>↺ 문구 전체 기본값</b><span>바꾼 문구를 모두 비움 (확인 후 실행)</span></button>
+      </div>
+      <div id="cfgLog"></div>
+      <details class="rz-all" id="rzAll">
       <summary>데이터 초기화 <small>화면별 자료를 모두 지웁니다 · 지우기 전에 복사본을 만들고, 확인 문구를 입력해야 실행됩니다</small></summary>
       <div class="rz-grid">
         <button class="btn ghost danger-t" type="button" data-reset="drivers">기사 정보관리</button>
@@ -1816,6 +1852,7 @@
         <button class="btn ghost danger-t" type="button" data-reset="accounts">계정관리</button>
       </div>
     </details>
+    </div>
    </section>
    <section id="view-einv" class="hidden">
     <div class="head">
@@ -12636,9 +12673,9 @@
       ['묶음', '<b>이번 달 돈</b>(자금배분·빼둘 돈 → 입금확인 → 월별 손익) · <b>통장</b>(잔액 · 내역 올리기 · 입출금 기록) · <b>손익·세금</b>(세금 일정 · 지출) · <b>⚙ 설정</b>(통장 목록 · 배분 설정 · 고정 운영비 · 직원)']
     ],
     'page:uiset': [
-      ['하는 일', '관리자 화면의 <b>메뉴 · 탭 · 제목 · 입력칸 이름 · 설명서 · 경고 문구 · 기사 앱 문구</b>를 코드 수정 없이 바꾸기'],
-      ['순서', '[✏️ 문구 편집 모드] → 바꿀 문구 입력 → [저장 · 바로 반영] · 비우면 기본값 · [전체 기본값으로] = 이 탭의 바꾼 문구 모두 비움'],
-      ['찾기', '위 검색칸에 단어(보험 · 정산서 …) → 그 문구가 있는 줄만 · 바꾼 이력은 아래 기록에']
+      ['📱 기사앱', '기사앱 메뉴(스케줄 · 정산서 · 품앗이 · 마이페이지) 켜기·끄기 · 꺼도 쓰는 사람 · 품앗이 · 정산서 공개'],
+      ['✏️ 화면 문구', '메뉴 · 탭 · 제목 · 입력칸 · 설명서 · 경고 · 기사앱 글자 바꾸기 → [저장 · 바로 반영] · 비우면 기본값 · 「바꾼 것만」으로 모아 보기'],
+      ['🔗 · 🛠', '자동 연결 = 메일 자동 수집 · 팀즈 · 확인 기록 바로가기 · 관리 = 속도 측정 · 문구 변경 기록 · 문구 전체 기본값 · 데이터 초기화']
     ],
     kinds: [
       ['하는 일', '쿠팡 정산서의 <b>구분</b> 값 → 계산 분류(배송 · 프레시백 · 분실파손 …)로 바꾸는 표'],
@@ -15695,18 +15732,20 @@
     if (el.matches(UI_FSEL)) return uiKeyOfF(el, String(def || '').replace(/^[\s—–-]+/, '').trim());
     if (el.matches('.nav a[data-view]')) {
       const g = el.closest('.ng'), gt = g && $('.ngt', g);
-      return ['nav:' + el.dataset.view + (el.dataset.stGo ? '/' + el.dataset.stGo : ''), '메뉴', '왼쪽 메뉴 · ' + (gt ? gt.textContent.trim() : '')];
+      return ['nav:' + el.dataset.view + (el.dataset.stGo ? '/' + el.dataset.stGo : ''), '메뉴', (gt ? '왼쪽 메뉴 · ' + gt.textContent.trim() : '왼쪽 메뉴 · 맨 위')];
     }
     if (el.matches('.nav .ngt')) { const g = [...el.parentNode.classList].find((c) => /^g-/.test(c)); return g ? ['ng:' + g, '메뉴 묶음', '왼쪽 메뉴 · ' + el.textContent.trim()] : null; }
     if (el.matches('section[id^="view-"] > .head h2') && el.id !== 'stTitle') return ['h2:' + el.closest('section').id, '화면 제목', '화면 맨 위'];
     if (el.matches('.tabs .tab')) {
       const box = el.closest('.tabs'), k = Object.keys(el.dataset).find((x) => x !== 'uik');
+      if (UI_HID_TABS.includes(box.id)) return null; // 화면에 안 보이는 예전 탭 줄 (정산관리 내부 이동용) — 바꿔도 보이지 않으므로 목록에서 뺌
       if (!k || el.dataset[k] === '') return null;
       const where = uiSecTitle(el) || '기타';
       return ['tab:' + (box.id || where) + ':' + k + '=' + el.dataset[k], '탭', where];
     }
     return null;
   }
+  const UI_HID_TABS = ['stTabs', 'stPnlTabs', 'stCfgTabs', 'stIdTabs', 'stIdTabs2', 'uiTabs'];
   const UI_SEL = '.nav a[data-view], .nav .ngt, section[id^="view-"] > .head h2, .tabs .tab, ' + UI_FSEL;
   function uiApplyEl(el) {
     const tn = uiFirstText(el); if (!tn) return;
@@ -15784,13 +15823,101 @@
     }).catch(() => {});
   }
   // ── 설정 화면
+  // ── 올인원 설정: 탭 4개 (📱 기사앱 · ✏️ 화면 문구 · 🔗 자동 연결 · 🛠 관리)
+  const CFGT = { tab: 'app', app: null, busy: false };
+  try { CFGT.tab = localStorage.getItem('runner.cfgTab') || 'app'; } catch (e) { /* 기본 */ }
+  function cfgShow(t) {
+    CFGT.tab = t; try { localStorage.setItem('runner.cfgTab', t); } catch (e) { /* 무시 */ }
+    $$('#cfgTabs [data-cfgt]').forEach((b) => b.classList.toggle('on', b.dataset.cfgt === t));
+    [['app', '#cfgApp'], ['text', '#cfgText'], ['link', '#cfgLink'], ['mng', '#cfgMng']].forEach(([k, sel]) => $(sel).classList.toggle('hidden', k !== t));
+    if (t !== 'text' && UI.edit) uiEditMode(false);
+    if (t === 'app') cfgAppLoad();
+    if (t === 'link') cfgLinkPaint();
+  }
+  $('#cfgTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-cfgt]'); if (b) cfgShow(b.dataset.cfgt); });
+  const cfgSw = (on, attr) => '<button type="button" class="cfg-tg' + (on ? ' on' : '') + '" ' + attr + ' role="switch" aria-checked="' + (on ? 'true' : 'false') + '"></button>';
+  function cfgAppLoad() {
+    if (!CFGT.app) $('#cfgApp').innerHTML = '<div class="sub" style="padding:30px">불러오는 중…</div>';
+    return api('adm_appCfg').then((r) => { if (!r.ok) return toast(r.msg); CFGT.app = r; cfgAppPaint(); }).catch(() => {});
+  }
+  function cfgAppPaint() {
+    const r = CFGT.app; if (!r) return;
+    const nm = (id) => { const d = r.drivers.find((x) => x.id === id); return d ? d.name + (d.title ? ' (' + d.title + ')' : '') : id; };
+    const menu = r.menus.map(([k, l]) => { const on = r.menu[k], ic = { sched: '📅', settle: '💰', pm: '🤝', my: '👤' }[k];
+      return '<div class="cfg-it"><div><b>' + ic + ' ' + esc(l) + '</b></div><div class="cfg-r"><span class="cfg-st ' + (on ? 'on' : 'off') + '">' + (on ? '사용 중' : '준비 중') + '</span>' + cfgSw(on, 'data-menu="' + k + '"') + '</div></div>'; }).join('');
+    const warn = !r.menu.pm && r.pmDone.length ? '<div class="cfg-warn">⚠ 배차 확정된 품앗이 일감 ' + r.pmDone.length + '건이 남아 있습니다 (' + r.pmDone.slice(0, 3).map((j) => +j.date.slice(5, 7) + '/' + +j.date.slice(8) + ' ' + esc(j.from) + '→' + esc(j.to)).join(', ') + (r.pmDone.length > 3 ? ' …' : '') + '). 품앗이를 꺼 둔 동안 기사는 앱에서 일감 정보를 볼 수 없습니다.</div>' : '';
+    const used = new Set(r.ex);
+    const exs = r.ex.map((id) => '<span class="cfg-chip">' + esc(nm(id)) + ' <button type="button" data-exdel="' + esc(id) + '" aria-label="빼기">✕</button></span>').join('') +
+      '<select class="inp cfg-exadd" id="cfgExAdd"><option value="">＋ 사람 추가</option>' + r.drivers.filter((d) => !used.has(d.id)).sort((a, b) => (b.title ? 1 : 0) - (a.title ? 1 : 0) || a.name.localeCompare(b.name, 'ko')).map((d) => '<option value="' + esc(d.id) + '">' + esc(d.name + (d.title ? ' (' + d.title + ')' : '') + (d.loginId ? ' · ' + d.loginId : '')) + '</option>').join('') + '</select>';
+    $('#cfgApp').innerHTML =
+      '<div class="cfg-box"><h4>메뉴 켜기 · 끄기</h4><p class="sub">끈 메뉴는 기사앱에서 「준비 중입니다」로 보이고, 그 메뉴의 미리 받기 · 휴대폰 알림도 멈춥니다. 기사가 앱을 다시 열면 바로 적용됩니다.</p>' +
+      '<div class="cfg-g2">' + menu + '</div>' + warn +
+      '<div class="cfg-ex"><b>꺼도 그대로 쓰는 사람</b> <span class="sub">준비 중인 메뉴를 미리 써 볼 기사 · 직원</span><div class="cfg-chips">' + exs + '</div></div></div>' +
+      '<div class="cfg-box"><h4>품앗이</h4><p class="sub">품앗이 관리 화면 위 스위치와 같은 설정입니다 (어디서 바꿔도 같음).</p><div class="cfg-g2">' +
+      '<div class="cfg-it"><div><b>기사가 일감 올리기</b><small>끄면 사무실 등록만</small></div>' + cfgSw(r.postOn, 'data-pmsw="post"') + '</div>' +
+      '<div class="cfg-it"><div><b>일감 제안</b><small>일할 기사에게 바로 맡기기</small></div>' + cfgSw(r.offerOn, 'data-pmsw="offer"') + '</div></div></div>' +
+      '<div class="cfg-box"><h4>정산서 공개</h4><p class="sub">정산관리 › ⚙ 설정의 「기사 앱」 설정과 같습니다.</p><div class="cfg-g2">' +
+      '<div class="cfg-it"><div><b>마감 전 달도 보이기</b><small>확정 전 · 세금계산서 발행 정보는 숨김</small></div>' + cfgSw(r.appShow, 'data-stlshow="1"') + '</div>' +
+      '<div class="cfg-it"><div><b style="white-space:nowrap">보여 줄 기간</b></div><select class="inp" id="cfgRange">' + r.ranges.map((x) => '<option' + (x === r.appRange ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></div></div></div>';
+  }
+  function cfgAppSave(patch, okMsg) {
+    if (CFGT.busy) return; CFGT.busy = true;
+    return api('adm_appCfgSet', patch).then((x) => { if (!x.ok) return toast(x.msg); CFGT.app.menu = x.menu; CFGT.app.ex = x.ex; if (patch.appShow !== undefined) CFGT.app.appShow = !!patch.appShow; cfgAppPaint(); toast(okMsg || '저장했습니다 · 기사앱을 다시 열면 적용'); }).catch(() => {}).finally(() => { CFGT.busy = false; });
+  }
+  $('#cfgApp').addEventListener('click', (e) => {
+    const r = CFGT.app; if (!r) return;
+    const m = e.target.closest('[data-menu]'), d = e.target.closest('[data-exdel]'), p = e.target.closest('[data-pmsw]'), st = e.target.closest('[data-stlshow]');
+    if (m) {
+      const k = m.dataset.menu, on = !r.menu[k], nmk = (r.menus.find((x) => x[0] === k) || [])[1];
+      if (!on && k === 'pm' && r.pmDone.length && !confirm('배차 확정된 품앗이 일감이 ' + r.pmDone.length + '건 있습니다. 품앗이를 끄면 기사가 앱에서 일감 정보를 볼 수 없습니다. 끌까요?')) return;
+      const menu = Object.assign({}, r.menu); menu[k] = on;
+      return cfgAppSave({ menu: menu }, nmk + (on ? ' 메뉴를 켰습니다.' : ' 메뉴를 「준비 중」으로 바꿨습니다.') + ' 기사앱을 다시 열면 적용됩니다.');
+    }
+    if (d) return cfgAppSave({ ex: r.ex.filter((id) => id !== d.dataset.exdel) }, '뺐습니다.');
+    if (p) {
+      const offer = p.dataset.pmsw === 'offer', on = !(offer ? r.offerOn : r.postOn);
+      return api('adm_pmPostSet', on, offer ? 'offer' : undefined).then((x) => { if (!x.ok) return toast(x.msg); r.postOn = x.postOn; r.offerOn = x.offerOn; cfgAppPaint(); toast((offer ? '일감 제안을 ' : '일감 올리기를 ') + (on ? '켰습니다.' : '껐습니다.')); }).catch(() => {});
+    }
+    if (st) return cfgAppSave({ appShow: !r.appShow }, !r.appShow ? '마감 전 달도 기사앱에 「확정 전」으로 보입니다.' : '마감한 달만 기사앱에 보입니다.');
+  });
+  $('#cfgApp').addEventListener('change', (e) => {
+    const r = CFGT.app; if (!r) return;
+    if (e.target.id === 'cfgExAdd' && e.target.value) return cfgAppSave({ ex: r.ex.concat([e.target.value]) }, '추가했습니다.');
+    if (e.target.id === 'cfgRange') { const v = e.target.value; api('adm_stlAppRangeSet', v).then((x) => { if (!x.ok) return toast(x.msg); r.appRange = v; toast('기사앱에 보이는 달: ' + (x.months.length ? x.months.join(', ') : '없음')); }).catch(() => {}); }
+  });
+  function cfgLinkPaint() {
+    const ml = ML.d, ping = ml && ml.ping ? ml.ping : '';
+    $('#cfgLink').innerHTML = '<div class="cfg-cards">' +
+      '<button type="button" class="cfg-card" data-lk="mail"><b>📧 메일 자동 수집</b><span>' + (ml ? (ml.on ? '켜짐' : '꺼짐') + (ping ? ' · 수집기 마지막 확인 ' + esc(String(ping)) : '') : '쿠팡 메일 엑셀 → 자동 올리기') + '</span><span class="cfg-go">설정 열기 ›</span></button>' +
+      '<button type="button" class="cfg-card" data-lk="teams"><b>💬 팀즈 소식</b><span>팀즈 수집기 상태 · 설정</span><span class="cfg-go">열기 ›</span></button>' +
+      '<button type="button" class="cfg-card" data-lk="seen"><b>👀 기사앱 확인 기록</b><span>공지 · 정산서 · 스케줄 변경 확인</span><span class="cfg-go">열기 ›</span></button></div>';
+    if (!ml) loadMail().then(() => { if (CFGT.tab === 'link' && ML.d) cfgLinkPaint(); });
+  }
+  $('#cfgLink').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lk]'); if (!b) return;
+    if (b.dataset.lk === 'mail') { RP.tab = 'mail'; switchView('perf'); loadMail(true); }
+    if (b.dataset.lk === 'teams') tmModalOpen('list');
+    if (b.dataset.lk === 'seen') switchView('applog');
+  });
+  $('#cfgMng').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mng]'); if (!b) return;
+    if (b.dataset.mng === 'speed') $('#pfOpen').click();
+    if (b.dataset.mng === 'log') { UI.logOn = !UI.logOn; if (!UI.logOn) $('#cfgLog').innerHTML = ''; else uiRender(); }
+  });
   function uiOpen() {
+    cfgShow(CFGT.tab);
     uiApplyAll();
     try { localStorage.setItem('runner.uiDefs', JSON.stringify(UI.defs)); } catch (e) {}
     uiRender();
     api('adm_uiText', true).then((r) => { if (r && r.ok) { UI.map = r.map || {}; UI.log = r.log || []; uiRepaint(); } }).catch(() => {});
   }
+  const UI_KINDS = ['menu', 'tab', 'guide', 'form', 'warn', 'drv'];
   function uiRows(kind) {
+    if (kind === 'all' || kind === 'mine') { // 전체 = 종류 6개를 한 목록으로 · 바꾼 것만 = 그중 바꾼 문구
+      const seen = {}, out = [];
+      UI_KINDS.forEach((k) => uiRows(k).forEach((r) => { if (seen[r.key]) return; seen[r.key] = 1; if (kind === 'all' || r.text) out.push(r); }));
+      return out;
+    }
     const keys = [], seen = {};
     const add = (k) => { if (!seen[k]) { seen[k] = 1; keys.push(k); } };
     if (kind === 'guide') Object.keys(ST_GUIDE).forEach((n) => add('guide:' + n));
@@ -15802,7 +15929,7 @@
       const kinds = kind === 'tab' ? ['탭'] : kind === 'form' ? UI_FKINDS : ['메뉴 묶음', '메뉴', '화면 제목'];
       $$('[data-uik]').forEach((el) => { const d = UI.defs[el.dataset.uik]; if (d && kinds.includes(d.kind)) add(el.dataset.uik); });
       Object.keys(UI.defs).forEach((k) => { if (!k.startsWith('warn:') && kinds.includes(UI.defs[k].kind)) add(k); });
-      Object.keys(UI.map).forEach((k) => { if (!k.startsWith('d:') && kinds.includes(UI.map[k].kind)) add(k); });
+      Object.keys(UI.map).forEach((k) => { if (!k.startsWith('d:') && kinds.includes(UI.map[k].kind) && !UI_HID_TABS.some((t) => k.startsWith('tab:' + t + ':'))) add(k); });
     }
     const rows = keys.map((k) => {
       const d = (k.startsWith('d:') ? (UI.drv || []).find((x) => x.key === k) : UI.defs[k]) || {}, o = UI.map[k] || {}, dr = UI.draft[k];
@@ -15814,14 +15941,11 @@
   }
   function uiRender() {
     $$('#uiTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.uit === UI.tab));
-    $('#uiResetAll').classList.toggle('hidden', UI.tab === 'log');
-    $('#uiSaveBtn').classList.toggle('hidden', UI.tab === 'log');
     const q = $('#uiQ').value.trim().toLowerCase();
-    if (UI.tab === 'log') {
-      const L = (UI.log || []).filter((x) => !q || (x.def + x.before + x.after + x.by).toLowerCase().includes(q));
-      $('#uiBody').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th>때</th><th>바꾼 사람</th><th>기본 문구</th><th>이전</th><th>이후</th></tr></thead><tbody>' +
+    if (UI.logOn) { // 🛠 관리 › 문구 변경 기록
+      const L = (UI.log || []);
+      $('#cfgLog').innerHTML = '<div class="table-wrap"><table class="uitbl"><thead><tr><th>때</th><th>바꾼 사람</th><th>기본 문구</th><th>이전</th><th>이후</th></tr></thead><tbody>' +
         (L.length ? L.map((x) => '<tr><td class="w">' + esc(x.at) + '</td><td>' + esc(x.by) + '</td><td class="d">' + esc(String(x.def).split('\n')[0]) + '</td><td>' + esc(String(x.before || '(기본)').split('\n')[0]) + '</td><td><b>' + esc(String(x.after || '(기본)').split('\n')[0]) + '</b></td></tr>').join('') : '<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">' + (UI.log ? '변경 기록이 없습니다.' : '불러오는 중…') + '</td></tr>') + '</tbody></table></div>';
-      return;
     }
     const rows = uiRows(UI.tab).filter((r) => !q || (r.def + ' ' + r.text + ' ' + r.where + ' ' + r.memo).toLowerCase().includes(q));
     // 무리(위치)별로 접기 — 기본은 접힘, 검색 중이면 모두 펼침
@@ -15872,14 +15996,14 @@
     return { key: k, kind: r.kind, where: r.where, def: r.def, text: text, memo: d.memo || '' };
   });
   $('#uiSaveBtn').addEventListener('click', () => uiSave(uiCollect()));
-  $('#uiResetAll').addEventListener('click', () => {
-    const rows = uiRows(UI.tab).filter((r) => r.text);
-    if (!rows.length) return toast('이 탭에는 바꾼 문구가 없습니다.');
-    if (!confirm('이 탭의 바꾼 문구 ' + rows.length + '개를 모두 기본값으로 되돌릴까요?')) return;
+  $('#uiResetAll').addEventListener('click', () => { // 🛠 관리 › 문구 전체 기본값 (모든 종류)
+    const rows = uiRows('mine');
+    if (!rows.length) return toast('바꾼 문구가 없습니다.');
+    if (!confirm('바꾼 문구 ' + rows.length + '개를 모두 기본 문구로 되돌릴까요?\n(메뉴 · 탭 · 설명서 · 창 · 경고 · 기사앱 전부)')) return;
     rows.forEach((r) => { uiDraftOf(r.key).text = ''; });
     uiSave(uiCollect());
   });
-  $('#uiTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-uit]'); if (!b || UI.edit) return; UI.tab = b.dataset.uit; uiRender(); if (UI.tab === 'drv' && !UI.drv) uiDrvLoad(); });
+  $('#uiTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-uit]'); if (!b || UI.edit) return; UI.tab = b.dataset.uit; uiRender(); if (['drv', 'all', 'mine'].includes(UI.tab) && !UI.drv) uiDrvLoad(); });
   // 기사앱 문구 목록: 기사앱 페이지(../)를 읽어 같은 규칙(Index.html UID_SEL)으로 뽑는다
   const UID_SEL = '#v-home .tile b, #v-home .tile > span, section.view > .topbar h2, .mylist button, .mylist .mylab, .pmban, .links a, section.view .lb, section.view .card > h3';
   function uiDrvScan(doc) {
@@ -15914,7 +16038,7 @@
       $('#uiBarEnd').addEventListener('click', () => uiEditMode(false));
     }
     if (!UI.edit && bar) bar.remove();
-    $('#uiEditBtn').textContent = UI.edit ? '✏️ 편집 끝내기' : '✏️ 문구 편집 모드';
+    $('#uiEditBtn').textContent = UI.edit ? '✏️ 편집 끝내기' : '✏️ 화면에서 바로 고치기';
   }
   $('#uiEditBtn').addEventListener('click', () => uiEditMode(!UI.edit));
   function uiPopClose() { const p = $('#uiPop'); if (p) p.remove(); }

@@ -4309,49 +4309,6 @@ function stlFbMigrate_(a) {
 }
 /** 관리자: 기사별 프레시백 (쿠팡 원래 금액 · 차감 설정 · 기사 지급 · 러너 몫 · 이익률) */
 /** ⚙ 기사별 조건 한눈에: 기본 규칙과 다르게 적용되는 기사만 (프백 차감 · 고정수당/공제 · 산재고용 예외 · 일시단가 · 퇴사 보류금 · 매출 목표/분할) */
-function adm_stlDrvCond(token, month) {
-  return run_(function () {
-    requireAdmin_(token);
-    if (!stlMonthOk_(month)) fail_('정산월을 확인해 주세요.');
-    const D = stlDrivers_(), X = stlIds_(D);
-    const rows = {}, order = [];
-    const key = function (name, acct) { const id = stlAcct_(X, D, name, acct); return id || ('n:' + str_(name)); };
-    const get = function (name, acct) {
-      const k = key(name, acct);
-      if (!rows[k]) { rows[k] = { id: k, name: str_(name).replace(/\s*\([^)]*\)\s*$/, '') || str_(name), acct: stlLogin_(acct) || '', fb: '', fbMemo: '', regular: [], ins: '', tmp: [], leave: '', target: '', split: [] }; order.push(k); }
-      return rows[k];
-    };
-    const inMonth = function (from, to) { const f = str_(from).slice(0, 7), t = str_(to).slice(0, 7); return (!f || f <= month) && (!t || t >= month); };
-    stlRead_('stl_fbcut').forEach(function (o) { if (!str_(o.cut)) return; const r = get(o.name, o.acct); r.fb = str_(o.cut); r.fbMemo = str_(o.memo); });
-    stlRead_('stl_regular').forEach(function (o) { if (!stlNum_(o.amt) || !inMonth(o.from, o.to)) return; get(o.name, o.acct).regular.push({ item: str_(o.item), amt: stlNum_(o.amt), to: str_(o.to) }); });
-    stlRead_('stl_camps').forEach(function (o) {
-      if (str_(o.kind) === '캠프' || !str_(o.name)) return;
-      const parts = [];
-      if (str_(o.runner)) parts.push('러너 ' + str_(o.runner));
-      if (/^(n|off|아니오|x)$/i.test(str_(o.sanOn))) parts.push('산재 제외');
-      if (/^(n|off|아니오|x)$/i.test(str_(o.goyOn))) parts.push('고용 제외');
-      if (str_(o.expense)) parts.push('경비율 ' + str_(o.expense));
-      if (str_(o.basis)) parts.push(str_(o.basis));
-      if (parts.length) get(o.name, o.acct).ins = parts.join(' · ');
-    });
-    stlRead_('stl_tmp').forEach(function (o) { if (!stlNum_(o.price) || !inMonth(o.from, o.to)) return; get(o.name, '').tmp.push({ from: str_(o.from).slice(5), to: str_(o.to).slice(5), price: stlNum_(o.price), routes: str_(o.routes) }); });
-    stlRead_('stl_leave').forEach(function (o) { if (str_(o.month).slice(0, 7) < month.slice(0, 7)) return; get(o.name, o.acct).leave = str_(o.month).slice(0, 7) + ' 퇴사 · ' + won_(stlNum_(o.amt)); });
-    stlRead_('stl_target').forEach(function (o) { if (!stlNum_(o.goal)) return; get(o.name, o.acct).target = '연 목표 ' + won_(stlNum_(o.goal)) + (str_(o.item) ? ' (' + str_(o.item) + ')' : ''); });
-    stlRead_('stl_split').forEach(function (o) {
-      if (str_(o.month) && str_(o.month).slice(0, 7) !== month && !stlYes_(o.repeat)) return;
-      get(o.from, o.fromId).split.push('→ ' + str_(o.to) + ' (목표 ' + won_(stlNum_(o.target)) + ')');
-      get(o.to, o.toId).split.push('← ' + str_(o.from));
-    });
-    // 기사 정보의 예전 칸 (산재고용 제외 · 프레시백 차감) 도 같이
-    D.all.forEach(function (o) {
-      if (!(o.status === ST.ACTIVE)) return;
-      if (stlYes_(o.insEx)) { const r = get(o.name, o.loginId); if (!r.ins) r.ins = '산재·고용 제외 (기사 정보)'; }
-    });
-    const out = order.map(function (k) { return rows[k]; }).filter(function (r) { return r.fb || r.regular.length || r.ins || r.tmp.length || r.leave || r.target || r.split.length; });
-    out.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
-    return { ok: true, month: month, rows: out, n: { fb: out.filter(function (r) { return r.fb; }).length, regular: out.filter(function (r) { return r.regular.length; }).length, ins: out.filter(function (r) { return r.ins; }).length, tmp: out.filter(function (r) { return r.tmp.length; }).length, leave: out.filter(function (r) { return r.leave; }).length, target: out.filter(function (r) { return r.target || r.split.length; }).length } };
-  });
-}
 /** 3단계 조정 카드: 이 달 품앗이·용차 · 공제·가감 · 가불금 · 일시단가 · 아이디 사용 기록 건수와 요약 2줄 */
 function adm_stlAdjSummary(token, month) {
   return run_(function () {
@@ -4423,40 +4380,6 @@ function adm_stlFbSave(token, list) {
   });
 }
 
-/**
- * 관리자: 지출 기록 여러 줄 한 번에 추가 (예전 납부 이력 옮겨 넣기)
- *  rows = [{ date:'yyyy-MM-dd', cat, name, vendor, amt, proof, bank, memo, month? }] · 귀속월을 비우면 날짜의 달
- *  같은 날짜·내용·금액 줄이 이미 있으면 건너뜀 (두 번 눌러도 중복 안 됨)
- */
-function adm_stlExpenseAdd(token, rows) {
-  return run_(function () {
-    const a = requireAdmin_(token);
-    rows = Array.isArray(rows) ? rows : [];
-    if (!rows.length || rows.length > 500) fail_('넣을 줄을 확인해 주세요 (최대 500줄).');
-    const lock = scriptLock_();
-    lock.waitLock(20000);
-    try {
-      stlFreshIn_('stl_expense');
-      const have = {};
-      stlRead_('stl_expense').forEach(function (r) { have[stlYmd_(r.date) + '|' + str_(r.name) + '|' + stlNum_(r.amt)] = 1; });
-      const add = [], skipped = [];
-      rows.forEach(function (r) {
-        const date = stlYmd_(r.date), amt = stlNum_(r.amt), name = str_(r.name).slice(0, 200);
-        if (!date || !amt || !name) { skipped.push(name || '(빈 줄)'); return; }
-        const month = stlMonthOk_(str_(r.month)) ? str_(r.month) : date.slice(0, 7);
-        const k = date + '|' + name + '|' + amt;
-        if (have[k]) { skipped.push(name); return; }
-        have[k] = 1;
-        add.push({ month: month, date: date, cat: STL_COST_CATS.indexOf(str_(r.cat)) >= 0 ? str_(r.cat) : '기타', name: name, vendor: str_(r.vendor).slice(0, 100),
-          amt: String(amt), proof: STL_PROOFS.indexOf(str_(r.proof)) >= 0 ? str_(r.proof) : '', bank: str_(r.bank).slice(0, 60), memo: str_(r.memo).slice(0, 300) });
-      });
-      stlAppend_('stl_expense', add);
-      stlTouch_(['stl_expense']);
-      logAdmin_(a, '지출 기록 일괄 추가', '', add.length + '줄 추가 · ' + skipped.length + '줄 건너뜀');
-      return { ok: true, added: add.length, skipped: skipped };
-    } finally { lock.releaseLock(); }
-  });
-}
 
 // ───────────────────────── 세무자료 내보내기 (#290) ─────────────────────────
 /**
