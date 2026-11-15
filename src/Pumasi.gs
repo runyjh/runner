@@ -66,6 +66,7 @@ function pmUser_(token) {
   const info = s ? driverInfo_(s.d) : null;
   if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) { const e = new Error('x'); e.userMsg = '로그인이 만료되었습니다. 다시 로그인해 주세요.'; e.code = 'EXPIRED'; throw e; }
   if (info.mustChange) { const e = new Error('x'); e.userMsg = '비밀번호를 먼저 바꿔 주세요.'; e.code = 'MUST_CHANGE'; throw e; }
+  if (typeof APP_MENU_FN !== 'undefined' && APP_MENU_FN[_curFn]) menuGate_(String(s.d), APP_MENU_FN[_curFn]); // 끈 메뉴(준비 중)의 자료 요청은 막음
   return { id: String(s.d), info: info };
 }
 function pmTouch_() { flushBeforeBump_(); fsMark_('pm'); try { cache_().put('pm:v', String(Date.now()) + Math.random().toString(36).slice(2, 5), CFG.CACHE_MAX); } catch (e) { /* 무시 */ } }
@@ -856,13 +857,16 @@ function pmAlertVer_(driverId) {
 function api_pmAlerts(token, ver) {
   return run_(function () {
     const u = pmUser_(token);
-    const v = pmAlertVer_(u.id);
+    // 끈 메뉴(정산서 · 품앗이)의 알림은 앱에도 안 보이게 — 메뉴를 켜고 끄면 버전도 바뀜
+    const off = typeof appMenuOffFor_ === 'function' ? appMenuOffFor_(u.id) : [];
+    const v = pmAlertVer_(u.id) + (off.length ? '~' + off.join('.') : '');
     if (ver && ver === v) return { ok: true, same: true, ver: v };
     // 같은 버전이면 결과가 같다 → 기사별로 10분 캐시 (앱을 열 때마다 알림 탭 전체를 읽지 않게 · 버전이 바뀌면 키도 바뀜)
     const ck = 'pml:' + u.id + ':' + v, hit = cache_().get(ck);
     if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 읽는다 */ } }
     const from = ymd_(addDays_(new Date(), -30));
     const list = readAll_(SH.PALERT).filter(function (a) { return a.driverId === u.id && a.id && String(a.createdAt).slice(0, 10) >= from; })
+      .filter(function (a) { const k = a.kind === 'slip' ? 'settle' : String(a.jobId || '').indexOf('BD-') === 0 ? '' : 'pm'; return !k || off.indexOf(k) < 0; })
       .sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
     const out = {
       ok: true, ver: v, unread: list.filter(function (a) { return !a.readAt; }).length,
@@ -1024,6 +1028,7 @@ function pmPushTokens_(driverId) {
 function pmPushSend_(list) {
   try {
     list = (list || []).filter(function (a) { return a && a.driverId; });
+    if (typeof menuAlertFilter_ === 'function') list = menuAlertFilter_(list); // 그 메뉴를 끈(준비 중) 기사에게는 휴대폰 알림을 보내지 않음 (알림 목록에는 남음)
     if (!list.length) return 0;
     const cfg = pmPushCfg_();
     if (!cfg.sa || !cfg.web) return 0;
