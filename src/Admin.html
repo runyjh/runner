@@ -6925,7 +6925,12 @@
       RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images; RT.addresses = r.addresses || []; RT.prices = r.prices || [];
       if (currentView === 'route') { if (!RVOL) loadVolumes(); if (!RP.loaded) loadPerf(); // 노선 줄의 SLA · 프백 · 담당 칸
         const again = () => { if ($('#rRows') && currentView === 'route') renderRoutes(); };
-        if (!SL.loaded) loadSla().then(again); if (!FW.loaded) loadFb().then(again); if (!DSB.drv) { const pd = dsNeed('drv'); if (pd) pd.then(again); } } // 대시보드 검색 준비로 부를 때는 노선 목록만 (물량·수행률은 필요할 때 dsNeed 가 따로)
+        // 한꺼번에 부르면 서로 느려지므로(구글이 호출을 줄 세움) 하나씩 차례로: 담당 → SLA → 프레시백 (노선 표는 먼저 뜨고 칸이 차례로 채워짐)
+        const step = (need, load) => () => (need() ? Promise.resolve(load()).catch(() => {}).then(again) : Promise.resolve());
+        Promise.resolve(RP.loading).catch(() => {})
+          .then(step(() => !DSB.drv, () => dsNeed('drv')))
+          .then(step(() => !SL.loaded, () => loadSla()))
+          .then(step(() => !FW.loaded, () => loadFb())); } // 대시보드 검색 준비로 부를 때는 노선 목록만 (물량·수행률은 필요할 때 dsNeed 가 따로)
       if (curCamp && curCamp !== ORPHAN && !campById(curCamp)) curCamp = null;
       if (curCamp === ORPHAN && !routesOf(ORPHAN).length) curCamp = null;
       if (!curCamp && RT.camps.length) curCamp = sortedCamps()[0].id;
