@@ -1685,6 +1685,7 @@
   .me-tag { background: var(--brand); color: #fff !important; border-radius: 999px; padding: 1px 7px; font-weight: 800; }
   .td-hi { margin: 0 2px 10px; } .td-hi b { display: block; font-size: 19px; } .td-hi small { color: var(--sub); font-size: 13px; }
   .td-q { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; } .td-q button { border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 12px 4px 10px; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; } .td-q button i { display: block; font-style: normal; font-size: 21px; margin-bottom: 3px; }
+  .td-ck { flex: none; width: 22px; height: 22px; margin-top: 1px; border: 2px solid #b8c4d4; border-radius: 6px; background: #fff; padding: 0; cursor: pointer; position: relative; } .td-ck::after { content: ''; position: absolute; inset: -9px; } .td-ck:active { background: var(--brand); border-color: var(--brand); }
   .td-m span small { display: block; margin-top: 2px; font-size: 12px; color: var(--sub); } .td-m.late span small { color: #b45309; }
   .td-m { display: flex; gap: 8px; padding: 8px 0; border-top: 1px solid #f1f2f4; font-size: 14px; } .td-h + .td-m { border-top: 0; } .td-m i { font-style: normal; flex: none; } .td-m span { flex: 1; min-width: 0; overflow-wrap: anywhere; } .td-m.done span { color: #9ca3af; text-decoration: line-through; }
   .td-hd { display: flex; align-items: center; justify-content: space-between; } .td-hd button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--brand); cursor: pointer; padding: 4px 0; }
@@ -11152,7 +11153,7 @@
       })();
       const memoCard = // 오늘 업무 · 남은 것 — 휴대폰 홈 맨 위
         '<div class="smb-card"><div class="td-hd"><p class="td-h">오늘 업무' + (left ? ' · 남은 것 ' + left : '') + '</p><button type="button" data-tdgo="memo">모두 보기 ›</button></div>' +
-        (HM.memos == null ? '<p class="smb-hint" style="margin:4px 0">불러오는 중…</p>' : memos.length ? memos.slice(0, 8).map((m) => '<div class="td-m' + m._cls + '"><i>' + m._ic + '</i><span>' + esc(String(m.content || '').split('\n')[0]) + (m._tag ? '<small>' + esc(m._tag) + '</small>' : '') + '</span></div>').join('') + (memos.length > 8 ? '<p class="smb-hint" style="margin:6px 0 0">외 ' + (memos.length - 8) + '건</p>' : '') : '<p class="smb-hint" style="margin:4px 0">남은 업무가 없습니다.</p>') + '</div>';
+        (HM.memos == null ? '<p class="smb-hint" style="margin:4px 0">불러오는 중…</p>' : memos.length ? memos.slice(0, 8).map((m) => '<div class="td-m' + m._cls + '"><button type="button" class="td-ck" data-tdck="' + esc(m.id) + '" aria-label="완료로 표시" title="완료로 표시 (홈에서 빠짐)"></button><span>' + (m._ic === '☐' ? '' : m._ic + ' ') + esc(String(m.content || '').split('\n')[0]) + (m._tag ? '<small>' + esc(m._tag) + '</small>' : '') + '</span></div>').join('') + (memos.length > 8 ? '<p class="smb-hint" style="margin:6px 0 0">외 ' + (memos.length - 8) + '건</p>' : '') : '<p class="smb-hint" style="margin:4px 0">남은 업무가 없습니다.</p>') + '</div>';
       box.innerHTML = '<div class="td-hi"><b>' + esc(who.name || '관리자') + ' 님</b><small>' + esc(mobMd(tdy)) + ' · 내일 배송(PDD) ' + esc(mobMd(pdd)) + (sStale ? ' · <span style="color:var(--brand)">새로 받는 중…</span>' : '') + '</small></div>' + memoCard +
         (pk ? '<button type="button" class="td-pk" data-tdgo="peak"><b>🔥 ' + +pk.period.slice(5, 7) + '월 피크데이 · ' + rpMd(pk.from) + ' ~ ' + rpMd(pk.to) + '</b>예상 물량 보기 ›</button>' : '') + myCard +
         '<div class="smb-card"><span class="td-pill">오늘 PDD · ' + esc(mobMd(pdd)) + '</span><p class="smb-hint" style="margin:6px 0 0">실제 출근일 ' + pv + ' 저녁 입차 · 휴무 ' + T.off + ' · 백업 ' + T.bk + (T.yc.length ? ' · 용차 ' + T.yc.length : '') + '</p>' +
@@ -11244,6 +11245,18 @@
   const isWorkDayCell = (v) => { const s = String(v || '').trim(); return !!s && s !== '휴가' && !['휴무', '용차', '병가', '퇴사', '미입차', '노쇼', '업무'].some((w) => s.includes(w)); };
   $('#sMobBox').addEventListener('click', (e) => {
     const t = e.target;
+    const ck = t.closest('[data-tdck]');
+    if (ck) { // 홈에서 바로 완료 체크: 먼저 화면에서 빼고 저장 — 실패하면 되돌림
+      const id = ck.dataset.tdck, hit = [HM.memos, HM.pinned, HM.late].map((L) => (L || []).filter((m) => m.id === id)).reduce((a, b) => a.concat(b), []);
+      if (!hit.length || ck.disabled) return;
+      ck.disabled = true; hit.forEach((m) => { m.done = true; }); paintMob();
+      api('adm_memoSave', { id: id, done: true }).then((r) => {
+        if (!r.ok) { hit.forEach((m) => { m.done = false; }); paintMob(); return toast(r.msg); }
+        admKeep.setP('hmemo', { ym: HM.ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); DSB.memos = null;
+        toast('완료로 표시했습니다. (되돌리기: 모두 보기)');
+      }).catch(() => { hit.forEach((m) => { m.done = false; }); paintMob(); });
+      return;
+    }
     const tg = t.closest('[data-tdgo]'); if (tg) { const v = tg.dataset.tdgo; if (v === 'sched') mSchedGo(''); else { schMode(''); if (v === 'peak') { RP.tab = 'pk'; navGo('perf'); if (currentView === 'perf') rpRender(); } else { if (v === 'perf') RP.tab = 'wk'; navGo(v); } } window.scrollTo(0, 0); return; }
     const tmy = t.closest('[data-tdmy]'); if (tmy) { schMode(''); mobSet('drv'); sMobDrv = tmy.dataset.tdmy; sMobDay = pddDate(); paintMob(); try { mTabSync(); } catch (x) { /* 무시 */ } window.scrollTo(0, 0); return; }
     const tr = t.closest('[data-tdrow]'); if (tr) { const k = tr.dataset.tdrow, r = srows.find((x) => (x.key || x.row) === k || String(x.row) === k); if (r && r.kind === 'd') ceOpen(r, pddDate()); else toast('그 줄을 찾지 못했습니다. 관리 탭에서 확인해 주세요.'); return; }
