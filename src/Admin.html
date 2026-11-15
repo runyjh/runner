@@ -881,18 +881,21 @@
   /* 노선관리 */
   .rt-wrap { display: block; }
   /* 노선관리 맨 위 탭: 한 덩어리 버튼 (휴대폰 · PC 같은 모양) */
-  .rtv-seg { display: inline-grid; grid-template-columns: repeat(4, minmax(120px, 150px)); background: #e9edf2; border-radius: 12px; padding: 4px; gap: 2px; margin: 0 0 12px; }
+  .rtv-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; } .rtv-bar #rtReload { background: #fff; }
+  .rtv-seg { display: inline-grid; grid-template-columns: repeat(4, minmax(120px, 150px)); background: #e9edf2; border-radius: 12px; padding: 4px; gap: 2px; }
   .rtv-seg button { display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: none; padding: 9px 4px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--sub); cursor: pointer; white-space: nowrap; }
   .rtv-seg button i { font-style: normal; font-size: 16px; line-height: 1; } .rtv-seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-  html.m .rtv-seg { display: grid; grid-template-columns: repeat(4, 1fr); } html.m .rtv-seg button { flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 2px; }
-  .camp-side { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px; } .camp-side #campQ { flex: none; width: 150px; height: 34px; border-radius: 999px; font-size: 13px; }
-  .camp-list { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  html.m .rtv-bar { flex-direction: column; align-items: stretch; } html.m .rtv-bar #rtReload { display: none; } html.m .rtv-seg { display: grid; grid-template-columns: repeat(4, 1fr); } html.m .rtv-seg button { flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 2px; }
+  .camp-side { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; } .camp-side #campQ { flex: none; width: 150px; height: 34px; border-radius: 999px; font-size: 13px; margin-left: auto; }
+  .camp-add { border: 1.5px dashed #b8c4d4; background: none; color: var(--brand); border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; } .camp-add:hover { background: #eef4ff; border-color: var(--brand); }
+  #rpUpBtn { display: none; } html.m #rpUpBtn { display: inline-flex; margin: 0 0 10px; }
+  .camp-list { display: contents; }
   .camp-item { display: inline-flex; align-items: center; gap: 6px; border: 0; background: #fff; border-radius: 999px; padding: 7px 8px 7px 13px; font-size: 13px; font-weight: 600; color: #4e5968; white-space: nowrap; cursor: pointer; }
   .camp-item:hover { background: #f1f4f8; }
   .camp-item.on { background: var(--brand); color: #fff; box-shadow: 0 2px 6px rgba(29,99,220,.3); }
   .camp-item b { font-size: 13px; font-weight: 700; } .camp-item em { font-style: normal; font-size: 11px; font-weight: 800; background: #f1f3f6; color: #6b7684; border-radius: 999px; min-width: 20px; text-align: center; padding: 2px 6px; } .camp-item.on em { background: rgba(255,255,255,.22); color: #fff; } .camp-item em.hit { background: #fff1e0; color: #b45309; }
   .camp-item.orphan:not(.on) b { color: var(--danger); }
-  html.m .camp-side { flex-direction: column; } html.m .camp-side #campQ { width: 100%; }
+  html.m .camp-side #campQ { width: 100%; margin-left: 0; }
   .ch-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
   .ch-top h3 { margin: 0 auto 0 0; font-size: 18px; }
   .kv2 { display: grid; grid-template-columns: minmax(48px, max-content) 1fr; gap: 6px 12px; font-size: 13px; }
@@ -2198,23 +2201,20 @@
    <section id="view-route" class="hidden">
     <div class="head">
       <h2>노선관리</h2>
-      <div class="tools">
-        <button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">⬆ 쿠팡 파일 올리기</button><input type="file" id="rpFile" multiple accept=".xlsx" class="hidden">
-        <button class="btn ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button>
-        <button class="btn ghost" id="rtReload">새로고침</button><button class="hidden" id="rpReload" type="button"></button><button class="hidden" id="xpOpen" type="button"></button>
-        <button class="btn" id="campNew">+ 캠프 추가</button>
-      </div>
+      <div class="tools"><button class="hidden" id="rpReload" type="button"></button><button class="hidden" id="xpOpen" type="button"></button></div>
     </div>
-    <div class="rtv-seg" id="rtvTabs" role="tablist" aria-label="노선관리 보기"><button type="button" data-rtv="routes" class="on"><i>🛣</i>노선</button><button type="button" data-rtv="price"><i>💰</i>단가·물량</button><button type="button" data-rtv="perf"><i>📊</i>수행률</button><button type="button" data-rtv="fb"><i>🧊</i>프백·피크</button></div>
+    <div class="rtv-bar"><div class="rtv-seg" id="rtvTabs" role="tablist" aria-label="노선관리 보기"><button type="button" data-rtv="routes" class="on"><i>🛣</i>노선</button><button type="button" data-rtv="price"><i>💰</i>단가·물량</button><button type="button" data-rtv="perf"><i>📊</i>수행률</button><button type="button" data-rtv="fb"><i>🧊</i>프백·피크</button></div><button class="btn sm ghost" id="rtReload" type="button" title="지금 탭의 자료를 새로 불러옵니다">↻ 새로고침</button></div>
     <div class="rt-wrap">
       <div class="camp-side">
         <div class="camp-list" id="campList"></div>
+        <button type="button" class="camp-add" id="campNew" title="새 캠프 등록">＋ 캠프 추가</button>
         <input class="inp" id="campQ" placeholder="캠프·노선 찾기" autocomplete="off">
       </div>
       <div id="campMain"></div>
     </div>
     <div id="allPrices" class="hidden"></div>
     <div id="rtvPerf" class="hidden">
+    <button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">⬆ 쿠팡 파일 올리기</button><input type="file" id="rpFile" multiple accept=".xlsx" class="hidden">
     <div class="updrop" data-up="#rpFile">
       <div class="ud-ic">⬆</div>
       <div class="ud-tx"><b>쿠팡 파일을 여기로 끌어다 놓으세요 (여러 개 가능)</b><span>주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 — 어떤 파일인지 자동으로 알아보고, 저장 전에 미리보기를 보여 줍니다 (같은 기간은 덮어씀 · 엑셀 .xlsx)</span></div>
@@ -6961,7 +6961,7 @@
     m.innerHTML =
       '<div class="sec">' +
         '<div class="ch-top"><h3>' + esc(c.name) + (orphan ? '' : rotBadge(c)) + '</h3>' +
-          (orphan ? '' : '<button class="btn sm ghost" data-ract="camp-edit">캠프 정보 수정</button><button class="btn sm ghost danger-t" data-ract="camp-del">캠프 삭제</button>') + '</div>' +
+          (orphan ? '' : '<button class="btn sm ghost" data-ract="camp-edit">캠프 정보 수정</button><button class="btn sm ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button><button class="btn sm ghost danger-t" data-ract="camp-del">캠프 삭제</button>') + '</div>' +
         (orphan ? '<p style="margin:0;color:var(--sub);font-size:13px">시트(routes 탭)에서 캠프명이 비었거나, camps 탭에 없는 캠프명을 쓴 노선입니다. 노선을 눌러 캠프를 지정해 주세요.</p>'
           : '<div class="kv2"><span>캠프 주소</span><span>' + (c.address ? esc(c.address) + mapLink(c.address) : '<em>없음</em>') + '</span>' +
             addrsOf(c.id).map((a) => '<span>' + esc(a.label) + '</span><span>' + esc(a.address) + mapLink(a.address) + '</span>').join('') +
