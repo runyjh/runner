@@ -1725,6 +1725,11 @@
   .lvauto-l span { background: #fff; border: 1px solid #d6e4fb; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; white-space: nowrap; }
   .lvauto-l span.none { color: var(--sub); border-style: dashed; }
   .lvauto p.sub { margin: 8px 0 0; font-size: 12px; }
+  .pa-avtab { border-color: #f5d7a8 !important; } .pa-avtab.on { background: #fff4e3 !important; color: #b45309 !important; }
+  .pa-avnote { margin: 0 0 8px; font-size: 13px; }
+  #paAvRows tr.pa-avfirst td { border-top: 2px solid var(--line); }
+  #paAvRows .pa-avmemo { max-width: 220px; white-space: normal; word-break: break-word; }
+  .btn.danger-t { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -2080,13 +2085,24 @@
     <p class="sub" style="margin:-4px 0 12px;font-size:13px">기사 앱 품앗이에 올라온 일감입니다. 줄을 누르면 지원자·연락처를 보고 사무실에서 <b>배차 확정 · 확정 풀기 · 마감 · 취소</b>를 할 수 있습니다 (처리하면 기사님께 알림이 갑니다). 데이터는 러너 올인원 DB 의 <b>pumasi_jobs · pumasi_apps</b> 탭.</p>
     <div class="tabs" id="paTabs"></div>
     <div class="rbulk hidden" id="paBulk"></div>
-    <div class="table-wrap">
+    <div class="hidden" id="paAvWrap">
+      <p class="sub pa-avnote">기사앱 품앗이 <b>「일할 기사」</b>에 보이는 근무 가능일입니다 (지난 날 · 배차 확정된 날은 빠짐). 지우면 기사앱에서도 바로 사라집니다.</p>
+      <div class="rbulk hidden" id="paAvBulk"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="ck"><input type="checkbox" id="paAvAll" aria-label="보이는 근무 가능일 모두 선택"></th><th>근무 가능일</th><th>구분</th><th>기사</th><th>소속 캠프</th><th>원하는 곳</th><th>조건</th><th>한마디</th><th>제안</th><th>삭제</th></tr></thead>
+          <tbody id="paAvRows"></tbody>
+        </table>
+        <div class="empty hidden" id="paAvEmpty">올라온 근무 가능일이 없습니다.</div>
+      </div>
+    </div>
+    <div id="paJobWrap"><div class="table-wrap">
       <table>
         <thead><tr><th class="ck"><input type="checkbox" id="paAll" aria-label="보이는 일감 모두 선택"></th><th>상태</th><th>배차일</th><th>입차</th><th>구분</th><th>센터 · 라우트</th><th>배송지</th><th>물량</th><th>건당 단가</th><th>지급</th><th>올린 기사</th><th>지원</th><th>확정 기사</th><th>등록</th></tr></thead>
         <tbody id="paRows"></tbody>
       </table>
       <div class="empty hidden" id="paEmpty"></div>
-    </div>
+    </div></div>
    </section>
    <section id="view-issue" class="hidden">
     <div class="head">
@@ -5629,11 +5645,16 @@
     api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
       if (seq !== PA.seq) return;
       if (!r.ok) return toast(r.msg);
-      PA.jobs = r.jobs; PA.count = r.count; paintPostSw(r.postOn !== false, r.offerOn !== false); renderPumasi();
+      PA.jobs = r.jobs; PA.count = r.count; PA.avail = r.avail || []; paintPostSw(r.postOn !== false, r.offerOn !== false); renderPumasi();
     }).catch(() => {});
   }
   function renderPumasi() {
-    $('#paTabs').innerHTML = PA_ST.map((st) => '<button class="tab' + (PA.status === st ? ' on' : '') + '" data-pst="' + esc(st) + '">' + esc(st) + ' <b>' + (st === '전체' ? PA.jobs.length : (PA.jobs.filter((j) => j.status === st).length)) + '</b></button>').join('');
+    const avTab = '<button class="tab pa-avtab' + (PA.status === PA_AV ? ' on' : '') + '" data-pst="' + PA_AV + '">🙋 ' + PA_AV + ' <b>' + (PA.avail || []).length + '</b></button>';
+    $('#paTabs').innerHTML = PA_ST.map((st) => '<button class="tab' + (PA.status === st ? ' on' : '') + '" data-pst="' + esc(st) + '">' + esc(st) + ' <b>' + (st === '전체' ? PA.jobs.length : (PA.jobs.filter((j) => j.status === st).length)) + '</b></button>' + (st === '전체' ? avTab : '')).join('');
+    const av = PA.status === PA_AV;
+    $('#paAvWrap').classList.toggle('hidden', !av); $('#paJobWrap').classList.toggle('hidden', av);
+    if (av) { $('#paBulk').classList.add('hidden'); return renderPaAvail(); }
+    $('#paAvBulk').classList.add('hidden');
     const list = PA.jobs.filter((j) => PA.status === '전체' || j.status === PA.status);
     $('#paCount').textContent = list.length + '건';
     const have = new Set(PA.jobs.map((j) => j.id)); [...paSel].forEach((id) => { if (!have.has(id)) paSel.delete(id); });
@@ -5645,6 +5666,56 @@
     const em = $('#paEmpty'); em.classList.toggle('hidden', !!list.length); em.textContent = '이 기간에 ' + (PA.status === '전체' ? '' : PA.status + ' ') + '품앗이 일감이 없습니다.';
     paPaintBulk(list);
   }
+  // ── 일할 기사 (근무 가능일): 기사가 '품앗이 주세요'로 올린 날 · 고르거나 줄 옆 버튼으로 삭제 ──
+  const PA_AV = '일할 기사', paAvSel = new Set();
+  const paAvCond = (x) => [x.crew, x.qty ? x.qty + '개' : '', x.top, x.price ? wn(x.price) + '원' : '', x.pay, x.useId].filter(Boolean).map(esc).join(' · ');
+  function renderPaAvail() {
+    const list = PA.avail || [];
+    $('#paCount').textContent = list.length + '건';
+    const have = new Set(list.map((x) => x.id)); [...paAvSel].forEach((id) => { if (!have.has(id)) paAvSel.delete(id); });
+    let prevD = '';
+    $('#paAvRows').innerHTML = list.map((x) => { const first = x.date !== prevD; prevD = x.date;
+      return '<tr data-pav="' + esc(x.id) + '"' + (first ? ' class="pa-avfirst"' : '') + '><td class="ck"><input type="checkbox" data-pavck="' + esc(x.id) + '"' + (paAvSel.has(x.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
+        '<td><b>' + paDay(x.date) + '</b></td><td>' + esc(paKind[x.kind] || x.kind) + '</td><td><b>' + esc(x.name) + '</b>' + (x.type ? ' <span class="sub">' + esc(x.type) + '</span>' : '') + '</td>' +
+        '<td>' + esc(String(x.camp || '').replace(/\s*캠프$/, '')) + '</td><td>' + ([String(x.wantCamp || '').replace(/\s*캠프$/, ''), x.area].filter(Boolean).map(esc).join(' · ') || '<span class="sub">모든 지역</span>') + '</td>' +
+        '<td class="sub">' + (paAvCond(x) || '-') + '</td><td class="pa-avmemo">' + (esc(x.memo) || '<span class="sub">-</span>') + '</td>' +
+        '<td>' + (x.offered ? '<span class="badge b-대기">' + x.offered + '건</span>' : '<span class="sub">-</span>') + '</td>' +
+        '<td><button type="button" class="btn sm ghost danger-t" data-pavdel="' + esc(x.id) + '">삭제</button></td></tr>'; }).join('');
+    $('#paAvEmpty').classList.toggle('hidden', !!list.length);
+    paAvBulk(list);
+  }
+  function paAvBulk(list) {
+    list = list || PA.avail || [];
+    const b = $('#paAvBulk');
+    b.classList.toggle('hidden', !paAvSel.size);
+    b.innerHTML = '<b>' + paAvSel.size + '건 선택</b><button class="btn sm ghost" id="paAvNone">선택 해제</button><button class="btn sm danger" id="paAvDel"' + (PA.avDeleting ? ' disabled>삭제 중…' : '>선택 삭제') + '</button>';
+    const all = $('#paAvAll'), on = list.filter((x) => paAvSel.has(x.id)).length;
+    all.checked = !!list.length && on === list.length; all.indeterminate = on > 0 && on < list.length;
+  }
+  function paAvDelete(ids) {
+    if (PA.avDeleting || !ids.length) return;
+    const xs = (PA.avail || []).filter((x) => ids.includes(x.id));
+    const names = [...new Set(xs.map((x) => x.name))];
+    const what = ids.length === 1 && xs[0] ? xs[0].name + ' 기사 ' + paDay(xs[0].date).replace(/<[^>]+>/g, '') + ' 근무 가능일' : ids.length + '건의 근무 가능일 (' + names.slice(0, 5).join(', ') + (names.length > 5 ? ' 외' : '') + ')';
+    if (!confirm(what + '을 삭제할까요?\n기사앱 「일할 기사」에서도 사라지고 되돌릴 수 없습니다.')) return;
+    PA.avDeleting = true; paAvBulk();
+    const keep = PA.avail;
+    PA.avail = (PA.avail || []).filter((x) => !ids.includes(x.id)); ids.forEach((id) => paAvSel.delete(id)); renderPumasi(); // 먼저 지워 보이고 실패하면 되돌림
+    api('adm_pmAvailDel', ids).then((r) => {
+      if (!r.ok) { PA.avail = keep; renderPumasi(); return toast(r.msg); }
+      toast(r.deleted + '건을 삭제했습니다.');
+    }).catch(() => { PA.avail = keep; renderPumasi(); }).finally(() => { PA.avDeleting = false; paAvBulk(); });
+  }
+  $('#paAvAll').addEventListener('change', (e) => { (PA.avail || []).forEach((x) => { if (e.target.checked) paAvSel.add(x.id); else paAvSel.delete(x.id); }); renderPaAvail(); });
+  $('#paAvBulk').addEventListener('click', (e) => {
+    if (e.target.id === 'paAvNone') { paAvSel.clear(); return renderPaAvail(); }
+    if (e.target.id === 'paAvDel') paAvDelete([...paAvSel]);
+  });
+  $('#paAvRows').addEventListener('click', (e) => {
+    const ck = e.target.closest('[data-pavck]');
+    if (ck) { if (ck.checked) paAvSel.add(ck.dataset.pavck); else paAvSel.delete(ck.dataset.pavck); return paAvBulk(); }
+    const d = e.target.closest('[data-pavdel]'); if (d) { e.stopPropagation(); paAvDelete([d.dataset.pavdel]); }
+  });
   // ── 일괄 선택 · 삭제 ──
   const paSel = new Set();
   function paPaintBulk(list) {
@@ -16408,6 +16479,7 @@
     //  key 굵은 왼쪽 칸 · mid 가운데(길면 …) · num 숫자(오른쪽 맞춤) · st 상태 · ico 아이콘만 · grp 묶음 제목이 될 열 · need 이 열이 있어야 이 규칙 · short 머리글 줄임말
     const OL = [
       { v: 'view-drivers', key: ['이름'], mid: ['배정 캠프 · 라우트'], st: ['앱 사용'], ico: ['연락처'], native: 1 },
+      { v: 'view-pumasi', key: ['기사'], mid: ['근무 가능일'], st: ['구분'], need: '한마디' },
       { v: 'view-pumasi', key: ['배차일'], mid: ['센터 · 라우트'], num: ['확정 기사'], st: ['상태'], native: 1, nw: 64 },
       { v: 'view-issue', need: '결과', key: ['날짜'], mid: ['기사'], st: ['결과'] },
       { v: 'view-bib', key: ['이름'], mid: ['신청일'], st: ['진행상태'] },
