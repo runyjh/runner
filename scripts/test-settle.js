@@ -388,6 +388,26 @@ scenario('퇴사자 자동 정지', null, function (r) {
   eq('26일 이후 퇴사자는 한 달 뒤에 정지 · 퇴사일 없는 기사는 그대로', [out.later, out.cSt], [[out.bId], '승인']);
 });
 
+// 20) 자동 보류금 (스위치): 퇴사 처리한 기사 → 퇴사월 보류 · 다음 달 반환 · 시작일 전 퇴사자 제외 · 등록한 명의자는 등록한 대로
+(function () {
+  const AUTO = function (on, from) { return [{ label: '퇴사 보류금 자동 (Y/N)', value: on, desc: '' }, { label: '퇴사 보류금 자동 시작일 (퇴사일이 이 날부터인 기사만)', value: from, desc: '' }]; };
+  const leave = function (M, id, d) { const o = M.main.drivers.filter(function (x) { return x.id === id; })[0]; o.workStatus = '퇴사'; o.leaveDate = d; };
+  const base = run(null), d0 = base.drv['강준길'].depDed, a0 = base.drv['강준길'].depAdd, h0 = base.drv['이현모'].depDed;
+  scenario('자동 보류금 켬', function (M) { M.stl.stl_config = AUTO('Y', '2026-11-02'); leave(M, 'd2', '2026-11-10'); leave(M, 'd1', '2026-11-01'); }, function (r) {
+    eq('퇴사 처리한 기사 → 퇴사월 정산에 보류금 10만원', r.drv['강준길'].depDed - d0, 100000);
+    eq('시작일 전에 퇴사한 기사는 걸지 않음', r.drv['이현모'].depDed - h0, 0);
+  });
+  scenario('자동 보류금 끔', function (M) { M.stl.stl_config = AUTO('N', '2026-11-02'); leave(M, 'd2', '2026-11-10'); }, function (r) {
+    eq('스위치가 꺼져 있으면 걸지 않음', r.drv['강준길'].depDed - d0, 0);
+  });
+  scenario('자동 보류금 반환', function (M) { M.stl.stl_config = AUTO('Y', '2026-10-01'); leave(M, 'd2', '2026-10-20'); }, function (r) {
+    eq('10월 퇴사 → 11월 정산에 보류금 반환 (차감 없음)', [r.drv['강준길'].depAdd - a0, r.drv['강준길'].depDed - d0], [100000, 0]);
+  });
+  scenario('자동 보류금 · 등록 우선', function (M) { M.stl.stl_config = AUTO('Y', '2026-11-02'); leave(M, 'd2', '2026-11-10'); M.stl.stl_leave = [{ name: '강준길', acct: 'kjg', month: '2026-11', amt: '50000', memo: '' }]; }, function (r) {
+    eq('보류금 설정에 등록한 명의자는 등록한 금액만 (자동과 겹치지 않음)', r.drv['강준길'].depDed - d0, 50000);
+  });
+})();
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');

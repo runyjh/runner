@@ -154,6 +154,8 @@ const STL_CFG = [
   ['invDay', '세금계산서 발행기한 (익월, 일)', '10', '', '지급일 · 입금일 · 세금계산서'],
   ['email', '세금계산서 수신 이메일', '', '기사 명세서의 공급받는자 이메일', '지급일 · 입금일 · 세금계산서'],
   ['leaveAmt', '퇴사 보류금 기본 금액', '100000', '', '퇴사 보류금'],
+  ['leaveAuto', '퇴사 보류금 자동 (Y/N)', 'N', 'Y = 기사 정보관리에서 퇴사 처리하면 등록하지 않아도 퇴사월 보류 · 다음 달 반환 (퇴사자 보류금 설정의 스위치로 켜고 끕니다)', '퇴사 보류금'],
+  ['leaveAutoFrom', '퇴사 보류금 자동 시작일 (퇴사일이 이 날부터인 기사만)', '', '스위치를 켤 때 정해집니다 — 그 전에 퇴사한 기사는 자동으로 걸지 않음', '퇴사 보류금'],
   ['earlyPay', '15일 선지급 기사 (운영자 · 쿠팡 입금일에 바로)', '', '기사로도 일하는 운영자·관리자 이름 또는 정산 아이디 (여러 명은 콤마) · 이 기사 정산금은 기사정산 통장으로 보내지 않고 쿠팡정산 통장에서 15일에 바로 지급', '지급일 · 입금일 · 세금계산서'],
   ['appShow', '기사 앱 정산서 공개 (마감한 달만 / 계산 중인 달도)', '마감한 달만', '계산 중인 달도 = 마감 전에도 기사 앱에 \'확정 전\' 으로 보임', '기사 앱'],
   ['appRange', '기사 앱 정산서 표시 범위 (전부 / 최근 3개월 / 정산 당월만 / 전부 숨김)', '전부', '세부정산 설정 위의 단추로 고릅니다', '기사 앱']
@@ -666,7 +668,7 @@ function stlCfg_() {
     expense: rate('expense'), san: rate('san'), commute: rate('commute'), goy: rate('goy'), goyMin: stlNum_(g.goyMin),
     runner: rate('runner'), insBasis: str_(g.insBasis) === '부가세포함' ? '부가세포함' : '공급가',
     payDay: stlNum_(g.payDay) || 20, cpDay: stlNum_(g.cpDay) || 15, payShift: stlYes_(g.payShift), invDay: stlNum_(g.invDay) || 10,
-    leaveAmt: stlNum_(g.leaveAmt) || 100000, email: str_(g.email), appOpen: /계산|모두|전부|y/i.test(str_(g.appShow)),
+    leaveAmt: stlNum_(g.leaveAmt) || 100000, leaveAuto: stlYes_(g.leaveAuto), leaveAutoFrom: /^\d{4}-\d{2}-\d{2}$/.test(stlYmd_(g.leaveAutoFrom)) ? stlYmd_(g.leaveAutoFrom) : '', email: str_(g.email), appOpen: /계산|모두|전부|y/i.test(str_(g.appShow)),
     appRange: STL_APP_RANGES.indexOf(str_(g.appRange)) >= 0 ? str_(g.appRange) : '전부',
     earlyPay: str_(g.earlyPay)
   };
@@ -1775,12 +1777,24 @@ function stlCompute_(month, opts) {
     if (a.to && month > a.to.slice(0, 7)) return;
     addAdj(stlAcct_(X, D, a.name, a.acct), a.item, stlNum_(a.amt), '정기 (설정)', true);
   });
+  const leaveReg = {};
   stlRead_('stl_leave').forEach(function (a) {
     const id = stlAcct_(X, D, a.name, a.acct), m = str_(a.month).slice(0, 7), amt = stlNum_(a.amt) || cfg.leaveAmt;
     if (!id || !stlMonthOk_(m)) return;
+    leaveReg[id] = 1;
     if (m === month) addAdj(id, '퇴사 보류금', amt, str_(a.memo) || stlLeaveMemo_(m, cfg), true);
     if (stlAddMonth_(m, 1) === month) addAdj(id, '보류금 반환', amt, Number(m.slice(5)) + '월 퇴사 보류금 반환 (분실파손·미차감분 정산 끝)', true);
   });
+  // 자동 보류금 (스위치): 퇴사 처리한 기사 — 퇴사자 보류금 설정에 등록한 명의자는 등록한 대로 (자동은 건너뜀)
+  if (cfg.leaveAuto) {
+    const gp = stlGroupOfPerson_(X, D);
+    stlLeaveAutoDrv_(D, cfg).forEach(function (x) {
+      const id = gp[x.o.id];
+      if (!id || leaveReg[id]) return;
+      if (x.m === month) addAdj(id, '퇴사 보류금', cfg.leaveAmt, stlLeaveMemo_(x.m, cfg), true);
+      if (stlAddMonth_(x.m, 1) === month) addAdj(id, '보류금 반환', cfg.leaveAmt, Number(x.m.slice(5)) + '월 퇴사 보류금 반환 (분실파손·미차감분 정산 끝)', true);
+    });
+  }
 
   // 기사별 마무리 계산
   Object.keys(S).forEach(function (id) { S[id].sched = stlGroupSched_(ctx, X.groups[id], sched, P, S[id].cidDays); });
@@ -1933,6 +1947,7 @@ function stlCompute_(month, opts) {
   stlRead_('stl_ack').forEach(function (k) { if (k.month === month) acked[k.kind + '|' + k.key] = 1; });
   const leaveOf = {};
   stlRead_('stl_leave').forEach(function (l) { const id = stlAcct_(X, D, l.name, l.acct); if (id && stlMonthOk_(str_(l.month).slice(0, 7))) leaveOf[id] = str_(l.month).slice(0, 7); });
+  if (cfg.leaveAuto) { const gpL = stlGroupOfPerson_(X, D); stlLeaveAutoDrv_(D, cfg).forEach(function (x) { const id = gpL[x.o.id]; if (id && !leaveOf[id]) leaveOf[id] = x.m; }); }
   const ownerNm = function (gk) { const g = X.groups[gk]; return g && g.ownerId && D.byId[g.ownerId] ? D.byId[g.ownerId].name : (g ? String(g.cid).replace(/@.*$/, '') : ''); };
   const mvKeys = Object.keys(warn.moveNo).filter(function (k) { return !acked['moveNo|' + k]; });
   W('moveNo', '아이디 사용 기록의 기사에게 본인 정산 아이디가 없음 (명의자 정산에 남김 — 서브 인원이면 [서브 인원], 따로 정산하면 [본인 정산 아이디 만들기])',
@@ -2032,6 +2047,19 @@ function stlYongRoutes_(v) {
     const m = t.match(/^(\d+)-?([A-Z]{2,})$/);
     if (m) m[2].split('').forEach(function (ch) { if (out.indexOf(m[1] + ch) < 0) out.push(m[1] + ch); });
     else if (out.indexOf(t) < 0) out.push(t);
+  });
+  return out;
+}
+/** 자동 보류금 대상: 근무상태 퇴사 · 퇴사일이 자동 시작일부터인 기사 → [{ o: 기사, m: 퇴사월 }] (스위치가 꺼져 있거나 시작일이 없으면 빈 목록) */
+function stlLeaveAutoDrv_(D, cfg) {
+  if (!cfg.leaveAuto || !cfg.leaveAutoFrom) return [];
+  const out = [];
+  D.all.forEach(function (o) {
+    if (str_(o.workStatus) !== '퇴사') return;
+    const ld = stlYmd_(o.leaveDate);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ld) || ld < cfg.leaveAutoFrom) return;
+    const m = stlMonthOfDate_(ld);
+    if (m) out.push({ o: o, m: m });
   });
   return out;
 }
@@ -3554,7 +3582,7 @@ function stlTableView_(name, month) {
       }
     }
     return {
-      ok: true, name: name, month: month, earlyPay: name === 'alloc' ? stlCfg_().earlyPay : undefined, cols: E.cols.map(function (c) {
+      ok: true, name: name, month: month, earlyPay: name === 'alloc' ? stlCfg_().earlyPay : undefined, leaveAuto: name === 'leave' ? stlLeaveAutoInfo_() : undefined, cols: E.cols.map(function (c) {
         if (c[2] === 'vendor') return { k: c[0], label: c[1], type: 'select', opts: [''].concat(X.vendors.list.map(function (v) { return v.name; })), idk: '' };
         if (c[2] === 'bank') return { k: c[0], label: c[1], type: 'select', opts: [''].concat(stlBanks_().map(function (b) { return b.name; })), idk: '' };
         return { k: c[0], label: c[1], type: Array.isArray(c[2]) ? 'select' : c[2], opts: Array.isArray(c[2]) ? c[2] : null, idk: c[3] || '', when: c[4] || '', ph: stlColPh_(name, c[0]) };
@@ -4143,6 +4171,36 @@ function adm_stlEarlyPaySet(token, text) {
     } finally { lock.releaseLock(); }
     logAdmin_(a, '15일 선지급 기사', v, '');
     return { ok: true, value: v };
+  });
+}
+/** 퇴사자 보류금 설정 위 스위치에 보여 줄 값: 켜짐 · 시작일 · 기본 금액 · 지금 자동으로 걸리는 기사 */
+function stlLeaveAutoInfo_() {
+  const cfg = stlCfg_();
+  return { on: cfg.leaveAuto, from: cfg.leaveAutoFrom, amt: cfg.leaveAmt, list: stlLeaveAutoDrv_(stlDrivers_(), cfg).map(function (x) { return { name: x.o.name, leave: stlYmd_(x.o.leaveDate), month: x.m }; }) };
+}
+/** 자동 보류금 켜기·끄기. 켤 때: 지금 퇴사로 되어 있는 기사는 빼도록 시작일 = (그 기사들의 가장 늦은 퇴사일, 오늘까지) 다음 날 */
+function adm_stlLeaveAutoSet(token, on) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    on = !!on;
+    const lab = function (k) { return STL_CFG.filter(function (d) { return d[0] === k; })[0][1]; };
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    try {
+      const was = stlCfg_();
+      const rows = stlRead_('stl_config');
+      const put = function (k, v) { const r = rows.filter(function (x) { return x.label === lab(k); })[0]; if (r) stlSetRow_('stl_config', r._row, { value: v }); else stlAppend_('stl_config', [{ label: lab(k), value: v, desc: '' }]); };
+      if (on && !was.leaveAuto) {
+        const today = todayText_();
+        let last = '';
+        stlDrivers_().all.forEach(function (o) { const ld = stlYmd_(o.leaveDate); if (str_(o.workStatus) === '퇴사' && /^\d{4}-\d{2}-\d{2}$/.test(ld) && ld <= today && ld > last) last = ld; });
+        put('leaveAutoFrom', last ? ymd_(addDays_(parseYmd_(last), 1)) : stlPeriod_(stlMonthNow_()).from);
+      }
+      put('leaveAuto', on ? 'Y' : 'N');
+      stlBump_();
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '퇴사 보류금 자동', on ? '켬' : '끔', '');
+    return { ok: true, leaveAuto: stlLeaveAutoInfo_() };
   });
 }
 function adm_stlAppRangeSet(token, range) {
