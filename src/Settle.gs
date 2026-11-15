@@ -4220,6 +4220,18 @@ function mySlipCore_(u, month) {
       if (!row || seen[row.id] || row.legacyNote || row.vendor || !(r.summary && r.summary.legacy)) return; // 기존 정산 이식 달만 (아이디가 다른 사람에게 넘어간 보통 달의 정산서가 보이지 않게)
       if (row.ownerId ? row.ownerId === u.id : (row.cids || []).some(function (c) { return mine[stlLogin_(c)]; })) { found.push(sl); seen[row.id] = 1; } // 명의자가 있으면 명의자만
     });
+    // 대표인데 마감 기록에 계산값(ceoView)이 없는 달 (기존 정산 이식 때 '쿠팡 매출만' 줄로 들어간 2·5·7·9월):
+    //  쿠팡 정산서 원본으로 그 자리에서 다시 계산해 내 줄만 가져온다 (읽기만 · 마감 기록은 그대로 · 결과는 mySlip_ 에서 6시간 기억)
+    let live = null;
+    const isCeo = (function () { try { const o = driverById_(u.id); return !!o && normTitle_(o.title) === '대표'; } catch (e) { return false; } })();
+    found.forEach(function (sl, i) {
+      if (!isCeo || !sl.row.legacyNote || sl.row.ceo) return;
+      try {
+        if (!live) live = stlCompute_(month);
+        const k = Object.keys(live.slips).filter(function (g) { const lr = live.slips[g].row; return lr && lr.ceo && (lr.ownerId === u.id || g === sl.row.id); })[0];
+        if (k) found[i] = Object.assign({}, live.slips[k], { row: Object.assign({}, live.slips[k].row, { legacyNote: sl.row.legacyNote }) });
+      } catch (e) { /* 다시 계산하지 못하면 이 달은 그대로 (안내만) */ }
+    });
     // 대표는 기존 정산서가 없던 달(지급하지 않으므로)도 확인용으로 보여 준다 — 쿠팡 정산서로 계산한 값(ceoView)
     const slips = found.filter(function (sl) { return !sl.row.legacyNote || sl.row.ceo; }).map(function (sl) {
       const d = sl.row.ceo ? Object.assign({}, sl.row, sl.row.ceoView) : sl.row;
