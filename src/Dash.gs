@@ -81,7 +81,7 @@ function dashMain_() {
     out.bib = { total: bibs.length, byStatus: cnt(bibs, function (b) { return b.status; }) };
 
     // ── 노선
-    const camps = readAll_(SH.CAMPS).filter(function (c) { return c.id; });
+    const camps = readAll_(SH.CAMPS).filter(function (c) { return c.id && !isStaffCamp_(c.name); });
     const routes = readAll_(SH.ROUTES).filter(function (r) { return r.id; });
     let rcWait = 0;
     try { rcWait = readAll_(SH.RCHG).filter(function (c) { return c.status === RCS.WAIT; }).length; } catch (e) { rcWait = 0; }
