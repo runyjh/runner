@@ -309,6 +309,57 @@ ops('확정 뒤 처리 순서·실패 기록', function (run) {
   eq('칸 쓰기 실패 → 오류 기록 · 확정은 그대로', run("var logs = []; errLog_ = function (k, f, m) { logs.push(k + '|' + f); }; var sh = schSheet_; schSheet_ = function () { throw new Error('boom'); }; pmDecide_('d1', 'J3', 'A1', 'back'); pmDecide_('d1', 'J3', 'A2', 'accept'); schSheet_ = sh; return [__M.jobs[2].status, logs];"), ['배차 확정', ['서버 오류|pmSchApply_', '서버 오류|pmSchApply_']]);
 });
 
+// 16) 기사앱 메뉴 켜기·끄기: 끈 메뉴는 서버에서도 막고 · 예외 기사는 그대로 · 그 메뉴 알림은 빠짐
+scenario('기사앱 메뉴 끄기', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    appSet_ = function () { return { appMenu: '{"sched":1,"settle":0,"pm":0,"my":1}', appMenuEx: '["d3"]' }; };
+    var gate = function (id, k) { try { menuGate_(id, k); return 'ok'; } catch (e) { return e.code + '|' + e.userMsg; } };
+    var al = [{ driverId: 'd1', kind: 'slip', jobId: 'SL-2026-10' }, { driverId: 'd3', kind: 'slip', jobId: 'SL-2026-10' }, { driverId: 'd1', kind: 'new', jobId: 'PM-1' }, { driverId: 'd1', kind: 'bd', jobId: 'BD-1' }];
+    return { off: appMenuOffFor_('d1'), ex: appMenuOffFor_('d3'), g: [gate('d1', 'pm'), gate('d1', 'sched'), gate('d3', 'pm'), gate('d1', '')],
+      keep: menuAlertFilter_(al).map(function (a) { return a.driverId + ':' + a.jobId; }), fn: [APP_MENU_FN.api_mySlip, APP_MENU_FN.api_pmList, APP_MENU_FN.api_myPerf, APP_MENU_FN.api_mySchedule || ''] };
+  })()`, r.ctx);
+  eq('끈 메뉴 목록 (설정 없는 메뉴는 켬)', out.off, ['settle', 'pm']);
+  eq('예외 기사는 끈 메뉴 없음', out.ex, []);
+  eq('끈 메뉴 자료 요청은 막고 · 켠 메뉴와 예외 기사는 통과', out.g, ['MENU_OFF|해당 메뉴는 준비 중입니다.', 'ok', 'ok', 'ok']);
+  eq('끈 메뉴 알림은 빼고 · 예외 기사와 게시판 알림은 보냄', out.keep, ['d3:SL-2026-10', 'd1:BD-1']);
+  eq('서버 함수 → 메뉴 연결', out.fn, ['settle', 'pm', 'my', '']);
+});
+
+// 17) 노선 물량: 1일 평균 · 총물량 · 요일별 평균은 전월(가장 최근 정산서 달)만으로
+scenario('노선 물량 전월 기준', function (M) { M.stl.stl_raw.push({ month: '2026-10', date: '2026-10-10', cid: 'rand1', camp: '시흥2', route: '708C', kind: '배송', qty: '999', ret: '0', total: '999000', fresh: '0', inc: '0' }); }, function (r) {
+  const out = vm.runInContext(`(function () {
+    var p0 = props_; props_ = function () { var o = p0(); o.STL_DB_ID = 'x'; return o; };
+    stlMonths_ = function () { return { withData: ['2026-10', '2026-11'] }; };
+    var v = routeVolumes_(), x = v.vol['시흥2|708C'];
+    return { pm: v.pm, period: v.pmPeriod, avg: x.avg, days: x.days, qty: x.qty, wd: x.wd, wn: x.wn, m: x.m };
+  })()`, r.ctx);
+  eq('전월 = 가장 최근 정산서 달 · 정산기간', [out.pm, out.period], ['2026-11', { from: '2026-10-26', to: '2026-11-25' }]);
+  eq('1일 평균 · 배송한 날 · 총물량은 전월만 (10월 999건은 안 섞임)', [out.avg, out.days, out.qty], [70, 3, 210]);
+  eq('요일별 평균 (일~토 · 배송 없는 요일은 null)', [out.wd, out.wn], [[null, null, null, 120, 50, 40, null], [0, 0, 0, 1, 1, 1, 0]]);
+  eq('정산월별 수량은 달마다 따로', out.m, { '2026-10': 999, '2026-11': 210 });
+});
+
+// 18) 대표 정산서: 기존 정산 이식 달에 '쿠팡 매출만' 줄로 들어간 달도 쿠팡 정산서로 계산해 확인용으로 (마감 기록은 그대로 · 대표가 아니면 숨김)
+scenario('대표 이식 달 정산서', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var res = stlCompute_('2026-11'), slips = JSON.parse(JSON.stringify(res.slips)), sum = JSON.parse(JSON.stringify(res.summary));
+    var bare = function (k) { var o = slips[k].row; slips[k] = { row: { id: o.id, cid: o.cid, name: o.name, ownerId: o.ownerId, vendor: '', ids: 1, qty: o.qty, sales: o.sales, legacyNote: '기존 정산서 없음 (쿠팡 매출만)', pay: 0, invoice: 0, net: 0 }, lines: [{ name: '(기존 정산서 없음 · 쿠팡 매출만)', side: '지급', method: '직접입력', amt: 0 }] }; };
+    var kc = Object.keys(slips).filter(function (k) { return slips[k].row.ownerId === 'd4'; })[0], k1 = Object.keys(slips).filter(function (k) { return slips[k].row.ownerId === 'd1'; })[0];
+    var liveCeo = !!res.slips[kc].row.ceo;
+    bare(kc); if (k1) bare(k1);
+    sum.legacy = { at: 'x', routeFix: 1 };
+    __M.stl.stl_closed = stlSnapRows_('2026-11', { summary: sum, slips: slips });
+    __M.stl.stl_close = [{ month: '2026-11', at: '2026-11-09 23:40:57', admin: '유정훈 (기존 정산 이식)' }];
+    var writes = 0; stlReplaceMonth_ = function () { writes++; };
+    driverById_ = function (id) { return readAll_('drivers').filter(function (o) { return o.id === id; })[0] || null; };
+    var ceo = mySlipCore_({ id: 'd4' }, '2026-11'), drv = mySlipCore_({ id: 'd1' }, '2026-11');
+    return { liveCeo: liveCeo, n: ceo.slips.length, ceo: ceo.slips[0] ? ceo.slips[0].row.ceo : null, lines: ceo.slips[0] ? ceo.slips[0].lines.length > 0 : false, drv: drv.slips.length, hadDrv: !!k1, writes: writes };
+  })()`, r.ctx);
+  eq('대표는 계산값으로 1장 (확인용 표시 · 줄 있음)', [out.liveCeo, out.n, out.ceo, out.lines], [true, 1, true, true]);
+  eq('대표가 아닌 기사의 같은 줄은 그대로 숨김', out.drv, 0);
+  eq('마감 기록은 건드리지 않음', out.writes, 0);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
