@@ -16512,5 +16512,55 @@
   })();
 })();
 </script>
+<script>
+// ── 요일 색: 화면 어디서든 일요일 = 빨강 · 토요일 = 파랑 ──
+//  「(일)」「(토)」 표기와 표 머리글의 「일」「토」 글자만 색을 입힌다 (글자·기능은 그대로 · 입력칸과 진한 바탕 위 글자는 건드리지 않음)
+(function () {
+  const RE = /\((일|토)\)/g, SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, INPUT: 1, OPTION: 1, SELECT: 1, TITLE: 1 };
+  const st = document.createElement('style');
+  st.textContent = '.wkc-s{color:#e5484d !important}.wkc-t{color:#2f6fed !important}';
+  document.head.appendChild(st);
+  function dark(el) { // 진한 바탕(파란 버튼 · 알약 등) 위에서는 색을 바꾸지 않는다 — 글자가 안 보이게 되므로
+    for (let e = el; e && e.nodeType === 1; e = e.parentElement) {
+      const m = getComputedStyle(e).backgroundColor.match(/[\d.]+/g);
+      if (m && (m.length < 4 || +m[3] > 0.5)) return (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) / 255 < 0.72;
+    }
+    return false;
+  }
+  function one(t) {
+    const p = t.parentNode; if (!p || p.nodeType !== 1 || SKIP[p.tagName] || p.isContentEditable) return;
+    if (p.classList.contains('wkc-s') || p.classList.contains('wkc-t')) return;
+    const v = t.nodeValue, s = v.trim();
+    if ((s === '일' || s === '토') && p.tagName === 'TH') { if (!dark(p)) p.classList.add(s === '일' ? 'wkc-s' : 'wkc-t'); return; }
+    if (v.indexOf('(일)') < 0 && v.indexOf('(토)') < 0) return;
+    if (dark(p)) return;
+    const f = document.createDocumentFragment(); let last = 0, m; RE.lastIndex = 0;
+    while ((m = RE.exec(v))) {
+      if (m.index > last) f.appendChild(document.createTextNode(v.slice(last, m.index)));
+      const sp = document.createElement('span'); sp.className = m[1] === '일' ? 'wkc-s' : 'wkc-t'; sp.textContent = m[0]; f.appendChild(sp);
+      last = m.index + m[0].length;
+    }
+    if (last < v.length) f.appendChild(document.createTextNode(v.slice(last)));
+    p.replaceChild(f, t);
+  }
+  function paint(root) {
+    if (!root) return;
+    if (root.nodeType === 3) return one(root);
+    if (root.nodeType !== 1 || SKIP[root.tagName]) return;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), list = [];
+    while (w.nextNode()) { const v = w.currentNode.nodeValue; if (v.length < 400 && (v.indexOf('(일)') >= 0 || v.indexOf('(토)') >= 0 || v.trim() === '일' || v.trim() === '토')) list.push(w.currentNode); }
+    list.forEach(one);
+  }
+  let q = [], on = false;
+  const run = () => { on = false; const a = q; q = []; a.forEach((n) => { if (n.isConnected) { try { paint(n); } catch (e) { /* 색만 못 입힘 */ } } }); };
+  try {
+    new MutationObserver((ms) => {
+      ms.forEach((m) => { if (m.type === 'characterData') q.push(m.target); else m.addedNodes.forEach((n) => q.push(n)); });
+      if (q.length && !on) { on = true; (window.requestAnimationFrame || setTimeout)(run); }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  } catch (e) { /* 지원하지 않는 브라우저: 색 없이 그대로 */ }
+  paint(document.body);
+})();
+</script>
 </body>
 </html>
