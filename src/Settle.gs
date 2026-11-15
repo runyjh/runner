@@ -4190,9 +4190,26 @@ function mySlip_(u, month) {
     const cfg = stlCfg_(), closed = stlClosedInfo_(month);
     if (!closed && !cfg.appOpen) fail_('아직 마감되지 않은 달입니다. 사무실에서 마감하면 볼 수 있습니다.');
     if (!stlAppMonths_(cfg).some(function (x) { return x.month === month; })) fail_('이 달 정산서는 기사 앱에서 보여 주지 않습니다.');
-    const r = stlResult_(month, false), XD = stlIds_(stlDrivers_()), groups = stlMyGroups_(u.id, XD); // 기사·아이디 표는 한 번만 읽음
+    // 마감된 달: 기사 한 명 몫의 결과를 서버에 기억 (달 전체 고정본을 꺼내 푸는 데 2초 남짓) — 열쇠에 정산 버전이 들어 있어
+    //  마감 풀기 · 정산 자료 · 기사 정보 · 아이디가 바뀌면 열쇠가 달라져 새로 만든다. 세금계산서 목록·회사 정보는 매번 새로.
+    const ckey = closed ? 'stl:my:' + month + ':' + u.id + ':' + stlVer_() : '';
+    let core = ckey ? stlCGet_(ckey) : null;
+    if (!core) { core = mySlipCore_(u, month); if (ckey) stlCPut_(ckey, core, 21600); }
+    if (!core.slips.length) fail_('이 달 정산 기록이 없습니다.');
     let co = {};
     try { co = companyInfo_(); } catch (e) { /* 회사 정보 없음 */ }
+    let taxInv = [];
+    try { taxInv = tiForDriver_(u.id, month); } catch (e) { taxInv = []; }
+    return {
+      ok: true, month: month, closed: !!closed, period: core.period, dates: core.dates, slips: core.slips, taxInv: taxInv,
+      company: { name: co.branchName || '', ceo: co.branchCeo || '', bizNo: co.branchBizNo || '', email: cfg.email }
+    };
+  }
+}
+/** 기사 한 명의 정산서 본문 (정산 계산 결과에서 내 묶음만) → { period, dates, slips } */
+function mySlipCore_(u, month) {
+  {
+    const r = stlResult_(month, false), XD = stlIds_(stlDrivers_()), groups = stlMyGroups_(u.id, XD); // 기사·아이디 표는 한 번만 읽음
     // 내 묶음 키로 찾고, 없으면 내 아이디가 들어 있는 정산서 (기존 정산 이식 달은 정산서 키가 그때 아이디라 다를 수 있음)
     const X = XD, mine = {}, seen = {};
     groups.forEach(function (g) { ((X.groups[g] || {}).cids || []).forEach(function (c) { mine[stlLogin_(c)] = 1; }); });
@@ -4223,13 +4240,7 @@ function mySlip_(u, month) {
         movedIn: sl.movedIn, movedOut: sl.movedOut, ins: sl.ins ? { excluded: sl.ins.excluded, bosu: sl.ins.bosu } : null
       };
     });
-    if (!slips.length) fail_('이 달 정산 기록이 없습니다.');
-    let taxInv = [];
-    try { taxInv = tiForDriver_(u.id, month); } catch (e) { taxInv = []; }
-    return {
-      ok: true, month: month, closed: !!closed, period: r.summary.period, dates: r.summary.dates, slips: slips, taxInv: taxInv,
-      company: { name: co.branchName || '', ceo: co.branchCeo || '', bizNo: co.branchBizNo || '', email: cfg.email }
-    };
+    return { period: r.summary.period, dates: r.summary.dates, slips: slips };
   }
 }
 
