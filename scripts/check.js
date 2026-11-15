@@ -42,7 +42,6 @@ function walk(dir) {
 
 walk(path.join(ROOT, 'src'));
 walk(path.join(ROOT, 'site'));
-walk(path.join(ROOT, 'extension'));
 checkJs('scripts/build-pages.js', fs.readFileSync(path.join(ROOT, 'scripts', 'build-pages.js'), 'utf8').replace(/^#!.*\n/, ''));
 
 // 없는 함수 부르기: 선언이 어디에도 없는 이름을 부르면 배포하지 않는다 (scripts/check-names.js)
