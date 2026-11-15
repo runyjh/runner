@@ -6384,6 +6384,7 @@
     if (act === 'done') {
       const want = e.target.checked;
       box.classList.toggle('done', want);
+      if (!want) HMD.del(id); // 홈에서 체크해 둔 기록도 지움 (다시 홈에 나오게)
       api('adm_memoSave', { id: id, done: want }).then((r) => {
         if (!r.ok) { toast(r.msg); e.target.checked = !want; box.classList.toggle('done', !want); return; }
         if (m.pin) return openMonth(memoMonth, selDate); // 항상 보기 묶음도 새로
@@ -11073,11 +11074,25 @@
   /** 내 스케줄 모드: 관리자 본인 줄만 한 달 달력으로 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   let sTd = false, sCampKeep = ''; // sCampKeep = 홈으로 가기 전에 관리에서 보던 캠프 (돌아오면 그 캠프로)
   const HM = { ym: '', memos: null, at: 0, p: null };
+  // 홈에서 방금 완료 체크한 업무 (이 기기에 잠깐 적어 둠): 새로고침해도 바로 안 나오게 · 저장이 끊겼으면 다시 보냄
+  //  { 메모ID: { t: 체크한 시각, ok: 서버 저장 끝 } } — 저장이 끝나고 2분 지나면 지움(그 뒤로는 서버 자료를 믿음) · 못 끝낸 것은 30분까지
+  const HMD = {
+    all() { let o = {}; try { o = JSON.parse(localStorage.getItem('runner.hmDone') || '{}') || {}; } catch (e) { o = {}; } const now = Date.now(); let ch = false;
+      Object.keys(o).forEach((k) => { const x = o[k] || {}; if (now - (x.t || 0) > (x.ok ? 120000 : 1800000)) { delete o[k]; ch = true; } }); if (ch) this.put(o); return o; },
+    put(o) { try { localStorage.setItem('runner.hmDone', JSON.stringify(o)); } catch (e) { /* 저장 못 해도 화면은 그대로 */ } },
+    add(id) { const o = this.all(); o[id] = { t: Date.now(), ok: 0 }; this.put(o); },
+    ok(id) { const o = this.all(); if (o[id]) { o[id] = { t: Date.now(), ok: 1 }; this.put(o); } },
+    del(id) { const o = this.all(); if (o[id]) { delete o[id]; this.put(o); } },
+    /** 받은 목록에 덮어씀: 체크해 둔 것은 완료로 */
+    mark() { const o = this.all(); if (!Object.keys(o).length) return; [HM.memos, HM.pinned, HM.late].forEach((L) => (L || []).forEach((m) => { if (o[m.id]) m.done = true; })); },
+    /** 저장이 끊긴 것(체크 직후 새로고침 등)을 다시 보냄 */
+    resend() { const o = this.all(); Object.keys(o).forEach((id) => { if (o[id].ok || Date.now() - o[id].t < 8000) return; api('adm_memoSave', { id: id, done: true }).then((r) => { if (r && r.ok) this.ok(id); else this.del(id); }).catch(() => {}); }); }
+  };
   function hmLoad() {
     const ym = ymdLocal(new Date()).slice(0, 7);
     if (HM.p || (HM.ym === ym && HM.memos && Date.now() - HM.at < 300000)) return;
     if (!HM.memos) { const km = admKeep.getP('hmemo'); if (km && km.ym === ym && Array.isArray(km.memos)) { HM.ym = ym; HM.memos = km.memos; HM.pinned = km.pinned || []; HM.late = km.late || []; } }
-    HM.p = api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { HM.ym = ym; HM.memos = r.memos || []; HM.pinned = r.pinned || []; HM.late = r.late || []; HM.at = Date.now(); admKeep.setP('hmemo', { ym: ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); if (sTd) { try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } } }).catch(() => {}).finally(() => { HM.p = null; });
+    HM.p = api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { HM.ym = ym; HM.memos = r.memos || []; HM.pinned = r.pinned || []; HM.late = r.late || []; HM.at = Date.now(); HMD.mark(); HMD.resend(); admKeep.setP('hmemo', { ym: ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); if (sTd) { try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } } }).catch(() => {}).finally(() => { HM.p = null; });
   }
   /** 휴대폰 기사스케줄 화면의 모드: 'my' 내 스케줄 · 'today' 오늘(PDD 한눈에) · '' 관리용 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   function schMode(m) {
@@ -11135,6 +11150,7 @@
       const tdy = ymdLocal(new Date()), who = (typeof me !== 'undefined' && me) || {};
       // 오늘 업무 = 📌 항상 보기(끝낼 때까지 · '까지' 날짜까지) + 최근 7일 안의 지난 미완료 + 오늘 날짜 업무 — 완료한 것은 빠짐 (모두 보기에서 확인)
       const dGap = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000), mdS = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
+      HMD.mark();
       const pins = (HM.pinned || []).filter((m) => !m.note && !m.done), seenId = new Set(pins.map((m) => m.id));
       const lates = (HM.late || []).filter((m) => !m.done && !seenId.has(m.id) && m.date < tdy); lates.forEach((m) => seenId.add(m.id));
       // 날짜 요약: 📌 = 적은 날 · 까지(D-몇) / 지난 것 = 며칠 전 / 오늘 = 시간
@@ -11249,12 +11265,13 @@
     if (ck) { // 홈에서 바로 완료 체크: 먼저 화면에서 빼고 저장 — 실패하면 되돌림
       const id = ck.dataset.tdck, hit = [HM.memos, HM.pinned, HM.late].map((L) => (L || []).filter((m) => m.id === id)).reduce((a, b) => a.concat(b), []);
       if (!hit.length || ck.disabled) return;
-      ck.disabled = true; hit.forEach((m) => { m.done = true; }); paintMob();
+      ck.disabled = true; hit.forEach((m) => { m.done = true; }); HMD.add(id); // 이 기기에 먼저 적어 둠 → 저장을 기다리는 동안 새로고침해도 다시 안 나옴
+      admKeep.setP('hmemo', { ym: HM.ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); paintMob();
       api('adm_memoSave', { id: id, done: true }).then((r) => {
-        if (!r.ok) { hit.forEach((m) => { m.done = false; }); paintMob(); return toast(r.msg); }
-        admKeep.setP('hmemo', { ym: HM.ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); DSB.memos = null;
+        if (!r.ok) { HMD.del(id); hit.forEach((m) => { m.done = false; }); paintMob(); return toast(r.msg); }
+        HMD.ok(id); DSB.memos = null;
         toast('완료로 표시했습니다. (되돌리기: 모두 보기)');
-      }).catch(() => { hit.forEach((m) => { m.done = false; }); paintMob(); });
+      }).catch(() => { /* 연결이 끊김: 적어 둔 것은 남기고 다음에 열 때 다시 보냄 */ });
       return;
     }
     const tg = t.closest('[data-tdgo]'); if (tg) { const v = tg.dataset.tdgo; if (v === 'sched') mSchedGo(''); else { schMode(''); if (v === 'peak') { RP.tab = 'pk'; navGo('perf'); if (currentView === 'perf') rpRender(); } else { if (v === 'perf') RP.tab = 'wk'; navGo(v); } } window.scrollTo(0, 0); return; }
