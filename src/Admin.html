@@ -747,6 +747,13 @@
   .actbl td.mm { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--sub); }
   .actbl .cat { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--brand-weak); color: var(--brand); font-size: 12px; font-weight: 700; }
   .nt-imp { color: var(--danger); font-weight: 800; margin-right: 4px; }
+  /* 공지 글자색 · 굵게 ([빨강]글자[/빨강] · **굵게**) */
+  .nc-빨강 { color: #e03131; } .nc-파랑 { color: #1c64f2; } .nc-보라 { color: #7c3aed; } .nc-주황 { color: #ea580c; } .nc-초록 { color: #16a34a; }
+  .ntcbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 12.5px; }
+  .ntcbar button { border: 1px solid #d0d5db; background: #fff; border-radius: 999px; height: 28px; padding: 0 10px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+  .ntcbar .hint { color: #8b95a1; font-weight: 500; }
+  .ntprev { margin-top: 6px; border: 1px dashed #d0d5db; border-radius: 8px; padding: 8px 10px; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; background: #fbfcfe; }
+
   .b-게시 { background: var(--ok-weak); color: var(--ok); } .b-숨김 { background: var(--gray-weak); color: var(--sub); }
   .b-예약 { background: var(--warn-weak); color: var(--warn); } .b-종료 { background: var(--gray-weak); color: var(--sub); }
   #ntRows td.t { max-width: 420px; } #ntRows td.t small { display: block; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -5945,17 +5952,47 @@
     $('#ntRows').innerHTML = list.map((n) => {
       const st = ntState(n), per = (n.start || '등록일부터') + ' ~ ' + (n.end || '계속');
       return '<tr data-nt="' + esc(n.id) + '"><td><span class="badge b-' + st + '">' + (st === '게시' ? '게시 중' : st) + '</span></td>' +
-        '<td class="t"><b>' + (n.important ? '<span class="nt-imp">[중요]</span>' : '') + esc(n.title) + (n.photos ? ' <span class="sub" style="font-weight:600">📷' + n.photos + '</span>' : '') + '</b><small>' + esc(String(n.body || '').replace(/\s+/g, ' ').slice(0, 80)) + '</small></td>' +
+        '<td class="t"><b>' + (n.important ? '<span class="nt-imp">[중요]</span>' : '') + esc(n.title) + (n.photos ? ' <span class="sub" style="font-weight:600">📷' + n.photos + '</span>' : '') + '</b><small>' + esc(ntPlain(n.body).replace(/\s+/g, ' ').slice(0, 80)) + '</small></td>' +
         '<td>' + (n.target ? esc(n.target) : '<span class="sub">전체</span>') + '</td><td class="sub">' + esc(per) + '</td>' +
         '<td class="sub">' + esc(n.author || '') + '</td><td class="sub">' + esc(String(n.updatedAt || n.createdAt || '').slice(0, 16)) + '</td></tr>';
     }).join('');
   }
   $('#ntTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-nf]'); if (!b) return; ntFilter = b.dataset.nf; renderNotices(); });
   $('#ntReload').addEventListener('click', loadNotices);
+  /** 공지 본문 꾸밈: 글자를 먼저 안전하게 바꾼 뒤 [빨강]…[/빨강] → 색 · **…** → 굵게 */
+  function ntRich(t) {
+    let h = String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    for (let i = 0; i < 3; i++) h = h.replace(/\[(빨강|파랑|보라|주황|초록)\]([\s\S]*?)\[\/\1\]/g, '<span class="nc-$1">$2</span>'); // 겹쳐 쓴 것도
+    return h.replace(/\*\*([^*\n][^*]*?)\*\*/g, '<b>$1</b>');
+  }
+  const ntPlain = (t) => String(t || '').replace(/\[\/?(빨강|파랑|보라|주황|초록)\]/g, '').replace(/\*\*/g, '');
+  /** 글자색 단추: 고른 글자를 [색]…[/색] 으로 감쌈 (고른 게 없으면 빈 짝을 넣고 가운데에 커서) */
+  function ntWrap(ta, open, close) {
+    const a = ta.selectionStart, b = ta.selectionEnd, v = ta.value;
+    ta.value = v.slice(0, a) + open + v.slice(a, b) + close + v.slice(b);
+    ta.focus(); ta.selectionStart = a + open.length; ta.selectionEnd = b + open.length;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  const NTC_BAR = '<div class="ntcbar"><span class="hint">글자를 고르고 →</span>' + [['빨강', '#e03131'], ['파랑', '#1c64f2'], ['보라', '#7c3aed'], ['주황', '#ea580c'], ['초록', '#16a34a']].map(([c, h]) => '<button type="button" data-ntc="' + c + '" style="color:' + h + ';border-color:' + h + '55">' + c + '</button>').join('') + '<button type="button" data-ntc="b">굵게</button><button type="button" data-ntc="x" title="고른 글자의 색·굵게를 지움">지우기</button></div>';
+  /** 내용 칸에 글자색 단추 + 미리보기 붙이기 */
+  function ntColorize(ta) {
+    if (!ta || ta.dataset.ntc) return; ta.dataset.ntc = '1';
+    ta.insertAdjacentHTML('beforebegin', NTC_BAR); ta.insertAdjacentHTML('afterend', '<div class="ntprev" aria-label="미리보기"></div>');
+    const bar = ta.previousElementSibling, pv = ta.nextElementSibling;
+    const paint = () => { pv.innerHTML = ta.value ? ntRich(ta.value) : '<span style="color:#b0b8c1">미리보기 — 기사 앱에 이렇게 보입니다</span>'; };
+    bar.addEventListener('mousedown', (e) => { if (e.target.closest('[data-ntc]')) e.preventDefault(); }); // 고른 글자가 풀리지 않게
+    bar.addEventListener('click', (e) => {
+      const k = (e.target.closest('[data-ntc]') || {}).dataset; if (!k || !k.ntc) return;
+      if (k.ntc === 'x') { const a = ta.selectionStart, b = ta.selectionEnd; if (a === b) return; const mid = ntPlain(ta.value.slice(a, b)); ta.value = ta.value.slice(0, a) + mid + ta.value.slice(b); ta.focus(); ta.selectionStart = a; ta.selectionEnd = a + mid.length; return paint(); }
+      if (k.ntc === 'b') return ntWrap(ta, '**', '**');
+      ntWrap(ta, '[' + k.ntc + ']', '[/' + k.ntc + ']');
+    });
+    ta.addEventListener('input', paint); ta._ntPaint = paint; paint();
+  }
   function openNotice(n) {
     ntEdit = n || null;
     $('#ntTitleH').textContent = n ? '공지 수정' : '새 공지';
-    $('#ntTitle').value = n ? n.title : ''; $('#ntBody').value = n ? n.body : '';
+    $('#ntTitle').value = n ? n.title : ''; $('#ntBody').value = n ? n.body : ''; ntColorize($('#ntBody')); $('#ntBody')._ntPaint();
     $('#ntImp').checked = !!(n && n.important);
     $('#ntStart').value = n ? n.start : ''; $('#ntEnd').value = n ? n.end : '';
     const tg = n && n.target ? n.target.split(',').map((x) => x.trim().replace(/캠프$/, '')).filter(Boolean) : [];

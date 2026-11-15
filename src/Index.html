@@ -551,6 +551,12 @@
   .mmi .ck { flex: 0 0 auto; width: 26px; height: 26px; border: 2px solid #c5ccd3; border-radius: 8px; background: #fff; color: #fff; font-size: 15px; font-weight: 800; line-height: 1; padding: 0; margin-top: 1px; }
   .mmi.done .ck { background: #12b886; border-color: #12b886; } .mmi.done .tx { color: #9aa4ae; text-decoration: line-through; }
   .mmi .bd { flex: 1; min-width: 0; } .mmi .tm { font-size: 12.5px; font-weight: 800; color: var(--brand); margin-right: 6px; } .mmi .cat { font-size: 11.5px; font-weight: 700; color: #8a4b00; background: #fff4d6; border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+  /* 공지 글자색 · 굵게 ([빨강]글자[/빨강] · **굵게**) */
+  .nc-빨강 { color: #e03131; } .nc-파랑 { color: #1c64f2; } .nc-보라 { color: #7c3aed; } .nc-주황 { color: #ea580c; } .nc-초록 { color: #16a34a; }
+  .ntcbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 12.5px; }
+  .ntcbar button { border: 1px solid #d0d5db; background: #fff; border-radius: 999px; height: 28px; padding: 0 10px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+  .ntcbar .hint { color: #8b95a1; font-weight: 500; }
+  .ntprev { margin-top: 6px; border: 1px dashed #d0d5db; border-radius: 8px; padding: 8px 10px; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; background: #fbfcfe; }
   .mc-빨강 { color: #e03131 !important; } .mc-파랑 { color: #1c64f2 !important; } .mc-보라 { color: #7c3aed !important; } .mc-주황 { color: #ea580c !important; } .mc-초록 { color: #16a34a !important; }
   .mmi.done .tx[class*="mc-"] { opacity: .55; }
   .mcol { display: inline-flex; gap: 6px; align-items: center; } .mcol button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #d0d5db; padding: 0; }
@@ -2556,7 +2562,7 @@
     const seen = ntGet(NT_SEEN);
     $('#ntList').innerHTML = ntList.length ? ntList.map((n) => '<div class="nitem' + (ntOpen.has(n.id) ? ' open' : '') + '" data-ni="' + escH(n.id) + '"><button type="button">' +
       (n.important ? '<span class="nimp">중요</span>' : '') + '<span class="tt">' + escH(n.title) + '</span>' + (seen.includes(ntKey(n)) ? '' : '<span class="nnew">N</span>') + '</button>' +
-      '<div class="meta">' + escH(n.date || '') + (n.photos ? ' · 📷 사진 ' + n.photos + '장' : '') + '</div><div class="nb">' + escH(n.body || '') + ntPhHtml(n) + '</div></div>').join('')
+      '<div class="meta">' + escH(n.date || '') + (n.photos ? ' · 📷 사진 ' + n.photos + '장' : '') + '</div><div class="nb">' + ntRich(n.body || '') + ntPhHtml(n) + '</div></div>').join('')
       : '<div class="card" style="text-align:center;color:var(--sub)">지금 올라온 공지가 없습니다.</div>';
   }
   // 공지 사진: 펼칠 때 받아 오고 이 화면이 켜져 있는 동안 메모리에 보관 (기기에는 저장 안 함)
@@ -2575,6 +2581,36 @@
     }
   }
   function markSeen(n) { try { seenSend('notice', n.id); } catch (e) { /* 확인 기록은 없어도 됨 */ } const seen = ntGet(NT_SEEN); if (!seen.includes(ntKey(n))) { seen.push(ntKey(n)); ntPut(NT_SEEN, seen); } }
+  /** 공지 본문 꾸밈: 글자를 먼저 안전하게 바꾼 뒤 [빨강]…[/빨강] → 색 · **…** → 굵게 */
+  function ntRich(t) {
+    let h = String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    for (let i = 0; i < 3; i++) h = h.replace(/\[(빨강|파랑|보라|주황|초록)\]([\s\S]*?)\[\/\1\]/g, '<span class="nc-$1">$2</span>'); // 겹쳐 쓴 것도
+    return h.replace(/\*\*([^*\n][^*]*?)\*\*/g, '<b>$1</b>');
+  }
+  const ntPlain = (t) => String(t || '').replace(/\[\/?(빨강|파랑|보라|주황|초록)\]/g, '').replace(/\*\*/g, '');
+  /** 글자색 단추: 고른 글자를 [색]…[/색] 으로 감쌈 (고른 게 없으면 빈 짝을 넣고 가운데에 커서) */
+  function ntWrap(ta, open, close) {
+    const a = ta.selectionStart, b = ta.selectionEnd, v = ta.value;
+    ta.value = v.slice(0, a) + open + v.slice(a, b) + close + v.slice(b);
+    ta.focus(); ta.selectionStart = a + open.length; ta.selectionEnd = b + open.length;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  const NTC_BAR = '<div class="ntcbar"><span class="hint">글자를 고르고 →</span>' + [['빨강', '#e03131'], ['파랑', '#1c64f2'], ['보라', '#7c3aed'], ['주황', '#ea580c'], ['초록', '#16a34a']].map(([c, h]) => '<button type="button" data-ntc="' + c + '" style="color:' + h + ';border-color:' + h + '55">' + c + '</button>').join('') + '<button type="button" data-ntc="b">굵게</button><button type="button" data-ntc="x" title="고른 글자의 색·굵게를 지움">지우기</button></div>';
+  /** 내용 칸에 글자색 단추 + 미리보기 붙이기 */
+  function ntColorize(ta) {
+    if (!ta || ta.dataset.ntc) return; ta.dataset.ntc = '1';
+    ta.insertAdjacentHTML('beforebegin', NTC_BAR); ta.insertAdjacentHTML('afterend', '<div class="ntprev" aria-label="미리보기"></div>');
+    const bar = ta.previousElementSibling, pv = ta.nextElementSibling;
+    const paint = () => { pv.innerHTML = ta.value ? ntRich(ta.value) : '<span style="color:#b0b8c1">미리보기 — 기사 앱에 이렇게 보입니다</span>'; };
+    bar.addEventListener('mousedown', (e) => { if (e.target.closest('[data-ntc]')) e.preventDefault(); }); // 고른 글자가 풀리지 않게
+    bar.addEventListener('click', (e) => {
+      const k = (e.target.closest('[data-ntc]') || {}).dataset; if (!k || !k.ntc) return;
+      if (k.ntc === 'x') { const a = ta.selectionStart, b = ta.selectionEnd; if (a === b) return; const mid = ntPlain(ta.value.slice(a, b)); ta.value = ta.value.slice(0, a) + mid + ta.value.slice(b); ta.focus(); ta.selectionStart = a; ta.selectionEnd = a + mid.length; return paint(); }
+      if (k.ntc === 'b') return ntWrap(ta, '**', '**');
+      ntWrap(ta, '[' + k.ntc + ']', '[/' + k.ntc + ']');
+    });
+    ta.addEventListener('input', paint); ta._ntPaint = paint; paint();
+  }
   function openNotices(id) {
     ntOpen.clear(); if (id) ntOpen.add(id);
     $('#ntAdmGo').classList.toggle('hidden', !isStaffUser());
@@ -2601,7 +2637,7 @@
   $('#slPopNo').addEventListener('click', slipPopDone);
   $('#slPopGo').addEventListener('click', () => { slipPopDone(); openSettle(); });
   function showNtPop(n) {
-    $('#ntPopTitle').textContent = n.title; $('#ntPopBody').textContent = n.body || '';
+    $('#ntPopTitle').textContent = n.title; $('#ntPopBody').innerHTML = ntRich(n.body || '');
     if (n.photos) { $('#ntPopBody').insertAdjacentHTML('beforeend', ntPhHtml(n)); ntPhLoad(n); }
     $('#ntPop').dataset.k = ntKey(n); $('#ntPop').classList.add('center'); $('#ntPop').classList.remove('hidden');
   }
@@ -4071,7 +4107,7 @@
   function naEdit(n) {
     NA.edit = n || null; NA.ph = []; NA.camp = new Set(n ? String(n.target || '').split(/\s*,\s*/).filter(Boolean) : []); NA.st = n && n.status === '숨김' ? '숨김' : '게시';
     $('#neH').textContent = n ? '공지 수정' : '새 공지';
-    $('#neTitle').value = n ? n.title : ''; $('#neBody').value = n ? n.body || '' : ''; $('#neImp').checked = !!(n && n.important);
+    $('#neTitle').value = n ? n.title : ''; $('#neBody').value = n ? n.body || '' : ''; ntColorize($('#neBody')); $('#neBody')._ntPaint(); $('#neImp').checked = !!(n && n.important);
     $('#neStart').value = n ? n.start || '' : ''; $('#neEnd').value = n ? n.end || '' : '';
     $('#neDel').classList.toggle('hidden', !n);
     if (n) for (let i = 0; i < (n.photos || 0); i++) NA.ph.push({ keep: i, t: '' });
