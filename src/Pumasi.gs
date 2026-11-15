@@ -1431,7 +1431,47 @@ function adm_pmList(token, f) {
       if (q && (j.poster + j.accepted + j.area + j.camp + j.route).replace(/\s+/g, '').toLowerCase().indexOf(q) < 0) return false;
       return true;
     }).sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time); });
-    return { ok: true, today: today, from: from, to: to, jobs: rows, count: count, total: all.length, postOn: pmPostOn_(), offerOn: pmOfferOn_() };
+    let avail = [];
+    try { avail = pmAvailAdmin_(d, today, q); } catch (e) { softFail_('품앗이 일할 기사 목록', e); }
+    return { ok: true, today: today, from: from, to: to, jobs: rows, count: count, total: all.length, avail: avail, postOn: pmPostOn_(), offerOn: pmOfferOn_() };
+  });
+}
+/** 관리자 '일할 기사' 탭: 기사가 올린 근무 가능일 (기사앱 '일할 기사'와 같은 기준 — 지난 날 · 이미 배차 확정된 날 · 앱 정지 기사는 뺌). 날짜 1개 = 1줄 */
+function pmAvailAdmin_(d, today, q) {
+  const booked = {}, offered = {};
+  d.jobs.forEach(function (j) { if (j.status === PST.DONE && j.acceptedId) booked[j.acceptedId + '|' + j.date] = 1; });
+  d.apps.forEach(function (a) { if (a.status === PAST.OFFER) offered[a.driverId + '|' + a.date] = (offered[a.driverId + '|' + a.date] || 0) + 1; });
+  const live = d.avail.filter(function (a) { return a.id && !pmPast_(a, today) && !booked[a.driverId + '|' + a.date]; });
+  if (!live.length) return [];
+  const dm = {};
+  readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) dm[o.id] = o; });
+  return live.map(function (a) {
+    const o = dm[a.driverId] || {};
+    if (o.status && o.status !== ST.ACTIVE) return null;
+    const inf = pmInfoOf_(a);
+    return Object.assign(inf, { id: a.id, driverId: a.driverId, name: o.name || a.name, camp: o.schCamp || '', wantCamp: inf.camp, type: o.driverType || '', date: a.date, kind: PM_AVAIL_KINDS.indexOf(a.kind) >= 0 ? a.kind : '무관',
+      memo: str_(a.memo), offered: offered[a.driverId + '|' + a.date] || 0, createdAt: str_(a.createdAt) });
+  }).filter(function (x) {
+    return x && (!q || (x.name + x.camp + x.wantCamp + x.area + x.memo).replace(/\s+/g, '').toLowerCase().indexOf(q) >= 0);
+  }).sort(function (a, b) { return a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'ko'); });
+}
+/** 관리자: 근무 가능일 삭제 (가능일ID 목록). 기사앱 '일할 기사'·'품앗이 주세요' 달력에서도 빠진다 */
+function adm_pmAvailDel(token, ids) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    if (!Array.isArray(ids) || !ids.length || ids.length > 500) fail_('삭제할 근무 가능일을 골라 주세요.');
+    const want = {};
+    ids.forEach(function (id) { want[str_(id)] = 1; });
+    const lock = scriptLock_();
+    lock.waitLock(20000);
+    let rows = [];
+    try {
+      rows = readAll_(SH.PAVAIL).filter(function (x) { return want[str_(x.id)]; });
+      delRows_(sheet_(SH.PAVAIL), rows.map(function (x) { return x._row; }));
+      pmTouch_();
+    } finally { lock.releaseLock(); }
+    logAdmin_(a, '품앗이 근무 가능일 삭제', rows.length + '건', rows.map(function (x) { return pmDate_(x.date) + ' ' + x.name; }).slice(0, 20).join(', '));
+    return { ok: true, deleted: rows.length };
   });
 }
 /** 관리자 상세: 모든 칸 + 지원자(연락처·자격증) + 첨부 링크 */
