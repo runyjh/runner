@@ -1009,6 +1009,7 @@
   .pin.date { width: 128px; text-align: left; }
   .pin.dirty { border-color: var(--warn); background: #fffdf7; }
   .rt-table td.vol .vol-m { display: none; } .tk-ol td.vol .vol-m { display: inline; white-space: nowrap; } .tk-ol td.vol .vol-p, .tk-ol td.volq { display: none; }
+  .xp-table td.wd-hi { color: #1d4ed8; font-weight: 800; } .xp-table td.wd-lo { color: #98a2b3; }
   .vol-note { margin: 8px 0 0; color: var(--sub); font-size: 12px; line-height: 1.6; word-break: keep-all; } .vol-note b { color: var(--text, #191f28); }
   .rt-table td.vol .vsum { margin-left: 4px; padding: 1px 6px; border-radius: 10px; background: #eef4ff; color: #1d4ed8; font-size: 12px; }
   .xp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -7101,7 +7102,7 @@
     if (!RVOL.pm) return '물량: 아직 올라온 쿠팡 정산서가 없습니다.';
     const P = RVOL.pmPeriod || {}, md = (d) => String(d || '').slice(5).replace('-', '/');
     return '📦 물량은 <b>전월 쿠팡 정산서(' + (+RVOL.pm.slice(5)) + '월 정산 · ' + md(P.from) + '~' + md(P.to) + ')</b> 기준입니다. ' +
-      '<b>1일 평균</b> = 그 기간 배송건수 ÷ 실제 배송한 날 수 · <b>전월 총물량</b> = 그 기간 배송건수 합계 (반품 포함). 묶인 노선(예: 205CD)은 글자별 값과 합계를 같이 보여 줍니다. 새 달 정산서를 올리면 그 달 기준으로 바뀝니다.';
+      '<b>1일 평균</b> = 그 기간 배송건수 ÷ 실제 배송한 날 수 · <b>전월 총물량</b> = 그 기간 배송건수 합계 (반품 포함). 묶인 노선(예: 205CD)은 글자별 값과 합계를 같이 보여 줍니다. 새 달 정산서를 올리면 그 달 기준으로 바뀝니다.' + (XP.wd ? ' <b>요일별</b> = 그 요일에 배송한 날들의 평균 (가장 많은 요일 <b style="color:#1d4ed8">파랑</b> · 가장 적은 요일 회색).' : '');
   }
   function volCell(r) {
     if (!RVOL) return '<td class="sub">…</td><td class="sub">…</td>';
@@ -7121,7 +7122,8 @@
 
   // ── 전체 단가표: 모든 캠프 · 정산코드(숫자+글자)별 단가를 한 표로 ──
   let xpOn = false, adirty = {};
-  const XP = { camp: '', level: '', st: '', empty: '', q: '', sort: { k: '', d: 0 } };
+  const XP = { camp: '', level: '', st: '', empty: '', q: '', sort: { k: '', d: 0 }, wd: false };
+  const WDS = [[1, '월'], [2, '화'], [3, '수'], [4, '목'], [5, '금'], [6, '토'], [0, '일']]; // 요일별 물량 열 순서 (월 → 일)
   const xpKey = (campId, key) => campId + '§' + key;
   function xpRows() {
     const out = [];
@@ -7132,7 +7134,7 @@
         const use = rs.filter((r) => r.g1 === n.num && r[gk] === n.value);
         const on = use.filter((r) => r.status !== '정지').length;
         const v = RVOL && RVOL.vol ? RVOL.vol[cs + '|' + code] : null;
-        out.push({ ak: xpKey(c.id, n.key), c, n, code, routes: use.length, on, st: !use.length ? '노선 없음' : on ? '사용' : '정지', vol: v ? Number(v.avg) || 0 : null, volq: v ? Number(v.qty) || 0 : null, volv: v });
+        out.push({ ak: xpKey(c.id, n.key), c, n, code, routes: use.length, on, st: !use.length ? '노선 없음' : on ? '사용' : '정지', vol: v ? Number(v.avg) || 0 : null, volq: v ? Number(v.qty) || 0 : null, volv: v, wd: v && v.wd ? v.wd : null });
       });
     });
     return out;
@@ -7167,9 +7169,10 @@
         '<select class="inp" id="xpSt" aria-label="사용여부">' + opt('', '사용여부 전체', XP.st) + ['사용', '정지', '노선 없음'].map((k) => opt(k, k, XP.st)).join('') + '</select>' +
         '<select class="inp" id="xpEmpty" aria-label="빈 단가 찾기">' + opt('', '빈 단가 찾기', XP.empty) + PKEYS.map((k) => opt(k, PLABEL[k] + ' 빈 것', XP.empty)).join('') + '</select>' +
         '<input class="inp" id="xpQ" placeholder="캠프·정산코드 검색" value="' + esc(XP.q) + '" autocomplete="off" style="width:150px">' +
+        '<button class="btn sm' + (XP.wd ? '' : ' ghost') + '" id="xpWd" title="정산코드마다 전월 정산서의 요일별 하루 평균 배송수량">' + (XP.wd ? '💰 단가 보기' : '📅 요일별 물량') + '</button>' +
         '<div class="grow"><span id="xpMsg"></span><button class="btn sm ghost" id="xpCopy">엑셀로 복사</button><button class="btn sm ghost" id="xpReset" disabled>되돌리기</button><button class="btn sm" id="xpSave" disabled>단가 저장</button></div>' +
       '</div>' +
-      '<div class="ptools xp-bulk"><b>일괄 설정</b>' +
+      '<div class="ptools xp-bulk' + (XP.wd ? ' hidden' : '') + '"><b>일괄 설정</b>' +
         '<select class="inp" id="xpBk" aria-label="일괄 설정할 단가">' + PKEYS.map((k) => opt(k, PLABEL[k], XP.bk || 'p2')).join('') + '</select>' +
         '<input class="inp" id="xpBv" inputmode="numeric" placeholder="금액 (비우면 지움)" autocomplete="off" style="width:140px">' +
         '<label class="check"><input type="checkbox" id="xpBe"' + (XP.be ? ' checked' : '') + '> 빈 칸만</label>' +
@@ -7183,7 +7186,7 @@
   }
   function xpCols() {
     return [{ k: 'camp', t: '캠프' }, { k: 'code', t: '정산코드' }, { k: 'level', t: '구분' }]
-      .concat(PKEYS.map((k) => ({ k, t: PLABEL[k] })))
+      .concat(XP.wd ? WDS.map(([i, t]) => ({ k: 'w' + i, t })) : PKEYS.map((k) => ({ k, t: PLABEL[k] })))
       .concat([{ k: 'vol', t: '1일 평균물량' }, { k: 'volq', t: '전월 총물량' }, { k: 'st', t: '사용여부' }]);
   }
   function xpList() {
@@ -7192,10 +7195,18 @@
       (!XP.empty || !xpCur(r, XP.empty)) && (!q || r.code.includes(q) || normCode(r.c.name).includes(q)));
     const { k, d } = XP.sort;
     if (k && d) {
-      const val = (r) => k === 'camp' ? r.c.name : k === 'code' ? r.code : k === 'level' ? r.n.level : k === 'vol' || k === 'volq' ? (r[k] == null ? -1 : r[k]) : k === 'st' ? r.st : (xpCur(r, k) === '' ? -1 : Number(xpCur(r, k)));
+      const val = (r) => k === 'camp' ? r.c.name : k === 'code' ? r.code : k === 'level' ? r.n.level : k === 'vol' || k === 'volq' ? (r[k] == null ? -1 : r[k]) : /^w\d$/.test(k) ? (r.wd && r.wd[+k[1]] != null ? r.wd[+k[1]] : -1) : k === 'st' ? r.st : (xpCur(r, k) === '' ? -1 : Number(xpCur(r, k)));
       list = list.slice().sort((a, b) => { const x = val(a), y = val(b); return d * (typeof x === 'number' && typeof y === 'number' ? x - y : koSort(String(x), String(y))); });
     }
     return list;
+  }
+  /** 요일별 하루 평균 칸 7개 (월 → 일) · 가장 많은 요일 파랑 굵게 · 가장 적은 요일 회색 */
+  function wdCells(r) {
+    if (!RVOL) return WDS.map(() => '<td class="num sub">…</td>').join('');
+    const w = r.wd || [], n = (r.volv && r.volv.wn) || [], vals = w.filter((x) => x != null);
+    const hi = vals.length > 1 ? Math.max(...vals) : null, lo = vals.length > 1 ? Math.min(...vals) : null;
+    return WDS.map(([i, t]) => w[i] == null ? '<td class="num sub">-</td>' :
+      '<td class="num wd' + (w[i] === hi ? ' wd-hi' : w[i] === lo ? ' wd-lo' : '') + '" title="' + esc(r.code + ' ' + t + '요일 · ' + (n[i] || 0) + '일 배송 평균') + '">' + wnV(w[i]) + '</td>').join('');
   }
   function xpRenderRows() {
     const all = xpRows(), list = xpList();
@@ -7207,7 +7218,7 @@
       };
       const vt = r.volv ? r.code + ': 하루 ' + wnV(r.volv.avg) + '건 · ' + r.volv.days + '일 배송 · 총 ' + wnV(r.volv.qty) + '건 (' + (+String(RVOL.pm || '').slice(5)) + '월 정산서)' : '';
       return '<tr data-ak="' + esc(r.ak) + '"' + (r.st !== '사용' ? ' class="off"' : '') + '><td>' + esc(r.c.name) + '</td><td><b class="code">' + esc(r.code) + '</b></td><td>구분' + r.n.level + '</td>' +
-        PKEYS.map(cell).join('') +
+        (XP.wd ? wdCells(r) : PKEYS.map(cell).join('')) +
         '<td class="num"' + (vt ? ' title="' + esc(vt) + '"' : '') + '>' + (!RVOL ? '…' : r.vol == null ? '-' : '<b>' + wnV(r.vol) + '</b>') + '</td>' +
         '<td class="num"' + (vt ? ' title="' + esc(vt) + '"' : '') + '>' + (!RVOL ? '…' : r.volq == null ? '-' : '<b>' + wnV(r.volq) + '</b>') + '</td>' +
         '<td>' + (r.st === '노선 없음' ? '<span class="tag">노선 없음</span>' : '<span class="badge b-' + esc(r.st) + '">' + esc(r.st) + '</span> <small class="sub">' + r.on + '/' + r.routes + '</small>') + '</td></tr>';
@@ -7280,9 +7291,10 @@
       xpRenderRows();
       return toast(list.length + '줄의 ' + PLABEL[k] + '를 ' + (raw ? won(raw) + '원으로' : '빈 칸으로') + ' 바꿨습니다. 단가 저장을 눌러야 저장됩니다.');
     }
+    if (e.target.id === 'xpWd') { XP.wd = !XP.wd; if (/^w\d$/.test(XP.sort.k)) XP.sort = { k: '', d: 0 }; return xpRender(); }
     if (e.target.id === 'xpCopy') {
       const cols = xpCols();
-      const lines = [cols.map((c) => c.t).join('\t')].concat(xpList().map((r) => [r.c.name, r.code, '구분' + r.n.level].concat(PKEYS.map((k) => xpCur(r, k))).concat([r.vol == null ? '' : Math.round(r.vol), r.volq == null ? '' : Math.round(r.volq), r.st]).join('\t')));
+      const lines = [cols.map((c) => c.t).join('\t')].concat(xpList().map((r) => [r.c.name, r.code, '구분' + r.n.level].concat(XP.wd ? WDS.map(([i]) => (r.wd && r.wd[i] != null ? r.wd[i] : '')) : PKEYS.map((k) => xpCur(r, k))).concat([r.vol == null ? '' : Math.round(r.vol), r.volq == null ? '' : Math.round(r.volq), r.st]).join('\t')));
       const txt = lines.join('\n');
       (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast((lines.length - 1) + '줄을 복사했습니다. 엑셀·구글시트에 붙여 넣으세요.'))
         .catch(() => { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('복사했습니다.'); });
@@ -16328,6 +16340,7 @@
       { v: 'view-pumasi', key: ['배차일'], mid: ['센터 · 라우트'], num: ['확정 기사'], st: ['상태'], native: 1, nw: 64 },
       { v: 'view-issue', need: '결과', key: ['날짜'], mid: ['기사'], st: ['결과'] },
       { v: 'view-bib', key: ['이름'], mid: ['신청일'], st: ['진행상태'] },
+      { v: 'view-route', need: '월', grp: '캠프', key: ['정산코드'], num: ['월', '화', '수', '목', '금', '토', '일'], hd: 1, nw: 27, short: { '정산코드': '코드' } },
       { v: 'view-route', need: '정산코드', grp: '캠프', key: ['정산코드'], mid: ['1일 평균물량', '전월 총물량'], num: ['고정단가', '백업단가', '품앗이단가'], hd: 1, short: { '1일 평균물량': '하루 · 총물량', '정산코드': '코드', '고정단가': '고정', '백업단가': '백업', '품앗이단가': '품앗이' } },
       { v: 'view-route', need: '노선코드', key: ['노선코드'], mid: ['메모'], num: ['1일 평균물량'], st: ['수행률'], hd: 1, nw: 118, short: { '노선코드': '노선', '1일 평균물량': '하루 · 총물량', '수행률': '수행률' } },
       { v: 'view-perf', need: '최신 등급', grp: '캠프', key: ['라우트'], mid: ['추세 (8주)'], st: ['최신 등급'] },
