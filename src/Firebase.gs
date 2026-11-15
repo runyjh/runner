@@ -165,7 +165,7 @@ function fsDirty_(area, extra) {
     }
     if (d.areas[key] || (!area && d.areas.any)) return; // 이번 실행에서 이미 알렸음 (영역 알림이 있었으면 일반 알림은 생략)
     d.areas[key] = 1; d.areas.any = 1;
-    fsPut_([{ path: 'pub/meta', data: { dirtyAt: now, nbAt: ar.nb || 0, schAt: ar.sch || 0, schBy: ar.schBy || '', pmAt: ar.pm || 0, pmBy: ar.pmBy || '', tmAt: ar.tm || 0 } }], now);
+    fsPut_([{ path: 'pub/meta', data: { dirtyAt: now, nbAt: ar.nb || 0, schAt: ar.sch || 0, schBy: ar.schBy || '', pmAt: ar.pm || 0, pmBy: ar.pmBy || '' } }], now);
   } catch (e) { softFail_('fsDirty_', e); }
 }
 /** 실행 안에서만 쓰는 임시 세션으로 기사 앱 함수 부르기 (사본 만들기용) */
@@ -282,6 +282,6 @@ function adm_live(token) {
     requireAdmin_(token);
     let ar = {};
     try { ar = JSON.parse(PropertiesService.getScriptProperties().getProperty('FS_AREAS') || '{}') || {}; } catch (e) { ar = {}; }
-    return { ok: true, dirtyAt: +(cache_().get('fs:dirty') || 0), schAt: ar.sch || 0, schBy: ar.schBy || '', pmAt: ar.pm || 0, pmBy: ar.pmBy || '', nbAt: ar.nb || 0, tmAt: ar.tm || 0 };
+    return { ok: true, dirtyAt: +(cache_().get('fs:dirty') || 0), schAt: ar.sch || 0, schBy: ar.schBy || '', pmAt: ar.pm || 0, pmBy: ar.pmBy || '', nbAt: ar.nb || 0 };
   });
 }
