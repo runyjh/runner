@@ -119,6 +119,8 @@
   /* 대시보드 오른쪽: 업무스케줄 + 팀즈 소식 */
   .ds-side { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .ds-side .ds-memo-card { position: static; }
+  /* 휴대폰 홈: 러너 업무스케줄을 맨 위에 (검색 · 팀즈 소식은 그 아래) */
+  html.m .ds-wrap { display: flex; flex-direction: column; align-items: stretch; } html.m .ds-side { display: contents; } html.m .ds-memo-card { order: -1; }
   .tm-hb { font-size: 12.5px; color: var(--sub); line-height: 1.5; } .tm-hb .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 5px; vertical-align: 1px; }
   .tm-hb.bad { color: var(--danger); font-weight: 600; } .tm-hb.bad .dot { background: var(--danger); } .tm-hb.none .dot { background: var(--faint); }
   .tm-list { margin: 0; padding: 0; list-style: none; } #tmCardList .tm-list { max-height: 48vh; overflow: auto; }
@@ -7139,7 +7141,7 @@
   // ── 전체 단가표: 모든 캠프 · 라우트 코드(숫자+글자)별 단가를 한 표로 ──
   let xpOn = false, adirty = {};
   const XP = { camp: '', level: '', st: '', empty: '', q: '', sort: { k: '', d: 0 }, wd: false };
-  const WDS = [[1, '월'], [2, '화'], [3, '수'], [4, '목'], [5, '금'], [6, '토'], [0, '일']]; // 요일별 물량 열 순서 (월 → 일)
+  const WDS = [[0, '일'], [1, '월'], [2, '화'], [3, '수'], [4, '목'], [5, '금'], [6, '토']]; // 요일별 물량 열 순서 (쿠팡 기준: 일 → 토)
   const xpKey = (campId, key) => campId + '§' + key;
   function xpRows() {
     const out = [];
@@ -7219,7 +7221,7 @@
     }
     return list;
   }
-  /** 요일별 하루 평균 칸 7개 (월 → 일) · 가장 많은 요일 파랑 굵게 · 가장 적은 요일 회색 */
+  /** 요일별 하루 평균 칸 7개 (일 → 토) · 가장 많은 요일 파랑 굵게 · 가장 적은 요일 회색 */
   function wdCells(r) {
     if (!RVOL) return WDS.map(() => '<td class="num sub">…</td>').join('');
     const w = r.wd || [], n = (r.volv && r.volv.wn) || [], vals = w.filter((x) => x != null);
@@ -16365,7 +16367,7 @@
       { v: 'view-pumasi', key: ['배차일'], mid: ['센터 · 라우트'], num: ['확정 기사'], st: ['상태'], native: 1, nw: 64 },
       { v: 'view-issue', need: '결과', key: ['날짜'], mid: ['기사'], st: ['결과'] },
       { v: 'view-bib', key: ['이름'], mid: ['신청일'], st: ['진행상태'] },
-      { v: 'view-route', need: '월', grp: '캠프', key: ['라우트 코드'], num: ['월', '화', '수', '목', '금', '토', '일'], hd: 1, nw: 27, short: { '라우트 코드': '코드' } },
+      { v: 'view-route', need: '월', grp: '캠프', key: ['라우트 코드'], num: ['일', '월', '화', '수', '목', '금', '토'], hd: 1, nw: 27, short: { '라우트 코드': '코드' } },
       { v: 'view-route', need: '라우트 코드', grp: '캠프', key: ['라우트 코드'], mid: ['1일 평균물량', '전월 총물량'], num: ['고정단가', '백업단가', '품앗이단가'], hd: 1, short: { '1일 평균물량': '하루 · 총물량', '라우트 코드': '코드', '고정단가': '고정', '백업단가': '백업', '품앗이단가': '품앗이' } },
       { v: 'view-route', need: '노선코드', key: ['노선코드'], mid: ['메모'], num: ['1일 평균물량'], st: ['수행률'], hd: 1, nw: 118, short: { '노선코드': '노선', '1일 평균물량': '하루 · 총물량', '수행률': '수행률' } },
       { v: 'view-perf', need: '최신 등급', grp: '캠프', key: ['라우트'], mid: ['추세 (8주)'], st: ['최신 등급'] },
