@@ -115,7 +115,7 @@ const D_NOTES = {
   stlMode: '정산 방식: 빈칸(기본) / 원청단가 / 용차내역',
   insEx: '산재·고용보험 공제 제외면 Y',
   fbCut: '프레시백 차감: 13% 같은 비율 또는 금액 (비우면 차감 없음)',
-  workStatus: '재직(빈칸) / 휴직 / 퇴사. 기사 앱 사용(상태 칸)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐',
+  workStatus: '재직(빈칸) / 휴직 / 퇴사. 기사 앱 사용(상태 칸)과 따로. 퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차 목록에서 빠짐 · 기사앱은 다음 달 정산 지급일 + 7일에 자동 정지',
   leaveDate: '마지막 근무일 (yyyy-mm-dd). 근무상태가 퇴사일 때만 씀',
   backupArea: '백업으로 들어갈 수 있는 곳. 전지역 또는 캠프 이름(예: 강서1,수원1). 기사스케줄 백업 추천에 사용',
   driverType: '고정 / 백업 / 품앗이 / 외부용차 (노선관리 고정단가 / 백업단가 / 품앗이단가 / 외부용차단가)',
@@ -1778,11 +1778,55 @@ function docsOf_(o) {
   Object.keys(DOCS).forEach(function (k) { out[k] = !!o[DOCS[k].col]; });
   return out;
 }
+// ───────────────────────── 퇴사자 기사앱 자동 정지 ─────────────────────────
+//  퇴사해도 마지막 정산서(퇴사월)와 다음 달 정산서(보류금 반환)는 기사앱에서 봐야 하므로 바로 막지 않는다.
+//  정지일 = 퇴사월 다음 달 정산 지급일(보통 20일) + 7일. 새벽 작업이 그날부터 '앱 사용'을 정지로 바꾼다 (한 번만 — 관리자가 다시 승인하면 그대로 둠)
+const LEAVE_STOP = { DAYS: 7, PROP: 'LEAVE_STOPPED' };
+let _leaveStopMemo = null;
+/** 퇴사자의 기사앱 자동 정지일 (yyyy-mm-dd). 퇴사가 아니거나 퇴사일이 없으면 '' */
+function leaveStopAt_(o) {
+  if (!o || str_(o.workStatus) !== '퇴사') return '';
+  const d = parseYmd_(o.leaveDate);
+  if (!d) return '';
+  try {
+    const m = stlMonthOfDate_(ymd_(d));
+    if (!m) return '';
+    if (!_leaveStopMemo) _leaveStopMemo = { cfg: stlCfg_(), by: {} };
+    if (!_leaveStopMemo.by[m]) _leaveStopMemo.by[m] = ymd_(addDays_(parseYmd_(stlDates_(stlAddMonth_(m, 1), _leaveStopMemo.cfg).pay), LEAVE_STOP.DAYS));
+    return _leaveStopMemo.by[m];
+  } catch (e) { return ''; }
+}
+/** 새벽 작업: 정지일이 된 퇴사자의 기사앱 사용을 정지로. 돌려준 값 = 정지한 기사 이름들 */
+function leaveAutoStop_() {
+  const today = todayText_(), sp = PropertiesService.getScriptProperties();
+  let done = {};
+  try { done = JSON.parse(sp.getProperty(LEAVE_STOP.PROP) || '{}') || {}; } catch (e) { done = {}; }
+  const due = readAll_(SH.DRIVERS).filter(function (o) {
+    if (!o.id || o.status !== ST.ACTIVE) return false;
+    const at = leaveStopAt_(o);
+    return !!at && today >= at && done[o.id] !== str_(o.leaveDate); // 같은 퇴사일로 이미 한 번 정지했으면(관리자가 다시 승인) 건드리지 않음
+  });
+  if (!due.length) return [];
+  const names = [], lock = scriptLock_();
+  lock.waitLock(30000);
+  try {
+    due.forEach(function (o) {
+      try {
+        updateDriverCore_({ name: '자동', loginId: '퇴사자 자동 정지' }, o.id, { status: ST.STOPPED });
+        done[o.id] = str_(o.leaveDate); names.push(o.name);
+      } catch (e) { softFail_('퇴사자 자동 정지 실패 (' + o.name + ')', e); }
+    });
+    const live = {}; readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) live[o.id] = 1; });
+    Object.keys(done).forEach(function (k) { if (!live[k]) delete done[k]; });
+    sp.setProperty(LEAVE_STOP.PROP, JSON.stringify(done));
+  } finally { lock.releaseLock(); }
+  return names;
+}
 /** 목록용 요약 */
 function listRow_(o) {
   return {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
-    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', subId1: o.subId1 || '', subId2: o.subId2 || '', subType1: o.subType1 || '', subType2: o.subType2 || '', stlMode: o.stlMode || '', insEx: o.insEx || '', fbCut: o.fbCut === undefined ? '' : String(o.fbCut), schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
+    driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', stopAt: o.status === ST.ACTIVE ? leaveStopAt_(o) : '', subId1: o.subId1 || '', subId2: o.subId2 || '', subType1: o.subType1 || '', subType2: o.subType2 || '', stlMode: o.stlMode || '', insEx: o.insEx || '', fbCut: o.fbCut === undefined ? '' : String(o.fbCut), schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
     docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
   };
@@ -3744,6 +3788,7 @@ function cleanupSessions() {
   } finally {
     lock.releaseLock();
     try { pmAlertCleanup_(); } catch (e) { softFail_('품앗이 알림 정리 실패', e); } // 60일 지난 품앗이 알림 정리
+    try { leaveAutoStop_(); } catch (e) { softFail_('퇴사자 자동 정지 실패', e); } // 퇴사월 다음 달 정산 지급일 + 7일이 된 퇴사자 → 기사앱 정지
     try { rcApplyDue_(); } catch (e) { softFail_('노선 변경 예약 적용 실패', e); } // 적용일이 된 노선 변경
     try { dataCheck_(); } catch (e) { console.error('자료 점검 실패: ' + (e && e.message)); errLog_('서버 오류', 'dataCheck_', String(e && e.message || e)); } // 자료 점검 (읽기만)
     try { if (typeof stlLegacyRouteFixAll_ === 'function') stlLegacyRouteFixAll_(); } catch (e) { softFail_('그날 노선 되살리기 실패', e); } // 기존 정산 이식 달 (한 번씩만)

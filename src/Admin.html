@@ -1730,6 +1730,7 @@
   html.m table:not(.sg):not(.kv2):not(.info):not(.f1):not(.t):not(.tk-card) > tbody > tr > th,
   html.m table:not(.sg):not(.kv2):not(.info):not(.f1):not(.t):not(.tk-card) > tfoot > tr > td,
   html.m table:not(.sg):not(.kv2):not(.info):not(.f1):not(.t):not(.tk-card) > tfoot > tr > th { text-align: center !important; }
+  .lv-stop { margin-top: 2px; font-size: 11px; font-weight: 700; color: #b45309; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -3448,7 +3449,7 @@
         '<td class="sub">' + esc(r.loginId) + '</td><td>' + (r.phone ? '<a class="dtel" href="tel:' + esc(String(r.phone).replace(/[^0-9+]/g, '')) + '" title="전화 걸기">' + esc(r.phone) + '</a>' : '') + '</td>' +
         '<td><span class="badge b-' + esc(r.status) + '">' + esc(r.status || '-') + '</span></td>' +
         '<td>' + (r.workStatus ? '<span class="badge ws-' + esc(r.workStatus) + '">' + esc(r.workStatus) + '</span>' : '<span class="sub">재직</span>') + '</td>' +
-        '<td class="sub">' + esc(r.leaveDate || '') + '</td>' +
+        '<td class="sub">' + esc(r.leaveDate || '') + (r.stopAt ? '<div class="lv-stop" title="마지막 정산서(보류금 반환)까지 볼 수 있게 두었다가 이날 기사앱을 자동으로 정지합니다">앱 정지 ' + Number(r.stopAt.slice(5, 7)) + '/' + Number(r.stopAt.slice(8, 10)) + '</div>' : '') + '</td>' +
         '<td class="sub">' + esc([r.carNo, r.carName, r.carYear].filter(Boolean).join(' · ')) + '</td>' +
         '<td class="dots">' + dots + '</td><td class="sub">' + esc(String(r.createdAt || '').slice(0, 10)) + '</td><td>' + tags + '</td></tr>';
     }).join('');
@@ -3892,7 +3893,8 @@
     const ws = d.workStatus || '재직';
     return '<div class="sec"><h4>근무상태 <small class="sub" style="font-weight:500">— 실제로 일하는지 (퇴사면 퇴사일 다음 날부터 스케줄·쿠팡 입차에서 빠짐)</small></h4><div class="status-row" style="margin-bottom:8px">' +
       ['재직', '휴직', '퇴사'].map((w) => '<button type="button" class="st' + (w === ws ? ' on' : '') + '" data-ws="' + w + '">' + w + '</button>').join('') + '</div>' +
-      '<div class="field" id="wsLeave" style="margin:0;max-width:240px' + (ws === '퇴사' ? '' : ';display:none') + '"><label class="lb">퇴사일 (마지막 근무일)</label><input class="inp" type="date" data-k="leaveDate" value="' + esc(d.leaveDate || '') + '"></div></div>';
+      '<div class="field" id="wsLeave" style="margin:0;max-width:240px' + (ws === '퇴사' ? '' : ';display:none') + '"><label class="lb">퇴사일 (마지막 근무일)</label><input class="inp" type="date" data-k="leaveDate" value="' + esc(d.leaveDate || '') + '"></div>' +
+      (ws === '퇴사' ? '<div class="sub" style="margin-top:6px">' + (d.stopAt ? '기사앱 자동 정지 <b>' + esc(d.stopAt) + '</b> — 다음 달 정산(보류금 반환) 지급일 + 7일. 그때까지 정산서를 볼 수 있습니다.' : d.status === '승인' ? '퇴사일을 저장하면 기사앱 자동 정지일이 정해집니다 (다음 달 정산 지급일 + 7일).' : '') + '</div>' : '') + '</div>';
   }
   /** 단가코드 버튼 + 기사코드 + 직함 (상세·등록 공용) */
   /** 단가코드 (고정·백업·품앗이·외부용차) + 서브아이디 1·2 (상세·등록 공용). 기사코드는 자동 (화면에 안 보임) */
