@@ -879,17 +879,20 @@
   .co-row label { font-size: 12px; color: var(--sub); }
 
   /* 노선관리 */
-  .rt-wrap { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; align-items: start; }
-  .camp-side { background: #fff; border-radius: var(--radius); padding: 12px; position: sticky; top: 16px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; gap: 8px; }
-  .camp-list { overflow: auto; display: flex; flex-direction: column; gap: 2px; }
-  .camp-item { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; border: 1px solid transparent; background: none; border-radius: 8px; padding: 9px 10px; }
-  .camp-item:hover { background: #f7f8fa; }
-  .camp-item.on { background: var(--brand-weak); border-color: #c9dbf8; }
-  .camp-item b { font-size: 14px; }
-  .camp-item small { color: var(--sub); font-size: 12px; }
-  .camp-item small em { font-style: normal; color: var(--brand); font-weight: 700; }
-  .camp-item span { color: var(--faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .camp-item.orphan b { color: var(--danger); }
+  .rt-wrap { display: block; }
+  /* 노선관리 맨 위 탭: 한 덩어리 버튼 (휴대폰 · PC 같은 모양) */
+  .rtv-seg { display: inline-grid; grid-template-columns: repeat(4, minmax(120px, 150px)); background: #e9edf2; border-radius: 12px; padding: 4px; gap: 2px; margin: 0 0 12px; }
+  .rtv-seg button { display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: none; padding: 9px 4px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--sub); cursor: pointer; white-space: nowrap; }
+  .rtv-seg button i { font-style: normal; font-size: 16px; line-height: 1; } .rtv-seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  html.m .rtv-seg { display: grid; grid-template-columns: repeat(4, 1fr); } html.m .rtv-seg button { flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 2px; }
+  .camp-side { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px; } .camp-side #campQ { flex: none; width: 150px; height: 34px; border-radius: 999px; font-size: 13px; }
+  .camp-list { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .camp-item { display: inline-flex; align-items: center; gap: 6px; border: 0; background: #fff; border-radius: 999px; padding: 7px 8px 7px 13px; font-size: 13px; font-weight: 600; color: #4e5968; white-space: nowrap; cursor: pointer; }
+  .camp-item:hover { background: #f1f4f8; }
+  .camp-item.on { background: var(--brand); color: #fff; box-shadow: 0 2px 6px rgba(29,99,220,.3); }
+  .camp-item b { font-size: 13px; font-weight: 700; } .camp-item em { font-style: normal; font-size: 11px; font-weight: 800; background: #f1f3f6; color: #6b7684; border-radius: 999px; min-width: 20px; text-align: center; padding: 2px 6px; } .camp-item.on em { background: rgba(255,255,255,.22); color: #fff; } .camp-item em.hit { background: #fff1e0; color: #b45309; }
+  .camp-item.orphan:not(.on) b { color: var(--danger); }
+  html.m .camp-side { flex-direction: column; } html.m .camp-side #campQ { width: 100%; }
   .ch-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
   .ch-top h3 { margin: 0 auto 0 0; font-size: 18px; }
   .kv2 { display: grid; grid-template-columns: minmax(48px, max-content) 1fr; gap: 6px 12px; font-size: 13px; }
@@ -1042,8 +1045,6 @@
   .tag.gray { background: var(--gray-weak); color: var(--sub); }
   table.mini td.num, table.mini th.num { text-align: right; }
   @media (max-width: 900px) {
-    .rt-wrap { grid-template-columns: minmax(0, 1fr); }
-    .camp-side { position: static; max-height: 300px; }
     .rfilters input.inp { width: 100%; }
   }
 
@@ -1618,7 +1619,7 @@
   .mmore .mm-me { text-align: center; color: var(--sub); font-size: 12px; margin-top: 4px; }
   /* ── 휴대폰 공통 틀: 보기 기본 — 설명 · 표 도구 · PC 전용 버튼은 숨기고, 칩은 한 줄(옆으로 밀기) ── */
   html.m .pg-help, html.m main > section > p.sub, html.m .tkbar, html.m .head .tools [id$="Reload"], html.m #reloadBtn { display: none !important; }
-  html.m #drvNew, html.m #coBtn, html.m #bibNew, html.m #campNew, html.m #view-perf > .updrop, html.m #paPostSw, html.m #paOfferSw, html.m #acCatEdit, html.m #acNew,
+  html.m #drvNew, html.m #coBtn, html.m #bibNew, html.m #campNew, html.m #rtvPerf > .updrop, html.m #paPostSw, html.m #paOfferSw, html.m #acCatEdit, html.m #acNew,
   html.m #paFrom, html.m #paTo, html.m #isFrom, html.m #isTo, html.m .is-mionly, html.m #tiFromStl, html.m #tiNew, html.m #view-einv .updrop, html.m #irCfgBtn, html.m #irXlsx, html.m #stRecalc, html.m #stGearBtn { display: none !important; }
   html.m .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-left: -12px; margin-right: -12px; padding: 0 12px; } html.m .tabs::-webkit-scrollbar { display: none; } html.m .tabs > * { flex: none; }
   html.m .head h2 small.sub { display: none; }
@@ -1740,7 +1741,6 @@
       </div>
       <div class="ng g-ops"><p class="ngt">운영</p>
         <a data-view="route">노선관리</a>
-        <a data-view="perf">수행률 · SLA</a>
         <a data-view="memo">업무스케줄</a>
       </div>
       <div class="ng g-fin"><p class="ngt">정산 · 회계</p>
@@ -2199,33 +2199,31 @@
     <div class="head">
       <h2>노선관리</h2>
       <div class="tools">
-        <button class="btn ghost" id="xpOpen" title="모든 캠프의 라우트 코드별 단가를 한 표로 봅니다">전체 단가표</button>
+        <button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">⬆ 쿠팡 파일 올리기</button><input type="file" id="rpFile" multiple accept=".xlsx" class="hidden">
         <button class="btn ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button>
-        <button class="btn ghost" id="rtReload">새로고침</button>
+        <button class="btn ghost" id="rtReload">새로고침</button><button class="hidden" id="rpReload" type="button"></button><button class="hidden" id="xpOpen" type="button"></button>
         <button class="btn" id="campNew">+ 캠프 추가</button>
       </div>
     </div>
+    <div class="rtv-seg" id="rtvTabs" role="tablist" aria-label="노선관리 보기"><button type="button" data-rtv="routes" class="on"><i>🛣</i>노선</button><button type="button" data-rtv="price"><i>💰</i>단가·물량</button><button type="button" data-rtv="perf"><i>📊</i>수행률</button><button type="button" data-rtv="fb"><i>🧊</i>프백·피크</button></div>
     <div class="rt-wrap">
       <div class="camp-side">
-        <input class="inp" id="campQ" placeholder="캠프명·노선코드 검색" autocomplete="off">
         <div class="camp-list" id="campList"></div>
+        <input class="inp" id="campQ" placeholder="캠프·노선 찾기" autocomplete="off">
       </div>
       <div id="campMain"></div>
     </div>
     <div id="allPrices" class="hidden"></div>
-   </section>
-   <section id="view-perf" class="hidden">
-    <div class="head">
-      <h2>노선 수행률 · SLA <small class="sub" style="font-size:13px;font-weight:500">쿠팡 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 파일</small></h2>
-      <div class="tools"><button class="btn ghost" id="rpReload">새로고침</button><button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">쿠팡 파일 올리기</button><input type="file" id="rpFile" multiple accept=".xlsx" class="hidden"></div>
-    </div>
+    <div id="rtvPerf" class="hidden">
     <div class="updrop" data-up="#rpFile">
       <div class="ud-ic">⬆</div>
       <div class="ud-tx"><b>쿠팡 파일을 여기로 끌어다 놓으세요 (여러 개 가능)</b><span>주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 — 어떤 파일인지 자동으로 알아보고, 저장 전에 미리보기를 보여 줍니다 (같은 기간은 덮어씀 · 엑셀 .xlsx)</span></div>
       <button class="btn" type="button" data-upfind>파일 찾기</button>
     </div>
     <div class="rp-box" id="perfBox"></div>
+    </div>
    </section>
+   <section id="view-perf" class="hidden"></section>
    <section id="view-settle" class="hidden">
     <div class="head">
       <h2 id="stTitle">정산관리</h2>
@@ -4198,7 +4196,7 @@
     if (mTabOf() === 'mng' && mMng !== currentView) { mMng = currentView; try { localStorage.setItem('runner.m.mng', mMng); } catch (e) { /* 무시 */ } }
   }
   function mMoreShow(on) { $('#mMore').classList.toggle('hidden', !on); if (on) { $('#mMore').scrollTop = 0; $('#mmMe').textContent = ($('#meName').textContent || '') + ($('#updNo').textContent || ''); } mTabSync(); }
-  const navGo = (v, stGo) => { const a = $$('.nav a[data-view="' + v + '"]').find((x) => (x.dataset.stGo || '') === (stGo || '')); if (a) a.click(); };
+  const navGo = (v, stGo) => { if (v === 'perf' || v === 'sla') return switchView(v); /* 수행률 · SLA = 노선관리 안의 탭 */ const a = $$('.nav a[data-view="' + v + '"]').find((x) => (x.dataset.stGo || '') === (stGo || '')); if (a) a.click(); };
   /** 기사스케줄 화면을 '내 스케줄'(on) 또는 관리용(off)으로 연다 */
   function mSchedGo(my) {
     const m = my === true ? 'my' : my || '', was = sMy ? 'my' : sTd ? 'today' : ''; schMode(m);
@@ -4228,6 +4226,9 @@
   });
   new MutationObserver(navCur).observe($('.nav'), { subtree: true, attributes: true, attributeFilter: ['class'] });
   function switchView(v) {
+    // 수행률 · SLA 메뉴는 노선관리 안의 탭이 됐다 — 예전 이름('perf' · 'sla')으로 오면 노선관리의 알맞은 탭으로
+    if (v === 'sla') { RP.tab = 'sla'; v = 'perf'; }
+    if (v === 'perf') { RTV.want = RP.tab === 'fb' || RP.tab === 'pk' ? 'fb' : 'perf'; v = 'route'; }
     if (v !== currentView && !viewRestoring) { viewHist.push(currentView); if (viewHist.length > 30) viewHist.shift(); }
     currentView = v;
     try { sessionStorage.setItem('runner.admView', v); } catch (e) {}
@@ -4268,7 +4269,7 @@
     if (v === 'settle') loadSettle();
     if (v === 'sched') { loadSched(); loadPkm(); }
     if (v === 'bib') loadBib();
-    if (v === 'route') loadRoutes();
+    if (v === 'route') { loadRoutes(); rtvShow(RTV.want || RTV.tab, true); RTV.want = ''; }
     // 기사 정보는 스케줄·배번호·정산·초기화 화면에서도 바뀌므로, 다른 메뉴에서 돌아오면 다시 불러온다 (선택 탭은 유지)
     if (v === 'drivers') { const first = !driversLoaded; driversLoaded = true; loadList(!first); }
     if (v === 'memo') openMonth(memoMonth || null);
@@ -6914,7 +6915,7 @@
       renderCampList(); renderCampMain();
     }).catch(() => {});
   }
-  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk() || !xpLeaveOk()) return; pdirty = {}; adirty = {}; RVOL = null; RP.loaded = false; loadRoutes().then(() => { if (xpOn) xpRender(); toast('새로 불러왔습니다.'); }); });
+  $('#rtReload').addEventListener('click', () => { if (!pricesLeaveOk() || !xpLeaveOk()) return; pdirty = {}; adirty = {}; RVOL = null; RP.loaded = false; if (rpViewOn()) return $('#rpReload').click(); loadRoutes().then(() => { if (xpOn) xpRender(); toast('새로 불러왔습니다.'); }); });
 
   // 왼쪽 캠프 목록
   /** 기본 회전이 D1·D2·F3 전부가 아니면 배지 ('2회전 D1·D2') */
@@ -6932,11 +6933,9 @@
       return normCode(it.name).includes(q) || it.hit;
     });
     $('#campList').innerHTML = shown.length ? shown.map((it) =>
-      '<button class="camp-item' + (it.id === curCamp ? ' on' : '') + (it.orphan ? ' orphan' : '') + '" data-camp="' + esc(it.id) + '">' +
-      '<b>' + esc(it.name) + (it.orphan ? '' : rotBadge(it)) + '</b><small>노선 ' + it.routes.length + (it.orphan ? '' : ' · 이미지 ' + it.imgs) +
-      (q && it.hit ? ' · <em>노선 ' + it.hit + '개 일치</em>' : '') + '</small>' +
-      (it.address ? '<span>' + esc(it.address) + '</span>' : '') + '</button>').join('')
-      : '<div class="empty" style="padding:24px 8px">' + (RT.camps.length ? '검색 결과가 없습니다.' : '등록된 캠프가 없습니다.<br><b>+ 캠프 추가</b>로 시작하세요.') + '</div>';
+      '<button type="button" class="camp-item' + (it.id === curCamp ? ' on' : '') + (it.orphan ? ' orphan' : '') + '" data-camp="' + esc(it.id) + '" title="' + esc(it.name + ' · 노선 ' + it.routes.length + (it.address ? ' · ' + it.address : '')) + '">' +
+      '<b>' + esc(it.orphan ? it.name : shortCamp(it.name)) + '</b>' + (q && it.hit ? '<em class="hit">' + it.hit + '개 일치</em>' : '<em>' + it.routes.length + '</em>') + '</button>').join('')
+      : '<div class="empty" style="padding:10px 8px">' + (RT.camps.length ? '검색 결과가 없습니다.' : '등록된 캠프가 없습니다. <b>+ 캠프 추가</b>로 시작하세요.') + '</div>';
   }
   onSearch($('#campQ'), renderCampList);
   $('#campList').addEventListener('click', (e) => {
@@ -6946,7 +6945,6 @@
     if (id !== curCamp) { curCamp = id; resetFilters(); rsel.clear(); pdirty = {}; RT.imgSel = null; }
     if (q && !normCode((campById(id) || {}).name).includes(q) && routesOf(id).some((r) => r.code.includes(q))) rtf.q = q;
     renderCampList(); renderCampMain();
-    if (window.innerWidth <= 900) $('#campMain').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   // 오른쪽: 캠프 정보 + 노선 + 참고 이미지 + 노선 정보
@@ -7140,6 +7138,7 @@
 
   // ── 전체 단가표: 모든 캠프 · 라우트 코드(숫자+글자)별 단가를 한 표로 ──
   let xpOn = false, adirty = {};
+  const RTV = { tab: 'routes', want: '' };
   const XP = { camp: '', level: '', st: '', empty: '', q: '', sort: { k: '', d: 0 }, wd: false };
   const WDS = [[0, '일'], [1, '월'], [2, '화'], [3, '수'], [4, '목'], [5, '금'], [6, '토']]; // 요일별 물량 열 순서 (쿠팡 기준: 일 → 토)
   const xpKey = (campId, key) => campId + '§' + key;
@@ -7176,6 +7175,21 @@
     else renderCampMain();
   }
   $('#xpOpen').addEventListener('click', () => xpShow(!xpOn));
+  /** 노선관리 맨 위 탭: routes 노선 · price 단가·물량(전체 단가표) · perf 수행률(주간 등급 · SLA) · fb 프백·피크 */
+  function rtvShow(tab, quiet) {
+    if (['routes', 'price', 'perf', 'fb'].indexOf(tab) < 0) tab = 'routes';
+    if (tab !== 'price' && xpOn) { xpShow(false); if (xpOn) return; }
+    if (tab !== 'routes' && tab !== RTV.tab && !quiet && !pricesLeaveOk()) return;
+    if (tab === 'price' && !xpOn) { xpShow(true); if (!xpOn) return; }
+    RTV.tab = tab;
+    const pf = tab === 'perf' || tab === 'fb';
+    $('.rt-wrap', $('#view-route')).classList.toggle('hidden', tab !== 'routes');
+    $('#allPrices').classList.toggle('hidden', tab !== 'price');
+    $('#rtvPerf').classList.toggle('hidden', !pf);
+    $$('#rtvTabs [data-rtv]').forEach((b) => b.classList.toggle('on', b.dataset.rtv === tab));
+    if (pf) { rpTabNow(); rpRender(); loadPerf(); if (RP.tab === 'sla') loadSla(); if (RP.tab === 'mail') { try { loadMail(); } catch (e) { /* 무시 */ } } }
+  }
+  $('#rtvTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-rtv]'); if (b && b.dataset.rtv !== RTV.tab) rtvShow(b.dataset.rtv); });
   function xpRender() {
     const box = $('#allPrices');
     const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
@@ -7427,9 +7441,9 @@
       grBadge(p.v.grade, p.c + ' ' + p.v.wk + (p.v.perf != null ? ' ' + p.v.perf + '%' : '') + (p.v.stale ? ' (최신 주차 자료 없음)' : '')) + (p.v.improve ? '<span class="gr-imp">개선 요청</span>' : '')).join(' ') + '</td>';
   }
   // 수행률·SLA 는 한 메뉴(view-perf)에 탭 둘. 라우트 변경이력은 노선관리 → 변경이력 탭 (lnRender 공용)
-  const rpViewOn = () => currentView === 'perf';
+  const rpViewOn = () => currentView === 'route' && (RTV.tab === 'perf' || RTV.tab === 'fb');
   const rpBox = () => $('#perfBox');
-  const rpTabs = () => [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)'], ['fb', '프레시백 가중요인'], ['pk', '🔥 피크 예상 물량'], ['mail', '📧 메일 자동 수집']];
+  const rpTabs = () => RTV.tab === 'fb' ? [['fb', '프레시백 가중요인'], ['pk', '🔥 피크 예상 물량']] : [['wk', '주간 수행률 (등급)'], ['sla', 'SLA 점수 (월간)'], ['mail', '📧 메일 자동 수집']];
   const rpTabNow = () => { const ts = rpTabs().map((t) => t[0]); if (ts.indexOf(RP.tab) < 0) RP.tab = ts[0]; return RP.tab; };
   $('#rpReload').addEventListener('click', () => { RP.loaded = false; SL.loaded = false; loadPerf(true).then(() => loadSla(true)).then(() => { rpRender(); toast('새로 불러왔습니다.'); }); });
   function rpList() {
@@ -7448,7 +7462,7 @@
     const onBtn = (id, on, lab) => '<span class="rp-on">' + lab + ' <b class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-rpset="' + id + '">' + (on ? '끄기' : '켜기') + '</button></span>';
     box.innerHTML = '<div class="sec rp-top"><div class="xp-head"><div class="tabs rp-tabs">' + rpTabs().map((t) => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" data-rptab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
       '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 기록을 업무스케줄에') : '') +
-      '<a class="btn sm ghost" href="#" data-view="route" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 종료 — 노선관리에서 관리합니다">라우트 변경이력 → 노선관리</a></span></div></div>';
+      '<a class="btn sm ghost" href="#" data-view="route" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 종료 — 🛣 노선 탭에서 관리합니다">라우트 변경이력 → 노선 탭</a></span></div></div>';
     if (tab === 'sla') return slaRender(box);
     if (tab === 'fb') return fbRender(box);
     if (tab === 'pk') return pkRender(box);
@@ -7527,7 +7541,7 @@
       sb.disabled = true;
       return api('adm_perfSet', f).then((r) => { if (!r.ok) return toast(r.msg); RP.drvOn = !!r.drvOn; RP.memoOn = !!r.memoOn; rpRender(); toast(k === 'drv' ? '기사 앱 표시를 ' + (r.drvOn ? '켰습니다. (기사 앱 마이페이지에 내 라우트 등급이 보입니다)' : '껐습니다.') : '메모 자동을 ' + (r.memoOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { sb.disabled = false; });
     }
-    const go = e.target.closest('a[data-rtab="ln"]'); if (go) { e.preventDefault(); rtab = 'ln'; switchView('route'); if (RT.camps.length) renderCampMain(); return; }
+    const go = e.target.closest('a[data-rtab="ln"]'); if (go) { e.preventDefault(); rtab = 'ln'; rtvShow('routes'); if (RT.camps.length) renderCampMain(); return; }
     if (e.target.id === 'rpUpBtn2' || e.target.id === 'rpUpBtn3') return $('#rpFile').click();
     const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); if (RP.tab === 'mail') loadMail(true); return; }
     if (fbClick(e)) return;
@@ -12697,11 +12711,12 @@
       ['탭', '진행상태별로 거르기 · 이름 · 차량번호 검색']
     ],
     'page:route': [
-      ['하는 일', '캠프마다 <b>노선 코드 · 라우트 코드(단가) · 담당 기사 · 참고 이미지 · 주소</b> 관리 — 정산서 단가와 기사 앱 "내 캠프"가 여기 값을 씀'],
-      ['순서', '[+ 캠프 추가] → 캠프 안에서 노선 추가 · 단가 코드 지정 · 기사 배정 · 참고 이미지(자동으로 저용량 미리보기) 올리기'],
-      ['노선 바뀔 때', '<b>노선변경 예약</b> = 날짜부터 기사의 노선이 바뀜 (기사스케줄 · 정산에 자동 반영) · [노선 이관] = 쿠팡이 노선을 통째로 옮길 때 (안양1 110 → 군포1 212)'],
-      ['단가', '[전체 단가표] 에서 모든 캠프 라우트 코드별 단가를 한 표로 · 외부용차단가 = 용차 · 품앗이 청구 기본값'],
-      ['기사 노선 정보', '캠프 화면 아래 = 기사들이 앱에 남긴 글 · 숨기기 · 되살리기 · 삭제']
+      ['🛣 노선', '캠프 칩을 눌러 고르기 → <b>노선 코드 · 구분별 단가 · 변경이력 · 참고 이미지 · 기사 노선 정보</b> — 정산서 단가와 기사 앱 "내 캠프"가 여기 값을 씀'],
+      ['💰 단가·물량', '모든 캠프 라우트 코드별 <b>단가</b> 보기·고치기 / <b>요일별 물량</b> 보기 (전월 정산서 기준)'],
+      ['📊 수행률', '쿠팡 주간 <b>수행률 등급</b> · 월간 <b>SLA 점수</b> · 메일 자동 수집'],
+      ['🧊 프백·피크', '<b>프레시백 가중요인</b> · <b>피크 예상 물량</b>'],
+      ['올리기', '[⬆ 쿠팡 파일 올리기] — 수행률 · SLA · 프레시백 · 피크 파일을 자동으로 알아보고 저장 전에 미리보기'],
+      ['노선 바뀔 때', '<b>노선변경 예약</b> = 날짜부터 기사의 노선이 바뀜 · [노선 이관] = 쿠팡이 노선을 통째로 옮길 때']
     ],
     'page:perf': [
       ['하는 일', '쿠팡 주간 <b>수행률 안내</b> · 월간 <b>SLA 점수</b> · <b>프레시백 가중요인</b> · <b>피크 예상 물량</b> 엑셀을 올려 노선 · 기사별 수행률 추이 보기'],
@@ -16143,8 +16158,7 @@
       ['sched', '', [['#sUpload', '버튼'], ['#sMore', '버튼'], ['#sFill', '버튼'], ['#sMode button', '보기']]],
       ['pumasi', '', [['#paPostSw', '버튼']]],
       ['bib', '', [['#bibNew', '버튼'], ['#coBtn', '버튼']]],
-      ['route', '', [['#xpOpen', '버튼'], ['[data-rcopen="move"]', '버튼'], ['#campNew', '버튼']]],
-      ['perf', '', [['#rpUpBtn', '버튼']]],
+      ['route', '', [['#rtvTabs button', '탭'], ['#rpUpBtn', '버튼'], ['[data-rcopen="move"]', '버튼'], ['#campNew', '버튼']]],
       ['settle', '', [['#stSteps .st-step', '단계', { adjust: '#stTabs [data-st="yongcha"], #stTabs [data-st="adjust"], #stTabs [data-st="advance"], #stTabs [data-st="tmp"], #stTabs [data-st="usage"]', list: '#stTabs [data-st="report"]' }], ['#stGearBtn', '버튼', { }], ['#stCfgTabs .tab', '설정'], ['#stTabs [data-st="ids"], #stTabs [data-st="vendors"]', '설정'], ['#stRecalc', '버튼'], ['#stCloseBtn', '버튼'], ['#stTaxPack', '버튼']]],
       ['settle', 'pnl', [['#stFinG .st-step', '단계'], ['#stPnlTabs .tab', '탭']]],
       ['taxinv', '', [['#tiTabs .tab', '탭'], ['#tiFromStl', '버튼'], ['#tiNew', '버튼']]],
@@ -16371,9 +16385,9 @@
       { v: 'view-route', need: '월', grp: '캠프', key: ['라우트 코드'], num: ['일', '월', '화', '수', '목', '금', '토'], hd: 1, nw: 27, short: { '라우트 코드': '코드' } },
       { v: 'view-route', need: '라우트 코드', grp: '캠프', key: ['라우트 코드'], mid: ['1일 평균물량', '전월 총물량'], num: ['고정단가', '백업단가', '품앗이단가'], hd: 1, short: { '1일 평균물량': '하루 · 총물량', '라우트 코드': '코드', '고정단가': '고정', '백업단가': '백업', '품앗이단가': '품앗이' } },
       { v: 'view-route', need: '노선코드', key: ['노선코드'], mid: ['메모'], num: ['1일 평균물량'], st: ['수행률'], hd: 1, nw: 118, short: { '노선코드': '노선', '1일 평균물량': '하루 · 총물량', '수행률': '수행률' } },
-      { v: 'view-perf', need: '최신 등급', grp: '캠프', key: ['라우트'], mid: ['추세 (8주)'], st: ['최신 등급'] },
-      { v: 'view-perf', need: '총점 (최신)', grp: '캠프', key: ['라우트'], num: ['총점 (최신)', '고객만족', '고객불만'], st: ['전 기간 대비'], hd: 1, short: { '라우트': '라우트', '총점 (최신)': '총점', '고객만족': '만족', '고객불만': '불만', '전 기간 대비': '변화' } },
-      { v: 'view-perf', need: '예상 단가', grp: '캠프', key: ['라우트'], num: ['최근 7일', '예상 단가'], hd: 1, nw: 70, short: { '라우트': '라우트', '최근 7일': '최근 7일', '예상 단가': '예상 단가' } },
+      { v: 'view-route', need: '최신 등급', grp: '캠프', key: ['라우트'], mid: ['추세 (8주)'], st: ['최신 등급'] },
+      { v: 'view-route', need: '총점 (최신)', grp: '캠프', key: ['라우트'], num: ['총점 (최신)', '고객만족', '고객불만'], st: ['전 기간 대비'], hd: 1, short: { '라우트': '라우트', '총점 (최신)': '총점', '고객만족': '만족', '고객불만': '불만', '전 기간 대비': '변화' } },
+      { v: 'view-route', need: '예상 단가', grp: '캠프', key: ['라우트'], num: ['최근 7일', '예상 단가'], hd: 1, nw: 70, short: { '라우트': '라우트', '최근 7일': '최근 7일', '예상 단가': '예상 단가' } },
       { v: 'view-taxinv', key: ['공급자'], mid: ['작성일자'], num: ['합계금액'], st: ['국세청'], nw: 84 },
       { v: 'view-einv', key: ['기사'], num: ['합계금액'], st: ['발행 여부'], nw: 84 },
       { v: 'view-insrep', key: ['기사'], num: ['기사 공제'], st: ['신고 여부'], nw: 72 },
