@@ -4303,7 +4303,7 @@ function routeVolumes_() {
         wd: ws.map(function (x, i) { return wn[i] ? Math.round(x / wn[i]) : null; }), wn: wn };
     });
     const out = { ok: true, months: months, vol: vol, pm: lm, pmPeriod: lm ? stlPeriod_(lm) : null }; // pm = 전월(1일 평균 · 총물량 기준 달)
-    stlCachePut_(key, out, 1800);
+    stlCachePut_(key, out, 21600); // 6시간 (열쇠에 정산 버전이 있어 정산 자료가 바뀌면 바로 새로 계산)
     return out;
   }
 }

@@ -805,7 +805,7 @@ function api_myFb(token) {
     else try { const ran = rpfRanRoutes_(u.id, camp, 10); out.period = ran.period; codes = ran.routes; } catch (e) { codes = []; }
     out.routes = codes.map(function (x) { const r = mk(x.camp, x.code); if (r && x.days) r.ranDays = x.days; return r; }).filter(Boolean);
     out.backup = !base.length;
-    try { const j = JSON.stringify(out); if (j.length < 90000) ck.put(key, j, 600); } catch (e) { /* 무시 */ }
+    try { const j = JSON.stringify(out); if (j.length < 90000) ck.put(key, j, 1800); } catch (e) { /* 무시 */ } // 30분 (기사앱이 30분마다 미리 받는 주기와 맞춤 · 파일을 올리면 버전이 바뀌어 바로 새로)
     return out;
   });
 }
