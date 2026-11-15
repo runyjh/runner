@@ -3995,6 +3995,7 @@
   // ───── 자유게시판 ─────
   /** 알림 대상 열기: 'BD-글ID' 는 게시판 글, 나머지는 품앗이 일감 */
   function openAlertTarget(id, from) { if (String(id).indexOf('SL-') === 0) { const m = String(id).slice(3); openSettle(); setTimeout(() => { if ($('#slMonth') && [...$('#slMonth').options].some((o) => o.value === m)) { $('#slMonth').value = m; loadSlip(m); } }, 300); return; } // 정산서 금액 변경 알림 → 그 달 정산서
+    if (String(id).indexOf('SC-') === 0) return openSched(); // 처음 가는 노선 알림 → 내 스케줄
     if (String(id).indexOf('BD-') === 0) return openBdPost(String(id).slice(3), from === 'alerts' ? 'alerts' : 'board'); openPmDetail(id, from); }
   let bdCat = '전체', bdPage = 0, bdPosts = [], bdCats = ['자유', '정보', '질문', '중고·나눔'], bdCurId = '', bdFrom = 'board', bdEditId = '', bdAttach = null, bdRemoveAttach = false, bdReply = null, bdFromHome = 'home';
   const bdAgo = (at) => { try { return agoText(at); } catch (e) { return String(at || '').slice(5, 16); } };

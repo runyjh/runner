@@ -1685,6 +1685,7 @@ function adm_check(token) {
   return run_(function () {
     const a = requireAdmin_(token);
     try { if (typeof fsEnsureTrigger_ === 'function') fsEnsureTrigger_(); } catch (e) { /* 사본 트리거 확인 (6시간에 한 번만 실제 확인) */ }
+    try { if (typeof frEnsureTrigger_ === 'function') frEnsureTrigger_(); } catch (e) { /* 처음 가는 노선 알림 트리거 (매일 18시) */ }
     let check = null;
     try { check = typeof dataCheckView_ === 'function' ? dataCheckView_() : JSON.parse(appSet_().dataCheck || 'null'); } catch (e) { check = null; } // 새벽 자료 점검 결과 + 자동 작업 멈춤 (대시보드에 표시)
     return { ok: true, admin: { name: a.name, loginId: a.loginId }, check: check };
