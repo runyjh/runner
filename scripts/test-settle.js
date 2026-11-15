@@ -359,6 +359,34 @@ scenario('대표 이식 달 정산서', null, function (r) {
   eq('대표가 아닌 기사의 같은 줄은 그대로 숨김', out.drv, 0);
   eq('마감 기록은 건드리지 않음', out.writes, 0);
 });
+// 19) 퇴사자 기사앱 자동 정지: 퇴사월 다음 달 정산 지급일 + 7일 · 한 번만 · 퇴사일 없으면 그대로
+scenario('퇴사자 자동 정지', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var prop = {}, stopped = [];
+    PropertiesService = { getScriptProperties: function () { return { getProperty: function (k) { return prop[k] || null; }, setProperty: function (k, v) { prop[k] = v; } }; } };
+    scriptLock_ = function () { return { waitLock: function () {}, releaseLock: function () {} }; };
+    var D = __M.main.drivers.filter(function (o) { return o.id; });
+    updateDriverCore_ = function (a, id, ch) { D.filter(function (o) { return o.id === id; })[0].status = ch.status; stopped.push(id); };
+    var cfg = stlCfg_(), pay = function (m) { return stlDates_(m, cfg).pay; }, plus7 = function (d) { return ymd_(addDays_(parseYmd_(d), 7)); };
+    var a = D[0], b = D[1], c = D[2];
+    a.status = b.status = c.status = '승인';
+    a.workStatus = '퇴사'; a.leaveDate = '2026-11-10';   // 11월 정산 → 12월 정산서(1월 지급)까지
+    b.workStatus = '퇴사'; b.leaveDate = '2026-11-26';   // 26일부터는 12월 정산 → 1월 정산서(2월 지급)까지
+    c.workStatus = '퇴사'; c.leaveDate = '';             // 퇴사일 없음 → 건드리지 않음
+    var at = [leaveStopAt_(a), leaveStopAt_(b), leaveStopAt_(c)], want = [plus7(pay('2026-12')), plus7(pay('2027-01')), ''];
+    var day = function (d) { todayText_ = function () { return d; }; stopped = []; leaveAutoStop_(); return stopped.slice(); };
+    var before = day(ymd_(addDays_(parseYmd_(at[0]), -1))), on = day(at[0]);
+    a.status = '승인';                                    // 관리자가 다시 승인
+    var again = day(ymd_(addDays_(parseYmd_(at[0]), 3)));
+    var later = day(at[1]);
+    return { at: at, want: want, before: before, on: on, again: again, later: later, aId: a.id, bId: b.id, cSt: c.status };
+  })()`, r.ctx);
+  eq('정지일 = 다음 달 정산 지급일 + 7일 (25일까지 / 26일부터 / 퇴사일 없음)', out.at, out.want);
+  eq('정지일 전날은 그대로', out.before, []);
+  eq('정지일에 정지', out.on, [out.aId]);
+  eq('관리자가 다시 승인하면 또 정지하지 않음', out.again, []);
+  eq('26일 이후 퇴사자는 한 달 뒤에 정지 · 퇴사일 없는 기사는 그대로', [out.later, out.cSt], [[out.bId], '승인']);
+});
 
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
