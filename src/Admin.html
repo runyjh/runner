@@ -300,16 +300,17 @@
   html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-k { display: block !important; order: 1; flex: none; min-width: 52px; font-size: 14.5px; font-weight: 800; white-space: nowrap !important; padding: 10px 0 !important; }
   html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-v { display: block !important; order: 2; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap !important; font-size: 13.5px; color: #374151; padding: 10px 0 !important; }
   html.m table.tk-card.tk-ol.ol-bold > tbody > tr:not(.ol-open) > td.ol-v { font-weight: 700; color: var(--ink); font-size: 14.5px; }
-  html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-n { display: block !important; order: 3; flex: none; width: var(--olw, 46px); text-align: right; font-variant-numeric: tabular-nums; font-size: 13.5px; white-space: nowrap !important; overflow: visible; }
-  html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-s { display: block !important; order: 4; flex: none; white-space: nowrap !important; font-size: 12.5px; text-align: right; }
-  html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-i { display: block !important; order: 5; flex: none; }
+  html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-n { display: block !important; order: var(--olo, 3); flex: none; width: var(--olw, 46px); text-align: center; font-variant-numeric: tabular-nums; font-size: 13.5px; white-space: nowrap !important; overflow: visible; }
+  html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-s { display: block !important; order: 40; flex: none; white-space: nowrap !important; font-size: 12.5px; text-align: right; }
+  html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-i { display: block !important; order: 50; flex: none; }
   html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-i .dtel { font-size: 0; padding: 7px 9px; } html.m table.tk-card.tk-ol > tbody > tr:not(.ol-open) > td.ol-i .dtel::before { font-size: 14px; }
   html.m table.tk-card.tk-ol > tbody > tr.ol-g::before { content: attr(data-g); flex: 0 0 calc(100% + 24px); margin: 0 -12px; padding: 5px 12px; background: #f8fafc; border-bottom: 1px solid #eef0f3; font-size: 12px; font-weight: 800; color: #475569; box-sizing: border-box; }
   html.m table.tk-card.tk-ol > tbody > tr.ol-g.ol-open::before { display: block; grid-column: 1 / -1; margin: -12px -14px 4px; }
   html.m table.tk-card.tk-ol > tbody > tr.ol-open { background: #fbfdff; cursor: pointer; }
   table > caption.ol-cap { display: none; }
   html.m table.tk-card.tk-ol > caption.ol-cap { display: flex; align-items: center; gap: 0 8px; padding: 0 13px 4px; font-size: 11px; font-weight: 700; color: var(--faint); caption-side: top; text-align: left; }
-  html.m table.tk-card.tk-ol > caption.ol-cap .k { flex: none; min-width: 52px; } html.m table.tk-card.tk-ol > caption.ol-cap .g { flex: 1 1 0; min-width: 0; white-space: nowrap; } html.m table.tk-card.tk-ol > caption.ol-cap .n { flex: none; text-align: right; white-space: nowrap; } html.m table.tk-card.tk-ol > caption.ol-cap .s { flex: none; white-space: nowrap; }
+  html.m table.tk-card.tk-ol > caption.ol-cap .k { flex: none; min-width: 52px; } html.m table.tk-card.tk-ol > caption.ol-cap .g { flex: 1 1 0; min-width: 0; white-space: nowrap; } html.m table.tk-card.tk-ol > caption.ol-cap .n { flex: none; text-align: center; white-space: nowrap; }
+  html.m table.tk-card.tk-ol.ol-nomid > tbody > tr:not(.ol-open) > td.ol-k { flex: 1 1 auto; } /* 가운데 칸이 없는 표: 숫자 칸을 머리글처럼 오른쪽으로 붙임 */ html.m table.tk-card.tk-ol > caption.ol-cap .s { flex: none; white-space: nowrap; }
   /* 휴대폰 전체 단가표: 보기 전용 (단가 칸은 글자처럼 · 고치기 · 일괄 설정은 PC) */
   html.m #allPrices .xp-bulk, html.m #allPrices .ptools .grow, html.m #allPrices #xpLevel, html.m #allPrices #xpSt, html.m #allPrices #xpEmpty, html.m #allPrices > .sec > p { display: none !important; }
   html.m #allPrices td input { border: 0 !important; background: none !important; padding: 0 !important; text-align: right; pointer-events: none; font: inherit; color: inherit; box-shadow: none !important; height: auto !important; }
@@ -2367,28 +2368,26 @@
   <div class="mmore hidden" id="mMore">
     <div class="mm-top"><b>더보기</b><button type="button" class="btn ghost sm" data-mmx>닫기</button></div>
     <div class="mm-card"><p>휴대폰에서 쓰는 메뉴</p>
-      <button type="button" data-mmv="notice">📢 공지사항</button>
+      <button type="button" data-mmv="route">🧭 노선관리 <small>노선 · 단가·물량 · 수행률 · 프백·피크</small></button>
       <button type="button" data-mmv="memo">🗒 업무스케줄</button>
-      <button type="button" data-mmv="applog">👀 기사앱 확인 기록</button>
       <button type="button" data-mmv="bib">🔢 배번호 관리</button>
-      <button type="button" data-mmv="perf">📊 수행률 · SLA</button>
-      <button type="button" data-mmv="perf" data-mmtab="pk">🔥 피크 예상 물량</button>
-      <button type="button" data-mmv="route">🧭 노선관리</button>
+      <button type="button" data-mmv="notice">📢 공지사항</button>
+      <button type="button" data-mmv="applog">👀 기사앱 확인 기록</button>
     </div>
     <div class="mm-card pc"><p>확인용 <small>(휴대폰에서는 보기만 · 처리는 PC에서)</small></p>
-      <button type="button" data-mmv="settle">정산관리</button>
-      <button type="button" data-mmv="settle" data-mmgo="pnl">매입·매출</button>
-      <button type="button" data-mmv="taxinv">세금계산서 역발행</button>
-      <button type="button" data-mmv="einv">전자세금계산서 발행</button>
-      <button type="button" data-mmv="insrep">산재/고용 신고 상황</button>
-      <button type="button" data-mmv="board">게시판 관리</button>
-      <button type="button" data-mmv="acc">계정관리</button>
+      <button type="button" data-mmv="settle">💰 정산관리</button>
+      <button type="button" data-mmv="settle" data-mmgo="pnl">📒 매입·매출</button>
+      <button type="button" data-mmv="taxinv">🧾 세금계산서 역발행</button>
+      <button type="button" data-mmv="einv">📄 전자세금계산서 발행</button>
+      <button type="button" data-mmv="insrep">🛡 산재/고용 신고 상황</button>
+      <button type="button" data-mmv="board">💬 게시판 관리</button>
+      <button type="button" data-mmv="acc">👥 계정관리</button>
     </div>
     <div class="mm-card">
       <button type="button" data-mmc="#uiSw">🖥 PC 화면으로 보기</button>
       <button type="button" data-mmc="#apOpen">🔑 비밀번호 변경</button>
       <button type="button" data-mmc="#pfOpen">⏱ 속도 측정</button>
-      <button type="button" data-mmc="#logoutBtn">로그아웃</button>
+      <button type="button" data-mmc="#logoutBtn">🚪 로그아웃</button>
     </div>
     <div class="mm-me" id="mmMe"></div>
   </div>
@@ -6997,7 +6996,7 @@
           (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
         '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
         '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
-        '<div class="table-wrap rt-table rt-rows"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th title="기사 정보의 배정 캠프 · 기본노선이 이 노선인 기사">담당</th><th title="전월 쿠팡 정산서 · 1일 평균 배송건수 (글자별 합)">하루</th><th title="전월 쿠팡 정산서 · 정산기간 배송건수 합계 (글자별 합)">총물량</th><th title="최신 월간 SLA 총점 (글자별)">SLA</th><th title="프레시백 가중요인 최신 누적 — 조건 2개 중 해당 수">프백</th><th title="쿠팡 주간 수행률 최신 등급 (글자별)">등급</th><th>사용</th><th>메모</th></tr></thead>' +
+        '<div class="table-wrap rt-table rt-rows"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th title="기사 정보의 배정 캠프 · 기본노선이 이 노선인 기사">담당</th><th title="전월 쿠팡 정산서 · 1일 평균 배송건수 (글자별 합)">일일평균</th><th title="전월 쿠팡 정산서 · 정산기간 배송건수 합계 (글자별 합)">총물량</th><th title="최신 월간 SLA 총점 (글자별)">SLA</th><th title="프레시백 가중요인 최신 누적 — 조건 2개 중 해당 수">프백</th><th title="쿠팡 주간 수행률 최신 등급 (글자별)">등급</th><th>사용</th><th>메모</th></tr></thead>' +
         '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div><p class="vol-note" id="rVolNote">' + volNote() + '</p></div>' +
         (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div>') +
       '</div>' +
@@ -7151,7 +7150,7 @@
         '<span><button type="button" class="btn sm ghost" data-rtd="edit">노선 수정</button><button type="button" class="btn sm ghost" data-rtd="close">닫기</button></span></div>' +
       (r.memo ? '<p class="rtd-memo">' + esc(r.memo) + '</p>' : '') +
       card('💰 단가', '', tbl(['코드'].concat(PKEYS.map((k) => PLABEL[k].replace('단가', ''))), d.L.map((x) => row(x, PKEYS.map((k) => x.n && x.n.price && x.n.price[k] ? won(String(x.n.price[k])) : ''))))) +
-      card('📦 물량', pm, tbl(['코드', '하루', '총물량'], d.L.map((x) => row(x, x.v ? ['<b>' + wnV(x.v.avg) + '</b>', wnV(x.v.qty)] : ['', '']))) +
+      card('📦 물량', pm, tbl(['코드', '일일평균', '총물량'], d.L.map((x) => row(x, x.v ? ['<b>' + wnV(x.v.avg) + '</b>', wnV(x.v.qty)] : ['', '']))) +
         tbl(['코드'].concat(WDS.map((w) => w[1])), d.L.map((x) => { const w = x.v && x.v.wd ? x.v.wd : [], vs = w.filter((n) => n != null), hi = vs.length > 1 ? Math.max(...vs) : null; return row(x, WDS.map(([i]) => w[i] == null ? '' : w[i] === hi ? '<b style="color:var(--brand)">' + wnV(w[i]) + '</b>' : wnV(w[i]))); }))) +
       card('📊 수행률 · SLA · 프레시백', '', tbl(['코드', '등급', '수행률', '추세', 'SLA', '프백'], d.L.map((x) => row(x, [x.p ? grBadge(x.p.grade, x.p.wk) : '', x.p && x.p.perf != null ? x.p.perf + '%' : '', rpTrend(d.cs, x.c, 8), x.s ? slaBadge(x.s.total, X.lp) : '', x.f ? rtFbBadge(x.f) : '']))) +
         (d.L.some((x) => x.p) ? '<button type="button" class="btn sm ghost" data-rtd="hist" data-keys="' + esc(d.L.map((x) => d.cs + '|' + x.c).join(',')) + '" style="margin-top:8px;width:100%">주간 수행률 이력 보기</button>' : ''));
@@ -7320,7 +7319,7 @@
   function xpCols() {
     return [{ k: 'camp', t: '캠프' }, { k: 'code', t: '라우트 코드' }, { k: 'level', t: '구분' }]
       .concat(XP.wd ? WDS.map(([i, t]) => ({ k: 'w' + i, t })) : PKEYS.map((k) => ({ k, t: PLABEL[k] })))
-      .concat([{ k: 'vol', t: '1일 평균물량' }, { k: 'volq', t: '전월 총물량' }, { k: 'st', t: '사용여부' }]);
+      .concat([{ k: 'vol', t: '일일평균' }, { k: 'volq', t: '총물량' }, { k: 'st', t: '사용여부' }]);
   }
   function xpList() {
     const q = normCode(XP.q);
@@ -7353,7 +7352,7 @@
       return '<tr data-ak="' + esc(r.ak) + '"' + (r.st !== '사용' ? ' class="off"' : '') + '><td>' + esc(r.c.name) + '</td><td><b class="code">' + esc(r.code) + '</b></td><td>구분' + r.n.level + '</td>' +
         (XP.wd ? wdCells(r) : PKEYS.map(cell).join('')) +
         '<td class="num"' + (vt ? ' title="' + esc(vt) + '"' : '') + '>' + (!RVOL ? '…' : r.vol == null ? '-' : '<b>' + wnV(r.vol) + '</b>') + '</td>' +
-        '<td class="num"' + (vt ? ' title="' + esc(vt) + '"' : '') + '>' + (!RVOL ? '…' : r.volq == null ? '-' : '<b>' + wnV(r.volq) + '</b>') + '</td>' +
+        '<td class="num"' + (vt ? ' title="' + esc(vt) + '"' : '') + '>' + (!RVOL ? '…' : r.volq == null ? '-' : wnV(r.volq)) + '</td>' +
         '<td>' + (r.st === '노선 없음' ? '<span class="tag">노선 없음</span>' : '<span class="badge b-' + esc(r.st) + '">' + esc(r.st) + '</span> <small class="sub">' + r.on + '/' + r.routes + '</small>') + '</td></tr>';
     }).join('');
     const em = $('#xpEmptyMsg');
@@ -16481,8 +16480,8 @@
       { v: 'view-issue', need: '결과', key: ['날짜'], mid: ['기사'], st: ['결과'] },
       { v: 'view-bib', key: ['이름'], mid: ['신청일'], st: ['진행상태'] },
       { v: 'view-route', need: '월', grp: '캠프', key: ['라우트 코드'], num: ['일', '월', '화', '수', '목', '금', '토'], hd: 1, nw: 27, short: { '라우트 코드': '코드' } },
-      { v: 'view-route', need: '라우트 코드', grp: '캠프', key: ['라우트 코드'], mid: ['1일 평균물량', '전월 총물량'], num: ['고정단가', '백업단가', '품앗이단가'], hd: 1, short: { '1일 평균물량': '하루 · 총물량', '라우트 코드': '코드', '고정단가': '고정', '백업단가': '백업', '품앗이단가': '품앗이' } },
-      { v: 'view-route', need: '노선코드', key: ['노선코드'], mid: ['담당'], num: ['하루', '총물량'], st: ['등급'], hd: 1, nw: 54, native: 1, short: { '노선코드': '노선' } },
+      { v: 'view-route', need: '라우트 코드', grp: '캠프', key: ['라우트 코드'], num: ['일일평균', '총물량', '고정단가', '백업단가', '품앗이단가'], hd: 1, nw: 41, short: { '라우트 코드': '코드', '고정단가': '고정', '백업단가': '백업', '품앗이단가': '품앗이' } },
+      { v: 'view-route', need: '노선코드', key: ['노선코드'], mid: ['담당'], num: ['일일평균', '총물량'], st: ['등급'], hd: 1, nw: 54, native: 1, short: { '노선코드': '노선' } },
       { v: 'view-route', need: '최신 등급', grp: '캠프', key: ['라우트'], mid: ['추세 (8주)'], st: ['최신 등급'] },
       { v: 'view-route', need: '총점 (최신)', grp: '캠프', key: ['라우트'], num: ['총점 (최신)', '고객만족', '고객불만'], st: ['전 기간 대비'], hd: 1, short: { '라우트': '라우트', '총점 (최신)': '총점', '고객만족': '만족', '고객불만': '불만', '전 기간 대비': '변화' } },
       { v: 'view-route', need: '예상 단가', grp: '캠프', key: ['라우트'], num: ['최근 7일', '예상 단가'], hd: 1, nw: 70, short: { '라우트': '라우트', '최근 7일': '최근 7일', '예상 단가': '예상 단가' } },
@@ -16496,7 +16495,7 @@
     function applyOl(tb, lab) {
       const sec = tb.closest('section[id^="view-"]'), labels = Object.keys(lab).map((k) => lab[k]);
       const cfg = MOB.matches && sec ? OL.find((c) => c.v === sec.id && (!c.need || labels.includes(c.need)) && (c.key || c.mid).every((l) => labels.includes(l))) : null;
-      tb.classList.toggle('tk-ol', !!cfg); tb.classList.toggle('ol-bold', !!(cfg && cfg.bold)); tb._ol = cfg || null;
+      tb.classList.toggle('tk-ol', !!cfg); tb.classList.toggle('ol-bold', !!(cfg && cfg.bold)); tb.classList.toggle('ol-nomid', !!(cfg && !cfg.mid)); tb._ol = cfg || null;
       const old = tb.querySelector('caption.ol-cap'); if (old && !(cfg && cfg.hd)) old.remove();
       if (!cfg) return;
       const roleOf = (l) => (cfg.key && cfg.key.includes(l) ? 'k' : cfg.mid && cfg.mid.includes(l) ? 'v' : cfg.num && cfg.num.includes(l) ? 'n' : cfg.st && cfg.st.includes(l) ? 's' : cfg.ico && cfg.ico.includes(l) ? 'i' : '');
@@ -16508,6 +16507,7 @@
           const l = c.dataset.l || '', role = roleOf(l);
           ['k', 'v', 'n', 's', 'i'].forEach((x) => c.classList.toggle('ol-' + x, role === x));
           if (role === 'n') c.style.setProperty('--olw', (cfg.nw || 46) + 'px');
+          if (role === 'n') c.style.setProperty('--olo', String(10 + cfg.num.indexOf(l))); // 머리글(설정) 순서대로 — 표의 칸 순서와 달라도 맞게
           if (cfg.grp && l === cfg.grp) g = txt(c);
         });
         if (cfg.grp) { const first = g !== prev; r.classList.toggle('ol-g', first); if (first) r.dataset.g = g; else delete r.dataset.g; prev = g; }
