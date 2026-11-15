@@ -812,7 +812,7 @@ function api_myFb(token) {
 
 // ───────────────────────── 피크 예상 물량 (쿠팡 Peak_Demand 파일 · route_peak) ─────────────────────────
 // 매달 피크데이(보통 1~7일)의 캠프 · 라우트별 예상 물량. 수행률 · SLA 화면에서 올리고, 켜 두면 기사 앱 '내 스케줄'의 그날 내 노선에 보인다.
-// '평소 대비' = 최근 정산 2달의 그 라우트 하루 평균 배송 수량(routeVolumes_ avgQ)과 비교 — 비교할 자료가 없으면 건수만.
+// '평소 대비' = 전월 정산서의 그 라우트 하루 평균 배송 수량(routeVolumes_ avgQ)과 비교 — 비교할 자료가 없으면 건수만.
 const PK_TOTAL = 'TOTAL';
 function pkSettings_() { return { drvOn: !/^(off|n|no|false|0|끔|꺼짐)$/i.test(str_(appSet_().peakDrvOn)) }; }
 function pkAll_() { let rows = []; try { rows = readAll_(SH.RPK).filter(function (o) { return o.key && o.date && o.code; }); } catch (e) { rows = []; } return rows; }
