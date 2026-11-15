@@ -4271,7 +4271,7 @@ function adm_routeVolumes(token) {
 function routeVolumes_() {
   {
     if (!props_().STL_DB_ID) return { ok: true, months: [], vol: {} };
-    const key = 'stl:vol3:' + stlVer_();
+    const key = 'stl:vol4:' + stlVer_();
     const hit = stlCacheGet_(key);
     if (hit) return hit;
     stlLoad_(STL_SMALL);
@@ -4287,7 +4287,8 @@ function routeVolumes_() {
         const k = stlShort_(r.camp) + '|' + normCode_(r.route);
         const a = acc[k] || (acc[k] = { m: {}, mq: {}, md: {} });
         a.m[m] = (a.m[m] || 0) + qty; a.mq[m] = (a.mq[m] || 0) + stlNum_(r.qty);
-        (a.md[m] = a.md[m] || {})[stlYmd_(r.date)] = 1;
+        const dk = stlYmd_(r.date), dm = a.md[m] || (a.md[m] = {});
+        dm[dk] = (dm[dk] || 0) + qty; // 날짜별 배송수량 (요일별 평균용)
       });
     });
     const vol = {};
@@ -4295,7 +4296,11 @@ function routeVolumes_() {
     const lm = months[months.length - 1] || '';
     Object.keys(acc).forEach(function (k) {
       const a = acc[k], q = a.m[lm] || 0, d = a.md[lm] ? Object.keys(a.md[lm]).length : 0;
-      vol[k] = { avg: d ? Math.round(q / d) : 0, avgQ: d ? Math.round((a.mq[lm] || 0) / d) : 0, days: d, qty: q, month: lm, m: a.m };
+      // 요일별 평균 (0=일 … 6=토): 그 요일에 배송한 날들의 수량 ÷ 그 날 수 · wn = 요일별 배송한 날 수
+      const ws = [0, 0, 0, 0, 0, 0, 0], wn = [0, 0, 0, 0, 0, 0, 0];
+      Object.keys(a.md[lm] || {}).forEach(function (dt) { const w = new Date(dt + 'T00:00:00Z').getUTCDay(); ws[w] += a.md[lm][dt]; wn[w]++; });
+      vol[k] = { avg: d ? Math.round(q / d) : 0, avgQ: d ? Math.round((a.mq[lm] || 0) / d) : 0, days: d, qty: q, month: lm, m: a.m,
+        wd: ws.map(function (x, i) { return wn[i] ? Math.round(x / wn[i]) : null; }), wn: wn };
     });
     const out = { ok: true, months: months, vol: vol, pm: lm, pmPeriod: lm ? stlPeriod_(lm) : null }; // pm = 전월(1일 평균 · 총물량 기준 달)
     stlCachePut_(key, out, 1800);

@@ -1009,6 +1009,12 @@
   .pin.date { width: 128px; text-align: left; }
   .pin.dirty { border-color: var(--warn); background: #fffdf7; }
   .rt-table td.vol .vol-m { display: none; } .tk-ol td.vol .vol-m { display: inline; white-space: nowrap; } .tk-ol td.vol .vol-p, .tk-ol td.volq { display: none; }
+  .xp-seg { display: inline-flex; background: #eef1f5; border-radius: 10px; padding: 3px; gap: 2px; margin-bottom: 8px; } .xp-seg button { border: 0; background: none; padding: 7px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 700; color: var(--sub); cursor: pointer; white-space: nowrap; }
+  .xp-seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .xp-desc { background: #f6f8fb; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.6; color: #4e5968; margin-bottom: 10px; word-break: keep-all; }
+  .xp-desc .xp-mo { display: none; } html.m .xp-desc .xp-pc { display: none; } html.m .xp-desc .xp-mo { display: inline; }
+  html.m .xp-seg { display: flex; } html.m .xp-seg button { flex: 1; padding: 8px 4px; font-size: 13px; }
+  .xp-table td.wd-hi { color: #1d4ed8; font-weight: 800; } .xp-table td.wd-lo { color: #98a2b3; }
   .vol-note { margin: 8px 0 0; color: var(--sub); font-size: 12px; line-height: 1.6; word-break: keep-all; } .vol-note b { color: var(--text, #191f28); }
   .rt-table td.vol .vsum { margin-left: 4px; padding: 1px 6px; border-radius: 10px; background: #eef4ff; color: #1d4ed8; font-size: 12px; }
   .xp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -2179,7 +2185,7 @@
     <div class="head">
       <h2>노선관리</h2>
       <div class="tools">
-        <button class="btn ghost" id="xpOpen" title="모든 캠프의 정산코드별 단가를 한 표로 봅니다">전체 단가표</button>
+        <button class="btn ghost" id="xpOpen" title="모든 캠프의 라우트 코드별 단가를 한 표로 봅니다">전체 단가표</button>
         <button class="btn ghost" data-rcopen="move" title="쿠팡이 노선을 통째로 옮길 때 (예: 안양1 110 → 군포1 212)">노선 이관</button>
         <button class="btn ghost" id="rtReload">새로고침</button>
         <button class="btn" id="campNew">+ 캠프 추가</button>
@@ -4327,7 +4333,7 @@
   const dsSec = (k, title, n, body, more) => '<div class="db-card ds-sec" data-dssec="' + k + '"><div class="db-top"><b>' + esc(title) + '</b>' + (n != null ? '<span class="ds-n">' + n + '</span>' : '') + (more ? '<a data-dsgo="' + more + '">열기 →</a>' : '') + '</div>' + body + '</div>';
   const dsLoad = '<div class="db-load">불러오는 중…</div>', dsNone = '<div class="db-empty">찾은 결과가 없습니다.</div>';
   function dsDrivers() { const terms = dsTerms(); return (DSB.drv || []).filter((d) => terms.some((t) => [d.name, d.loginId, d.subId1, d.subId2, d.phone, d.carNo, d.baseRoute, d.schCamp, d.driverCode].some((v) => dsHas(v, t)))); }
-  /** 검색어가 기사 이름이면 그 기사의 기본노선 정산코드들 (수행률·노선 검색에 같이) */
+  /** 검색어가 기사 이름이면 그 기사의 기본노선 라우트 코드들 (수행률·노선 검색에 같이) */
   function dsDrvCodes() {
     const out = [];
     dsDrivers().forEach((d) => { const camp = shortCamp(d.schCamp || '').replace(/\s/g, ''); String(d.baseRoute || '').toUpperCase().split(/[,\s/]+/).forEach((tk) => { const m = tk.match(/^(\d{2,4})([A-Z]*)/); if (!m) return; (m[2] ? m[2].split('') : ['']).forEach((L) => out.push({ camp, code: m[1] + L, who: d.name })); }); });
@@ -4361,7 +4367,7 @@
       let rows = null;
       if (camps) rows = xpRows().filter((x) => routeHit(x.c.name, x.code));
       out.push(dsSec('price', '노선 단가', rows ? rows.length : null, !rows ? dsLoad : !rows.length ? dsNone :
-        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>캠프</th><th>정산코드</th>' + PKEYS.map((k) => '<th>' + PLABEL[k] + '</th>').join('') + '<th>사용</th></tr></thead><tbody>' +
+        '<table class="db-tbl ds-tbl" data-tk-off><thead><tr><th>캠프</th><th>라우트 코드</th>' + PKEYS.map((k) => '<th>' + PLABEL[k] + '</th>').join('') + '<th>사용</th></tr></thead><tbody>' +
         rows.slice(0, 40).map((x) => '<tr class="clk" data-dsrt="' + esc(x.c.id) + '"><td>' + esc(shortCamp(x.c.name)) + '</td><td><b>' + esc(x.code) + '</b></td>' + PKEYS.map((k) => { const v = xpOrig(x, k); return '<td>' + (v === '' || v == null ? '<span class="sub">-</span>' : won(v)) + '</td>'; }).join('') + '<td>' + esc(x.st) + '</td></tr>').join('') + '</tbody></table>', 'route'));
     }
     if (w.indexOf('perf') >= 0) {
@@ -7100,8 +7106,7 @@
     if (!RVOL) return '물량: 쿠팡 정산서를 불러오는 중…';
     if (!RVOL.pm) return '물량: 아직 올라온 쿠팡 정산서가 없습니다.';
     const P = RVOL.pmPeriod || {}, md = (d) => String(d || '').slice(5).replace('-', '/');
-    return '📦 물량은 <b>전월 쿠팡 정산서(' + (+RVOL.pm.slice(5)) + '월 정산 · ' + md(P.from) + '~' + md(P.to) + ')</b> 기준입니다. ' +
-      '<b>1일 평균</b> = 그 기간 배송건수 ÷ 실제 배송한 날 수 · <b>전월 총물량</b> = 그 기간 배송건수 합계 (반품 포함). 묶인 노선(예: 205CD)은 글자별 값과 합계를 같이 보여 줍니다. 새 달 정산서를 올리면 그 달 기준으로 바뀝니다.';
+    return '📦 <b>' + (+RVOL.pm.slice(5)) + '월 정산서(' + md(P.from) + '~' + md(P.to) + ')</b> 기준 · 1일 평균 = 배송건수 ÷ 배송한 날 수 · 총물량 = 배송건수 합계';
   }
   function volCell(r) {
     if (!RVOL) return '<td class="sub">…</td><td class="sub">…</td>';
@@ -7119,9 +7124,10 @@
   }
   const wnV = (v) => (Math.round(Number(v) || 0)).toLocaleString('ko-KR');
 
-  // ── 전체 단가표: 모든 캠프 · 정산코드(숫자+글자)별 단가를 한 표로 ──
+  // ── 전체 단가표: 모든 캠프 · 라우트 코드(숫자+글자)별 단가를 한 표로 ──
   let xpOn = false, adirty = {};
-  const XP = { camp: '', level: '', st: '', empty: '', q: '', sort: { k: '', d: 0 } };
+  const XP = { camp: '', level: '', st: '', empty: '', q: '', sort: { k: '', d: 0 }, wd: false };
+  const WDS = [[1, '월'], [2, '화'], [3, '수'], [4, '목'], [5, '금'], [6, '토'], [0, '일']]; // 요일별 물량 열 순서 (월 → 일)
   const xpKey = (campId, key) => campId + '§' + key;
   function xpRows() {
     const out = [];
@@ -7132,7 +7138,7 @@
         const use = rs.filter((r) => r.g1 === n.num && r[gk] === n.value);
         const on = use.filter((r) => r.status !== '정지').length;
         const v = RVOL && RVOL.vol ? RVOL.vol[cs + '|' + code] : null;
-        out.push({ ak: xpKey(c.id, n.key), c, n, code, routes: use.length, on, st: !use.length ? '노선 없음' : on ? '사용' : '정지', vol: v ? Number(v.avg) || 0 : null, volq: v ? Number(v.qty) || 0 : null, volv: v });
+        out.push({ ak: xpKey(c.id, n.key), c, n, code, routes: use.length, on, st: !use.length ? '노선 없음' : on ? '사용' : '정지', vol: v ? Number(v.avg) || 0 : null, volq: v ? Number(v.qty) || 0 : null, volv: v, wd: v && v.wd ? v.wd : null });
       });
     });
     return out;
@@ -7160,16 +7166,20 @@
     const box = $('#allPrices');
     const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(t) + '</option>';
     box.innerHTML =
-      '<div class="sec"><div class="xp-head"><h3>전체 단가표</h3><span class="xp-sum" id="xpSum"></span></div>' +
+      '<div class="sec"><div class="xp-head"><h3>' + (XP.wd ? '요일별 물량표' : '전체 단가표') + '</h3><span class="xp-sum" id="xpSum"></span></div>' +
+      '<div class="xp-seg" role="tablist" aria-label="보기"><button type="button" data-xpm="price" class="' + (XP.wd ? '' : 'on') + '">💰 단가 보기</button><button type="button" data-xpm="wd" class="' + (XP.wd ? 'on' : '') + '">📦 물량 보기 (요일별)</button></div>' +
+      '<div class="xp-desc">' + (XP.wd
+        ? '라우트 코드별 <b>요일별 하루 평균 물량</b> · 전월 정산서 기준 · <b style="color:#1d4ed8">파랑</b> = 가장 많은 요일'
+        : '라우트 코드별 <b>단가</b> · 빨간 칸 = 단가 없음') + '</div>' +
       '<div class="ptools">' +
         '<select class="inp" id="xpCamp" aria-label="캠프">' + opt('', '캠프 전체', XP.camp) + sortedCamps().map((c) => opt(c.id, c.name, XP.camp)).join('') + '</select>' +
         '<select class="inp" id="xpLevel" aria-label="구분">' + opt('', '구분 전체', XP.level) + [2, 3, 4, 5].map((k) => opt(k, '구분' + k, XP.level)).join('') + '</select>' +
         '<select class="inp" id="xpSt" aria-label="사용여부">' + opt('', '사용여부 전체', XP.st) + ['사용', '정지', '노선 없음'].map((k) => opt(k, k, XP.st)).join('') + '</select>' +
-        '<select class="inp" id="xpEmpty" aria-label="빈 단가 찾기">' + opt('', '빈 단가 찾기', XP.empty) + PKEYS.map((k) => opt(k, PLABEL[k] + ' 빈 것', XP.empty)).join('') + '</select>' +
-        '<input class="inp" id="xpQ" placeholder="캠프·정산코드 검색" value="' + esc(XP.q) + '" autocomplete="off" style="width:150px">' +
-        '<div class="grow"><span id="xpMsg"></span><button class="btn sm ghost" id="xpCopy">엑셀로 복사</button><button class="btn sm ghost" id="xpReset" disabled>되돌리기</button><button class="btn sm" id="xpSave" disabled>단가 저장</button></div>' +
+        '<select class="inp' + (XP.wd ? ' hidden' : '') + '" id="xpEmpty" aria-label="빈 단가 찾기">' + opt('', '빈 단가 찾기', XP.empty) + PKEYS.map((k) => opt(k, PLABEL[k] + ' 빈 것', XP.empty)).join('') + '</select>' +
+        '<input class="inp" id="xpQ" placeholder="캠프·코드 검색" value="' + esc(XP.q) + '" autocomplete="off" style="width:150px">' +
+        '<div class="grow"><span id="xpMsg"></span><button class="btn sm ghost" id="xpCopy">엑셀로 복사</button><button class="btn sm ghost' + (XP.wd ? ' hidden' : '') + '" id="xpReset" disabled>되돌리기</button><button class="btn sm' + (XP.wd ? ' hidden' : '') + '" id="xpSave" disabled>단가 저장</button></div>' +
       '</div>' +
-      '<div class="ptools xp-bulk"><b>일괄 설정</b>' +
+      '<div class="ptools xp-bulk' + (XP.wd ? ' hidden' : '') + '"><b>일괄 설정</b>' +
         '<select class="inp" id="xpBk" aria-label="일괄 설정할 단가">' + PKEYS.map((k) => opt(k, PLABEL[k], XP.bk || 'p2')).join('') + '</select>' +
         '<input class="inp" id="xpBv" inputmode="numeric" placeholder="금액 (비우면 지움)" autocomplete="off" style="width:140px">' +
         '<label class="check"><input type="checkbox" id="xpBe"' + (XP.be ? ' checked' : '') + '> 빈 칸만</label>' +
@@ -7178,12 +7188,12 @@
       '<div class="table-wrap rt-table pt xp-table"><table><thead><tr>' +
         xpCols().map((c) => '<th class="srt" data-xps="' + c.k + '">' + c.t + (XP.sort.k === c.k ? (XP.sort.d > 0 ? ' ▲' : ' ▼') : '') + '</th>').join('') +
       '</tr></thead><tbody id="xpRows"></tbody></table><div class="empty hidden" id="xpEmptyMsg"></div></div>' +
-      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">정산코드 = 숫자(구분1) + 글자. 칸을 고치고 <b>단가 저장</b>을 누르면 캠프별로 저장됩니다. 빨간 칸은 단가가 비어 있습니다. 머리글을 누르면 정렬됩니다.</p><p class="vol-note">' + volNote() + '</p></div>';
+      '<p style="margin:8px 0 0;color:var(--sub);font-size:12px">라우트 코드 = 숫자 + 글자 (예: 205C) · 머리글을 누르면 정렬</p><div class="vol-note">' + volNote() + '</div></div>';
     xpRenderRows();
   }
   function xpCols() {
-    return [{ k: 'camp', t: '캠프' }, { k: 'code', t: '정산코드' }, { k: 'level', t: '구분' }]
-      .concat(PKEYS.map((k) => ({ k, t: PLABEL[k] })))
+    return [{ k: 'camp', t: '캠프' }, { k: 'code', t: '라우트 코드' }, { k: 'level', t: '구분' }]
+      .concat(XP.wd ? WDS.map(([i, t]) => ({ k: 'w' + i, t })) : PKEYS.map((k) => ({ k, t: PLABEL[k] })))
       .concat([{ k: 'vol', t: '1일 평균물량' }, { k: 'volq', t: '전월 총물량' }, { k: 'st', t: '사용여부' }]);
   }
   function xpList() {
@@ -7192,14 +7202,22 @@
       (!XP.empty || !xpCur(r, XP.empty)) && (!q || r.code.includes(q) || normCode(r.c.name).includes(q)));
     const { k, d } = XP.sort;
     if (k && d) {
-      const val = (r) => k === 'camp' ? r.c.name : k === 'code' ? r.code : k === 'level' ? r.n.level : k === 'vol' || k === 'volq' ? (r[k] == null ? -1 : r[k]) : k === 'st' ? r.st : (xpCur(r, k) === '' ? -1 : Number(xpCur(r, k)));
+      const val = (r) => k === 'camp' ? r.c.name : k === 'code' ? r.code : k === 'level' ? r.n.level : k === 'vol' || k === 'volq' ? (r[k] == null ? -1 : r[k]) : /^w\d$/.test(k) ? (r.wd && r.wd[+k[1]] != null ? r.wd[+k[1]] : -1) : k === 'st' ? r.st : (xpCur(r, k) === '' ? -1 : Number(xpCur(r, k)));
       list = list.slice().sort((a, b) => { const x = val(a), y = val(b); return d * (typeof x === 'number' && typeof y === 'number' ? x - y : koSort(String(x), String(y))); });
     }
     return list;
   }
+  /** 요일별 하루 평균 칸 7개 (월 → 일) · 가장 많은 요일 파랑 굵게 · 가장 적은 요일 회색 */
+  function wdCells(r) {
+    if (!RVOL) return WDS.map(() => '<td class="num sub">…</td>').join('');
+    const w = r.wd || [], n = (r.volv && r.volv.wn) || [], vals = w.filter((x) => x != null);
+    const hi = vals.length > 1 ? Math.max(...vals) : null, lo = vals.length > 1 ? Math.min(...vals) : null;
+    return WDS.map(([i, t]) => w[i] == null ? '<td class="num sub">-</td>' :
+      '<td class="num wd' + (w[i] === hi ? ' wd-hi' : w[i] === lo ? ' wd-lo' : '') + '" title="' + esc(r.code + ' ' + t + '요일 · ' + (n[i] || 0) + '일 배송 평균') + '">' + wnV(w[i]) + '</td>').join('');
+  }
   function xpRenderRows() {
     const all = xpRows(), list = xpList();
-    $('#xpSum').textContent = '캠프 ' + RT.camps.length + ' · 정산코드 ' + all.length + ' · 고정단가 입력 ' + all.filter((r) => xpCur(r, 'p2')).length + '/' + all.length;
+    $('#xpSum').textContent = '캠프 ' + RT.camps.length + ' · 라우트 코드 ' + all.length + ' · 고정단가 입력 ' + all.filter((r) => xpCur(r, 'p2')).length + '/' + all.length;
     $('#xpRows').innerHTML = list.map((r) => {
       const cell = (k) => {
         const v = xpCur(r, k), dirty = adirty[r.ak] && k in adirty[r.ak];
@@ -7207,14 +7225,14 @@
       };
       const vt = r.volv ? r.code + ': 하루 ' + wnV(r.volv.avg) + '건 · ' + r.volv.days + '일 배송 · 총 ' + wnV(r.volv.qty) + '건 (' + (+String(RVOL.pm || '').slice(5)) + '월 정산서)' : '';
       return '<tr data-ak="' + esc(r.ak) + '"' + (r.st !== '사용' ? ' class="off"' : '') + '><td>' + esc(r.c.name) + '</td><td><b class="code">' + esc(r.code) + '</b></td><td>구분' + r.n.level + '</td>' +
-        PKEYS.map(cell).join('') +
+        (XP.wd ? wdCells(r) : PKEYS.map(cell).join('')) +
         '<td class="num"' + (vt ? ' title="' + esc(vt) + '"' : '') + '>' + (!RVOL ? '…' : r.vol == null ? '-' : '<b>' + wnV(r.vol) + '</b>') + '</td>' +
         '<td class="num"' + (vt ? ' title="' + esc(vt) + '"' : '') + '>' + (!RVOL ? '…' : r.volq == null ? '-' : '<b>' + wnV(r.volq) + '</b>') + '</td>' +
         '<td>' + (r.st === '노선 없음' ? '<span class="tag">노선 없음</span>' : '<span class="badge b-' + esc(r.st) + '">' + esc(r.st) + '</span> <small class="sub">' + r.on + '/' + r.routes + '</small>') + '</td></tr>';
     }).join('');
     const em = $('#xpEmptyMsg');
     em.classList.toggle('hidden', !!list.length);
-    em.textContent = all.length ? '조건에 맞는 정산코드가 없습니다.' : '노선이 없습니다.';
+    em.textContent = all.length ? '조건에 맞는 라우트 코드가 없습니다.' : '노선이 없습니다.';
     xpStatus();
   }
   function xpBn() { const el = $('#xpBn'); if (!el) return; const k = $('#xpBk').value, l = xpList(); el.textContent = '대상 ' + ($('#xpBe').checked ? l.filter((r) => !xpCur(r, k)).length : l.length) + '줄'; }
@@ -7280,9 +7298,16 @@
       xpRenderRows();
       return toast(list.length + '줄의 ' + PLABEL[k] + '를 ' + (raw ? won(raw) + '원으로' : '빈 칸으로') + ' 바꿨습니다. 단가 저장을 눌러야 저장됩니다.');
     }
+    const xm = e.target.closest('[data-xpm]');
+    if (xm) { // 💰 단가 보기 ↔ 📦 물량 보기
+      const wd = xm.dataset.xpm === 'wd'; if (wd === XP.wd) return;
+      if (wd && xpDirtyN() && !confirm('저장하지 않은 단가가 ' + xpDirtyN() + '줄 있습니다. 물량 보기로 넘어가도 고친 값은 남아 있습니다. 넘어갈까요?')) return;
+      XP.wd = wd; if (/^(w\d|p\d)$/.test(XP.sort.k)) XP.sort = { k: '', d: 0 }; if (wd) XP.empty = '';
+      return xpRender();
+    }
     if (e.target.id === 'xpCopy') {
       const cols = xpCols();
-      const lines = [cols.map((c) => c.t).join('\t')].concat(xpList().map((r) => [r.c.name, r.code, '구분' + r.n.level].concat(PKEYS.map((k) => xpCur(r, k))).concat([r.vol == null ? '' : Math.round(r.vol), r.volq == null ? '' : Math.round(r.volq), r.st]).join('\t')));
+      const lines = [cols.map((c) => c.t).join('\t')].concat(xpList().map((r) => [r.c.name, r.code, '구분' + r.n.level].concat(XP.wd ? WDS.map(([i]) => (r.wd && r.wd[i] != null ? r.wd[i] : '')) : PKEYS.map((k) => xpCur(r, k))).concat([r.vol == null ? '' : Math.round(r.vol), r.volq == null ? '' : Math.round(r.volq), r.st]).join('\t')));
       const txt = lines.join('\n');
       (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast((lines.length - 1) + '줄을 복사했습니다. 엑셀·구글시트에 붙여 넣으세요.'))
         .catch(() => { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('복사했습니다.'); });
@@ -7363,7 +7388,7 @@
     }).catch(() => RP).finally(() => { RP.loading = null; });
     return RP.loading;
   }
-  /** 라우트(정산코드)의 가장 최근 기록 (최신 주차에 없으면 그 전 주차 · stale 표시) */
+  /** 라우트(라우트 코드)의 가장 최근 기록 (최신 주차에 없으면 그 전 주차 · stale 표시) */
   function rpLatestOf(camp, code) {
     const e = RP.map.get(lnHead(rpKey(camp, code))); if (!e) return null;
     for (let i = RP.weeks.length - 1; i >= 0; i--) { const r = e.byWeek[RP.weeks[i]]; if (r) return Object.assign({ stale: RP.weeks[i] !== RP.latest }, r); }
@@ -7376,7 +7401,7 @@
     return '<span class="rp-trend" title="' + esc(wks.map((w) => { const r = e.byWeek[w]; return rpWkLabel(w) + ' ' + (r && r.grade ? r.grade + '등급' + (r.perf != null ? ' ' + r.perf + '%' : '') : '-'); }).join('\n')) + '">' +
       wks.map((w) => { const r = e.byWeek[w]; return '<i class="g' + (r && r.grade ? r.grade : 0) + '"></i>'; }).join('') + '</span>';
   }
-  /** 노선관리 노선 표의 '수행률' 칸: 노선 줄(110ABCD)의 글자마다 정산코드(110A…) 최신 등급 */
+  /** 노선관리 노선 표의 '수행률' 칸: 노선 줄(110ABCD)의 글자마다 라우트 코드(110A…) 최신 등급 */
   function perfCell(r) {
     if (!RP.loaded) return '<td class="sub">' + (RP.loading ? '…' : '-') + '</td>';
     const camp = campById(r.campId), cs = camp ? rpCamp(camp.name) : '';
@@ -8041,7 +8066,7 @@
     const camps = [...new Set(RP.rows.map((r) => r.camp).concat(SL.rows.map((r) => r.camp), RT.camps.map((c) => rpCamp(c.name))).filter(Boolean))].sort(koSort);
     const kinds = ['개명', '이관', '분할', '병합', '종료'];
     const edges = LN.edges.filter((e) => o.all || !cs || e.fromCamp === cs || e.toCamp === cs).slice().sort((a, b) => koSort(b.date || '', a.date || '') || koSort(a.fromCamp, b.fromCamp) || koSort(a.fromCode, b.fromCode));
-    // 이 캠프 노선의 정산코드(숫자+글자) 목록 → 라우트 칸 자동완성
+    // 이 캠프 노선의 라우트 코드(숫자+글자) 목록 → 라우트 칸 자동완성
     const rcodes = [...new Set((o.routes || []).flatMap((r) => { const L = GK.slice(1).map((k) => r[k]).filter(Boolean); return L.length ? L.map((x) => r.g1 + x) : [r.code]; }))].sort(koSort);
     box.insertAdjacentHTML('beforeend', '<div class="sec"><div class="xp-head"><h4 style="margin:0">라우트 변경이력' + (cs ? ' <span style="color:var(--brand)">' + esc(cs) + '</span>' : '') + ' <small class="sub">코드가 바뀐 라우트를 이어 붙입니다 · 없어진 라우트는 종료</small></h4><span class="grow"></span>' +
       (cs ? '<label class="check" style="align-self:center"><input type="checkbox" id="lnAllCk"' + (o.all ? ' checked' : '') + '> 전체 캠프 보기</label>' : '') + '<button class="btn sm" id="lnSugBtn">자동 제안 확인</button></div>' +
@@ -12657,10 +12682,10 @@
       ['탭', '진행상태별로 거르기 · 이름 · 차량번호 검색']
     ],
     'page:route': [
-      ['하는 일', '캠프마다 <b>노선 코드 · 정산코드(단가) · 담당 기사 · 참고 이미지 · 주소</b> 관리 — 정산서 단가와 기사 앱 "내 캠프"가 여기 값을 씀'],
+      ['하는 일', '캠프마다 <b>노선 코드 · 라우트 코드(단가) · 담당 기사 · 참고 이미지 · 주소</b> 관리 — 정산서 단가와 기사 앱 "내 캠프"가 여기 값을 씀'],
       ['순서', '[+ 캠프 추가] → 캠프 안에서 노선 추가 · 단가 코드 지정 · 기사 배정 · 참고 이미지(자동으로 저용량 미리보기) 올리기'],
       ['노선 바뀔 때', '<b>노선변경 예약</b> = 날짜부터 기사의 노선이 바뀜 (기사스케줄 · 정산에 자동 반영) · [노선 이관] = 쿠팡이 노선을 통째로 옮길 때 (안양1 110 → 군포1 212)'],
-      ['단가', '[전체 단가표] 에서 모든 캠프 정산코드별 단가를 한 표로 · 외부용차단가 = 용차 · 품앗이 청구 기본값'],
+      ['단가', '[전체 단가표] 에서 모든 캠프 라우트 코드별 단가를 한 표로 · 외부용차단가 = 용차 · 품앗이 청구 기본값'],
       ['기사 노선 정보', '캠프 화면 아래 = 기사들이 앱에 남긴 글 · 숨기기 · 되살리기 · 삭제']
     ],
     'page:perf': [
@@ -16328,7 +16353,8 @@
       { v: 'view-pumasi', key: ['배차일'], mid: ['센터 · 라우트'], num: ['확정 기사'], st: ['상태'], native: 1, nw: 64 },
       { v: 'view-issue', need: '결과', key: ['날짜'], mid: ['기사'], st: ['결과'] },
       { v: 'view-bib', key: ['이름'], mid: ['신청일'], st: ['진행상태'] },
-      { v: 'view-route', need: '정산코드', grp: '캠프', key: ['정산코드'], mid: ['1일 평균물량', '전월 총물량'], num: ['고정단가', '백업단가', '품앗이단가'], hd: 1, short: { '1일 평균물량': '하루 · 총물량', '정산코드': '코드', '고정단가': '고정', '백업단가': '백업', '품앗이단가': '품앗이' } },
+      { v: 'view-route', need: '월', grp: '캠프', key: ['라우트 코드'], num: ['월', '화', '수', '목', '금', '토', '일'], hd: 1, nw: 27, short: { '라우트 코드': '코드' } },
+      { v: 'view-route', need: '라우트 코드', grp: '캠프', key: ['라우트 코드'], mid: ['1일 평균물량', '전월 총물량'], num: ['고정단가', '백업단가', '품앗이단가'], hd: 1, short: { '1일 평균물량': '하루 · 총물량', '라우트 코드': '코드', '고정단가': '고정', '백업단가': '백업', '품앗이단가': '품앗이' } },
       { v: 'view-route', need: '노선코드', key: ['노선코드'], mid: ['메모'], num: ['1일 평균물량'], st: ['수행률'], hd: 1, nw: 118, short: { '노선코드': '노선', '1일 평균물량': '하루 · 총물량', '수행률': '수행률' } },
       { v: 'view-perf', need: '최신 등급', grp: '캠프', key: ['라우트'], mid: ['추세 (8주)'], st: ['최신 등급'] },
       { v: 'view-perf', need: '총점 (최신)', grp: '캠프', key: ['라우트'], num: ['총점 (최신)', '고객만족', '고객불만'], st: ['전 기간 대비'], hd: 1, short: { '라우트': '라우트', '총점 (최신)': '총점', '고객만족': '만족', '고객불만': '불만', '전 기간 대비': '변화' } },
