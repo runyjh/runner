@@ -3287,6 +3287,7 @@
     $('#meName').textContent = admin.name + ' (' + admin.loginId + ')';
     if (UPD) $('#updNo').textContent = ' · 업데이트 ' + UPD;
     driversLoaded = false;
+    setTimeout(() => { try { PQ.resend(); } catch (e) { /* 다음에 열 때 */ } }, 3000); // 누르고 바로 새로고침해서 끊긴 저장을 다시 보냄
     uiLoad();
     try { if (document.documentElement.classList.contains('m')) $('#q').placeholder = '이름 · 아이디 · 연락처 · 차량'; } catch (e) { /* 무시 */ }
     setTimeout(() => { try { liveStart(); } catch (e) {} }, 3000); // 실시간 갱신 구독 (Firestore pub/meta)
@@ -4460,7 +4461,8 @@
     api('adm_memoMonth', ym).then((r) => { if (seq !== DSB.memoSeq) return; if (!r.ok) return toast(r.msg); DSB.memoYm = ym; DSB.memos = r.memos || []; DSB.pinned = r.pinned || []; admKeep.set('memo', { ym: ym, memos: DSB.memos }); dsMemoPaint(); }).catch(() => {});
   }
   function dsMemoPaint() {
-    const list = (DSB.memos || []).filter((m) => m.date === DSB.memoDay), pins = DSB.pinned || [];
+    PQ.memo(DSB.memos, DSB.pinned);
+    const list = (DSB.memos || []).filter((m) => m.date === DSB.memoDay), pins = (DSB.pinned || []).filter((m) => !m.done);
     $('#dsMemoList').innerHTML = (pins.length ? '<ul class="db-list ds-memo">' + pins.map((m) => '<li style="background:#fffbea"><span class="tm">📌</span><span class="t' + (m.color ? ' mc-' + m.color : '') + '">' + esc(m.content).replace(/\n/g, '<br>') + (m.until ? ' <small style="color:#a07a1a">~' + esc(m.until.slice(5).replace('-', '/')) + '</small>' : '') + '</span></li>').join('') + '</ul>' : '') + (list.length ? '<ul class="db-list ds-memo">' + list.map((m) => '<li class="' + (m.done ? 'done' : '') + (m.note ? ' note' : '') + '"><span class="tm">' + esc(m.time || (m.note ? '비고' : '')) + '</span><span class="t' + (m.color ? ' mc-' + m.color : '') + '">' + esc(m.content).replace(/\n/g, '<br>') + '</span>' + (m.done ? '<span class="ok">완료</span>' : '') + '</li>').join('') + '</ul>' : '<div class="db-empty">이날 적힌 업무가 없습니다.</div>');
   }
   const dsShift = (n) => { const p = (DSB.memoDay || ymdLocal(new Date())).split('-'); dsMemo(dsYmd(new Date(+p[0], +p[1] - 1, +p[2] + n))); };
@@ -6281,7 +6283,7 @@
     api('adm_memoMonth', memoMonth).then((r) => {
       if (asked !== memoMonth) return; // 그 사이 다른 달로 이동함
       if (!r.ok) return toast(r.msg);
-      memos = r.memos.slice().sort(memoSort); memoToday = r.today || memoToday; pinned = r.pinned || []; renderPins();
+      memos = r.memos.slice().sort(memoSort); memoToday = r.today || memoToday; pinned = r.pinned || []; PQ.memo(memos, pinned); pinned = pinned.filter((x) => !x.done); renderPins();
       noteLabels = r.noteLabels || []; fillCats($('#memoCat'), $('#memoCat').value || noteLabels[0]);
       $('#lateBar').classList.toggle('hidden', !r.pastUndone);
       $('#lateText').textContent = '지난 날짜에 완료 안 된 메모가 ' + r.pastUndone + '건 있습니다.';
@@ -6372,8 +6374,8 @@
     const x = pinned.find((p) => p.id === it.dataset.pid); if (!x) return;
     if (e.target.dataset.pact === 'go') return openMonth(ymOf(x.date), x.date);
     if (e.target.dataset.pact === 'done') {
-      e.target.disabled = true;
-      api('adm_memoSave', { id: x.id, done: true }).then((r) => { if (!r.ok) { e.target.checked = false; e.target.disabled = false; return toast(r.msg); } toast('완료 — 항상 보기에서 뺐습니다.'); openMonth(memoMonth, selDate); }).catch(() => { e.target.checked = false; e.target.disabled = false; });
+      e.target.disabled = true; it.style.opacity = '.45';
+      PQ.memoSave(x.id, true).then((r) => { if (!r.ok) { e.target.checked = false; e.target.disabled = false; it.style.opacity = ''; return toast(r.msg); } HM.at = 0; DSB.memos = null; toast('완료 — 항상 보기에서 뺐습니다.'); openMonth(memoMonth, selDate); }).catch(() => { e.target.checked = false; e.target.disabled = false; });
     }
   });
   // 완료 / 수정 / 삭제
@@ -6384,8 +6386,10 @@
     if (act === 'done') {
       const want = e.target.checked;
       box.classList.toggle('done', want);
-      api('adm_memoSave', { id: id, done: want }).then((r) => {
-        if (!r.ok) { toast(r.msg); e.target.checked = !want; box.classList.toggle('done', !want); return; }
+      m.done = want; // 누르는 즉시 반영 (PQ: 새로고침해도 그대로)
+      PQ.memoSave(id, want).then((r) => {
+        if (!r.ok) { toast(r.msg); m.done = !want; e.target.checked = !want; box.classList.toggle('done', !want); return; }
+        HM.at = 0; DSB.memos = null;
         if (m.pin) return openMonth(memoMonth, selDate); // 항상 보기 묶음도 새로
         upsertMemo(r.memo); refreshLate();
       }).catch(() => { e.target.checked = !want; box.classList.toggle('done', !want); });
@@ -11073,11 +11077,33 @@
   /** 내 스케줄 모드: 관리자 본인 줄만 한 달 달력으로 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   let sTd = false, sCampKeep = ''; // sCampKeep = 홈으로 가기 전에 관리에서 보던 캠프 (돌아오면 그 캠프로)
   const HM = { ym: '', memos: null, at: 0, p: null };
+  // ── 체크 · 스위치 공용: 누르는 순간 이 기기에 먼저 적어 두고 서버에 저장 ──
+  //  새로고침해도 방금 누른 대로 보이고(서버가 아직 옛 자료를 줘도) · 저장이 끊겼으면 다음에 열 때 다시 보냄
+  //  runner.pq = { 열쇠: { t: 누른 시각, ok: 저장 끝, fn, a: 인자, v: 누른 값 } } — 저장이 끝나고 2분 지나면 지움 · 못 끝낸 것은 30분까지
+  const PQ = {
+    all() { let o = {}; try { o = JSON.parse(localStorage.getItem('runner.pq') || '{}') || {}; } catch (e) { o = {}; } const now = Date.now(); let ch = false;
+      Object.keys(o).forEach((k) => { const x = o[k] || {}; if (now - (x.t || 0) > (x.ok ? 120000 : 1800000)) { delete o[k]; ch = true; } }); if (ch) this.put(o); return o; },
+    put(o) { try { localStorage.setItem('runner.pq', JSON.stringify(o)); } catch (e) { /* 적어 두지 못해도 화면·저장은 그대로 */ } },
+    get(key) { return this.all()[key] || null; },
+    ok(key) { const o = this.all(); if (o[key]) { o[key].t = Date.now(); o[key].ok = 1; this.put(o); } },
+    del(key) { const o = this.all(); if (o[key]) { delete o[key]; this.put(o); } },
+    /** 적어 두고 저장. 서버가 안 된다고 하면 적어 둔 것을 지움 (부른 쪽이 화면을 되돌림) · 연결이 끊기면 남겨 둠 */
+    send(key, fn, args, val) {
+      const o = this.all(); o[key] = { t: Date.now(), ok: 0, fn: fn, a: args, v: val }; this.put(o);
+      return api.apply(null, [fn].concat(args)).then((r) => { if (r && r.ok) this.ok(key); else this.del(key); return r; });
+    },
+    /** 저장이 끊긴 것(누르고 바로 새로고침 등)을 다시 보냄 */
+    resend() { const o = this.all(); Object.keys(o).forEach((k) => { const x = o[k]; if (x.ok || !x.fn || Date.now() - x.t < 8000) return;
+      api.apply(null, [x.fn].concat(x.a || [])).then((r) => { if (r && r.ok) this.ok(k); else this.del(k); }).catch(() => {}); }); },
+    /** 업무스케줄 목록에 덮어씀: 방금 체크한(푼) 완료 상태 */
+    memo() { const o = this.all(); if (!Object.keys(o).length) return; [].slice.call(arguments).forEach((L) => (L || []).forEach((m) => { const x = o['memo:' + m.id]; if (x) m.done = !!x.v; })); },
+    memoSave(id, done) { return this.send('memo:' + id, 'adm_memoSave', [{ id: id, done: done }], done); }
+  };
   function hmLoad() {
     const ym = ymdLocal(new Date()).slice(0, 7);
     if (HM.p || (HM.ym === ym && HM.memos && Date.now() - HM.at < 300000)) return;
     if (!HM.memos) { const km = admKeep.getP('hmemo'); if (km && km.ym === ym && Array.isArray(km.memos)) { HM.ym = ym; HM.memos = km.memos; HM.pinned = km.pinned || []; HM.late = km.late || []; } }
-    HM.p = api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { HM.ym = ym; HM.memos = r.memos || []; HM.pinned = r.pinned || []; HM.late = r.late || []; HM.at = Date.now(); admKeep.setP('hmemo', { ym: ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); if (sTd) { try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } } }).catch(() => {}).finally(() => { HM.p = null; });
+    HM.p = api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { HM.ym = ym; HM.memos = r.memos || []; HM.pinned = r.pinned || []; HM.late = r.late || []; HM.at = Date.now(); PQ.memo(HM.memos, HM.pinned, HM.late); admKeep.setP('hmemo', { ym: ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); if (sTd) { try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } } }).catch(() => {}).finally(() => { HM.p = null; });
   }
   /** 휴대폰 기사스케줄 화면의 모드: 'my' 내 스케줄 · 'today' 오늘(PDD 한눈에) · '' 관리용 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   function schMode(m) {
@@ -11135,6 +11161,7 @@
       const tdy = ymdLocal(new Date()), who = (typeof me !== 'undefined' && me) || {};
       // 오늘 업무 = 📌 항상 보기(끝낼 때까지 · '까지' 날짜까지) + 최근 7일 안의 지난 미완료 + 오늘 날짜 업무 — 완료한 것은 빠짐 (모두 보기에서 확인)
       const dGap = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000), mdS = (d) => +d.slice(5, 7) + '/' + +d.slice(8, 10);
+      PQ.memo(HM.memos, HM.pinned, HM.late);
       const pins = (HM.pinned || []).filter((m) => !m.note && !m.done), seenId = new Set(pins.map((m) => m.id));
       const lates = (HM.late || []).filter((m) => !m.done && !seenId.has(m.id) && m.date < tdy); lates.forEach((m) => seenId.add(m.id));
       // 날짜 요약: 📌 = 적은 날 · 까지(D-몇) / 지난 것 = 며칠 전 / 오늘 = 시간
@@ -11249,12 +11276,13 @@
     if (ck) { // 홈에서 바로 완료 체크: 먼저 화면에서 빼고 저장 — 실패하면 되돌림
       const id = ck.dataset.tdck, hit = [HM.memos, HM.pinned, HM.late].map((L) => (L || []).filter((m) => m.id === id)).reduce((a, b) => a.concat(b), []);
       if (!hit.length || ck.disabled) return;
-      ck.disabled = true; hit.forEach((m) => { m.done = true; }); paintMob();
-      api('adm_memoSave', { id: id, done: true }).then((r) => {
+      ck.disabled = true; hit.forEach((m) => { m.done = true; }); // PQ: 이 기기에 먼저 적어 둠 → 저장을 기다리는 동안 새로고침해도 다시 안 나옴
+      admKeep.setP('hmemo', { ym: HM.ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); paintMob();
+      PQ.memoSave(id, true).then((r) => {
         if (!r.ok) { hit.forEach((m) => { m.done = false; }); paintMob(); return toast(r.msg); }
-        admKeep.setP('hmemo', { ym: HM.ym, memos: HM.memos, pinned: HM.pinned, late: HM.late }); DSB.memos = null;
+        DSB.memos = null;
         toast('완료로 표시했습니다. (되돌리기: 모두 보기)');
-      }).catch(() => { hit.forEach((m) => { m.done = false; }); paintMob(); });
+      }).catch(() => { /* 연결이 끊김: 적어 둔 것은 남기고 다음에 열 때 다시 보냄 */ });
       return;
     }
     const tg = t.closest('[data-tdgo]'); if (tg) { const v = tg.dataset.tdgo; if (v === 'sched') mSchedGo(''); else { schMode(''); if (v === 'peak') { RP.tab = 'pk'; navGo('perf'); if (currentView === 'perf') rpRender(); } else { if (v === 'perf') RP.tab = 'wk'; navGo(v); } } window.scrollTo(0, 0); return; }
@@ -13486,6 +13514,11 @@
     }).catch(() => { el.disabled = false; });
   });
   // 자금배분: 쿠팡 입금 → 통장별
+  /** 자금 일정 체크(입금 받음 · 이체 완료 · 운영자 선지급): 방금 누른 것이 아직 저장 중이면 누른 대로 보여 줌 */
+  function pqFund() {
+    const o = PQ.all(), pre = 'fund:' + STX.month + ':';
+    Object.keys(o).forEach((k) => { if (k.indexOf(pre) !== 0) return; const ck = $('#stPnl [data-fk="' + k.slice(pre.length) + '"][data-ff="done"]'); if (ck) ck.checked = !!o[k].v; });
+  }
   function loadFund() {
     const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     const el = $('#stPnl');
@@ -13494,7 +13527,7 @@
     api('adm_stlFund', STX.month).then((r) => { if (ps !== STX.paneSeq) return;
       if (seq !== STX.fundSeq) return;
       if (!r.ok) { el.innerHTML = ''; return toast(r.msg); }
-      STX.fund = r; renderFund();
+      STX.fund = r; renderFund(); pqFund();
     }).catch(() => {});
   }
   function renderFund() {
@@ -13536,7 +13569,7 @@
       const checked = ff === 'done' ? el.checked : ck.checked, date = (dt && dt.value) || ((F.dates || {}).coupang || '').slice(0, 10) || ymdLocal(new Date());
       if (ff === 'date' && !checked) return; // 날짜만 바꾸고 체크 전이면 저장 안 함
       el.disabled = true;
-      api('adm_stlPaySet', STX.month, (F.early || []).map((x) => ({ id: x.id, checked: checked, date: checked ? date : '' }))).then((r) => {
+      PQ.send('fund:' + STX.month + ':early', 'adm_stlPaySet', [STX.month, (F.early || []).map((x) => ({ id: x.id, checked: checked, date: checked ? date : '' }))], checked).then((r) => {
         if (!r.ok) { el.disabled = false; return toast(r.msg); }
         toast(checked ? '운영자 선지급을 입금 완료로 기록했습니다 (입금확인에도 체크 · 쿠팡정산 통장에서 출금).' : '선지급 체크를 풀었습니다.');
         if (STX.sum) (F.early || []).forEach((x) => { const d = STX.sum.drivers.find((y) => y.id === x.id); if (d) { d.checked = checked; d.payDate = checked ? date : ''; } });
@@ -13550,7 +13583,7 @@
     if (ff === 'done' && el.checked) { const box = el.closest('tr, .fund-dep, .row'), a = box && box.querySelector('[data-ff="amt"]'), dt = box && box.querySelector('[data-ff="date"]'); if (a && a.value) f.amt = a.value.replace(/[^\d-]/g, ''); else { const it = key === 'deposit' ? STX.fund.deposit : STX.fund.items.find((x) => x.key === key); if (it) f.amt = String(it.plan); } if (dt && dt.value) f.date = dt.value; else f.date = ymdLocal(new Date()); }
     if (ff === 'done' && !el.checked) f.amt = '';
     el.disabled = true;
-    api('adm_stlFundSave', STX.month, key, f).then((r) => {
+    (ff === 'done' ? PQ.send('fund:' + STX.month + ':' + key, 'adm_stlFundSave', [STX.month, key, f], el.checked) : api('adm_stlFundSave', STX.month, key, f)).then((r) => {
       if (!r.ok) { el.disabled = false; return toast(r.msg); }
       if (ff === 'done') toast(el.checked ? (key === 'deposit' ? '쿠팡 입금을 받음으로 기록했습니다.' : '이체 완료로 기록했습니다 (통장 잔액에 반영).') : '완료를 취소했습니다.');
       loadFund();
@@ -14203,7 +14236,10 @@
   function loadPay() {
     const ps = STX.paneSeq; // 응답이 왔을 때 다른 탭으로 옮겨 갔으면 그리지 않는다
     $('#payTable').innerHTML = '<tr><td style="padding:30px"><div class="spin"></div></td></tr>';
-    return api('adm_stlPayList', STX.month).then((r) => { if (ps !== STX.paneSeq) return; if (!r.ok) return toast(r.msg); STX.pay = r; renderPay(); }).catch(() => {});
+    return api('adm_stlPayList', STX.month).then((r) => { if (ps !== STX.paneSeq) return; if (!r.ok) return toast(r.msg);
+      { const o = PQ.all(), pre = 'pay:' + STX.month + ':', td = ymdLocal(new Date()); // 방금 누른 입금확인 체크 (저장 중이거나 서버가 아직 옛 자료를 줄 때)
+        (r.list || []).forEach((x) => { const q = o[pre + x.id]; if (q) { x.checked = !!q.v; x.payDate = q.v ? (x.payDate || td) : ''; } }); }
+      STX.pay = r; renderPay(); }).catch(() => {});
   }
   function renderPay() {
     const P = STX.pay; if (!P) return;
@@ -14238,9 +14274,9 @@
     const today = ymdLocal(new Date());
     if (c) apply({ checked: c.checked, payDate: c.checked ? (it && it.payDate || today) : '' }); else apply({ memo: m.value });
     if (c) renderPay();
-    api('adm_stlPaySet', STX.month, [body]).then((r) => {
+    (c ? PQ.send('pay:' + STX.month + ':' + id, 'adm_stlPaySet', [STX.month, [body]], c.checked) : api('adm_stlPaySet', STX.month, [body])).then((r) => {
       if (!r.ok) { toast(r.msg); apply(was); renderPay(); }
-    }).catch(() => { apply(was); renderPay(); });
+    }).catch(() => { if (!c) { apply(was); renderPay(); } /* 체크는 적어 둔 대로 두고 다음에 열 때 다시 보냄 */ });
   });
   $('#payCopy').addEventListener('click', () => {
     const P = STX.pay; if (!P) return;
@@ -16043,7 +16079,10 @@
   const cfgSw = (on, attr) => '<button type="button" class="cfg-tg' + (on ? ' on' : '') + '" ' + attr + ' role="switch" aria-checked="' + (on ? 'true' : 'false') + '"></button>';
   function cfgAppLoad() {
     if (!CFGT.app) $('#cfgApp').innerHTML = '<div class="sub" style="padding:30px">불러오는 중…</div>';
-    return api('adm_appCfg').then((r) => { if (!r.ok) return toast(r.msg); CFGT.app = r; cfgAppPaint(); }).catch(() => {});
+    return api('adm_appCfg').then((r) => { if (!r.ok) return toast(r.msg);
+      const q = (k) => PQ.get('cfg:' + k); // 방금 누른 스위치 (저장 중이거나 서버가 아직 옛 값을 줄 때)
+      if (q('menu')) r.menu = Object.assign({}, r.menu, q('menu').v); if (q('show')) r.appShow = !!q('show').v; if (q('post')) r.postOn = !!q('post').v; if (q('offer')) r.offerOn = !!q('offer').v;
+      CFGT.app = r; cfgAppPaint(); }).catch(() => {});
   }
   function cfgAppPaint() {
     const r = CFGT.app; if (!r) return;
@@ -16065,9 +16104,12 @@
       '<div class="cfg-it"><div><b>마감 전 달도 보이기</b><small>확정 전 · 세금계산서 발행 정보는 숨김</small></div>' + cfgSw(r.appShow, 'data-stlshow="1"') + '</div>' +
       '<div class="cfg-it"><div><b style="white-space:nowrap">보여 줄 기간</b></div><select class="inp" id="cfgRange">' + r.ranges.map((x) => '<option' + (x === r.appRange ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></div></div></div>';
   }
-  function cfgAppSave(patch, okMsg) {
-    if (CFGT.busy) return; CFGT.busy = true;
-    return api('adm_appCfgSet', patch).then((x) => { if (!x.ok) return toast(x.msg); CFGT.app.menu = x.menu; CFGT.app.ex = x.ex; if (patch.appShow !== undefined) CFGT.app.appShow = !!patch.appShow; cfgAppPaint(); toast(okMsg || '저장했습니다 · 기사앱을 다시 열면 적용'); }).catch(() => {}).finally(() => { CFGT.busy = false; });
+  /** 저장. pk 가 있으면 스위치(이미 화면에 반영함): 이 기기에 적어 두고 보냄 · 실패하면 undo 로 되돌림 */
+  function cfgAppSave(patch, pk, val, undo, okMsg) {
+    if (CFGT.busy) { if (undo) { undo(); cfgAppPaint(); } return; } CFGT.busy = true;
+    const p = pk ? PQ.send('cfg:' + pk, 'adm_appCfgSet', [patch], val) : api('adm_appCfgSet', patch);
+    return p.then((x) => { if (!x.ok) { if (undo) { undo(); cfgAppPaint(); } return toast(x.msg); } CFGT.app.menu = x.menu; CFGT.app.ex = x.ex; if (patch.appShow !== undefined) CFGT.app.appShow = !!patch.appShow; cfgAppPaint(); toast(okMsg || '저장했습니다 · 기사앱을 다시 열면 적용'); })
+      .catch(() => {}).finally(() => { CFGT.busy = false; });
   }
   $('#cfgApp').addEventListener('click', (e) => {
     const r = CFGT.app; if (!r) return;
@@ -16075,19 +16117,21 @@
     if (m) {
       const k = m.dataset.menu, on = !r.menu[k], nmk = (r.menus.find((x) => x[0] === k) || [])[1];
       if (!on && k === 'pm' && r.pmDone.length && !confirm('배차 확정된 품앗이 일감이 ' + r.pmDone.length + '건 있습니다. 품앗이를 끄면 기사가 앱에서 일감 정보를 볼 수 없습니다. 끌까요?')) return;
-      const menu = Object.assign({}, r.menu); menu[k] = on;
-      return cfgAppSave({ menu: menu }, nmk + (on ? ' 메뉴를 켰습니다.' : ' 메뉴를 「준비 중」으로 바꿨습니다.') + ' 기사앱을 다시 열면 적용됩니다.');
+      const menu = Object.assign({}, r.menu), was = r.menu; menu[k] = on;
+      r.menu = menu; cfgAppPaint(); // 스위치는 누르는 즉시
+      return cfgAppSave({ menu: menu }, 'menu', menu, () => { r.menu = was; }, nmk + (on ? ' 메뉴를 켰습니다.' : ' 메뉴를 「준비 중」으로 바꿨습니다.') + ' 기사앱을 다시 열면 적용됩니다.');
     }
-    if (d) return cfgAppSave({ ex: r.ex.filter((id) => id !== d.dataset.exdel) }, '뺐습니다.');
+    if (d) return cfgAppSave({ ex: r.ex.filter((id) => id !== d.dataset.exdel) }, '', null, null, '뺐습니다.');
     if (p) {
       const offer = p.dataset.pmsw === 'offer', on = !(offer ? r.offerOn : r.postOn);
-      return api('adm_pmPostSet', on, offer ? 'offer' : undefined).then((x) => { if (!x.ok) return toast(x.msg); r.postOn = x.postOn; r.offerOn = x.offerOn; cfgAppPaint(); toast((offer ? '일감 제안을 ' : '일감 올리기를 ') + (on ? '켰습니다.' : '껐습니다.')); }).catch(() => {});
+      if (offer) r.offerOn = on; else r.postOn = on; cfgAppPaint(); // 스위치는 누르는 즉시
+      return PQ.send('cfg:' + (offer ? 'offer' : 'post'), 'adm_pmPostSet', offer ? [on, 'offer'] : [on], on).then((x) => { if (!x.ok) { if (offer) r.offerOn = !on; else r.postOn = !on; cfgAppPaint(); return toast(x.msg); } r.postOn = x.postOn; r.offerOn = x.offerOn; cfgAppPaint(); toast((offer ? '일감 제안을 ' : '일감 올리기를 ') + (on ? '켰습니다.' : '껐습니다.')); }).catch(() => {});
     }
-    if (st) return cfgAppSave({ appShow: !r.appShow }, !r.appShow ? '마감 전 달도 기사앱에 「확정 전」으로 보입니다.' : '마감한 달만 기사앱에 보입니다.');
+    if (st) { const was = r.appShow, on = !was; r.appShow = on; cfgAppPaint(); return cfgAppSave({ appShow: on }, 'show', on, () => { r.appShow = was; }, on ? '마감 전 달도 기사앱에 「확정 전」으로 보입니다.' : '마감한 달만 기사앱에 보입니다.'); }
   });
   $('#cfgApp').addEventListener('change', (e) => {
     const r = CFGT.app; if (!r) return;
-    if (e.target.id === 'cfgExAdd' && e.target.value) return cfgAppSave({ ex: r.ex.concat([e.target.value]) }, '추가했습니다.');
+    if (e.target.id === 'cfgExAdd' && e.target.value) return cfgAppSave({ ex: r.ex.concat([e.target.value]) }, '', null, null, '추가했습니다.');
     if (e.target.id === 'cfgRange') { const v = e.target.value; api('adm_stlAppRangeSet', v).then((x) => { if (!x.ok) return toast(x.msg); r.appRange = v; toast('기사앱에 보이는 달: ' + (x.months.length ? x.months.join(', ') : '없음')); }).catch(() => {}); }
   });
   function cfgLinkPaint() {
