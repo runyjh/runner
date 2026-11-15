@@ -882,10 +882,10 @@
   .rt-wrap { display: block; }
   /* 노선관리 맨 위 탭: 한 덩어리 버튼 (휴대폰 · PC 같은 모양) */
   .rtv-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; } .rtv-bar #rtReload { background: #fff; }
-  .rtv-seg { display: inline-grid; grid-template-columns: repeat(4, minmax(120px, 150px)); background: #e9edf2; border-radius: 12px; padding: 4px; gap: 2px; }
+  .rtv-seg { display: inline-grid; grid-template-columns: repeat(5, minmax(110px, 140px)); background: #e9edf2; border-radius: 12px; padding: 4px; gap: 2px; }
   .rtv-seg button { display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: none; padding: 9px 4px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--sub); cursor: pointer; white-space: nowrap; }
   .rtv-seg button i { font-style: normal; font-size: 16px; line-height: 1; } .rtv-seg button.on { background: #fff; color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-  html.m .rtv-bar { flex-direction: column; align-items: stretch; } html.m .rtv-bar #rtReload { display: none; } html.m .rtv-seg { display: grid; grid-template-columns: repeat(4, 1fr); } html.m .rtv-seg button { flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 2px; }
+  html.m .rtv-bar { flex-direction: column; align-items: stretch; } html.m .rtv-bar #rtReload { display: none; } html.m .rtv-seg { display: grid; grid-template-columns: repeat(5, 1fr); } html.m .rtv-seg button { flex-direction: column; gap: 2px; font-size: 12px; padding: 7px 2px; }
   .camp-side { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; } .camp-side #campQ { flex: none; width: 150px; height: 34px; border-radius: 999px; font-size: 13px; margin-left: auto; }
   .camp-add { border: 1.5px dashed #b8c4d4; background: none; color: var(--brand); border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; } .camp-add:hover { background: #eef4ff; border-color: var(--brand); }
   #rpUpBtn { display: none; } html.m #rpUpBtn { display: flex; width: 100%; align-items: center; justify-content: center; margin: 0 0 10px; }
@@ -1621,7 +1621,7 @@
   .mmore .mm-card.pc { background: #fafafa; } .mmore .mm-card.pc button { color: #6b7280; font-weight: 600; }
   .mmore .mm-me { text-align: center; color: var(--sub); font-size: 12px; margin-top: 4px; }
   /* ── 휴대폰 공통 틀: 보기 기본 — 설명 · 표 도구 · PC 전용 버튼은 숨기고, 칩은 한 줄(옆으로 밀기) ── */
-  html.m .pg-help, html.m main > section > p.sub, html.m .tkbar, html.m .head .tools [id$="Reload"], html.m #reloadBtn { display: none !important; }
+  html.m .pg-help, html.m .st-helpg, html.m main > section > p.sub, html.m .tkbar, html.m .head .tools [id$="Reload"], html.m #reloadBtn { display: none !important; }
   html.m #drvNew, html.m #coBtn, html.m #bibNew, html.m #campNew, html.m #rtvPerf > .updrop, html.m #paPostSw, html.m #paOfferSw, html.m #acCatEdit, html.m #acNew,
   html.m #paFrom, html.m #paTo, html.m #isFrom, html.m #isTo, html.m .is-mionly, html.m #tiFromStl, html.m #tiNew, html.m #view-einv .updrop, html.m #irCfgBtn, html.m #irXlsx, html.m #stRecalc, html.m #stGearBtn { display: none !important; }
   html.m .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-left: -12px; margin-right: -12px; padding: 0 12px; } html.m .tabs::-webkit-scrollbar { display: none; } html.m .tabs > * { flex: none; }
@@ -2203,7 +2203,7 @@
       <h2>노선관리</h2>
       <div class="tools"><button class="hidden" id="rpReload" type="button"></button><button class="hidden" id="xpOpen" type="button"></button></div>
     </div>
-    <div class="rtv-bar"><div class="rtv-seg" id="rtvTabs" role="tablist" aria-label="노선관리 보기"><button type="button" data-rtv="routes" class="on"><i>🛣</i>노선</button><button type="button" data-rtv="price"><i>💰</i>단가·물량</button><button type="button" data-rtv="perf"><i>📊</i>수행률</button><button type="button" data-rtv="fb"><i>🧊</i>프백·피크</button></div><button class="btn sm ghost" id="rtReload" type="button" title="지금 탭의 자료를 새로 불러옵니다">↻ 새로고침</button></div>
+    <div class="rtv-bar"><div class="rtv-seg" id="rtvTabs" role="tablist" aria-label="노선관리 보기"><button type="button" data-rtv="routes" class="on"><i>🛣</i>노선</button><button type="button" data-rtv="price"><i>💰</i>단가·물량</button><button type="button" data-rtv="perf"><i>📊</i>수행률</button><button type="button" data-rtv="fb"><i>🧊</i>프백·피크</button><button type="button" data-rtv="ln" title="코드가 바뀐 라우트 이어 붙이기 · 없어진 라우트는 종료 (수행률·SLA 이력이 이어집니다)"><i>🔀</i>변경이력</button></div><button class="btn sm ghost" id="rtReload" type="button" title="지금 탭의 자료를 새로 불러옵니다">↻ 새로고침</button></div>
     <div class="rt-wrap">
       <div class="camp-side">
         <div class="camp-list" id="campList"></div>
@@ -2213,6 +2213,7 @@
       <div id="campMain"></div>
     </div>
     <div id="allPrices" class="hidden"></div>
+    <div id="rtvLn" class="hidden"><div id="tabLn"></div></div>
     <div id="rtvPerf" class="hidden">
     <button class="btn" id="rpUpBtn" title="쿠팡 파일 4가지 — 주간 수행률 안내 · 월간 SLA 점수 · 프레시백 가중요인 · 피크 예상 물량 (파일 종류 자동 인식 · 같은 기간은 덮어씀 · 저장 전 미리보기)">⬆ 쿠팡 파일 올리기</button><input type="file" id="rpFile" multiple accept=".xlsx" class="hidden">
     <div class="updrop" data-up="#rpFile">
@@ -6955,7 +6956,7 @@
       return;
     }
     const orphan = curCamp === ORPHAN;
-    if (orphan) rtab = 'routes';
+    if (orphan || rtab === 'ln') rtab = 'routes'; // 변경이력은 맨 위 🔀 변경이력 탭으로 옮김
     const c = orphan ? { name: '캠프 미지정', address: '', memo: '' } : campById(curCamp);
     const imgs = orphan ? [] : imagesOf(curCamp);
     m.innerHTML =
@@ -6971,13 +6972,13 @@
       '<div class="sec"><div class="sec-h"><div class="rtabs">' +
           '<button class="tab' + (rtab === 'routes' ? ' on' : '') + '" data-rtab="routes">노선 <b id="rCount"></b></button>' +
           (orphan ? '' : '<button class="tab' + (rtab === 'prices' ? ' on' : '') + '" data-rtab="prices">구분별 단가 <b id="pCount"></b></button>' +
-            '<button class="tab' + (rtab === 'ln' ? ' on' : '') + '" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 없어진 라우트는 종료 (수행률·SLA 이력이 이어집니다)">변경이력 <b id="lnCount"></b></button>') + '</div>' +
+            '') + '</div>' +
           (orphan ? '' : '<button class="btn sm' + (rtab === 'routes' ? '' : ' hidden') + '" data-ract="route-add">+ 노선 추가</button>') + '</div>' +
         '<div id="tabRoutes"' + (rtab === 'routes' ? '' : ' class="hidden"') + '>' +
         '<div class="rfilters" id="rFilters"></div><div class="rbulk hidden" id="rBulk"></div>' +
         '<div class="table-wrap rt-table"><table><thead><tr><th class="ck"><input type="checkbox" id="rAll" aria-label="모두 선택"></th><th>노선코드</th><th>구분1</th><th>구분2</th><th>구분3</th><th>구분4</th><th>구분5</th><th>사용여부</th><th title="전월 쿠팡 정산서 · 라우트별 배송건수(반품 포함) ÷ 배송한 날 수">1일 평균물량</th><th title="전월 쿠팡 정산서 · 정산기간(전전월 26일 ~ 전월 25일) 동안 라우트별 배송건수 합계 (반품 포함)">전월 총물량</th><th title="쿠팡 주간 수행률 최신 등급 (1~2 우수 · 3~4 위탁 조정 대상) · 누르면 이력">수행률</th><th>메모</th><th>수정일시</th></tr></thead>' +
         '<tbody id="rRows"></tbody></table><div class="empty hidden" id="rEmpty"></div></div><p class="vol-note" id="rVolNote">' + volNote() + '</p></div>' +
-        (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div><div id="tabLn"' + (rtab === 'ln' ? '' : ' class="hidden"') + '></div>') +
+        (orphan ? '' : '<div id="tabPrices"' + (rtab === 'prices' ? '' : ' class="hidden"') + '></div>') +
       '</div>' +
       (orphan ? '' :
       '<div class="sec"><div class="sec-h"><h4>참고 이ミ지<small>' + imgs.length + '장</small></h4><span style="display:flex;gap:6px">' + (imgs.length ? '<button class="btn sm ghost" data-ract="img-sel">' + (RT.imgSel ? '선택 끝내기' : '여러 장 선택') + '</button>' : '') + '<button class="btn sm" data-ract="img-add">+ 이미지 추가</button></span></div>' +
@@ -7050,18 +7051,18 @@
     const box = $('#tabLn'); if (!box) return;
     const c = campById(curCamp), cs = c ? rpCamp(c.name) : '';
     const cnt = $('#lnCount'); if (cnt) cnt.textContent = LN.loaded ? LN.edges.filter((e) => !cs || e.fromCamp === cs || e.toCamp === cs).length + '건' : '';
-    if (rtab !== 'ln') return;
+    if (RTV.tab !== 'ln') return;
     if (!RP.loaded || !SL.loaded) {
       box.innerHTML = '<div class="sec"><div class="spin"></div></div>';
       const p = [];
       if (!RP.loaded) p.push(loadPerf(true)); if (!SL.loaded) p.push(loadSla(true));
       // 불러오기 실패면 다시 부르지 않고 '다시' 버튼 (예전: 실패하면 2~3초마다 끝없이 다시 불렀음)
-      Promise.all(p).then(() => { if (rtab !== 'ln') return; if (RP.loaded && SL.loaded) renderLnTab(); else box.innerHTML = '<div class="sec sub">변경이력을 불러오지 못했습니다. <button type="button" class="btn ghost sm" id="lnRetry">다시</button></div>'; })
-        .catch(() => { if (rtab === 'ln') box.innerHTML = '<div class="sec sub">변경이력을 불러오지 못했습니다. <button type="button" class="btn ghost sm" id="lnRetry">다시</button></div>'; });
+      Promise.all(p).then(() => { if (RTV.tab !== 'ln') return; if (RP.loaded && SL.loaded) renderLnTab(); else box.innerHTML = '<div class="sec sub">변경이력을 불러오지 못했습니다. <button type="button" class="btn ghost sm" id="lnRetry">다시</button></div>'; })
+        .catch(() => { if (RTV.tab === 'ln') box.innerHTML = '<div class="sec sub">변경이력을 불러오지 못했습니다. <button type="button" class="btn ghost sm" id="lnRetry">다시</button></div>'; });
       return;
     }
     box.innerHTML = '';
-    lnRender(box, { camp: cs, all: lnAll, routes: routesOf(curCamp) });
+    lnRender(box, { camp: '', all: true, routes: RT.routes });
   }
 
   function renderFilters() {
@@ -7175,9 +7176,9 @@
     else renderCampMain();
   }
   $('#xpOpen').addEventListener('click', () => xpShow(!xpOn));
-  /** 노선관리 맨 위 탭: routes 노선 · price 단가·물량(전체 단가표) · perf 수행률(주간 등급 · SLA) · fb 프백·피크 */
+  /** 노선관리 맨 위 탭: routes 노선 · price 단가·물량(전체 단가표) · perf 수행률(주간 등급 · SLA) · fb 프백·피크 · ln 라우트 변경이력 */
   function rtvShow(tab, quiet) {
-    if (['routes', 'price', 'perf', 'fb'].indexOf(tab) < 0) tab = 'routes';
+    if (['routes', 'price', 'perf', 'fb', 'ln'].indexOf(tab) < 0) tab = 'routes';
     if (tab !== 'price' && xpOn) { xpShow(false); if (xpOn) return; }
     if (tab !== 'routes' && tab !== RTV.tab && !quiet && !pricesLeaveOk()) return;
     if (tab === 'price' && !xpOn) { xpShow(true); if (!xpOn) return; }
@@ -7186,6 +7187,8 @@
     $('.rt-wrap', $('#view-route')).classList.toggle('hidden', tab !== 'routes');
     $('#allPrices').classList.toggle('hidden', tab !== 'price');
     $('#rtvPerf').classList.toggle('hidden', !pf);
+    $('#rtvLn').classList.toggle('hidden', tab !== 'ln');
+    if (tab === 'ln') renderLnTab();
     $$('#rtvTabs [data-rtv]').forEach((b) => b.classList.toggle('on', b.dataset.rtv === tab));
     if (pf) { rpTabNow(); rpRender(); loadPerf(); if (RP.tab === 'sla') loadSla(); if (RP.tab === 'mail') { try { loadMail(); } catch (e) { /* 무시 */ } } }
   }
@@ -7462,7 +7465,7 @@
     const onBtn = (id, on, lab) => '<span class="rp-on">' + lab + ' <b class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</b> <button class="btn sm ghost" data-rpset="' + id + '">' + (on ? '끄기' : '켜기') + '</button></span>';
     box.innerHTML = '<div class="sec rp-top"><div class="xp-head"><div class="tabs rp-tabs">' + rpTabs().map((t) => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" data-rptab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
       '<span class="grow" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + (RP.loaded ? onBtn('drv', RP.drvOn, '기사 앱에 내 라우트 표시') + onBtn('memo', RP.memoOn, '업로드 기록을 업무스케줄에') : '') +
-      '<a class="btn sm ghost" href="#" data-view="route" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 종료 — 🛣 노선 탭에서 관리합니다">라우트 변경이력 → 노선 탭</a></span></div></div>';
+      '<a class="btn sm ghost" href="#" data-view="route" data-rtab="ln" title="코드가 바뀐 라우트 이어 붙이기 · 종료 — 🔀 변경이력 탭에서 관리합니다">🔀 라우트 변경이력</a></span></div></div>';
     if (tab === 'sla') return slaRender(box);
     if (tab === 'fb') return fbRender(box);
     if (tab === 'pk') return pkRender(box);
@@ -7541,7 +7544,7 @@
       sb.disabled = true;
       return api('adm_perfSet', f).then((r) => { if (!r.ok) return toast(r.msg); RP.drvOn = !!r.drvOn; RP.memoOn = !!r.memoOn; rpRender(); toast(k === 'drv' ? '기사 앱 표시를 ' + (r.drvOn ? '켰습니다. (기사 앱 마이페이지에 내 라우트 등급이 보입니다)' : '껐습니다.') : '메모 자동을 ' + (r.memoOn ? '켰습니다.' : '껐습니다.')); }).catch(() => {}).finally(() => { sb.disabled = false; });
     }
-    const go = e.target.closest('a[data-rtab="ln"]'); if (go) { e.preventDefault(); rtab = 'ln'; rtvShow('routes'); if (RT.camps.length) renderCampMain(); return; }
+    const go = e.target.closest('a[data-rtab="ln"]'); if (go) { e.preventDefault(); rtvShow('ln'); return; }
     if (e.target.id === 'rpUpBtn2' || e.target.id === 'rpUpBtn3') return $('#rpFile').click();
     const tb = e.target.closest('[data-rptab]'); if (tb) { RP.tab = tb.dataset.rptab; rpRender(); if (RP.tab === 'sla') loadSla(); if (RP.tab === 'mail') loadMail(true); return; }
     if (fbClick(e)) return;
@@ -7549,8 +7552,8 @@
     lnClick(e);
   }));
   // 노선관리 변경이력 탭: 같은 핸들러
-  $('#campMain').addEventListener('click', (e) => { if (e.target.closest('#tabLn')) lnClick(e); });
-  $('#campMain').addEventListener('change', (e) => {
+  $('#view-route').addEventListener('click', (e) => { if (e.target.closest('#tabLn')) lnClick(e); });
+  $('#view-route').addEventListener('change', (e) => {
     if (!e.target.closest('#tabLn')) return;
     if (e.target.id === 'lnAllCk') { lnAll = e.target.checked; renderLnTab(); }
     if (e.target.dataset.lns !== undefined && lnSug) { lnSug[+e.target.dataset.lns].on = e.target.checked; e.target.closest('tr').classList.toggle('off', !e.target.checked); }
@@ -8135,7 +8138,7 @@
     rpRender(); lnAfter();
   }
   /** 변경이력이 바뀐 뒤 노선관리 화면 갱신 (변경이력 탭 · 노선 표 배지) */
-  function lnAfter() { if (currentView === 'route' && $('#campMain') && RT.camps.length) { if (rtab === 'ln') renderLnTab(); else { renderRoutes(); const cnt = $('#lnCount'); if (cnt) renderLnTab(); } } }
+  function lnAfter() { if (currentView === 'route' && $('#campMain') && RT.camps.length) { if (RTV.tab === 'ln') renderLnTab(); else renderRoutes(); } }
   /** 노선을 정지할 때: 변경이력에 '종료'로 기록할지 묻기 (이미 종료된 코드는 건너뜀) */
   function lnAskEnd(routes) {
     const todo = [];
@@ -9099,7 +9102,6 @@
     $$('[data-rtab]', $('#campMain')).forEach((b) => b.classList.toggle('on', b.dataset.rtab === v));
     $('#tabRoutes').classList.toggle('hidden', v !== 'routes');
     $('#tabPrices').classList.toggle('hidden', v !== 'prices');
-    const tl = $('#tabLn'); if (tl) tl.classList.toggle('hidden', v !== 'ln');
     const add = $('[data-ract="route-add"]', $('#campMain')); if (add) add.classList.toggle('hidden', v !== 'routes');
     if (v === 'prices') renderPrices();
     if (v === 'ln') renderLnTab();
@@ -12715,6 +12717,7 @@
       ['💰 단가·물량', '모든 캠프 라우트 코드별 <b>단가</b> 보기·고치기 / <b>요일별 물량</b> 보기 (전월 정산서 기준)'],
       ['📊 수행률', '쿠팡 주간 <b>수행률 등급</b> · 월간 <b>SLA 점수</b> · 메일 자동 수집'],
       ['🧊 프백·피크', '<b>프레시백 가중요인</b> · <b>피크 예상 물량</b>'],
+      ['🔀 변경이력', '코드가 바뀐 라우트 이어 붙이기 · 없어진 라우트는 종료 — 수행률 · SLA 이력이 이어짐'],
       ['올리기', '[⬆ 쿠팡 파일 올리기] — 수행률 · SLA · 프레시백 · 피크 파일을 자동으로 알아보고 저장 전에 미리보기'],
       ['노선 바뀔 때', '<b>노선변경 예약</b> = 날짜부터 기사의 노선이 바뀜 · [노선 이관] = 쿠팡이 노선을 통째로 옮길 때']
     ],
@@ -12756,8 +12759,8 @@
     const el = $('#stEditHelp'), g = uiGuide(name) || ST_GUIDE[name];
     UI.lastHelp = name; el.dataset.uig = name;
     if (!g) { el.className = 'sub st-help'; el.textContent = name === 'migrate' ? '' : ST_HELP[name] || ''; return; }
-    el.className = 'st-help stg';
-    el.innerHTML = g.map((x) => '<div class="stg-r"><span class="stg-t g-' + (ST_GTAG[x[0]] || 'info') + '">' + esc(x[0]) + '</span><span>' + x[1] + '</span></div>').join('');
+    el.className = 'st-help st-helpg';
+    el.innerHTML = '<details class="pg-help" style="margin:0"><summary><span class="pgh-i">ⓘ</span> 사용법<span class="pgh-tg"></span></summary><div class="stg">' + g.map((x) => '<div class="stg-r"><span class="stg-t g-' + (ST_GTAG[x[0]] || 'info') + '">' + esc(x[0]) + '</span><span>' + x[1] + '</span></div>').join('') + '</div></details>';
   }
   function loadSettle(month, fresh) {
     if (!STX.sum) $('#stTable').innerHTML = '<tr><td style="padding:40px"><div class="spin"></div></td></tr>';
@@ -15830,7 +15833,7 @@
   }
   // 화면 맨 위 '사용법' — 접었다 펼 수 있음 (접은 상태는 이 기기에 기억)
   const PG_NAV = { dash: '대시보드', drivers: '기사 정보관리', sched: '기사스케줄', bib: '배번호 관리', route: '노선관리', perf: '수행률 · SLA', memo: '업무스케줄', settle: '정산관리', pnl: '매입·매출', uiset: '올인원 설정' };
-  const pgOpen = (v) => { if (v === 'sched') return false; try { return localStorage.getItem('runner.pgHelp.' + v) !== '0'; } catch (e) { return true; } };
+  const pgOpen = (v) => { try { return localStorage.getItem('runner.pgHelp2.' + v) === '1'; } catch (e) { return false; } }; // 기본은 접힘 — 펼친 화면만 이 기기에 기억
   function pageHelpAll() {
     Object.keys(PG_NAV).forEach((v) => {
       const sec = $('#view-' + (v === 'pnl' ? 'settle' : v)); if (!sec) return;
@@ -15839,7 +15842,7 @@
       if (v === 'settle' || v === 'pnl') { if ((v === 'pnl') !== !!STX.fin) { return; } }
       const g = uiGuide('page:' + v) || ST_GUIDE['page:' + v]; if (!g) return;
       const html = g.map((x) => '<div class="stg-r"><span class="stg-t g-' + (ST_GTAG[x[0]] || 'info') + '">' + esc(x[0]) + '</span><span>' + x[1] + '</span></div>').join('');
-      if (!box) { box = document.createElement('details'); box.className = 'pg-help'; head.insertAdjacentElement('afterend', box); box.addEventListener('toggle', () => { try { localStorage.setItem('runner.pgHelp.' + box.dataset.pg, box.open ? '1' : '0'); } catch (e) {} }); }
+      if (!box) { box = document.createElement('details'); box.className = 'pg-help'; head.insertAdjacentElement('afterend', box); box.addEventListener('toggle', () => { try { localStorage.setItem('runner.pgHelp2.' + box.dataset.pg, box.open ? '1' : '0'); } catch (e) {} }); }
       if (box.dataset.pg !== v) { box.dataset.pg = v; box.open = pgOpen(v); }
       const want = '<summary><span class="pgh-i">ⓘ</span> 사용법 <small>' + esc(PG_NAV[v]) + '</small><span class="pgh-tg"></span></summary><div class="stg">' + html + '</div>';
       if (box.__pg !== want) { box.innerHTML = want; box.__pg = want; }
