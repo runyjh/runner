@@ -120,9 +120,40 @@ function adm_seenList(token) {
       .map(function (n) { return { id: n.id, title: n.title, date: (n.start || n.createdAt || '').slice(0, 10), targets: noticeTargets_(n.target), live: noticeLive_(n, today), important: n.important }; });
     const rows = readAll_(SH.SEEN).filter(function (o) { return o.kind && o.driverId; })
       .map(function (o) { return { k: o.kind, d: o.driverId, key: o.key, old: o.old, text: o.text, at: o.at, ack: o.ackAt, by: o.by }; });
-    return { ok: true, today: today, drivers: drivers, notices: notices, rows: rows };
+    return { ok: true, today: today, drivers: drivers, notices: notices, rows: rows, act: onlineMap_(drivers.map(function (d) { return d.id; })), now: Date.now(), nowMs: ONLINE.NOW_MS };
   });
 }
+// ───── 기사앱 접속 중 · 마지막 활동 시각 ─────
+// 기사앱이 서버에 무언가 요청할 때마다(getSession_) 부른다. 시트에는 쓰지 않는다.
+//  · 접속 중: 임시 기억 on:<기사ID> = "마지막 활동 ms|마지막으로 오래 남긴 ms" (1분에 한 번만 갱신)
+//  · 마지막 활동(기한 없이): 스크립트 속성 APP_ONLINE = { 기사ID: 분 단위 시각 } — 기사당 10분에 한 번만 씀
+const ONLINE = { LIVE_MS: 60000, KEEP_MS: 600000, PROP: 'APP_ONLINE', NOW_MS: 300000 };
+function onlineTouch_(driverId) {
+  try {
+    const id = String(driverId || ''); if (!id) return;
+    const ck = cache_(), key = 'on:' + id, now = Date.now();
+    const p = String(ck.get(key) || '').split('|'), t = Number(p[0]) || 0, w = Number(p[1]) || 0;
+    if (now - t < ONLINE.LIVE_MS) return;
+    const keep = now - w >= ONLINE.KEEP_MS;
+    ck.put(key, now + '|' + (keep ? now : w), 21600);
+    if (!keep) return;
+    const P = PropertiesService.getScriptProperties();
+    let m = {}; try { m = JSON.parse(P.getProperty(ONLINE.PROP) || '{}') || {}; } catch (e) { m = {}; }
+    m[id] = Math.floor(now / 60000);
+    P.setProperty(ONLINE.PROP, JSON.stringify(m));
+  } catch (e) { /* 접속 표시는 덤 — 실패해도 요청은 그대로 */ }
+}
+/** 기사별 마지막 활동 시각(ms) — 임시 기억(1분 단위)과 오래 남긴 값(10분 단위) 중 더 최근 것 */
+function onlineMap_(ids) {
+  const out = {};
+  try { const m = JSON.parse(PropertiesService.getScriptProperties().getProperty(ONLINE.PROP) || '{}') || {}; Object.keys(m).forEach(function (id) { out[id] = (Number(m[id]) || 0) * 60000; }); } catch (e) { /* 없음 */ }
+  try {
+    const keys = (ids || []).map(function (id) { return 'on:' + id; }), hit = keys.length ? cache_().getAll(keys) : {};
+    Object.keys(hit || {}).forEach(function (k) { const t = Number(String(hit[k]).split('|')[0]) || 0, id = k.slice(3); if (t > (out[id] || 0)) out[id] = t; });
+  } catch (e) { /* 임시 기억을 못 읽으면 오래 남긴 값만 */ }
+  return out;
+}
+
 /** 관리자: 공지를 아직 안 본 기사에게 휴대폰 알림 → { ok, target, pushed } */
 function adm_seenNudge(token, noticeId) {
   return run_(function () {

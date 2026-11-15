@@ -1254,6 +1254,7 @@ function getSession_(token) {
   }
   if (!(s.e > Date.now())) return null;
   s.th = th;
+  onlineTouch_(s.d);
   return s;
 }
 
