@@ -1254,7 +1254,7 @@ function getSession_(token) {
   }
   if (!(s.e > Date.now())) return null;
   s.th = th;
-  onlineTouch_(s.d);
+  if (typeof _curFn !== 'string' || _curFn.indexOf('adm_') !== 0) onlineTouch_(s.d); // 기사앱 요청만 '접속 중'으로 셈 (관리자앱 요청은 빼고)
   return s;
 }
 
