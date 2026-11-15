@@ -2504,7 +2504,8 @@ function memoMonth_(ym) {
   {
     if (!/^\d{4}-\d{2}$/.test(String(ym || ''))) fail_('월 형식이 올바르지 않습니다.');
     const today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
-    const base = rcvGet_('memo', 'month|' + ym + '|' + today, 600, function () {
+    const base = rcvGet_('memo', 'month2|' + ym + '|' + today, 600, function () {
+    const lateFrom = ymd_(addDays_(new Date(today + 'T00:00:00'), -7)), late = []; // 최근 7일 안의 지난 미완료 (휴대폰 홈 '오늘 업무'에 넘겨 보여 줌)
     const sh = sheet_(SH.MEMO), c = cols_(SH.MEMO), last = sh.getLastRow();
     const rows = last >= 2 ? sh.getRange(2, 1, last - 1, c.__w).getValues() : [];
     const list = [];
@@ -2519,16 +2520,16 @@ function memoMonth_(ym) {
       if (m.rep) { memoRepDates_(m.rep, o.date, m.until, ym).forEach(function (d) { list.push(memoOcc_(m, o.repDone, d)); }); return; } // 반복: 그 달 날짜마다
       if (memoPinnedNow_(m, today)) pinned.push(m);
       if (o.date.indexOf(ym) === 0) list.push(m);
-      if (!m.done && !m.note && o.date < today) pastUndone++;
+      if (!m.done && !m.note && o.date < today) { pastUndone++; if (o.date >= lateFrom && !m.pin) late.push(m); }
     });
-    list.sort(memoSort_); pinned.sort(memoSort_);
-    return { list: list, pinned: pinned, pastUndone: pastUndone };
+    list.sort(memoSort_); pinned.sort(memoSort_); late.sort(memoSort_);
+    return { list: list, pinned: pinned, pastUndone: pastUndone, late: late };
     });
-    const list = base.list, pinned = base.pinned, pastUndone = base.pastUndone;
+    const list = base.list, pinned = base.pinned, pastUndone = base.pastUndone, late = base.late || [];
     let noteLabels = [];
     try { noteLabels = schNotes_().map(function (n) { return n.label; }); } catch (e) { /* 스케줄 DB 가 없으면 비움 */ }
     const holidays = {}; Object.keys(HOLIDAYS).forEach(function (d) { if (d.indexOf(ym) === 0) holidays[d] = HOLIDAYS[d]; });
-    return { ok: true, memos: list, pinned: pinned, pastUndone: pastUndone, today: today, noteLabels: noteLabels, holidays: holidays };
+    return { ok: true, memos: list, pinned: pinned, late: late, pastUndone: pastUndone, today: today, noteLabels: noteLabels, holidays: holidays };
   }
 }
 
