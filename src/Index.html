@@ -2475,6 +2475,12 @@
       html: ok.map((x) => '<span class="v k-pm' + (x.role === '맡김' ? ' give' : '') + '">' + (x.role === '수행' ? '<i class="cp">🤝 ' + escH(x.camp || '품앗이') + '</i>' + escH(x.route || '수행') : '<i class="cp">🤝 맡김</i>→' + escH(x.who || '')) + '</span>').join('')
     };
   }
+  /** 내 칸 노선이 그날 확정된 품앗이(수행) 노선과 같은가 — 같으면 달력 칸에 같은 노선이 두 번 보이지 않게 품앗이 칩만 */
+  function pmSame(r, d, pc) {
+    if (!pc || !pc.routes) return false;
+    const n = (x) => String(x || '').replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/[^0-9A-Za-z]/g, '').toUpperCase(), cp = (x) => String(x || '').replace(/\s*캠프$/, '').replace(/\s/g, '');
+    return pmOfDay(r, d).some((x) => x.status === '확정' && x.role === '수행' && n(x.route) && n(x.route) === n(pc.routes) && (!pc.camp || !x.camp || cp(pc.camp) === cp(x.camp)));
+  }
   function pmDoneRow(r, d) {
     return ((r.pmDone || {})[d] || []).map((x) => '<button type="button" class="pmx r-done" data-pm="' + escH(x.id) + '"><b>✅ 배차확정 완료</b>' +
       escH(String(x.camp || '').replace(/\s*캠프$/, '') + ' ' + x.route) + (x.accepted ? ' → ' + escH(x.accepted) + ' 기사님' : '') + '</button>').join('');
@@ -2533,7 +2539,7 @@
       const icons = ((r.inst || {})[d] ? '<span title="' + (isStaffUser() ? '일정 메모' : '지시사항') + '">' + instIco() + '</span>' : '') + (schRegId(v0, myIds) ? '<span title="다른 아이디로 업무등록">🆔</span>' : '') + (((r.pmDone || {})[d] || []).length ? '<span title="품앗이 배차확정 완료">✅</span>' : np.length ? '<span title="품앗이">🤝</span>' : '');
       cells.push('<button type="button" class="mc' + (dow === 0 || r.holidays[d] ? ' sun' : dow === 6 ? ' sat' : '') + (d === pdd ? ' pdd' : '') + (d === r.today ? ' td' : '') + (d === scSel ? ' sel' : '') + '" data-d="' + d + '">' +
         '<span class="n"><span>' + day + '</span>' + (peakIn(d) ? '<span title="피크데이">🔥</span>' : '') + (icons ? '<span class="instdot">' + icons + '</span>' : '') + '</span>' +
-        (d === pdd ? '<em class="pddt">PDD</em>' : '') + (pmWork && (!v || /휴무|휴가/.test(v)) ? '' : chip) + pmChip + '</button>');
+        (d === pdd ? '<em class="pddt">PDD</em>' : '') + (pmWork && (!v || /휴무|휴가/.test(v) || pmSame(r, d, pc)) ? '' : chip) + pmChip + '</button>'); // 칸 노선이 확정 품앗이 노선과 같으면 품앗이 칩 하나만
     });
     $('#scBody').innerHTML = rcNote(r) + '<div class="mcal"><div class="mnav"><button type="button" data-mv="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + m + '월</b><button type="button" data-mv="1" aria-label="다음 달">▶</button></div>' +
       '<div class="msum">근무 ' + work + '일 · 휴무 ' + off + '일' + (r.camp ? ' · ' + escH(r.camp) : '') + (nPlan ? ' <b class="plc">· 예정 ' + nPlan + '일</b>' : '') + '</div>' +

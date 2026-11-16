@@ -690,6 +690,19 @@ scenario('기사앱 빈칸 예정', null, function (r) {
   eq('고정휴무일 읽기', out.off, [[4, 5], [0], [3, 4], null, []]);
 });
 
+// 34) 기사앱 달력: 내 칸 노선 = 확정 품앗이(수행) 노선이면 칩 하나만 (같은 노선이 두 번 보이지 않게)
+(function () {
+  try {
+    const html = fs.readFileSync(path.join(SRC, 'Index.html'), 'utf8'), i = html.indexOf('  function pmOfDay('), j = html.indexOf('  function pmDoneRow(');
+    const box = {}; vm.createContext(box);
+    vm.runInContext('var escH = function (x) { return String(x); };' + html.slice(i, j), box);
+    const f = function (pm, pc) { box.R = { pumasi: { d: pm } }; box.PC = pc; return vm.runInContext("pmSame(R, 'd', PC)", box); };
+    const job = function (o) { return [Object.assign({ id: 'j', role: '수행', status: '확정', camp: '인천8캠프', route: '103AB' }, o)]; };
+    eq('같은 노선 품앗이 합치기', [f(job({}), { routes: '103AB', camp: '' }), f(job({}), { routes: '103AB', camp: '인천8' }), f(job({}), { routes: '122CD', camp: '' }), f(job({}), { routes: '103AB', camp: '강서1' }),
+      f(job({ status: '신청' }), { routes: '103AB' }), f(job({ role: '맡김' }), { routes: '103AB' }), f(job({}), null), f(job({}), { routes: '', raw: '휴무' })], [true, true, false, false, false, false, false, false]);
+  } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 같은 노선 품앗이 합치기 (실행 오류) ' + (e && e.message)); }
+})();
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
