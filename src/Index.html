@@ -1192,7 +1192,7 @@
   const PVS = { until: 0, ended: false };
   function pvEnd() {
     if (PVS.ended) return; PVS.ended = true;
-    document.body.insertAdjacentHTML('beforeend', '<div class="pv-end"><div><b>미리 보기가 끝났습니다</b><p>창을 닫고, 다시 보려면 관리자앱에서 [기사앱으로 보기]를 눌러 주세요.</p><button type="button" id="pvEndX">창 닫기</button></div></div>');
+    document.body.insertAdjacentHTML('beforeend', '<div class="pv-end"><div><b>미리 보기가 끝났습니다</b><p>다시 보려면 관리자앱에서 [기사앱으로 보기]를 눌러 주세요.</p><button type="button" id="pvEndX">관리자앱으로 돌아가기</button></div></div>');
   }
   function pvBar(p) {
     if (!PVT || !p) return;
@@ -1205,7 +1205,8 @@
     bar.innerHTML = '<span><b>👁 미리 보기 · ' + String(p.name || '').replace(/[<>&]/g, '') + '</b><small>보기 전용 · 지금 자료 그대로 · ' + (p.online ? '기사 접속 중' : ago < 0 ? '접속 기록 없음' : ago < 60 ? '마지막 접속 ' + ago + '분 전' : ago < 1440 ? '마지막 접속 ' + Math.round(ago / 60) + '시간 전' : '마지막 접속 ' + Math.round(ago / 1440) + '일 전') +
       ' · ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + ' 남음</small></span><button type="button" id="pvX">닫기</button>';
   }
-  document.addEventListener('click', (e) => { if (e.target.id === 'pvX' || e.target.id === 'pvEndX') { try { window.close(); } catch (x) { /* 무시 */ } pvEnd(); } });
+  // 닫기: 창을 닫아 보고, 안 닫히면(휴대폰 · 링크로 연 창은 스스로 못 닫음) 관리자앱으로 돌아간다
+  document.addEventListener('click', (e) => { if (e.target.id === 'pvX' || e.target.id === 'pvEndX') { try { window.close(); } catch (x) { /* 무시 */ } pvEnd(); setTimeout(() => { try { location.replace(new URL('admin/', location.href.split('#')[0]).href); } catch (x) { /* 무시 */ } }, 350); } });
 
   // ───── 서버 호출 ─────
   // 구글 앱스크립트 주소에서 열리면 google.script.run, 깃허브 페이지에서 열리면 웹앱 주소(RUNNER_CONFIG.api)로 POST.
