@@ -52,6 +52,27 @@ try {
 } catch (e) { bad('없는 함수 부르기 검사', e); }
 
 // 정산 계산 시험: 금액이 기대값과 다르면 배포하지 않는다 (scripts/test-settle.js)
+// 연결 안 된 버튼 찾기: 화면에 id 가 있는 버튼인데 코드 어디에서도 그 id 를 쓰지 않으면 눌러도 아무 일이 없다 (#475 에서 [달력으로 보기] 연결이 빠졌던 일)
+//  + 서버에 기사 정보를 통째로 보내는 실수 (ID 만 보내야 함 · 기사앱 미리 보기)
+(function () {
+  const SKIP = ['askOk', 'edAdd']; // 폼 제출 · class 로 연결
+  ['Admin.html', 'Index.html'].forEach(function (f) {
+    const s = fs.readFileSync(path.join(ROOT, 'src', f), 'utf8');
+    const ids = Array.from(new Set((s.match(/<button[^>]*\bid="[A-Za-z0-9_-]+"/g) || []).map(function (m) { return /id="([^"]+)"/.exec(m)[1]; })));
+    const dead = ids.filter(function (id) {
+      if (SKIP.indexOf(id) >= 0) return false;
+      const esc = id.replace(/[-]/g, '\\-');
+      const all = (s.match(new RegExp('(^|[^A-Za-z0-9_-])' + esc + '(?![A-Za-z0-9_-])', 'g')) || []).length;
+      const decl = (s.match(new RegExp('id="' + esc + '"', 'g')) || []).length;
+      const css = (s.match(new RegExp('#' + esc + '\\s*[{,]', 'g')) || []).length;
+      return all - decl - css <= 0;
+    });
+    if (dead.length) bad(f + ' 버튼 연결', new Error('눌러도 아무 일이 없는 버튼: ' + dead.join(', '))); else ok(f + ' 버튼 연결 (' + ids.length + '개)');
+    const whole = s.match(/api\('adm_previewStart', cur\)/);
+    if (whole) bad(f + ' 미리 보기 호출', new Error('기사 ID 가 아니라 기사 정보 전체를 보내고 있음')); else ok(f + ' 미리 보기 호출');
+  });
+})();
+
 if (!failed) {
   try {
     const t = require('./test-settle.js');

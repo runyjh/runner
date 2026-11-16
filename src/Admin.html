@@ -12314,6 +12314,7 @@
     api('adm_pmMeta').then((r) => { if (!r.ok) return toast(r.msg); PMC.meta = r; go(); }).catch(() => {});
   }
   // ⋯ 더 보기: 가끔 쓰는 것들을 한 곳에 (PC · 휴대폰 같음)
+  $('#sMobBack').addEventListener('click', () => { mobSet('camp'); paintMob(); }); // 휴대폰: 표 → 달력으로 돌아가기 (#475 에서 빠졌던 연결)
   $('#sMore').addEventListener('click', (e) => { e.stopPropagation(); const b = $('#sMoreBox'); b.classList.toggle('hidden'); $('#sMore').setAttribute('aria-expanded', String(!b.classList.contains('hidden'))); });
   document.addEventListener('click', (e) => { const b = $('#sMoreBox'); if (!b || b.classList.contains('hidden')) return; if (e.target.closest('#sMoreBox') && !e.target.closest('button')) return; b.classList.add('hidden'); $('#sMore').setAttribute('aria-expanded', 'false'); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { const b = $('#sMoreBox'); if (b && !b.classList.contains('hidden')) b.classList.add('hidden'); } });
