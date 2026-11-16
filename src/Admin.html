@@ -1473,6 +1473,11 @@
   /* 전자세금계산서 연간 보기 */
   .ey-tb td.ec, .ey-tb th.ec { text-align: center; white-space: nowrap; min-width: 62px; }
   .ey-tb .eyc { display: inline-block; min-width: 54px; padding: 3px 6px; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer; border: 0; background: none; }
+  /* 관리자앱 모든 표: 맨 앞 선택 칸을 체크한 줄에 색 (여러 줄 고를 때 한눈에) */
+  section[id^="view-"] tbody tr:has(> td:first-child input[type=checkbox]:checked) > td,
+  .modal tbody tr:has(> td:first-child input[type=checkbox]:checked) > td { background: #e8f0ff !important; }
+  section[id^="view-"] tbody tr:has(> td:first-child input[type=checkbox]:checked) > td:first-child,
+  .modal tbody tr:has(> td:first-child input[type=checkbox]:checked) > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .ey-tb .eyc.wait { background: #fff1e0; color: #c2410c; } .ey-tb .eyc.out, .ey-tb .eyc.sub { color: #adb5bd; cursor: default; font-weight: 700; }
   .ey-tb .eyc.done { color: #0b6b3a; } .ey-tb .eyc.ti { color: var(--brand); } .ey-tb .eyc.no { background: #fde8e8; color: #c81e1e; } .ey-tb .eyc.skip { color: #adb5bd; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
   .ey-tb tr.eyr { cursor: pointer; } .ey-tb tr.eyr:hover td { background: #f8fafc; } .ey-tb tr.eyr.open td { background: #f1f6ff; }
