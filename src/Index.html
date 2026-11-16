@@ -1678,8 +1678,9 @@
       store.set(USER, JSON.stringify(r.user), auto);
       store.set(LAST_ID, id, true);
       $('#lgPw').value = '';
+      menuOffSet(r.menuOff || []); // 이 기사 기준으로 다시 (같은 기기에서 앞서 로그인했던 기사의 「준비 중」 표시가 남지 않게)
       if (r.mustChange) openChangePw(true, pw); else goHome(r.user);
-      slipPop(r.slipClose);
+      if (!menuBlocked('settle', true)) slipPop(r.slipClose);
       fsSignOut(); setTimeout(fsReady, 1500); // 다른 기사로 로그인했을 수 있으니 새로
     }).catch(netErr).finally(() => { btn.disabled = false; btn.textContent = '로그인'; });
   });

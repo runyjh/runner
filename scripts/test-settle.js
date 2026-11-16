@@ -552,6 +552,15 @@ scenario('푸시 미루기', null, function (r) {
   eq('바로 보냄 → 미룸(2건 쌓임) → 1분 작업이 한 번에 보내고 비움', out, [['d1'], ['d1'], 2, ['d1', 'd2,d3'], true]);
 });
 
+// 27) 끈 메뉴: 예외 기사(꺼도 쓰는 사람)는 꺼진 메뉴 없음 · 로그인 응답에도 끈 메뉴가 들어감
+scenario('끈 메뉴 예외 기사', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    appSet_ = function () { return { appMenu: '{"settle":0}', appMenuEx: '["d3"]' }; };
+    return [appMenuOffFor_('d1'), appMenuOffFor_('d3'), /menuOff:/.test(String(api_login))];
+  })()`, r.ctx);
+  eq('일반 기사는 정산서 꺼짐 · 예외 기사는 없음 · 로그인 응답에 포함', out, [['settle'], [], true]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
