@@ -408,6 +408,67 @@ scenario('퇴사자 자동 정지', null, function (r) {
   });
 })();
 
+// 21) 처음 가는 캠프·노선 전날 알림: 늘 가던 곳 X · 새 노선 글자 · 새 캠프 · 품앗이 줄 · 노선 변경 예약 · 미입차 X · 퇴사 X · 같은 날 두 번 X
+scenario('처음 가는 노선 알림', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var dates = []; for (var i = 1; i <= 20; i++) dates.push('2026-11-' + ('0' + i).slice(-2));
+    var head = ['행ID', '구분', '캠프', '이름', '기본노선'].concat(dates), T = '2026-11-17';
+    var row = function (id, base, cells) { return [id, '', '', '', base].concat(dates.map(function (d) { return cells[d] || ''; })); };
+    var c = {}; c['2026-11-10'] = '출근'; c[T] = '출근';
+    var rows = [
+      row('d1', '212CD', c),                                                                   // 늘 가던 곳
+      row('d2', '백업', { '2026-11-10': '군포1 212C', '2026-11-12': '시흥2 708C' }),
+      row('PMd2', '', { '2026-11-17': '군포1 212CD' }),                                          // 품앗이 줄: 212D 처음
+      row('d3', '백업', { '2026-11-10': '군포1 212CD', '2026-11-17': '인천7 919C' }),            // 처음 캠프
+      row('d4', '212CD', { '2026-11-05': '출근', '2026-11-17': '미입차' })                        // 근무 아님
+    ];
+    schSS_ = function () { return { getSheetByName: function () { return 1; } }; };
+    props_ = function () { return { SCH_DB_ID: 'x' }; };
+    schHeader_ = function () { var h = { fixed: {}, dates: {} }; head.forEach(function (t, i) { if (/^\\d{4}/.test(t)) h.dates[t] = i; else h.fixed[t] = i; }); return h; };
+    schSheet_ = function () { return { getLastRow: function () { return rows.length + 1; }, getRange: function (a, b, n, w) { return { getValues: function () { return rows.map(function (x) { return x.slice(0, w); }); } }; } }; };
+    master_ = function () { return { camps: __M.main.camps }; };
+    rcByDriver_ = function () { return { d1: [{ date: T, status: RCS.WAIT, fromCamp: '군포1캠프', fromRoute: '212AB', toCamp: '군포1캠프', toCampId: 'C1', toRoute: '212CD' }] }; };
+    todayText_ = function () { return '2026-11-16'; };
+    var D = __M.main.drivers; D[0].baseRoute = '212CD';
+    var found = frFind_(T).map(function (x) { return x.name + ':' + x.camp + ':' + frJoin_(x.units) + (x.newCamp ? ':새캠프' : ''); });
+    var prop = {}, sent = [], memo = [];
+    PropertiesService = { getScriptProperties: function () { return { getProperty: function (k) { return prop[k] || null; }, setProperty: function (k, v) { prop[k] = v; } }; } };
+    scriptLock_ = function () { return { waitLock: function () {}, releaseLock: function () {} }; };
+    pmAlertAdd_ = function (l) { sent = sent.concat(l); }; pmPushSend_ = function () {};
+    appendObj_ = function (n, o) { memo.push(o.content); }; writeFields_ = function () {};
+    frRun_(false); var again = frRun_(false);
+    return { found: found, sent: sent.map(function (a) { return a.driverId + ':' + a.jobId + ':' + a.kind; }), memo: memo, again: !!again.skipped };
+  })()`, r.ctx);
+  // d1 은 11/10 '출근' 이 212AB(변경 전) 이라 내일 212CD 가 처음 · d2 는 212C 만 가 봐서 212D 처음 · d3 은 인천7 처음 · d4 미입차는 제외
+  eq('처음 가는 기사 고르기 (캠프 → 이름 순)', out.found, ['강준길:군포1:212D', '이현모:군포1:212CD', '유정근:인천7:919C:새캠프']);
+  eq('기사 알림 3건 (누르면 내 스케줄)', out.sent, ['d2:SC-2026-11-17:first', 'd1:SC-2026-11-17:first', 'd3:SC-2026-11-17:first']);
+  eq('업무스케줄 한 줄', out.memo.length === 1 && /^내일 11\/17\(화\) 처음 가는 기사 3명/.test(out.memo[0]), true);
+  eq('같은 날 두 번 보내지 않음', out.again, true);
+});
+// 22) 공지 대상: 전체 · 캠프 · 기사 · 캠프+기사 / 알림 메뉴 구분 (처음 가는 노선 = 스케줄)
+scenario('공지 대상 · 알림 메뉴', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var f = function (t, d, camp, id) { return noticeFor_({ target: t, targetDrv: d }, camp, id); };
+    return [f('', '', '', 'D1'), f('군포1', '', '군포1캠프', 'D1'), f('군포1', '', '', 'D2'), f('', 'D2, D3', '', 'D2'), f('', 'D2', '군포1캠프', 'D1'), f('인천7', 'D2', '', 'D2'),
+      alertMenuOf_({ kind: 'first' }), alertMenuOf_({ kind: 'slip' }), alertMenuOf_({ jobId: 'BD-1' }), alertMenuOf_({ jobId: 'J1', kind: 'newjob' })];
+  })()`, r.ctx);
+  eq('전체 · 캠프 · 캠프 없는 백업 · 기사 지정 · 다른 기사 · 캠프+기사', out.slice(0, 6), [true, true, false, true, false, true]);
+  eq('알림 메뉴: 처음 가는 노선 → 스케줄 · 정산서 · 게시판 · 품앗이', out.slice(6), ['sched', 'settle', '', 'pm']);
+});
+// 23) 품앗이 관리 '일할 기사': 지난 날 · 배차 확정된 날 · 앱 정지 기사는 빼고, 날짜 → 이름 순
+scenario('품앗이 일할 기사', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    todayText_ = function () { return '2026-11-16'; };
+    __M.main.drivers[2].status = '정지';
+    var d = { jobs: [{ status: PST.DONE, acceptedId: 'd2', date: '2026-11-20' }], apps: [{ status: PAST.OFFER, driverId: 'd1', date: '2026-11-18' }], avail: [
+      { id: 'V1', driverId: 'd2', name: '강준길', date: '2026-11-18', kind: '야간' }, { id: 'V2', driverId: 'd1', name: '이현모', date: '2026-11-18', kind: '주간', memo: '하이탑' },
+      { id: 'V3', driverId: 'd2', name: '강준길', date: '2026-11-20', kind: '무관' }, { id: 'V4', driverId: 'd1', name: '이현모', date: '2026-11-10', kind: '무관' },
+      { id: 'V5', driverId: 'd3', name: '유정근', date: '2026-11-19', kind: '무관' }] };
+    return pmAvailAdmin_(d, '2026-11-16', '').map(function (x) { return x.id + ':' + x.name + ':' + x.offered; });
+  })()`, r.ctx);
+  eq('지난 날 · 확정된 날 · 정지 기사 빼고 날짜→이름 순 · 제안 수', out, ['V1:강준길:0', 'V2:이현모:1']);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
