@@ -175,7 +175,7 @@ function insRows_(month) {
         acct: d.id, driverId: d.ownerId || '', name: d.name, rrn: o.rrn || '', hasRrn: !!o.rrnEnc, leave: o.leaveDate || '', enr: str_(o.enr), enrAt: str_(o.enrAt),
         supply: d.supply, invoice: d.invoice, bosu: bosu, excluded: excluded, sanOn: sanOn, goyOn: goyOn,
         sanD: d.san || 0, goyD: d.goy || 0, runner: d.runnerIns || 0, sanAll: sanAll, goyAll: goyAll,
-        start: start0, done: docYn_(c.done), date: c.date || '', memo: c.memo || '', by: c.by || '', at: c.at || '',
+        start: start0, done: docYn_(c.done), ex: str_(c.done) === '제외', date: c.date || '', memo: c.memo || '', by: c.by || '', at: c.at || '',
         savedBosu: stlNum_(c.bosu) || 0, goyFlag: goyFlag
       };
     });
@@ -207,7 +207,7 @@ function insRows_(month) {
 }
 /**
  * 연간 보기: 그 해 정산월마다 기사별 신고 상태를 모아 기사 × 월 표로.
- * 칸 상태: done 신고 완료 · no 미신고(기한 지남) · wait 신고 전(기한 안) · out 대상 아님 · sub 상위 기사에 합산 · skip 집계 시작 전
+ * 칸 상태: done 신고 완료 · no 미신고(기한 지남) · wait 신고 전(기한 안) · out 대상 아님 · sub 상위 기사에 합산 · skip 집계 시작 전 · ex 제외(관리자가 신고 안 하기로 함, done='제외')
  * from = 집계 시작 정산월 (app_settings insFrom)
  */
 function adm_insYear(token, year, from) {
@@ -236,7 +236,7 @@ function adm_insYear(token, year, from) {
         if (!d) { d = drv[r.acct] = { acct: r.acct, driverId: r.driverId, name: r.name, hasRrn: r.hasRrn, cells: {} }; order.push(d); }
         d.name = r.name; d.hasRrn = r.hasRrn; d.enr = r.enr; d.enrAt = r.enrAt;
         const tgt = !r.parent && !r.excluded && (r.sanOn || r.goyOn);
-        const stt = r.parent ? 'sub' : !tgt ? 'out' : r.done ? 'done' : startM && m < startM ? 'skip' : today > x.due ? 'no' : 'wait';
+        const stt = r.parent ? 'sub' : !tgt ? 'out' : r.ex ? 'ex' : r.done ? 'done' : startM && m < startM ? 'skip' : today > x.due ? 'no' : 'wait';
         d.cells[m] = { st: stt, base: r.invoice, supply: r.supply, bosu: r.bosu, sanOn: r.sanOn, goyOn: r.goyOn, ded: (r.sanD || 0) + (r.goyD || 0),
           pay: (r.sanAll || 0) + (r.goyAll || 0), start: r.start, date: r.date, memo: r.memo, parentName: r.parentName || '' };
       });
@@ -253,10 +253,10 @@ function adm_insRepSet(token, month, list) {
     list = (Array.isArray(list) ? list : []).slice(0, 500);
     const n = docUpsert_(SH.INSREP, month, list, a, function (x) {
       const f = { driverId: str_(x.driverId), name: str_(x.name), bosu: String(Math.round(stlNum_(x.bosu) || 0)), san: x.san ? 'Y' : '', goy: x.goy ? 'Y' : '',
-        start: stlYmd_(x.start) || '', done: x.done ? 'Y' : '', date: x.done ? (stlYmd_(x.date) || todayText_()) : '', memo: str_(x.memo).slice(0, 200) };
+        start: stlYmd_(x.start) || '', done: x.ex ? '제외' : x.done ? 'Y' : '', date: !x.ex && x.done ? (stlYmd_(x.date) || todayText_()) : '', memo: str_(x.memo).slice(0, 200) };
       return f;
     });
-    logAdmin_(a, '산재·고용 신고 체크', month, list.map(function (x) { return str_(x.name) + (x.done ? ' 신고' : ''); }).join(', ').slice(0, 300));
+    logAdmin_(a, '산재·고용 신고 체크', month, list.map(function (x) { return str_(x.name) + (x.ex ? ' 제외' : x.done ? ' 신고' : ''); }).join(', ').slice(0, 300));
     return { ok: true, n: n };
   });
 }
@@ -369,7 +369,7 @@ function adm_insRepSetMany(token, items) {
       const list = (Array.isArray(it.list) ? it.list : []).slice(0, 500);
       n += docUpsert_(SH.INSREP, it.month, list, a, function (x) {
         return { driverId: str_(x.driverId), name: str_(x.name), bosu: String(Math.round(stlNum_(x.bosu) || 0)), san: x.san ? 'Y' : '', goy: x.goy ? 'Y' : '',
-          start: stlYmd_(x.start) || '', done: x.done ? 'Y' : '', date: x.done ? (stlYmd_(x.date) || todayText_()) : '', memo: str_(x.memo).slice(0, 200) };
+          start: stlYmd_(x.start) || '', done: x.ex ? '제외' : x.done ? 'Y' : '', date: !x.ex && x.done ? (stlYmd_(x.date) || todayText_()) : '', memo: str_(x.memo).slice(0, 200) };
       });
     });
     logAdmin_(a, '산재·고용 신고 일괄 체크 (연간)', items.map(function (it) { return it.month; }).join(', '), n + '건');

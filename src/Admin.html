@@ -1479,7 +1479,8 @@
   section[id^="view-"] tbody tr:has(> td:first-child input[type=checkbox]:checked) > td:first-child,
   .modal tbody tr:has(> td:first-child input[type=checkbox]:checked) > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .ey-tb .eyc.wait { background: #fff1e0; color: #c2410c; } .ey-tb .eyc.out, .ey-tb .eyc.sub { color: #adb5bd; cursor: default; font-weight: 700; }
-  .ey-tb .eyc.done { color: #0b6b3a; } .ey-tb .eyc.ti { color: var(--brand); } .ey-tb .eyc.no { background: #fde8e8; color: #c81e1e; } .ey-tb .eyc.skip { color: #adb5bd; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
+  .ey-tb .eyc.done { color: #0b6b3a; } .ey-tb .eyc.ti { color: var(--brand); } .ey-tb .eyc.no { background: #fde8e8; color: #c81e1e; } .ey-tb .eyc.skip { color: #adb5bd; } .ey-tb .eyc.ex { color: #868e96; background: #f1f3f5; }
+  .ey-tb td.ec .eyx { margin-left: 3px; height: 22px; padding: 0 6px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; color: #495057; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; } .ey-tb td.ec .eyx:hover { border-color: #868e96; background: #f8f9fa; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
   .ey-tb tr.eyr { cursor: pointer; } .ey-tb tr.eyr:hover td { background: #f8fafc; } .ey-tb tr.eyr.open td { background: #f1f6ff; }
   .ey-tb tr.eyd > td { background: #fbfcfe; padding: 10px 14px 14px; }
   .eyd-tb { width: 100%; border-collapse: collapse; font-size: 12.5px; } .eyd-tb th, .eyd-tb td { padding: 5px 8px; border-bottom: 1px solid #eef1f4; text-align: left; white-space: nowrap; } .eyd-tb .num { text-align: right; } .eyd-tb tr.sub td { background: #f4f6f9; font-weight: 800; }
@@ -4834,7 +4835,7 @@
 
   // ── 산재/고용 신고 상황 ──
   const IR = { month: '', rows: [], tab: '신고 대상', sel: new Set(), seq: 0, info: null, parEdit: '' };
-  const irTarget = (x) => !x.parent && !x.excluded && (x.sanOn || x.goyOn);
+  const irTarget = (x) => !x.parent && !x.excluded && !x.ex && (x.sanOn || x.goyOn);
   function loadInsRep(month) {
     const seq = ++IR.seq;
     if (!IR.rows.length) $('#irRows').innerHTML = '<tr><td colspan="14" class="sub">정산 결과를 불러오는 중…</td></tr>';
@@ -4898,7 +4899,7 @@
         '<td>' + (x.excluded ? '<span class="dc-tag n" title="정산 설정에서 산재·고용 제외">제외</span>' : yn(x.sanOn, '산재 OFF')) + '</td>' +
         '<td>' + (x.excluded ? '' : yn(x.goyOn, x.bosu < (rt.goyMin || 0) ? '월보수액 ' + dWon(rt.goyMin) + '원 미만' : '고용 OFF')) + '</td>' +
         '<td class="num">' + dWon(x.sanD + x.goyD) + '</td><td class="num">' + dWon(x.sanAll + x.goyAll) + '</td>' +
-        '<td>' + (tgt ? '<button type="button" class="dc-st' + (x.done ? ' on' : '') + '" data-irtog="' + esc(x.acct) + '">' + (x.done ? '신고 완료' : '미신고') + '</button>' : '<span class="sm">대상 아님</span>') + '</td>' +
+        '<td>' + (tgt ? '<button type="button" class="dc-st' + (x.done ? ' on' : '') + '" data-irtog="' + esc(x.acct) + '">' + (x.done ? '신고 완료' : '미신고') + '</button>' : x.ex ? '<button type="button" class="dc-st" data-irex="' + esc(x.acct) + '" title="누르면 제외를 풀고 다시 신고 대상으로">제외 · 풀기</button>' : '<span class="sm">대상 아님</span>') + '</td>' +
         '<td>' + (tgt ? '<input class="inp dcd" type="date" data-irf="date" value="' + esc(x.date) + '"' + (x.done ? '' : ' disabled') + '>' : '') + '</td>' +
         '<td><input class="inp dcm" data-irf="memo" value="' + esc(x.memo) + '" maxlength="200"></td></tr>';
     }).join('');
@@ -4908,7 +4909,7 @@
   }
   function irSelPaint() { dcSel(IR.sel, '#irRows', '#irAll', '#irBulk', 'data-irck', '<button type="button" class="btn sm" data-irbulk="1">신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="0">미신고로</button><button type="button" class="btn sm ghost" data-irbulk="x">⬇ 고른 기사만 엑셀</button><span style="width:1px;height:20px;background:var(--line);margin:0 4px"></span><button type="button" class="btn sm ghost" data-irbulk="enx">⬇ 입직신고 엑셀</button><button type="button" class="btn sm ghost" data-irbulk="e완료">입직신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="e대상">입직신고 대상으로</button>'); }
   function irSave(list) {
-    const pay = list.map((x) => ({ acct: x.acct, driverId: x.driverId, name: x.name, bosu: x.bosu, san: x.sanOn, goy: x.goyOn, start: x.start, done: x.done, date: x.date, memo: x.memo }));
+    const pay = list.map((x) => ({ acct: x.acct, driverId: x.driverId, name: x.name, bosu: x.bosu, san: x.sanOn, goy: x.goyOn, start: x.start, done: x.done, ex: !!x.ex, date: x.date, memo: x.memo }));
     return api('adm_insRepSet', IR.month, pay).then((r) => { if (!r.ok) { toast(r.msg); loadInsRep(); } return r; });
   }
   $('#irMonth').addEventListener('change', (e) => { IR.rows = []; loadInsRep(e.target.value); });
@@ -4969,12 +4970,12 @@
       (!q || String(d.name).toLowerCase().includes(q)));
     list = list.slice().sort((a, b) => cellsOf(b, 'no').length - cellsOf(a, 'no').length || a.name.localeCompare(b.name, 'ko'));
     $('#iyHead').innerHTML = '<tr><th class="ck"><input type="checkbox" id="iyAll" aria-label="보이는 기사 모두 선택"></th><th>기사</th>' + ms.map((m) => '<th class="ec">' + esc(eyMon(m)) + '</th>').join('') + '<th class="num">미신고</th><th class="num">미신고 공단 납부</th></tr>';
-    const lab = { done: '✓ 신고', no: '미신고', wait: '신고 전', out: '대상 아님', sub: '합산', skip: '기록 전' };
+    const lab = { done: '✓ 신고', no: '미신고', wait: '신고 전', out: '대상 아님', sub: '합산', skip: '기록 전', ex: '제외' };
     $('#iyRows').innerHTML = list.map((d) => {
       const nc = cellsOf(d, 'no'), amt = nc.reduce((a, m) => a + (d.cells[m].pay || 0), 0), open = IY.open === d.acct, ne = iyNoEnr(d);
       return '<tr class="eyr' + (open ? ' open' : '') + '" data-iya="' + esc(d.acct) + '"><td class="ck"><input type="checkbox" data-iyck="' + esc(d.acct) + '"' + (IY.sel.has(d.acct) ? ' checked' : '') + '></td><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' +
         (ne && tgt.includes(d) ? (d.enr === '신고중' ? ' <span class="dc-tag w" style="color:#c2410c;background:#fff1e0">입직신고 중</span>' : ' <span class="dc-tag w" style="color:#c81e1e">입직신고 대상</span>') : '') + (!d.hasRrn && tgt.includes(d) ? ' <span class="dc-tag n" title="기사 정보관리에서 주민등록번호를 넣어 주세요">주민번호 없음</span>' : '') + '</td>' +
-        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-iym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' title="' + esc(dMon(m) + ' · 월보수 ' + dWon(c.bosu) + '원 · 공단 납부 ' + dWon(c.pay) + '원' + (c.st === 'sub' ? ' · ' + c.parentName + ' 기사에 합산' : c.st === 'out' ? ' · 신고 대상 아님' : c.st === 'done' ? ' · 누르면 미신고로' : ' · 누르면 신고 완료로 · 기한 ' + (r.dues[m] || ''))) + '">' + (c.busy ? '저장 중…' : lab[c.st]) + '</button>' : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
+        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-iym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' title="' + esc(dMon(m) + ' · 월보수 ' + dWon(c.bosu) + '원 · 공단 납부 ' + dWon(c.pay) + '원' + (c.st === 'sub' ? ' · ' + c.parentName + ' 기사에 합산' : c.st === 'out' ? ' · 신고 대상 아님' : c.st === 'done' ? ' · 누르면 미신고로' : c.st === 'ex' ? ' · 신고 안 하기로 함 · 누르면 제외를 풀기' : ' · 누르면 신고 완료로 · 기한 ' + (r.dues[m] || ''))) + '">' + (c.busy ? '저장 중…' : lab[c.st]) + '</button>' + (!c.busy && (c.st === 'no' || c.st === 'wait') ? '<button type="button" class="eyx" data-iyx="' + esc(m) + '" title="' + esc(dMon(m) + ' · 이 달은 신고 대상에서 뺌') + '">제외</button>' : '') : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
         '<td class="num">' + (nc.length ? '<b style="color:#c81e1e">' + nc.length + '건</b>' : '<span class="sm">없음</span>') + '</td><td class="num">' + (amt ? dWon(amt) : '') + '</td></tr>' +
         (open ? '<tr class="eyd"><td colspan="' + (ms.length + 4) + '">' + iyDetail(d) + '</td></tr>' : '');
     }).join('');
@@ -4985,7 +4986,7 @@
   /** 기사 1명의 1년 내역: 월별 줄 + 상·하반기 소계 + 1년 합계 */
   function iyDetail(d) {
     const ms = IY.info.months.filter((m) => d.cells[m]);
-    const stx = { out: '<span class="sm">대상 아님</span>', sub: '<span class="sm">상위 기사에 합산</span>' };
+    const stx = { out: '<span class="sm">대상 아님</span>', sub: '<span class="sm">상위 기사에 합산</span>', ex: '<span class="sm" style="font-weight:800">제외</span>' };
     const yn = (on) => on ? '<span class="dc-tag y">적용</span>' : '<span class="sm">—</span>';
     const sum = (l) => l.reduce((a, m) => { const c = d.cells[m]; a.b += c.base || 0; a.w += c.bosu || 0; a.d += c.ded || 0; a.p += c.pay || 0; return a; }, { b: 0, w: 0, d: 0, p: 0 });
     const line = (lab, x, n) => '<tr class="sub"><td>' + lab + '</td><td class="num">' + dWon(x.b) + '</td><td class="num">' + dWon(x.w) + '</td><td></td><td></td><td class="num">' + dWon(x.d) + '</td><td class="num">' + dWon(x.p) + '</td><td colspan="3">' + (n ? '<span style="color:#c81e1e">미신고 ' + n + '건</span>' : '') + '</td></tr>';
@@ -5005,6 +5006,7 @@
   function iyToggle(acct, m) {
     const d = IY.info.drivers.find((x) => x.acct === acct), c = d && d.cells[m]; if (!c || c.busy) return;
     if (c.st === 'out' || c.st === 'sub') return toast(c.st === 'sub' ? c.parentName + ' 기사에 합산해 신고하는 달입니다.' : '신고 대상이 아닌 달입니다.');
+    if (c.st === 'ex') { if (confirm(d.name + ' · ' + dMon(m) + '분\n\n제외를 풀고 다시 신고 대상으로 둘까요?')) iyMark([{ d, m, c }], 'free'); return; }
     const on = c.st !== 'done';
     if (!on && !confirm(d.name + ' · ' + dMon(m) + '분\n\n신고 완료를 미신고로 되돌릴까요?')) return;
     const prev = { st: c.st, date: c.date };
@@ -5020,16 +5022,34 @@
     }).catch(() => { c.busy = false; Object.assign(c, prev); renderInsYear(); });
   }
 
+  /** 칸 상태 바꾸기: to = 'ex' 제외 · 'free' 제외 풀기 (미신고/신고 전으로) */
+  function iyMark(tg, to) {
+    const r = IY.info, ex = to === 'ex', by = {};
+    const back = (m) => (r.from && m < r.from ? 'skip' : (r.today > (r.dues[m] || '') ? 'no' : 'wait'));
+    tg.forEach(({ d, m, c }) => { (by[m] = by[m] || []).push({ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: false, ex: ex, date: '', memo: c.memo || '' }); c.busy = true; IY.keep.add(d.acct); });
+    renderInsYear();
+    const ppl = new Set(tg.map((x) => x.d.acct)).size;
+    return api('adm_insRepSetMany', Object.keys(by).map((m) => ({ month: m, list: by[m] }))).then((res) => {
+      tg.forEach(({ c }) => { c.busy = false; });
+      if (!res.ok) { renderInsYear(); return toast(res.msg); }
+      tg.forEach(({ m, c }) => { c.st = ex ? 'ex' : back(m); c.date = ''; });
+      if (by[IR.month]) IR.rows = [];
+      renderInsYear(); toast((ppl > 1 || tg.length > 1 ? ppl + '명 · ' + tg.length + '건을 ' : tg[0].d.name + ' ' + dMon(tg[0].m) + '분을 ') + (ex ? '신고 대상에서 뺐습니다 (제외).' : '다시 신고 대상으로 돌렸습니다.'));
+    }).catch(() => { tg.forEach(({ c }) => { c.busy = false; }); renderInsYear(); });
+  }
+
   // ── 연간 보기 선택 · 일괄 처리 ──
   /** 고른 기사 × 고른 달(비우면 모든 달)에서 바꿀 칸 목록 */
   function iyTargets(on) {
-    const r = IY.info, ms = IY.bm ? [IY.bm] : r.months, out = [];
+    const r = IY.info, ms = !IY.bm ? r.months : IY.bm[0] === '~' ? r.months.filter((m) => m <= IY.bm.slice(1)) : [IY.bm], out = [];
     r.drivers.filter((d) => IY.sel.has(d.acct)).forEach((d) => ms.forEach((m) => {
       const c = d.cells[m]; if (!c || c.busy) return;
-      if (on ? ['no', 'wait', 'skip'].includes(c.st) && (IY.bm || c.st !== 'skip') : c.st === 'done') out.push({ d, m, c });
+      if (on === 'ex' ? ['no', 'wait', 'skip'].includes(c.st) && (IY.bm || c.st !== 'skip') : on === 'free' ? c.st === 'ex' :
+        on ? ['no', 'wait', 'skip'].includes(c.st) && (IY.bm || c.st !== 'skip') : c.st === 'done') out.push({ d, m, c });
     }));
     return out;
   }
+  const iyBmLab = () => !IY.bm ? '모든 달' : IY.bm[0] === '~' ? dMon(IY.info.months[0]) + ' ~ ' + dMon(IY.bm.slice(1)) + '분' : dMon(IY.bm) + '분';
   function iySelPaint() {
     const r = IY.info; if (!r) return;
     const vis = $$('#iyRows [data-iyck]').map((c) => c.dataset.iyck);
@@ -5038,8 +5058,10 @@
     if (!IY.sel.size) return;
     const t1 = iyTargets(true), amt = t1.reduce((a, x) => a + (x.c.pay || 0), 0);
     box.innerHTML = '<b>' + IY.sel.size + '명 선택</b>' +
-      '<select class="inp" id="iyBm" style="height:30px;width:auto;font-size:13px" title="어느 달을 바꿀지"><option value="">모든 달 (미신고·신고 전)</option>' + r.months.map((m) => '<option value="' + esc(m) + '"' + (m === IY.bm ? ' selected' : '') + '>' + esc(dMon(m)) + '분</option>').join('') + '</select>' +
+      '<select class="inp" id="iyBm" style="height:30px;width:auto;font-size:13px" title="어느 달을 바꿀지"><option value="">모든 달 (미신고·신고 전)</option>' + '<optgroup label="한 달만">' + r.months.map((m) => '<option value="' + esc(m) + '"' + (m === IY.bm ? ' selected' : '') + '>' + esc(dMon(m)) + '분</option>').join('') + '</optgroup>' +
+      '<optgroup label="처음 달부터 ~ 이 달까지">' + r.months.slice(1).map((m) => '<option value="~' + esc(m) + '"' + ('~' + m === IY.bm ? ' selected' : '') + '>' + esc(dMon(r.months[0]) + ' ~ ' + dMon(m)) + '분</option>').join('') + '</optgroup></select>' +
       '<button type="button" class="btn sm" data-iyb="1">신고 완료로 (' + t1.length + '건)</button><button type="button" class="btn sm ghost" data-iyb="0">미신고로</button>' +
+      '<button type="button" class="btn sm ghost" data-iyb="ex" title="고른 달을 신고 대상에서 뺌">제외</button>' + (iyTargets('free').length ? '<button type="button" class="btn sm ghost" data-iyb="free">제외 풀기</button>' : '') +
       '<span style="width:1px;height:20px;background:var(--line);margin:0 4px"></span><button type="button" class="btn sm ghost" data-iyb="e완료">입직신고 완료로</button><button type="button" class="btn sm ghost" data-iyb="e대상">입직신고 대상으로</button>' +
       '<span class="sm">' + (t1.length ? '공단 납부 ' + dWon(amt) + '원' : '') + '</span><button type="button" class="btn sm ghost" data-iyclr>선택 풀기</button>';
   }
@@ -5050,6 +5072,12 @@
     if (e.target.closest('[data-iyclr]')) { IY.sel.clear(); return renderInsYear(); }
     const b = e.target.closest('[data-iyb]'); if (!b) return;
     const k = b.dataset.iyb, r = IY.info;
+    if (k === 'ex' || k === 'free') {
+      const tg = iyTargets(k);
+      if (!tg.length) return toast(k === 'ex' ? '고른 기사·달에 미신고(신고 전)인 칸이 없습니다.' : '고른 기사·달에 제외된 칸이 없습니다.');
+      if (!confirm(new Set(tg.map((x) => x.d.acct)).size + '명 · ' + tg.length + '건 (' + iyBmLab() + ')\n\n' + (k === 'ex' ? '신고 대상에서 뺄까요? (제외)' : '제외를 풀고 다시 신고 대상으로 둘까요?'))) return;
+      return iyMark(tg, k).then(() => { IY.sel.clear(); renderInsYear(); });
+    }
     if (k[0] === 'e') {
       const v = k.slice(1), ids = [...new Set(r.drivers.filter((d) => IY.sel.has(d.acct) && d.driverId).map((d) => d.driverId))];
       if (!confirm(ids.length + '명을 ' + (v === '완료' ? '입직신고 완료(오늘 날짜)' : '입직신고 대상') + '으로 바꿀까요?')) return;
@@ -5058,7 +5086,7 @@
     const on = k === '1', tg = iyTargets(on);
     if (!tg.length) return toast(on ? '고른 기사·달에 미신고(신고 전)인 칸이 없습니다.' : '고른 기사·달에 신고 완료인 칸이 없습니다.');
     const ppl = new Set(tg.map((x) => x.d.acct)).size, amt = tg.reduce((a, x) => a + (x.c.pay || 0), 0);
-    if (!confirm(ppl + '명 · ' + tg.length + '건 (' + (IY.bm ? dMon(IY.bm) + '분' : '모든 달') + ') · 공단 납부 ' + dWon(amt) + '원\n\n' + (on ? '신고 완료(오늘 날짜)로' : '미신고로') + ' 바꿀까요?')) return;
+    if (!confirm(ppl + '명 · ' + tg.length + '건 (' + iyBmLab() + ') · 공단 납부 ' + dWon(amt) + '원\n\n' + (on ? '신고 완료(오늘 날짜)로' : '미신고로') + ' 바꿀까요?')) return;
     const by = {}, today = dToday();
     tg.forEach(({ d, m, c }) => { (by[m] = by[m] || []).push({ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: on, date: on ? (c.date || today) : '', memo: c.memo || '' }); c.busy = true; });
     tg.forEach(({ d }) => IY.keep.add(d.acct));
@@ -5078,6 +5106,12 @@
   $('#iyTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-iyt]'); if (b) { IY.tab = b.dataset.iyt; IY.keep.clear(); renderInsYear(); } });
   $('#iyRows').addEventListener('click', (e) => {
     if (e.target.closest('td.ck')) return; // 선택 칸은 줄 펼치기와 따로
+    const x = e.target.closest('[data-iyx]');
+    if (x) {
+      const t = x.closest('tr.eyr'), d = t && IY.info.drivers.find((y) => y.acct === t.dataset.iya), m = x.dataset.iyx, c = d && d.cells[m];
+      if (c && !c.busy && confirm(d.name + ' · ' + dMon(m) + '분\n\n이 달은 신고하지 않고 제외할까요?\n(제외 칸을 다시 누르면 풀 수 있습니다)')) iyMark([{ d, m, c }], 'ex');
+      return;
+    }
     const c = e.target.closest('[data-iym]');
     if (c) { const t = c.closest('tr.eyr'); return iyToggle(t ? t.dataset.iya : IY.open, c.dataset.iym); }
     if (e.target.closest('.eyd')) return;
@@ -5110,6 +5144,12 @@
     const pe = e.target.closest('[data-irpared]');
     if (pe) { IR.parEdit = IR.parEdit === pe.dataset.irpared ? '' : pe.dataset.irpared; renderInsRep(); const s = $('#irRows [data-irpar]'); if (s) s.focus(); return; }
     const up = e.target.closest('[data-irunpar]'); if (up) return irMerge(up.dataset.irunpar, '');
+    const xb = e.target.closest('[data-irex]');
+    if (xb) {
+      const x = IR.rows.find((i) => i.acct === xb.dataset.irex); if (!x || !confirm(x.name + '\n\n제외를 풀고 다시 신고 대상으로 둘까요?')) return;
+      x.ex = false; x.done = false; x.date = ''; renderInsRep();
+      return irSave([x]).then((r) => { if (r && r.ok) { toast(x.name + ' 다시 신고 대상으로 돌렸습니다.'); IY.info = null; } }).catch(() => {});
+    }
     const b = e.target.closest('[data-irtog]'); if (!b) return;
     const x = IR.rows.find((i) => i.acct === b.dataset.irtog); if (!x) return;
     x.done = !x.done; x.date = x.done ? (x.date || dToday()) : ''; x.savedBosu = x.done ? x.bosu : 0;
