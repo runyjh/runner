@@ -497,13 +497,20 @@ scenario('대시보드 오늘 한눈에', null, function (r) {
     pkAll_ = function () { throw new Error('피크 탭 없음'); };      // 한 부분이 실패해도
     rpfSummary_ = function () { return { wk: 46, bad: 4, improve: 1 }; }; slaSummary_ = function () { return { low: 2, warn: 3 }; };
     softFail_ = function () {};
-    var o = homeMain_();
+    props_ = function () { return { SCH_DB_ID: 'x', STL_DB_ID: '' }; };
+    schIssues_ = function () { return [
+      { id: 'I1', date: '2026-11-15', end: T, name: '유정근', kind: '질병', result: '병가', reason: '질병', mi: true, subWho: '강준길' },   // 오늘까지 진행 중
+      { id: 'I2', date: '2026-11-12', end: '2026-11-12', name: '이현모', kind: '고장', result: '미입차', reason: '', mi: true },          // 지난 것 · 사유 없음
+      { id: 'I3', date: '2026-11-19', end: '2026-11-19', name: '이현모', kind: '물량조율', result: '물량조율', reason: '기타' },             // 예정
+      { id: 'I4', date: T, name: '메모', kind: '지시' }]; };
+    var o = homeMain_(); __M.issueOut = o.issue;
     return { tiles: o.tiles, todo: o.todo.map(function (x) { return x.lv + ':' + x.k + ':' + x.n; }), soon: o.soon.map(function (x) { return x.date.slice(5) + ' ' + x.label; }),
-      week: o.week.length, wk: o.week.filter(function (x) { return x.date === T; })[0], notice: o.notice, perf: o.perf, sys: o.sys.err };
+      iss: [o.issue.today, o.issue.week, o.issue.by, o.issue.list[0].text], week: o.week.length, wk: o.week.filter(function (x) { return x.date === T; })[0], notice: o.notice, perf: o.perf, sys: o.sys.err };
   })()`, r.ctx);
   eq('숫자 칸 (소속 없는 백업 기사도 근무로 셈 · 내일 용차는 근무 아님)', out.tiles, { work: 2, off: 0, sick: 0, miss: 1, mi: 1, empty: 0, workTom: 0, online: 1, opened: 1, pm: 1, pmNew: 1 });
-  eq('확인할 것: 급한 것(r) 먼저 · 건이 있는 것만', out.todo, ['r:mi:1', 'r:empty:1', 'r:first:1', 'r:ck:pmBoth:3', 'r:pmApply:1', 'r:pmOpen:1', 'b:yong:1', 'b:pending:1', 'b:doc:1', 'b:unseen:1', 'b:nopush:1', 'b:report:1']);
-  eq('다가오는 변경: 날짜순 (적용 끝난 변경 · 범위 밖은 빼고)', out.soon.filter(function (x) { return !/정산|쿠팡|계산서/.test(x); }), ['11-18 노선 변경 · 이현모', '11-20 공지 게시 종료 · 공지', '11-25 퇴사 예정 · 퇴사자']);
+  eq('확인할 것: 급한 것(r) 먼저 · 건이 있는 것만', out.todo, ['r:empty:1', 'r:issNow:1', 'r:first:1', 'r:ck:pmBoth:3', 'r:pmApply:1', 'r:pmOpen:1', 'b:yong:1', 'b:issReason:1', 'b:pending:1', 'b:doc:1', 'b:unseen:1', 'b:nopush:1', 'b:report:1']);
+  eq('다가오는 변경: 날짜순 (적용 끝난 변경 · 범위 밖은 빼고)', out.soon.filter(function (x) { return !/정산|쿠팡|계산서/.test(x); }), ['11-18 노선 변경 · 이현모', '11-19 이슈 예정 · 이현모', '11-20 공지 게시 종료 · 공지', '11-25 퇴사 예정 · 퇴사자']);
+  eq('이슈: 오늘 진행 중 1 · 최근 7일 2 · 결과별 · 지시는 뺌 (오늘 이슈가 있으면 미입차 칸 줄은 숨김)', out.iss, [1, 2, { '병가': 1, '미입차': 1 }, '유정근 병가(질병) → 강준길']);
   eq('이번 주 7일 · 오늘 근무 2 미입차 1', [out.week, out.wk.work, out.wk.mi], [7, 2, 1]);
   eq('공지 읽음 수 · 수행률 · 어제 오류', [out.notice[0].read + '/' + out.notice[0].total, out.perf.bad, out.perf.slaLow, out.sys], ['1/4', 4, 2, 4]);
 });

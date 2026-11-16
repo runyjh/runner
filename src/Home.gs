@@ -25,7 +25,7 @@ function adm_home(token, fresh) {
 }
 function homeMain_() {
   const today = todayText_(), t0 = parseYmd_(today), tom = ymd_(addDays_(t0, 1)), until = ymd_(addDays_(t0, HOME.SOON_DAYS));
-  const out = { ok: true, today: today, tom: tom, tiles: {}, todo: [], soon: [], week: [], notice: [], perf: null, sys: null };
+  const out = { ok: true, today: today, tom: tom, tiles: {}, todo: [], soon: [], week: [], notice: [], perf: null, sys: null, issue: null };
   const part = function (name, fn) { try { fn(); } catch (e) { softFail_('대시보드 ' + name, e); } };
   const todo = function (k, lv, n, label, sub, go) { if (n > 0) out.todo.push({ k: k, lv: lv, n: n, label: label, sub: str_(sub).slice(0, 140), go: go || '' }); };
   const soon = function (date, label, sub, go) { if (date >= today && date <= until) out.soon.push({ date: date, label: label, sub: str_(sub).slice(0, 140), go: go || '' }); };
@@ -59,6 +59,25 @@ function homeMain_() {
     if (tm) todo('empty', 'r', tm.empty, '내일 빈 칸 (스케줄 미입력)', Object.keys(tm.emptyBy).map(function (k) { return k + ' ' + tm.emptyBy[k] + '명'; }).join(' · '), 'sched');
     const yl = (td ? td.yongL.map(function (x) { return '오늘 ' + x; }) : []).concat(tm ? tm.yongL.map(function (x) { return '내일 ' + x; }) : []);
     todo('yong', 'b', yl.length, '용차 쓰는 날', homeNames_(yl), 'sched');
+  });
+  // ── 이슈 (이슈 관리): 오늘 진행 중 · 최근 7일 · 사유 안 적은 것
+  part('이슈', function () {
+    if (!props_().SCH_DB_ID) return;
+    const from = ymd_(addDays_(t0, -6)), to = ymd_(addDays_(t0, 7));
+    const all = schIssues_(from, to).filter(function (x) { return x.id && x.kind !== '지시' && x.date; });
+    const what = function (x) { return str_(x.result) || str_(x.kind); };
+    const line = function (x) { return x.name + ' ' + what(x) + (x.reason && x.reason !== what(x) ? '(' + x.reason + ')' : '') + (x.mi ? (str_(x.subWho) || str_(x.sub) ? ' → ' + (str_(x.subWho) || str_(x.sub)) : ' · 대체 없음') : ''); };
+    const now = all.filter(function (x) { return x.date <= today && (x.end || x.date) >= today; });
+    const week = all.filter(function (x) { return x.date <= today && (x.end || x.date) >= from; });
+    const noReason = week.filter(function (x) { return x.date >= ISS.RULE_FROM && !str_(x.reason); });
+    const next = all.filter(function (x) { return x.date > today; });
+    if (now.length) out.todo = out.todo.filter(function (x) { return x.k !== 'mi'; }); // 같은 내용(오늘 미입차 칸)을 두 줄로 보이지 않게
+    todo('issNow', 'r', now.length, '오늘 이슈', homeNames_(now.map(line), 3), 'issue');
+    todo('issReason', 'b', noReason.length, '이슈 사유 미입력', homeNames_(noReason.map(function (x) { return x.date.slice(5).replace('-', '/') + ' ' + x.name; })), 'issue');
+    next.forEach(function (x) { soon(x.date, '이슈 예정 · ' + x.name, what(x) + (x.end && x.end > x.date ? ' ~ ' + x.end.slice(5).replace('-', '/') : ''), 'issue'); });
+    const by = {}; week.forEach(function (x) { const k = what(x) || '기타'; by[k] = (by[k] || 0) + 1; });
+    out.issue = { today: now.length, week: week.length, by: by,
+      list: week.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; }).slice(0, 5).map(function (x) { return { date: x.date, end: x.end || x.date, text: line(x) }; }) };
   });
   // ── 내일 처음 가는 기사
   part('처음 가는 노선', function () {
