@@ -1480,7 +1480,7 @@
   .modal tbody tr:has(> td:first-child input[type=checkbox]:checked) > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .ey-tb .eyc.wait { background: #fff1e0; color: #c2410c; } .ey-tb .eyc.out, .ey-tb .eyc.sub { color: #adb5bd; cursor: default; font-weight: 700; }
   .ey-tb .eyc.done { color: #0b6b3a; } .ey-tb .eyc.ti { color: var(--brand); } .ey-tb .eyc.no { background: #fde8e8; color: #c81e1e; } .ey-tb .eyc.skip { color: #adb5bd; } .ey-tb .eyc.ex { color: #868e96; background: #f1f3f5; }
-  .ey-tb tr.skipd > td { opacity: .6; } .ey-tb .eyx { margin-left: 3px; height: 22px; padding: 0 6px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; color: #495057; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; } .ey-tb .eyx:hover { border-color: #868e96; background: #f8f9fa; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
+  .ey-tb tr.skipd > td { opacity: .6; } a.irdrv { color: inherit; cursor: pointer; text-decoration: underline dotted #adb5bd; text-underline-offset: 3px; } a.irdrv:hover { color: var(--brand); } .ey-tb .eyx { margin-left: 3px; height: 22px; padding: 0 6px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; color: #495057; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; } .ey-tb .eyx:hover { border-color: #868e96; background: #f8f9fa; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
   .ey-tb tr.eyr { cursor: pointer; } .ey-tb tr.eyr:hover td { background: #f8fafc; } .ey-tb tr.eyr.open td { background: #f1f6ff; }
   .ey-tb tr.eyd > td { background: #fbfcfe; padding: 10px 14px 14px; }
   .eyd-tb { width: 100%; border-collapse: collapse; font-size: 12.5px; } .eyd-tb th, .eyd-tb td { padding: 5px 8px; border-bottom: 1px solid #eef1f4; text-align: left; white-space: nowrap; } .eyd-tb .num { text-align: right; } .eyd-tb tr.sub td { background: #f4f6f9; font-weight: 800; }
@@ -4885,7 +4885,7 @@
       if (x.parent) {
         const o = x.own || {};
         return '<tr data-acct="' + esc(x.acct) + '" class="irkid" style="background:#f8fafc;color:#64748b">' +
-          '<td class="ck"></td><td style="white-space:nowrap;padding-left:22px">↳ <b>' + esc(x.name) + '</b> <span class="dc-tag n" title="이 기사의 보험료는 상위 기사 한 사람으로 합쳐 신고합니다">' + esc(x.parentName) + '에 합산</span>' +
+          '<td class="ck"></td><td style="white-space:nowrap;padding-left:22px">↳ <b>' + (x.driverId ? '<a class="irdrv" data-irdrv="' + esc(x.driverId) + '" title="기사 정보 보기">' + esc(x.name) + '</a>' : esc(x.name)) + '</b> <span class="dc-tag n" title="이 기사의 보험료는 상위 기사 한 사람으로 합쳐 신고합니다">' + esc(x.parentName) + '에 합산</span>' +
           ' <button type="button" class="btn sm ghost" data-irunpar="' + esc(x.acct) + '" style="height:24px;padding:0 8px;font-size:11.5px">풀기</button></td>' +
           '<td></td><td class="sm">' + (x.hasRrn ? esc(x.rrn || '등록됨') : '') + '</td><td></td>' +
           '<td class="num">' + dWon(o.supply) + '</td><td class="num">' + dWon(o.bosu) + '</td><td colspan="2" class="sm">상위에 합산</td>' +
@@ -4895,7 +4895,7 @@
       const tgt = irTarget(x), chg = x.done && x.savedBosu && x.savedBosu !== x.bosu;
       return '<tr data-acct="' + esc(x.acct) + '"' + (x.done && tgt ? ' class="done"' : '') + (tgt ? '' : ' style="opacity:.6"') + '>' +
         '<td class="ck">' + (tgt ? '<input type="checkbox" data-irck="' + esc(x.acct) + '"' + (IR.sel.has(x.acct) ? ' checked' : '') + '>' : '') + '</td>' +
-        '<td style="white-space:nowrap"><b>' + esc(x.name) + '</b>' + (x.leave ? ' <span class="dc-tag w" title="퇴사일">퇴사 ' + esc(dMd(x.leave)) + '</span>' : '') +
+        '<td style="white-space:nowrap"><b>' + (x.driverId ? '<a class="irdrv" data-irdrv="' + esc(x.driverId) + '" title="기사 정보 보기">' + esc(x.name) + '</a>' : esc(x.name)) + '</b>' + (x.leave ? ' <span class="dc-tag w" title="퇴사일">퇴사 ' + esc(dMd(x.leave)) + '</span>' : '') +
           (x.kids ? ' <span class="dc-tag y" title="하위 기사 보험료를 이 기사에 합쳐 신고">+ 하위 ' + x.kids.length + '명</span>' : '') +
           (x.parentMissing ? ' <span class="dc-tag w" title="지정한 상위 기사가 이번 달 정산에 없어 따로 신고합니다">상위 없음</span> <button type="button" class="btn sm ghost" data-irunpar="' + esc(x.acct) + '" style="height:24px;padding:0 8px;font-size:11.5px">풀기</button>' : '') +
           (!x.kids && !x.parentMissing ? (IR.parEdit === x.acct ? '<div>' + parSel(x) + '</div>' : ' <button type="button" class="irpar-b" data-irpared="' + esc(x.acct) + '" title="이 기사를 다른 기사의 하위로 넣어 보험료를 합쳐 신고">하위로</button>') : '') + '</td>' +
@@ -5163,6 +5163,7 @@
     const pe = e.target.closest('[data-irpared]');
     if (pe) { IR.parEdit = IR.parEdit === pe.dataset.irpared ? '' : pe.dataset.irpared; renderInsRep(); const s = $('#irRows [data-irpar]'); if (s) s.focus(); return; }
     const up = e.target.closest('[data-irunpar]'); if (up) return irMerge(up.dataset.irunpar, '');
+    const dl = e.target.closest('[data-irdrv]'); if (dl) return openDrawer(dl.dataset.irdrv);
     const xb = e.target.closest('[data-irex]');
     if (xb) {
       const x = IR.rows.find((i) => i.acct === xb.dataset.irex); if (!x || !confirm(x.name + '\n\n제외를 풀고 다시 신고 대상으로 둘까요?')) return;
