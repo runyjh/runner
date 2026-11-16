@@ -605,6 +605,19 @@ scenario('자료 점검 추가', null, function (r) {
     'miNoIss:11/15 이현모 · 미입차', 'goneSch:유정근 (퇴사) · 11/17', 'sameRoute(b):11/17 군포1 212 · 이현모, 강준길']);
 });
 
+// 30) 관리자 휴대폰: 날짜별 업무스케줄 표시(🗒) — 그날 적은 업무 + 항상 보기의 마감일 · 끝낸 것 · 비고 글은 뺌
+(function () {
+  try {
+    const html = fs.readFileSync(path.join(SRC, 'Admin.html'), 'utf8'), i = html.indexOf('  const MMO = '), j = html.indexOf('  const mmoMark = ');
+    const box = { HM: { ym: '2026-11', memos: [{ id: 'a', date: '2026-11-18', content: 'x' }, { id: 'b', date: '2026-11-18', done: true }, { id: 'c', date: '2026-11-18', note: true },
+      { id: 'p', date: '2026-11-15', pin: true, until: '2026-11-20' }], pinned: [{ id: 'p', date: '2026-11-15', pin: true, until: '2026-11-20' }, { id: 'q', date: '2026-11-18', pin: true, until: '' }] }, api: function () { return { then: function () { return { catch: function () { return { finally: function () {} }; } }; } }; }, window: {} };
+    vm.createContext(box);
+    vm.runInContext(html.slice(i, j).replace('const MMO', 'var MMO'), box);
+    const ids = function (d) { return vm.runInContext("mmoOf('" + d + "').map(function (m) { return m.id; })", box); };
+    eq('날짜별 업무스케줄 표시', [ids('2026-11-18'), ids('2026-11-20'), ids('2026-11-15'), ids('2026-12-01')], [['a', 'q'], ['p'], [], []]);
+  } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 날짜별 업무스케줄 표시 (실행 오류) ' + (e && e.message)); }
+})();
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');

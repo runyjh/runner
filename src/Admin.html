@@ -1764,6 +1764,10 @@
   .hm-more { display: flex; flex-wrap: wrap; gap: 6px; } .hm-more button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; } .hm-more small { color: var(--sub); font-weight: 500; }
   .hm-rt td, .hm-rt th { text-align: center !important; }
   @media (max-width: 760px) { .hm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hm-tile:last-child { grid-column: 1 / -1; } .hm-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .smb-mm { font-style: normal; font-size: 11px; font-weight: 700; color: #b45309; text-align: center; line-height: 1.2; white-space: nowrap; }
+  .smb-mmo { margin: 10px 0 2px; padding: 10px 12px; border-radius: 10px; background: #fff8ec; border: 1px solid #f5d7a8; } .smb-mmo b { display: block; font-size: 13.5px; color: #b45309; margin-bottom: 4px; }
+  .smb-mmo p { margin: 3px 0; font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; } .smb-mmo p i { font-style: normal; color: var(--sub); font-size: 12px; }
+  .smb-mmo button { border: 0; background: none; color: var(--brand); font: inherit; font-size: 13px; font-weight: 700; padding: 6px 0 0; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -11130,6 +11134,18 @@
   /** 내 스케줄 모드: 관리자 본인 줄만 한 달 달력으로 (보기 설정 sMob 은 저장하지 않고 잠깐만 바꿈) */
   let sTd = false, sCampKeep = ''; // sCampKeep = 홈으로 가기 전에 관리에서 보던 캠프 (돌아오면 그 캠프로)
   const HM = { ym: '', memos: null, at: 0, p: null };
+  // 날짜별 업무스케줄 (대표 · 운영자 · 관리자 줄의 '내 근무' · 한 달 달력에 🗒 표시): 달마다 한 번 받아 둠
+  const MMO = { by: {}, busy: {} };
+  function mmoOf(dt) {
+    const ym = dt.slice(0, 7), src = ym === HM.ym && HM.memos ? { memos: HM.memos, pinned: HM.pinned || [] } : MMO.by[ym];
+    if (!src) {
+      if (!MMO.busy[ym]) { MMO.busy[ym] = 1; api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { MMO.by[ym] = { memos: r.memos || [], pinned: r.pinned || [] }; try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } }).catch(() => {}).finally(() => { delete MMO.busy[ym]; }); }
+      return [];
+    }
+    const seen = {}; // 그날 적은 업무 + 항상 보기 업무의 마감일(까지 · 없으면 적은 날) — 끝낸 것 · 비고 글은 뺌
+    return src.memos.filter((m) => m.date === dt && !m.pin).concat(src.pinned.filter((m) => (m.until || m.date) === dt)).filter((m) => !m.done && !m.note && !seen[m.id] && (seen[m.id] = 1));
+  }
+  const mmoMark = (dt) => { const n = mmoOf(dt).length; return n ? '<em class="smb-mm" title="업무스케줄 ' + n + '건">🗒' + (n > 1 ? n : '') + '</em>' : ''; };
   // ── 체크 · 스위치 공용: 누르는 순간 이 기기에 먼저 적어 두고 서버에 저장 ──
   //  새로고침해도 방금 누른 대로 보이고(서버가 아직 옛 자료를 줘도) · 저장이 끊겼으면 다음에 열 때 다시 보냄
   //  runner.pq = { 열쇠: { t: 누른 시각, ok: 저장 끝, fn, a: 인자, v: 누른 값 } } — 저장이 끝나고 2분 지나면 지움 · 못 끝낸 것은 30분까지
@@ -11227,7 +11243,7 @@
       const MD = myDrv(), myCard = (() => { // 내 근무: PDD부터 7일 (이번 달 안에서)
         if (!MD) return '';
         const ds = dates.slice(pi, pi + 7), cells = ds.map((dt) => { const r = mobRowFor(MD.id, dt), c = r ? mobCell(r, dt) : { kind: 'none', top: '' }; const w = new Date(dt + 'T00:00:00').getDay();
-          return '<span class="td-myc' + (dt === pdd ? ' on' : '') + '"><i' + (w === 0 || SD.holidays[dt] ? ' style="color:var(--danger)"' : '') + '>' + DOW[w] + ' ' + +dt.slice(8) + '</i><b class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '·' : c.kind === 'k-work' || c.kind === 'k-other' ? '출근' : c.top) + '</b></span>'; }).join('');
+          return '<span class="td-myc' + (dt === pdd ? ' on' : '') + '"><i' + (w === 0 || SD.holidays[dt] ? ' style="color:var(--danger)"' : '') + '>' + DOW[w] + ' ' + +dt.slice(8) + '</i><b class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '·' : c.kind === 'k-work' || c.kind === 'k-other' ? '출근' : c.top) + '</b>' + (isStaffRow(MD) ? (mmoMark(dt) || (r && instOf(r.row, dt) ? '<em class="smb-mm">📅</em>' : '')) : '') + '</span>'; }).join('');
         const tt = MD.title || (TITLES.includes(MD.type) ? MD.type : '');
         return '<button type="button" class="smb-card td-my" data-tdmy="' + esc(MD.id) + '"><span class="td-hd"><span class="td-h">내 근무 · ' + esc(MD.name + (tt ? ' ' + tt : '')) + '</span><span class="td-mygo">한 달 보기 ›</span></span><span class="td-myr">' + cells + '</span></button>';
       })();
@@ -11302,7 +11318,7 @@
         const cnt = { w: 0, o: 0, s: 0, m: 0, y: 0 };
         dates.forEach((dt) => { const r = mobRowFor(D.id, dt); if (!r) return; const v = sget(r.row, dt); if (!v) return; if (/^용차/.test(v)) cnt.y++; else if (/병가/.test(v)) cnt.s++; else if (/미입차|노쇼/.test(v)) cnt.m++; else if (/휴무|휴가/.test(v)) cnt.o++; else if (isWorkDayCell(v) || cellNorm(v, r.row)) cnt.w++; });
         html += '<div class="smb-cal">' + nav(D.name + (D.title || (TITLES.includes(D.type) ? D.type : '') ? ' ' + (D.title || D.type) : '')) + '<div class="smb-sum">근무 ' + cnt.w + '일 · 쉬는 날 ' + cnt.o + '일' + (cnt.s ? ' · 병가 ' + cnt.s + '일' : '') + (cnt.m ? ' · 미입차 ' + cnt.m + '일' : '') + (cnt.y ? ' · 용차 ' + cnt.y + '일' : '') + '</div>' +
-          grid((dt) => { const r = mobRowFor(D.id, dt); if (!r) return ''; const c = mobCell(r, dt); return '<span class="v ' + c.kind + '">' + esc(c.kind === 'none' ? '·' : c.top) + '</span>' + (c.sub && c.kind !== 'k-yong' ? '<span class="sb">서브</span>' : '') + (instOf(r.row, dt) ? '<span>' + (r.staff ? '📅' : '📌') + '</span>' : ''); }) + '</div>';
+          grid((dt) => { const r = mobRowFor(D.id, dt); if (!r) return ''; const c = mobCell(r, dt); return '<span class="v ' + c.kind + '">' + esc(c.kind === 'none' ? '·' : c.top) + '</span>' + (c.sub && c.kind !== 'k-yong' ? '<span class="sb">서브</span>' : '') + (instOf(r.row, dt) ? '<span>' + (r.staff ? '📅' : '📌') + '</span>' : '') + (isStaffRow(D) ? mmoMark(dt) : ''); }) + '</div>';
         const r = mobRowFor(D.id, d);
         if (r) {
           const Dd = drvAt(rowDrv(r.row), d) || r.d || D; // 그날의 캠프 · 담당 노선 (노선 변경 · 이관 전후가 다름)
@@ -11313,7 +11329,8 @@
             '<span class="smb-pill ' + (c.kind === 'none' ? 'none' : c.kind) + '">' + esc(c.kind === 'none' ? '빈 칸' : c.kind === 'k-work' ? '출근' : c.full) + '</span>' + (c.sub && c.kind !== 'k-yong' ? ' <span class="smb-pill" style="background:#dcfce7;color:#15803d">' + esc(c.sub) + ' 업무등록</span>' : '') +
             (iss ? '<p class="smb-hint" style="margin:8px 0 0">이슈: ' + esc(iss.result + ' · ' + iss.kind + (iss.sub ? ' · 대체 ' + iss.sub + (iss.subWho ? ' ' + iss.subWho : '') : '')) + '</p>' : '') + (ins ? '<p class="smb-hint" style="margin:6px 0 0">📌 ' + esc(ins.reason) + '</p>' : '') +
             pkmBox(r, d) +
-            '<button type="button" class="btn" data-smbrow="' + esc(r.key || r.row) + '">이 날 고치기</button></div>';
+            (isStaffRow(D) && mmoOf(d).length ? '<div class="smb-mmo"><b>🗒 이 날 업무스케줄 ' + mmoOf(d).length + '건</b>' + mmoOf(d).slice(0, 6).map((m) => '<p>' + (m.pin ? '📌 ' : '') + (m.time ? '<i>' + esc(m.time) + '</i> ' : '') + esc(m.content) + '</p>').join('') + '<button type="button" data-tdgo="memo">업무스케줄 열기 ›</button></div>' : '') +
+            '<button type="button" class="btn" data-smbrow=""' + esc(r.key || r.row) + '">이 날 고치기</button></div>';
         }
         if (sMy) { const st = isStaffRow(D), cs = st ? '' : shortCamp(D.camp || ''); html += '<button type="button" class="btn ghost" data-smbmng="' + esc(cs) + '" style="width:100%;margin-top:10px">' + esc(cs ? cs + ' 캠프 스케줄 보기' : '캠프 스케줄 보기') + '</button>' +
           '<details style="margin-top:10px"><summary class="smb-hint" style="cursor:pointer">내 줄이 아니면 바꾸기</summary><div style="margin-top:6px">' + myPick(D.id) + '</div></details>'; }
