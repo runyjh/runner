@@ -158,7 +158,7 @@ const M = {
   pin: '항상 보기', until: '까지', rep: '반복', repDone: '반복 완료일', color: '글자색'
 };
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전해서 자동으로 추가하는 열 (시트별)
-const AUTO_ADD_COLS = { work_memo: ['cat', 'pin', 'until', 'rep', 'repDone', 'color'], camps: ['cpCode'] };
+const AUTO_ADD_COLS = { work_memo: ['cat', 'pin', 'until', 'rep', 'repDone', 'color'], camps: ['cpCode'], notices: ['targetDrv'] };
 // 예전 버전이 쓰던 머리글 (지금은 정산 DB 로 옮겨짐). 남아 있어도 '이름 바뀐 머리글'로 보지 않는다
 const LEGACY_HEADS = { drivers: ['정산 대상 기사ID', '기사 일시단가', '기사 일시단가 노선', '기사 일시단가 시작일', '기사 일시단가 종료일'] };
 const M_NOTES = {
@@ -173,7 +173,7 @@ const M_NOTES = {
 const NST = { ON: '게시', OFF: '숨김' };
 const N = {
   id: '공지ID', title: '제목', body: '내용', important: '중요', target: '대상 캠프', start: '게시 시작일', end: '게시 종료일',
-  status: '상태', author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', attach: '사진'
+  status: '상태', author: '작성자', createdAt: '작성일시', updatedAt: '수정일시', attach: '사진', targetDrv: '대상 기사ID'
 };
 const N_NOTES = {
   title: '새 줄에 제목·내용을 입력하면 공지ID·작성일시가 자동으로 채워지고 기사 앱에 바로 보입니다.',
@@ -1685,6 +1685,7 @@ function adm_check(token) {
   return run_(function () {
     const a = requireAdmin_(token);
     try { if (typeof fsEnsureTrigger_ === 'function') fsEnsureTrigger_(); } catch (e) { /* 사본 트리거 확인 (6시간에 한 번만 실제 확인) */ }
+    try { if (typeof frEnsureTrigger_ === 'function') frEnsureTrigger_(); } catch (e) { /* 처음 가는 노선 알림 트리거 (매일 18시) */ }
     let check = null;
     try { check = typeof dataCheckView_ === 'function' ? dataCheckView_() : JSON.parse(appSet_().dataCheck || 'null'); } catch (e) { check = null; } // 새벽 자료 점검 결과 + 자동 작업 멈춤 (대시보드에 표시)
     return { ok: true, admin: { name: a.name, loginId: a.loginId }, check: check };
@@ -2742,7 +2743,7 @@ function fixMemoRow_(sh, c, o) {
 function newNoticeId_() { return uniqId_('N'); }
 function noticeView_(o) {
   return {
-    id: o.id, title: o.title, body: o.body, important: String(o.important).toUpperCase() === 'Y', target: o.target,
+    id: o.id, title: o.title, body: o.body, important: String(o.important).toUpperCase() === 'Y', target: o.target, targetDrv: noticeDrvIds_(o.targetDrv),
     start: normDate_(o.start) || '', end: normDate_(o.end) || '', status: o.status === NST.OFF ? NST.OFF : NST.ON,
     author: o.author, createdAt: o.createdAt, updatedAt: o.updatedAt, photos: ntPhotos_(o.attach).length
   };
@@ -2767,9 +2768,15 @@ function noticeLive_(n, today) {
 function noticeTargets_(t) {
   return str_(t).split(/[,，、\/]/).map(function (x) { return x.replace(/\s+/g, '').replace(/캠프$/, ''); }).filter(Boolean);
 }
-function noticeFor_(n, campName) {
-  const t = noticeTargets_(n.target);
-  if (!t.length) return true;
+/** 대상 기사ID 글자 → ['D…', …] */
+function noticeDrvIds_(v) {
+  return (Array.isArray(v) ? v : str_(v).split(/[,，\s]+/)).map(function (x) { return str_(x); }).filter(function (x, i, a) { return /^D\w+$/.test(x) && a.indexOf(x) === i; });
+}
+/** 이 기사에게 보이나: 대상 캠프도 대상 기사도 없으면 전체 · 있으면 그 캠프 소속이거나 고른 기사 */
+function noticeFor_(n, campName, driverId) {
+  const t = noticeTargets_(n.target), d = noticeDrvIds_(n.targetDrv);
+  if (!t.length && !d.length) return true;
+  if (driverId && d.indexOf(String(driverId)) >= 0) return true;
   const mine = str_(campName).replace(/\s+/g, '').replace(/캠프$/, '');
   return !!mine && t.indexOf(mine) >= 0;
 }
@@ -2784,7 +2791,7 @@ function api_notices(token) {
     const today = todayText_();
     let camp = info.camp || '';
     if (info.campId) { const c = master_().camps.filter(function (x) { return x.id === info.campId; })[0]; if (c) camp = c.name; }
-    const list = noticeAll_().filter(function (n) { return noticeLive_(n, today) && noticeFor_(n, camp); }).sort(noticeSort_).slice(0, 50)
+    const list = noticeAll_().filter(function (n) { return noticeLive_(n, today) && noticeFor_(n, camp, s.d); }).sort(noticeSort_).slice(0, 50)
       .map(function (n) { return { id: n.id, title: n.title, body: n.body, important: n.important, date: n.start || n.createdAt.slice(0, 10), updatedAt: n.updatedAt, photos: n.photos || 0 }; });
     const out = { ok: true, notices: list, today: today };
     // 기사 앱 홈 사본 (공지 + 게시판 최근 글) → 다음 번엔 Firestore 에서
@@ -2805,7 +2812,12 @@ function noticeList_() {
       if (a.live !== b.live) return a.live ? -1 : 1;
       return noticeSort_(a, b);
     });
-    return { ok: true, notices: list, today: today, camps: master_().camps.filter(function (c) { return c.name && !isStaffCamp_(c.name); }).map(function (c) { return c.name; }) };
+    // 대상 기사 고르기용: 앱 사용 중(승인) · 퇴사 아닌 기사 [{ id, name, camp }] — 이미 고른 기사는 퇴사·정지여도 이름이 보이게 같이 넣음
+    const picked = {}; list.forEach(function (n) { (n.targetDrv || []).forEach(function (id) { picked[id] = 1; }); });
+    const drivers = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.name && ((o.status === ST.ACTIVE && str_(o.workStatus) !== '퇴사') || picked[o.id]); })
+      .map(function (o) { return { id: o.id, name: o.name, camp: str_(o.schCamp).replace(/\s*캠프$/, ''), off: !(o.status === ST.ACTIVE && str_(o.workStatus) !== '퇴사') }; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+    return { ok: true, notices: list, today: today, camps: master_().camps.filter(function (c) { return c.name && !isStaffCamp_(c.name); }).map(function (c) { return c.name; }), drivers: drivers };
   }
 }
 
@@ -2840,7 +2852,7 @@ function api_ntPhoto(token, id, i) {
     if (info.campId) { const c = master_().camps.filter(function (x) { return x.id === info.campId; })[0]; if (c) camp = c.name; }
     const row = findRow_(SH.NOTICE, 'id', String(id || ''));
     const o = row ? readObj_(SH.NOTICE, row) : null;
-    if (!o || !noticeLive_(noticeView_(o), todayText_()) || !noticeFor_(noticeView_(o), camp)) fail_('공지를 찾을 수 없습니다.');
+    if (!o || !noticeLive_(noticeView_(o), todayText_()) || !noticeFor_(noticeView_(o), camp, s.d)) fail_('공지를 찾을 수 없습니다.');
     const u = ntPhotos_(o.attach)[Number(i) || 0];
     if (!u) fail_('사진이 없습니다.');
     return ntPhotoBlob_(u);
@@ -2870,7 +2882,7 @@ function noticeSave_(a, n) {
     n = n || {};
     const f = {
       title: str_(n.title), body: String(n.body == null ? '' : n.body).replace(/\r\n?/g, '\n').trim(),
-      important: n.important ? 'Y' : '', target: noticeTargets_(n.target).join(', '),
+      important: n.important ? 'Y' : '', target: noticeTargets_(n.target).join(', '), targetDrv: noticeDrvIds_(n.targetDrv).join(', '),
       start: n.start ? normDate_(n.start) : '', end: n.end ? normDate_(n.end) : '', status: n.status === NST.OFF ? NST.OFF : NST.ON
     };
     if (!f.title) fail_('제목을 입력해 주세요.');
@@ -2879,6 +2891,7 @@ function noticeSave_(a, n) {
     if (n.start && !f.start) fail_('게시 시작일을 확인해 주세요.');
     if (n.end && !f.end) fail_('게시 종료일을 확인해 주세요.');
     if (f.start && f.end && f.end < f.start) fail_('게시 종료일이 시작일보다 빠릅니다.');
+    if (f.targetDrv) { const ok = {}; readAll_(SH.DRIVERS).forEach(function (o) { if (o.id) ok[o.id] = 1; }); f.targetDrv = noticeDrvIds_(f.targetDrv).filter(function (id) { return ok[id]; }).join(', '); }
     // 사진: keep = 남길 기존 사진 번호들 · add = 새 사진 [{data, mime}] (최대 5장 · 잠금 밖에서 드라이브에 올림)
     const add = Array.isArray(n.add) ? n.add : [];
     if (add.length > NT_MAX_PHOTOS) fail_('사진은 ' + NT_MAX_PHOTOS + '장까지 올릴 수 있습니다.');
@@ -2895,7 +2908,7 @@ function noticeSave_(a, n) {
       if (!n.id) {
         f.attach = newUrls.slice(0, NT_MAX_PHOTOS).join('\n');
         row = appendObj_(SH.NOTICE, Object.assign({ id: newNoticeId_(), author: a.name, createdAt: now, updatedAt: now }, f));
-        logAdmin_(a, '공지 등록', f.title, f.target || '전체');
+        logAdmin_(a, '공지 등록', f.title, [f.target, f.targetDrv ? '기사 ' + noticeDrvIds_(f.targetDrv).length + '명' : ''].filter(Boolean).join(' · ') || '전체');
       } else {
         row = findRow_(SH.NOTICE, 'id', String(n.id));
         if (!row) fail_('공지를 찾을 수 없습니다. 시트에서 지워졌을 수 있습니다. 새로고침해 주세요.');

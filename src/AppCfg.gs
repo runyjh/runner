@@ -32,11 +32,13 @@ function menuGate_(driverId, k) {
   if (appMenuOffFor_(driverId).indexOf(k) >= 0) { const e = new Error('x'); e.userMsg = APP_MENU_OFF_MSG; e.code = 'MENU_OFF'; throw e; }
 }
 /** 알림 받을 사람 걸러내기: 그 알림의 메뉴가 꺼진 기사는 뺌 (정산 알림 = settle · 나머지 품앗이 알림 = pm) */
+/** 알림이 어느 메뉴 것인가: 정산서 · 기사스케줄(처음 가는 노선) · 게시판('') · 그 밖은 품앗이 */
+function alertMenuOf_(a) { return a.kind === 'slip' ? 'settle' : a.kind === 'first' ? 'sched' : String(a.jobId || '').indexOf('BD-') === 0 ? '' : 'pm'; }
 function menuAlertFilter_(list) {
   const c = appMenuCfg_();
   if (APP_MENUS.every(function (x) { return c.menu[x[0]]; })) return list;
   return (list || []).filter(function (a) {
-    const k = a.kind === 'slip' ? 'settle' : String(a.jobId || '').indexOf('BD-') === 0 ? '' : 'pm';
+    const k = alertMenuOf_(a);
     return !k || c.menu[k] || c.ex.indexOf(String(a.driverId)) >= 0;
   });
 }

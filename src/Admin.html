@@ -1730,6 +1730,11 @@
   #paAvRows tr.pa-avfirst td { border-top: 2px solid var(--line); }
   #paAvRows .pa-avmemo { max-width: 220px; white-space: normal; word-break: break-word; }
   .btn.danger-t { color: var(--danger); }
+  .nt-pick { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fafbfc; }
+  .nt-pk-h { font-size: 13px; font-weight: 700; margin: 2px 0 6px; } .nt-pk-h small { font-weight: 500; color: var(--sub); margin-left: 4px; }
+  .nt-pk-h:not(:first-child) { margin-top: 12px; }
+  .nt-drv .inp { width: 100%; max-width: 320px; height: 36px; }
+  .nt-drvs { margin-top: 6px; } .nt-drvs small { opacity: .75; font-weight: 500; }
 </style>
 </head>
 <body>
@@ -2630,8 +2635,14 @@
       <div class="ntph" id="ntPhotos"></div><input type="file" id="ntFile" accept="image/*" multiple class="hidden"></div>
     <label class="check"><input type="checkbox" id="ntImp"> <b style="color:var(--danger);white-space:nowrap">중요</b>&nbsp;— 맨 위 고정, 처음 볼 때 팝업으로 한 번 보여 줌</label>
     <div class="field"><span class="lb">보낼 대상</span>
-      <div class="seg" id="ntTgtMode"><button type="button" data-tm="all" class="on">전체 기사</button><button type="button" data-tm="camp">캠프 선택</button></div>
-      <div class="rchips hidden" id="ntCamps" style="margin-top:8px"></div></div>
+      <div class="seg" id="ntTgtMode"><button type="button" data-tm="all" class="on">전체 기사</button><button type="button" data-tm="camp">캠프 · 기사 선택</button></div>
+      <div class="hidden nt-pick" id="ntPick">
+        <div class="nt-pk-h">캠프 <small>소속 기사 모두에게</small></div>
+        <div class="rchips" id="ntCamps"></div>
+        <div class="nt-pk-h">기사 <small>캠프와 상관없이 이 기사에게 (백업 기사 등)</small></div>
+        <div class="nt-drv"><input class="inp" id="ntDrvQ" list="ntDrvDL" placeholder="🔍 기사 이름 입력 → 고르기" autocomplete="off"><datalist id="ntDrvDL"></datalist></div>
+        <div class="rchips nt-drvs" id="ntDrvs"></div>
+      </div></div>
     <div class="grid2">
       <div class="field"><label class="lb" for="ntStart">게시 시작일 (비우면 바로)</label><input class="inp" type="date" id="ntStart"></div>
       <div class="field"><label class="lb" for="ntEnd">게시 종료일 (비우면 계속)</label><input class="inp" type="date" id="ntEnd"></div>
@@ -6007,7 +6018,9 @@
   });
 
   // ───── 공지사항 ─────
-  let NT = { notices: [], camps: [], today: '' }, ntFilter = '전체', ntEdit = null;
+  let NT = { notices: [], camps: [], drivers: [], today: '' }, ntFilter = '전체', ntEdit = null, ntDrv = [];
+  const ntDrvName = (id) => { const d = (NT.drivers || []).find((x) => x.id === id); return d ? d.name : id; };
+  const ntTgtText = (n) => [n.target || ''].concat((n.targetDrv || []).length ? [(n.targetDrv.length <= 2 ? n.targetDrv.map(ntDrvName).join(', ') : ntDrvName(n.targetDrv[0]) + ' 외 ' + (n.targetDrv.length - 1) + '명')] : []).filter(Boolean).join(' · ');
   const ntState = (n) => n.status === '숨김' ? '숨김' : n.start && n.start > NT.today ? '예약' : n.end && n.end < NT.today ? '종료' : '게시';
   function loadNotices() {
     api('adm_noticeList').then((r) => { if (!r.ok) return toast(r.msg); NT = r; renderNotices(); }).catch(() => {});
@@ -6024,7 +6037,7 @@
       const st = ntState(n), per = (n.start || '등록일부터') + ' ~ ' + (n.end || '계속');
       return '<tr data-nt="' + esc(n.id) + '"><td><span class="badge b-' + st + '">' + (st === '게시' ? '게시 중' : st) + '</span></td>' +
         '<td class="t"><b>' + (n.important ? '<span class="nt-imp">[중요]</span>' : '') + esc(n.title) + (n.photos ? ' <span class="sub" style="font-weight:600">📷' + n.photos + '</span>' : '') + '</b><small>' + esc(ntPlain(n.body).replace(/\s+/g, ' ').slice(0, 80)) + '</small></td>' +
-        '<td>' + (n.target ? esc(n.target) : '<span class="sub">전체</span>') + '</td><td class="sub">' + esc(per) + '</td>' +
+        '<td>' + (ntTgtText(n) ? esc(ntTgtText(n)) : '<span class="sub">전체</span>') + '</td><td class="sub">' + esc(per) + '</td>' +
         '<td class="sub">' + esc(n.author || '') + '</td><td class="sub">' + esc(String(n.updatedAt || n.createdAt || '').slice(0, 16)) + '</td></tr>';
     }).join('');
   }
@@ -6071,7 +6084,9 @@
     tg.forEach((x) => { if (!names.some((c) => c.replace(/\s*캠프$/, '') === x)) names.push(x); }); // 노선관리에서 지워진 캠프도 표시
     $('#ntCamps').innerHTML = names.length ? names.map((c) => { const k = c.replace(/\s*캠프$/, ''); return '<button type="button" data-nc="' + esc(k) + '" class="' + (tg.includes(k) ? 'on' : '') + '">' + esc(c) + '</button>'; }).join('')
       : '<span class="sub" style="font-size:13px">노선관리에 등록된 캠프가 없습니다.</span>';
-    setTgtMode(tg.length ? 'camp' : 'all');
+    ntDrv = (n && n.targetDrv || []).slice(); ntDrvPaint();
+    $('#ntDrvDL').innerHTML = (NT.drivers || []).filter((d) => !d.off).map((d) => '<option value="' + esc(d.name + (d.camp ? ' · ' + d.camp : '')) + '">').join(''); $('#ntDrvQ').value = '';
+    setTgtMode(tg.length || ntDrv.length ? 'camp' : 'all');
     setNtStatus(n ? n.status : '게시');
     $('#ntDel').classList.toggle('hidden', !n);
     // 사진: 기존 사진은 번호(i)로, 새 사진은 압축한 data 로 들고 있다가 저장할 때 보냄
@@ -6099,7 +6114,19 @@
       catch (err) { toast(err.message || '사진을 읽지 못했습니다.'); }
     }
   });
-  function setTgtMode(m) { $$('#ntTgtMode [data-tm]').forEach((b) => b.classList.toggle('on', b.dataset.tm === m)); $('#ntCamps').classList.toggle('hidden', m !== 'camp'); }
+  function setTgtMode(m) { $$('#ntTgtMode [data-tm]').forEach((b) => b.classList.toggle('on', b.dataset.tm === m)); $('#ntPick').classList.toggle('hidden', m !== 'camp'); }
+  function ntDrvPaint() { $('#ntDrvs').innerHTML = ntDrv.length ? ntDrv.map((id) => { const d = (NT.drivers || []).find((x) => x.id === id) || { name: id }; return '<button type="button" class="on" data-ndx="' + esc(id) + '" title="빼기">' + esc(d.name) + (d.camp ? ' <small>' + esc(d.camp) + '</small>' : '') + (d.off ? ' <small>(정지·퇴사)</small>' : '') + ' ✕</button>'; }).join('') : '<span class="sub" style="font-size:12.5px">고른 기사 없음</span>'; }
+  function ntDrvPick() {
+    const v = $('#ntDrvQ').value.trim(); if (!v) return;
+    const name = v.split(' · ')[0].trim(), camp = (v.split(' · ')[1] || '').trim();
+    const hit = (NT.drivers || []).filter((d) => !d.off && d.name === name && (!camp || d.camp === camp));
+    if (hit.length !== 1) return; // 아직 고르는 중 (목록에서 고르면 '이름 · 캠프' 로 들어옴)
+    if (!ntDrv.includes(hit[0].id)) ntDrv.push(hit[0].id);
+    $('#ntDrvQ').value = ''; ntDrvPaint();
+  }
+  $('#ntDrvQ').addEventListener('input', ntDrvPick);
+  $('#ntDrvQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ntDrvPick(); } });
+  $('#ntDrvs').addEventListener('click', (e) => { const b = e.target.closest('[data-ndx]'); if (b) { ntDrv = ntDrv.filter((x) => x !== b.dataset.ndx); ntDrvPaint(); } });
   function setNtStatus(v) { $$('#ntStatus [data-st]').forEach((b) => b.classList.toggle('on', b.dataset.st === v)); }
   $('#ntTgtMode').addEventListener('click', (e) => { const b = e.target.closest('[data-tm]'); if (b) setTgtMode(b.dataset.tm); });
   $('#ntStatus').addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) setNtStatus(b.dataset.st); });
@@ -6113,9 +6140,10 @@
     e.preventDefault();
     const campMode = $('#ntTgtMode [data-tm="camp"]').classList.contains('on');
     const target = campMode ? $$('#ntCamps [data-nc].on').map((b) => b.dataset.nc).join(', ') : '';
-    if (campMode && !target) return toast('공지를 보낼 캠프를 하나 이상 골라 주세요.');
+    const targetDrv = campMode ? ntDrv.join(', ') : '';
+    if (campMode && !target && !targetDrv) return toast('공지를 보낼 캠프나 기사를 하나 이상 골라 주세요.');
     const n = {
-      id: ntEdit ? ntEdit.id : '', title: $('#ntTitle').value.trim(), body: $('#ntBody').value, important: $('#ntImp').checked, target: target,
+      id: ntEdit ? ntEdit.id : '', title: $('#ntTitle').value.trim(), body: $('#ntBody').value, important: $('#ntImp').checked, target: target, targetDrv: targetDrv,
       start: $('#ntStart').value, end: $('#ntEnd').value, status: $('#ntStatus [data-st].on').dataset.st,
       keep: ntPh.filter((p) => p.i !== undefined).map((p) => p.i), add: ntPh.filter((p) => p.data).map((p) => ({ data: p.data, mime: p.mime }))
     };
@@ -7828,7 +7856,7 @@
     const drv = D.drivers.slice().sort((a, b) => koSort(a.camp, b.camp) || koSort(a.name, b.name)), byId = new Map(drv.map((x) => [x.id, x]));
     const nm = (x) => esc(x.name) + (x.title ? ' ' + esc(x.title) : x.camp ? ' <small>' + esc(x.camp) + '</small>' : '');
     const rows = D.rows, seenOf = (k, key) => { const m = new Map(); rows.forEach((r) => { if (r.k === k && r.key === key && byId.has(r.d)) m.set(r.d, r.at); }); return m; };
-    const tgt = (n) => drv.filter((x) => !n.targets.length || n.targets.includes(String(x.camp).replace(/\s/g, '')));
+    const tgt = (n) => drv.filter((x) => (!n.targets.length && !(n.targetDrv || []).length) || n.targets.includes(String(x.camp).replace(/\s/g, '').replace(/캠프$/, '')) || (n.targetDrv || []).includes(x.id));
     const opens = new Map(); rows.forEach((r) => { if (r.k === 'open') opens.set(r.d, r); });
     const dayGap = (t) => { const m = String(t || '').slice(0, 10); if (!m) return null; return Math.round((new Date(D.today + 'T00:00:00') - new Date(m + 'T00:00:00')) / 86400000); };
     const sch = rows.filter((r) => r.k === 'sch' && byId.has(r.d)), schOpen = sch.filter((r) => !r.ack && r.key >= D.today);
@@ -7856,7 +7884,7 @@
       const stale = drv.filter((x) => { const o = opens.get(x.id), g = o ? dayGap(o.ack || o.at) : null; return g == null || g >= 7; }).length;
       h += '<div class="al-sum"><div><b>' + drv.length + '명</b>기사앱 사용 기사</div><div class="g"><b>' + (top ? tT.filter((x) => tm.has(x.id)).length + '명' : '-') + '</b>가장 최근 공지 확인</div><div class="r"><b>' + (top ? tT.filter((x) => !tm.has(x.id)).length + '명' : '-') + '</b>아직 안 봄</div><div><b>' + stale + '명</b>7일 넘게 앱 안 엶</div></div>';
       h += D.notices.length ? '<div class="al-card">' + D.notices.map((n) => { const T = tgt(n), m = seenOf('notice', n.id), ok = T.filter((x) => m.has(x.id)).length, un = T.length - ok;
-        return '<div class="al-row' + (AL.sel === n.id ? ' sel' : '') + '"><span class="tx"><b>' + (n.important ? '<span class="al-no">[중요]</span> ' : '') + esc(n.title) + '</b><small>' + esc(alMd(n.date)) + ' · ' + esc(n.targets.length ? n.targets.join(', ') : '전체') + ' ' + T.length + '명' + (n.live ? '' : ' · 게시 끝남') + '</small></span>' +
+        return '<div class="al-row' + (AL.sel === n.id ? ' sel' : '') + '"><span class="tx"><b>' + (n.important ? '<span class="al-no">[중요]</span> ' : '') + esc(n.title) + '</b><small>' + esc(alMd(n.date)) + ' · ' + esc(n.targets.length || (n.targetDrv || []).length ? n.targets.concat((n.targetDrv || []).length ? ['기사 ' + n.targetDrv.length + '명'] : []).join(', ') : '전체') + ' ' + T.length + '명' + (n.live ? '' : ' · 게시 끝남') + '</small></span>' +
           '<span class="v"><span class="al-bar"><i style="width:' + (T.length ? Math.round(ok / T.length * 100) : 0) + '%"></i></span>' + ok + ' / ' + T.length + '<small class="' + (un ? 'al-no' : 'al-ok') + '">' + (un ? '안 봄 ' + un + '명' : T.length ? '모두 확인' : '대상 없음') + '</small></span>' +
           '<span class="bt"><button type="button" class="btn sm ghost" data-alsel="' + esc(n.id) + '">' + (AL.sel === n.id ? '접기' : '명단') + '</button>' + (n.live && un ? '<button type="button" class="btn sm" data-alnudge="' + esc(n.id) + '">안 본 사람에게 알림</button>' : '') + '</span></div>' +
           (AL.sel === n.id ? (() => { const sp = split(T, m); return '<div class="al-box" style="margin-top:4px">' + chips(sp[0], sp[1]) + '</div>'; })() : ''); }).join('') + '</div>'

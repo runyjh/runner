@@ -866,7 +866,7 @@ function api_pmAlerts(token, ver) {
     if (hit) { try { return JSON.parse(hit); } catch (e) { /* 다시 읽는다 */ } }
     const from = ymd_(addDays_(new Date(), -30));
     const list = readAll_(SH.PALERT).filter(function (a) { return a.driverId === u.id && a.id && String(a.createdAt).slice(0, 10) >= from; })
-      .filter(function (a) { const k = a.kind === 'slip' ? 'settle' : String(a.jobId || '').indexOf('BD-') === 0 ? '' : 'pm'; return !k || off.indexOf(k) < 0; })
+      .filter(function (a) { const k = alertMenuOf_(a); return !k || off.indexOf(k) < 0; })
       .sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
     const out = {
       ok: true, ver: v, unread: list.filter(function (a) { return !a.readAt; }).length,
