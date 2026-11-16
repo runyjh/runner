@@ -1202,7 +1202,7 @@ function pmSchApply_(ops, soft) {
         const last = sh.getLastRow();
         return last >= 2 ? sh.getRange(2, 1, last - 1, 5).getValues() : [];
       };
-      let fixed = read();
+      let fixed = read(), give = null, giveDirty = false;
       const rowOf = function (id) { for (let i = 0; i < fixed.length; i++) if (str_(fixed[i][F['행ID']]) === id) return i + 2; return 0; };
       ops.forEach(function (o) {
         const id = SCH_PM_PREFIX + o.driverId, col = h.dates[o.date];
@@ -1227,7 +1227,18 @@ function pmSchApply_(ops, soft) {
         if (o.op === 'set' && !has) next = lines.concat([o.value]).join('\n');
         if (o.op === 'clear' && has) next = lines.filter(function (x) { return x !== o.value; }).join('\n');
         if (next !== null) c.setNumberFormat('@').setValue(safeText_(next));
+        // 맡긴 기사 칸: 배차 확정 → 그날 휴무 (원래 값은 기억) · 확정이 풀리면 원래 값으로. 읽는 길(soft)의 복구 때는 하지 않는다
+        if (!soft && o.posterId && o.jobId && o.posterId !== o.driverId) {
+          const pr = rowOf(o.posterId);
+          if (pr) {
+            if (!give) give = pmGiveLoad_();
+            const pc = sh.getRange(pr, col + 1), pv = str_(pc.getValue());
+            const nx = pmGiveOffNext_(o, pv, str_(fixed[pr - 2][F['기본노선']]), give);
+            if (nx !== null) { pc.setNumberFormat('@').setValue(safeText_(nx)); giveDirty = true; }
+          }
+        }
       });
+      if (giveDirty) pmGiveSave_(give);
     } finally {
       lock.releaseLock();
       fsMark_('sch'); // 품앗이 줄이 바뀜 → 관리자 기사스케줄 실시간 갱신
@@ -1237,6 +1248,41 @@ function pmSchApply_(ops, soft) {
     // 오류 기록 탭에도 남긴다 (관리자가 기사스케줄을 열면 자동으로 다시 채워지지만, 실패한 사실은 알아야 함)
     errLog_('서버 오류', 'pmSchApply_', '기사스케줄 품앗이 칸 쓰기 실패 (' + (ops || []).map(function (o) { return o.op + ' ' + o.date + ' ' + o.value; }).slice(0, 3).join(' / ') + '): ' + String(e && e.message || e));
   }
+}
+// 품앗이로 맡긴 날 = 맡긴 기사 휴무: 배차 확정 때 맡긴 기사 칸을 '휴무'로 바꾸고 원래 값을 기억해 둔다 (스크립트 속성 PM_GIVE_OFF = { 일감ID: { p, d, old } })
+const PM_GIVE = { PROP: 'PM_GIVE_OFF', OFF: '휴무' };
+function pmGiveLoad_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(PM_GIVE.PROP) || '{}') || {}; } catch (e) { return {}; } }
+function pmGiveSave_(m) {
+  try {
+    const lim = ymd_(addDays_(new Date(), -7));
+    Object.keys(m).forEach(function (k) { if (!m[k] || str_(m[k].d) < lim) delete m[k]; }); // 지난 일감은 지움
+    PropertiesService.getScriptProperties().setProperty(PM_GIVE.PROP, JSON.stringify(m));
+  } catch (e) { softFail_('품앗이 맡긴 날 휴무 기록', e); }
+}
+/**
+ * 맡긴 기사 칸에 넣을 값 (바꿀 것이 없으면 null). o = { op, jobId, posterId, date, value: '군포1 212CD' } · cur = 지금 칸 · base = 맡긴 기사 기본노선 · store 는 여기서 고친다
+ *  set  : 칸이 근무이고 그 칸의 노선이 모두 일감 노선 안에 있을 때만 휴무로 (하루에 여러 노선을 뛰는데 일부만 맡긴 날은 그대로 둔다)
+ *  clear: 우리가 휴무로 바꾼 칸이 아직 '휴무' 그대로면 원래 값으로
+ */
+function pmGiveOffNext_(o, cur, base, store) {
+  const units = function (t) { return rpfBaseCodes_(str_(t).replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')); };
+  if (o.op === 'set') {
+    if (store[o.jobId] || !schWorkDay_(cur, [])) return null;
+    const mine = units(cur).length ? units(cur) : /^출근/.test(cur) ? units(base) : [], job = units(o.value);
+    if (!mine.length || !job.length) return null;
+    const jobNum = {}; job.forEach(function (u) { jobNum[u] = 1; });
+    const covered = mine.every(function (u) { return jobNum[u] || jobNum[u.replace(/[A-Z]+$/, '')] || job.some(function (j) { return j.replace(/[A-Z]+$/, '') === u; }); });
+    if (!covered) return null;
+    store[o.jobId] = { p: o.posterId, d: o.date, old: cur };
+    return PM_GIVE.OFF;
+  }
+  if (o.op === 'clear') {
+    const g = store[o.jobId];
+    if (!g) return null;
+    delete store[o.jobId];
+    return cur === PM_GIVE.OFF && g.p === o.posterId && g.d === o.date ? g.old : null;
+  }
+  return null;
 }
 /**
  * 일감 단가가 그 노선의 평소 단가(고정·백업단가 중 높은 쪽)보다 낮으면 안내 글, 아니면 ''.

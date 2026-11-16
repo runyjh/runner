@@ -508,6 +508,23 @@ scenario('대시보드 오늘 한눈에', null, function (r) {
   eq('공지 읽음 수 · 수행률 · 어제 오류', [out.notice[0].read + '/' + out.notice[0].total, out.perf.bad, out.perf.slaLow, out.sys], ['1/4', 4, 2, 4]);
 });
 
+// 25) 품앗이로 맡긴 날 = 맡긴 기사 휴무: 확정 때 휴무 · 풀리면 원래 값 · 일부 노선만 맡긴 날 · 이미 휴무 · 손으로 고친 칸은 그대로
+scenario('품앗이 맡긴 날 휴무', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var st = {}, o = function (op, id, v) { return { op: op, jobId: id, posterId: 'd1', driverId: 'd2', date: '2026-11-24', value: v }; };
+    var a = pmGiveOffNext_(o('set', 'J1', '군포1 212CD'), '군포1 212CD', '백업', st);      // 백업 기사: 칸에 적힌 노선을 맡김
+    var a2 = pmGiveOffNext_(o('set', 'J1', '군포1 212CD'), '출근', '212CD', st);            // 같은 일감 두 번째는 건드리지 않음
+    var b = pmGiveOffNext_(o('set', 'J2', '군포1 212CD'), '출근', '212CD', st);              // 고정 기사: 출근 = 기본노선
+    var c = pmGiveOffNext_(o('set', 'J3', '군포1 212C'), '출근', '212CD', st);               // 일부만 맡김 → 그대로
+    var d = pmGiveOffNext_(o('set', 'J4', '군포1 212CD'), '휴무', '212CD', st);              // 이미 휴무
+    var e = pmGiveOffNext_(o('clear', 'J1', '군포1 212CD'), '휴무', '백업', st);              // 확정 풀림 → 원래 값
+    var f = pmGiveOffNext_(o('clear', 'J2', '군포1 212CD'), '병가', '212CD', st);             // 그 사이 손으로 고친 칸은 그대로
+    var g = pmGiveOffNext_(o('clear', 'J9', '군포1 212CD'), '휴무', '212CD', st);             // 우리가 바꾼 적 없는 휴무
+    return [a, a2, b, c, d, e, f, g, Object.keys(st).length];
+  })()`, r.ctx);
+  eq('확정 → 휴무 · 풀림 → 원래 값 · 나머지는 건드리지 않음', out, ['휴무', null, '휴무', null, null, '군포1 212CD', null, null, 0]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
