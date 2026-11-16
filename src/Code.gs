@@ -60,7 +60,7 @@ const D = {
   // 정산관리: 명의자 세금계산서 정보 (정산 기준인 쿠팡 아이디·단가코드·일시단가는 정산 DB 의 아이디 관리·일시단가 탭)
   bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
-  docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증',
+  docQual: '서류_화물운송 종사자격증', docLicense: '서류_운전면허증', docBiz: '서류_사업자등록증', docCar: '서류_자동차등록증', docAlien: '서류_외국인등록증',
   docFolder: '서류 폴더',
   createdAt: '가입일시', approvedAt: '승인일시', updatedAt: '수정일시', pwChangedAt: '비밀번호 변경일시',
   memo: '관리자 메모',
@@ -73,7 +73,7 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
-  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId', 'enr', 'enrAt', 'nation', 'visa'];
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId', 'enr', 'enrAt', 'nation', 'visa', 'docAlien'];
 // 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -448,7 +448,8 @@ const DOCS = {
   qual: { col: 'docQual', label: '화물운송종사자격증' },
   license: { col: 'docLicense', label: '운전면허증' },
   biz: { col: 'docBiz', label: '사업자등록증' },
-  car: { col: 'docCar', label: '자동차등록증' }
+  car: { col: 'docCar', label: '자동차등록증' },
+  alien: { col: 'docAlien', label: '외국인등록증', opt: true } // 외국인 기사만 · 가입 때 선택
 };
 
 // ───────────────────────── 웹앱 진입점 ─────────────────────────
@@ -1178,6 +1179,8 @@ function validateSignup_(f) {
   out.account = digits_(req_(f.account, '계좌번호', 30));
   if (out.account.length < 8 || out.account.length > 16) fail_('계좌번호를 확인해 주세요.');
   out.accountHolder = req_(f.accountHolder, '예금주', 30);
+  out.nation = str_(f.nation).slice(0, 40); // 외국인만 (선택)
+  out.visa = str_(f.visa).slice(0, 40).toUpperCase();
   if (f.agree !== true) fail_('개인정보 수집·이용에 동의해 주세요.');
   return out;
 }
@@ -1292,6 +1295,7 @@ function api_signup(form, files) {
     files = files || {};
     Object.keys(DOCS).forEach(function (k) {
       const x = files[k];
+      if (DOCS[k].opt && (!x || !x.data)) return; // 선택 서류
       if (!x || !x.data) fail_(DOCS[k].label + ' 이미지를 올려 주세요.');
       if (!/^image\//.test(String(x.mime))) fail_(DOCS[k].label + '는 이미지 파일만 올릴 수 있습니다.');
       if (String(x.data).length > CFG.MAX_FILE_B64) fail_(DOCS[k].label + ' 이미지가 너무 큽니다.');
@@ -1311,6 +1315,7 @@ function api_signup(form, files) {
     try {
       const stamp = Utilities.formatDate(new Date(), CFG.TZ, 'yyyyMMdd');
       Object.keys(DOCS).forEach(function (k) {
+        if (!files[k] || !files[k].data) return; // 선택 서류를 안 올림
         const blob = Utilities.newBlob(Utilities.base64Decode(files[k].data), files[k].mime,
           f.name + '_' + DOCS[k].label + '_' + stamp + '.jpg');
         urls[k] = folder.createFile(blob).getUrl();
@@ -1337,7 +1342,7 @@ function api_signup(form, files) {
         licenseNo: maskLicense_(f.licenseDigits), licenseType: f.licenseType,
         carName: f.carName, carYear: f.carYear, maxLoad: f.maxLoad,
         bankName: f.bankName, account: maskAccount_(f.account), accountHolder: f.accountHolder,
-        docQual: urls.qual, docLicense: urls.license, docBiz: urls.biz, docCar: urls.car, docFolder: folder.getUrl(),
+        docQual: urls.qual, docLicense: urls.license, docBiz: urls.biz, docCar: urls.car, docAlien: urls.alien || '', nation: f.nation, visa: f.visa, docFolder: folder.getUrl(),
         createdAt: now, updatedAt: now, pwChangedAt: pw.pwChangedAt,
         rrnEnc: encrypt_(f.rrnDigits.replace(/(\d{6})(\d{7})/, '$1-$2')), rrnIndex: rrnIdx,
         licenseNoEnc: encrypt_(f.licenseDigits.replace(/(\d{2})(\d{2})(\d{6})(\d{2})/, '$1-$2-$3-$4')),
@@ -1828,7 +1833,7 @@ function listRow_(o) {
     id: o.id, loginId: o.loginId, name: o.name, phone: o.phone, status: o.status,
     driverType: o.driverType, driverCode: o.driverCode, title: o.title || '', workStatus: o.workStatus || '', leaveDate: o.leaveDate || '', stopAt: o.status === ST.ACTIVE ? leaveStopAt_(o) : '', subId1: o.subId1 || '', subId2: o.subId2 || '', subType1: o.subType1 || '', subType2: o.subType2 || '', stlMode: o.stlMode || '', insEx: o.insEx || '', fbCut: o.fbCut === undefined ? '' : String(o.fbCut), schCampId: o.schCampId, schCamp: o.schCamp, baseRoute: o.baseRoute,
     createdAt: o.createdAt, approvedAt: o.approvedAt, carNo: o.carNo, carName: o.carName, carYear: o.carYear,
-    docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo
+    docs: docsOf_(o), mustChange: mustChange_(o), hasPw: !!o.pwHash, memo: o.memo, nation: o.nation || '', visa: o.visa || ''
   };
 }
 /** 행 내용 지문: 화면이 불러온 뒤 시트나 다른 관리자가 고쳤는지 확인하는 용도 */
@@ -3600,6 +3605,7 @@ function fixBibRow_(sh, c, o) {
 const TOOLS = { SHEET: '서류 연결', RUN_CELL: 'B4', RESULT_CELL: 'B7', LAST_CELL: 'B6', LOG_ROW: 9 };
 // 순서 중요: "자동차운전면허증"이 자동차보다 면허로, "사업자등록증"이 등록증보다 사업자로 먼저 판별되도록
 const DOC_KINDS = [
+  { key: 'alien', words: ['외국인', '체류', '거소'] }, // '등록증' · '자격' 보다 먼저 봄
   { key: 'biz', words: ['사업자'] },
   { key: 'qual', words: ['자격', '화물운송', '종사'] },
   { key: 'license', words: ['면허', '운전'] },
@@ -3732,7 +3738,7 @@ function linkUploadedDocs_() {
       const base = fname.replace(/\.[^.]+$/, ''), cut = base.lastIndexOf('_');
       if (cut < 1) { fail('파일 이름이 "기사_서류종류" 형식이 아닙니다. (예: kim@flex.com_면허증.jpg)'); continue; }
       const kind = docKind_(base.slice(cut + 1));
-      if (!kind) { fail('서류 종류를 알 수 없습니다. _ 뒤에 자격증/면허증/사업자/자동차 중 하나를 써 주세요.'); continue; }
+      if (!kind) { fail('서류 종류를 알 수 없습니다. _ 뒤에 자격증/면허증/사업자/자동차/외국인등록증 중 하나를 써 주세요.'); continue; }
       const r = findDriverForDoc_(idx, base.slice(0, cut));
       if (r === 'DUP') { fail('같은 이름의 기사가 여러 명입니다. 이름 대신 아이디나 연락처로 바꿔 주세요.'); continue; }
       if (!r) { fail('drivers 시트에서 "' + base.slice(0, cut) + '" 기사를 찾을 수 없습니다.'); continue; }

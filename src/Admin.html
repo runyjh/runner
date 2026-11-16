@@ -1480,7 +1480,7 @@
   .modal tbody tr:has(> td:first-child input[type=checkbox]:checked) > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .ey-tb .eyc.wait { background: #fff1e0; color: #c2410c; } .ey-tb .eyc.out, .ey-tb .eyc.sub { color: #adb5bd; cursor: default; font-weight: 700; }
   .ey-tb .eyc.done { color: #0b6b3a; } .ey-tb .eyc.ti { color: var(--brand); } .ey-tb .eyc.no { background: #fde8e8; color: #c81e1e; } .ey-tb .eyc.skip { color: #adb5bd; } .ey-tb .eyc.ex { color: #868e96; background: #f1f3f5; }
-  .ey-tb td.ec .eyx { margin-left: 3px; height: 22px; padding: 0 6px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; color: #495057; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; } .ey-tb td.ec .eyx:hover { border-color: #868e96; background: #f8f9fa; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
+  .ey-tb tr.skipd > td { opacity: .6; } .ey-tb .eyx { margin-left: 3px; height: 22px; padding: 0 6px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; color: #495057; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; } .ey-tb .eyx:hover { border-color: #868e96; background: #f8f9fa; } .ey-tb .eyc.none { color: #ced4da; cursor: default; }
   .ey-tb tr.eyr { cursor: pointer; } .ey-tb tr.eyr:hover td { background: #f8fafc; } .ey-tb tr.eyr.open td { background: #f1f6ff; }
   .ey-tb tr.eyd > td { background: #fbfcfe; padding: 10px 14px 14px; }
   .eyd-tb { width: 100%; border-collapse: collapse; font-size: 12.5px; } .eyd-tb th, .eyd-tb td { padding: 5px 8px; border-bottom: 1px solid #eef1f4; text-align: left; white-space: nowrap; } .eyd-tb .num { text-align: right; } .eyd-tb tr.sub td { background: #f4f6f9; font-weight: 800; }
@@ -2980,7 +2980,10 @@
   const STATUSES = ['승인대기', '승인', '반려', '정지'];
   const DTYPES = ['고정', '백업', '품앗이', '외부용차']; // 단가코드 = 단가코드
   const TITLES = ['관리자', '운영자', '대표'];          // 직함 = 러너 내부 직책 (단가와 무관 · 정산서 이름 숨김 · 앞으로 권한)
-  const DOCS = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증' };
+  const DOCS = { qual: '화물운송 종사자격증', license: '운전면허증', biz: '사업자등록증', car: '자동차등록증', alien: '외국인등록증' };
+  // 외국인등록증은 외국인 기사(국적이 대한민국이 아니거나 체류자격이 있음 · 또는 이미 올림)만 보이고 셈
+  const isFg = (r) => !!(r && ((r.nation && !/^(대한민국|한국|korea)$/i.test(String(r.nation).trim())) || r.visa || (r.docs && r.docs.alien)));
+  const docKeys = (r) => Object.keys(DOCS).filter((k) => k !== 'alien' || isFg(r));
   const LICENSE_TYPES = ['1종 대형', '1종 보통', '2종 보통', '특수 대형견인', '특수 소형견인'];
   const BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크',
     'SC제일은행', '한국씨티은행', '우체국', '새마을금고', '신협', '수협은행', 'KDB산업은행', '부산은행', 'iM뱅크(대구)', '경남은행',
@@ -3406,7 +3409,7 @@
 
   // 머리글을 누르면 오름차순 → 내림차순 → 정렬 해제
   let dsort = { k: '', d: 0 };
-  const dsVal = (r, k) => k === 'workStatus' ? (r.workStatus || '재직') : k === 'camp' ? String(r.schCamp || '') + ' ' + String(r.baseRoute || '') : k === 'docs' ? Object.keys(DOCS).filter((x) => r.docs && r.docs[x]).length : String(r[k] == null ? '' : r[k]);
+  const dsVal = (r, k) => k === 'workStatus' ? (r.workStatus || '재직') : k === 'camp' ? String(r.schCamp || '') + ' ' + String(r.baseRoute || '') : k === 'docs' ? docKeys(r).filter((x) => r.docs && r.docs[x]).length : String(r[k] == null ? '' : r[k]);
   function paintDSort() { $$('#dHead th.dsrt').forEach((th) => { const i = th.querySelector('i'); if (i) i.remove(); if (th.dataset.ds === dsort.k && dsort.d) th.insertAdjacentHTML('beforeend', '<i>' + (dsort.d > 0 ? '▲' : '▼') + '</i>'); }); }
   $('#dHead').addEventListener('click', (e) => {
     const th = e.target.closest('th.dsrt'); if (!th) return;
@@ -3444,7 +3447,7 @@
     $('#empty').classList.toggle('hidden', list.length > 0);
     $('#empty').textContent = all.length ? ($('#q').value.trim() ? '"' + $('#q').value.trim() + '" 에 맞는 기사가 없습니다.' : '조건에 맞는 기사가 없습니다.') : '등록된 기사가 없습니다.';
     $('#rows').innerHTML = list.map((r) => {
-      const dots = Object.keys(DOCS).map((k) => '<i class="dot' + (r.docs[k] ? ' on' : '') + '" title="' + DOCS[k] + '"></i>').join(' ');
+      const dots = docKeys(r).map((k) => '<i class="dot' + (r.docs[k] ? ' on' : '') + '" title="' + DOCS[k] + '"></i>').join(' ');
       const tags = (r.mustChange ? '<span class="tag">비번 변경 전</span>' : '') + (!r.hasPw && r.loginId ? '<span class="tag">비밀번호 없음</span>' : '') + (!r.loginId ? '<span class="tag gray">앱 미사용</span>' : '');
       return '<tr data-id="' + esc(r.id) + '"' + (r.id === selectedId ? ' class="sel"' : '') + '>' +
         '<td class="ck"><input type="checkbox" data-dck="' + esc(r.id) + '"' + (dsel.has(r.id) ? ' checked' : '') + ' aria-label="선택"></td>' +
@@ -3637,7 +3640,7 @@
     cur = d; setDirty({});
     $('#dTitle').textContent = d.name || '(이름 없음)';
     $('#dBadge').innerHTML = '<span class="badge b-' + esc(d.status) + '">' + esc(d.status) + '</span>';
-    const docs = Object.keys(DOCS).map((k) => '<div class="doc"><span>' + DOCS[k] + '<br><em>' + (d.docs[k] ? '등록됨' : '없음') + '</em></span>' +
+    const docs = docKeys(d).map((k) => '<div class="doc"><span>' + DOCS[k] + '<br><em>' + (d.docs[k] ? '등록됨' : '없음') + '</em></span>' +
       (d.docs[k] ? '<button type="button" class="btn sm ghost" data-doc="' + k + '">보기</button>' : '') + '</div>').join('');
     $('#dBody').innerHTML =
       (d.status === '승인대기' ? '<div class="warnbox">가입 승인 대기 중입니다. 서류를 확인한 뒤 승인 또는 반려해 주세요.</div>' : '') +
@@ -4125,7 +4128,7 @@
     const i = all.findIndex((x) => x.id === d.id);
     const before = i >= 0 ? all[i].status : null;
     const row = { id: d.id, loginId: d.loginId, name: d.name, phone: d.phone, status: d.status, driverType: d.driverType, driverCode: d.driverCode, title: d.title || '', workStatus: d.workStatus || '', leaveDate: d.leaveDate || '', subId1: d.subId1 || '', subId2: d.subId2 || '', subOf: (all.find((x) => x.id === d.id) || {}).subOf || '', schCampId: d.schCampId, schCamp: d.schCamp, baseRoute: d.baseRoute, createdAt: d.createdAt, approvedAt: d.approvedAt,
-      carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo };
+      carNo: d.carNo, carName: d.carName, carYear: d.carYear, docs: d.docs, mustChange: d.mustChange, hasPw: d.hasPw, memo: d.memo, nation: d.nation, visa: d.visa };
     if (i >= 0) all[i] = row; else { all.unshift(row); counts.all = (counts.all || 0) + 1; }
     if (before !== d.status) { if (before && counts[before] != null) counts[before]--; if (counts[d.status] != null) counts[d.status]++; }
     renderTabs(); renderRows();
@@ -4903,7 +4906,7 @@
         '<td>' + (x.excluded ? '<span class="dc-tag n" title="정산 설정에서 산재·고용 제외">제외</span>' : yn(x.sanOn, '산재 OFF')) + '</td>' +
         '<td>' + (x.excluded ? '' : yn(x.goyOn, x.bosu < (rt.goyMin || 0) ? '월보수액 ' + dWon(rt.goyMin) + '원 미만' : '고용 OFF')) + '</td>' +
         '<td class="num">' + dWon(x.sanD + x.goyD) + '</td><td class="num">' + dWon(x.sanAll + x.goyAll) + '</td>' +
-        '<td>' + (tgt ? '<button type="button" class="dc-st' + (x.done ? ' on' : '') + '" data-irtog="' + esc(x.acct) + '">' + (x.done ? '신고 완료' : '미신고') + '</button>' : x.ex ? '<button type="button" class="dc-st" data-irex="' + esc(x.acct) + '" title="누르면 제외를 풀고 다시 신고 대상으로">제외 · 풀기</button>' : '<span class="sm">대상 아님</span>') + '</td>' +
+        '<td>' + (tgt ? '<button type="button" class="dc-st' + (x.done ? ' on' : '') + '" data-irtog="' + esc(x.acct) + '">' + (x.done ? '신고 완료' : '미신고') + '</button>' : x.ex ? '<button type="button" class="dc-st" data-irex="' + esc(x.acct) + '" title="누르면 제외를 풀고 다시 신고 대상으로">' + (x.skip ? '제외한 기사 · 풀기' : '제외 · 풀기') + '</button>' : '<span class="sm">대상 아님</span>') + '</td>' +
         '<td>' + (tgt ? '<input class="inp dcd" type="date" data-irf="date" value="' + esc(x.date) + '"' + (x.done ? '' : ' disabled') + '>' : '') + '</td>' +
         '<td><input class="inp dcm" data-irf="memo" value="' + esc(x.memo) + '" maxlength="200"></td></tr>';
     }).join('');
@@ -4913,7 +4916,7 @@
   }
   function irSelPaint() { dcSel(IR.sel, '#irRows', '#irAll', '#irBulk', 'data-irck', '<button type="button" class="btn sm" data-irbulk="1">신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="0">미신고로</button><button type="button" class="btn sm ghost" data-irbulk="x">⬇ 고른 기사만 엑셀</button><span style="width:1px;height:20px;background:var(--line);margin:0 4px"></span><button type="button" class="btn sm ghost" data-irbulk="enx">⬇ 입직신고 엑셀</button><button type="button" class="btn sm ghost" data-irbulk="e완료">입직신고 완료로</button><button type="button" class="btn sm ghost" data-irbulk="e대상">입직신고 대상으로</button>'); }
   function irSave(list) {
-    const pay = list.map((x) => ({ acct: x.acct, driverId: x.driverId, name: x.name, bosu: x.bosu, san: x.sanOn, goy: x.goyOn, start: x.start, done: x.done, ex: !!x.ex, date: x.date, memo: x.memo }));
+    const pay = list.map((x) => ({ acct: x.acct, driverId: x.driverId, name: x.name, bosu: x.bosu, san: x.sanOn, goy: x.goyOn, start: x.start, done: x.done, ex: !!x.ex && !x.skip, date: x.date, memo: x.memo }));
     return api('adm_insRepSet', IR.month, pay).then((r) => { if (!r.ok) { toast(r.msg); loadInsRep(); } return r; });
   }
   $('#irMonth').addEventListener('change', (e) => { IR.rows = []; loadInsRep(e.target.value); });
@@ -4967,19 +4970,21 @@
       (wait.length ? '<div class="dcs"><small>신고 전 (기한 안)</small><b style="color:#c2410c">' + wait.length + '명</b><em>' + waitM.map((m) => esc(eyMon(m)) + '분 ~' + esc(dMd(r.dues[m]))).join(' · ') + '</em></div>' : '') +
       '<div class="dcs ok"><small>기한 지난 달 모두 신고</small><b>' + (tgt.length - bad.length) + '명</b></div>' +
       (IY.enr || all.some((d) => d.enr) ? '<div class="dcs' + (noEnr.length ? ' bad' : ' ok') + '" title="' + esc(noEnr.map((d) => d.name).join(', ')) + '"><small>입직신고 대상</small><b>' + noEnr.length + '명</b><em>직접 고름 · 양식에 성명 없음</em></div>' : '');
-    const tabs = [['미신고 있는 기사', bad.length], ['신고 전', wait.length], ['신고 대상 전체', tgt.length], ['전체', all.length]];
+    const skd = all.filter((d) => d.skip);
+    const tabs = [['미신고 있는 기사', bad.length], ['신고 전', wait.length], ['신고 대상 전체', tgt.length], ['전체', all.length]].concat(skd.length ? [['제외한 기사', skd.length]] : []);
     $('#iyTabs').innerHTML = tabs.map(([k, n]) => '<button class="tab' + (IY.tab === k ? ' on' : '') + '" data-iyt="' + esc(k) + '">' + esc(k) + ' <b>' + n + '</b></button>').join('');
     const q = $('#iyQ').value.trim().toLowerCase();
-    let list = all.filter((d) => (IY.tab === '전체' || (IY.tab === '신고 대상 전체' && tgt.includes(d)) || (IY.tab === '미신고 있는 기사' && cellsOf(d, 'no').length) || (IY.tab === '신고 전' && cellsOf(d, 'wait').length) || IY.keep.has(d.acct)) &&
+    let list = all.filter((d) => (IY.tab === '전체' || (IY.tab === '신고 대상 전체' && tgt.includes(d)) || (IY.tab === '미신고 있는 기사' && cellsOf(d, 'no').length) || (IY.tab === '신고 전' && cellsOf(d, 'wait').length) || (IY.tab === '제외한 기사' && d.skip) || IY.keep.has(d.acct)) &&
       (!q || String(d.name).toLowerCase().includes(q)));
     list = list.slice().sort((a, b) => cellsOf(b, 'no').length - cellsOf(a, 'no').length || a.name.localeCompare(b.name, 'ko'));
     $('#iyHead').innerHTML = '<tr><th class="ck"><input type="checkbox" id="iyAll" aria-label="보이는 기사 모두 선택"></th><th>기사</th>' + ms.map((m) => '<th class="ec">' + esc(eyMon(m)) + '</th>').join('') + '<th class="num">미신고</th><th class="num">미신고 공단 납부</th></tr>';
     const lab = { done: '✓ 신고', no: '미신고', wait: '신고 전', out: '대상 아님', sub: '합산', skip: '기록 전', ex: '제외' };
     $('#iyRows').innerHTML = list.map((d) => {
       const nc = cellsOf(d, 'no'), amt = nc.reduce((a, m) => a + (d.cells[m].pay || 0), 0), open = IY.open === d.acct, ne = iyNoEnr(d);
-      return '<tr class="eyr' + (open ? ' open' : '') + '" data-iya="' + esc(d.acct) + '"><td class="ck"><input type="checkbox" data-iyck="' + esc(d.acct) + '"' + (IY.sel.has(d.acct) ? ' checked' : '') + '></td><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' +
+      return '<tr class="eyr' + (open ? ' open' : '') + (d.skip ? ' skipd' : '') + '" data-iya="' + esc(d.acct) + '"><td class="ck"><input type="checkbox" data-iyck="' + esc(d.acct) + '"' + (IY.sel.has(d.acct) ? ' checked' : '') + '></td><td style="white-space:nowrap"><b>' + esc(d.name) + '</b> <span class="sm">' + (open ? '▾' : '▸') + '</span>' +
+        (d.skip ? ' <span class="dc-tag n">제외한 기사</span><button type="button" class="eyx" data-iyskip="0" title="다시 산재/고용 신고 대상으로">풀기</button>' : '<button type="button" class="eyx" data-iyskip="1" title="이 기사를 산재/고용 신고에서 뺌 (모든 달 · 앞으로 생기는 달도)">제외</button>') +
         (ne && tgt.includes(d) ? (d.enr === '신고중' ? ' <span class="dc-tag w" style="color:#c2410c;background:#fff1e0">입직신고 중</span>' : ' <span class="dc-tag w" style="color:#c81e1e">입직신고 대상</span>') : '') + (!d.hasRrn && tgt.includes(d) ? ' <span class="dc-tag n" title="기사 정보관리에서 주민등록번호를 넣어 주세요">주민번호 없음</span>' : '') + '</td>' +
-        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-iym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' title="' + esc(dMon(m) + ' · 월보수 ' + dWon(c.bosu) + '원 · 공단 납부 ' + dWon(c.pay) + '원' + (c.st === 'sub' ? ' · ' + c.parentName + ' 기사에 합산' : c.st === 'out' ? ' · 신고 대상 아님' : c.st === 'done' ? ' · 누르면 미신고로' : c.st === 'ex' ? ' · 신고 안 하기로 함 · 누르면 제외를 풀기' : ' · 누르면 신고 완료로 · 기한 ' + (r.dues[m] || ''))) + '">' + (c.busy ? '저장 중…' : lab[c.st]) + '</button>' + (!c.busy && (c.st === 'no' || c.st === 'wait') ? '<button type="button" class="eyx" data-iyx="' + esc(m) + '" title="' + esc(dMon(m) + ' · 이 달은 신고 대상에서 뺌') + '">제외</button>' : '') : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
+        ms.map((m) => { const c = d.cells[m]; return '<td class="ec">' + (c ? '<button type="button" class="eyc ' + c.st + '" data-iym="' + esc(m) + '"' + (c.busy ? ' disabled' : '') + ' title="' + esc(dMon(m) + ' · 월보수 ' + dWon(c.bosu) + '원 · 공단 납부 ' + dWon(c.pay) + '원' + (c.st === 'sub' ? ' · ' + c.parentName + ' 기사에 합산' : c.st === 'out' ? ' · 신고 대상 아님' : c.st === 'done' ? ' · 누르면 미신고로' : c.st === 'ex' ? (d.skip ? ' · 신고에서 뺀 기사' : ' · 신고 안 하기로 함 · 누르면 제외를 풀기') : ' · 누르면 신고 완료로 · 기한 ' + (r.dues[m] || ''))) + '">' + (c.busy ? '저장 중…' : lab[c.st]) + '</button>' : '<span class="eyc none">—</span>') + '</td>'; }).join('') +
         '<td class="num">' + (nc.length ? '<b style="color:#c81e1e">' + nc.length + '건</b>' : '<span class="sm">없음</span>') + '</td><td class="num">' + (amt ? dWon(amt) : '') + '</td></tr>' +
         (open ? '<tr class="eyd"><td colspan="' + (ms.length + 4) + '">' + iyDetail(d) + '</td></tr>' : '');
     }).join('');
@@ -5010,6 +5015,7 @@
   function iyToggle(acct, m) {
     const d = IY.info.drivers.find((x) => x.acct === acct), c = d && d.cells[m]; if (!c || c.busy) return;
     if (c.st === 'out' || c.st === 'sub') return toast(c.st === 'sub' ? c.parentName + ' 기사에 합산해 신고하는 달입니다.' : '신고 대상이 아닌 달입니다.');
+    if (c.st === 'ex' && d.skip) return toast(d.name + ' 기사는 신고에서 뺐습니다. 이름 옆 [풀기]로 되돌립니다.');
     if (c.st === 'ex') { if (confirm(d.name + ' · ' + dMon(m) + '분\n\n제외를 풀고 다시 신고 대상으로 둘까요?')) iyMark([{ d, m, c }], 'free'); return; }
     const on = c.st !== 'done';
     if (!on && !confirm(d.name + ' · ' + dMon(m) + '분\n\n신고 완료를 미신고로 되돌릴까요?')) return;
@@ -5042,6 +5048,18 @@
     }).catch(() => { tg.forEach(({ c }) => { c.busy = false; }); renderInsYear(); });
   }
 
+  /** 기사를 신고에서 빼기 / 다시 넣기 (adm_insSkipSet · 모든 달) */
+  function iySkip(ds, on) {
+    if (!ds.length) { toast(on ? '고른 기사가 이미 모두 제외돼 있습니다.' : '고른 기사 중 제외한 기사가 없습니다.'); return Promise.resolve(); }
+    const nm = ds.length > 1 ? ds[0].name + ' 외 ' + (ds.length - 1) + '명' : ds[0].name;
+    if (!confirm(nm + '\n\n' + (on ? '산재/고용 신고에서 뺄까요?\n(모든 달 · 앞으로 생기는 달도 신고 대상에서 빠집니다. 정산 공제는 그대로)' : '다시 산재/고용 신고 대상으로 둘까요?'))) return Promise.resolve();
+    return api('adm_insSkipSet', ds.map((d) => ({ acct: d.acct, name: d.name })), on).then((res) => {
+      if (!res.ok) return toast(res.msg);
+      IR.rows = []; toast(nm + (on ? ' 기사를 신고에서 뺐습니다.' : ' 기사를 다시 신고 대상으로 돌렸습니다.'));
+      return loadInsYear();
+    });
+  }
+
   // ── 연간 보기 선택 · 일괄 처리 ──
   /** 고른 기사 × 고른 달(비우면 모든 달)에서 바꿀 칸 목록 */
   function iyTargets(on) {
@@ -5065,7 +5083,7 @@
       '<select class="inp" id="iyBm" style="height:30px;width:auto;font-size:13px" title="어느 달을 바꿀지"><option value="">모든 달 (미신고·신고 전)</option>' + '<optgroup label="한 달만">' + r.months.map((m) => '<option value="' + esc(m) + '"' + (m === IY.bm ? ' selected' : '') + '>' + esc(dMon(m)) + '분</option>').join('') + '</optgroup>' +
       '<optgroup label="처음 달부터 ~ 이 달까지">' + r.months.slice(1).map((m) => '<option value="~' + esc(m) + '"' + ('~' + m === IY.bm ? ' selected' : '') + '>' + esc(dMon(r.months[0]) + ' ~ ' + dMon(m)) + '분</option>').join('') + '</optgroup></select>' +
       '<button type="button" class="btn sm" data-iyb="1">신고 완료로 (' + t1.length + '건)</button><button type="button" class="btn sm ghost" data-iyb="0">미신고로</button>' +
-      '<button type="button" class="btn sm ghost" data-iyb="ex" title="고른 달을 신고 대상에서 뺌">제외</button>' + (iyTargets('free').length ? '<button type="button" class="btn sm ghost" data-iyb="free">제외 풀기</button>' : '') +
+      '<button type="button" class="btn sm ghost" data-iyb="skip1" title="고른 기사를 산재/고용 신고에서 뺌 (모든 달)">기사 제외</button>' + (r.drivers.some((d) => IY.sel.has(d.acct) && d.skip) ? '<button type="button" class="btn sm ghost" data-iyb="skip0">제외 풀기</button>' : '') +
       '<span style="width:1px;height:20px;background:var(--line);margin:0 4px"></span><button type="button" class="btn sm ghost" data-iyb="e완료">입직신고 완료로</button><button type="button" class="btn sm ghost" data-iyb="e대상">입직신고 대상으로</button>' +
       '<span class="sm">' + (t1.length ? '공단 납부 ' + dWon(amt) + '원' : '') + '</span><button type="button" class="btn sm ghost" data-iyclr>선택 풀기</button>';
   }
@@ -5076,6 +5094,7 @@
     if (e.target.closest('[data-iyclr]')) { IY.sel.clear(); return renderInsYear(); }
     const b = e.target.closest('[data-iyb]'); if (!b) return;
     const k = b.dataset.iyb, r = IY.info;
+    if (k === 'skip1' || k === 'skip0') return iySkip(r.drivers.filter((d) => IY.sel.has(d.acct) && d.skip !== (k === 'skip1')), k === 'skip1').then(() => { IY.sel.clear(); renderInsYear(); });
     if (k === 'ex' || k === 'free') {
       const tg = iyTargets(k);
       if (!tg.length) return toast(k === 'ex' ? '고른 기사·달에 미신고(신고 전)인 칸이 없습니다.' : '고른 기사·달에 제외된 칸이 없습니다.');
@@ -5110,12 +5129,8 @@
   $('#iyTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-iyt]'); if (b) { IY.tab = b.dataset.iyt; IY.keep.clear(); renderInsYear(); } });
   $('#iyRows').addEventListener('click', (e) => {
     if (e.target.closest('td.ck')) return; // 선택 칸은 줄 펼치기와 따로
-    const x = e.target.closest('[data-iyx]');
-    if (x) {
-      const t = x.closest('tr.eyr'), d = t && IY.info.drivers.find((y) => y.acct === t.dataset.iya), m = x.dataset.iyx, c = d && d.cells[m];
-      if (c && !c.busy && confirm(d.name + ' · ' + dMon(m) + '분\n\n이 달은 신고하지 않고 제외할까요?\n(제외 칸을 다시 누르면 풀 수 있습니다)')) iyMark([{ d, m, c }], 'ex');
-      return;
-    }
+    const x = e.target.closest('[data-iyskip]');
+    if (x) { const t = x.closest('tr.eyr'), d = t && IY.info.drivers.find((y) => y.acct === t.dataset.iya); if (d) iySkip([d], x.dataset.iyskip === '1'); return; }
     const c = e.target.closest('[data-iym]');
     if (c) { const t = c.closest('tr.eyr'); return iyToggle(t ? t.dataset.iya : IY.open, c.dataset.iym); }
     if (e.target.closest('.eyd')) return;
@@ -5151,6 +5166,7 @@
     const xb = e.target.closest('[data-irex]');
     if (xb) {
       const x = IR.rows.find((i) => i.acct === xb.dataset.irex); if (!x || !confirm(x.name + '\n\n제외를 풀고 다시 신고 대상으로 둘까요?')) return;
+      if (x.skip) return api('adm_insSkipSet', [{ acct: x.acct, name: x.name }], false).then((r) => { if (!r.ok) return toast(r.msg); toast(x.name + ' 다시 신고 대상으로 돌렸습니다.'); IY.info = null; IR.rows = []; loadInsRep(); });
       x.ex = false; x.done = false; x.date = ''; renderInsRep();
       return irSave([x]).then((r) => { if (r && r.ok) { toast(x.name + ' 다시 신고 대상으로 돌렸습니다.'); IY.info = null; } }).catch(() => {});
     }

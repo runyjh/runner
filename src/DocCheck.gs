@@ -137,7 +137,9 @@ function docInsCfg_() {
   try { enr = s.insEnrolled ? JSON.parse(s.insEnrolled) : null; } catch (e) { enr = null; }
   let mg = {};
   try { mg = s.insMerge ? JSON.parse(s.insMerge) || {} : {}; } catch (e) { mg = {}; }
-  return { jobCode: str_(s.insJobCode) || DOC_JOB_DEFAULT, bizMgmtNo: str_(s.insBizMgmtNo) || '', tpl: tpl, enrolled: enr, merge: mg };
+  let sk = {};
+  try { sk = s.insSkip ? JSON.parse(s.insSkip) || {} : {}; } catch (e) { sk = {}; }
+  return { jobCode: str_(s.insJobCode) || DOC_JOB_DEFAULT, bizMgmtNo: str_(s.insBizMgmtNo) || '', tpl: tpl, enrolled: enr, merge: mg, skip: sk };
 }
 function adm_insRepList(token, month) {
   return run_(function () {
@@ -181,7 +183,8 @@ function insRows_(month) {
     });
     rows.sort(function (a, b) { return koCmp_(a.name, b.name); });
     // 하위 기사: 보험료를 상위 기사 한 사람으로 합쳐 신고 (설정 insMerge = { 하위 정산ID: 상위 정산ID })
-    const icfg = docInsCfg_(), mg = icfg.merge || {}, byAcct = {};
+    const icfg = docInsCfg_(), mg = icfg.merge || {}, byAcct = {}, sk = icfg.skip || {};
+    rows.forEach(function (x) { if (sk[x.acct]) { x.skip = true; x.ex = true; } }); // 신고에서 뺀 기사 (모든 달 · 앞으로도)
     rows.forEach(function (x) { byAcct[x.acct] = x; x.own = { supply: x.supply, invoice: x.invoice, bosu: x.bosu, sanD: x.sanD, goyD: x.goyD, runner: x.runner, sanAll: x.sanAll, goyAll: x.goyAll }; });
     rows.forEach(function (x) {
       const pa = mg[x.acct]; if (!pa) return;
@@ -234,7 +237,7 @@ function adm_insYear(token, year, from) {
       x.rows.forEach(function (r) {
         let d = drv[r.acct];
         if (!d) { d = drv[r.acct] = { acct: r.acct, driverId: r.driverId, name: r.name, hasRrn: r.hasRrn, cells: {} }; order.push(d); }
-        d.name = r.name; d.hasRrn = r.hasRrn; d.enr = r.enr; d.enrAt = r.enrAt;
+        d.name = r.name; d.hasRrn = r.hasRrn; d.enr = r.enr; d.enrAt = r.enrAt; d.skip = !!r.skip;
         const tgt = !r.parent && !r.excluded && (r.sanOn || r.goyOn);
         const stt = r.parent ? 'sub' : !tgt ? 'out' : r.ex ? 'ex' : r.done ? 'done' : startM && m < startM ? 'skip' : today > x.due ? 'no' : 'wait';
         d.cells[m] = { st: stt, base: r.invoice, supply: r.supply, bosu: r.bosu, sanOn: r.sanOn, goyOn: r.goyOn, ded: (r.sanD || 0) + (r.goyD || 0),
@@ -374,6 +377,23 @@ function adm_insRepSetMany(token, items) {
     });
     logAdmin_(a, '산재·고용 신고 일괄 체크 (연간)', items.map(function (it) { return it.month; }).join(', '), n + '건');
     return { ok: true, n: n };
+  });
+}
+/** 기사를 산재/고용 신고에서 빼기 (모든 달 · 앞으로 생기는 달도) · on=false 면 다시 넣기. list = [{ acct, name }] */
+function adm_insSkipSet(token, list, on) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    list = (Array.isArray(list) ? list : []).slice(0, 500);
+    const sk = docInsCfg_().skip || {}, names = [];
+    list.forEach(function (x) {
+      const acct = str_(x && x.acct); if (!acct) return;
+      if (on) sk[acct] = str_(x.name).slice(0, 40) || acct; else delete sk[acct];
+      names.push(str_(x.name) || acct);
+    });
+    appSetPut_('insSkip', Object.keys(sk).length ? JSON.stringify(sk) : '', '산재/고용 신고: 신고에서 뺀 기사 { 정산ID: 이름 }');
+    cache_().remove('appset');
+    logAdmin_(a, on ? '산재·고용 신고 기사 제외' : '산재·고용 신고 기사 제외 풀기', names.join(', ').slice(0, 300), '');
+    return { ok: true, skip: sk };
   });
 }
 /** 공단(토탈서비스) 양식 대조 결과 반영: items = [{ driverId, enr: '완료'|'대상', enrAt }] — 기사마다 따로 */

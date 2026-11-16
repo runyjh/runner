@@ -814,6 +814,23 @@
           <label class="doc" data-doc="car" data-name="자동차등록증"><input type="file" accept="image/*"><span class="plus">＋</span><b>자동차등록증</b>사진 올리기</label>
         </div>
         <div class="hint">글자가 잘 보이게 찍어 주세요. 사진은 자동으로 용량을 줄여 올립니다.</div>
+        <label class="check" style="margin:14px 0 0;color:var(--ink)"><input type="checkbox" id="suForeign"> 외국인입니다</label>
+        <div id="suFgBox" class="hidden" style="margin-top:10px">
+          <div class="row">
+            <div class="field">
+              <label class="lb" for="suNation">국적</label>
+              <input type="text" id="suNation" list="suNationL" placeholder="예: 중국" maxlength="40">
+              <datalist id="suNationL"><option value="중국"><option value="베트남"><option value="우즈베키스탄"><option value="카자흐스탄"><option value="러시아"><option value="몽골"><option value="필리핀"><option value="태국"><option value="캄보디아"><option value="네팔"></datalist>
+            </div>
+            <div class="field">
+              <label class="lb" for="suVisa">체류자격</label>
+              <select id="suVisa"><option value="">선택</option><option>F-4</option><option>F-5</option><option>F-6</option><option>F-2</option><option>H-2</option><option>E-9</option><option>E-7</option><option>D-2</option><option value="기타">기타</option></select>
+            </div>
+          </div>
+          <div class="docs">
+            <label class="doc" data-doc="alien" data-name="외국인등록증"><input type="file" accept="image/*"><span class="plus">＋</span><b>외국인등록증</b>사진 올리기 (선택)</label>
+          </div>
+        </div>
       </div>
 
       <div class="card agree">
@@ -1809,6 +1826,7 @@
       img.src = url;
     });
   }
+  $('#suForeign').addEventListener('change', (e) => $('#suFgBox').classList.toggle('hidden', !e.target.checked));
   $$('.doc').forEach((box) => {
     const input = box.querySelector('input');
     input.addEventListener('change', () => {
@@ -1832,6 +1850,7 @@
       address: addr, phone: v('#suPhone'), bizNo: v('#suBiz'), qualDate: v('#suQualDate'), qualNo: v('#suQualNo'),
       licenseNo: v('#suLicNo'), licenseType: v('#suLicType'), carName: v('#suCar'), carYear: v('#suYear'),
       maxLoad: v('#suLoad'), bankName: v('#suBank'), account: v('#suAcc'), accountHolder: v('#suHolder'),
+      nation: $('#suForeign').checked ? v('#suNation') : '', visa: $('#suForeign').checked ? v('#suVisa') : '',
       agree: $('#suAgree').checked
     };
   }
@@ -1865,9 +1884,10 @@
     if (!checkSignup(f)) return;
     const btn = $('#suBtn'); btn.disabled = true;
     loading(true, '서류를 올리는 중… (10초 정도 걸립니다)');
+    if (!$('#suForeign').checked) delete docs.alien; // 외국인 체크를 풀었으면 올린 사진도 빼고 보냄
     api('api_signup', f, docs).then((r) => {
       if (!r.ok) { toast(r.msg); return; }
-      $('#signupForm').reset();
+      $('#signupForm').reset(); $('#suFgBox').classList.add('hidden');
       Object.keys(docs).forEach((k) => delete docs[k]);
       $$('.doc').forEach((d) => { d.classList.remove('done'); const i = d.querySelector('img'); if (i) i.remove(); });
       idChecked = ''; $('#suIdHint').textContent = ''; $('#suPwHint').textContent = '';
