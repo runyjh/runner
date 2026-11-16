@@ -1679,7 +1679,7 @@
   .td-q { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; } .td-q button { border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 12px 4px 10px; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; } .td-q button i { display: block; font-style: normal; font-size: 21px; margin-bottom: 3px; }
   .td-ck { flex: none; width: 22px; height: 22px; margin-top: 1px; border: 2px solid #b8c4d4; border-radius: 6px; background: #fff; padding: 0; cursor: pointer; position: relative; } .td-ck::after { content: ''; position: absolute; inset: -9px; } .td-ck:active { background: var(--brand); border-color: var(--brand); }
   .td-m span small { display: block; margin-top: 2px; font-size: 12px; color: var(--sub); } .td-m.late span small { color: #b45309; }
-  .td-m { display: flex; gap: 8px; padding: 8px 0; border-top: 1px solid #f1f2f4; font-size: 14px; } .td-h + .td-m { border-top: 0; } .td-m i { font-style: normal; flex: none; } .td-m span { flex: 1; min-width: 0; overflow-wrap: anywhere; } .td-m.done span { color: #9ca3af; text-decoration: line-through; }
+  .td-m { display: flex; gap: 8px; padding: 8px 0; border-top: 1px solid #f1f2f4; font-size: 14px; } .td-h + .td-m { border-top: 0; } .td-ml { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; } .td-ml .td-m:first-child { border-top: 0; } .td-m i { font-style: normal; flex: none; } .td-m span { flex: 1; min-width: 0; overflow-wrap: anywhere; } .td-m.done span { color: #9ca3af; text-decoration: line-through; }
   .td-hd { display: flex; align-items: center; justify-content: space-between; } .td-hd button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--brand); cursor: pointer; padding: 4px 0; }
   .td-pk { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; background: linear-gradient(135deg, #fff4ea, #ffe6d3); border: 1px solid #fdba74; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; color: #7c2d12; font-size: 13px; } .td-pk b { display: block; color: #9a3412; font-size: 14.5px; margin-bottom: 2px; }
   #view-sched.td > .head { display: none; }
@@ -5004,17 +5004,30 @@
     if (c.st === 'ex') { if (confirm(d.name + ' · ' + dMon(m) + '분\n\n제외를 풀고 다시 신고 대상으로 둘까요?')) iyMark([{ d, m, c }], 'free'); return; }
     const on = c.st !== 'done';
     if (!on && !confirm(d.name + ' · ' + dMon(m) + '분\n\n신고 완료를 미신고로 되돌릴까요?')) return;
-    const prev = { st: c.st, date: c.date };
-    IY.keep.add(acct); c.busy = true; renderInsYear();
-    const date = on ? (c.date || dToday()) : '';
-    api('adm_insRepSet', m, [{ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: on, date: date, memo: c.memo || '' }]).then((res) => {
-      c.busy = false;
-      if (!res.ok) { Object.assign(c, prev); renderInsYear(); return toast(res.msg); }
-      const r = IY.info;
-      c.st = on ? 'done' : (r.from && m < r.from ? 'skip' : (r.today > (r.dues[m] || '') ? 'no' : 'wait')); c.date = date;
-      if (IR.month === m) IR.rows = [];
-      renderInsYear(); toast(d.name + ' ' + dMon(m) + '분 ' + (on ? '신고 완료로 체크했습니다.' : '미신고로 바꿨습니다.'));
-    }).catch(() => { c.busy = false; Object.assign(c, prev); renderInsYear(); });
+    // 누르면 바로 화면에 반영하고, 잇달아 누른 칸은 모아서 한 번에 저장한다 (칸마다 따로 저장하면 서로 기다리느라 느려지고 저장 충돌이 남)
+    const prev = { st: c.st, date: c.date }, r = IY.info, date = on ? (c.date || dToday()) : '';
+    IY.keep.add(acct);
+    c.st = on ? 'done' : (r.from && m < r.from ? 'skip' : (r.today > (r.dues[m] || '') ? 'no' : 'wait')); c.date = date;
+    const key = acct + '|' + m, old = IYQ.wait.get(key);
+    IYQ.wait.set(key, { d, m, c, on, date, prev: old ? old.prev : prev });
+    renderInsYear(); iyFlushSoon();
+  }
+  const IYQ = { wait: new Map(), timer: 0, busy: false };
+  function iyFlushSoon() { clearTimeout(IYQ.timer); IYQ.timer = setTimeout(iyFlush, 600); }
+  function iyFlush() {
+    if (IYQ.busy) return iyFlushSoon(); // 앞 저장이 끝난 뒤에 (한 번에 하나씩)
+    const tg = [...IYQ.wait.values()].filter((x) => !(x.prev.st === x.c.st && x.prev.date === x.c.date)).slice(0, 400); // 눌렀다 되돌린 칸은 보낼 것 없음
+    IYQ.wait.clear();
+    if (!tg.length) return;
+    const by = {};
+    tg.forEach(({ d, m, c, on, date }) => { (by[m] = by[m] || []).push({ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: on, date: date, memo: c.memo || '' }); });
+    const undo = (msg) => { tg.forEach((x) => { if (!IYQ.wait.has(x.d.acct + '|' + x.m)) Object.assign(x.c, x.prev); }); renderInsYear(); toast(msg); };
+    IYQ.busy = true;
+    api('adm_insRepSetMany', Object.keys(by).map((m) => ({ month: m, list: by[m] }))).then((res) => {
+      if (!res.ok) return undo(res.msg);
+      if (tg.some((x) => x.m === IR.month)) IR.rows = [];
+      toast(tg.length === 1 ? tg[0].d.name + ' ' + dMon(tg[0].m) + '분 ' + (tg[0].on ? '신고 완료로 체크했습니다.' : '미신고로 바꿨습니다.') : tg.length + '칸을 저장했습니다.');
+    }).catch(() => undo('저장하지 못했습니다. 다시 눌러 주세요.')).finally(() => { IYQ.busy = false; if (IYQ.wait.size) iyFlushSoon(); });
   }
 
   /** 칸 상태 바꾸기: to = 'ex' 제외 · 'free' 제외 풀기 (미신고/신고 전으로) */
@@ -11400,7 +11413,8 @@
       })();
       const memoCard = // 오늘 업무 · 남은 것 — 휴대폰 홈 맨 위
         '<div class="smb-card"><div class="td-hd"><p class="td-h">오늘 업무' + (left ? ' · 남은 것 ' + left : '') + '</p><button type="button" data-tdgo="memo">모두 보기 ›</button></div>' +
-        (HM.memos == null ? '<p class="smb-hint" style="margin:4px 0">불러오는 중…</p>' : memos.length ? memos.slice(0, 8).map((m) => '<div class="td-m' + m._cls + '"><button type="button" class="td-ck" data-tdck="' + esc(m.id) + '" aria-label="완료로 표시" title="완료로 표시 (홈에서 빠짐)"></button><span>' + (m._ic === '☐' ? '' : m._ic + ' ') + esc(String(m.content || '').split('\n')[0]) + (m._tag ? '<small>' + esc(m._tag) + '</small>' : '') + '</span></div>').join('') + (memos.length > 8 ? '<p class="smb-hint" style="margin:6px 0 0">외 ' + (memos.length - 8) + '건</p>' : '') : '<p class="smb-hint" style="margin:4px 0">남은 업무가 없습니다.</p>') + '</div>';
+        (HM.memos == null ? '<p class="smb-hint" style="margin:4px 0">불러오는 중…</p>' : memos.length ? '<div class="td-ml">' + memos.map((m) => '<div class="td-m' + m._cls + '"><button type="button" class="td-ck" data-tdck="' + esc(m.id) + '" aria-label="완료로 표시" title="완료로 표시 (홈에서 빠짐)"></button><span>' + (m._ic === '☐' ? '' : m._ic + ' ') + esc(String(m.content || '').split('\n')[0]) + (m._tag ? '<small>' + esc(m._tag) + '</small>' : '') + '</span></div>').join('') + '</div>' + (memos.length > 5 ? '<p class="smb-hint td-mlh" style="margin:6px 0 0">↕ 5건씩 보입니다 · 밀어서 나머지 ' + (memos.length - 5) + '건</p>' : '') : '<p class="smb-hint" style="margin:4px 0">남은 업무가 없습니다.</p>') + '</div>';
+      const mlTop = (box.querySelector('.td-ml') || {}).scrollTop || 0; // 오늘 업무 상자 안 스크롤 위치 (다시 그려도 유지)
       box.innerHTML = '<div class="td-hi"><b>' + esc(who.name || '관리자') + ' 님</b><small>' + esc(mobMd(tdy)) + ' · 내일 배송(PDD) ' + esc(mobMd(pdd)) + (sStale ? ' · <span style="color:var(--brand)">새로 받는 중…</span>' : '') + '</small></div>' + memoCard +
         (pk ? '<button type="button" class="td-pk" data-tdgo="peak"><b>🔥 ' + +pk.period.slice(5, 7) + '월 피크데이 · ' + rpMd(pk.from) + ' ~ ' + rpMd(pk.to) + '</b>예상 물량 보기 ›</button>' : '') + myCard +
         '<div class="smb-card"><span class="td-pill">오늘 PDD · ' + esc(mobMd(pdd)) + '</span><p class="smb-hint" style="margin:6px 0 0">실제 출근일 ' + pv + ' 저녁 입차 · 휴무 ' + T.off + ' · 백업 ' + T.bk + (T.yc.length ? ' · 용차 ' + T.yc.length : '') + '</p>' +
@@ -11410,6 +11424,9 @@
         '<div class="td-q">' + q('sched', '📅', '스케줄') + q('issue', '🚩', '이슈') + q('pumasi', '🤝', '품앗이') + q('memo', '🗒', '업무스케줄') + q('notice', '📢', '공지') + q('perf', '📊', '수행률') + '</div>' +
         (T.pm.length || T.yc.length ? '<div class="smb-card"><p class="td-h">품앗이 · 용차</p>' + T.pm.map((x) => row(x, (x.s ? x.s + ' · ' : '') + '배차 확정')).join('') + T.yc.map((x) => row(x, '용차 · ' + (x.s || ''))).join('') + '</div>' : '') +
         (T.is.length || T.nt.length ? '<div class="smb-card"><p class="td-h">이슈 · 지시</p>' + T.is.map((x) => row(x, x.s || '')).join('') + T.nt.map((x) => row(x, x.s || '')).join('') + '</div>' : '');
+      // 오늘 업무: 5건 높이까지만 보이고 나머지는 상자 안에서 밀어 본다 (줄 높이가 제각각이라 6번째 줄 위치로 잰다)
+      const ml = box.querySelector('.td-ml');
+      if (ml && ml.children.length > 5) { ml.style.maxHeight = (ml.children[5].offsetTop - ml.children[0].offsetTop) + 'px'; ml.scrollTop = mlTop; }
       return;
     }
     let myNone = false;
