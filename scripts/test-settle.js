@@ -469,6 +469,45 @@ scenario('품앗이 일할 기사', null, function (r) {
   eq('지난 날 · 확정된 날 · 정지 기사 빼고 날짜→이름 순 · 제안 수', out, ['V1:강준길:0', 'V2:이현모:1']);
 });
 
+// 24) 대시보드 '오늘 한눈에': 숫자 칸 · 확인할 것(건이 있을 때만 · 급한 것 먼저) · 다가오는 변경(날짜순) · 한 부분이 실패해도 나머지는 나옴
+scenario('대시보드 오늘 한눈에', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var T = '2026-11-16', N = '2026-11-17';
+    todayText_ = function () { return T; };
+    var D = __M.main.drivers; D[0].docQual = 'u'; D[0].docLicense = 'u'; D[1].schCampId = ''; D[1].schCamp = '';
+    D.push({ id: 'd9', name: '신청자', status: ST.PENDING }); D.push({ id: 'd8', name: '퇴사자', status: ST.ACTIVE, workStatus: '퇴사', leaveDate: '2026-11-25' });
+    __M.main.app_seen = [{ kind: 'open', driverId: 'd1', ackAt: T + ' 08:00:00' }, { kind: 'sch', driverId: 'd1', name: '이현모', key: N, ackAt: '' }, { kind: 'sch', driverId: 'd3', name: '유정근', key: N, ackAt: '취소' }, { kind: 'notice', driverId: 'd1', key: 'N1' }];
+    __M.main.push_tokens = [{ driverId: 'd1', token: 't' }];
+    __M.main.board_reports = [{ id: 'R1', status: '' }, { id: 'R2', status: '처리' }];
+    var drv = function (id, name, camp, base, extra) { return Object.assign({ id: id, name: name, status: ST.ACTIVE, workStatus: '', campId: camp ? 'C1' : '', camp: camp, baseRoute: base }, extra || {}); };
+    schRead_ = function (a, b) {
+      var dates = schDateRange_(a, b), cells = { d1: {}, d2: {}, d3: {} };
+      cells.d1[T] = '출근'; cells.d1[N] = '';            // 내일 빈 칸
+      cells.d2[T] = '군포1 212CD'; cells.d2[N] = '출근 [용차]';
+      cells.d3[T] = '미입차'; cells.d3[N] = '병가';
+      return { dates: dates, holidays: {}, cells: cells, drivers: [drv('d1', '이현모', '군포1캠프', '212CD'), drv('d2', '강준길', '', '백업'), drv('d3', '유정근', '군포1캠프', '212AB')] };
+    };
+    frFind_ = function () { return [{ name: '강준길', campName: '군포1캠프', all: ['212C', '212D'] }]; };
+    dataCheckView_ = function () { return { at: T + ' 04:56:00', items: [{ k: 'err', n: 4, list: ['a'] }, { k: 'pmBoth', label: '품앗이로 맡긴 날인데 맡긴 기사도 출근', n: 3, list: ['x', 'y', 'z'] }] }; };
+    onlineMap_ = function () { return { d1: Date.now() }; };
+    master_ = function () { return { camps: __M.main.camps }; };
+    noticeAll_ = function () { return [{ id: 'N1', title: '공지', status: NST.ON, start: '', end: '2026-11-20', important: true, target: '', targetDrv: [], createdAt: T }]; };
+    pmData_ = function () { return { jobs: [{ id: 'J9', status: PST.OPEN, date: N, camp: '군포1캠프', route: '212CD', kind: '주간' }], apps: [{ jobId: 'J9', status: PAST.APPLY, name: '강준길' }], avail: [] }; };
+    rcRows_ = function () { return [{ kind: RCK.DRV, status: RCS.WAIT, date: '2026-11-18', name: '이현모', fromCamp: '군포1캠프', fromRoute: '212AB', toCamp: '군포1캠프', toRoute: '212CD' }, { kind: RCK.DRV, status: RCS.DONE, date: '2026-11-19', name: 'x' }]; };
+    pkAll_ = function () { throw new Error('피크 탭 없음'); };      // 한 부분이 실패해도
+    rpfSummary_ = function () { return { wk: 46, bad: 4, improve: 1 }; }; slaSummary_ = function () { return { low: 2, warn: 3 }; };
+    softFail_ = function () {};
+    var o = homeMain_();
+    return { tiles: o.tiles, todo: o.todo.map(function (x) { return x.lv + ':' + x.k + ':' + x.n; }), soon: o.soon.map(function (x) { return x.date.slice(5) + ' ' + x.label; }),
+      week: o.week.length, wk: o.week.filter(function (x) { return x.date === T; })[0], notice: o.notice, perf: o.perf, sys: o.sys.err };
+  })()`, r.ctx);
+  eq('숫자 칸 (소속 없는 백업 기사도 근무로 셈 · 내일 용차는 근무 아님)', out.tiles, { work: 2, off: 0, sick: 0, miss: 1, mi: 1, empty: 0, workTom: 0, online: 1, opened: 1, pm: 1, pmNew: 1 });
+  eq('확인할 것: 급한 것(r) 먼저 · 건이 있는 것만', out.todo, ['r:mi:1', 'r:empty:1', 'r:first:1', 'r:ck:pmBoth:3', 'r:pmApply:1', 'r:pmOpen:1', 'b:yong:1', 'b:pending:1', 'b:doc:1', 'b:unseen:1', 'b:nopush:1', 'b:report:1']);
+  eq('다가오는 변경: 날짜순 (적용 끝난 변경 · 범위 밖은 빼고)', out.soon.filter(function (x) { return !/정산|쿠팡|계산서/.test(x); }), ['11-18 노선 변경 · 이현모', '11-20 공지 게시 종료 · 공지', '11-25 퇴사 예정 · 퇴사자']);
+  eq('이번 주 7일 · 오늘 근무 2 미입차 1', [out.week, out.wk.work, out.wk.mi], [7, 2, 1]);
+  eq('공지 읽음 수 · 수행률 · 어제 오류', [out.notice[0].read + '/' + out.notice[0].total, out.perf.bad, out.perf.slaLow, out.sys], ['1/4', 4, 2, 4]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
