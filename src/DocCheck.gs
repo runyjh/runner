@@ -376,3 +376,24 @@ function adm_insRepSetMany(token, items) {
     return { ok: true, n: n };
   });
 }
+/** 공단(토탈서비스) 양식 대조 결과 반영: items = [{ driverId, enr: '완료'|'대상', enrAt }] — 기사마다 따로 */
+function adm_insEnrSync(token, items) {
+  return run_(function () {
+    const a = requireAdmin_(token);
+    items = (Array.isArray(items) ? items : []).slice(0, 500);
+    const lock = scriptLock_();
+    lock.waitLock(25000);
+    let n = 0;
+    try {
+      items.forEach(function (it) {
+        const id = str_(it && it.driverId), v = str_(it && it.enr);
+        if (!id || ['완료', '대상'].indexOf(v) < 0) return;
+        const o = driverById_(id); if (!o) return;
+        const at = v === '완료' ? (stlYmd_(it.enrAt) || str_(o.enrAt) || todayText_()) : '';
+        if (str_(o.enr) === v && str_(o.enrAt) === at) return; // 이미 같음
+        updateDriverCore_(a, id, { enr: v, enrAt: at }); n++;
+      });
+    } finally { lock.releaseLock(); }
+    return { ok: true, n: n };
+  });
+}
