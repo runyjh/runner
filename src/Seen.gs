@@ -117,7 +117,7 @@ function adm_seenList(token) {
       .map(function (o) { return { id: String(o.id), name: o.name, camp: short(cn[o.schCampId] || o.schCamp || ''), title: titleOf_(o) || '' }; });
     const lim = Utilities.formatDate(new Date(Date.now() - 60 * 86400000), CFG.TZ, 'yyyy-MM-dd');
     const notices = noticeAll_().filter(function (n) { return n.status === NST.ON && (!n.end || n.end >= lim); }).sort(function (x, y) { const p = x.start || x.createdAt, q = y.start || y.createdAt; return p < q ? 1 : p > q ? -1 : 0; }).slice(0, 60)
-      .map(function (n) { return { id: n.id, title: n.title, date: (n.start || n.createdAt || '').slice(0, 10), targets: noticeTargets_(n.target), live: noticeLive_(n, today), important: n.important }; });
+      .map(function (n) { return { id: n.id, title: n.title, date: (n.start || n.createdAt || '').slice(0, 10), targets: noticeTargets_(n.target), targetDrv: n.targetDrv || [], live: noticeLive_(n, today), important: n.important }; });
     const rows = readAll_(SH.SEEN).filter(function (o) { return o.kind && o.driverId; })
       .map(function (o) { return { k: o.kind, d: o.driverId, key: o.key, old: o.old, text: o.text, at: o.at, ack: o.ackAt, by: o.by }; });
     return { ok: true, today: today, drivers: drivers, notices: notices, rows: rows, act: onlineMap_(drivers.map(function (d) { return d.id; })), now: Date.now(), nowMs: ONLINE.NOW_MS };
@@ -164,7 +164,7 @@ function adm_seenNudge(token, noticeId) {
     master_().camps.forEach(function (c) { cn[c.id] = c.name; });
     const seen = {};
     readAll_(SH.SEEN).forEach(function (o) { if (o.kind === SEEN_KIND.NOTICE && o.key === n.id) seen[o.driverId] = 1; });
-    const list = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.status === ST.ACTIVE && !seen[String(o.id)] && noticeFor_(n, cn[o.schCampId] || o.schCamp || ''); });
+    const list = readAll_(SH.DRIVERS).filter(function (o) { return o.id && o.status === ST.ACTIVE && !seen[String(o.id)] && noticeFor_(n, cn[o.schCampId] || o.schCamp || '', o.id); });
     let pushed = 0;
     try { pushed = pmPushSend_(list.map(function (o) { return { driverId: String(o.id), title: '📢 공지를 확인해 주세요', text: n.title, jobId: '', kind: 'notice' }; })) || 0; } catch (e) { softFail_('공지 확인 알림 실패', e); }
     logAdmin_(a, '공지 확인 알림', n.title, '안 본 기사 ' + list.length + '명 · 알림 ' + pushed + '건');

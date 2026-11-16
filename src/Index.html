@@ -649,6 +649,7 @@
   .layer .head button { border: 0; background: none; font-size: 22px; cursor: pointer; }
   .layer #postcodeWrap { flex: 1; }
   @media (max-width: 640px) { input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px !important; } }
+  .nedrvs { margin-top: 6px; } .nedrvs small { opacity: .75; font-weight: 500; }
 </style>
 </head>
 <body>
@@ -904,7 +905,8 @@
       <div class="field"><label class="lb" for="neBody">내용</label><textarea id="neBody" maxlength="5000" style="min-height:160px"></textarea></div>
       <div class="field"><label class="lb">사진 <small style="font-weight:500;color:var(--sub)">5장까지</small></label><div class="riph" id="nePh"></div></div>
       <label class="check" style="color:var(--ink)"><input type="checkbox" id="neImp"> 중요 공지 (맨 위 고정 · 처음 열 때 팝업)</label>
-      <div class="field"><label class="lb">대상 캠프 <small style="font-weight:500;color:var(--sub)">아무것도 안 고르면 전체 기사</small></label><div class="necamps" id="neCamps"></div></div>
+      <div class="field"><label class="lb">대상 캠프 <small style="font-weight:500;color:var(--sub)">캠프 · 기사 모두 안 고르면 전체 기사</small></label><div class="necamps" id="neCamps"></div></div>
+      <div class="field"><label class="lb" for="neDrvQ">대상 기사 <small style="font-weight:500;color:var(--sub)">캠프와 상관없이 이 기사에게</small></label><input id="neDrvQ" list="neDrvDL" placeholder="🔍 기사 이름 입력 → 고르기" autocomplete="off"><datalist id="neDrvDL"></datalist><div class="necamps nedrvs" id="neDrvs"></div></div>
       <div class="field" style="display:flex;gap:8px"><div style="flex:1;min-width:0"><label class="lb" for="neStart">게시 시작일</label><input type="date" id="neStart"></div><div style="flex:1;min-width:0"><label class="lb" for="neEnd">게시 종료일</label><input type="date" id="neEnd"></div></div>
       <div class="field"><label class="lb">상태</label><div class="segm" id="neSt"><button type="button" data-st="게시" class="on">게시</button><button type="button" data-st="숨김">숨김</button></div></div>
       <button class="btn" id="neSave" type="button">저장</button>
@@ -4089,12 +4091,14 @@
   function mmGoDay(d) { MM.day = d; mmReset(); mmPaint(); mmLoad(); }
   $('#mMemo').addEventListener('click', openMemo);
   // ───── 공지 관리 (직함자 전용): 목록(숨김·기간 지난 것 포함) · 새 공지 · 수정 · 사진 · 삭제 ─────
-  const NA = { list: [], camps: [], edit: null, ph: [], camp: new Set(), st: '게시', big: {} };
+  const NA = { list: [], camps: [], drivers: [], edit: null, ph: [], camp: new Set(), drv: [], st: '게시', big: {} };
+  const naDrvName = (id) => { const d = NA.drivers.find((x) => x.id === id); return d ? d.name : id; };
+  const naTgt = (n) => [n.target || ''].concat((n.targetDrv || []).length ? [(n.targetDrv.length <= 2 ? n.targetDrv.map(naDrvName).join(', ') : naDrvName(n.targetDrv[0]) + ' 외 ' + (n.targetDrv.length - 1) + '명')] : []).filter(Boolean).join(' · ') || '전체';
   function openNtAdm() { show('ntadm'); naPaint(); naLoad(); }
   function naLoad() {
     const tok = store.get(TOKEN); if (!tok) return Promise.resolve();
     if (!NA.list.length) $('#naList').innerHTML = '<div class="pmempty">불러오는 중…</div>';
-    return api('api_ntAdmList', tok).then((r) => { if (!pmOk(r, '공지를 불러오지 못했습니다.')) return; NA.list = r.notices || []; NA.camps = (r.camps || []).map((c) => String(c).replace(/\s*캠프\s*$/, '')); NA.today = r.today; naPaint(); }).catch(() => netErr());
+    return api('api_ntAdmList', tok).then((r) => { if (!pmOk(r, '공지를 불러오지 못했습니다.')) return; NA.list = r.notices || []; NA.camps = (r.camps || []).map((c) => String(c).replace(/\s*캠프\s*$/, '')); NA.drivers = r.drivers || []; NA.today = r.today; naPaint(); }).catch(() => netErr());
   }
   function naPaint() {
     if (!NA.list.length) { if (NA.today) $('#naList').innerHTML = '<div class="pmempty">공지가 없습니다. ＋ 새 공지로 올려 주세요.</div>'; return; }
@@ -4102,23 +4106,38 @@
       const per = (n.start || n.end) ? ' · ' + (n.start ? n.start.slice(5).replace('-', '/') : '') + '~' + (n.end ? n.end.slice(5).replace('-', '/') : '') : '';
       return '<button type="button" class="naw" data-na="' + escH(n.id) + '"><div class="t">' + (n.important ? '<i class="bg imp" style="font-style:normal">중요</i>' : '') + '<span>' + escH(n.title) + (n.photos ? ' 📷' + n.photos : '') + '</span>' +
         '<i class="bg ' + (n.live ? 'on' : 'off') + '" style="font-style:normal">' + (n.live ? '게시 중' : n.status === '숨김' ? '숨김' : '기간 외') + '</i></div>' +
-        '<span class="m">' + escH(n.target || '전체') + per + ' · ' + escH(n.author || '') + ' ' + escH(String(n.updatedAt || n.createdAt || '').slice(5, 10).replace('-', '/')) + '</span></button>';
+        '<span class="m">' + escH(naTgt(n)) + per + ' · ' + escH(n.author || '') + ' ' + escH(String(n.updatedAt || n.createdAt || '').slice(5, 10).replace('-', '/')) + '</span></button>';
     }).join('');
   }
   function naEdit(n) {
-    NA.edit = n || null; NA.ph = []; NA.camp = new Set(n ? String(n.target || '').split(/\s*,\s*/).filter(Boolean) : []); NA.st = n && n.status === '숨김' ? '숨김' : '게시';
+    NA.edit = n || null; NA.ph = []; NA.camp = new Set(n ? String(n.target || '').split(/\s*,\s*/).filter(Boolean) : []); NA.drv = (n && n.targetDrv || []).slice(); NA.st = n && n.status === '숨김' ? '숨김' : '게시';
     $('#neH').textContent = n ? '공지 수정' : '새 공지';
     $('#neTitle').value = n ? n.title : ''; $('#neBody').value = n ? n.body || '' : ''; ntColorize($('#neBody')); $('#neBody')._ntPaint(); $('#neImp').checked = !!(n && n.important);
     $('#neStart').value = n ? n.start || '' : ''; $('#neEnd').value = n ? n.end || '' : '';
     $('#neDel').classList.toggle('hidden', !n);
     if (n) for (let i = 0; i < (n.photos || 0); i++) NA.ph.push({ keep: i, t: '' });
-    neCampPaint(); neStPaint(); nePhPaint(); show('ntedit');
+    neCampPaint(); neDrvPaint(); $('#neDrvQ').value = ''; neStPaint(); nePhPaint(); show('ntedit');
     if (n) NA.ph.forEach((x) => {
       const k = n.id + '|' + x.keep + '|' + (n.updatedAt || '');
       if (NA.big[k]) { x.src = NA.big[k]; return; }
       api('api_ntAdmPhoto', store.get(TOKEN), n.id, x.keep).then((r) => { if (r && r.ok) { NA.big[k] = x.src = 'data:' + r.mime + ';base64,' + r.data; nePhPaint(); } }).catch(() => {});
     });
   }
+  function neDrvPaint() {
+    $('#neDrvs').innerHTML = NA.drv.map((id) => { const d = NA.drivers.find((x) => x.id === id) || { name: id }; return '<button type="button" class="on" data-ndx="' + escH(id) + '">' + escH(d.name) + (d.camp ? ' <small>' + escH(d.camp) + '</small>' : '') + ' ✕</button>'; }).join('');
+    $('#neDrvDL').innerHTML = NA.drivers.filter((d) => !d.off && !NA.drv.includes(d.id)).map((d) => '<option value="' + escH(d.name + (d.camp ? ' · ' + d.camp : '')) + '">').join('');
+  }
+  function neDrvPick() {
+    const v = $('#neDrvQ').value.trim(); if (!v) return;
+    const name = v.split(' · ')[0].trim(), camp = (v.split(' · ')[1] || '').trim();
+    const hit = NA.drivers.filter((d) => !d.off && d.name === name && (!camp || d.camp === camp));
+    if (hit.length !== 1) return;
+    if (!NA.drv.includes(hit[0].id)) NA.drv.push(hit[0].id);
+    $('#neDrvQ').value = ''; neDrvPaint();
+  }
+  $('#neDrvQ').addEventListener('input', neDrvPick);
+  $('#neDrvQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); neDrvPick(); } });
+  $('#neDrvs').addEventListener('click', (e) => { const b = e.target.closest('[data-ndx]'); if (b) { NA.drv = NA.drv.filter((x) => x !== b.dataset.ndx); neDrvPaint(); } });
   function neCampPaint() { $('#neCamps').innerHTML = NA.camps.concat([...NA.camp].filter((c) => !NA.camps.includes(c))).map((c) => '<button type="button" data-nc="' + escH(c) + '" class="' + (NA.camp.has(c) ? 'on' : '') + '">' + escH(c) + '</button>').join(''); }
   function neStPaint() { $$('#neSt button').forEach((b) => b.classList.toggle('on', b.dataset.st === NA.st)); }
   function nePhPaint() {
@@ -4142,7 +4161,7 @@
   $('#neSave').addEventListener('click', () => {
     const t = $('#neTitle').value.trim(), btn = $('#neSave'); if (!t) { toast('제목을 입력해 주세요.'); return $('#neTitle').focus(); }
     if (btn.disabled) return;
-    const n = { id: NA.edit ? NA.edit.id : '', title: t, body: $('#neBody').value, important: $('#neImp').checked, target: [...NA.camp].join(', '), start: $('#neStart').value, end: $('#neEnd').value, status: NA.st,
+    const n = { id: NA.edit ? NA.edit.id : '', title: t, body: $('#neBody').value, important: $('#neImp').checked, target: [...NA.camp].join(', '), targetDrv: NA.drv.join(', '), start: $('#neStart').value, end: $('#neEnd').value, status: NA.st,
       keep: NA.ph.filter((x) => x.keep != null).map((x) => x.keep), add: NA.ph.filter((x) => x.data).map((x) => ({ data: x.data, mime: x.mime })) };
     btn.disabled = true; btn.textContent = '저장 중…';
     api('api_ntAdmSave', store.get(TOKEN), n).then((r) => {
