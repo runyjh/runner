@@ -209,7 +209,7 @@ function issSubCell_(iss, mctx, sctx, src) {
  * 이슈를 칸에 반영 (저장·수정·삭제 공통 · 잠금 안에서)
  * prev: 고치기 전 이슈(없으면 새 이슈) · next: 고친 뒤 이슈(없으면 삭제)
  * 1) 그 기사 칸: 미입차 / 노쇼 / 병가 / 뛴 회전만 남긴 노선 (11/1 이후)
- * 2) 대신 뛴 우리 기사(업체백업·품앗이) 칸: PDD(내일)부터 그 노선 (오늘까지는 실제 기록이라 건드리지 않음)
+ * 2) 대신 뛴 우리 기사(업체백업·품앗이) 칸: 오늘부터 그 노선 (지난 날짜는 실제 기록이라 건드리지 않음)
  * 원래 값은 '원래 칸'에 { 날짜: 값, '@sub': { id, cells: { 날짜: 값 } } } 로 보관 → 지우거나 바꾸면 (칸이 그대로일 때) 되돌림
  * dry: 덮어쓸 특별한 칸만 돌려 줌 · subOnly: 대신 뛴 기사 칸만 맞춤 (칸에서 이슈를 고쳤을 때)
  */
@@ -247,8 +247,8 @@ function issSyncCells_(a, drv, prev, next, dry, subOnly) {
     });
     if (!dry) cells = cells.concat(issWriteCells_(a, drv.id, want));
   }
-  // 2) 대신 뛴 우리 기사 칸 (PDD = 내일부터)
-  const pdd = schAddDays_(todayText_(), 1);
+  // 2) 대신 뛴 우리 기사 칸 (오늘부터 — 오늘 받아 준 물량도 그 기사 내 스케줄에 보이게 · 지난 날짜는 실제 기록이라 건드리지 않음)
+  const pdd = todayText_();
   const ps = orig['@sub'] || null, sPrev = ps && ps.id ? (readAll_(SH.DRIVERS).filter(function (o) { return o.id === ps.id; })[0] || null) : null;
   const sNext = live(next) ? issSubDrv_(next) : null;
   const so = Object.assign({}, (ps && ps.cells) || {});
@@ -454,8 +454,8 @@ function adm_schCellApply(token, o) {
   const alt = o.alt && str_(o.alt.id) && str_(o.alt.value) ? { id: str_(o.alt.id), value: str_(o.alt.value) } : null;
   const out = { ok: true, cells: [], issues: [], removed: [], inst: undefined, warn: '' };
   const drvId = row.split('~')[0]; // 이슈 · 지시사항은 기사 단위 (구간 줄 'id~n' 도 같은 기사)
-  const pdd = schAddDays_(todayText_(), 1);
-  // 이슈가 대체 인원 칸을 대신 넣어 주는 날 = 이슈 결과가 있고 · 올인원 규칙 기간(11/1~)이고 · 내일 이후 · 대체가 우리 인원(업체백업·품앗이)
+  const pdd = todayText_();
+  // 이슈가 대체 인원 칸을 대신 넣어 주는 날 = 이슈 결과가 있고 · 올인원 규칙 기간(11/1~)이고 · 오늘 이후 · 대체가 우리 인원(업체백업·품앗이)
   const viaIssue = function (d) { return !!iss && issOurs_(str_(iss.sub)) && d >= ISS.RULE_FROM && d >= pdd && !schExParse_(row); };
   // 1) 칸 (기간 전체) + 이슈가 넣어 주지 않는 날의 대체 인원 칸
   let cur = {}, curAlt = {};

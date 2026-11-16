@@ -221,6 +221,7 @@ function fsCodeCheck_() {
   return false;
 }
 function fsSync() {
+  try { if (typeof pmPushFlush_ === 'function') pmPushFlush_(); } catch (e) { /* 무시 */ } // 저장 때 미뤄 둔 휴대폰 알림
   if (!fsCfg_()) return;
   try { if (typeof hbMark_ === 'function') hbMark_('fs'); } catch (e) { /* 무시 */ } // 1분 트리거가 살아 있다는 표시 (15분에 한 번만 적음)
   fsCodeCheck_();

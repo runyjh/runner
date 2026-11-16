@@ -6086,8 +6086,10 @@ function adm_schIssueSave(token, o) {
     try {
       schIssueHeadFix_(sh);
       const list = schIssues_();
-      const hit = o.id ? list.filter(function (x) { return x.id === str_(o.id); })[0] : null;
+      let hit = o.id ? list.filter(function (x) { return x.id === str_(o.id); })[0] : null;
       if (o.id && !hit) fail_('이미 지워진 이슈입니다. 새로고침해 주세요.');
+      // 두 번 눌림 · 다시 보내기: 같은 기사 · 같은 날 · 같은 결과 · 같은 뺀 회전의 이슈가 이미 있으면 새로 만들지 않고 그 이슈를 고친다
+      if (!o.id && result && kind !== '지시') hit = list.filter(function (x) { return x.driverId === drv.id && x.date === date && x.result === result && str_(x.cut) === cut && x.kind !== '지시'; })[0] || null;
       // 기간: end 가 있으면 그대로, 없으면 예전 방식(mi + miDays)
       let end = parseYmd_(o.end) ? ymd_(parseYmd_(o.end)) : '';
       if (!result && kind !== '지시') {

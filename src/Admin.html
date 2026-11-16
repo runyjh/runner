@@ -4497,7 +4497,11 @@
     const P = A.perf, pf = P ? '<div class="hm-chips">' + chip('3~4등급 ' + P.bad, P.bad ? 'r' : 'g') + chip('개선 요청 ' + P.improve, P.improve ? 'y' : 'n') + chip('SLA 위험 ' + P.slaLow, P.slaLow ? 'r' : 'n') + '</div>' : '<div class="db-empty">올린 수행률 자료가 없습니다.</div>';
     const X = S && S.stl, st = !S ? '<div class="db-load">불러오는 중…</div>' : !X ? '<div class="db-empty">정산 자료 없음</div>' : '<div class="hm-chips">' + chip(X.closed ? '마감' : '계산 중', X.closed ? 'g' : 'y') + chip('기사 ' + X.drivers + '명') + (X.einv ? chip(+X.einv.month.slice(5) + '월 계산서 ' + X.einv.done + '/' + X.einv.total, X.einv.done < X.einv.total ? 'y' : 'g') : '') + (X.pay ? chip('지급일 ' + dhMd(X.pay)) : '') + '</div>';
     const Y = A.sys || {}, sy = '<div class="hm-chips">' + chip(Y.stopped && Y.stopped.length ? '자동 작업 멈춤 ' + Y.stopped.length : '자동 작업 정상', Y.stopped && Y.stopped.length ? 'r' : 'g') + chip('어제부터 오류 ' + (Y.err || 0), Y.err ? 'y' : 'n') + (UPD ? chip('업데이트 #' + UPD) : '') + '</div>' + (Y.at ? '<div class="db-note" style="margin-top:6px">자료 점검 ' + esc(String(Y.at).slice(5, 16).replace('-', '/')) + '</div>' : '');
-    return box('공지사항', 'notice', '공지', nt) + box('수행률 · SLA' + (P && P.wk ? ' <small class="sub" style="font-weight:500">' + esc(String(P.wk)) + '주차</small>' : ''), 'route', '노선관리', pf) + box('정산' + (X ? ' · ' + (+X.month.slice(5)) + '월' : ''), 'settle', '정산관리', st) + box('프로그램 상태', 'uiset', '유지보수', sy);
+    const I = A.issue, iss = !I ? '' : box('이슈 <small class="sub" style="font-weight:500">최근 7일</small>', 'issue', '이슈 관리',
+      (I.week ? '<div class="hm-chips" style="margin-bottom:6px">' + (I.today ? chip('오늘 ' + I.today, 'r') : '') + Object.keys(I.by).map((k) => chip(k + ' ' + I.by[k], /미입차|노쇼/.test(k) ? 'r' : /병가/.test(k) ? 'y' : 'n')).join('') + '</div>' +
+        '<ul class="hm-todo">' + I.list.map((x) => { const w = dhDow(x.date); return '<li data-dsgo="issue"><i class="d' + (w === 0 ? ' sun' : w === 6 ? ' sat' : '') + '">' + dhMd(x.date) + (x.end > x.date ? '~' + dhMd(x.end).split('/')[1] : '') + '</i><span style="font-weight:500">' + esc(x.text) + '</span></li>'; }).join('') + '</ul>'
+        : '<div class="db-empty">최근 7일 이슈가 없습니다 ✅</div>'));
+    return iss + box('공지사항', 'notice', '공지', nt) + box('수행률 · SLA' + (P && P.wk ? ' <small class="sub" style="font-weight:500">' + esc(String(P.wk)) + '주차</small>' : ''), 'route', '노선관리', pf) + box('정산' + (X ? ' · ' + (+X.month.slice(5)) + '월' : ''), 'settle', '정산관리', st) + box('프로그램 상태', 'uiset', '유지보수', sy);
   }
   document.addEventListener('click', (e) => {
     if (e.target.closest('#hmMore')) { DHD.more = !DHD.more; return dhPaint(); }
@@ -5670,10 +5674,12 @@
     if (o.result === '물량조율' && !o.cut) return toast('뺀 노선이나 회전을 고르세요.');
     if (!o.kind) return toast('사유를 고르세요.');
     const b = $('#isMGo'); b.disabled = true; b.textContent = '저장 중…';
+    isClose(); toast('이슈 저장 중…'); // 창은 바로 닫고 저장은 뒤에서 (실패하면 적은 내용 그대로 다시 엶)
+    const back = () => { $('#isModal').classList.remove('hidden'); };
     isSave(o).then((r) => {
-      if (!r) return;
-      isClose(); toast('이슈를 ' + (o.id ? '고쳤습니다' : '기록했습니다') + (r.cells && r.cells.length ? ' · 기사스케줄 ' + r.cells.length + '칸 바꿈' + (o.subWho && r.cells.some((c) => c.row !== o.driverId) ? ' (' + o.subWho + ' 칸 포함)' : '') : '') + '.'); loadIssue();
-    }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
+      if (!r) return back();
+      toast('이슈를 ' + (o.id ? '고쳤습니다' : '기록했습니다') + (r.cells && r.cells.length ? ' · 기사스케줄 ' + r.cells.length + '칸 바꿈' + (o.subWho && r.cells.some((c) => c.row !== o.driverId) ? ' (' + o.subWho + ' 칸 포함)' : '') : '') + '.'); loadIssue();
+    }).catch(() => { back(); toast('저장하지 못했습니다. 다시 눌러 주세요.'); }).finally(() => { b.disabled = false; b.textContent = '저장'; });
   });
   $('#isMDel').addEventListener('click', () => {
     const x = IS.cur; if (!x) return;
@@ -11791,6 +11797,7 @@
     }).catch(() => { c.busy = false; });
   }
   function ceShow() { cePaint(); $('#ceModal').classList.remove('hidden'); try { const t = $('#cellTip'); if (t) t.style.display = 'none'; } catch (e) { /* 무시 */ } }
+  const ceFly = {}; // 칸 편집기 저장이 서버에 가 있는 칸 (끝나기 전에 같은 칸을 또 저장하지 않게)
   function ceClose() { CE = null; $('#ceModal').classList.add('hidden'); const w = $('#sWrap'); if (w) w.focus({ preventScroll: true }); }
   const ceRoutes = () => (SD.routes[CE.pk.campId] || []).map((c) => ({ code: c, stopped: false }));
   /** 고른 노선 글자 (회전 포함 · 다른 캠프면 캠프 이름 앞에) */
@@ -11929,15 +11936,24 @@
     const multi = c.end > c.dt && c.st && c.st !== '출근';
     if (val === c.v0 && !multi && !alt && !issChg && !insChg) return ceClose();
     const k = c.r.row + '|' + c.dt;
-    if (sBusy || sPending[k] || (alt && sPending[alt.id + '|' + c.dt])) { flushSave(); return toast('앞선 저장이 끝나는 중입니다. 잠시 뒤 다시 눌러 주세요.'); }
+    if (sBusy || sPending[k] || ceFly[k] || (alt && sPending[alt.id + '|' + c.dt])) { flushSave(); return toast('앞선 저장이 끝나는 중입니다. 잠시 뒤 다시 눌러 주세요.'); }
     const o = { row: c.r.row, date: c.dt, end: multi ? c.end : c.dt, old: sBase[k] || '', value: val };
     if (issOn && (val !== c.v0 || issChg)) o.issue = { result: ceIssRes(), kind: c.ik, reason: c.ir.trim(), sub: c.isub || (alt ? '업체백업' : ''), subWho: alt ? alt.name : (c.x0 && c.isub === c.isub0 ? c.x0.subWho || '' : '') };
     if (alt) o.alt = { id: alt.id, value: ceRouteText(alt.campId || '') };
     if (insChg) o.inst = ins;
-    c.busy = true; cePaint();
+    // 창은 바로 닫고 칸에 먼저 보여 준 뒤 저장은 뒤에서 (실패하면 칸을 되돌리고 알림)
+    const pre = c.v0, optim = val !== pre;
+    const back = (v) => { delete ceFly[k]; if (optim) { isApplyCells([{ row: c.r.row, date: c.dt, value: v }]); refreshAfterChange(); } };
+    ceFly[k] = 1;
+    if (optim) { isApplyCells([{ row: c.r.row, date: c.dt, value: val }]); refreshAfterChange(); }
+    ceClose(); toast('저장 중…');
     api('adm_schCellApply', o).then((r) => {
-      if (CE === c) c.busy = false;
       if (!r.ok) {
+        back(r.code === 'CONFLICT' ? r.current || '' : pre); return toast(r.msg);
+      }
+      delete ceFly[k];
+      if (optim) (SD.cells[c.r.row] = SD.cells[c.r.row] || {})[c.dt] = pre; // 되돌리기(Ctrl+Z) 값을 맞게 잡으려고 잠깐 원래 값으로
+      if (false) {
         if (r.code === 'CONFLICT') { isApplyCells([{ row: c.r.row, date: c.dt, value: r.current || '' }]); if (CE === c) ceOpen(c.r, c.dt); return toast(r.msg); }
         if (CE === c) cePaint(); return toast(r.msg);
       }
@@ -11947,12 +11963,13 @@
       if (r.inst !== undefined) { const cur = instOf(c.did, c.dt); if (cur) SD.issues = SD.issues.filter((x) => x !== cur); if (r.inst) SD.issues.push(r.inst); }
       (r.cells || []).forEach((x) => { delete sPending[x.row + '|' + x.date]; });
       isApplyCells(r.cells || []);
+      if (optim && !(r.cells || []).some((x) => x.row === c.r.row && x.date === c.dt)) isApplyCells([{ row: c.r.row, date: c.dt, value: val }]); // 서버가 '바뀐 것 없음'으로 본 경우
       if (undo.length) { sUndo.push(undo); if (sUndo.length > 50) sUndo.shift(); }
       refreshAfterChange();
       if (CE === c) ceClose();
       toast(r.warn ? '저장했습니다. ' + r.warn : '저장했습니다.' + (alt ? ' ' + alt.name + ' 칸에 ' + o.alt.value + ' 배정' : '') + (undo.length ? ' (Ctrl+Z 로 되돌리기)' : ''));
       try { if (!$('#view-issue').classList.contains('hidden')) loadIssue(); } catch (e) { /* 무시 */ }
-    }).catch(() => { if (CE === c) { c.busy = false; cePaint(); } toast('저장하지 못했습니다. 다시 눌러 주세요.'); });
+    }).catch(() => { back(pre); toast('저장하지 못했습니다. 칸을 눌러 다시 저장해 주세요.'); });
   }
   $('#ceBody').addEventListener('input', (e) => { if (!CE) return; if (e.target.id === 'ceIns') CE.ins = e.target.value; if (e.target.id === 'ceIr') CE.ir = e.target.value; if (e.target.id === 'ceYid') { CE.yid = e.target.value; CE.touched = true; } });
   $('#ceBody').addEventListener('keydown', (e) => { if ((e.target.id === 'ceIns' || e.target.id === 'ceIr') && e.key === 'Enter' && !e.altKey && !e.shiftKey && !e.isComposing) { e.preventDefault(); ceSave(); } });
