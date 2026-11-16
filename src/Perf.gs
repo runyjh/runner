@@ -338,8 +338,82 @@ function dataCheckLive_(drivers, today) {
       });
     });
     if (a11.length) out.push({ k: 'chgNoRc', label: "칸에 '변경'만 적혀 있고 노선 변경 예약이 없음", list: a11, hint: "그 날부터 기본노선이 바뀌는 것이면 칸을 눌러 [이 날부터 노선 이관] 또는 기사 설정의 노선 변경 예약으로 등록해 주세요. 안 하면 그 뒤 '출근'이 옛 노선으로 계산됩니다." });
+    dataCheckMore_(out, { cell: cell, byId: byId, dates: dates, today: today, day: day, from: from, to: to });
   });
   return out;
+}
+/**
+ * 자료 점검 ⑫~⑯: 오류는 아니지만 자료가 서로 어긋난 것 (2026-11-16 추가 — 그동안 화면에서 눈으로 찾던 종류)
+ *  x = { cell: { 행ID: { 날짜: 칸 } }, byId: { 기사ID: 기사 }, dates, today, day(d), from, to } · lv: 'b' = 참고(정상인 경우도 섞임)
+ */
+function dataCheckMore_(out, x) {
+  const cell = x.cell, byId = x.byId, today = x.today, day = x.day;
+  const soft = function (fn) { try { fn(); } catch (e) { softFail_('자료 점검(추가)', e); } };
+  let iss = [];
+  soft(function () { iss = schIssues_(x.from, x.to).filter(function (i) { return i.id && i.kind !== '지시' && i.date; }); });
+  // ⑫ 같은 이슈가 두 번 (같은 기사 · 같은 날 · 같은 결과 · 같은 뺀 회전)
+  soft(function () {
+    const n = {}, a = [];
+    iss.forEach(function (i) { if (!i.result) return; const k = i.driverId + '|' + i.date + '|' + i.result + '|' + str_(i.cut); (n[k] = n[k] || []).push(i); });
+    Object.keys(n).forEach(function (k) { if (n[k].length > 1) a.push(day(n[k][0].date) + ' ' + n[k][0].name + ' ' + n[k][0].result + (n[k][0].cut ? ' ' + n[k][0].cut : '') + ' × ' + n[k].length + '줄'); });
+    if (a.length) out.push({ k: 'issDup', label: '같은 이슈가 두 번 들어감', list: a, hint: '이슈 관리에서 한 줄만 남기고 지워 주세요.' });
+  });
+  // ⑬ 이슈에 대신 뛴 기사가 있는데 그 기사 칸이 근무가 아님 (오늘 이후)
+  soft(function () {
+    const a = [];
+    iss.forEach(function (i) {
+      if (i.link !== 'Y' || !i.result || !issOurs_(str_(i.sub)) || !str_(i.subWho)) return;
+      const sub = issSubDrv_(i); if (!sub || !cell[sub.id]) return;
+      issDates_(i.date, i.end || i.date).forEach(function (d) {
+        if (d < today || cell[sub.id][d] === undefined) return;
+        if (!schWorkDay_(cell[sub.id][d], schSubIdsOf_(sub))) a.push(day(d) + ' ' + i.name + ' ' + i.result + ' → ' + sub.name + ' (칸: ' + (cell[sub.id][d] || '빈 칸') + ')');
+      });
+    });
+    if (a.length) out.push({ k: 'issSub', label: '이슈의 대신 뛴 기사 칸에 반영이 안 됨', list: a, hint: '이슈를 열어 다시 저장하면 그 기사 칸에 들어갑니다.' });
+  });
+  // ⑭ 칸은 미입차 · 노쇼인데 이슈가 없음
+  soft(function () {
+    const has = {}, a = [];
+    iss.forEach(function (i) { issDates_(i.date, i.end || i.date).forEach(function (d) { has[i.driverId + '|' + d] = 1; }); });
+    Object.keys(cell).forEach(function (id) {
+      const o = byId[id]; if (!o) return;
+      x.dates.forEach(function (d) { const v = cell[id][d]; if (d >= ISS.RULE_FROM && d <= today && /^(미입차|노쇼)/.test(str_(v)) && !has[id + '|' + d]) a.push(day(d) + ' ' + o.name + ' · ' + v); });
+    });
+    if (a.length) out.push({ k: 'miNoIss', label: '칸은 미입차 · 노쇼인데 이슈 기록이 없음', list: a, hint: '그 칸을 눌러 이슈(사유)를 등록하거나, 잘못 적힌 칸이면 고쳐 주세요.' });
+  });
+  // ⑮ 퇴사 · 앱 정지 기사에게 남은 앞으로의 근무 칸
+  soft(function () {
+    const a = [];
+    Object.keys(cell).forEach(function (id) {
+      const o = byId[id]; if (!o) return;
+      const gone = str_(o.workStatus) === '퇴사' || o.status === ST.STOPPED, lf = str_(o.workStatus) === '퇴사' ? schLeaveFrom_(o) : '';
+      if (!gone) return;
+      const ds = x.dates.filter(function (d) { return d > today && (!lf || d >= lf) && schWorkDay_(cell[id][d], schSubIdsOf_(o)); });
+      if (ds.length) a.push(o.name + ' (' + (str_(o.workStatus) === '퇴사' ? '퇴사' : '앱 정지') + ') · ' + day(ds[0]) + (ds.length > 1 ? ' 외 ' + (ds.length - 1) + '일' : ''));
+    });
+    if (a.length) out.push({ k: 'goneSch', label: '퇴사 · 정지 기사에게 앞으로의 근무 칸이 남아 있음', list: a, hint: '기사스케줄에서 그 칸을 지우거나, 계속 일하는 기사면 기사 정보의 상태를 고쳐 주세요.' });
+  });
+  // ⑯ (참고) 같은 날 같은 노선에 두 명 — 회전을 나눠 뛰는 칸(괄호가 있는 칸)은 빼고 본다
+  soft(function () {
+    if (typeof frCell_ !== 'function') return;
+    const camps = frCamps_(), a = [];
+    x.dates.filter(function (d) { return d >= today; }).forEach(function (d) {
+      const who = {};
+      Object.keys(cell).forEach(function (id) {
+        const o = byId[id]; if (!o || o.status !== ST.ACTIVE || str_(o.workStatus) === '퇴사') return;
+        const v = str_(cell[id][d]); if (!v || /[(\[]/.test(v) || !schWorkDay_(v, [])) return;
+        const r = frCell_(v, { camp: frCampKey_(o.schCamp), route: o.baseRoute }, camps); if (!r) return;
+        r.units.forEach(function (u) { const k = r.camp + ' ' + u; (who[k] = who[k] || []).push(o.name); });
+      });
+      const seen = {};
+      Object.keys(who).forEach(function (k) {
+        const names = who[k].filter(function (n, i, l) { return l.indexOf(n) === i; }); if (names.length < 2) return;
+        const key = d + '|' + names.join(',') + '|' + k.replace(/[A-Z]+$/, ''); if (seen[key]) return; seen[key] = 1;
+        a.push(day(d) + ' ' + k.replace(/([0-9]+)[A-Z]+$/, '$1') + ' · ' + names.join(', '));
+      });
+    });
+    if (a.length) out.push({ k: 'sameRoute', lv: 'b', label: '같은 날 같은 노선에 두 명 (참고)', list: a, hint: '회전을 나눠 뛰는 것이면 칸에 (D1,D2) · (F3) 처럼 회전을 적어 주세요. 잘못 겹친 것이면 한 쪽을 고쳐 주세요.' });
+  });
 }
 /** 화면이 보낸 오류 목록 [{ k: 종류, v: 화면, f: 함수, m: 내용, u: 업데이트 }] (한 번에 10건까지) */
 function errRows_(errs, app, who) {

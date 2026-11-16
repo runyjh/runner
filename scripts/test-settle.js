@@ -580,6 +580,31 @@ scenario('끈 메뉴 예외 기사', null, function (r) {
   } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 공지 팝업 기록 계정별 (실행 오류) ' + (e && e.message)); }
 })();
 
+// 29) 자료 점검 추가분: 이슈 중복 · 대신 뛴 기사 칸 미반영 · 미입차인데 이슈 없음 · 퇴사자 남은 근무 칸 · 같은 노선 두 명(참고)
+scenario('자료 점검 추가', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var T = '2026-11-16', N = '2026-11-17', P = '2026-11-15';
+    softFail_ = function (l, e) { throw e; };
+    master_ = function () { return { camps: __M.main.camps }; };
+    var D = __M.main.drivers, byId = {}; D.forEach(function (o) { byId[o.id] = o; });
+    D[2].workStatus = '퇴사'; D[2].leaveDate = '2026-11-16';                 // d3 유정근: 11/16 퇴사
+    var I = function (id, drv, name, date, result, cut, sub, who) { return { id: id, driverId: drv, name: name, date: date, end: date, kind: '기타', result: result, cut: cut || '', sub: sub || '', subWho: who || '', link: 'Y' }; };
+    schIssues_ = function () { return [I('I1', 'd1', '이현모', T, '물량조율', '212C (D2)', '업체백업', '강준길'), I('I2', 'd1', '이현모', T, '물량조율', '212C (D2)', '업체백업', '강준길'),
+      I('I3', 'd4', '유정훈', N, '미입차', '', '없음'), { id: 'I4', driverId: 'd1', date: T, kind: '지시' }]; };
+    issSubDrv_ = function (x) { return x.subWho === '강준길' ? byId.d2 : null; };
+    var cell = { d1: {}, d2: {}, d3: {}, d4: {} };
+    cell.d1[P] = '미입차'; cell.d1[T] = '출근'; cell.d1[N] = '출근';            // 11/15 미입차인데 이슈 없음
+    cell.d2[P] = ''; cell.d2[T] = '휴무'; cell.d2[N] = '군포1 212CD';            // 대신 뛴 기사 오늘 칸이 휴무 · 내일은 d1 과 같은 노선
+    cell.d3[P] = '출근'; cell.d3[T] = '출근'; cell.d3[N] = '출근';              // 퇴사 다음 날 근무 칸
+    cell.d4[P] = ''; cell.d4[T] = ''; cell.d4[N] = '미입차';                    // 이슈 있음 · 내일이라 ⑭ 대상 아님
+    var o = [];
+    dataCheckMore_(o, { cell: cell, byId: byId, dates: [P, T, N], today: T, day: function (d) { return d.slice(5).replace('-', '/'); }, from: P, to: N });
+    return o.map(function (x) { return x.k + (x.lv ? '(' + x.lv + ')' : '') + ':' + x.list.join(' / '); });
+  })()`, r.ctx);
+  eq('어긋난 자료 5가지', out, ['issDup:11/16 이현모 물량조율 212C (D2) × 2줄', 'issSub:11/16 이현모 물량조율 → 강준길 (칸: 휴무) / 11/16 이현모 물량조율 → 강준길 (칸: 휴무)',
+    'miNoIss:11/15 이현모 · 미입차', 'goneSch:유정근 (퇴사) · 11/17', 'sameRoute(b):11/17 군포1 212 · 이현모, 강준길']);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');

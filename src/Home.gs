@@ -87,7 +87,7 @@ function homeMain_() {
   // ── 새벽 자료 점검 · 자동 작업
   part('자료 점검', function () {
     const ck = dataCheckView_() || {}, items = ck.items || [];
-    items.forEach(function (x) { if (x.k !== 'err' && x.k !== 'hb') todo('ck:' + x.k, 'r', Number(x.n) || 0, x.label, homeNames_(x.list || [], 2), /^pm/.test(x.k) ? 'sched' : ''); });
+    items.forEach(function (x) { if (x.k !== 'err' && x.k !== 'hb') todo('ck:' + x.k, x.lv === 'b' ? 'b' : 'r', Number(x.n) || (x.list || []).length, x.label, homeNames_(x.list || [], 2), /^pm/.test(x.k) ? 'sched' : ''); });
     const err = items.filter(function (x) { return x.k === 'err'; })[0], hb = items.filter(function (x) { return x.k === 'hb'; });
     out.sys = { at: str_(ck.at), err: err ? Number(err.n) || 0 : 0, errList: err ? (err.list || []).slice(0, 4) : [], stopped: hb.map(function (x) { return x.label; }) };
   });
