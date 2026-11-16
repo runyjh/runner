@@ -659,6 +659,37 @@ scenario('스케줄 변경 알림 묶기', null, function (r) {
   eq('오늘 · 내일 바로 / 모레 이후는 10분 조용해야 / 시각 없는 옛 기록은 바로', out, [true, true, false, false, true, true]);
 });
 
+// 33) 기사앱 빈칸 '예정': 고정 기사 = 담당 노선 · 고정휴무 / 백업 = 미정 (+고정휴무 요일) / 패턴 스위치 = 최근 3주 같은 요일이 같을 때만 / 적힌 칸 · 지난 날 · 퇴사 뒤 · 직함자 제외
+scenario('기사앱 빈칸 예정', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var today = '2026-11-16', dates = []; for (var i = 9; i <= 22; i++) dates.push('2026-11-' + (i < 10 ? '0' + i : i)); // 11/9(월) ~ 11/22(일)
+    var mk = function (x) { return Object.assign({ status: ST.ACTIVE, driverType: '고정', baseRoute: '212CD', fixedOff: '화,수', title: '', workStatus: '', planPat: '' }, x); };
+    var H = {}; // 지난 칸 (패턴용): 월 = 3주 같음 · 목 = 3주 휴무 · 금 = 한 주 다름 · 토 = 병가 끼임
+    ['2026-11-09', '2026-11-02', '2026-10-26'].forEach(function (d) { H[d] = '강서1 527B [B01]'; });
+    ['2026-11-12', '2026-11-05', '2026-10-29'].forEach(function (d, i) { H[d] = i ? '휴무' : '고정휴무'; });
+    H['2026-11-13'] = '530AB'; H['2026-11-06'] = '530AB'; H['2026-10-30'] = '529B';
+    H['2026-11-14'] = '527B'; H['2026-11-07'] = '병가'; H['2026-10-31'] = '527B';
+    var valAt = function (d) { return H[d] || ''; };
+    var show = function (o, cells) { var p = splPlan_(o, dates, cells || {}, today, valAt); return dates.filter(function (d) { return p[d]; }).map(function (d) { return d.slice(8) + ':' + (p[d].v || '미정') + '/' + p[d].k; }).join(' '); };
+    return {
+      fix: show(mk({}), { '2026-11-18': '휴가', '2026-11-19': '출근' }),
+      noOff: show(mk({ fixedOff: '' })).split(' ').length + ':' + show(mk({ fixedOff: '조정 백업에 맞혀서' })).split(' ')[0],
+      bk: show(mk({ driverType: '백업', baseRoute: '백업', fixedOff: '일' })),
+      pat: show(mk({ driverType: '백업', baseRoute: '백업', fixedOff: '일', planPat: 'Y' })),
+      none: [show(mk({ title: '운영자' })), show(mk({ status: '정지' })), show(mk({ driverType: '외부용차' })), show(mk({ baseRoute: '용차' }))],
+      leave: show(mk({ workStatus: '퇴사', leaveDate: '2026-11-18' })),
+      off: [splOffDows_('목,금'), splOffDows_('일요일'), splOffDows_('수.목'), splOffDows_('주5일'), splOffDows_('')]
+    };
+  })()`, r.ctx);
+  eq('고정 기사: 오늘부터 빈칸만 · 화수 고정휴무 · 나머지 출근 · 적힌 칸(18 · 19)은 건드리지 않음', out.fix, '16:출근/fix 17:고정휴무/fix 20:출근/fix 21:출근/fix 22:출근/fix');
+  eq('고정휴무 없음 = 전부 출근(7일) · 요일로 안 적었으면 미정', out.noOff, '7:16:미정/tbd');
+  eq('백업: 고정휴무 요일만 예정 · 나머지 미정', out.bk, '16:미정/tbd 17:미정/tbd 18:미정/tbd 19:미정/tbd 20:미정/tbd 21:미정/tbd 22:고정휴무/fix');
+  eq('패턴 스위치: 3주 같은 월(노선 · 대괄호 뺌) · 목(휴무)만 예정 / 다른 주 · 병가 낀 요일은 미정', out.pat, '16:강서1 527B/pat 17:미정/tbd 18:미정/tbd 19:휴무/pat 20:미정/tbd 21:미정/tbd 22:고정휴무/fix');
+  eq('직함자 · 정지 · 외부용차 · 용차 노선은 예정 없음', out.none, ['', '', '', '']);
+  eq('퇴사: 퇴사일 다음 날부터 예정 없음', out.leave, '16:출근/fix 17:고정휴무/fix 18:고정휴무/fix');
+  eq('고정휴무일 읽기', out.off, [[4, 5], [0], [3, 4], null, []]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
