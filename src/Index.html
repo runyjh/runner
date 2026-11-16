@@ -2528,8 +2528,12 @@
   let ntList = [], ntAt = 0, ntTok = '';
   const ntOpen = new Set(); // 목록에서 펼친 공지
   const ntMem = {}; // 저장소가 막힌 브라우저(시크릿 창 등)에서는 이번 화면 동안만 기억
-  const ntGet = (k) => { try { const v = localStorage.getItem(k); if (v) return JSON.parse(v); } catch (e) {} return (ntMem[k] || []).slice(); };
-  const ntPut = (k, v) => { ntMem[k] = v.slice(-200); try { localStorage.setItem(k, JSON.stringify(ntMem[k])); } catch (e) {} };
+  // 공지를 봤는지 · 중요 공지 팝업을 봤는지는 계정별로 기억 (한 기기에서 계정을 바꿔도 계정마다 한 번씩 뜨게). 예전 기록(계정 구분 없음)은 처음 읽는 계정이 넘겨받는다
+  const ntUk = (k) => { try { const u = JSON.parse(store.get(USER) || '{}') || {}; return k + '.' + String(u.loginId || '').toLowerCase(); } catch (e) { return k + '.'; } };
+  const ntGet = (k0) => { const k = ntUk(k0);
+    try { let v = localStorage.getItem(k); if (!v) { v = localStorage.getItem(k0); if (v) { localStorage.setItem(k, v); localStorage.removeItem(k0); } } if (v) return JSON.parse(v); } catch (e) {}
+    return (ntMem[k] || []).slice(); };
+  const ntPut = (k0, v) => { const k = ntUk(k0); ntMem[k] = v.slice(-200); try { localStorage.setItem(k, JSON.stringify(ntMem[k])); } catch (e) {} };
   const ntKey = (n) => n.id + '|' + (n.updatedAt || '');
   const ntDate = (d) => { const p = String(d || '').split('-'); return p.length >= 3 ? (+p[1]) + '/' + (+p[2].slice(0, 2)) : ''; };
   function loadNotices(force) {
