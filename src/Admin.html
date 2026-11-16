@@ -3592,7 +3592,11 @@
   const fld = (key, label, val, extra) => '<div class="field' + (extra && extra.full ? ' full' : '') + '"><label class="lb">' + label + '</label>' +
     (extra && extra.select ? '<select class="inp" data-k="' + key + '">' + opt(extra.select, val) + '</select>'
       : extra && extra.area ? '<textarea class="inp" data-k="' + key + '">' + esc(val) + '</textarea>'
-      : '<input class="inp" data-k="' + key + '" value="' + esc(val) + '"' + (extra && extra.type ? ' type="' + extra.type + '"' : '') + '>') + '</div>';
+      : '<input class="inp" data-k="' + key + '" value="' + esc(val) + '"' + (extra && extra.type ? ' type="' + extra.type + '"' : '') + (extra && extra.list ? ' list="' + extra.list + '" placeholder="' + esc(extra.ph || '') + '"' : '') + '>') + '</div>';
+  // 국적 · 체류자격 (외국인 기사) — 고르거나 직접 입력
+  const NV_LISTS = '<datalist id="dl-nation">' + ['대한민국', '중국', '베트남', '우즈베키스탄', '카자흐스탄', '러시아', '몽골', '필리핀', '태국', '캄보디아', '네팔', '미얀마', '인도네시아', '스리랑카'].map((x) => '<option value="' + x + '">').join('') + '</datalist>' +
+    '<datalist id="dl-visa">' + [['F-4', '재외동포'], ['F-5', '영주'], ['F-6', '결혼이민'], ['F-2', '거주'], ['H-2', '방문취업'], ['E-9', '비전문취업'], ['E-7', '특정활동'], ['D-2', '유학'], ['G-1', '기타']].map((x) => '<option value="' + x[0] + '">' + x[0] + ' ' + x[1] + '</option>').join('') + '</datalist>';
+  const nvFlds = (d, mk) => NV_LISTS + mk('nation', '국적', d.nation, { list: 'dl-nation', ph: '대한민국 · 중국 · 베트남 …' }) + mk('visa', '체류자격', d.visa, { list: 'dl-visa', ph: '외국인만 (예: F-4) · 내국인은 비움' });
   const sens = (key, label, d) => '<div class="field' + (key === 'rrn' ? ' full' : '') + '"><label class="lb">' + label + '</label><div class="sens">' +
     '<input class="inp" data-s="' + key + '" value="' + esc(d[key]) + '" readonly placeholder="미등록">' +
     (d.has[key] ? '<button type="button" class="btn sm ghost" data-reveal="' + key + '">전체 보기</button>' : '') +
@@ -3646,7 +3650,7 @@
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         fld('name', '이름', d.name) + fld('loginId', '쿠팡플렉스 아이디 (앱 로그인용)', d.loginId) +
         fld('phone', '연락처', d.phone) + '<div class="field"><label class="lb">생년월일 (주민번호에서 자동)</label><input class="inp" value="' + esc(d.birthDate) + '" readonly></div>' +
-        sens('rrn', '주민등록번호', d) + fld('address', '주소(주민등록상)', d.address, { full: true }) +
+        sens('rrn', '주민등록번호', d) + fld('address', '주소(주민등록상)', d.address, { full: true }) + nvFlds(d, fld) +
       '</div></div>' +
       '<div class="sec"><h4>자격 · 면허</h4><div class="grid2">' +
         fld('qualDate', '화물운송 종사자격 취득일', d.qualDate, { type: 'date' }) + fld('qualNo', '화물운송 종사자격증 번호', d.qualNo) +
@@ -3967,7 +3971,7 @@
       '<div class="sec"><h4>기본 정보</h4><div class="grid2">' +
         inp('name', '이름', { req: true }) + inp('phone', '연락처') +
         inp('loginId', '쿠팡플렉스 아이디 (앱 로그인용, 선택)') + inp('tempPw', '앱 임시 비밀번호 (선택, 영문+숫자 8자 이상)') +
-        inp('rrn', '주민등록번호', { full: true }) + inp('address', '주소(주민등록상)', { full: true }) +
+        inp('rrn', '주민등록번호', { full: true }) + inp('address', '주소(주민등록상)', { full: true }) + nvFlds({}, (k, l, v, x) => inp(k, l, x)) +
       '</div></div>' +
       '<div class="sec"><h4>자격 · 면허</h4><div class="grid2">' +
         inp('qualDate', '화물운송 종사자격 취득일', { type: 'date' }) + inp('qualNo', '화물운송 종사자격증 번호') +

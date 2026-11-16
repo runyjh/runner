@@ -51,7 +51,7 @@ const D = {
   subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감',
   enr: '입직신고', enrAt: '입직신고일', // 산재·고용(노무제공자) 입직신고: 완료 / 대상 / 빈칸(토탈서비스 양식으로 자동 판단)
   driverType: '단가코드', driverCode: '기사코드', title: '직함',
-  birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)',
+  birthDate: '생년월일', rrn: '주민등록번호', address: '주소(주민등록상)', nation: '국적', visa: '체류자격',
   qualDate: '화물운송 종사자격 취득일', qualNo: '화물운송 종사자격증 번호',
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
   carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
@@ -73,7 +73,7 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
-  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId', 'enr', 'enrAt'];
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId', 'enr', 'enrAt', 'nation', 'visa'];
 // 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -1760,7 +1760,7 @@ function fixAdminRow_(sh, c, o) {
 
 // ───────────────────────── 관리자 : 기사 정보관리 ─────────────────────────
 const D_EDIT_LABEL = {
-  enr: '입직신고', enrAt: '입직신고일',
+  enr: '입직신고', enrAt: '입직신고일', nation: '국적', visa: '체류자격',
   loginId: '쿠팡플렉스 아이디', name: '이름', phone: '연락처', status: '상태', address: '주소',
   driverType: '단가코드', driverCode: '기사코드', title: '직함',
   qualDate: '자격 취득일', qualNo: '자격증 번호', licenseType: '면허 종류', carName: '차명', carYear: '연식',
@@ -1847,7 +1847,7 @@ function qualFmt_(v) {
 function detailOf_(o) {
   const out = listRow_(o);
   ['birthDate', 'address', 'qualDate', 'qualNo', 'licenseType', 'maxLoad', 'bankName', 'accountHolder',
-    'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail', 'extraAssign', 'tiOn', 'enr', 'enrAt',
+    'bizNo', 'bizName', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'bizEmail', 'extraAssign', 'tiOn', 'enr', 'enrAt', 'nation', 'visa',
     'updatedAt', 'pwChangedAt', 'docFolder'].forEach(function (k) { out[k] = o[k]; });
   out.qualNo = qualFmt_(o.qualNo);
   out.rrn = o.rrn; out.licenseNo = o.licenseNo; out.account = o.account;
@@ -2229,6 +2229,8 @@ function driverFields_(changes, o) {
       }
       case 'memo': f.memo = opt(v, '관리자 메모', 2000); break;
       case 'address': f.address = opt(v, '주소', 200); break;
+      case 'nation': f.nation = opt(v, '국적', 40); break;
+      case 'visa': f.visa = opt(v, '체류자격', 40).toUpperCase(); break; // 외국인: F-4 · F-5 · E-9 … (내국인은 비움)
       case 'qualNo': f.qualNo = qualFmt_(opt(v, '자격증 번호', 30)); break;
       case 'carName': f.carName = opt(v, '차명', 40); break;
       case 'carNo': f.carNo = opt(v, '차량번호', 20).replace(/\s/g, ''); break;
