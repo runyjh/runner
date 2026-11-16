@@ -5217,8 +5217,10 @@
   /** 공단 업로드 엑셀: 양식이 있으면 그 머리글 순서, 없으면 신고서 항목 순서 */
   function irExport(accts) {
     const want = (accts && accts.length ? accts : IR.rows.filter((x) => irTarget(x) && !x.done).map((x) => x.acct));
-    const list = IR.rows.filter((x) => want.includes(x.acct) && irTarget(x));
-    if (!list.length) return toast(accts && accts.length ? '고른 기사 중 신고 대상이 없습니다.' : '미신고 대상이 없습니다. (다시 받으려면 기사를 골라 \'고른 기사만 엑셀\')');
+    const list0 = IR.rows.filter((x) => want.includes(x.acct) && irTarget(x));
+    // 입직신고 대상(공단 양식에 이름 없음 · 직접 '대상'으로 고름)은 월보수액신고 엑셀에서 뺌 — 자격이 없어 업로드가 안 됨 · 입직신고(자격취득신고) 먼저
+    const noEnr = list0.filter((x) => irEnrEff(x) === false), list = list0.filter((x) => irEnrEff(x) !== false);
+    if (!list.length) return toast(noEnr.length ? '엑셀에 넣을 기사가 없습니다 — 입직신고 대상 ' + noEnr.length + '명(' + noEnr.slice(0, 6).map((x) => x.name).join(', ') + ')은 입직신고를 먼저 해야 해서 뺐습니다.' : accts && accts.length ? '고른 기사 중 신고 대상이 없습니다.' : '미신고 대상이 없습니다. (다시 받으려면 기사를 골라 \'고른 기사만 엑셀\')');
     const over = {}; list.forEach((x) => { over[x.acct] = { start: x.start }; });
     const b = $('#irXlsx'); b.disabled = true;
     api('adm_insRepExport', IR.month, list.map((x) => x.acct), over).then((r) => {
@@ -5239,7 +5241,7 @@
       const blob = ssXlsx(out, { sheet: (cfg.tpl && cfg.tpl.sheet) || '노무제공자 월보수액', head: top.length, boxed: true, merges: merges, title: merges.map((m) => m.r),
         widths: keys.map((k) => ({ kind: 11, name: 14, rrn: 18, job: 11, start: 13, bosu: 14 }[k] || 12)), textCols: keys.map((k) => k !== 'bosu' && k !== 'seq') });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '노무제공자_월보수액신고_' + ym + '_' + r.rows.length + '명.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      toast(r.rows.length + '명 엑셀을 받았습니다.' + (r.noRrn.length ? ' 주민등록번호 없음: ' + r.noRrn.join(', ') : ''));
+      toast(r.rows.length + '명 엑셀을 받았습니다.' + (noEnr.length ? ' · 입직신고 대상 ' + noEnr.length + '명은 뺐습니다 (' + noEnr.slice(0, 6).map((x) => x.name).join(', ') + (noEnr.length > 6 ? ' 외' : '') + ' — 입직신고 먼저)' : '') + (r.noRrn.length ? ' · 주민등록번호 없음: ' + r.noRrn.join(', ') : ''));
       // 엑셀에 들어간 미신고 기사 → 신고 완료로 일괄 전환할지 묻기
       const got = r.rows.map((x) => x.acct), left = IR.rows.filter((x) => got.includes(x.acct) && irTarget(x) && !x.done);
       if (left.length) setTimeout(() => {
