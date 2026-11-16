@@ -56,7 +56,7 @@ const D = {
   licenseNo: '운전면허번호', licenseType: '운전면허 종류',
   carNo: '차량번호', carName: '차명', carYear: '연식', maxLoad: '최대적재량(kg)',
   schCampId: '소속캠프ID', schCamp: '소속캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무',
-  workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', extraAssign: '추가 배정', tiOn: '역발행 대상',
+  workPattern: '근무형태', schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', extraAssign: '추가 배정', tiOn: '역발행 대상', planPat: '예정 패턴 표시',
   // 정산관리: 명의자 세금계산서 정보 (정산 기준인 쿠팡 아이디·단가코드·일시단가는 정산 DB 의 아이디 관리·일시단가 탭)
   bizNo: '사업자등록번호', bizName: '상호', bizEmail: '계산서 이메일', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목',
   bankName: '은행명', account: '계좌번호', accountHolder: '예금주',
@@ -73,7 +73,7 @@ const D = {
 // 코드 업데이트로 새로 생긴 열 중, 비어 있어도 안전한 열은 setup 없이 자동으로 추가한다
 const D_AUTO_ADD = ['pwMustChange', 'carNo', 'driverType', 'driverCode', 'schCampId', 'schCamp', 'baseRoute', 'fixedOff', 'extraOff', 'workPattern', 'schMemo', 'schOrder',
   'bizNo', 'bizName', 'bizEmail', 'bizCeo', 'bizAddr', 'bizType', 'bizItem', 'title', 'backupArea', 'workStatus', 'leaveDate', 'subId1', 'subId2',
-  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'workerId', 'enr', 'enrAt', 'nation', 'visa', 'docAlien'];
+  'subType1', 'subType2', 'stlMode', 'insEx', 'fbCut', 'extraAssign', 'tiOn', 'planPat', 'workerId', 'enr', 'enrAt', 'nation', 'visa', 'docAlien'];
 // 단가코드 (고정/백업/품앗이/외부용차 → 노선관리 고정단가/백업단가/품앗이단가/외부용차단가)
 const DTYPES = ['고정', '백업', '품앗이', '외부용차'];
 // 직함 = 단가와 무관한 러너 내부 직책. 대신 뛴 건은 기사 정산서에 이름이 안 보이고, 앞으로 권한 부여에 쓴다
@@ -1773,7 +1773,7 @@ const D_EDIT_LABEL = {
   rrn: '주민등록번호', licenseNo: '운전면허번호', account: '계좌번호',
   schCampId: '소속 캠프', baseRoute: '기본노선', fixedOff: '고정휴무일', extraOff: '추가휴무', workPattern: '근무형태',
   schMemo: '스케줄 메모', schOrder: '스케줄 순서', backupArea: '백업 범위', workStatus: '근무상태', leaveDate: '퇴사일', subId1: '서브아이디1', subId2: '서브아이디2',
-  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감', extraAssign: '추가 배정', tiOn: '세금계산서 역발행 대상',
+  subType1: '서브아이디1 단가코드', subType2: '서브아이디2 단가코드', stlMode: '정산 방식', insEx: '산재·고용 제외', fbCut: '프레시백 차감', extraAssign: '추가 배정', tiOn: '세금계산서 역발행 대상', planPat: '예정 패턴 표시',
   bizNo: '사업자등록번호', bizName: '상호', bizCeo: '사업자 대표자', bizAddr: '사업장 주소', bizType: '업태', bizItem: '종목', bizEmail: '계산서 이메일'
 };
 const SENSITIVE = { rrn: 'rrnEnc', licenseNo: 'licenseNoEnc', account: 'accountEnc' };
@@ -2250,6 +2250,7 @@ function driverFields_(changes, o) {
       case 'bizName': f.bizName = opt(v, '상호', 100); break;
       case 'enr': f.enr = str_(v); if (f.enr && ['완료', '대상', '신고중'].indexOf(f.enr) < 0) fail_('입직신고는 완료 / 신고중 / 대상 중에서 골라 주세요.'); break;
       case 'enrAt': { const d = str_(v); if (d && !parseYmd_(d)) fail_('입직신고일을 확인해 주세요.'); f.enrAt = d ? ymd_(parseYmd_(d)) : ''; break; }
+      case 'planPat': f.planPat = /^(y|yes|예|true|1)$/i.test(str_(v)) ? 'Y' : ''; break; // Y = 기사앱 한 달 달력 빈칸에 최근 3주 같은 요일 패턴을 '예정' 으로 보여 줌 (SchPlan.gs)
       case 'tiOn': f.tiOn = /^(y|yes|예|역발행|true|1)$/i.test(str_(v)) ? 'Y' : ''; break; // Y = 기사 앱 정산서에 역발행 세금계산서를 보여 줌
       case 'extraAssign': f.extraAssign = extraAssignNorm_(v, changes.schCampId !== undefined ? str_(changes.schCampId) : o.schCampId); break;
       case 'bizCeo': f.bizCeo = opt(v, '대표자', 50); break;
@@ -4988,7 +4989,7 @@ function schDriver_(o) {
   return {
     id: o.id, name: o.name, loginId: o.loginId, type: o.driverType, code: o.driverCode, status: o.status, title: titleOf_(o),
     campId: o.schCampId, camp: o.schCamp, baseRoute: o.baseRoute, fixedOff: o.fixedOff, extraOff: o.extraOff,
-    workPattern: o.workPattern, memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
+    workPattern: o.workPattern, planPat: str_(o.planPat) === 'Y' ? 'Y' : '', memo: o.schMemo, order: o.schOrder, carNo: o.carNo, backupArea: o.backupArea || '',
     workStatus: o.workStatus || '', leaveDate: schLeaveFrom_(o),
     subIds: [o.subId1, o.subId2].map(function (x) { return str_(x); }).filter(Boolean), // 칸 편집기 '서브아이디 업무등록' 추천용
     workerId: str_(o.workerId), alias: [],
@@ -5564,13 +5565,13 @@ function api_mySchedule(token, month) {
     const out = { ok: true, today: todayText_(), month: ym, dates: dates, cells: {}, holidays: {} };
     dates.forEach(function (d) { if (HOLIDAYS[d]) out.holidays[d] = HOLIDAYS[d]; });
     // 같은 근무자 연결: 명의 계정으로 들어와도 근무자 줄(스케줄 한 줄)을 본다 · 그날 쓸 아이디(서브 · 다른 명의)를 앱이 알 수 있게 내려 준다
-    let rowId = String(s.d), wkCur = null;
+    let rowId = String(s.d), wkCur = null, wkObj = null, rowVals = null, hh = null;
     out.subIds = []; out.alias = [];
     try {
       const allD = readAll_(SH.DRIVERS), lk = schLinkMap_(allD);
       const meO = allD.filter(function (o) { return o.id === String(s.d); })[0], wk = lk.workerOf[String(s.d)] || meO;
       if (wk) {
-        rowId = String(wk.id);
+        rowId = String(wk.id); wkObj = wk;
         out.baseRoute = str_(wk.baseRoute); out.loginId = str_(wk.loginId);
         wkCur = { campId: str_(wk.schCampId), camp: str_(wk.schCamp), baseRoute: str_(wk.baseRoute) };
         out.subIds = schSubIdsOf_(wk); out.alias = lk.aliasOf[wk.id] || [];
@@ -5597,14 +5598,15 @@ function api_mySchedule(token, month) {
     // 품앗이: 내가 뛰는 일감(수행)·맡긴 일감(맡김)·지원 중인 일감
     try { out.pumasi = pmScheduleOf_(String(s.d), dates); } catch (e) { out.pumasi = {}; }
     stg_('pm');
-    const fsW = function (o) { return o; };
+    const fsW = function (o) { splAttach_(o, wkObj, rowId, rowVals, hh); return o; }; // 빈칸 '예정' 표시 (SchPlan.gs)
     if (!props_().SCH_DB_ID || !schSS_().getSheetByName(SCH.SHEET)) return fsW(out);
-    const h = schHeader_();
+    const h = schHeader_(); hh = h;
     const cols = dates.map(function (d) { return h.dates[d]; }).filter(function (c) { return c !== undefined; });
     if (!cols.length) return fsW(out);
     const c0 = Math.min.apply(null, cols), c1 = Math.max.apply(null, cols);
     // 내 줄 찾기: 지난번에 찾은 줄 번호를 기억해 두고, 그 줄의 행ID 가 그대로면 한 번만 읽는다 (줄이 밀렸으면 예전처럼 다시 찾음)
     const sh0 = schSheet_(), idCol = h.fixed['행ID'], rk = 'schrow:' + rowId, takeRow = function (vals) {
+      rowVals = vals;
       dates.forEach(function (d) { const c = h.dates[d]; if (c !== undefined) { const v = str_(vals[c]); if (v) out.cells[d] = v; } });
     };
     let done = false;
