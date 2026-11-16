@@ -649,6 +649,16 @@ scenario('기사앱 미리 보기', null, function (r) {
   eq('모든 기사앱 함수가 읽기/막음 중 하나로 분류됨 (새 함수를 만들면 Preview.gs 에 적어야 함)', [all.filter(function (x) { return cls.indexOf(x) < 0; }), cls.filter(function (x) { return all.indexOf(x) < 0; }), both], [[], [], []]);
 });
 
+// 32) 스케줄 변경 알림 묶기: 오늘·내일은 바로 · 그 뒤 날짜는 마지막 수정 뒤 10분 지나야
+scenario('스케줄 변경 알림 묶기', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    toMs_ = function (v) { return v ? Number(v) : 0; };
+    var now = 1000000000, f = function (key, ago) { return seenChangeDue_({ key: key, at: ago == null ? '' : String(now - ago) }, '2026-11-17', now); };
+    return [f('2026-11-16', 0), f('2026-11-17', 1000), f('2026-11-18', 1000), f('2026-11-18', 599000), f('2026-11-18', 600000), f('2026-11-25', null)];
+  })()`, r.ctx);
+  eq('오늘 · 내일 바로 / 모레 이후는 10분 조용해야 / 시각 없는 옛 기록은 바로', out, [true, true, false, false, true, true]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');

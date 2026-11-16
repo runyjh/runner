@@ -51,11 +51,22 @@ function api_seen(token, items) {
         add.push(n); have[k] = n;
       });
       seenAppend_(add);
-      const changes = mine.filter(function (o) { return o.kind === SEEN_KIND.SCH && !o.ackAt && o.key >= today; }).map(seenChangeView_)
+      const tom = schAddDays_(today, 1), nowMs = Date.now();
+      const changes = mine.filter(function (o) { return o.kind === SEEN_KIND.SCH && !o.ackAt && o.key >= today && seenChangeDue_(o, tom, nowMs); }).map(seenChangeView_)
         .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
       return { ok: true, changes: changes, today: today };
     } finally { lock.releaseLock(); }
   });
+}
+/**
+ * 스케줄 변경을 지금 기사에게 알릴 때인지: 오늘 · 내일(PDD) 변경은 바로, 그 뒤 날짜는 마지막으로 고친 뒤 10분 동안 더 안 바뀌었을 때
+ *  (스케줄을 짜는 동안 앱을 열어 둔 기사에게 확인 창이 여러 번 뜨지 않게 — 바뀐 값 자체는 스케줄 화면에 바로 보인다)
+ */
+const SEEN_QUIET_MS = 600000;
+function seenChangeDue_(o, tomorrow, nowMs) {
+  if (str_(o.key) <= tomorrow) return true;
+  const t = toMs_(o.at);
+  return !t || nowMs - t >= SEEN_QUIET_MS;
 }
 /** 기사 앱: 스케줄 변경 [확인했습니다] — dates 가 없으면 아직 확인 안 한 것 전부 */
 function api_seenAck(token, dates) {
