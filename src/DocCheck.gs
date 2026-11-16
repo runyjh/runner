@@ -345,7 +345,7 @@ function adm_insEnrSet(token, driverIds, value, date) {
   return run_(function () {
     const a = requireAdmin_(token);
     value = str_(value);
-    if (value && ['완료', '대상'].indexOf(value) < 0) fail_('입직신고는 완료 / 대상 중에서 골라 주세요.');
+    if (value && ['완료', '대상', '신고중'].indexOf(value) < 0) fail_('입직신고는 완료 / 신고중 / 대상 중에서 골라 주세요.');
     const ids = (Array.isArray(driverIds) ? driverIds : []).map(str_).filter(function (x, i, l) { return x && l.indexOf(x) === i; }).slice(0, 300);
     if (!ids.length) fail_('기사를 골라 주세요.');
     const d = value === '완료' ? (stlYmd_(date) || todayText_()) : '';
@@ -387,7 +387,7 @@ function adm_insEnrSync(token, items) {
     try {
       items.forEach(function (it) {
         const id = str_(it && it.driverId), v = str_(it && it.enr);
-        if (!id || ['완료', '대상'].indexOf(v) < 0) return;
+        if (!id || ['완료', '대상', '신고중'].indexOf(v) < 0) return;
         const o = driverById_(id); if (!o) return;
         const at = v === '완료' ? (stlYmd_(it.enrAt) || str_(o.enrAt) || todayText_()) : '';
         if (str_(o.enr) === v && str_(o.enrAt) === at) return; // 이미 같음

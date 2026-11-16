@@ -2241,7 +2241,7 @@ function driverFields_(changes, o) {
         f.bizNo = d ? d.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3') : ''; break;
       }
       case 'bizName': f.bizName = opt(v, '상호', 100); break;
-      case 'enr': f.enr = str_(v); if (f.enr && ['완료', '대상'].indexOf(f.enr) < 0) fail_('입직신고는 완료 / 대상 중에서 골라 주세요.'); break;
+      case 'enr': f.enr = str_(v); if (f.enr && ['완료', '대상', '신고중'].indexOf(f.enr) < 0) fail_('입직신고는 완료 / 신고중 / 대상 중에서 골라 주세요.'); break;
       case 'enrAt': { const d = str_(v); if (d && !parseYmd_(d)) fail_('입직신고일을 확인해 주세요.'); f.enrAt = d ? ymd_(parseYmd_(d)) : ''; break; }
       case 'tiOn': f.tiOn = /^(y|yes|예|역발행|true|1)$/i.test(str_(v)) ? 'Y' : ''; break; // Y = 기사 앱 정산서에 역발행 세금계산서를 보여 줌
       case 'extraAssign': f.extraAssign = extraAssignNorm_(v, changes.schCampId !== undefined ? str_(changes.schCampId) : o.schCampId); break;
