@@ -5004,17 +5004,30 @@
     if (c.st === 'ex') { if (confirm(d.name + ' · ' + dMon(m) + '분\n\n제외를 풀고 다시 신고 대상으로 둘까요?')) iyMark([{ d, m, c }], 'free'); return; }
     const on = c.st !== 'done';
     if (!on && !confirm(d.name + ' · ' + dMon(m) + '분\n\n신고 완료를 미신고로 되돌릴까요?')) return;
-    const prev = { st: c.st, date: c.date };
-    IY.keep.add(acct); c.busy = true; renderInsYear();
-    const date = on ? (c.date || dToday()) : '';
-    api('adm_insRepSet', m, [{ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: on, date: date, memo: c.memo || '' }]).then((res) => {
-      c.busy = false;
-      if (!res.ok) { Object.assign(c, prev); renderInsYear(); return toast(res.msg); }
-      const r = IY.info;
-      c.st = on ? 'done' : (r.from && m < r.from ? 'skip' : (r.today > (r.dues[m] || '') ? 'no' : 'wait')); c.date = date;
-      if (IR.month === m) IR.rows = [];
-      renderInsYear(); toast(d.name + ' ' + dMon(m) + '분 ' + (on ? '신고 완료로 체크했습니다.' : '미신고로 바꿨습니다.'));
-    }).catch(() => { c.busy = false; Object.assign(c, prev); renderInsYear(); });
+    // 누르면 바로 화면에 반영하고, 잇달아 누른 칸은 모아서 한 번에 저장한다 (칸마다 따로 저장하면 서로 기다리느라 느려지고 저장 충돌이 남)
+    const prev = { st: c.st, date: c.date }, r = IY.info, date = on ? (c.date || dToday()) : '';
+    IY.keep.add(acct);
+    c.st = on ? 'done' : (r.from && m < r.from ? 'skip' : (r.today > (r.dues[m] || '') ? 'no' : 'wait')); c.date = date;
+    const key = acct + '|' + m, old = IYQ.wait.get(key);
+    IYQ.wait.set(key, { d, m, c, on, date, prev: old ? old.prev : prev });
+    renderInsYear(); iyFlushSoon();
+  }
+  const IYQ = { wait: new Map(), timer: 0, busy: false };
+  function iyFlushSoon() { clearTimeout(IYQ.timer); IYQ.timer = setTimeout(iyFlush, 600); }
+  function iyFlush() {
+    if (IYQ.busy) return iyFlushSoon(); // 앞 저장이 끝난 뒤에 (한 번에 하나씩)
+    const tg = [...IYQ.wait.values()].filter((x) => !(x.prev.st === x.c.st && x.prev.date === x.c.date)).slice(0, 400); // 눌렀다 되돌린 칸은 보낼 것 없음
+    IYQ.wait.clear();
+    if (!tg.length) return;
+    const by = {};
+    tg.forEach(({ d, m, c, on, date }) => { (by[m] = by[m] || []).push({ acct: d.acct, driverId: d.driverId, name: d.name, bosu: c.bosu, san: c.sanOn, goy: c.goyOn, start: c.start, done: on, date: date, memo: c.memo || '' }); });
+    const undo = (msg) => { tg.forEach((x) => { if (!IYQ.wait.has(x.d.acct + '|' + x.m)) Object.assign(x.c, x.prev); }); renderInsYear(); toast(msg); };
+    IYQ.busy = true;
+    api('adm_insRepSetMany', Object.keys(by).map((m) => ({ month: m, list: by[m] }))).then((res) => {
+      if (!res.ok) return undo(res.msg);
+      if (tg.some((x) => x.m === IR.month)) IR.rows = [];
+      toast(tg.length === 1 ? tg[0].d.name + ' ' + dMon(tg[0].m) + '분 ' + (tg[0].on ? '신고 완료로 체크했습니다.' : '미신고로 바꿨습니다.') : tg.length + '칸을 저장했습니다.');
+    }).catch(() => undo('저장하지 못했습니다. 다시 눌러 주세요.')).finally(() => { IYQ.busy = false; if (IYQ.wait.size) iyFlushSoon(); });
   }
 
   /** 칸 상태 바꾸기: to = 'ex' 제외 · 'free' 제외 풀기 (미신고/신고 전으로) */

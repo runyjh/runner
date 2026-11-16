@@ -705,6 +705,27 @@ scenario('기사앱 빈칸 예정', null, function (r) {
   } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 같은 노선 품앗이 합치기 (실행 오류) ' + (e && e.message)); }
 })();
 
+// 35) 산재/고용 연간 표 체크: 잇달아 누른 칸을 모아 한 번에 저장 · 눌렀다 되돌린 칸은 안 보냄 · 실패하면 화면 되돌림 · 저장 중 누른 칸은 다음 묶음으로
+(function () {
+  try {
+    const html = fs.readFileSync(path.join(SRC, 'Admin.html'), 'utf8'), i = html.indexOf('  function iyToggle('), j = html.indexOf("  /** 칸 상태 바꾸기: to = 'ex'");
+    const cell = function () { return { st: 'no', date: '', bosu: 1, sanOn: true, goyOn: true, start: '', memo: '' }; };
+    const box = { calls: [], timers: [], toasts: [], res: [], IR: { month: '2026-10', rows: [1] }, confirm: function () { return true; }, renderInsYear: function () {}, toast: function (m) { box.toasts.push(m); },
+      dToday: function () { return '2026-11-16'; }, dMon: function (m) { return m; }, setTimeout: function (f) { box.timers.push(f); return box.timers.length; }, clearTimeout: function (n) { if (n) box.timers[n - 1] = null; },
+      IY: { keep: new Set(), info: { from: '', today: '2026-11-16', dues: {}, drivers: [{ acct: 'a', driverId: 'd1', name: '가', cells: { '2026-09': cell(), '2026-10': cell() } }, { acct: 'b', driverId: 'd2', name: '나', cells: { '2026-10': cell() } }] } },
+      api: function (fn, items) { box.calls.push(fn + ':' + items.map(function (it) { return it.month + '=' + it.list.map(function (x) { return x.name + (x.done ? '+' : '-'); }).join(''); }).join(' ')); var h = {}; box.res.push(function (v) { try { h.t && h.t(v); } catch (e) { h.c && h.c(e); } h.f && h.f(); }); return { then: function (f) { h.t = f; return this; }, catch: function (f) { h.c = f; return this; }, finally: function (f) { h.f = f; return this; } }; } };
+    vm.createContext(box); vm.runInContext(html.slice(i, j), box);
+    const run = function () { const t = box.timers; box.timers = []; t.forEach(function (f) { if (f) f(); }); }, st = function () { return box.IY.info.drivers.map(function (d) { return Object.keys(d.cells).map(function (m) { return d.cells[m].st; }).join(','); }).join('|'); };
+    box.iyToggle('a', '2026-09'); box.iyToggle('a', '2026-10'); box.iyToggle('b', '2026-10'); box.iyToggle('b', '2026-10'); // 나 는 눌렀다 되돌림
+    const shown = st(), before = box.calls.length; run();
+    box.iyToggle('b', '2026-10'); run(); // 저장 중에 누름 → 아직 안 보냄
+    const mid = box.calls.slice();
+    box.res.shift()({ ok: true }); run();
+    const second = box.calls.slice(); box.res.shift()({ ok: false, msg: 'x' });
+    eq('연간 표 체크 묶어 저장', [shown, before, mid, second, st(), box.toasts], ['done,done|no', 0, ['adm_insRepSetMany:2026-09=가+ 2026-10=가+'], ['adm_insRepSetMany:2026-09=가+ 2026-10=가+', 'adm_insRepSetMany:2026-10=나+'], 'done,done|no', ['2칸을 저장했습니다.', 'x']]);
+  } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 연간 표 체크 묶어 저장 (실행 오류) ' + (e && e.message)); }
+})();
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
