@@ -1215,7 +1215,8 @@ function api_login(loginId, password, auto) {
     if (o.status !== ST.ACTIVE) fail_('사용이 중지된 계정입니다. 관리자에게 문의해 주세요.');
 
     const s = createSession_(o.id, auto === true);
-    return { ok: true, token: s.token, expiresAt: s.expiresAt, mustChange: mustChange_(o), user: { name: o.name, loginId: id, title: titleOf_(o) }, slipClose: stlLastClose_() };
+    return { ok: true, token: s.token, expiresAt: s.expiresAt, mustChange: mustChange_(o), user: { name: o.name, loginId: id, title: titleOf_(o) }, slipClose: stlLastClose_(),
+      menuOff: (function () { try { return appMenuOffFor_(o.id); } catch (e) { return []; } })() }; // 로그인 직후에도 끈 메뉴를 바로 맞춤 (앞서 쓰던 기사의 표시가 남지 않게)
   });
 }
 
