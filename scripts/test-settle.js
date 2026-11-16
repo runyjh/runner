@@ -690,7 +690,11 @@ scenario('기사앱 빈칸 예정', null, function (r) {
   eq('고정휴무일 읽기', out.off, [[4, 5], [0], [3, 4], null, []]);
 });
 
+<<<<<<< Updated upstream
 // 34) 기사앱 달력: 내 칸 노선 = 확정 품앗이(수행) 노선이면 칩 하나만 (같은 노선이 두 번 보이지 않게)
+=======
+// 34) 기사앱 달력: 내 칸 노선 = 확정 품앗이(수행) 노선이면 품앗이 칩은 그리지 않고 🤝 아이콘만 (같은 노선이 두 번 보이지 않게)
+>>>>>>> Stashed changes
 (function () {
   try {
     const html = fs.readFileSync(path.join(SRC, 'Index.html'), 'utf8'), i = html.indexOf('  function pmOfDay('), j = html.indexOf('  function pmDoneRow(');
@@ -700,6 +704,11 @@ scenario('기사앱 빈칸 예정', null, function (r) {
     const job = function (o) { return [Object.assign({ id: 'j', role: '수행', status: '확정', camp: '인천8캠프', route: '103AB' }, o)]; };
     eq('같은 노선 품앗이 합치기', [f(job({}), { routes: '103AB', camp: '' }), f(job({}), { routes: '103AB', camp: '인천8' }), f(job({}), { routes: '122CD', camp: '' }), f(job({}), { routes: '103AB', camp: '강서1' }),
       f(job({ status: '신청' }), { routes: '103AB' }), f(job({ role: '맡김' }), { routes: '103AB' }), f(job({}), null), f(job({}), { routes: '', raw: '휴무' })], [true, true, false, false, false, false, false, false]);
+<<<<<<< Updated upstream
+=======
+    const cell = function (pc) { box.R = { pumasi: { d: job({}) } }; box.PC = pc; return vm.runInContext("pmCell(R, 'd', PC).html", box); };
+    eq('같은 노선이면 품앗이 칩을 또 그리지 않음 (아이콘만) · 다른 노선 · 휴무 칸이면 칩 표시', [cell({ routes: '103AB' }), /103AB/.test(cell({ routes: '122CD' })), /103AB/.test(cell(null))], ['', true, true]);
+>>>>>>> Stashed changes
   } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 같은 노선 품앗이 합치기 (실행 오류) ' + (e && e.message)); }
 })();
 
