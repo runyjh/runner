@@ -5222,6 +5222,7 @@
    * 일반 엑셀(.xlsx): 글자는 sharedStrings, 숫자는 숫자 칸 (공공기관 업로드가 inlineStr 을 못 읽는 경우가 있어서)
    * opt = { sheet, head(머리글 줄 수 · 회색), textCols[ci] = true 면 숫자도 글자로 }
    */
+  window.ssXlsx = (rows, opt) => ssXlsx(rows, opt); // 표 도구(⬇ 엑셀)에서도 씀
   function ssXlsx(rows, opt) {
     opt = opt || {};
     const enc = new TextEncoder(), xe = (v) => String(v).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
@@ -16498,13 +16499,41 @@
       const body = [];
       [...tb.tBodies].forEach((b) => [...b.rows].forEach((r) => {
         if (r.style.display === 'none' || r.classList.contains('sep')) return;
-        body.push([...r.cells].filter(vis).filter((c) => !c.querySelector('input[type=checkbox]')).map((c) => { const f = c.querySelector('input:not([type=checkbox]),select'); return f && !txt(c) ? String(f.value || '') : txt(c); }));
+        if (r.classList.contains('eyd') || r.classList.contains('tk-1')) return; // 연간 보기의 펼친 1년 내역 · 카드 머리줄은 표와 섞지 않음
+        body.push([...r.cells].filter(vis).filter((c) => !c.querySelector('input[type=checkbox]')).map(cellVal));
       }));
       return [head].concat(body);
     }
+    /** 칸 글자: 고르는 칸(select)은 고른 글자, 입력칸은 넣은 값 (나머지 글자와 함께) */
+    const XL_ACT = /^(수정|삭제|하위로|보기|열기|편집|복사|변경|전체 보기|상세|›|✕|×)$/;
+    function cellVal(c) {
+      const acts = [...c.querySelectorAll('button')].filter((b) => b.hasAttribute('data-noxl') || XL_ACT.test(txt(b)));
+      if (!acts.length && !c.querySelector('select, input:not([type=checkbox]), textarea')) return txt(c);
+      const k = c.cloneNode(true);
+      k.querySelectorAll('button').forEach((b) => { if (b.hasAttribute('data-noxl') || XL_ACT.test(txt(b))) b.remove(); }); // 칸 안의 작업 단추 글자는 빼고
+      const other = String(k.textContent || '').replace(/\s+/g, '') !== '' && k.querySelectorAll('select').length < k.childNodes.length;
+      k.querySelectorAll('select').forEach((sel, i) => { const o = c.querySelectorAll('select')[i]; const t = o && o.selectedIndex >= 0 && !(o.value === '' && other && o.options[o.selectedIndex].text.length < 8 && /^(선택|고르기|하위로|—|-)/.test(o.options[o.selectedIndex].text)) ? o.options[o.selectedIndex].text : ''; sel.replaceWith(document.createTextNode(' ' + t + ' ')); });
+      k.querySelectorAll('input:not([type=checkbox]), textarea').forEach((inp, i) => { const o = c.querySelectorAll('input:not([type=checkbox]), textarea')[i]; inp.replaceWith(document.createTextNode(' ' + (o ? o.value : '') + ' ')); });
+      return String(k.textContent || '').replace(/[▲▼]/g, '').replace(/\s+/g, ' ').trim();
+    }
+    /** 엑셀(.xlsx)로: 금액·숫자는 숫자 칸 (쉼표 빼고), 번호·날짜·앞자리 0 은 글자 칸 */
+    function xlsxOf(rows, sheet) {
+      const head = rows[0] || [];
+      const textHead = head.map((h) => /번호|코드|아이디|ID|전화|연락처|주민|사업자|계좌|우편|차량|일자|날짜|일$|월$|기간|시간/i.test(String(h)) && !/금액|합계|단가|수량|건수|원$|보수|공제|납부|세액|공급가/.test(String(h)));
+      const num = (v, ci) => {
+        const t = String(v == null ? '' : v).replace(/[▸▾]/g, '').replace(/\s+/g, ' ').trim(); // 펼치기 표시는 빼고
+        if (textHead[ci] || !t) return t;
+        if (/^-?\d{1,3}(,\d{3})+(\.\d+)?원?$/.test(t) || /^-?(0|[1-9]\d{0,14})(\.\d+)?원?$/.test(t)) { const n = Number(t.replace(/[,원]/g, '')); return isFinite(n) ? n : t; }
+        return t;
+      };
+      const out = [head].concat(rows.slice(1).map((r) => r.map(num)));
+      return window.ssXlsx(out, { sheet: sheet, head: 1, textCols: textHead });
+    }
     function titleOf(tb) {
       const m = tb.closest('.modal'); const h = m ? m.querySelector('.m-top b, h3') : (tb.closest('section') || document).querySelector('.head h2, h2');
-      return (h ? txt(h) : '표').replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
+      let t = '표';
+      if (h) { const k = h.cloneNode(true); k.querySelectorAll('small').forEach((x) => x.remove()); t = String(k.textContent || '').replace(/\s+/g, ' ').trim() || txt(h); } // 제목 옆 작은 글씨(건수 등)는 빼고
+      return t.replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
     }
     function bar(tb, k) {
       const box = tb.closest('.table-wrap, .up-wrap') || tb.parentElement;
@@ -16514,7 +16543,7 @@
         b.innerHTML = '<input class="tk-q" type="search" placeholder="🔍 표 안에서 찾기" aria-label="표 안에서 찾기"><span class="tk-n"></span>' +
           '<span class="tk-sp"></span><div class="tk-cw"><button type="button" class="tk-b tk-cols" title="열 숨기기 · 좌우 순서">☰ 열</button><div class="tk-panel hidden"></div></div>' +
           '<button type="button" class="tk-b tk-card-b" title="휴대폰: 카드로 보기 ↔ 표로 보기">▦ 표로</button>' +
-          '<button type="button" class="tk-b tk-copy" title="보이는 줄을 엑셀에 붙여넣을 수 있게 복사">⧉ 복사</button><button type="button" class="tk-b tk-csv" title="보이는 줄을 엑셀 파일(CSV)로">⬇ 엑셀</button>';
+          '<button type="button" class="tk-b tk-copy" title="보이는 줄을 엑셀에 붙여넣을 수 있게 복사">⧉ 복사</button><button type="button" class="tk-b tk-csv" title="보이는 줄을 엑셀 파일(.xlsx)로">⬇ 엑셀</button>';
         box.parentNode.insertBefore(b, box);
       }
       b._tb = tb; b._k = k;
@@ -16693,10 +16722,13 @@
         return;
       }
       if (e.target.closest('.tk-csv')) {
-        const rows = rowsFor(tb), csv = '﻿' + rows.map((r) => r.map((v) => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v)).join(',')).join('\r\n');
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-        a.download = titleOf(tb) + '_' + ymdLocal(new Date()) + '.csv'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-        toast((rows.length - 1) + '줄을 엑셀(CSV) 파일로 내려받았습니다.');
+        const rows = rowsFor(tb), t = titleOf(tb), sec = tb.closest('section[id^="view-"]');
+        const sub = sec && sec.querySelector('.head h2 small'); // 예: 2026년 10월 · 0/41명 신고 → 파일 이름에 달 붙이기
+        const ym = sub && (txt(sub).match(/(\d{4})년\s*(\d{1,2})월/) || txt(sub).match(/(\d{4})년/));
+        const tag = ym ? '_' + ym[1] + (ym[2] ? '-' + String(ym[2]).padStart(2, '0') : '') : '';
+        const a = document.createElement('a'); a.href = URL.createObjectURL(xlsxOf(rows, t || 'Sheet1'));
+        a.download = t + tag + '_' + ymdLocal(new Date()) + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+        toast((rows.length - 1) + '줄을 엑셀(.xlsx) 파일로 내려받았습니다.');
       }
     });
     document.addEventListener('change', (e) => {
