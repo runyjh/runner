@@ -1774,6 +1774,9 @@
   .smb-mmo { margin: 10px 0 2px; padding: 10px 12px; border-radius: 10px; background: #fff8ec; border: 1px solid #f5d7a8; } .smb-mmo b { display: block; font-size: 13.5px; color: #b45309; margin-bottom: 4px; }
   .smb-mmo p { margin: 3px 0; font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; } .smb-mmo p i { font-style: normal; color: var(--sub); font-size: 12px; }
   .smb-mmo button { border: 0; background: none; color: var(--brand); font: inherit; font-size: 13px; font-weight: 700; padding: 6px 0 0; cursor: pointer; }
+  .al-pv { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; }
+  .al-pv b { font-size: 14px; color: #9a3412; white-space: nowrap; } .al-pv select { width: auto; min-width: 150px; max-width: 100%; flex: 0 1 220px; } .al-pv small { color: var(--sub); font-size: 12px; }
+  .al-row .bt [data-alpv] { white-space: nowrap; }
   a.pv-open { text-decoration: none; display: inline-flex; align-items: center; background: #b45309; border-color: #b45309; color: #fff; }
 </style>
 </head>
@@ -4071,27 +4074,7 @@
     } else if (e.target.id === 'delDrvBtn' && cur) {
       deleteDriver(cur);
     } else if (e.target.id === 'pvBtn' && cur) {
-      // 기사앱 미리 보기: 열쇠를 받은 뒤 PC 는 미리 열어 둔 창으로 보내고, 휴대폰(설치한 앱 · 팝업 차단)은 버튼을 '열기' 링크로 바꿔 한 번 더 누르게 한다
-      //  (휴대폰은 서버 응답을 기다린 뒤에 여는 새 창을 막기 때문 — 직접 누른 링크만 열린다)
-      const b = e.target; if (b.disabled) return;
-      if (!/\/admin\//.test(location.pathname)) return toast('미리 보기는 러너 관리자 주소(깃허브 페이지)에서만 열 수 있습니다.');
-      const phone = document.documentElement.classList.contains('m');
-      let w = null;
-      if (!phone) { try { w = window.open('', 'runnerPreview', 'width=430,height=900'); if (w) w.document.write('<p style="font:15px sans-serif;padding:24px">기사앱 미리 보기를 여는 중…</p>'); } catch (x) { w = null; } }
-      b.disabled = true; const label = b.textContent; b.textContent = '여는 중…';
-      api('adm_previewStart', cur.id).then((r) => {
-        if (!r.ok) { if (w) w.close(); return toast(r.msg); }
-        const url = new URL('../', location.href).href + '#pv=' + r.pv;
-        let opened = false;
-        if (w && !w.closed) { try { w.location.href = url; opened = true; } catch (x) { opened = false; } }
-        if (opened) return toast(r.name + ' 기사앱 미리 보기 (보기 전용 · 10분)');
-        const a = document.createElement('a');
-        a.className = 'btn sm pv-open'; a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '👁 ' + r.name + ' 미리 보기 열기 ›';
-        a.addEventListener('click', () => setTimeout(() => { if (a.parentNode) a.remove(); }, 300)); // 열쇠는 한 번 쓰는 용도 — 누르면 링크를 치움
-        b.insertAdjacentElement('afterend', a);
-        setTimeout(() => { if (a.parentNode) a.remove(); }, 600000);
-        toast('준비됐습니다. [미리 보기 열기]를 눌러 주세요.');
-      }).catch(() => { if (w) w.close(); toast('미리 보기를 열지 못했습니다. 다시 눌러 주세요.'); }).finally(() => { b.disabled = false; b.textContent = label; });
+      pvOpen(cur.id, e.target);
     } else if (e.target.id === 'tempPwBtn' && cur) {
       $('#pwNew').value = ''; $('#pwModal').classList.remove('hidden'); $('#pwNew').focus();
     }
@@ -8099,6 +8082,29 @@
       return loadPerf(true).then(() => { if (!rpViewOn()) switchView('perf'); else { RP.tab = 'wk'; rpRender(); } });
     }).catch(() => {}).finally(() => { b.disabled = false; b.textContent = '저장'; });
   });
+  // 기사앱 미리 보기 열기 (기사 정보 › 계정 · 기사앱 확인 기록 공용): 열쇠를 받은 뒤 PC 는 미리 열어 둔 창으로 보내고,
+  //  휴대폰(설치한 앱 · 팝업 차단)은 버튼 옆에 '열기' 링크를 만들어 한 번 더 누르게 한다 (서버 응답 뒤에 여는 새 창은 막히므로 — 직접 누른 링크만 열린다)
+  function pvOpen(id, b) {
+    if (!id || !b || b.disabled) return;
+    if (!/\/admin\//.test(location.pathname)) return toast('미리 보기는 러너 관리자 주소(깃허브 페이지)에서만 열 수 있습니다.');
+    const phone = document.documentElement.classList.contains('m');
+    let w = null;
+    if (!phone) { try { w = window.open('', 'runnerPreview', 'width=430,height=900'); if (w) w.document.write('<p style="font:15px sans-serif;padding:24px">기사앱 미리 보기를 여는 중…</p>'); } catch (x) { w = null; } }
+    b.disabled = true; const label = b.textContent; b.textContent = '여는 중…';
+    api('adm_previewStart', id).then((r) => {
+      if (!r.ok) { if (w) w.close(); return toast(r.msg); }
+      const url = new URL('../', location.href).href + '#pv=' + r.pv;
+      let opened = false;
+      if (w && !w.closed) { try { w.location.href = url; opened = true; } catch (x) { opened = false; } }
+      if (opened) return toast(r.name + ' 기사앱 미리 보기 (보기 전용 · 10분)');
+      const a = document.createElement('a');
+      a.className = 'btn sm pv-open'; a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '👁 ' + r.name + ' 미리 보기 열기 ›';
+      a.addEventListener('click', () => setTimeout(() => { if (a.parentNode) a.remove(); }, 300)); // 열쇠는 한 번 쓰는 용도 — 누르면 링크를 치움
+      b.insertAdjacentElement('afterend', a);
+      setTimeout(() => { if (a.parentNode) a.remove(); }, 600000);
+      toast('준비됐습니다. [미리 보기 열기]를 눌러 주세요.');
+    }).catch(() => { if (w) w.close(); toast('미리 보기를 열지 못했습니다. 다시 눌러 주세요.'); }).finally(() => { b.disabled = false; b.textContent = label; });
+  }
   // ───── 기사앱 확인 기록 (app_seen): 공지 확인 · 정산서 열람 · 스케줄 변경 확인 · 앱 접속 · 기사별 ─────
   const AL = { d: null, tab: 'notice', sel: '', drv: '', only: true, loading: null, at: 0 };
   const AL_TABS = [['notice', '📢 공지 확인'], ['slip', '🧾 정산서 열람'], ['sch', '📅 스케줄 변경 확인'], ['open', '📱 앱 접속'], ['drv', '👤 기사별 보기']];
@@ -8140,6 +8146,10 @@
     const isOn = (id) => { const t = Number(act[id]) || 0; return !!t && nowS - t <= live; };
     const onNow = drv.filter((x) => isOn(x.id)).sort((a, b) => act[b.id] - act[a.id]);
     let h = '<div class="al-on"><b><i></i>지금 접속 중 ' + onNow.length + '명</b><span class="al-chips">' + (onNow.length ? onNow.map((x) => '<span>' + nm(x) + ' <small>' + esc(ago(x.id)) + '</small></span>').join('') : '<span class="al-dim">없음</span>') + '</span><small>최근 ' + Math.round(live / 60000) + '분 안에 기사앱을 쓴 사람</small></div>';
+    // 기사앱으로 보기 (보기 전용 미리 보기 · 대표 · 운영자만): 기사를 고르고 바로 연다
+    if (!AL.pv || !byId.has(AL.pv)) AL.pv = AL.drv && byId.has(AL.drv) ? AL.drv : drv.length ? drv[0].id : '';
+    h += '<div class="al-pv"><b>📱 기사앱으로 보기</b><select class="inp" id="alPvSel" aria-label="미리 볼 기사">' + drv.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === AL.pv ? ' selected' : '') + '>' + esc(d.name + (d.title ? ' ' + d.title : ' · ' + (d.camp || '-'))) + '</option>').join('') +
+      '</select><button type="button" class="btn sm" id="alPvBtn">열기</button><small>그 기사가 지금 보는 화면 그대로 · 보기 전용 · 10분</small></div>';
     if (AL.tab === 'notice') {
       const live = D.notices.filter((n) => n.live), top = live[0], tm = top ? seenOf('notice', top.id) : null, tT = top ? tgt(top) : [];
       const stale = drv.filter((x) => { const o = opens.get(x.id), g = o ? dayGap(o.ack || o.at) : null; return g == null || g >= 7; }).length;
@@ -8170,7 +8180,7 @@
       const L = drv.map((x) => { const o = opens.get(x.id), t = o ? o.ack || o.at : ''; return { x, t, g: o ? dayGap(t) : null, n: o ? Number(o.text) || 1 : 0, a: Number(act[x.id]) || 0 }; })
         .sort((a, b) => (b.a - a.a) || (a.t < b.t ? 1 : a.t > b.t ? -1 : koSort(a.x.name, b.x.name)));
       h += '<div class="al-card">' + L.map((r) => '<div class="al-row"><span class="tx"><b>' + (isOn(r.x.id) ? '<i class="al-dot" title="지금 접속 중"></i>' : '') + nm(r.x) + '</b><small>' + (r.t ? '마지막으로 연 날 ' + esc(alT(r.t)) + ' · 연 날 ' + r.n + '일' : '앱을 연 기록 없음') + '</small></span>' +
-        '<span class="v ' + (isOn(r.x.id) ? 'al-ok">접속 중<small>' + esc(ago(r.x.id)) + '</small>' : r.a ? (r.g != null && r.g >= 7 ? 'al-no">' : '">') + esc(ago(r.x.id)) : r.g == null ? 'al-dim">기록 없음' : r.g >= 7 ? 'al-no">' + r.g + '일 전' : r.g === 0 ? 'al-ok">오늘' : '">' + r.g + '일 전') + '</span></div>').join('') + '</div>';
+        '<span class="v ' + (isOn(r.x.id) ? 'al-ok">접속 중<small>' + esc(ago(r.x.id)) + '</small>' : r.a ? (r.g != null && r.g >= 7 ? 'al-no">' : '">') + esc(ago(r.x.id)) : r.g == null ? 'al-dim">기록 없음' : r.g >= 7 ? 'al-no">' + r.g + '일 전' : r.g === 0 ? 'al-ok">오늘' : '">' + r.g + '일 전') + '</span><span class="bt"><button type="button" class="btn sm ghost" data-alpv="' + esc(r.x.id) + '" title="이 기사가 보는 기사앱 화면 (보기 전용)">📱 보기</button></span></div>').join('') + '</div>';
     } else {
       if (!AL.drv || !byId.has(AL.drv)) AL.drv = drv.length ? drv[0].id : '';
       const x = byId.get(AL.drv);
@@ -8188,8 +8198,10 @@
   }
   $('#alTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-alt]'); if (!b) return; AL.tab = b.dataset.alt; AL.sel = ''; alRender(); });
   $('#alReload').addEventListener('click', () => loadAppLog(true));
-  $('#alBody').addEventListener('change', (e) => { if (e.target.id === 'alDrv') { AL.drv = e.target.value; alRender(); } if (e.target.id === 'alOnly') { AL.only = e.target.checked; alRender(); } });
+  $('#alBody').addEventListener('change', (e) => { if (e.target.id === 'alPvSel') { AL.pv = e.target.value; return; } if (e.target.id === 'alDrv') { AL.drv = e.target.value; AL.pv = AL.drv; alRender(); } if (e.target.id === 'alOnly') { AL.only = e.target.checked; alRender(); } });
   $('#alBody').addEventListener('click', (e) => {
+    if (e.target.id === 'alPvBtn') return pvOpen($('#alPvSel').value, e.target);
+    const pb = e.target.closest('[data-alpv]'); if (pb) return pvOpen(pb.dataset.alpv, pb);
     const s = e.target.closest('[data-alsel]'); if (s) { AL.sel = AL.sel === s.dataset.alsel ? '' : s.dataset.alsel; return alRender(); }
     const n = e.target.closest('[data-alnudge]'); if (!n) return;
     const nt = AL.d.notices.find((x) => x.id === n.dataset.alnudge); if (!nt || !confirm('「' + nt.title + '」을 아직 안 본 기사에게 휴대폰 알림을 보냅니다. 보낼까요?')) return;
