@@ -618,6 +618,37 @@ scenario('자료 점검 추가', null, function (r) {
   } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 날짜별 업무스케줄 표시 (실행 오류) ' + (e && e.message)); }
 })();
 
+// 31) 기사앱 미리 보기: 읽기만 통과 · 저장은 거절 · 만료 · 관리자 함수에 못 씀 · 대표/운영자만 · 모든 api_ 함수가 읽기/막음 중 하나로 분류돼 있는지
+scenario('기사앱 미리 보기', null, function (r) {
+  const all = []; fs.readdirSync(SRC).filter(function (f) { return /\.gs$/.test(f); }).forEach(function (f) { (fs.readFileSync(path.join(SRC, f), 'utf8').match(/^function api_[A-Za-z]+/gm) || []).forEach(function (x) { all.push(x.replace('function ', '')); }); });
+  const out = vm.runInContext(`(function () {
+    var c = {}, logs = [], now = Date.now();
+    cache_ = function () { return { get: function (k) { return c[k] || null; }, put: function (k, v) { c[k] = v; }, remove: function (k) { delete c[k]; } }; };
+    tokenHash_ = function (t) { return 'h' + t; };
+    var D = __M.main.drivers; D[1].status = '정지';
+    driverByLogin_ = function (id) { return D.filter(function (o) { return o.loginId === id; })[0] || null; };
+    driverById_ = function (id) { return D.filter(function (o) { return o.id === id; })[0] || null; };
+    normLoginId_ = function (v) { return String(v); };
+    logAdmin_ = function (a, act, t) { logs.push(act + ':' + t); };
+    var who = 'jrd'; requireAdmin0 = requireAdmin_; requireAdmin_ = function () { return { name: 'x', loginId: who }; };
+    var st = function (id) { var x = adm_previewStart('adm', id); return x.ok ? 'ok' : x.msg; };
+    var r1 = st('d1');                         // 운영자(d3 jrd) → 됨
+    var tok = Object.keys(c)[0].slice(4);       // 'pv:h' + 열쇠
+    who = 'lhm'; var r2 = st('d3');            // 직함 없는 계정 → 안 됨
+    who = 'jrd'; var r3 = st('d2');            // 정지 기사 → 안 됨
+    var ses = function (fn, t) { _curFn = fn; _pv = false; try { var s = getSession_(t || tok); return s ? s.d + ':' + (s.pv ? 'pv' : '') + ':' + _pv : 'null'; } catch (e) { return e.code || 'ERR'; } };
+    var a = ses('api_mySchedule'), b = ses('api_pmApply'), b2 = ses('api_changePassword'), b3 = ses('adm_listDrivers'), b4 = ses('api_seen');
+    requireAdmin_ = requireAdmin0; _curFn = 'adm_listDrivers'; var adm = 'ok'; try { requireAdmin_(tok); } catch (e) { adm = 'blocked'; }
+    var none = ses('api_mySchedule', 'PVnope');
+    c[Object.keys(c)[0]] = JSON.stringify({ d: 'd1', a: 'jrd', e: now - 1 }); var exp = ses('api_mySchedule');
+    return { start: [r1, /대표 · 운영자만/.test(r2), /승인/.test(r3)], ses: [a, b, b2, b3, b4, adm, none, exp], logs: logs, read: PVW.READ, write: PVW.WRITE };
+  })()`, r.ctx);
+  eq('열쇠 발급: 운영자 O · 직함 없음 X · 정지 기사 X · 기록 남김', [out.start, out.logs], [['ok', true, true], ['기사앱 미리 보기:이현모 (d1)']]);
+  eq('읽기 통과 · 저장/비밀번호/관리자 함수 거절 · 없는 열쇠 · 만료', out.ses, ['d1:pv:true', 'PREVIEW', 'PREVIEW', 'PREVIEW', 'd1:pv:true', 'blocked', 'null', 'null']);
+  const both = out.read.filter(function (x) { return out.write.indexOf(x) >= 0; }), cls = out.read.concat(out.write);
+  eq('모든 기사앱 함수가 읽기/막음 중 하나로 분류됨 (새 함수를 만들면 Preview.gs 에 적어야 함)', [all.filter(function (x) { return cls.indexOf(x) < 0; }), cls.filter(function (x) { return all.indexOf(x) < 0; }), both], [[], [], []]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');

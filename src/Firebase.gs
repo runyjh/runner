@@ -66,7 +66,7 @@ function api_fsToken(token) {
     const info = s ? driverInfo_(s.d) : null;
     // 다른 기사 앱 함수와 같은 확인: 승인된 기사 · 비밀번호를 바꾼 뒤의 로그인 · 임시 비밀번호 변경 완료 · 퇴사 아님
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED' };
-    if (info.mustChange) return { ok: false, code: 'MUST_CHANGE' };
+    if (info.mustChange && !_pv) return { ok: false, code: 'MUST_CHANGE' };
     const o = driverById_(s.d);
     if (!o || o.workStatus === '퇴사') return { ok: true, on: false };
     const x = Date.now() + FS_TTL_DRV;

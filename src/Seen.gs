@@ -29,7 +29,8 @@ function api_seen(token, items) {
     if (!s || !info || info.status !== ST.ACTIVE) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
     const id = String(s.d), now = nowText_(), today = todayText_();
     const want = (Array.isArray(items) ? items : []).slice(0, 40).map(function (x) { return { k: str_(x && x.k), key: str_(x && x.key).slice(0, 60) }; })
-      .filter(function (x) { return x.k === SEEN_KIND.OPEN || ((x.k === SEEN_KIND.NOTICE || x.k === SEEN_KIND.SLIP) && x.key); });
+      .filter(function (x) { return x.k === SEEN_KIND.OPEN || ((x.k === SEEN_KIND.NOTICE || x.k === SEEN_KIND.SLIP) && x.key); })
+      .filter(function () { return !s.pv; }); // 미리 보기는 아무것도 적지 않는다 (아직 확인 안 한 스케줄 변경만 읽어 줌)
     const lock = scriptLock_();
     lock.waitLock(20000);
     try {
