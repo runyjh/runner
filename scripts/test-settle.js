@@ -561,6 +561,25 @@ scenario('끈 메뉴 예외 기사', null, function (r) {
   eq('일반 기사는 정산서 꺼짐 · 예외 기사는 없음 · 로그인 응답에 포함', out, [['settle'], [], true]);
 });
 
+// 28) 기사앱 화면 쪽: 공지 팝업·읽음 기록은 계정별 (예전 기록은 처음 읽는 계정이 넘겨받음 · 다른 계정은 빈 상태에서 시작)
+(function () {
+  try {
+    const html = fs.readFileSync(path.join(SRC, 'Index.html'), 'utf8'), i = html.indexOf('  const ntUk = '), j = html.indexOf('  const ntKey = ');
+    const L = {}, box = { localStorage: { getItem: function (k) { return k in L ? L[k] : null; }, setItem: function (k, v) { L[k] = v; }, removeItem: function (k) { delete L[k]; } },
+      cur: '{"loginId":"AAA"}', USER: 'u', ntMem: {}, JSON: JSON, String: String };
+    box.store = { get: function () { return box.cur; } };
+    vm.createContext(box);
+    vm.runInContext(html.slice(i, j).replace(/const nt/g, 'var nt'), box);
+    L['runner.ntPop'] = '["N1|x"]';
+    const a1 = vm.runInContext("ntGet('runner.ntPop')", box);
+    vm.runInContext("ntPut('runner.ntPop', ['N1|x', 'N2|y'])", box);
+    box.cur = '{"loginId":"bbb"}';
+    const b1 = vm.runInContext("ntGet('runner.ntPop')", box);
+    box.cur = '{"loginId":"aaa"}';
+    eq('공지 팝업 기록 계정별', [a1, b1, vm.runInContext("ntGet('runner.ntPop')", box), Object.keys(L).sort()], [['N1|x'], [], ['N1|x', 'N2|y'], ['runner.ntPop.aaa']]);
+  } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 공지 팝업 기록 계정별 (실행 오류) ' + (e && e.message)); }
+})();
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
