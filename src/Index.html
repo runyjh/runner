@@ -2468,12 +2468,18 @@
     return ((r.pumasi || {})[d] || []).filter((x) => !(x.role === '맡김' && x.status === '확정' && done.includes(x.id)));
   }
   /** 달력 칸의 확정 품앗이 칩 (한 달 · 내 캠프 공용): 수행 = 🤝 캠프·노선 (내 칸이 휴무·빈칸이면 그 대신) · 맡김 = 🤝 맡김 → 받은 기사 */
-  function pmCell(r, d) {
-    const ok = pmOfDay(r, d).filter((x) => x.status === '확정');
+  function pmCell(r, d, pc) {
+    const ok = pmOfDay(r, d).filter((x) => x.status === '확정' && !(pc && x.role === '수행' && pmSame({ pumasi: { [d]: [x] } }, d, pc)));
     return {
       work: ok.some((x) => x.role === '수행'),
       html: ok.map((x) => '<span class="v k-pm' + (x.role === '맡김' ? ' give' : '') + '">' + (x.role === '수행' ? '<i class="cp">🤝 ' + escH(x.camp || '품앗이') + '</i>' + escH(x.route || '수행') : '<i class="cp">🤝 맡김</i>→' + escH(x.who || '')) + '</span>').join('')
     };
+  }
+  /** 내 칸 노선이 그날 확정된 품앗이(수행) 노선과 같은가 — 같으면 달력 칸에 같은 노선이 두 번 보이지 않게 품앗이 칩만 */
+  function pmSame(r, d, pc) {
+    if (!pc || !pc.routes) return false;
+    const n = (x) => String(x || '').replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/[^0-9A-Za-z]/g, '').toUpperCase(), cp = (x) => String(x || '').replace(/\s*캠프$/, '').replace(/\s/g, '');
+    return pmOfDay(r, d).some((x) => x.status === '확정' && x.role === '수행' && n(x.route) && n(x.route) === n(pc.routes) && (!pc.camp || !x.camp || cp(pc.camp) === cp(x.camp)));
   }
   function pmDoneRow(r, d) {
     return ((r.pmDone || {})[d] || []).map((x) => '<button type="button" class="pmx r-done" data-pm="' + escH(x.id) + '"><b>✅ 배차확정 완료</b>' +
@@ -2521,7 +2527,7 @@
     for (let i = 0; i < lead; i++) cells.push('<div class="mc blank"></div>');
     r.dates.forEach((d) => {
       const day = +d.slice(8), dow = (lead + day - 1) % 7, v0 = r.cells[d] || '', v = schOwn(v0, myIds), np = pmOfDay(r, d);
-      const pmC = pmCell(r, d), pmChip = pmC.html, pmWork = pmC.work;
+      const pmC = pmCell(r, d, v ? schParse(v, brAt(r, d)) : null), pmChip = pmC.html, pmWork = pmC.work; // 칸 노선과 같은 품앗이는 칩을 또 그리지 않음 (🤝 아이콘만 · 상세는 아래 카드)
       // 칸에는 내 노선(줄임 표기)만. 지시·품앗이·확정완료는 작은 아이콘, 백업/근무 인원 글자는 없음 (아래 요약·상세에)
       // 예정: 관리자가 아직 안 적은 오늘 이후 빈칸 (서버 SchPlan.gs) — 점선으로 · 미정은 회색 글자
       const pl = !v0 ? (r.plan || {})[d] : null, pv = pl && pl.v ? pl.v : '', vv = v || pv;
