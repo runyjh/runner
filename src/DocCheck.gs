@@ -284,8 +284,14 @@ function adm_insRepCfg(token, o) {
       let t2 = '';
       if (o.enrolled && Array.isArray(o.enrolled.names)) {
         const names = o.enrolled.names.map(function (v) { return str_(v).replace(/\s+/g, '').slice(0, 30); }).filter(Boolean).slice(0, 2000);
-        t2 = JSON.stringify({ file: str_(o.enrolled.file).slice(0, 80), at: todayText_(), names: names });
-        if (t2.length > 45000) fail_('양식의 성명이 너무 많습니다.');
+        // 양식 줄의 보험구분 · 자격취득일 (성명별 · 주민번호는 저장 안 함) → 공단 엑셀에 그대로
+        const info = {};
+        if (o.enrolled.info && typeof o.enrolled.info === 'object') Object.keys(o.enrolled.info).slice(0, 2000).forEach(function (k) {
+          const v = o.enrolled.info[k] || {}, nk = str_(k).replace(/\s+/g, '').slice(0, 30);
+          if (nk) info[nk] = [str_(v.kind).slice(0, 10), str_(v.start).replace(/\D/g, '').slice(0, 8)];
+        });
+        t2 = JSON.stringify({ file: str_(o.enrolled.file).slice(0, 80), at: todayText_(), names: names, info: info });
+        if (t2.length > 90000) fail_('양식의 성명이 너무 많습니다.');
       }
       appSetPut_('insEnrolled', t2, '산재/고용 신고: 토탈서비스 양식에 들어 있는 노무제공자 성명 (입직신고 여부 판단)');
     }

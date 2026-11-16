@@ -5178,7 +5178,10 @@
       if (!keys.includes('bosu')) return toast('양식에서 월보수액 칸을 찾지 못했습니다.');
       // 머리글 아래 성명 = 이미 입직신고된 노무제공자
       const nameCol = keys.indexOf('name'), names = nameCol < 0 ? [] : rows.slice(h + 1).map((r) => String((r || [])[nameCol] == null ? '' : r[nameCol]).trim()).filter((v) => v && !/^(성명|이름|예시|예\))/.test(v));
-      IR.pendTpl = { tpl: { file: f.name.slice(0, 80), sheet: (sheets[0] || {}).name || 'Sheet1', top, h, head }, enrolled: { file: f.name.slice(0, 80), names } };
+      // 성명별 보험구분 · 자격취득일 (공단 엑셀에 그대로 쓰기 · 주민번호는 저장하지 않음)
+      const kc = keys.indexOf('kind'), sc = keys.indexOf('start'), info = {};
+      if (nameCol >= 0) rows.slice(h + 1).forEach((r) => { const n = String((r || [])[nameCol] == null ? '' : r[nameCol]).replace(/\s+/g, ''); if (n) info[n] = { kind: kc < 0 ? '' : String(r[kc] == null ? '' : r[kc]).trim(), start: sc < 0 ? '' : String(r[sc] == null ? '' : r[sc]).trim() }; });
+      IR.pendTpl = { tpl: { file: f.name.slice(0, 80), sheet: (sheets[0] || {}).name || 'Sheet1', top, h, head }, enrolled: { file: f.name.slice(0, 80), names, info } };
       $('#irTplName').innerHTML = '<b style="color:var(--brand)">새로 고른 양식: ' + esc(f.name) + ' · 성명 ' + names.length + '명</b> — <b>[설정 저장]</b>을 누르면 저장하고 기사 명단과 대조합니다';
       toast('양식을 읽었습니다 (성명 ' + names.length + '명). [설정 저장]을 누르면 대조합니다.');
     } catch (err) { toast('양식을 읽지 못했습니다: ' + (err.message || err)); }
@@ -5193,17 +5196,20 @@
     api('adm_insRepExport', IR.month, list.map((x) => x.acct), over).then((r) => {
       if (!r.ok) return toast(r.msg);
       const cfg = r.cfg || {}, ym = r.month.replace('-', ''), d8 = (v) => String(v || '').replace(/\D/g, '').slice(0, 8);
-      const val = (k, x, i) => ({ seq: i + 1, name: x.name, rrn: String(x.rrn || '').replace(/\D/g, ''), job: x.jobCode, start: d8(x.start), bosu: x.bosu, biz: String(cfg.bizMgmtNo || '').replace(/\D/g, ''),
-        ym: ym, kind: [x.goy ? '고용' : '', x.san ? '산재' : ''].filter(Boolean).join(','), goy: x.goy ? 'Y' : 'N', san: x.san ? 'Y' : 'N' }[k]);
-      let out;
-      if (cfg.tpl && cfg.tpl.head) {
-        const keys = cfg.tpl.head.map(irKey);
-        out = cfg.tpl.top.map((row) => row.slice()).concat(r.rows.map((x, i) => keys.map((k) => (k ? val(k, x, i) : ''))));
-      } else {
-        const keys = ['seq', 'goy', 'san', 'name', 'rrn', 'job', 'start', 'bosu', 'ym'];
-        out = [['순번', '보험구분(고용)', '보험구분(산재)', '성명', '주민등록번호', '직종부호', '자격취득일', '월보수액', '노무제공월']].concat(r.rows.map((x, i) => keys.map((k) => val(k, x, i))));
-      }
-      const blob = ssXlsx(out, { sheet: (cfg.tpl && cfg.tpl.sheet) || '노무제공자 월보수액', head: cfg.tpl ? cfg.tpl.h + 1 : 1, textCols: (cfg.tpl ? cfg.tpl.head.map(irKey) : ['seq', 'goy', 'san', 'name', 'rrn', 'job', 'start', 'bosu', 'ym']).map((k) => k !== 'bosu' && k !== 'seq') });
+      // 보험구분: 토탈서비스 양식에 그 사람 줄이 있으면 그 값 · 없으면 양식에서 가장 많이 쓴 값 (보통 5) · 양식이 없으면 5
+      const tinfo = (cfg.enrolled && cfg.enrolled.info) || {}, kinds = Object.keys(tinfo).map((k) => tinfo[k][0]).filter(Boolean);
+      const kindDef = kinds.length ? kinds.sort((p, q) => kinds.filter((v) => v === q).length - kinds.filter((v) => v === p).length)[0] : '5';
+      const ti = (x) => tinfo[String(x.name || '').replace(/\s+/g, '')] || tinfo[String(x.name || '').replace(/\s*\(.*\)\s*$/, '').replace(/\s+/g, '')] || [];
+      // 자격취득일: 공단 양식(토탈서비스)에 적힌 날짜가 먼저 · 없으면 기사 정보의 날짜
+      const val = (k, x, i) => ({ seq: i + 1, name: x.name, rrn: String(x.rrn || '').replace(/\D/g, ''), job: x.jobCode, start: ti(x)[1] || d8(x.start), bosu: x.bosu, biz: String(cfg.bizMgmtNo || '').replace(/\D/g, ''),
+        ym: ym, kind: ti(x)[0] || kindDef, goy: x.goy ? 'Y' : 'N', san: x.san ? 'Y' : 'N' }[k]);
+      // 공단 '노무제공자 월보수액신고 전자신고용' 양식 그대로: 제목 한 줄 + 머리글 (보험구분 · 성명 · 주민번호 · 직종부호 · 자격취득일 · 월보수액)
+      const top = cfg.tpl && cfg.tpl.head ? cfg.tpl.top.map((row) => row.slice()) : [['고용·산재보험 노무제공자 월보수액신고 전자신고용'], ['보험구분', '성명', '주민(외국인)\n등록번호', '직종부호', '자격취득일', '월보수액']];
+      const head = top[top.length - 1], keys = head.map(irKey);
+      const out = top.concat(r.rows.map((x, i) => keys.map((k) => (k ? val(k, x, i) : ''))));
+      const W = head.length, merges = top.slice(0, -1).map((row, ri) => (row.filter((v) => String(v || '').trim()).length === 1 && W > 1 ? { r: ri, c0: 0, c1: W - 1 } : null)).filter(Boolean);
+      const blob = ssXlsx(out, { sheet: (cfg.tpl && cfg.tpl.sheet) || '노무제공자 월보수액', head: top.length, boxed: true, merges: merges, title: merges.map((m) => m.r),
+        widths: keys.map((k) => ({ kind: 11, name: 14, rrn: 18, job: 11, start: 13, bosu: 14 }[k] || 12)), textCols: keys.map((k) => k !== 'bosu' && k !== 'seq') });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '노무제공자_월보수액신고_' + ym + '_' + r.rows.length + '명.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
       toast(r.rows.length + '명 엑셀을 받았습니다.' + (r.noRrn.length ? ' 주민등록번호 없음: ' + r.noRrn.join(', ') : ''));
       // 엑셀에 들어간 미신고 기사 → 신고 완료로 일괄 전환할지 묻기
@@ -5218,6 +5224,14 @@
     }).catch(() => {}).finally(() => { b.disabled = false; });
   }
   $('#irXlsx').addEventListener('click', () => irExport(IR.sel.size ? Array.from(IR.sel) : null));
+  /** 표 위 '⬇ 엑셀'(산재/고용 월별): 지금 보이는 신고 대상 기사 모두를 공단 양식으로 (고른 기사가 있으면 그 기사만) */
+  window.irExportShown = () => {
+    if (IR.sel.size) return irExport(Array.from(IR.sel));
+    const shown = $$('#irRows tr[data-acct]').filter((t) => t.style.display !== 'none').map((t) => t.dataset.acct);
+    const acc = (shown.length ? IR.rows.filter((x) => shown.includes(x.acct)) : IR.rows).filter(irTarget).map((x) => x.acct);
+    if (!acc.length) return toast('보이는 줄에 신고 대상 기사가 없습니다.');
+    irExport(acc);
+  };
   /**
    * 일반 엑셀(.xlsx): 글자는 sharedStrings, 숫자는 숫자 칸 (공공기관 업로드가 inlineStr 을 못 읽는 경우가 있어서)
    * opt = { sheet, head(머리글 줄 수 · 회색), textCols[ci] = true 면 숫자도 글자로 }
@@ -5229,23 +5243,31 @@
     const col = (i) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
     const sst = [], sIdx = new Map(), si = (v) => { v = String(v == null ? '' : v); if (!sIdx.has(v)) { sIdx.set(v, sst.length); sst.push(v); } return sIdx.get(v); };
     let refs = 0;
-    const W = Math.max(1, ...rows.map((r) => r.length)), H = opt.head || 1, tc = opt.textCols || [];
-    const body = rows.map((r, ri) => '<row r="' + (ri + 1) + '">' + Array.from({ length: W }, (_, ci) => {
-      const v = r[ci], ref = col(ci) + (ri + 1), hs = ri < H ? ' s="1"' : '';
-      if (v === '' || v == null) return ri < H ? '<c r="' + ref + '"' + hs + '/>' : '';
-      if (typeof v === 'number' && ri >= H && !tc[ci]) return '<c r="' + ref + '"><v>' + v + '</v></c>';
+    const W = Math.max(1, ...rows.map((r) => r.length)), H = opt.head || 1, tc = opt.textCols || [], BX = !!opt.boxed, TT = opt.title || [];
+    // 스타일: 0 기본 · 1 머리글(회색) · 2 칸(테두리·가운데) · 3 머리글(회색·테두리·가운데·굵게·줄바꿈) · 4 제목(굵게·가운데)
+    const stOf = (ri) => (TT.includes(ri) ? ' s="4"' : ri < H ? (BX ? ' s="3"' : ' s="1"') : BX ? ' s="2"' : '');
+    const body = rows.map((r, ri) => '<row r="' + (ri + 1) + '"' + (TT.includes(ri) ? ' ht="22" customHeight="1"' : BX && ri === H - 1 ? ' ht="30" customHeight="1"' : '') + '>' + Array.from({ length: W }, (_, ci) => {
+      const v = r[ci], ref = col(ci) + (ri + 1), hs = stOf(ri);
+      if (v === '' || v == null) return ri < H || BX ? '<c r="' + ref + '"' + hs + '/>' : '';
+      if (typeof v === 'number' && ri >= H && !tc[ci]) return '<c r="' + ref + '"' + hs + '><v>' + v + '</v></c>';
       refs++;
       return '<c r="' + ref + '" t="s"' + hs + '><v>' + si(v) + '</v></c>';
     }).join('') + '</row>').join('');
-    const widths = Array.from({ length: W }, (_, ci) => Math.min(30, Math.max(8, ...rows.map((r) => String(r[ci] == null ? '' : r[ci]).length * 1.6 + 2))));
+    const widths = opt.widths || Array.from({ length: W }, (_, ci) => Math.min(30, Math.max(8, ...rows.filter((_, ri) => !TT.includes(ri)).map((r) => String(r[ci] == null ? '' : r[ci]).length * 1.6 + 2))));
+    const mg = (opt.merges || []).map((m) => col(m.c0) + (m.r + 1) + ':' + col(m.c1) + (m.r + 1));
     const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     const f = (name, x) => ({ name, data: enc.encode(X + x) });
     const sheet = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:' + col(W - 1) + rows.length + '"/><sheetViews><sheetView workbookViewId="0" tabSelected="true"/></sheetViews><sheetFormatPr defaultRowHeight="15.0"/>' +
-      '<cols>' + widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + Math.round(w) + '" customWidth="true"/>').join('') + '</cols><sheetData>' + body + '</sheetData><pageMargins bottom="0.75" footer="0.3" header="0.3" left="0.7" right="0.7" top="0.75"/></worksheet>';
-    const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11.0"/><color indexed="8"/><name val="맑은 고딕"/><family val="2"/></font></fonts>' +
+      '<cols>' + widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + Math.round(w) + '" customWidth="true"/>').join('') + '</cols><sheetData>' + body + '</sheetData>' + (mg.length ? '<mergeCells count="' + mg.length + '">' + mg.map((x) => '<mergeCell ref="' + x + '"/>').join('') + '</mergeCells>' : '') + '<pageMargins bottom="0.75" footer="0.3" header="0.3" left="0.7" right="0.7" top="0.75"/></worksheet>';
+    const B = '<left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/>';
+    const AC = '<alignment horizontal="center" vertical="center" wrapText="1"/>';
+    const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11.0"/><color indexed="8"/><name val="맑은 고딕"/><family val="2"/></font><font><b/><sz val="11.0"/><color indexed="8"/><name val="맑은 고딕"/><family val="2"/></font><font><b/><sz val="14.0"/><color indexed="8"/><name val="맑은 고딕"/><family val="2"/></font></fonts>' +
       '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor indexed="22"/></patternFill></fill></fills>' +
-      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-      '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="true"/></cellXfs>' +
+      '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border>' + B + '</border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="true"/>' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="true" applyAlignment="true">' + AC + '</xf>' +
+      '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="true" applyFill="true" applyBorder="true" applyAlignment="true">' + AC + '</xf>' +
+      '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="true" applyAlignment="true">' + AC + '</xf></cellXfs>' +
       '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
     const sn = String(opt.sheet || 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31);
     return ZIPW.zip([
@@ -16722,6 +16744,7 @@
         return;
       }
       if (e.target.closest('.tk-csv')) {
+        if (tb.closest('#irBox') && window.irExportShown) return window.irExportShown(); // 산재/고용 월별 = 공단 신고 양식 그대로
         const rows = rowsFor(tb), t = titleOf(tb), sec = tb.closest('section[id^="view-"]');
         const sub = sec && sec.querySelector('.head h2 small'); // 예: 2026년 10월 · 0/41명 신고 → 파일 이름에 달 붙이기
         const ym = sub && (txt(sub).match(/(\d{4})년\s*(\d{1,2})월/) || txt(sub).match(/(\d{4})년/));
