@@ -532,6 +532,26 @@ scenario('품앗이 맡긴 날 휴무', null, function (r) {
   eq('확정 → 휴무 · 풀림 → 원래 값 · 나머지는 건드리지 않음', out, ['휴무', null, '휴무', null, null, '군포1 212CD', null, null, 0]);
 });
 
+// 26) 저장 빠르게: 휴대폰 알림 미루기 (1분 작업이 살아 있을 때만 · 아니면 바로) · 미뤄 둔 것 보내기
+scenario('푸시 미루기', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var prop = {}, c = {}, sent = [];
+    PropertiesService = { getScriptProperties: function () { return { getProperty: function (k) { return prop[k] || null; }, setProperty: function (k, v) { prop[k] = v; }, deleteProperty: function (k) { delete prop[k]; } }; } };
+    cache_ = function () { return { get: function (k) { return c[k] || null; }, put: function (k, v) { c[k] = v; }, remove: function (k) { delete c[k]; } }; };
+    scriptLock_ = function () { return { tryLock: function () { return true; }, waitLock: function () {}, releaseLock: function () {} }; };
+    pmPushSend_ = function (l) { sent.push(l.map(function (a) { return a.driverId; }).join(',')); return l.length; };
+    var A = function (id) { return { driverId: id, title: 't', text: 'x', jobId: 'J', kind: 'k' }; };
+    pmPushLater_([A('d1')]);                       // 1분 작업 표시 없음 → 바로
+    var s1 = sent.slice();
+    pmPushFlush_();                                // 살아 있음 표시 (보낼 것 없음)
+    pmPushLater_([A('d2')]); pmPushLater_([A('d3'), { title: '받는 사람 없음' }]);
+    var s2 = sent.slice(), q = JSON.parse(prop.PUSH_Q).length;
+    pmPushFlush_();
+    return [s1, s2, q, sent, prop.PUSH_Q === undefined];
+  })()`, r.ctx);
+  eq('바로 보냄 → 미룸(2건 쌓임) → 1분 작업이 한 번에 보내고 비움', out, [['d1'], ['d1'], 2, ['d1', 'd2,d3'], true]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');

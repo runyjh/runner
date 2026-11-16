@@ -1146,7 +1146,40 @@ function pmDoneOf_(me, cells, myCamp) {
 function pmAfter_(out) {
   // 기사스케줄 칸·정산 기록을 먼저 쓰고 휴대폰 알림은 그 뒤에 (알림 발송이 느려도 스케줄 반영이 늦어지지 않게)
   if (out && out.sch && out.sch.length) { pmSchApply_(out.sch); pmStlUsageApply_(out.sch); try { if (typeof stlBump_ === 'function') stlBump_(); } catch (e) { /* 무시 */ } } // 정산 품앗이 자동 줄도 다시 계산되게
-  pmPushSend_(out);
+  pmPushLater_(out);
+}
+// 저장 응답을 빨리 돌려주려고 휴대폰 알림은 1분 작업(fsSync)이 대신 보낸다 (최대 1분 늦음). 1분 작업이 안 돌고 있으면 지금 바로 보낸다
+const PUSH_Q = { PROP: 'PUSH_Q', ALIVE: 'pq:alive', MAX: 8000 };
+function pmPushLater_(list) {
+  list = (list || []).filter(function (a) { return a && a.driverId; });
+  if (!list.length) return;
+  try {
+    if (cache_().get(PUSH_Q.ALIVE)) {
+      const lock = scriptLock_();
+      if (lock.tryLock(3000)) {
+        try {
+          const sp = PropertiesService.getScriptProperties();
+          let q = []; try { q = JSON.parse(sp.getProperty(PUSH_Q.PROP) || '[]') || []; } catch (e) { q = []; }
+          const j = JSON.stringify(q.concat(list.map(function (a) { return { driverId: a.driverId, name: a.name || '', title: a.title, text: a.text, jobId: a.jobId || '', kind: a.kind || '' }; })));
+          if (j.length <= PUSH_Q.MAX) { sp.setProperty(PUSH_Q.PROP, j); return; }
+        } finally { lock.releaseLock(); }
+      }
+    }
+  } catch (e) { softFail_('푸시 미루기 실패', e); }
+  pmPushSend_(list);
+}
+/** 1분 작업: 미뤄 둔 휴대폰 알림 보내기 + '1분 작업이 살아 있음' 표시 */
+function pmPushFlush_() {
+  try {
+    cache_().put(PUSH_Q.ALIVE, '1', 180);
+    const sp = PropertiesService.getScriptProperties();
+    if (!sp.getProperty(PUSH_Q.PROP)) return 0;
+    let q = [];
+    const lock = scriptLock_();
+    if (!lock.tryLock(5000)) return 0;
+    try { try { q = JSON.parse(sp.getProperty(PUSH_Q.PROP) || '[]') || []; } catch (e) { q = []; } sp.deleteProperty(PUSH_Q.PROP); } finally { lock.releaseLock(); }
+    return q.length ? pmPushSend_(q) : 0;
+  } catch (e) { softFail_('미뤄 둔 푸시 보내기 실패', e); return 0; }
 }
 /**
  * 정산 연동 (모두 러너 소속 기사): 배송 아이디가 '주는 기사 아이디'인 품앗이가 배차 확정되면

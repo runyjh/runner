@@ -66,7 +66,7 @@ function homeMain_() {
     const from = ymd_(addDays_(t0, -6)), to = ymd_(addDays_(t0, 7));
     const all = schIssues_(from, to).filter(function (x) { return x.id && x.kind !== '지시' && x.date; });
     const what = function (x) { return str_(x.result) || str_(x.kind); };
-    const line = function (x) { return x.name + ' ' + what(x) + (x.reason && x.reason !== what(x) ? '(' + x.reason + ')' : '') + (x.mi ? (str_(x.subWho) || str_(x.sub) ? ' → ' + (str_(x.subWho) || str_(x.sub)) : ' · 대체 없음') : ''); };
+    const line = function (x) { return x.name + ' ' + what(x) + (x.reason && x.reason !== what(x) ? '(' + x.reason + ')' : '') + (str_(x.cut) ? ' ' + str_(x.cut) : '') + (str_(x.qty) ? ' ' + str_(x.qty).replace(/개$/, '') + '개' : '') + (str_(x.subWho) || (str_(x.sub) && x.sub !== '없음') ? ' → ' + (str_(x.subWho) || str_(x.sub)) : x.mi ? ' · 대체 없음' : ''); };
     const now = all.filter(function (x) { return x.date <= today && (x.end || x.date) >= today; });
     const week = all.filter(function (x) { return x.date <= today && (x.end || x.date) >= from; });
     const noReason = week.filter(function (x) { return x.date >= ISS.RULE_FROM && !str_(x.reason); });
