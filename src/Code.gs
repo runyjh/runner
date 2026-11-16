@@ -815,7 +815,7 @@ function run0_(fn, t0) {
   }
 }
 /** 데이터를 바꾸지 않는 함수 (Firestore 사본을 오래된 것으로 표시하지 않음). 여기에 없는 함수는 저장으로 보고 표시한다. */
-const FS_READ_FNS = ['adm_home', 'adm_homeStl', 'adm_ntPhoto', 'api_ntPhoto', 'api_ntAdmPhoto', 'api_ntAdmList', 'adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'adm_peakList', 'adm_peakMap', 'api_myPeak', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
+const FS_READ_FNS = ['adm_previewStart', 'adm_home', 'adm_homeStl', 'adm_ntPhoto', 'api_ntPhoto', 'api_ntAdmPhoto', 'api_ntAdmList', 'adm_live', 'adm_einvList', 'adm_insRepList', 'adm_issueList', 'adm_issueCell', 'api_routeNotePhoto', 'api_routeInfo', 'api_campImage', 'adm_routeNotes', 'adm_stlTaxPack', 'adm_dash', 'adm_dashStl', 'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_lineageSuggest', 'adm_fbList', 'api_myFb', 'adm_peakList', 'adm_peakMap', 'api_myPeak', 'api_myPerf', 'api_pmPushLog', 'adm_pushCheck', 'adm_uiText', 'api_uiText', 'adm_accList', 'adm_accReveal', 'adm_bdList', 'adm_bdPost', 'adm_bibGet', 'adm_bibList', 'adm_bibPrint', 'adm_campImage', 'adm_campRoutes',
   'adm_check', 'adm_companyGet', 'adm_fsStatus', 'adm_fsToken', 'adm_fsRebuild', 'adm_getDoc', 'adm_getDriver', 'adm_listDrivers', 'adm_login', 'adm_logout', 'adm_changePassword',
   'adm_memoMonth', 'api_memoMonth', 'adm_memoPastUndone', 'adm_noticeList', 'adm_perf', 'adm_perfDrv', 'adm_perfStats', 'adm_pmJob', 'adm_pmList', 'adm_rcList', 'adm_reveal',
   'adm_routeAll', 'adm_routeVolumes', 'adm_schRange', 'adm_schUploadTable', 'adm_schWeek', 'adm_schYear', 'adm_stlDrivers', 'adm_stlFund', 'adm_stlIdsView',
@@ -1238,6 +1238,7 @@ function sessTtl_(exp) { return Math.max(1, Math.min(CFG.SESS_CACHE, Math.floor(
 function getSession_(token) {
   if (typeof PERF_BENCH_ !== 'undefined' && PERF_BENCH_ && token === PERF_BENCH_.tok) return PERF_BENCH_.s; // 속도 측정 (이 실행 안에서만)
   if (!token || String(token).length > 200) return null;
+  if (String(token).indexOf(PVW.PREFIX) === 0) return pvSession_(token); // 기사앱 미리 보기 열쇠 (읽기 전용 · 접속 기록 없음 · Preview.gs)
   const th = tokenHash_(token);
   let s = cache_().get('ss:' + th);
   if (s) s = JSON.parse(s);
@@ -1264,7 +1265,7 @@ function api_checkSession(token) {
     const info = driverInfo_(s.d);
     if (!info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED' };
     let menuOff = []; try { menuOff = appMenuOffFor_(s.d); } catch (e) { menuOff = []; } // 끈 메뉴 (기사앱이 열릴 때마다 받아 「준비 중」 표시)
-    return { ok: true, mustChange: !!info.mustChange, user: { name: info.name, loginId: info.loginId, title: info.title || '' }, slipClose: stlLastClose_(), menuOff: menuOff };
+    return { ok: true, mustChange: !!info.mustChange && !s.pv, user: { name: info.name, loginId: info.loginId, title: info.title || '' }, slipClose: s.pv ? '' : stlLastClose_(), menuOff: menuOff, pv: s.pv ? pvInfo_(s, info) : undefined };
   });
 }
 
@@ -2685,7 +2686,7 @@ function memoStaff_(token) {
   const s = getSession_(token);
   const info = s ? driverInfo_(s.d) : null;
   if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { err: { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' } };
-  if (info.mustChange) return { err: { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' } };
+  if (info.mustChange && !_pv) return { err: { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' } };
   if (!info.title) fail_('관리자·운영자·대표만 쓸 수 있는 기능입니다.');
   return { me: info };
 }
@@ -5537,7 +5538,7 @@ function api_mySchedule(token, month) {
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
-    if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    if (info.mustChange && !_pv) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
     if (appMenuOffFor_(s.d).indexOf('sched') >= 0) return { ok: false, code: 'MENU_OFF', msg: APP_MENU_OFF_MSG }; // 스케줄 메뉴 준비 중
     stg_('auth');
     let dates, ym = '';
@@ -5687,7 +5688,7 @@ function api_campSchedule(token, month, campId) {
     const s = getSession_(token);
     const info = s ? driverInfo_(s.d) : null;
     if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) return { ok: false, code: 'EXPIRED', msg: '로그인이 만료되었습니다. 다시 로그인해 주세요.' };
-    if (info.mustChange) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
+    if (info.mustChange && !_pv) return { ok: false, code: 'MUST_CHANGE', msg: '비밀번호를 먼저 바꿔 주세요.' };
     if (appMenuOffFor_(s.d).indexOf('sched') >= 0) return { ok: false, code: 'MENU_OFF', msg: APP_MENU_OFF_MSG }; // 스케줄 메뉴 준비 중
     // 직함자(관리자·운영자·대표)는 캠프를 골라 다른 캠프도 볼 수 있다 (보기만). 일반 기사는 소속 캠프만
     const staff = !!info.title, pickCamp = staff ? str_(campId) : '';

@@ -65,7 +65,7 @@ function pmUser_(token) {
   const s = getSession_(token);
   const info = s ? driverInfo_(s.d) : null;
   if (!s || !info || info.status !== ST.ACTIVE || !sessionAfterPw_(s.c, info.pwChangedAt)) { const e = new Error('x'); e.userMsg = '로그인이 만료되었습니다. 다시 로그인해 주세요.'; e.code = 'EXPIRED'; throw e; }
-  if (info.mustChange) { const e = new Error('x'); e.userMsg = '비밀번호를 먼저 바꿔 주세요.'; e.code = 'MUST_CHANGE'; throw e; }
+  if (info.mustChange && !_pv) { const e = new Error('x'); e.userMsg = '비밀번호를 먼저 바꿔 주세요.'; e.code = 'MUST_CHANGE'; throw e; }
   if (typeof APP_MENU_FN !== 'undefined' && APP_MENU_FN[_curFn]) menuGate_(String(s.d), APP_MENU_FN[_curFn]); // 끈 메뉴(준비 중)의 자료 요청은 막음
   return { id: String(s.d), info: info };
 }

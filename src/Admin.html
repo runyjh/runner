@@ -3674,7 +3674,7 @@
         '<span>기사ID</span><span>' + esc(d.id) + '</span><span>가입일시</span><span>' + esc(d.createdAt || '-') + '</span>' +
         '<span>승인일시</span><span>' + esc(d.approvedAt || '-') + '</span><span>수정일시</span><span>' + esc(d.updatedAt || '-') + '</span>' +
         '<span>비밀번호</span><span>' + (d.hasPw ? '설정됨 (변경 ' + esc(d.pwChangedAt || '-') + ')' : '없음 - 임시 비밀번호를 지정해 주세요') + '</span>' +
-      '</div><div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button>' +
+      '</div><div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn sm ghost" id="tempPwBtn">임시 비밀번호 지정</button>' + (d.status === '승인' ? '<button type="button" class="btn sm" id="pvBtn" title="이 기사가 보는 기사앱 화면을 보기 전용으로 엽니다 (대표 · 운영자 · 10분). 비밀번호 · 기사 로그인은 그대로입니다">📱 기사앱으로 보기</button>' : '') +
       '<button type="button" class="btn sm ghost danger-t" id="delDrvBtn" style="margin-left:auto">기사 삭제</button></div></div>';
     drawerTabs();
     initAssign(d);
@@ -4058,6 +4058,19 @@
       openDoc(dc.dataset.doc);
     } else if (e.target.id === 'delDrvBtn' && cur) {
       deleteDriver(cur);
+    } else if (e.target.id === 'pvBtn' && cur) {
+      // 기사앱 미리 보기: 창을 먼저 열어 두고(팝업 차단 피하기) 열쇠를 받으면 그 주소로 보낸다
+      const b = e.target; if (b.disabled) return;
+      if (!/\/admin\//.test(location.pathname)) return toast('미리 보기는 러너 관리자 주소(깃허브 페이지)에서만 열 수 있습니다.');
+      const w = window.open('', 'runnerPreview', 'width=430,height=900');
+      if (w) { try { w.document.write('<p style="font:15px sans-serif;padding:24px">기사앱 미리 보기를 여는 중…</p>'); } catch (x) { /* 무시 */ } }
+      b.disabled = true;
+      api('adm_previewStart', cur).then((r) => {
+        if (!r.ok) { if (w) w.close(); return toast(r.msg); }
+        const url = new URL('../', location.href).href + '#pv=' + r.pv;
+        if (w) w.location.href = url; else location.href = url;
+        toast(r.name + ' 기사앱 미리 보기 (보기 전용 · 10분)');
+      }).catch(() => { if (w) w.close(); }).finally(() => { b.disabled = false; });
     } else if (e.target.id === 'tempPwBtn' && cur) {
       $('#pwNew').value = ''; $('#pwModal').classList.remove('hidden'); $('#pwNew').focus();
     }
