@@ -726,6 +726,59 @@ scenario('기사앱 빈칸 예정', null, function (r) {
   } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 연간 표 체크 묶어 저장 (실행 오류) ' + (e && e.message)); }
 })();
 
+// 저장 가볍게 (Later.gs): 작업 기록 · 기사 확인 기록을 1분 작업에 맡김 — 1분 작업이 살아 있을 때만 · 아니면 바로 · 미뤄 둔 것은 순서대로 한 번에
+scenario('나중 처리', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var prop = {}, c = {}, app = [], sets = [], seen = [];
+    PropertiesService = { getScriptProperties: function () { return { getProperty: function (k) { return prop[k] || null; }, setProperty: function (k, v) { prop[k] = v; }, deleteProperty: function (k) { delete prop[k]; },
+      getKeys: function () { return Object.keys(prop); }, getProperties: function () { return Object.assign({}, prop); } }; } };
+    cache_ = function () { return { get: function (k) { return c[k] || null; }, put: function (k, v) { c[k] = v; }, remove: function (k) { delete c[k]; } }; };
+    scriptLock_ = function () { return { tryLock: function () { return true; }, waitLock: function () {}, releaseLock: function () {} }; };
+    sheet_ = function () { return { appendRow: function (row) { app.push(row[2]); }, getLastRow: function () { return 10; }, getMaxRows: function () { return 1000; }, insertRowsAfter: function () {},
+      getRange: function (r0, c0, n, w) { return { setValues: function (v) { sets.push(r0 + ':' + n + 'x' + w + ':' + v.map(function (x) { return x[2]; }).join(',')); } }; } }; };
+    seenSchChanges_ = function (a, list) { seen.push(a.loginId + ':' + list.map(function (x) { return x.row + x.date.slice(8) + x.value; }).join(',')); return list.length; };
+    todayText_ = function () { return '2026-11-10'; };
+    var A = { name: '관리자', loginId: 'adm' }, lq = function () { return Object.keys(prop).filter(function (k) { return k.indexOf('LQ_') === 0; }).length; };
+    logAdmin_(A, '바로', 'x', '');                                   // 1분 작업 표시 없음 → 바로 씀
+    var s1 = [app.slice(), lq()];
+    c['pq:alive'] = '1';
+    logAdmin_(A, '하나', 'x', ''); logAdmin_(A, '둘', 'y', 'z');
+    seenSchLater_(A, [{ row: 'd1', date: '2026-11-12', value: '휴무', old: '출근' }, { row: 'd1', date: '2026-11-01', value: '휴무', old: '출근' }, { row: 'd2', date: '2026-11-13', value: '출근', old: '' }]); // 지난 날 · 빈칸이던 칸은 뺌
+    seenSchLater_(A, [{ row: 'NOTE1', date: '2026-11-12', value: 'a', old: 'b' }]);  // 알릴 것 없음 → 적지 않음
+    logAdmin_(A, '큰것', 'x', new Array(9000).join('가'));            // 너무 큼 → 바로
+    var s2 = [app.slice(), sets.slice(), seen.slice(), lq(), !!c['lq:has']];
+    var n = laterFlush_();
+    var s3 = [n, app.slice(), sets.slice(), seen.slice(), lq(), !!c['lq:has']];
+    var n2 = laterFlush_();                                         // 다시 불러도 두 번 쓰지 않음
+    c['lq:has'] = '300'; logAdmin_(A, '넘침', 'x', '');               // 너무 많이 쌓였으면 바로
+    return [s1, s2, s3, n2, sets.length, app.slice(-1)[0], lq()];
+  })()`, r.ctx);
+  eq('1분 작업이 안 돌면 바로 기록', out[0], [['바로'], 0]);
+  eq('살아 있으면 미룸 (큰 것만 바로 · 알릴 변경 없는 저장은 적지 않음)', out[1], [['바로', '큰것'], [], [], 3, true]);
+  eq('1분 작업: 작업 기록은 한 번에 · 확인 기록은 고른 칸만 · 비움', out[2], [3, ['바로', '큰것'], ['11:2x5:하나,둘'], ['adm:d112휴무'], 0, false]);
+  eq('다시 처리해도 중복 없음 · 넘치면 바로', [out[3], out[4], out[5], out[6]], [0, 1, '넘침', 0]);
+});
+
+// 저장 가볍게: 이슈와 상관없는 칸(출근·휴무)만 고치면 이슈 시트를 다시 읽지 않음 (캐시해 둔 연동 이슈 기간표로 판단) · 걸친 이슈가 있으면 읽음
+scenario('이슈 연동 건너뛰기', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var c = {}, big = {}, reads = 0;
+    cache_ = function () { return { get: function (k) { return c[k] || null; }, put: function (k, v) { c[k] = v; }, remove: function (k) { delete c[k]; } }; };
+    stlCGet_ = function (k) { return k in big ? JSON.parse(big[k]) : null; }; stlCPut_ = function (k, v) { big[k] = JSON.stringify(v); };
+    RCV.dirty = {}; c['rcv:iss'] = 'v1';
+    var ISS0 = [{ id: 'I1', row: 2, driverId: 'd1', date: '2026-11-20', end: '2026-11-21', result: '미입차', link: 'Y', kind: '미입차', orig: {} }, { id: 'I2', row: 3, driverId: 'd2', date: '2026-11-20', end: '2026-11-20', result: '', link: 'Y', kind: '지시', orig: {} }];
+    schIssues_ = function () { reads++; return JSON.parse(JSON.stringify(ISS0)); };
+    schIssueSheet_ = function () { throw new Error('이슈 시트를 열면 안 됨'); };
+    var A = { name: '관리자', loginId: 'adm' };
+    var r1 = issFromCells_(A, [{ row: 'd1', date: '2026-11-18', value: '휴무', old: '출근' }]); var n1 = reads;   // 기간표를 만드느라 1번
+    var r2 = issFromCells_(A, [{ row: 'd2', date: '2026-11-20', value: '출근', old: '휴무' }, { row: 'd1', date: '2026-11-19', value: '', old: '출근' }]); var n2 = reads; // 캐시 → 0번 ('지시'는 걸친 이슈로 치지 않음)
+    var opened = false; schIssueSheet_ = function () { opened = true; throw new Error('stop'); };
+    try { issFromCells_(A, [{ row: 'd1', date: '2026-11-21', value: '출근', old: '미입차' }]); } catch (e) { /* 시트까지 갔는지만 봄 */ }
+    return [r1.created.length + r1.changed.length + r1.removed.length, n1, r2.created.length + r2.changed.length + r2.removed.length, n2, reads > n2, opened];
+  })()`, r.ctx);
+  eq('상관없는 칸은 읽지 않고 끝 · 이슈에 걸친 칸은 지금처럼 처리', out, [0, 1, 0, 1, true, true]);
+});
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');

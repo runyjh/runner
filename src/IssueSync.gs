@@ -294,6 +294,12 @@ function issFromCells_(a, saved) {
   const list = (saved || []).filter(function (x) { return x.date >= ISS.RULE_FROM && x.row && !/^NOTE\d+$/.test(x.row) && x.row.indexOf(SCH_PM_PREFIX) !== 0 && !schExParse_(x.row); });
   if (!list.length) return out;
   // 이슈와 상관없는 칸은 건너뛴다 (결과는 같고 읽기만 줄임): 그날 걸친 연동 이슈가 없고, 글자가 이슈가 될 수 없는 것(빈칸·휴무·출근 등)이면 할 일이 없다
+  const cantBe0 = function (v) { v = str_(v); return !v || (!/노쇼|미입차|^병가/.test(v) && /휴무|휴가|퇴사|출근|용차|변경/.test(v)); };
+  // 먼저 캐시해 둔 '연동 이슈 기간표'로만 본다: 고친 칸이 전부 이슈와 상관없으면 이슈 시트를 읽지 않고 끝 (대부분의 저장 · 이슈가 바뀌면 캐시는 바로 버려짐)
+  try {
+    const idx = rcvGet_('iss', 'idx', 120, function () { return schIssues_().filter(function (x) { return x.link !== 'N' && x.result && x.kind !== '지시'; }).map(function (x) { return { d: x.driverId, s: x.date, e: x.end || x.date }; }); });
+    if (Array.isArray(idx) && list.every(function (ch) { return cantBe0(ch.value) && !idx.some(function (x) { return x.d === ch.row && x.s <= ch.date && ch.date <= x.e; }); })) return out;
+  } catch (e) { /* 캐시를 못 쓰면 아래에서 시트를 읽어 판단 */ }
   let issues = schIssues_();
   const cantBe = function (v) { v = str_(v); return !v || (!/노쇼|미입차|^병가/.test(v) && /휴무|휴가|퇴사|출근|용차|변경/.test(v)); }; // issClassify_ 가 기본노선을 보지 않고 null 을 내는 경우와 같음
   const hitOf = function (id, date) { return issues.filter(function (x) { return x.driverId === id && x.link !== 'N' && x.result && x.date <= date && date <= (x.end || x.date) && x.kind !== '지시'; })[0]; };

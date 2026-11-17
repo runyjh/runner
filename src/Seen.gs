@@ -91,14 +91,26 @@ function api_seenAck(token, dates) {
  * 기사스케줄 저장 뒤 (잠금 안에서 호출): 기사 줄의 '이미 값이 있던 칸'이 바뀌었으면 스케줄 변경 기록을 남긴다.
  * 오늘 이후 날짜만 · 처음 채우는 칸(빈칸 → 값)은 변경이 아님 · 확인 전에 또 바뀌면 그 줄을 고치고, 원래 값으로 돌아가면 취소로 닫는다
  */
-function seenSchChanges_(a, savedList) {
-  const today = todayText_();
-  // 서브아이디 업무등록 표기만 붙거나 빠진 것은 기사에게 바뀐 것이 없으므로 기록하지 않는다
-  const plain = function (v) { return str_(v).replace(/\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)/g, ' ').replace(/업무등록/g, ' ').replace(/\s+/g, ' ').trim(); };
-  const list = (savedList || []).filter(function (x) {
+// 서브아이디 업무등록 표기만 붙거나 빠진 것은 기사에게 바뀐 것이 없으므로 기록하지 않는다
+function seenPlain_(v) { return str_(v).replace(/\(\s*[A-Za-z][A-Za-z0-9_.]{2,}\s*\)/g, ' ').replace(/업무등록/g, ' ').replace(/\s+/g, ' ').trim(); }
+/** 기사에게 알릴 변경만 고르기 (오늘 이후 · 기사 줄 · 원래 글자가 있던 칸) — 시트를 읽지 않음 */
+function seenSchPick_(savedList) {
+  const today = todayText_(), plain = seenPlain_;
+  return (savedList || []).filter(function (x) {
     const row = str_(x.row);
     return row && !/^NOTE\d+$/.test(row) && row.indexOf(SCH_PM_PREFIX) !== 0 && !schExParse_(row) && x.date >= today && plain(x.old) !== '' && plain(x.old) !== plain(x.value);
   });
+}
+/** 스케줄 저장에서 부름: 알릴 변경이 있으면 1분 작업에 맡기고(Later.gs), 못 맡기면 바로 기록 */
+function seenSchLater_(a, savedList) {
+  const list = seenSchPick_(savedList).map(function (x) { return { row: x.row, date: x.date, value: x.value, old: x.old }; });
+  if (!list.length) return 0;
+  if (typeof laterAdd_ === 'function' && laterAdd_('seen', { a: { name: a.name || '', loginId: a.loginId || '' }, list: list })) return list.length;
+  return seenSchChanges_(a, list);
+}
+function seenSchChanges_(a, savedList) {
+  const plain = seenPlain_;
+  const list = seenSchPick_(savedList);
   if (!list.length) return 0;
   const now = nowText_(), open = {};
   readAll_(SH.SEEN).forEach(function (o) { if (o.kind === SEEN_KIND.SCH && !o.ackAt) open[o.driverId + '|' + o.key] = o; });
@@ -122,6 +134,7 @@ function seenSchChanges_(a, savedList) {
 function adm_seenList(token) {
   return run_(function () {
     requireAdmin_(token);
+    if (typeof laterFlushIf_ === 'function') laterFlushIf_(); // 방금 저장한 스케줄 변경이 아직 1분 작업을 기다리는 중이면 지금 적고 읽음
     const today = todayText_(), cn = {};
     master_().camps.forEach(function (c) { cn[c.id] = c.name; });
     const short = function (n) { return str_(n).replace(/\s+/g, '').replace(/캠프$/, ''); };

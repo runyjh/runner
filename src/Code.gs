@@ -1663,8 +1663,11 @@ function requireAdmin_(token) {
 }
 /** 관리자 작업 기록 (개인정보 열람·수정 추적용) */
 function logAdmin_(a, action, target, detail) {
+  // 기록은 1분 작업이 모아서 쓴다 (저장 응답을 빨리 · Later.gs). 못 미루면 지금 바로 쓴다
+  const row = [nowText_(), a.name + ' (' + a.loginId + ')', action, target || '', detail || ''];
+  try { if (typeof laterAdd_ === 'function' && laterAdd_('log', row)) return; } catch (e) { /* 바로 쓰기로 */ }
   try {
-    sheet_(SH.ALOG).appendRow([nowText_(), a.name + ' (' + a.loginId + ')', action, target || '', detail || '']);
+    sheet_(SH.ALOG).appendRow(row);
   } catch (e) { console.error(e); }
 }
 
@@ -5347,7 +5350,7 @@ function adm_schSave(token, changes) {
       stg_('write');
       if (saved) { logSchChange_(a, ok, saved); try { stlBump_(); } catch (e) { /* 정산 캐시 */ } } // 정산서 근무일수는 기사스케줄에서 세므로 정산 캐시도 새로
       stg_('log');
-      if (saved) { try { if (typeof seenSchChanges_ === 'function') seenSchChanges_(a, savedList); } catch (e) { softFail_('스케줄 변경 확인 기록 실패', e); } }
+      if (saved) { try { if (typeof seenSchLater_ === 'function') seenSchLater_(a, savedList); } catch (e) { softFail_('스케줄 변경 확인 기록 실패', e); } }
       stg_('seen');
       // 칸 → 이슈 (2026-11-01 이후 · 미입차·노쇼·회전 줄임이면 '사유 미정' 이슈를 만들고, 정상으로 고치면 이슈에서 뺌)
       let issueSync = null;
