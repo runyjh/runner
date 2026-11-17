@@ -67,3 +67,27 @@ function laterLogRows_(rows) {
   if (r + fit.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), fit.length + 500);
   sh.getRange(r, 1, fit.length, 5).setValues(fit);
 }
+
+/**
+ * 읽기 묶음: 화면을 열 때 동시에 나가는 읽기 요청 여러 개를 한 번에 받는다 (관리자앱 gsCall0 이 30ms 안에 모인 것을 묶어 보냄).
+ *  - 왕복 한 번 · 같은 실행 안에서 시트 열기·기사 목록 같은 공통 읽기를 한 번만 (동시 실행 여러 개가 서로 막던 것도 없어짐)
+ *  - 읽기 전용 함수만 (BATCH_OK). 하나가 실패해도 나머지는 그대로 · 결과는 보낸 순서대로
+ *  calls = [{ fn, args }] (args 는 그 함수에 그대로 넘김 · 맨 앞이 토큰)
+ */
+const BATCH_OK = ['adm_uiText', 'adm_check', 'adm_peakMap', 'adm_memoMonth', 'adm_schRange', 'adm_schWeek', 'adm_pmList', 'adm_issueList', 'adm_listDrivers', 'adm_home', 'adm_homeStl',
+  'adm_live', 'adm_routeAll', 'adm_routeNotes', 'adm_campThumbs', 'adm_pmMeta', 'adm_rcList', 'adm_noticeList', 'adm_seenList', 'adm_stlMonth', 'adm_stlDrivers', 'adm_dash', 'adm_dashStl',
+  'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_fbList', 'adm_peakList', 'adm_routeVolumes', 'adm_companyGet', 'adm_einvList', 'adm_insRepList', 'adm_tiList', 'adm_accCats', 'adm_bdList', 'adm_mailStatus', 'adm_memoPastUndone'];
+const BATCH_MAX = 12;
+function adm_batch(token, calls) {
+  const t0 = Date.now();
+  calls = Array.isArray(calls) ? calls.slice(0, BATCH_MAX) : [];
+  const res = calls.map(function (c) {
+    const fn = String(c && c.fn || '');
+    if (BATCH_OK.indexOf(fn) < 0 || typeof GLOBAL_[fn] !== 'function') return { ok: false, code: 'NOBATCH', msg: '묶어 보낼 수 없는 요청' };
+    _curFn = fn;
+    try { const r = GLOBAL_[fn].apply(null, Array.isArray(c.args) ? c.args : [token]); return r === undefined ? null : r; }
+    catch (e) { try { errLog_('서버 오류', fn, '묶음: ' + String(e && e.message || e)); } catch (x) { /* 무시 */ } return { ok: false, msg: '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }; }
+  });
+  _curFn = 'adm_batch';
+  return { ok: true, res: res, _ms: Date.now() - t0 };
+}

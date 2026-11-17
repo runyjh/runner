@@ -3095,14 +3095,39 @@
       throw e;
     });
   }
+  // ── 읽기 묶음: 30ms 안에 나간 읽기 요청을 한 번에 (서버 adm_batch · Later.gs BATCH_OK 와 같은 목록) ──
+  //  화면을 열 때 6~7개가 동시에 나가 서로 막히던 것 → 왕복 1번 · 서버도 공통 읽기를 한 번만. 묶음이 실패하면 하나씩 다시 보냄
+  const BATCH_OK = new Set(['adm_uiText', 'adm_check', 'adm_peakMap', 'adm_memoMonth', 'adm_schRange', 'adm_schWeek', 'adm_pmList', 'adm_issueList', 'adm_listDrivers', 'adm_home', 'adm_homeStl',
+    'adm_live', 'adm_routeAll', 'adm_routeNotes', 'adm_campThumbs', 'adm_pmMeta', 'adm_rcList', 'adm_noticeList', 'adm_seenList', 'adm_stlMonth', 'adm_stlDrivers', 'adm_dash', 'adm_dashStl',
+    'adm_perfList', 'adm_slaList', 'adm_lineageList', 'adm_fbList', 'adm_peakList', 'adm_routeVolumes', 'adm_companyGet', 'adm_einvList', 'adm_insRepList', 'adm_tiList', 'adm_accCats', 'adm_bdList', 'adm_mailStatus', 'adm_memoPastUndone']);
+  const BQ = { q: [], t: null, MAX: 12, WAIT: 30 };
   function gsCall0(fn, args) {
+    if (!BATCH_OK.has(fn) || !args || typeof args[0] !== 'string' || !args[0]) return gsCallOne(fn, args);
+    return new Promise((res, rej) => {
+      BQ.q.push({ fn, args, res, rej });
+      if (BQ.q.length >= BQ.MAX) bqFlush(); else if (!BQ.t) BQ.t = setTimeout(bqFlush, BQ.WAIT);
+    });
+  }
+  function bqFlush() {
+    clearTimeout(BQ.t); BQ.t = null;
+    const list = BQ.q.splice(0, BQ.MAX);
+    if (BQ.q.length) BQ.t = setTimeout(bqFlush, 0);
+    if (!list.length) return;
+    if (list.length === 1) { const x = list[0]; gsCallOne(x.fn, x.args).then(x.res, x.rej); return; }
+    const one = (x) => gsCallOne(x.fn, x.args).then(x.res, x.rej);
+    gsCallOne('adm_batch', [list[0].args[0], list.map((x) => ({ fn: x.fn, args: x.args }))]).then((r) => {
+      if (!r || !r.ok || !Array.isArray(r.res) || r.res.length !== list.length) return list.forEach(one); // 서버가 아직 옛 버전 등 → 하나씩
+      list.forEach((x, i) => { const v = r.res[i]; if (v && v.code === 'NOBATCH') one(x); else x.res(v); });
+    }, (e) => list.forEach((x) => x.rej(e))); // 연결 실패 · 시간 초과 → 하나씩 다시 보내지 않음 (두 배로 기다리게 됨)
+  }
+  function gsCallOne(fn, args) {
     if (window.google && google.script && google.script.run) {
       return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
     }
     if (!RUNNER_API) return Promise.reject(new Error('NO_API'));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     // 오래 걸리는 작업(이관·정산서 올리기·초기화·마감·사본 다시 만들기)은 60초에 끊지 않는다 — 끊으면 서버는 계속 도는데 화면은 "다시 시도"라 해서 두 번 처리될 수 있음
-    const LONG_MS = { adm_stlTaxCheck: 180000, adm_schLegacyPull: 240000, adm_maintSync: 240000, adm_stlLegacyCompare: 300000, adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000 };
+    const LONG_MS = { adm_stlTaxCheck: 180000, adm_schLegacyPull: 240000, adm_maintSync: 240000, adm_stlLegacyCompare: 300000, adm_stlLegacyPreview: 360000, adm_stlLegacyClose: 240000, adm_stlDriveGet: 120000, adm_stlMigrate: 360000, adm_stlImport: 300000, adm_reset: 300000, adm_fsRebuild: 300000, adm_stlClose: 240000, adm_schUploadTable: 180000, adm_tiFromSettle: 180000, adm_perfDrv: 120000, adm_batch: 90000 };
     const timer = setTimeout(() => { if (ctl) ctl.abort(); }, LONG_MS[fn] || 60000);
     return fetch(RUNNER_API, {
       method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', credentials: 'omit', cache: 'no-store',

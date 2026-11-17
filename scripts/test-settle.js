@@ -779,6 +779,53 @@ scenario('이슈 연동 건너뛰기', null, function (r) {
   eq('상관없는 칸은 읽지 않고 끝 · 이슈에 걸친 칸은 지금처럼 처리', out, [0, 1, 0, 1, true, true]);
 });
 
+// 읽기 묶음 (adm_batch): 허용한 읽기만 · 보낸 순서대로 · 하나가 실패해도 나머지는 그대로 · 저장 함수는 묶지 않음
+scenario('읽기 묶음', null, function (r) {
+  const out = vm.runInContext(`(function () {
+    var got = [];
+    adm_uiText = function (t, x) { got.push('ui:' + t + ':' + x); return { ok: true, map: { a: 1 } }; };
+    adm_pmList = function (t, q) { got.push('pm:' + q.q); throw new Error('터짐'); };
+    adm_peakMap = function (t) { got.push('pk'); return { ok: false, msg: '없음' }; };
+    adm_schSave = function () { got.push('저장됨'); return { ok: true }; };
+    errLog_ = function () {};
+    var r = adm_batch('T', [{ fn: 'adm_uiText', args: ['T', false] }, { fn: 'adm_pmList', args: ['T', { q: '홍' }] }, { fn: 'adm_schSave', args: ['T', []] }, { fn: 'adm_peakMap', args: ['T'] }, { fn: 'eval', args: [] }]);
+    var g0 = got.slice(); var big = adm_batch('T', new Array(20).fill({ fn: 'adm_uiText', args: ['T', true] }));
+    return [r.ok, r.res.map(function (x) { return x && (x.code || (x.ok ? 'ok' : x.msg)); }), g0, big.res.length, FS_READ_FNS.indexOf('adm_batch') >= 0];
+  })()`, r.ctx);
+  eq('순서 · 실패 따로 · 저장/모르는 함수는 거절', out, [true, ['ok', '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'NOBATCH', '없음', 'NOBATCH'], ['ui:T:false', 'pm:홍', 'pk'], 12, true]);
+});
+
+// 읽기 묶음 (관리자앱 gsCall0): 30ms 안의 읽기는 한 번에 · 저장은 따로 · 서버가 옛 버전(묶음 모름)이면 하나씩 · 연결 실패는 다시 보내지 않음
+(function () {
+  try {
+    // 바로 끝나는 약속 (시험이 기다리지 않게)
+    const SP = function (ex) { const me = this; me.s = 0; me.q = []; const fin = function (s, v) { if (me.s) return; me.s = s; me.v = v; me.q.forEach(function (f) { f(); }); }; ex(function (v) { fin(1, v); }, function (e) { fin(2, e); }); };
+    SP.prototype.then = function (f, g) { const me = this; return new SP(function (res, rej) { const go = function () { try { const h = me.s === 1 ? f : g; if (!h) return (me.s === 1 ? res : rej)(me.v); const v = h(me.v); if (v && v.then) v.then(res, rej); else res(v); } catch (e) { rej(e); } }; if (me.s) go(); else me.q.push(go); }); };
+    SP.ok = function (v) { return new SP(function (r) { r(v); }); }; SP.no = function (e) { return new SP(function (r, j) { j(e); }); };
+    const html = fs.readFileSync(path.join(SRC, 'Admin.html'), 'utf8'), i = html.indexOf('  const BATCH_OK = new Set('), j = html.indexOf('  function gsCallOne(');
+    const box = { sent: [], timers: [], setTimeout: function (f) { box.timers.push(f); return box.timers.length; }, clearTimeout: function (n) { if (n) box.timers[n - 1] = null; }, Promise: SP, Set: Set, Array: Array };
+    box.gsCallOne = function (fn, args) { box.sent.push(fn === 'adm_batch' ? 'B:' + args[1].map(function (x) { return x.fn; }).join(',') : fn); return box.reply(fn, args); };
+    vm.createContext(box);
+    vm.runInContext(html.slice(i, j), box);
+    const tick = function () { const t = box.timers.slice(); box.timers.length = 0; t.forEach(function (f) { if (f) f(); }); };
+    const val = function (p) { let out; p.then(function (v) { out = v && v.who !== undefined ? v.who : v; }, function (e) { out = 'ERR:' + e.message; }); return out; };
+    // 1) 묶음 · 결과 나눠 주기 · 저장은 따로 · 묶을 수 없다고 하면 하나씩
+    box.reply = function (fn, args) { return SP.ok(fn === 'adm_batch' ? { ok: true, res: args[1].map(function (x) { return x.fn === 'adm_peakMap' ? { ok: false, code: 'NOBATCH' } : { ok: true, who: x.fn }; }) } : { ok: true, who: fn + '(1)' }); };
+    const ps = ["gsCall0('adm_uiText', ['T', false])", "gsCall0('adm_schRange', ['T', 'a', 'b'])", "gsCall0('adm_peakMap', ['T'])", "gsCall0('adm_schSave', ['T', []])"].map(function (c) { return vm.runInContext(c, box); });
+    tick(); tick();
+    eq('읽기 3개 묶음 · 저장 따로 · 묶을 수 없다고 하면 하나씩', [box.sent, ps.map(val)], [['adm_schSave', 'B:adm_uiText,adm_schRange,adm_peakMap', 'adm_peakMap'], ['adm_uiText', 'adm_schRange', 'adm_peakMap(1)', 'adm_schSave(1)']]);
+    // 2) 하나만이면 묶지 않음 · 서버가 옛 버전 → 하나씩 · 연결 실패 → 모두 실패 (다시 보내지 않음)
+    box.sent.length = 0; box.reply = function (fn) { return SP.ok(fn === 'adm_batch' ? { ok: false, code: 'UNKNOWN_FN' } : { ok: true, who: fn }); };
+    const p1 = vm.runInContext("gsCall0('adm_live', ['T'])", box); tick();
+    const q2 = ["gsCall0('adm_uiText', ['T'])", "gsCall0('adm_pmList', ['T', {}])"].map(function (c) { return vm.runInContext(c, box); }); tick();
+    const s2 = box.sent.slice();
+    box.sent.length = 0; box.reply = function () { return SP.no(new Error('NET')); };
+    const q3 = ["gsCall0('adm_uiText', ['T'])", "gsCall0('adm_pmList', ['T', {}])"].map(function (c) { return vm.runInContext(c, box); }); tick();
+    eq('하나면 그대로 · 옛 서버면 하나씩 · 연결 실패는 한 번만 보냄', [val(p1), s2, q2.map(val), box.sent, q3.map(val)],
+      ['adm_live', ['adm_live', 'B:adm_uiText,adm_pmList', 'adm_uiText', 'adm_pmList'], ['adm_uiText', 'adm_pmList'], ['B:adm_uiText,adm_pmList'], ['ERR:NET', 'ERR:NET']]);
+  } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 읽기 묶음 화면 (실행 오류) ' + (e && e.stack || e)); }
+})();
+
 if (require.main === module) {
   if (failed) { console.error('\n자동 시험 실패 ' + failed + '건 / ' + count + '개'); process.exit(1); }
   console.log('OK   자동 시험 ' + count + '개');
