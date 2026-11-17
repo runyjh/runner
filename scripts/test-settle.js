@@ -610,11 +610,13 @@ scenario('자료 점검 추가', null, function (r) {
   try {
     const html = fs.readFileSync(path.join(SRC, 'Admin.html'), 'utf8'), i = html.indexOf('  const MMO = '), j = html.indexOf('  const mmoMark = ');
     const box = { HM: { ym: '2026-11', memos: [{ id: 'a', date: '2026-11-18', content: 'x' }, { id: 'b', date: '2026-11-18', done: true }, { id: 'c', date: '2026-11-18', note: true },
-      { id: 'p', date: '2026-11-15', pin: true, until: '2026-11-20' }], pinned: [{ id: 'p', date: '2026-11-15', pin: true, until: '2026-11-20' }, { id: 'q', date: '2026-11-18', pin: true, until: '' }] }, api: function () { return { then: function () { return { catch: function () { return { finally: function () {} }; } }; } }; }, window: {} };
+      { id: 'p', date: '2026-11-15', pin: true, until: '2026-11-20' }], pinned: [{ id: 'p', date: '2026-11-15', pin: true, until: '2026-11-20' }, { id: 'q', date: '2026-11-18', pin: true, until: '' }] }, calls: [], api: function (fn, ym) { box.calls.push(ym); return { then: function () { return { catch: function () { return { finally: function () {} }; } }; } }; }, window: {},
+      keepP: { get: function (k, ym) { return k === 'mmo' && ym === '2026-12' ? { memos: [{ id: 'k', date: '2026-12-01' }], pinned: [] } : null; }, set: function () {} } };
     vm.createContext(box);
     vm.runInContext(html.slice(i, j).replace('const MMO', 'var MMO'), box);
     const ids = function (d) { return vm.runInContext("mmoOf('" + d + "').map(function (m) { return m.id; })", box); };
-    eq('날짜별 업무스케줄 표시', [ids('2026-11-18'), ids('2026-11-20'), ids('2026-11-15'), ids('2026-12-01')], [['a', 'q'], ['p'], [], []]);
+    eq('날짜별 업무스케줄 표시', [ids('2026-11-18'), ids('2026-11-20'), ids('2026-11-15'), ids('2026-12-01')], [['a', 'q'], ['p'], [], ['k']]);
+    eq('지난번 업무스케줄 먼저 보여 주고 새로 받으러 감 (받는 중엔 다시 안 부름)', [ids('2026-12-01'), box.calls], [['k'], ['2026-12']]);
   } catch (e) { count++; failed++; console.error('FAIL 자동 시험 · 날짜별 업무스케줄 표시 (실행 오류) ' + (e && e.message)); }
 })();
 

@@ -3019,6 +3019,11 @@
     // 로그인한 관리자 이름·아이디 (화면을 먼저 띄울 때 씀 · 자동 로그인이면 이 PC 에, 아니면 이 창에만 — 토큰과 같은 곳)
     me(v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(ADM_KEEP + 'me') || sessionStorage.getItem(ADM_KEEP + 'me') || 'null'); (localStorage.getItem(TOKEN) ? localStorage : sessionStorage).setItem(ADM_KEEP + 'me', JSON.stringify(v)); } catch (e) { return null; } }
   };
+  // 지난번 내용 먼저 (앱을 닫았다 열어도 · 자동 로그인 기기만 오래 남음): 처음 열 때 보관본을 바로 그리고, 서버에서 새로 오면 바꿔 그린다. 너무 크면(약 1.5MB) 보관하지 않음
+  const keepP = {
+    get(k, key) { const v = admKeep.getP('k_' + k); return v && v.key === (key || '') ? v.r : null; },
+    set(k, key, r) { try { const j = JSON.stringify(r); if (j.length > 1500000) return; } catch (e) { return; } admKeep.setP('k_' + k, { key: key || '', r: r }); }
+  };
   let toastTimer;
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3000); }
   // ───── 서버 호출 ─────
@@ -3385,12 +3390,12 @@
   let all = [], counts = {}, filter = '전체', tfilter = '', wfilter = '', selectedId = '';
   function loadList(keepSel) {
     // 이미 받은 목록이 있으면 그대로 두고 뒤에서 새로 받는다 (메뉴를 누를 때마다 빈 화면으로 기다리지 않게) · 처음이면 이 창에 보관해 둔 것부터
-    if (!all.length) { const c = admKeep.get('drv') || (typeof DSB !== 'undefined' && DSB.drv && DSB.drv.length ? { rows: DSB.drv, counts: null } : null); if (c && c.rows && c.rows.length && c.counts) { all = c.rows; counts = c.counts; renderTabs(); renderRows(); } }
+    if (!all.length) { const c = admKeep.get('drv') || keepP.get('drv') || (typeof DSB !== 'undefined' && DSB.drv && DSB.drv.length ? { rows: DSB.drv, counts: null } : null); if (c && c.rows && c.rows.length && c.counts) { all = c.rows; counts = c.counts; renderTabs(); renderRows(); } }
     if (!all.length) $('#rows').innerHTML = '<tr><td colspan="12"><div style="padding:24px"><div class="spin"></div></div></td></tr>';
     return api('adm_listDrivers').then((r) => {
       if (!r.ok) return toast(r.msg);
       all = r.rows; counts = r.counts;
-      admKeep.set('drv', { rows: all, counts: counts });
+      admKeep.set('drv', { rows: all, counts: counts }); keepP.set('drv', '', { rows: all, counts: counts });
       try { if (typeof DSB !== 'undefined') DSB.drv = all; } catch (e) { /* 대시보드 검색용 목록도 같은 것으로 */ }
       if (r.repaired && r.repaired.length) toast('겹친 기사ID를 고쳤습니다: ' + r.repaired.map((m) => m.name + '(' + m.keptName + '와 겹침)').join(', ') + ' · 새 ID를 받았습니다.');
       if (!keepSel && filter === '전체' && counts['승인대기'] > 0) filter = '승인대기';
@@ -4516,8 +4521,9 @@
   function dhLoad(fresh) {
     if (!fresh && DHD.a && Date.now() - DHD.at < 60000) return;
     DHD.at = Date.now();
-    api('adm_home', !!fresh).then((r) => { if (r && r.ok) { DHD.a = r; dhPaint(); } }).catch(() => {});
-    setTimeout(() => api('adm_homeStl', !!fresh).then((r) => { if (r && r.ok) { DHD.s = r; dhPaint(); } }).catch(() => {}), fresh ? 0 : 1200); // 정산 계산이 들어가 조금 뒤에
+    if (!DHD.a) { const ka = keepP.get('home'), ks = keepP.get('homeStl'); if (ka) { DHD.a = ka; if (ks && !DHD.s) DHD.s = ks; dhPaint(); } } // 지난번 내용 먼저
+    api('adm_home', !!fresh).then((r) => { if (r && r.ok) { DHD.a = r; dhPaint(); keepP.set('home', '', r); } }).catch(() => {});
+    setTimeout(() => api('adm_homeStl', !!fresh).then((r) => { if (r && r.ok) { DHD.s = r; dhPaint(); keepP.set('homeStl', '', r); } }).catch(() => {}), fresh ? 0 : 1200); // 정산 계산이 들어가 조금 뒤에
   }
   function dhPaint() { if (currentView !== 'dash') return; if (!dsTerms().length) $('#dsRes').innerHTML = dhHtml(); $('#hmSide').innerHTML = dhSideHtml(); }
   function dhTodo() { const A = DHD.a, S = DHD.s; return ((A && A.todo) || []).concat((S && S.todo) || []).sort((x, y) => (x.lv === y.lv ? 0 : x.lv === 'r' ? -1 : 1)); }
@@ -5526,11 +5532,17 @@
   }
   function loadIssue() {
     if (!$('#isFrom').value || !$('#isTo').value) isQuick('this');
-    if (!IS.list.length) $('#isRows').innerHTML = '<tr><td colspan="10" class="sub">불러오는 중…</td></tr>';
+    const ikey = $('#isFrom').value + '|' + $('#isTo').value;
+    if (!IS.list.length) {
+      const k = keepP.get('issue', ikey); // 지난번 내용 먼저 (같은 기간일 때만)
+      if (k) { IS.list = k.issues || []; IS.rm = k.routeMiss || []; IS.from = k.from; IS.to = k.to; isTakeMeta(k); renderIssue(); }
+      else $('#isRows').innerHTML = '<tr><td colspan="10" class="sub">불러오는 중…</td></tr>';
+    }
     const seq = ++IS.seq;
     api('adm_issueList', { from: $('#isFrom').value, to: $('#isTo').value }).then((r) => {
       if (seq !== IS.seq) return;
       if (!r.ok) return toast(r.msg);
+      keepP.set('issue', ikey, r);
       IS.list = r.issues || []; IS.rm = r.routeMiss || []; IS.from = r.from; IS.to = r.to; isTakeMeta(r);
       renderIssue();
     }).catch(() => {});
@@ -5933,11 +5945,17 @@
   }
   function loadPumasi() {
     paDefaultRange();
-    if (!PA.jobs.length) $('#paRows').innerHTML = '<tr><td colspan="14" class="sub">불러오는 중…</td></tr>'; // 받은 목록이 있으면 그대로 두고 뒤에서 갱신
+    const pkey = $('#paFrom').value + '|' + $('#paTo').value + '|' + $('#paQ').value.trim();
+    if (!PA.jobs.length) { // 받은 목록이 있으면 그대로 두고 뒤에서 갱신 · 처음이면 지난번 내용 먼저 (같은 조건일 때만)
+      const k = keepP.get('pm', pkey);
+      if (k && Array.isArray(k.jobs)) { PA.jobs = k.jobs; PA.count = k.count; PA.avail = k.avail || []; paintPostSw(k.postOn !== false, k.offerOn !== false); renderPumasi(); }
+      else $('#paRows').innerHTML = '<tr><td colspan="14" class="sub">불러오는 중…</td></tr>';
+    }
     const seq = PA.seq = (PA.seq || 0) + 1; // 늦게 온 예전 응답이 새 결과를 덮지 않게
     api('adm_pmList', { from: $('#paFrom').value, to: $('#paTo').value, q: $('#paQ').value.trim() }).then((r) => {
       if (seq !== PA.seq) return;
       if (!r.ok) return toast(r.msg);
+      keepP.set('pm', pkey, r);
       PA.jobs = r.jobs; PA.count = r.count; PA.avail = r.avail || []; paintPostSw(r.postOn !== false, r.offerOn !== false); renderPumasi();
     }).catch(() => {});
   }
@@ -7145,9 +7163,14 @@
   const sortedCamps = () => RT.camps.slice().sort((a, b) => koSort(a.name, b.name));
 
   function loadRoutes() {
-    if (!RT.camps.length) $('#campMain').innerHTML = '<div class="sec"><div class="spin"></div></div>';
+    if (!RT.camps.length) { // 지난번 내용 먼저 (표만 · 물량·수행률 칸은 새 자료가 온 뒤)
+      const k = keepP.get('route');
+      if (k && Array.isArray(k.camps) && k.camps.length) { RT.camps = k.camps; RT.routes = k.routes; RT.images = k.images; RT.addresses = k.addresses || []; RT.prices = k.prices || []; if (!curCamp && RT.camps.length) curCamp = sortedCamps()[0].id; if (currentView === 'route') { renderCampList(); renderCampMain(); } }
+      else $('#campMain').innerHTML = '<div class="sec"><div class="spin"></div></div>';
+    } else if (currentView === 'route' && !$('#campMain').children.length) { if (!curCamp) curCamp = sortedCamps()[0].id; renderCampList(); renderCampMain(); } // 대시보드 검색용으로 미리 받아 둔 목록
     return api('adm_routeAll').then((r) => {
       if (!r.ok) return toast(r.msg);
+      keepP.set('route', '', r);
       RT.camps = r.camps; RT.routes = r.routes; RT.images = r.images; RT.addresses = r.addresses || []; RT.prices = r.prices || [];
       if (currentView === 'route') { if (!RVOL) loadVolumes(); if (!RP.loaded) loadPerf(); // 노선 줄의 SLA · 프백 · 담당 칸
         const again = () => { if ($('#rRows') && currentView === 'route') renderRoutes(); };
@@ -11287,9 +11310,10 @@
   const pkmIn = (d) => !!PKM && (PKM.periods || []).some((p) => d >= p.from && d <= p.to);
   function loadPkm(force) {
     if (pkmP && !force) return pkmP;
+    if (!PKM) PKM = keepP.get('pkm'); // 지난번 내용 먼저
     const had = JSON.stringify((PKM && PKM.periods) || []);
     pkmP = api('adm_peakMap').then((r) => {
-      PKM = r && r.ok ? r : PKM;
+      PKM = r && r.ok ? r : PKM; if (r && r.ok) keepP.set('pkm', '', r);
       if (PKM && JSON.stringify(PKM.periods || []) !== had && SD.dates.length && !$('#view-sched').classList.contains('hidden') && SD.dates.some(pkmIn) && !sEdit && !Object.keys(sPending).length) renderSched();
       return PKM;
     }).catch(() => PKM);
@@ -11324,12 +11348,13 @@
   let sTd = false, sCampKeep = ''; // sCampKeep = 홈으로 가기 전에 관리에서 보던 캠프 (돌아오면 그 캠프로)
   const HM = { ym: '', memos: null, at: 0, p: null };
   // 날짜별 업무스케줄 (대표 · 운영자 · 관리자 줄의 '내 근무' · 한 달 달력에 🗒 표시): 달마다 한 번 받아 둠
-  const MMO = { by: {}, busy: {} };
+  const MMO = { by: {}, busy: {}, fresh: {} };
   function mmoOf(dt) {
-    const ym = dt.slice(0, 7), src = ym === HM.ym && HM.memos ? { memos: HM.memos, pinned: HM.pinned || [] } : MMO.by[ym];
-    if (!src) {
-      if (!MMO.busy[ym]) { MMO.busy[ym] = 1; api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { MMO.by[ym] = { memos: r.memos || [], pinned: r.pinned || [] }; try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } }).catch(() => {}).finally(() => { delete MMO.busy[ym]; }); }
-      return [];
+    const ym = dt.slice(0, 7);
+    let src = ym === HM.ym && HM.memos ? { memos: HM.memos, pinned: HM.pinned || [] } : MMO.by[ym];
+    if (!src || (src._kept && !MMO.fresh[ym])) {
+      if (!MMO.busy[ym]) { MMO.busy[ym] = 1; api('adm_memoMonth', ym).then((r) => { if (r && r.ok) { MMO.by[ym] = { memos: r.memos || [], pinned: r.pinned || [] }; MMO.fresh[ym] = 1; keepP.set('mmo', ym, MMO.by[ym]); try { if (window.__schMob) window.__schMob(); } catch (e) { /* 무시 */ } } }).catch(() => {}).finally(() => { delete MMO.busy[ym]; }); }
+      if (!src) { const k = keepP.get('mmo', ym); if (!k) return []; k._kept = 1; MMO.by[ym] = src = k; } // 지난번 내용 먼저 (뒤에서 새로 받음)
     }
     const seen = {}; // 그날 적은 업무 + 항상 보기 업무의 마감일(까지 · 없으면 적은 날) — 끝낸 것 · 비고 글은 뺌
     return src.memos.filter((m) => m.date === dt && !m.pin).concat(src.pinned.filter((m) => (m.until || m.date) === dt)).filter((m) => !m.done && !m.note && !seen[m.id] && (seen[m.id] = 1));
